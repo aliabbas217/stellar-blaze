@@ -1,15 +1,14 @@
 """ADR 0010 section 4.3: every floor carries a comparator, and a candidate may never be less protective."""
 
-import types
-from datetime import date
-from typing import Annotated, Any, ClassVar, Union, get_args, get_origin
+from datetime import date, time, timedelta
+from typing import Annotated, Any, ClassVar
 
 import pytest
 from pydantic import BaseModel
-from pydantic.fields import FieldInfo
 
 from stellar_blaze.domain.rules.floors import Floor, FloorViolation, floor_violations, model_floor_violations
-from stellar_blaze.domain.rules.ruleset import Ruleset, RulesetSection
+from stellar_blaze.domain.rules.ruleset import Ruleset, RulesetSection, TwlZones
+from tests.unit.rules.structure import comparator_gaps, floor_misfits, section_fields
 from tests.unit.rules.support import seed_dict, set_path
 
 pytestmark = pytest.mark.unit
@@ -158,73 +157,187 @@ def test_the_walker_descends_into_nested_models_and_prefixes_the_path() -> None:
     assert paths(found) == ["inner.flag"]
 
 
+class Hours(BaseModel):
+    """Time-of-day windows and durations: the kinds of floor B3's labour-law section will carry."""
+
+    ban_hours: Annotated[tuple[time, time], Floor(safer="wider")]
+    max_shift: Annotated[timedelta, Floor(safer="lower")]
+    min_break: Annotated[timedelta, Floor(safer="higher")]
+
+
+def hours(
+    *,
+    ban_hours: tuple[time, time] = (time(12, 30, 0), time(15, 0, 0)),
+    max_shift: timedelta = timedelta(hours=8),
+    min_break: timedelta = timedelta(minutes=30),
+) -> Hours:
+    return Hours(ban_hours=ban_hours, max_shift=max_shift, min_break=min_break)
+
+
+@pytest.mark.parametrize(
+    ("candidate_ban", "violates"),
+    [
+        ((time(12, 30, 0), time(15, 0, 0)), False),
+        ((time(12, 0, 0), time(15, 30, 0)), False),
+        ((time(12, 30, 1), time(15, 0, 0)), True),
+        ((time(12, 30, 0), time(14, 59, 59)), True),
+        ((time(13, 0, 0), time(14, 0, 0)), True),
+    ],
+)
+def test_a_wider_time_of_day_window_contains_the_reference(candidate_ban: tuple[time, time], violates: bool) -> None:
+    found = model_floor_violations(hours(ban_hours=candidate_ban), hours())
+    assert paths(found) == (["ban_hours"] if violates else [])
+
+
+def test_durations_compare_in_the_direction_the_floor_names() -> None:
+    longer_shift = hours(max_shift=timedelta(hours=9))
+    assert paths(model_floor_violations(longer_shift, hours())) == ["max_shift"]
+    shorter_break = hours(min_break=timedelta(minutes=20))
+    assert paths(model_floor_violations(shorter_break, hours())) == ["min_break"]
+    safer = hours(max_shift=timedelta(hours=7), min_break=timedelta(minutes=45))
+    assert model_floor_violations(safer, hours()) == []
+
+
 # --- structural test: no numeric, boolean or window field ships without a comparator -----------------------------
-
-_COMPARABLE = (bool, int, float, date)
-
-
-def needs_comparator(annotation: Any) -> bool:
-    """True for a number, a boolean, a date or time, a window of them, or a container of such values."""
-    if get_origin(annotation) is Annotated:
-        return needs_comparator(get_args(annotation)[0])
-    origin = get_origin(annotation)
-    if origin in (Union, types.UnionType):
-        return any(needs_comparator(arg) for arg in get_args(annotation) if arg is not type(None))
-    if origin is not None:
-        return any(needs_comparator(arg) for arg in get_args(annotation) if arg is not Ellipsis)
-    return isinstance(annotation, type) and issubclass(annotation, _COMPARABLE)
+# The helpers are in `structure`. Every guard runs over the real sections and over deliberately broken ones, so a guard
+# that stopped looking would fail its negative control instead of passing over nothing.
 
 
-def has_comparator(info: FieldInfo) -> bool:
-    if any(isinstance(m, Floor) for m in info.metadata):
-        return True
-    # A table whose values are the floors: dict[str, Annotated[float, Floor(...)]].
-    return any(
-        get_origin(arg) is Annotated and any(isinstance(m, Floor) for m in get_args(arg)[1:])
-        for arg in get_args(info.annotation)
-    )
+def real_sections() -> list[type[RulesetSection]]:
+    sections = list(section_fields().values())
+    assert len(sections) >= 3, "the structural tests found no value sections: they would pass vacuously"
+    return sections
 
 
-def comparator_gaps(section: type[RulesetSection]) -> list[str]:
-    """Fields of ``section`` that need a comparator and have neither a ``Floor`` nor a ``NON_FLOOR_FIELDS`` entry."""
-    declared = set(section.model_fields)
-    assert declared >= section.NON_FLOOR_FIELDS, f"{section.__name__}.NON_FLOOR_FIELDS names fields that do not exist"
-    return [
-        name
-        for name, info in section.model_fields.items()
-        if needs_comparator(info.annotation) and not has_comparator(info) and name not in section.NON_FLOOR_FIELDS
-    ]
+def test_every_field_of_a_ruleset_is_a_section_or_explicitly_not_one() -> None:
+    assert frozenset({"meta", "sources", "tunables"}) == Ruleset.NON_SECTION_FIELDS
+    assert set(section_fields()) == {"niosh_clothing", "twl_zones", "twl_withdrawal"}
 
 
-def ruleset_sections() -> list[type[RulesetSection]]:
-    found = [
-        info.annotation
-        for info in Ruleset.model_fields.values()
-        if isinstance(info.annotation, type) and issubclass(info.annotation, RulesetSection)
-    ]
-    assert len(found) >= 3, "the structural test found no value sections: it would pass vacuously"
-    return found
+def test_a_ruleset_field_that_is_not_a_section_and_not_allowlisted_is_found() -> None:
+    class LooseRuleset(Ruleset):
+        labour: TwlZones | None = (
+            None  # an Optional section escapes the source check, the golden file and the floor walk
+        )
+
+    with pytest.raises(AssertionError, match=r"Ruleset\.labour is neither a RulesetSection"):
+        section_fields(LooseRuleset)
+
+    class WrongAllowlist(Ruleset):
+        NON_SECTION_FIELDS: ClassVar[frozenset[str]] = frozenset({"meta", "sources", "tunables", "nothing"})
+
+    with pytest.raises(AssertionError, match="nothing"):
+        section_fields(WrongAllowlist)
 
 
-@pytest.mark.parametrize("section", ruleset_sections(), ids=lambda section: section.__name__)
-def test_every_numeric_boolean_or_window_field_has_a_comparator_or_is_declared_non_floor(
-    section: type[RulesetSection],
-) -> None:
+@pytest.mark.parametrize("section", real_sections(), ids=lambda section: section.__name__)
+def test_every_ordered_field_has_a_comparator_or_is_declared_non_floor(section: type[RulesetSection]) -> None:
     assert comparator_gaps(section) == []
 
 
-def test_the_structural_check_finds_a_floor_without_a_comparator() -> None:
+@pytest.mark.parametrize("section", real_sections(), ids=lambda section: section.__name__)
+def test_every_comparator_fits_the_type_it_guards(section: type[RulesetSection]) -> None:
+    assert floor_misfits(section) == []
+
+
+class Rate(BaseModel):
+    per_hour: float
+    label: str = ""
+
+
+class Covered(BaseModel):
+    per_hour: Annotated[float, Floor(safer="lower")]
+
+
+def test_the_comparator_check_finds_every_kind_of_unguarded_floor() -> None:
     class Sloppy(RulesetSection):
         edge_w_m2: float
         enabled: bool
         ban: tuple[date, date]
         table: dict[str, float]
+        ban_hours: tuple[time, time]  # a time-of-day window
+        max_shift: timedelta  # a duration
+        inner: Rate  # a nested model: its own fields count
+        covered_inner: Covered  # a nested model that is fine
+        windows: tuple[Rate, ...]  # a container of models: the walker never reaches into it
+        maybe: Rate | None = None  # nor into an Optional model
         explained: float
         label: str
         covered: Annotated[float, Floor(safer="higher")]
         NON_FLOOR_FIELDS: ClassVar[frozenset[str]] = frozenset({"explained"})
 
-    assert comparator_gaps(Sloppy) == ["edge_w_m2", "enabled", "ban", "table"]
+    unreachable = "(a model inside a container or an Optional is not walked by floor_violations)"
+    assert comparator_gaps(Sloppy) == [
+        "edge_w_m2",
+        "enabled",
+        "ban",
+        "table",
+        "ban_hours",
+        "max_shift",
+        "inner.per_hour",
+        f"windows {unreachable}",
+        f"maybe {unreachable}",
+    ]
+
+
+def test_a_container_of_models_without_ordered_values_is_not_a_gap() -> None:
+    class Notes(BaseModel):
+        text: str
+
+    class Tidy(RulesetSection):
+        notes: tuple[Notes, ...] = ()
+
+    assert comparator_gaps(Tidy) == []
+
+
+def test_a_field_cannot_be_both_declared_non_floor_and_carry_a_floor() -> None:
+    class Contradiction(RulesetSection):
+        edge: Annotated[float, Floor(safer="higher")]
+        NON_FLOOR_FIELDS: ClassVar[frozenset[str]] = frozenset({"edge"})
+
+    with pytest.raises(AssertionError, match="edge"):
+        comparator_gaps(Contradiction)
+
+
+def test_a_declaration_for_a_field_that_does_not_exist_is_found() -> None:
+    class Typo(RulesetSection):
+        edge: Annotated[float, Floor(safer="higher")]
+        NON_FLOOR_FIELDS: ClassVar[frozenset[str]] = frozenset({"edgee"})
+
+    with pytest.raises(AssertionError, match="edgee"):
+        comparator_gaps(Typo)
+
+
+def test_the_fit_check_finds_a_comparator_on_the_wrong_kind_of_value() -> None:
+    class Misfit(RulesetSection):
+        flag_on_a_float: Annotated[float, Floor(safer="true")]
+        window_on_a_float: Annotated[float, Floor(safer="wider")]
+        window_of_unknown_length: Annotated[tuple[date, ...], Floor(safer="wider")]
+        window_of_mixed_types: Annotated[tuple[date, float], Floor(safer="wider")]
+        higher_on_a_bool: Annotated[bool, Floor(safer="higher")]
+        lower_on_a_string: Annotated[str, Floor(safer="lower")]
+        optional_number: Annotated[float | None, Floor(safer="higher")] = None
+        table_of_flags: dict[str, Annotated[bool, Floor(safer="lower")]]
+        nested: Covered
+        fine_flag: Annotated[bool, Floor(safer="true")]
+        fine_window: Annotated[tuple[time, time], Floor(safer="wider")]
+        fine_duration: Annotated[timedelta, Floor(safer="higher")]
+        fine_table: dict[str, Annotated[float, Floor(safer="higher")]]
+
+    class MisfitNested(RulesetSection):
+        inner: Misfit
+
+    assert floor_misfits(Misfit) == [
+        "flag_on_a_float",
+        "window_on_a_float",
+        "window_of_unknown_length",
+        "window_of_mixed_types",
+        "higher_on_a_bool",
+        "lower_on_a_string",
+        "optional_number",
+        "table_of_flags",
+    ]
+    assert floor_misfits(MisfitNested)[0] == "inner.flag_on_a_float"
 
 
 def test_every_floor_in_the_seed_ruleset_is_walked() -> None:

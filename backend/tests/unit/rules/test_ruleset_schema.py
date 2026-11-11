@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from stellar_blaze.domain.physics.niosh import Clothing
-from stellar_blaze.domain.rules.ruleset import Ruleset
+from stellar_blaze.domain.rules.ruleset import Ruleset, TwlZones
 from tests.unit.rules.support import seed_dict, set_path
 
 pytestmark = pytest.mark.unit
@@ -197,6 +197,28 @@ def test_a_tunable_needs_a_direction() -> None:
     raw["tunables"]["twl_margin_w_m2"]["safer"] = "sideways"
     with pytest.raises(ValidationError, match="safer"):
         Ruleset.model_validate(raw)
+
+
+def test_a_ruleset_field_that_is_not_a_section_is_refused_when_a_file_is_loaded() -> None:
+    class Loose(Ruleset):
+        labour: TwlZones | None = None  # an Optional section would escape the source check
+
+    raw = seed_dict()
+    raw["labour"] = {"source": "adosh-twl", "low_min_w_m2": 140.0, "medium_min_w_m2": 115.0}
+    with pytest.raises(ValidationError, match="labour is neither a RulesetSection"):
+        Loose.model_validate(raw)
+
+
+def test_a_section_added_to_the_schema_gets_the_same_source_check() -> None:
+    class Wider(Ruleset):
+        labour: TwlZones
+
+    raw = seed_dict()
+    raw["labour"] = {"source": "no-such-source", "low_min_w_m2": 140.0, "medium_min_w_m2": 115.0}
+    with pytest.raises(ValidationError, match="labour cites source 'no-such-source'"):
+        Wider.model_validate(raw)
+    raw["labour"]["source"] = "adosh-twl"
+    assert Wider.model_validate(raw).labour.low_min_w_m2 == 140.0
 
 
 def test_rulesets_are_immutable() -> None:

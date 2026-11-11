@@ -1,6 +1,6 @@
 # Build context is backend/. The Dockerfile copies only pyproject.toml, uv.lock, src/, alembic/, alembic.ini, rulesets/,
-# models/ and THIRD_PARTY_NOTICES.md, so this file keeps the context small and keeps secrets and local state out of it.
-# Never exclude rulesets/ or models/: they ship inside the image (ADR 0009).
+# models/, config/ and THIRD_PARTY_NOTICES.md, so this file keeps the context small and keeps secrets and local state
+# out of it. Never exclude rulesets/, models/ or config/: they ship inside the image (ADR 0009, ADR 0010).
 
 # Local environments and caches
 .venv

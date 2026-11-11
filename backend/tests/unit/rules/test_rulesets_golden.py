@@ -3,6 +3,7 @@
 A change to a ruleset is therefore visible in one pull request as three edits: the TOML, its golden file, and the lock.
 """
 
+import dataclasses
 import json
 import tomllib
 from pathlib import Path
@@ -11,7 +12,9 @@ from typing import Any
 import pytest
 
 from stellar_blaze.domain.physics.niosh import Clothing
-from stellar_blaze.domain.rules.ruleset import Ruleset, RulesetSection
+from stellar_blaze.domain.physics.twl import WithdrawalLimits as TwlWithdrawalLimits
+from stellar_blaze.domain.rules.ruleset import Ruleset, WithdrawalLimits
+from tests.unit.rules.structure import section_fields
 from tests.unit.rules.support import BACKEND_ROOT, RULESETS_DIR
 
 pytestmark = pytest.mark.unit
@@ -31,13 +34,11 @@ NIOSH_TABLE_3_2_C = {
 
 
 def value_sections() -> list[str]:
-    """Names of the ruleset fields that hold values: every ``RulesetSection`` plus the tunables."""
-    sections = [
-        name
-        for name, info in Ruleset.model_fields.items()
-        if isinstance(info.annotation, type) and issubclass(info.annotation, RulesetSection)
-    ]
-    return [*sections, "tunables"]
+    """Names of the ruleset fields that hold values: every ``RulesetSection`` plus the tunables.
+
+    ``section_fields`` fails on any field that is neither a section nor allowlisted, so none can escape the golden file.
+    """
+    return [*section_fields(), "tunables"]
 
 
 def load(path: Path) -> Ruleset:
@@ -64,12 +65,34 @@ def test_the_ruleset_matches_its_golden_file(path: Path) -> None:
     dumped = ruleset.model_dump(mode="json")
 
     assert golden["id"] == ruleset.meta.id
-    assert golden["meta"] == {k: v for k, v in dumped["meta"].items() if k not in {"id", "jurisdiction"}}
+    assert golden["meta"] == {k: v for k, v in dumped["meta"].items() if k != "id"}
     assert golden["source_ids"] == [s["id"] for s in dumped["sources"]]
     # Every value section is pinned: a section added to the schema cannot escape its golden file.
     assert set(golden["sections"]) == set(value_sections())
     for name in value_sections():
         assert dumped[name] == golden["sections"][name], f"{path.name}: section {name} differs from its golden file"
+
+
+def withdrawal_drift(seed: WithdrawalLimits) -> list[str]:
+    """Names of the fields in which ``twl.WithdrawalLimits()`` and the ruleset's section differ."""
+    reference = TwlWithdrawalLimits()
+    return [f.name for f in dataclasses.fields(reference) if getattr(reference, f.name) != getattr(seed, f.name)]
+
+
+def test_the_golden_file_covers_every_field_of_the_ruleset() -> None:
+    pinned = {"meta", "sources", *value_sections()}
+    assert pinned == set(Ruleset.model_fields)
+
+
+def test_the_twl_module_defaults_are_the_withdrawal_limits_of_the_seed_ruleset() -> None:
+    # `twl.WithdrawalLimits()` is the reference implementation's own default; B3 builds an instance from the ruleset
+    # instead. Until it does, the two must not drift apart, and a field added to one must show up in the other.
+    seed = load(RULESETS_DIR / "ae-heat-0.1.toml").twl_withdrawal
+    reference = TwlWithdrawalLimits()
+    assert {f.name for f in dataclasses.fields(reference)} == {"dry_bulb_c", "natural_wet_bulb_c", "cap_w_m2"}
+    assert withdrawal_drift(seed) == []
+    # Negative control: the comparison does notice a difference.
+    assert withdrawal_drift(seed.model_copy(update={"cap_w_m2": 120.0})) == ["cap_w_m2"]
 
 
 def test_the_seed_pins_niosh_table_3_2_and_the_adosh_zone_edges() -> None:

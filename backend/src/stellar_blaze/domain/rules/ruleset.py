@@ -140,7 +140,15 @@ class TunableSpec(_Model):
 
 
 class Ruleset(_Model):
-    """One versioned ruleset: metadata, cited sources, floors in sections, and the tunables with their ranges."""
+    """One versioned ruleset: metadata, cited sources, floors in sections, and the tunables with their ranges.
+
+    Every field except those in ``NON_SECTION_FIELDS`` is a ``RulesetSection``: the source check, the golden file and
+    the floor comparison all work on sections, so a value field of any other shape (an Optional section, a tuple of
+    sections, a bare model) would escape all three, and is refused here and by a structural test.
+    """
+
+    # The fields that are not value sections: identity, citations, and the tunables (which have ranges, not floors).
+    NON_SECTION_FIELDS: ClassVar[frozenset[str]] = frozenset({"meta", "sources", "tunables"})
 
     meta: RulesetMeta
     sources: tuple[Source, ...]
@@ -157,11 +165,14 @@ class Ruleset(_Model):
             msg = f"duplicate source ids: {duplicates}"
             raise ValueError(msg)
         declared = set(ids)
-        cited: dict[str, str] = {
-            name: value.source
-            for name in type(self).model_fields
-            if isinstance(value := getattr(self, name), RulesetSection)
-        }
+        cited: dict[str, str] = {}
+        for name, info in type(self).model_fields.items():
+            if name in self.NON_SECTION_FIELDS:
+                continue
+            if not (isinstance(info.annotation, type) and issubclass(info.annotation, RulesetSection)):
+                msg = f"{name} is neither a RulesetSection nor listed in NON_SECTION_FIELDS"
+                raise ValueError(msg)
+            cited[name] = getattr(self, name).source
         cited.update({f"tunables.{name}": spec.source for name, spec in self.tunables.items()})
         for where, source in cited.items():
             if source not in declared:

@@ -74,13 +74,24 @@ def test_a_model_directory_without_a_manifest_fails(tmp_path: Path) -> None:
         scan_models(directory)
 
 
-def test_a_manifest_that_is_not_valid_fails_with_the_validation_error(tmp_path: Path) -> None:
+def test_a_manifest_that_is_not_valid_fails_with_the_validation_error_naming_the_directory(tmp_path: Path) -> None:
     directory = copy_models(tmp_path)
-    raw = manifest_dict(FIRST)
+    raw = manifest_dict(SECOND)
     raw["surprise"] = 1
-    (directory / FIRST / "manifest.json").write_text(json.dumps(raw), encoding="utf-8")
-    with pytest.raises(ValidationError, match="surprise"):
+    (directory / SECOND / "manifest.json").write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValidationError, match="surprise") as raised:
         scan_models(directory)
+    # The exception type is unchanged; a note says which of the model directories it was.
+    assert any(SECOND in note and "manifest.json" in note for note in raised.value.__notes__)
+    assert not any(FIRST in note for note in raised.value.__notes__)
+
+
+def test_a_manifest_that_is_not_json_names_the_directory_too(tmp_path: Path) -> None:
+    directory = copy_models(tmp_path)
+    (directory / FIRST / "manifest.json").write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValidationError, match="Invalid JSON") as raised:
+        scan_models(directory)
+    assert any(FIRST in note for note in raised.value.__notes__)
 
 
 def test_an_empty_directory_is_an_empty_registry(tmp_path: Path) -> None:

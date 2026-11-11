@@ -3,6 +3,8 @@
 import hashlib
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from stellar_blaze.domain.config.models import LoadedModel, ModelManifest, ModelRegistry
 
 MANIFEST = "manifest.json"
@@ -27,7 +29,8 @@ def scan_models(models_dir: Path) -> ModelRegistry:
     Raises:
         ModelIntegrityError: ``models_dir`` is missing, a model directory has no manifest or is not named by its id, or
             a listed artifact is missing or has a different hash.
-        pydantic.ValidationError: A manifest is not valid (including an id that does not match its training config).
+        pydantic.ValidationError: A manifest is not valid (including an id that does not match its training config);
+            a note on the exception names the model directory.
     """
     if not models_dir.is_dir():
         raise ModelIntegrityError(f"models directory not found: {models_dir} (SB_MODELS_DIR)")
@@ -36,7 +39,11 @@ def scan_models(models_dir: Path) -> ModelRegistry:
         manifest_path = directory / MANIFEST
         if not manifest_path.is_file():
             raise ModelIntegrityError(f"model directory {directory.name} has no {MANIFEST}")
-        manifest = ModelManifest.model_validate_json(manifest_path.read_bytes())
+        try:
+            manifest = ModelManifest.model_validate_json(manifest_path.read_bytes())
+        except ValidationError as exc:
+            exc.add_note(f"in {directory.name}/{MANIFEST}")  # the error itself does not say which model it was
+            raise
         if manifest.model_id != directory.name:
             raise ModelIntegrityError(
                 f"directory {directory.name} holds the manifest of {manifest.model_id}: "
