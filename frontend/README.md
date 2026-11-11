@@ -29,6 +29,9 @@ type specimen is at `/en/dev/specimen` (any language prefix works; it returns 40
 | `pnpm typecheck` | `next typegen`, then `tsc --noEmit` |
 | `pnpm test` | Vitest unit tests (`tests/unit`) |
 | `pnpm design:lint` | Lints `../DESIGN.md`; any warning fails |
+| `pnpm api:gen` | Regenerates `src/api/schema.d.ts` from `openapi/stellar-blaze.mock.openapi.json` |
+| `pnpm api:check` | `api:gen`, then fails if `schema.d.ts` differs from the committed file (it needs the file to be tracked: an untracked one passes) |
+| `pnpm mock:api` | The MSW handlers behind <http://localhost:4010> (the mock API; used by e2e). Ctrl+C stops it |
 
 ## Where things live
 
@@ -41,6 +44,13 @@ type specimen is at `/en/dev/specimen` (any language prefix works; it returns 40
   names for them, plus the adapter that maps the shadcn/ui components onto the tokens).
 - `src/components/ui/`: shadcn/ui (Base UI, `rtl: true`) with a few documented local edits
   (`grep -rn "Local edit" src/components/ui`).
+- `src/api/`: the typed API client (`apiClient` for the browser, `serverApiClient()` for server code), `call()` (turns a
+  response into a `Result`), `problem.ts` (`application/problem+json`) and the generated `schema.d.ts`. The browser calls
+  only same-origin `/api/v1/*`; `src/app/api/v1/[...path]/route.ts` forwards it to `API_ORIGIN`.
+- `src/mocks/`: the fixtures and MSW handlers for the contract proposal in `openapi/`. Vitest starts them for every
+  test (`tests/setup-msw.ts`); `pnpm mock:api` serves them over HTTP. A request header `x-sb-mock-scenario: error | stale
+  | empty` selects a failure, a stale forecast or an empty result (forwarded only outside production, or with
+  `SB_MOCK_SCENARIOS=1`).
 - Layout classes are logical only (`ms-*`, `pe-*`, `text-start`); a test rejects `ml-*`, `left-*` and friends
   everywhere except `src/components/ui`.
 

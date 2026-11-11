@@ -1,0 +1,818 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Stellar Blaze API (mock contract proposal)",
+    "version": "0.1.0-mock",
+    "description": "Contract proposal written by the F1 frontend foundation (Task 5) and served in tests and e2e by MSW handlers. B3 Task 0 owns the real contract from 14 Nov and may adopt or replace this file. Every non-2xx response is application/problem+json (RFC 9457 shape plus request_id). Version strings are opaque to the UI: policy_version and RiskPolicy.version carry the backend ruleset id (ADR 0009); config_version is the integer id of the active runtime configuration (ADR 0010)."
+  },
+  "paths": {
+    "/api/v1/sites": {
+      "get": {
+        "operationId": "listSites",
+        "summary": "List sites.",
+        "responses": {
+          "200": {
+            "description": "All sites.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Site"
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/forecast/today": {
+      "get": {
+        "operationId": "getSiteForecastToday",
+        "summary": "Today's hourly WBGT forecast and site level for a site.",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id, from GET /api/v1/sites.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hourly forecast for the site's local day.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteForecastToday"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/risk-policy": {
+      "get": {
+        "operationId": "getRiskPolicy",
+        "summary": "The active risk policy the device uses to compute personal risk.",
+        "responses": {
+          "200": {
+            "description": "The active risk policy.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskPolicy"
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/crews": {
+      "get": {
+        "operationId": "listSiteCrews",
+        "summary": "List the crews of a site.",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id, from GET /api/v1/sites.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crews of the site.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Crew"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/crews/{crew_id}/timeline": {
+      "get": {
+        "operationId": "getCrewTimeline",
+        "summary": "Crew-level aggregate timeline for one day (k-suppressed below k).",
+        "parameters": [
+          {
+            "name": "crew_id",
+            "in": "path",
+            "required": true,
+            "description": "Crew id, from GET /api/v1/sites/{site_id}/crews.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "description": "Local date at the crew's site, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregates only; never one person's state.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewTimeline"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/push/subscriptions": {
+      "post": {
+        "operationId": "createPushSubscription",
+        "summary": "Register a Web Push subscription for site and optional crew alerts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription registered.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscriptionCreated"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/push/subscriptions/{subscription_id}": {
+      "delete": {
+        "operationId": "deletePushSubscription",
+        "summary": "Remove a Web Push subscription.",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "description": "Id returned by POST /api/v1/push/subscriptions.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Subscription removed (idempotent).",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "headers": {
+      "XRequestId": {
+        "description": "Correlation id of this request. Repeated as request_id in every problem body.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "The resource does not exist.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "The request failed validation.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "The API could not reach a dependency.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Problem": {
+        "description": "Any other error.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Level": {
+        "type": "string",
+        "enum": [
+          "green",
+          "amber",
+          "orange",
+          "red"
+        ],
+        "description": "Heat level. Never shown by colour alone."
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "URI reference identifying the problem type."
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Same value as the X-Request-ID response header."
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "Site": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone; the UI renders every time in it."
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True for demo data."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "synthetic"
+        ],
+        "additionalProperties": false
+      },
+      "HourForecast": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wbgt_c": {
+            "type": "object",
+            "properties": {
+              "p05": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "p50": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "p95": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "p05",
+              "p50",
+              "p95"
+            ],
+            "additionalProperties": false
+          },
+          "site_level": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "action_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ban_active": {
+            "type": "boolean",
+            "description": "Midday work ban in force during this hour."
+          }
+        },
+        "required": [
+          "starts_at",
+          "wbgt_c",
+          "site_level",
+          "action_codes",
+          "ban_active"
+        ],
+        "additionalProperties": false
+      },
+      "SiteForecastToday": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policy_version": {
+            "type": "string",
+            "description": "Backend ruleset id (ae-heat-<yyyy>.<n>). Shown verbatim, never parsed."
+          },
+          "config_version": {
+            "type": "integer",
+            "description": "Active runtime configuration version id (ADR 0010)."
+          },
+          "hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HourForecast"
+            }
+          }
+        },
+        "required": [
+          "site_id",
+          "date",
+          "generated_at",
+          "policy_version",
+          "config_version",
+          "hours"
+        ],
+        "additionalProperties": false
+      },
+      "RiskPolicy": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Backend ruleset id (ae-heat-<yyyy>.<n>). Shown verbatim, never parsed."
+          },
+          "config_version": {
+            "type": "integer",
+            "description": "Must equal the forecast's config_version before the device computes personal risk."
+          },
+          "k_suppression": {
+            "type": "integer",
+            "description": "Smallest crew size whose aggregates are shown."
+          },
+          "acclimatisation_days_required": {
+            "type": "integer"
+          },
+          "bands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "level": {
+                  "$ref": "#/components/schemas/Level"
+                },
+                "min_exceedance_probability": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "level",
+                "min_exceedance_probability"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workload_classes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "moderate",
+                    "heavy"
+                  ]
+                },
+                "metabolic_rate_w": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "code",
+                "metabolic_rate_w"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "clothing_options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "adjustment_c": {
+                  "type": "number"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "adjustment_c",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "version",
+          "config_version",
+          "k_suppression",
+          "acclimatisation_days_required",
+          "bands",
+          "workload_classes",
+          "clothing_options"
+        ],
+        "additionalProperties": false
+      },
+      "Crew": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "site_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "member_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "site_id",
+          "name",
+          "member_count"
+        ],
+        "additionalProperties": false
+      },
+      "CrewHour": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "crew_level": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "share_above_amber": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Share of the crew above amber, 0 to 1. Null when suppressed or without data."
+          },
+          "ban_active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "starts_at",
+          "crew_level",
+          "share_above_amber",
+          "ban_active"
+        ],
+        "additionalProperties": false
+      },
+      "CrewTimeline": {
+        "type": "object",
+        "properties": {
+          "crew_id": {
+            "type": "string"
+          },
+          "crew_name": {
+            "type": "string"
+          },
+          "site_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "suppressed": {
+            "type": "boolean",
+            "description": "True when the crew has fewer than k members."
+          },
+          "k": {
+            "type": "integer"
+          },
+          "hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrewHour"
+            }
+          }
+        },
+        "required": [
+          "crew_id",
+          "crew_name",
+          "site_id",
+          "date",
+          "suppressed",
+          "k",
+          "hours"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionCreate": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string"
+              },
+              "expirationTime": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "keys": {
+                "type": "object",
+                "properties": {
+                  "p256dh": {
+                    "type": "string"
+                  },
+                  "auth": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "p256dh",
+                  "auth"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "endpoint",
+              "expirationTime",
+              "keys"
+            ],
+            "additionalProperties": false
+          },
+          "site_id": {
+            "type": "string"
+          },
+          "crew_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "subscription",
+          "site_id",
+          "crew_id"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

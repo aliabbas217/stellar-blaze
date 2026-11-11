@@ -6,3 +6,8 @@ allowBuilds:
   # next-intl dependencies used only by its message-extraction feature (useExtracted), which F1 does not enable.
   "@parcel/watcher": false
   "@swc/core": false
+# openapi-typescript 7.13.0 peers `typescript ^5.x`; TypeScript 6 support is open upstream (openapi-ts/openapi-typescript #2723).
+# The generator only uses the TypeScript compiler API to print the generated AST, and api:gen output is verified under 6.0.3.
+peerDependencyRules:
+  allowedVersions:
+    "openapi-typescript>typescript": "6"

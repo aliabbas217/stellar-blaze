@@ -29,5 +29,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      # Regenerates src/api/schema.d.ts from the OpenAPI source and fails when it differs from the committed file.
+      - run: pnpm api:check
       - run: pnpm test
       - run: pnpm build

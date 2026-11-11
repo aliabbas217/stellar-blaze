@@ -7,6 +7,7 @@ import { titleTemplate } from "@/app/titles";
 import { themeScript } from "@/components/shell/theme-script";
 import { dirFor } from "@/i18n/direction";
 import { routing } from "@/i18n/routing";
+import { QueryProvider } from "@/providers/QueryProvider";
 import "@/styles/globals.css";
 
 /*
@@ -40,7 +41,9 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-dvh flex-col">
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
