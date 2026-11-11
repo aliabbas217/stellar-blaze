@@ -37,8 +37,19 @@ const SHARED = [
   "src/lib/utils.ts",
   "src/i18n/request.ts",
 ];
-// Pages outside every group (the locale home, the dev specimen) are not restricted.
-const UNRESTRICTED = ["src/app/[locale]/page.tsx", "src/app/[locale]/dev/specimen/page.tsx"];
+// Pages outside every group (the locale home, the dev specimen) are not restricted. Neither is the PWA feature
+// (src/features/pwa: the manifest, the offline fallback and the SW cache rules hold no personal data, so it is
+// neutral ground that worker, supervisor and app-level code may all use) nor the files that wire it in.
+const UNRESTRICTED = [
+  "src/app/[locale]/page.tsx",
+  "src/app/[locale]/dev/specimen/page.tsx",
+  "src/app/[locale]/offline/page.tsx",
+  "src/app/[locale]/manifest.webmanifest/route.ts",
+  "src/app/serwist/[path]/route.ts",
+  "src/app/sw.ts",
+  "src/features/pwa/fallback.ts",
+  "src/features/pwa/manifest.ts",
+];
 
 async function rulesFor(rel: string): Promise<Rules> {
   const config = (await eslint.calculateConfigForFile(path.join(cwd, rel))) as Linter.Config | undefined;
@@ -163,6 +174,10 @@ describe("route-group isolation: what the resolved rules report", () => {
     ["shared api, import()", "src/api/client.ts", 'export const load = () => import("@/features/today/x");', [SYNTAX]],
     ["shared i18n, require()", "src/i18n/request.ts", 'export const r: unknown = require("@/features/profile/store");', [SYNTAX]],
     ["shared component, import type expression", "src/components/ui/button.tsx", 'export type T = import("@/features/risk/store").S;', [SYNTAX]],
+    // The PWA feature is a feature like any other for shared code: shared code must not import it. That is why the
+    // fallback mapping lives in src/features/pwa and is imported only by files in src/app (the SW, the layout).
+    ["shared lib, pwa feature", "src/lib/utils.ts", 'export { fallbackUrlFor } from "@/features/pwa/fallback";', [IMPORTS]],
+    ["shared component, pwa feature import()", "src/components/ui/button.tsx", 'export const load = () => import("@/features/pwa/fallback");', [SYNTAX]],
     // What must stay allowed.
     ["supervisor feature, own code and shared code", SUPERVISOR_FEATURE, 'import { a } from "./local"; import { b } from "@/api/client"; import { c } from "@/components/ui/button"; import { d } from "@/features/supervisor/model"; export { a, b, c, d };', []],
     ["supervisor feature, import() of own and shared code", SUPERVISOR_FEATURE, 'export const load = () => [import("./local"), import("@/features/supervisor/model"), import("@/lib/utils")]; export type T = import("@/features/supervisor/model").M;', []],
@@ -173,6 +188,11 @@ describe("route-group isolation: what the resolved rules report", () => {
     ["worker route, worker features", WORKER_ROUTE, 'import { a } from "@/features/today/x"; import { b } from "@/features/risk/x"; export const load = () => import("@/features/profile/x"); export { a, b };', []],
     ["supervisor route, supervisor features", SUPERVISOR_ROUTE, 'import { a } from "@/features/supervisor/x"; export const load = () => import("@/features/supervisor/x"); export { a };', []],
     ["hse route, supervisor features (a preview of the supervisor view)", HSE_ROUTE, 'import { a } from "@/features/supervisor/x"; export { a };', []],
+    // The PWA feature is neutral: the service worker, the layout, the worker route and the supervisor route may use it.
+    ["service worker, pwa feature", "src/app/sw.ts", 'import { offlineFallbacks } from "@/features/pwa/fallback"; import { isCachedApiPath } from "@/features/pwa/api-cache"; export { offlineFallbacks, isCachedApiPath };', []],
+    ["worker route, pwa feature", WORKER_ROUTE, 'import { fallbackUrlFor } from "@/features/pwa/fallback"; export { fallbackUrlFor };', []],
+    ["supervisor route, pwa feature", SUPERVISOR_ROUTE, 'import { fallbackUrlFor } from "@/features/pwa/fallback"; export { fallbackUrlFor };', []],
+    ["pwa feature, shared code", "src/features/pwa/fallback.ts", 'import { routing } from "@/i18n/routing"; import { u } from "@/lib/utils"; export { routing, u };', []],
     ["shared code, shared code", "src/components/ui/button.tsx", 'import { cn } from "./utils"; import { u } from "@/lib/utils"; export const load = () => import("@/i18n/routing"); export { cn, u };', []],
   ];
 

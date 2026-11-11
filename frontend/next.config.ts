@@ -1,3 +1,4 @@
+import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
@@ -15,4 +16,5 @@ const nextConfig: NextConfig = {
 // Finds src/i18n/request.ts (the default location) and wires next-intl into the build.
 const withNextIntl = createNextIntlPlugin();
 
-export default withNextIntl(nextConfig);
+// Keeps esbuild out of the server bundle: it builds the service worker (src/app/serwist/[path]/route.ts).
+export default withSerwist(withNextIntl(nextConfig));

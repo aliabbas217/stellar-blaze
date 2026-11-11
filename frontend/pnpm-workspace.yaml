@@ -5,6 +5,7 @@ allowBuilds:
   unrs-resolver: true
   # next-intl dependencies used only by its message-extraction feature (useExtracted), which F1 does not enable.
   "@parcel/watcher": false
+  # Same for @swc/core. @serwist/turbopack 9.5.13 also declares it but never calls it (grep of its dist and src).
   "@swc/core": false
 # openapi-typescript 7.13.0 peers `typescript ^5.x`; TypeScript 6 support is open upstream (openapi-ts/openapi-typescript #2723).
 # The generator only uses the TypeScript compiler API to print the generated AST, and api:gen output is verified under 6.0.3.
