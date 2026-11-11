@@ -1,0 +1,54 @@
+== DAY: per station (mean of 3 summers)
+station  base_E30  base_E32  seasonal_loso_E30av%  seasonal_loso_E32av%  monthly_loso_E30av%  monthly_loso_E32av%  weekly_oracle_E30av%  weekly_oracle_E32av%  daily_fc1_raw_E30av%  daily_fc1_raw_E32av%  daily_oracle_E30av%  daily_oracle_E32av%
+   OMAA     750.0     414.7                  36.6                  58.6                 36.7                 58.9                  37.2                  61.6                  37.0                  60.6                 38.8                 66.6
+   OMAD     854.2     542.2                  27.4                  51.0                 27.7                 52.4                  28.0                  54.3                  27.5                  52.4                 28.7                 58.2
+   OMAL     544.8     210.7                  58.7                  78.2                 58.8                 79.8                  60.0                  80.9                  58.6                  79.4                 62.2                 85.7
+   OMDB     853.5     546.3                  32.3                  61.6                 32.2                 61.2                  32.5                  62.8                  32.2                  62.1                 33.1                 65.6
+   OMDW     747.9     446.8                  40.6                  65.5                 40.4                 66.0                  40.9                  67.9                  40.6                  66.6                 42.0                 71.6
+   OMFJ    1023.8     742.2                  22.2                  49.4                 22.3                 49.7                  22.4                  50.3                  22.2                  49.4                 22.7                 51.5
+   OMSJ     811.8     510.0                  39.3                  65.7                 39.3                 65.3                  39.6                  67.1                  39.8                  66.3                 40.5                 69.7
+   OMRK     832.6     535.1                  42.6                  64.8                 42.6                 65.1                  43.0                  67.2                  43.0                  65.7                 43.9                 70.7
+== DAY: per summer, 4 headline stations
+ year      strategy  base_E30  E30av%  E32av%
+ 2024 seasonal_loso     820.8    33.0    54.2
+ 2024  daily_oracle     820.8    34.2    59.0
+ 2025 seasonal_loso     787.6    37.1    64.0
+ 2025  daily_oracle     787.6    38.8    67.6
+ 2026 seasonal_loso     770.7    33.6    56.4
+ 2026  daily_oracle     770.7    35.3    61.4
+== EVE: per station (mean of 3 summers)
+station  base_E30  base_E32  seasonal_loso_E30av%  seasonal_loso_E32av%  monthly_loso_E30av%  monthly_loso_E32av%  weekly_oracle_E30av%  weekly_oracle_E32av%  daily_fc1_raw_E30av%  daily_fc1_raw_E32av%  daily_oracle_E30av%  daily_oracle_E32av%
+   OMAA     750.0     414.7                  53.3                  83.2                 53.6                 83.6                  54.2                  84.4                  53.9                  84.0                 55.8                 86.4
+   OMAD     854.2     542.2                  38.7                  74.3                 39.3                 74.3                  39.6                  75.4                  39.6                  74.5                 40.6                 77.7
+   OMAL     544.8     210.7                  81.2                  93.8                 82.2                 94.4                  82.5                  94.8                  81.6                  94.3                 84.3                 96.3
+   OMDB     853.8     546.2                  51.3                  87.1                 51.4                 87.5                  51.9                  87.9                  51.7                  88.0                 53.0                 88.9
+   OMDW     748.3     447.0                  62.7                  89.7                 63.2                 90.4                  63.8                  90.7                  63.6                  90.4                 65.1                 91.7
+   OMFJ    1023.8     742.2                  39.5                  76.7                 39.5                 76.7                  39.6                  76.8                  39.5                  76.2                 39.8                 77.0
+   OMSJ     811.8     510.0                  64.3                  89.8                 64.3                 89.8                  64.5                  90.2                  64.5                  89.9                 65.6                 91.1
+   OMRK     832.7     536.0                  70.5                  88.9                 70.5                 88.9                  70.8                  88.9                  70.4                  88.7                 71.4                 89.5
+== EVE: per summer, 4 headline stations
+ year      strategy  base_E30  E30av%  E32av%
+ 2024 seasonal_loso     820.8    48.9    79.6
+ 2024  daily_oracle     820.8    50.4    81.5
+ 2025 seasonal_loso     787.6    57.7    86.8
+ 2025  daily_oracle     787.6    59.3    88.1
+ 2026 seasonal_loso     770.9    52.9    82.8
+ 2026  daily_oracle     770.9    54.8    84.5
+== ALL: per station (mean of 3 summers)
+station  base_E30  base_E32  seasonal_loso_E30av%  seasonal_loso_E32av%  monthly_loso_E30av%  monthly_loso_E32av%  weekly_oracle_E30av%  weekly_oracle_E32av%  daily_fc1_raw_E30av%  daily_fc1_raw_E32av%  daily_oracle_E30av%  daily_oracle_E32av%
+   OMAA     750.7     416.5                  75.2                  98.4                 75.0                 98.4                  75.4                  98.4                  75.6                  95.8                 78.8                 97.9
+   OMAD     854.6     542.9                  58.3                  95.5                 58.6                 95.5                  59.2                  95.2                  59.2                  92.7                 63.6                 95.8
+   OMAL     547.9     212.2                  97.1                 100.0                 97.1                100.0                  97.1                 100.0                  95.7                  99.8                 97.2                 99.8
+   OMDB     854.2     548.0                  74.4                  96.8                 74.4                 96.8                  74.4                  97.2                  73.8                  95.4                 77.1                 96.9
+   OMDW     748.6     447.8                  88.4                  99.4                 88.4                 99.4                  88.4                  99.4                  88.0                  98.7                 89.0                 99.2
+   OMFJ    1025.5     745.7                  63.5                  98.4                 63.5                 98.4                  64.6                  98.5                  61.4                  96.4                 67.2                 98.4
+   OMSJ     812.2     511.8                  88.9                  98.8                 88.9                 98.8                  89.2                  98.8                  88.0                  97.3                 90.2                 98.3
+   OMRK     832.7     538.5                  93.1                  99.4                 93.1                 99.4                  93.4                  99.3                  92.3                  98.5                 94.1                 99.3
+== ALL: per summer, 4 headline stations
+ year      strategy  base_E30  E30av%  E32av%
+ 2024 seasonal_loso     822.8    69.3    96.7
+ 2024  daily_oracle     822.8    72.4    96.5
+ 2025 seasonal_loso     788.7    79.6    99.2
+ 2025  daily_oracle     788.7    82.2    99.1
+ 2026 seasonal_loso     772.4    76.3    98.7
+ 2026  daily_oracle     772.4    79.0    98.6

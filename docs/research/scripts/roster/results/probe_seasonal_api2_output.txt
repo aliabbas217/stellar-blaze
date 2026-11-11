@@ -1,0 +1,13 @@
+w_2025_09 200 de=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&timezone=UTC&start_date=2025-09-01&end_date=2025-12-31
+   steps, non-null, first non-null, last non-null: (122, 0, '', '')
+   members in response: 50 ; member01 non-null: (122, 0, '', '')
+w_2026_06_08 200 de=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&timezone=UTC&start_date=2026-06-01&end_date=2026-08-31
+   steps, non-null, first non-null, last non-null: (92, 0, '', '')
+   members in response: 50 ; member01 non-null: (92, 0, '', '')
+w_2026_09_10 200 de=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&timezone=UTC&start_date=2026-09-01&end_date=2026-10-31
+   steps, non-null, first non-null, last non-null: (61, 22, '2026-10-10', '2026-10-31')
+   members in response: 50 ; member01 non-null: (61, 22, '2026-10-10', '2026-10-31')
+w_2026_01_03 200 de=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&timezone=UTC&start_date=2026-01-01&end_date=2026-03-31
+   steps, non-null, first non-null, last non-null: (90, 0, '', '')
+   members in response: 50 ; member01 non-null: (90, 0, '', '')
+six_hourly attempt: 200 {"latitude":24.590162,"longitude":54.683544,"generationtime_ms":0.0017881393432617188,"utc_offset_seconds":0,"timezone":"GMT","timezone_abbreviation":"GMT","elevation":16.0}

@@ -1,0 +1,1441 @@
+library,station,year,strategy,month,roster
+DAY,OMAA,2024,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,seasonal_oracle,5,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,seasonal_oracle,6,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,seasonal_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,seasonal_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,seasonal_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,seasonal_oracle,5,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,seasonal_oracle,6,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,seasonal_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,seasonal_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,seasonal_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,seasonal_loso,5,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,seasonal_loso,6,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,seasonal_loso,7,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,seasonal_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,seasonal_loso,9,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_oracle,8,04:30-11:00 + 17:30-19:30
+DAY,OMAA,2024,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,monthly_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,monthly_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMAA,2026,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,monthly_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMAA,2026,monthly_oracle,8,04:30-11:00 + 17:30-19:30
+DAY,OMAA,2026,monthly_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2024,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2024,monthly_loso,9,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2025,monthly_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMAA,2025,monthly_loso,8,04:30-11:00 + 17:30-19:30
+DAY,OMAA,2025,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAA,2026,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAA,2026,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2024,monthly_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2024,monthly_oracle,8,04:30-11:00 + 17:30-19:30
+DAY,OMAD,2024,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2025,monthly_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2025,monthly_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2025,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAD,2025,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2026,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2026,monthly_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2026,monthly_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2026,monthly_oracle,8,04:30-11:00 + 17:30-19:30
+DAY,OMAD,2026,monthly_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMAD,2024,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2024,monthly_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2024,monthly_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2024,monthly_loso,8,04:30-11:00 + 17:30-19:30
+DAY,OMAD,2024,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAD,2025,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2025,monthly_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2025,monthly_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2025,monthly_loso,8,04:30-11:00 + 17:30-19:30
+DAY,OMAD,2025,monthly_loso,9,04:30-10:30 + 17:00-19:30
+DAY,OMAD,2026,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2026,monthly_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2026,monthly_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMAD,2026,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAD,2026,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,monthly_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2024,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2024,monthly_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMAL,2025,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,monthly_oracle,6,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2025,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2025,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2026,monthly_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2024,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2024,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2024,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2025,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2025,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMAL,2026,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMAL,2026,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,seasonal_oracle,5,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2026,seasonal_oracle,6,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2026,seasonal_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2026,seasonal_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2026,seasonal_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMDB,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2024,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMDB,2026,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2026,monthly_oracle,9,04:30-11:00 + 17:30-19:30
+DAY,OMDB,2024,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2024,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2024,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2025,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2025,monthly_loso,9,04:30-10:30 + 17:00-19:30
+DAY,OMDB,2026,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMDB,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDB,2026,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,seasonal_oracle,5,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,seasonal_oracle,6,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,seasonal_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,seasonal_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,seasonal_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMDW,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMDW,2025,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2025,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,monthly_oracle,7,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,monthly_oracle,8,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,monthly_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2024,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMDW,2024,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2024,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2024,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2025,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2025,monthly_loso,9,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMDW,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMDW,2026,monthly_loso,8,04:30-10:30 + 17:00-19:30
+DAY,OMDW,2026,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,seasonal_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,seasonal_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,seasonal_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,seasonal_oracle,8,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,seasonal_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,seasonal_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,seasonal_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,seasonal_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,seasonal_loso,8,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,seasonal_loso,9,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,seasonal_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,seasonal_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,seasonal_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,seasonal_loso,8,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,seasonal_loso,9,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,monthly_oracle,8,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,monthly_oracle,9,04:30-09:00 + 15:30-19:30
+DAY,OMFJ,2025,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,monthly_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,monthly_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,monthly_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,monthly_oracle,5,04:30-10:30 + 17:00-19:30
+DAY,OMFJ,2026,monthly_oracle,6,04:30-10:30 + 17:00-19:30
+DAY,OMFJ,2026,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,monthly_oracle,9,04:30-09:00 + 15:30-19:30
+DAY,OMFJ,2024,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,monthly_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2024,monthly_loso,9,04:30-09:00 + 15:30-19:30
+DAY,OMFJ,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2025,monthly_loso,8,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2025,monthly_loso,9,04:30-09:00 + 15:30-19:30
+DAY,OMFJ,2026,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMFJ,2026,monthly_loso,8,04:30-09:30 + 16:00-19:30
+DAY,OMFJ,2026,monthly_loso,9,04:30-09:30 + 16:00-19:30
+DAY,OMSJ,2024,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMSJ,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMSJ,2025,monthly_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMSJ,2025,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMSJ,2026,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_oracle,9,04:30-10:30 + 17:00-19:30
+DAY,OMSJ,2024,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2024,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2025,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMSJ,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMSJ,2026,monthly_loso,9,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,seasonal_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,seasonal_oracle,6,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,seasonal_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,seasonal_oracle,8,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,seasonal_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2025,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,seasonal_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,seasonal_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,seasonal_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,seasonal_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,seasonal_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,seasonal_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,seasonal_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,seasonal_loso,6,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,seasonal_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,seasonal_loso,8,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,seasonal_loso,9,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2025,monthly_oracle,5,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2025,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_oracle,7,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2025,monthly_oracle,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_oracle,9,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,monthly_oracle,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,monthly_oracle,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,monthly_oracle,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,monthly_oracle,8,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,monthly_oracle,9,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_loso,5,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2024,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2024,monthly_loso,9,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_loso,7,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2025,monthly_loso,9,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,monthly_loso,5,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,monthly_loso,6,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,monthly_loso,7,04:30-09:30 + 16:00-19:30
+DAY,OMRK,2026,monthly_loso,8,04:30-10:00 + 16:30-19:30
+DAY,OMRK,2026,monthly_loso,9,04:30-09:30 + 16:00-19:30
+EVE,OMAA,2024,seasonal_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,seasonal_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2024,monthly_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,monthly_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2024,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2024,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2025,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2025,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAA,2026,monthly_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAA,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,monthly_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2024,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2026,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2024,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2024,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2025,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2025,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAD,2026,monthly_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2026,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAD,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,seasonal_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,seasonal_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,seasonal_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,seasonal_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,seasonal_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2025,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,monthly_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2025,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,monthly_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,monthly_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2024,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2024,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2025,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2025,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMAL,2026,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMAL,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,seasonal_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,seasonal_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,seasonal_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,seasonal_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,seasonal_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2024,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,monthly_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2024,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2024,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2024,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2025,monthly_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2025,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDB,2026,monthly_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDB,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,seasonal_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,seasonal_oracle,5,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,seasonal_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,seasonal_oracle,7,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,seasonal_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,seasonal_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,seasonal_loso,5,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,seasonal_loso,6,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,seasonal_loso,7,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,seasonal_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,seasonal_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,monthly_oracle,6,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_oracle,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,monthly_oracle,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2024,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2024,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2025,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2025,monthly_loso,9,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMDW,2026,monthly_loso,8,04:30-09:30 + 18:30-22:00
+EVE,OMDW,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2024,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2025,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMFJ,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2024,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2025,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMSJ,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,seasonal_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_oracle,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_oracle,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_oracle,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_oracle,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_oracle,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2024,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2025,monthly_loso,9,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_loso,5,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_loso,6,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_loso,7,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_loso,8,04:30-09:00 + 18:00-22:00
+EVE,OMRK,2026,monthly_loso,9,04:30-09:00 + 18:00-22:00
+ALL,OMAA,2024,seasonal_oracle,5,23:00-07:30
+ALL,OMAA,2024,seasonal_oracle,6,23:00-07:30
+ALL,OMAA,2024,seasonal_oracle,7,23:00-07:30
+ALL,OMAA,2024,seasonal_oracle,8,23:00-07:30
+ALL,OMAA,2024,seasonal_oracle,9,23:00-07:30
+ALL,OMAA,2025,seasonal_oracle,5,23:00-07:30
+ALL,OMAA,2025,seasonal_oracle,6,23:00-07:30
+ALL,OMAA,2025,seasonal_oracle,7,23:00-07:30
+ALL,OMAA,2025,seasonal_oracle,8,23:00-07:30
+ALL,OMAA,2025,seasonal_oracle,9,23:00-07:30
+ALL,OMAA,2026,seasonal_oracle,5,23:00-07:30
+ALL,OMAA,2026,seasonal_oracle,6,23:00-07:30
+ALL,OMAA,2026,seasonal_oracle,7,23:00-07:30
+ALL,OMAA,2026,seasonal_oracle,8,23:00-07:30
+ALL,OMAA,2026,seasonal_oracle,9,23:00-07:30
+ALL,OMAA,2024,seasonal_loso,5,23:00-07:30
+ALL,OMAA,2024,seasonal_loso,6,23:00-07:30
+ALL,OMAA,2024,seasonal_loso,7,23:00-07:30
+ALL,OMAA,2024,seasonal_loso,8,23:00-07:30
+ALL,OMAA,2024,seasonal_loso,9,23:00-07:30
+ALL,OMAA,2025,seasonal_loso,5,23:00-07:30
+ALL,OMAA,2025,seasonal_loso,6,23:00-07:30
+ALL,OMAA,2025,seasonal_loso,7,23:00-07:30
+ALL,OMAA,2025,seasonal_loso,8,23:00-07:30
+ALL,OMAA,2025,seasonal_loso,9,23:00-07:30
+ALL,OMAA,2026,seasonal_loso,5,23:00-07:30
+ALL,OMAA,2026,seasonal_loso,6,23:00-07:30
+ALL,OMAA,2026,seasonal_loso,7,23:00-07:30
+ALL,OMAA,2026,seasonal_loso,8,23:00-07:30
+ALL,OMAA,2026,seasonal_loso,9,23:00-07:30
+ALL,OMAA,2024,monthly_oracle,5,23:00-07:30
+ALL,OMAA,2024,monthly_oracle,6,23:00-07:30
+ALL,OMAA,2024,monthly_oracle,7,23:00-07:30
+ALL,OMAA,2024,monthly_oracle,8,23:00-07:30
+ALL,OMAA,2024,monthly_oracle,9,23:00-07:30
+ALL,OMAA,2025,monthly_oracle,5,23:00-07:30
+ALL,OMAA,2025,monthly_oracle,6,22:30-07:00
+ALL,OMAA,2025,monthly_oracle,7,23:00-07:30
+ALL,OMAA,2025,monthly_oracle,8,23:00-07:30
+ALL,OMAA,2025,monthly_oracle,9,23:00-07:30
+ALL,OMAA,2026,monthly_oracle,5,19:30-04:00
+ALL,OMAA,2026,monthly_oracle,6,22:00-06:30
+ALL,OMAA,2026,monthly_oracle,7,23:00-07:30
+ALL,OMAA,2026,monthly_oracle,8,23:00-07:30
+ALL,OMAA,2026,monthly_oracle,9,23:00-07:30
+ALL,OMAA,2024,monthly_loso,5,23:00-07:30
+ALL,OMAA,2024,monthly_loso,6,22:30-07:00
+ALL,OMAA,2024,monthly_loso,7,23:00-07:30
+ALL,OMAA,2024,monthly_loso,8,23:00-07:30
+ALL,OMAA,2024,monthly_loso,9,23:00-07:30
+ALL,OMAA,2025,monthly_loso,5,23:00-07:30
+ALL,OMAA,2025,monthly_loso,6,23:00-07:30
+ALL,OMAA,2025,monthly_loso,7,23:00-07:30
+ALL,OMAA,2025,monthly_loso,8,23:00-07:30
+ALL,OMAA,2025,monthly_loso,9,23:00-07:30
+ALL,OMAA,2026,monthly_loso,5,23:00-07:30
+ALL,OMAA,2026,monthly_loso,6,23:00-07:30
+ALL,OMAA,2026,monthly_loso,7,23:00-07:30
+ALL,OMAA,2026,monthly_loso,8,23:00-07:30
+ALL,OMAA,2026,monthly_loso,9,23:00-07:30
+ALL,OMAD,2024,seasonal_oracle,5,23:00-07:30
+ALL,OMAD,2024,seasonal_oracle,6,23:00-07:30
+ALL,OMAD,2024,seasonal_oracle,7,23:00-07:30
+ALL,OMAD,2024,seasonal_oracle,8,23:00-07:30
+ALL,OMAD,2024,seasonal_oracle,9,23:00-07:30
+ALL,OMAD,2025,seasonal_oracle,5,23:00-07:30
+ALL,OMAD,2025,seasonal_oracle,6,23:00-07:30
+ALL,OMAD,2025,seasonal_oracle,7,23:00-07:30
+ALL,OMAD,2025,seasonal_oracle,8,23:00-07:30
+ALL,OMAD,2025,seasonal_oracle,9,23:00-07:30
+ALL,OMAD,2026,seasonal_oracle,5,23:00-07:30
+ALL,OMAD,2026,seasonal_oracle,6,23:00-07:30
+ALL,OMAD,2026,seasonal_oracle,7,23:00-07:30
+ALL,OMAD,2026,seasonal_oracle,8,23:00-07:30
+ALL,OMAD,2026,seasonal_oracle,9,23:00-07:30
+ALL,OMAD,2024,seasonal_loso,5,23:00-07:30
+ALL,OMAD,2024,seasonal_loso,6,23:00-07:30
+ALL,OMAD,2024,seasonal_loso,7,23:00-07:30
+ALL,OMAD,2024,seasonal_loso,8,23:00-07:30
+ALL,OMAD,2024,seasonal_loso,9,23:00-07:30
+ALL,OMAD,2025,seasonal_loso,5,23:00-07:30
+ALL,OMAD,2025,seasonal_loso,6,23:00-07:30
+ALL,OMAD,2025,seasonal_loso,7,23:00-07:30
+ALL,OMAD,2025,seasonal_loso,8,23:00-07:30
+ALL,OMAD,2025,seasonal_loso,9,23:00-07:30
+ALL,OMAD,2026,seasonal_loso,5,23:00-07:30
+ALL,OMAD,2026,seasonal_loso,6,23:00-07:30
+ALL,OMAD,2026,seasonal_loso,7,23:00-07:30
+ALL,OMAD,2026,seasonal_loso,8,23:00-07:30
+ALL,OMAD,2026,seasonal_loso,9,23:00-07:30
+ALL,OMAD,2024,monthly_oracle,5,22:00-06:30
+ALL,OMAD,2024,monthly_oracle,6,23:00-07:30
+ALL,OMAD,2024,monthly_oracle,7,23:00-07:30
+ALL,OMAD,2024,monthly_oracle,8,23:00-07:30
+ALL,OMAD,2024,monthly_oracle,9,23:00-07:30
+ALL,OMAD,2025,monthly_oracle,5,22:00-06:30
+ALL,OMAD,2025,monthly_oracle,6,22:00-06:30
+ALL,OMAD,2025,monthly_oracle,7,23:00-07:30
+ALL,OMAD,2025,monthly_oracle,8,23:00-07:30
+ALL,OMAD,2025,monthly_oracle,9,23:00-07:30
+ALL,OMAD,2026,monthly_oracle,5,22:00-06:30
+ALL,OMAD,2026,monthly_oracle,6,22:00-06:30
+ALL,OMAD,2026,monthly_oracle,7,23:00-07:30
+ALL,OMAD,2026,monthly_oracle,8,23:00-07:30
+ALL,OMAD,2026,monthly_oracle,9,23:00-07:30
+ALL,OMAD,2024,monthly_loso,5,22:00-06:30
+ALL,OMAD,2024,monthly_loso,6,22:00-06:30
+ALL,OMAD,2024,monthly_loso,7,23:00-07:30
+ALL,OMAD,2024,monthly_loso,8,23:00-07:30
+ALL,OMAD,2024,monthly_loso,9,23:00-07:30
+ALL,OMAD,2025,monthly_loso,5,22:00-06:30
+ALL,OMAD,2025,monthly_loso,6,22:00-06:30
+ALL,OMAD,2025,monthly_loso,7,23:00-07:30
+ALL,OMAD,2025,monthly_loso,8,23:00-07:30
+ALL,OMAD,2025,monthly_loso,9,23:00-07:30
+ALL,OMAD,2026,monthly_loso,5,22:00-06:30
+ALL,OMAD,2026,monthly_loso,6,23:00-07:30
+ALL,OMAD,2026,monthly_loso,7,23:00-07:30
+ALL,OMAD,2026,monthly_loso,8,23:00-07:30
+ALL,OMAD,2026,monthly_loso,9,23:00-07:30
+ALL,OMAL,2024,seasonal_oracle,5,23:00-07:30
+ALL,OMAL,2024,seasonal_oracle,6,23:00-07:30
+ALL,OMAL,2024,seasonal_oracle,7,23:00-07:30
+ALL,OMAL,2024,seasonal_oracle,8,23:00-07:30
+ALL,OMAL,2024,seasonal_oracle,9,23:00-07:30
+ALL,OMAL,2025,seasonal_oracle,5,23:00-07:30
+ALL,OMAL,2025,seasonal_oracle,6,23:00-07:30
+ALL,OMAL,2025,seasonal_oracle,7,23:00-07:30
+ALL,OMAL,2025,seasonal_oracle,8,23:00-07:30
+ALL,OMAL,2025,seasonal_oracle,9,23:00-07:30
+ALL,OMAL,2026,seasonal_oracle,5,23:00-07:30
+ALL,OMAL,2026,seasonal_oracle,6,23:00-07:30
+ALL,OMAL,2026,seasonal_oracle,7,23:00-07:30
+ALL,OMAL,2026,seasonal_oracle,8,23:00-07:30
+ALL,OMAL,2026,seasonal_oracle,9,23:00-07:30
+ALL,OMAL,2024,seasonal_loso,5,23:00-07:30
+ALL,OMAL,2024,seasonal_loso,6,23:00-07:30
+ALL,OMAL,2024,seasonal_loso,7,23:00-07:30
+ALL,OMAL,2024,seasonal_loso,8,23:00-07:30
+ALL,OMAL,2024,seasonal_loso,9,23:00-07:30
+ALL,OMAL,2025,seasonal_loso,5,23:00-07:30
+ALL,OMAL,2025,seasonal_loso,6,23:00-07:30
+ALL,OMAL,2025,seasonal_loso,7,23:00-07:30
+ALL,OMAL,2025,seasonal_loso,8,23:00-07:30
+ALL,OMAL,2025,seasonal_loso,9,23:00-07:30
+ALL,OMAL,2026,seasonal_loso,5,23:00-07:30
+ALL,OMAL,2026,seasonal_loso,6,23:00-07:30
+ALL,OMAL,2026,seasonal_loso,7,23:00-07:30
+ALL,OMAL,2026,seasonal_loso,8,23:00-07:30
+ALL,OMAL,2026,seasonal_loso,9,23:00-07:30
+ALL,OMAL,2024,monthly_oracle,5,20:30-05:00
+ALL,OMAL,2024,monthly_oracle,6,22:30-07:00
+ALL,OMAL,2024,monthly_oracle,7,23:00-07:30
+ALL,OMAL,2024,monthly_oracle,8,23:00-07:30
+ALL,OMAL,2024,monthly_oracle,9,23:00-07:30
+ALL,OMAL,2025,monthly_oracle,5,20:30-05:00
+ALL,OMAL,2025,monthly_oracle,6,23:00-07:30
+ALL,OMAL,2025,monthly_oracle,7,23:00-07:30
+ALL,OMAL,2025,monthly_oracle,8,23:00-07:30
+ALL,OMAL,2025,monthly_oracle,9,23:00-07:30
+ALL,OMAL,2026,monthly_oracle,5,20:30-05:00
+ALL,OMAL,2026,monthly_oracle,6,23:00-07:30
+ALL,OMAL,2026,monthly_oracle,7,23:00-07:30
+ALL,OMAL,2026,monthly_oracle,8,23:00-07:30
+ALL,OMAL,2026,monthly_oracle,9,23:00-07:30
+ALL,OMAL,2024,monthly_loso,5,20:30-05:00
+ALL,OMAL,2024,monthly_loso,6,23:00-07:30
+ALL,OMAL,2024,monthly_loso,7,23:00-07:30
+ALL,OMAL,2024,monthly_loso,8,23:00-07:30
+ALL,OMAL,2024,monthly_loso,9,23:00-07:30
+ALL,OMAL,2025,monthly_loso,5,20:30-05:00
+ALL,OMAL,2025,monthly_loso,6,23:00-07:30
+ALL,OMAL,2025,monthly_loso,7,23:00-07:30
+ALL,OMAL,2025,monthly_loso,8,23:00-07:30
+ALL,OMAL,2025,monthly_loso,9,23:00-07:30
+ALL,OMAL,2026,monthly_loso,5,20:30-05:00
+ALL,OMAL,2026,monthly_loso,6,23:00-07:30
+ALL,OMAL,2026,monthly_loso,7,23:00-07:30
+ALL,OMAL,2026,monthly_loso,8,23:00-07:30
+ALL,OMAL,2026,monthly_loso,9,23:00-07:30
+ALL,OMDB,2024,seasonal_oracle,5,23:00-07:30
+ALL,OMDB,2024,seasonal_oracle,6,23:00-07:30
+ALL,OMDB,2024,seasonal_oracle,7,23:00-07:30
+ALL,OMDB,2024,seasonal_oracle,8,23:00-07:30
+ALL,OMDB,2024,seasonal_oracle,9,23:00-07:30
+ALL,OMDB,2025,seasonal_oracle,5,23:00-07:30
+ALL,OMDB,2025,seasonal_oracle,6,23:00-07:30
+ALL,OMDB,2025,seasonal_oracle,7,23:00-07:30
+ALL,OMDB,2025,seasonal_oracle,8,23:00-07:30
+ALL,OMDB,2025,seasonal_oracle,9,23:00-07:30
+ALL,OMDB,2026,seasonal_oracle,5,23:00-07:30
+ALL,OMDB,2026,seasonal_oracle,6,23:00-07:30
+ALL,OMDB,2026,seasonal_oracle,7,23:00-07:30
+ALL,OMDB,2026,seasonal_oracle,8,23:00-07:30
+ALL,OMDB,2026,seasonal_oracle,9,23:00-07:30
+ALL,OMDB,2024,seasonal_loso,5,23:00-07:30
+ALL,OMDB,2024,seasonal_loso,6,23:00-07:30
+ALL,OMDB,2024,seasonal_loso,7,23:00-07:30
+ALL,OMDB,2024,seasonal_loso,8,23:00-07:30
+ALL,OMDB,2024,seasonal_loso,9,23:00-07:30
+ALL,OMDB,2025,seasonal_loso,5,23:00-07:30
+ALL,OMDB,2025,seasonal_loso,6,23:00-07:30
+ALL,OMDB,2025,seasonal_loso,7,23:00-07:30
+ALL,OMDB,2025,seasonal_loso,8,23:00-07:30
+ALL,OMDB,2025,seasonal_loso,9,23:00-07:30
+ALL,OMDB,2026,seasonal_loso,5,23:00-07:30
+ALL,OMDB,2026,seasonal_loso,6,23:00-07:30
+ALL,OMDB,2026,seasonal_loso,7,23:00-07:30
+ALL,OMDB,2026,seasonal_loso,8,23:00-07:30
+ALL,OMDB,2026,seasonal_loso,9,23:00-07:30
+ALL,OMDB,2024,monthly_oracle,5,23:00-07:30
+ALL,OMDB,2024,monthly_oracle,6,23:00-07:30
+ALL,OMDB,2024,monthly_oracle,7,23:00-07:30
+ALL,OMDB,2024,monthly_oracle,8,23:00-07:30
+ALL,OMDB,2024,monthly_oracle,9,23:00-07:30
+ALL,OMDB,2025,monthly_oracle,5,23:00-07:30
+ALL,OMDB,2025,monthly_oracle,6,23:00-07:30
+ALL,OMDB,2025,monthly_oracle,7,23:00-07:30
+ALL,OMDB,2025,monthly_oracle,8,23:00-07:30
+ALL,OMDB,2025,monthly_oracle,9,23:00-07:30
+ALL,OMDB,2026,monthly_oracle,5,23:00-07:30
+ALL,OMDB,2026,monthly_oracle,6,23:00-07:30
+ALL,OMDB,2026,monthly_oracle,7,23:00-07:30
+ALL,OMDB,2026,monthly_oracle,8,23:00-07:30
+ALL,OMDB,2026,monthly_oracle,9,23:00-07:30
+ALL,OMDB,2024,monthly_loso,5,23:00-07:30
+ALL,OMDB,2024,monthly_loso,6,23:00-07:30
+ALL,OMDB,2024,monthly_loso,7,23:00-07:30
+ALL,OMDB,2024,monthly_loso,8,23:00-07:30
+ALL,OMDB,2024,monthly_loso,9,23:00-07:30
+ALL,OMDB,2025,monthly_loso,5,23:00-07:30
+ALL,OMDB,2025,monthly_loso,6,23:00-07:30
+ALL,OMDB,2025,monthly_loso,7,23:00-07:30
+ALL,OMDB,2025,monthly_loso,8,23:00-07:30
+ALL,OMDB,2025,monthly_loso,9,23:00-07:30
+ALL,OMDB,2026,monthly_loso,5,23:00-07:30
+ALL,OMDB,2026,monthly_loso,6,23:00-07:30
+ALL,OMDB,2026,monthly_loso,7,23:00-07:30
+ALL,OMDB,2026,monthly_loso,8,23:00-07:30
+ALL,OMDB,2026,monthly_loso,9,23:00-07:30
+ALL,OMDW,2024,seasonal_oracle,5,23:00-07:30
+ALL,OMDW,2024,seasonal_oracle,6,23:00-07:30
+ALL,OMDW,2024,seasonal_oracle,7,23:00-07:30
+ALL,OMDW,2024,seasonal_oracle,8,23:00-07:30
+ALL,OMDW,2024,seasonal_oracle,9,23:00-07:30
+ALL,OMDW,2025,seasonal_oracle,5,23:00-07:30
+ALL,OMDW,2025,seasonal_oracle,6,23:00-07:30
+ALL,OMDW,2025,seasonal_oracle,7,23:00-07:30
+ALL,OMDW,2025,seasonal_oracle,8,23:00-07:30
+ALL,OMDW,2025,seasonal_oracle,9,23:00-07:30
+ALL,OMDW,2026,seasonal_oracle,5,23:00-07:30
+ALL,OMDW,2026,seasonal_oracle,6,23:00-07:30
+ALL,OMDW,2026,seasonal_oracle,7,23:00-07:30
+ALL,OMDW,2026,seasonal_oracle,8,23:00-07:30
+ALL,OMDW,2026,seasonal_oracle,9,23:00-07:30
+ALL,OMDW,2024,seasonal_loso,5,23:00-07:30
+ALL,OMDW,2024,seasonal_loso,6,23:00-07:30
+ALL,OMDW,2024,seasonal_loso,7,23:00-07:30
+ALL,OMDW,2024,seasonal_loso,8,23:00-07:30
+ALL,OMDW,2024,seasonal_loso,9,23:00-07:30
+ALL,OMDW,2025,seasonal_loso,5,23:00-07:30
+ALL,OMDW,2025,seasonal_loso,6,23:00-07:30
+ALL,OMDW,2025,seasonal_loso,7,23:00-07:30
+ALL,OMDW,2025,seasonal_loso,8,23:00-07:30
+ALL,OMDW,2025,seasonal_loso,9,23:00-07:30
+ALL,OMDW,2026,seasonal_loso,5,23:00-07:30
+ALL,OMDW,2026,seasonal_loso,6,23:00-07:30
+ALL,OMDW,2026,seasonal_loso,7,23:00-07:30
+ALL,OMDW,2026,seasonal_loso,8,23:00-07:30
+ALL,OMDW,2026,seasonal_loso,9,23:00-07:30
+ALL,OMDW,2024,monthly_oracle,5,22:30-07:00
+ALL,OMDW,2024,monthly_oracle,6,23:00-07:30
+ALL,OMDW,2024,monthly_oracle,7,23:00-07:30
+ALL,OMDW,2024,monthly_oracle,8,23:00-07:30
+ALL,OMDW,2024,monthly_oracle,9,23:00-07:30
+ALL,OMDW,2025,monthly_oracle,5,23:00-07:30
+ALL,OMDW,2025,monthly_oracle,6,23:00-07:30
+ALL,OMDW,2025,monthly_oracle,7,23:00-07:30
+ALL,OMDW,2025,monthly_oracle,8,23:00-07:30
+ALL,OMDW,2025,monthly_oracle,9,23:00-07:30
+ALL,OMDW,2026,monthly_oracle,5,22:30-07:00
+ALL,OMDW,2026,monthly_oracle,6,23:00-07:30
+ALL,OMDW,2026,monthly_oracle,7,23:00-07:30
+ALL,OMDW,2026,monthly_oracle,8,23:00-07:30
+ALL,OMDW,2026,monthly_oracle,9,23:00-07:30
+ALL,OMDW,2024,monthly_loso,5,23:00-07:30
+ALL,OMDW,2024,monthly_loso,6,23:00-07:30
+ALL,OMDW,2024,monthly_loso,7,23:00-07:30
+ALL,OMDW,2024,monthly_loso,8,23:00-07:30
+ALL,OMDW,2024,monthly_loso,9,23:00-07:30
+ALL,OMDW,2025,monthly_loso,5,22:30-07:00
+ALL,OMDW,2025,monthly_loso,6,23:00-07:30
+ALL,OMDW,2025,monthly_loso,7,23:00-07:30
+ALL,OMDW,2025,monthly_loso,8,23:00-07:30
+ALL,OMDW,2025,monthly_loso,9,23:00-07:30
+ALL,OMDW,2026,monthly_loso,5,23:00-07:30
+ALL,OMDW,2026,monthly_loso,6,23:00-07:30
+ALL,OMDW,2026,monthly_loso,7,23:00-07:30
+ALL,OMDW,2026,monthly_loso,8,23:00-07:30
+ALL,OMDW,2026,monthly_loso,9,23:00-07:30
+ALL,OMFJ,2024,seasonal_oracle,5,22:00-06:30
+ALL,OMFJ,2024,seasonal_oracle,6,22:00-06:30
+ALL,OMFJ,2024,seasonal_oracle,7,22:00-06:30
+ALL,OMFJ,2024,seasonal_oracle,8,22:00-06:30
+ALL,OMFJ,2024,seasonal_oracle,9,22:00-06:30
+ALL,OMFJ,2025,seasonal_oracle,5,22:00-06:30
+ALL,OMFJ,2025,seasonal_oracle,6,22:00-06:30
+ALL,OMFJ,2025,seasonal_oracle,7,22:00-06:30
+ALL,OMFJ,2025,seasonal_oracle,8,22:00-06:30
+ALL,OMFJ,2025,seasonal_oracle,9,22:00-06:30
+ALL,OMFJ,2026,seasonal_oracle,5,22:00-06:30
+ALL,OMFJ,2026,seasonal_oracle,6,22:00-06:30
+ALL,OMFJ,2026,seasonal_oracle,7,22:00-06:30
+ALL,OMFJ,2026,seasonal_oracle,8,22:00-06:30
+ALL,OMFJ,2026,seasonal_oracle,9,22:00-06:30
+ALL,OMFJ,2024,seasonal_loso,5,22:00-06:30
+ALL,OMFJ,2024,seasonal_loso,6,22:00-06:30
+ALL,OMFJ,2024,seasonal_loso,7,22:00-06:30
+ALL,OMFJ,2024,seasonal_loso,8,22:00-06:30
+ALL,OMFJ,2024,seasonal_loso,9,22:00-06:30
+ALL,OMFJ,2025,seasonal_loso,5,22:00-06:30
+ALL,OMFJ,2025,seasonal_loso,6,22:00-06:30
+ALL,OMFJ,2025,seasonal_loso,7,22:00-06:30
+ALL,OMFJ,2025,seasonal_loso,8,22:00-06:30
+ALL,OMFJ,2025,seasonal_loso,9,22:00-06:30
+ALL,OMFJ,2026,seasonal_loso,5,22:00-06:30
+ALL,OMFJ,2026,seasonal_loso,6,22:00-06:30
+ALL,OMFJ,2026,seasonal_loso,7,22:00-06:30
+ALL,OMFJ,2026,seasonal_loso,8,22:00-06:30
+ALL,OMFJ,2026,seasonal_loso,9,22:00-06:30
+ALL,OMFJ,2024,monthly_oracle,5,20:30-05:00
+ALL,OMFJ,2024,monthly_oracle,6,21:30-06:00
+ALL,OMFJ,2024,monthly_oracle,7,22:00-06:30
+ALL,OMFJ,2024,monthly_oracle,8,22:00-06:30
+ALL,OMFJ,2024,monthly_oracle,9,22:00-06:30
+ALL,OMFJ,2025,monthly_oracle,5,21:30-06:00
+ALL,OMFJ,2025,monthly_oracle,6,21:30-06:00
+ALL,OMFJ,2025,monthly_oracle,7,22:00-06:30
+ALL,OMFJ,2025,monthly_oracle,8,22:00-06:30
+ALL,OMFJ,2025,monthly_oracle,9,22:00-06:30
+ALL,OMFJ,2026,monthly_oracle,5,21:00-05:30
+ALL,OMFJ,2026,monthly_oracle,6,22:00-06:30
+ALL,OMFJ,2026,monthly_oracle,7,22:00-06:30
+ALL,OMFJ,2026,monthly_oracle,8,22:00-06:30
+ALL,OMFJ,2026,monthly_oracle,9,22:00-06:30
+ALL,OMFJ,2024,monthly_loso,5,21:30-06:00
+ALL,OMFJ,2024,monthly_loso,6,22:00-06:30
+ALL,OMFJ,2024,monthly_loso,7,22:00-06:30
+ALL,OMFJ,2024,monthly_loso,8,22:00-06:30
+ALL,OMFJ,2024,monthly_loso,9,22:00-06:30
+ALL,OMFJ,2025,monthly_loso,5,21:00-05:30
+ALL,OMFJ,2025,monthly_loso,6,22:00-06:30
+ALL,OMFJ,2025,monthly_loso,7,22:00-06:30
+ALL,OMFJ,2025,monthly_loso,8,22:00-06:30
+ALL,OMFJ,2025,monthly_loso,9,22:00-06:30
+ALL,OMFJ,2026,monthly_loso,5,21:30-06:00
+ALL,OMFJ,2026,monthly_loso,6,21:30-06:00
+ALL,OMFJ,2026,monthly_loso,7,22:00-06:30
+ALL,OMFJ,2026,monthly_loso,8,22:00-06:30
+ALL,OMFJ,2026,monthly_loso,9,22:00-06:30
+ALL,OMSJ,2024,seasonal_oracle,5,23:00-07:30
+ALL,OMSJ,2024,seasonal_oracle,6,23:00-07:30
+ALL,OMSJ,2024,seasonal_oracle,7,23:00-07:30
+ALL,OMSJ,2024,seasonal_oracle,8,23:00-07:30
+ALL,OMSJ,2024,seasonal_oracle,9,23:00-07:30
+ALL,OMSJ,2025,seasonal_oracle,5,23:00-07:30
+ALL,OMSJ,2025,seasonal_oracle,6,23:00-07:30
+ALL,OMSJ,2025,seasonal_oracle,7,23:00-07:30
+ALL,OMSJ,2025,seasonal_oracle,8,23:00-07:30
+ALL,OMSJ,2025,seasonal_oracle,9,23:00-07:30
+ALL,OMSJ,2026,seasonal_oracle,5,23:00-07:30
+ALL,OMSJ,2026,seasonal_oracle,6,23:00-07:30
+ALL,OMSJ,2026,seasonal_oracle,7,23:00-07:30
+ALL,OMSJ,2026,seasonal_oracle,8,23:00-07:30
+ALL,OMSJ,2026,seasonal_oracle,9,23:00-07:30
+ALL,OMSJ,2024,seasonal_loso,5,23:00-07:30
+ALL,OMSJ,2024,seasonal_loso,6,23:00-07:30
+ALL,OMSJ,2024,seasonal_loso,7,23:00-07:30
+ALL,OMSJ,2024,seasonal_loso,8,23:00-07:30
+ALL,OMSJ,2024,seasonal_loso,9,23:00-07:30
+ALL,OMSJ,2025,seasonal_loso,5,23:00-07:30
+ALL,OMSJ,2025,seasonal_loso,6,23:00-07:30
+ALL,OMSJ,2025,seasonal_loso,7,23:00-07:30
+ALL,OMSJ,2025,seasonal_loso,8,23:00-07:30
+ALL,OMSJ,2025,seasonal_loso,9,23:00-07:30
+ALL,OMSJ,2026,seasonal_loso,5,23:00-07:30
+ALL,OMSJ,2026,seasonal_loso,6,23:00-07:30
+ALL,OMSJ,2026,seasonal_loso,7,23:00-07:30
+ALL,OMSJ,2026,seasonal_loso,8,23:00-07:30
+ALL,OMSJ,2026,seasonal_loso,9,23:00-07:30
+ALL,OMSJ,2024,monthly_oracle,5,22:00-06:30
+ALL,OMSJ,2024,monthly_oracle,6,22:30-07:00
+ALL,OMSJ,2024,monthly_oracle,7,23:00-07:30
+ALL,OMSJ,2024,monthly_oracle,8,23:00-07:30
+ALL,OMSJ,2024,monthly_oracle,9,23:00-07:30
+ALL,OMSJ,2025,monthly_oracle,5,23:00-07:30
+ALL,OMSJ,2025,monthly_oracle,6,22:00-06:30
+ALL,OMSJ,2025,monthly_oracle,7,23:00-07:30
+ALL,OMSJ,2025,monthly_oracle,8,23:00-07:30
+ALL,OMSJ,2025,monthly_oracle,9,23:00-07:30
+ALL,OMSJ,2026,monthly_oracle,5,20:30-05:00
+ALL,OMSJ,2026,monthly_oracle,6,22:30-07:00
+ALL,OMSJ,2026,monthly_oracle,7,22:30-07:00
+ALL,OMSJ,2026,monthly_oracle,8,23:00-07:30
+ALL,OMSJ,2026,monthly_oracle,9,23:00-07:30
+ALL,OMSJ,2024,monthly_loso,5,23:00-07:30
+ALL,OMSJ,2024,monthly_loso,6,22:30-07:00
+ALL,OMSJ,2024,monthly_loso,7,22:30-07:00
+ALL,OMSJ,2024,monthly_loso,8,23:00-07:30
+ALL,OMSJ,2024,monthly_loso,9,23:00-07:30
+ALL,OMSJ,2025,monthly_loso,5,22:00-06:30
+ALL,OMSJ,2025,monthly_loso,6,22:30-07:00
+ALL,OMSJ,2025,monthly_loso,7,22:30-07:00
+ALL,OMSJ,2025,monthly_loso,8,23:00-07:30
+ALL,OMSJ,2025,monthly_loso,9,23:00-07:30
+ALL,OMSJ,2026,monthly_loso,5,23:00-07:30
+ALL,OMSJ,2026,monthly_loso,6,22:30-07:00
+ALL,OMSJ,2026,monthly_loso,7,23:00-07:30
+ALL,OMSJ,2026,monthly_loso,8,23:00-07:30
+ALL,OMSJ,2026,monthly_loso,9,23:00-07:30
+ALL,OMRK,2024,seasonal_oracle,5,22:00-06:30
+ALL,OMRK,2024,seasonal_oracle,6,22:00-06:30
+ALL,OMRK,2024,seasonal_oracle,7,22:00-06:30
+ALL,OMRK,2024,seasonal_oracle,8,22:00-06:30
+ALL,OMRK,2024,seasonal_oracle,9,22:00-06:30
+ALL,OMRK,2025,seasonal_oracle,5,22:00-06:30
+ALL,OMRK,2025,seasonal_oracle,6,22:00-06:30
+ALL,OMRK,2025,seasonal_oracle,7,22:00-06:30
+ALL,OMRK,2025,seasonal_oracle,8,22:00-06:30
+ALL,OMRK,2025,seasonal_oracle,9,22:00-06:30
+ALL,OMRK,2026,seasonal_oracle,5,22:00-06:30
+ALL,OMRK,2026,seasonal_oracle,6,22:00-06:30
+ALL,OMRK,2026,seasonal_oracle,7,22:00-06:30
+ALL,OMRK,2026,seasonal_oracle,8,22:00-06:30
+ALL,OMRK,2026,seasonal_oracle,9,22:00-06:30
+ALL,OMRK,2024,seasonal_loso,5,22:00-06:30
+ALL,OMRK,2024,seasonal_loso,6,22:00-06:30
+ALL,OMRK,2024,seasonal_loso,7,22:00-06:30
+ALL,OMRK,2024,seasonal_loso,8,22:00-06:30
+ALL,OMRK,2024,seasonal_loso,9,22:00-06:30
+ALL,OMRK,2025,seasonal_loso,5,22:00-06:30
+ALL,OMRK,2025,seasonal_loso,6,22:00-06:30
+ALL,OMRK,2025,seasonal_loso,7,22:00-06:30
+ALL,OMRK,2025,seasonal_loso,8,22:00-06:30
+ALL,OMRK,2025,seasonal_loso,9,22:00-06:30
+ALL,OMRK,2026,seasonal_loso,5,22:00-06:30
+ALL,OMRK,2026,seasonal_loso,6,22:00-06:30
+ALL,OMRK,2026,seasonal_loso,7,22:00-06:30
+ALL,OMRK,2026,seasonal_loso,8,22:00-06:30
+ALL,OMRK,2026,seasonal_loso,9,22:00-06:30
+ALL,OMRK,2024,monthly_oracle,5,20:30-05:00
+ALL,OMRK,2024,monthly_oracle,6,22:00-06:30
+ALL,OMRK,2024,monthly_oracle,7,22:00-06:30
+ALL,OMRK,2024,monthly_oracle,8,22:30-07:00
+ALL,OMRK,2024,monthly_oracle,9,23:00-07:30
+ALL,OMRK,2025,monthly_oracle,5,20:30-05:00
+ALL,OMRK,2025,monthly_oracle,6,22:00-06:30
+ALL,OMRK,2025,monthly_oracle,7,22:00-06:30
+ALL,OMRK,2025,monthly_oracle,8,22:00-06:30
+ALL,OMRK,2025,monthly_oracle,9,23:00-07:30
+ALL,OMRK,2026,monthly_oracle,5,19:30-04:00
+ALL,OMRK,2026,monthly_oracle,6,22:00-06:30
+ALL,OMRK,2026,monthly_oracle,7,22:00-06:30
+ALL,OMRK,2026,monthly_oracle,8,22:00-06:30
+ALL,OMRK,2026,monthly_oracle,9,22:30-07:00
+ALL,OMRK,2024,monthly_loso,5,20:30-05:00
+ALL,OMRK,2024,monthly_loso,6,22:00-06:30
+ALL,OMRK,2024,monthly_loso,7,22:00-06:30
+ALL,OMRK,2024,monthly_loso,8,22:00-06:30
+ALL,OMRK,2024,monthly_loso,9,23:00-07:30
+ALL,OMRK,2025,monthly_loso,5,20:30-05:00
+ALL,OMRK,2025,monthly_loso,6,22:00-06:30
+ALL,OMRK,2025,monthly_loso,7,22:00-06:30
+ALL,OMRK,2025,monthly_loso,8,22:00-06:30
+ALL,OMRK,2025,monthly_loso,9,23:00-07:30
+ALL,OMRK,2026,monthly_loso,5,20:30-05:00
+ALL,OMRK,2026,monthly_loso,6,22:00-06:30
+ALL,OMRK,2026,monthly_loso,7,22:00-06:30
+ALL,OMRK,2026,monthly_loso,8,22:30-07:00
+ALL,OMRK,2026,monthly_loso,9,23:00-07:30

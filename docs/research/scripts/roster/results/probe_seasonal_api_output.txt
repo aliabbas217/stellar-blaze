@@ -1,0 +1,35 @@
+Installed 5 packages in 63ms
+--- seasonal_daily46: HTTP 200, 74272 bytes, URL https://seasonal-api.open-meteo.com/v1/seasonal?latitude=24.433&longitude=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean%2Crelative_humidity_2m_mean%2Cwind_speed_10m_mean%2Cshortwave_radiation_s
+    grid 24.590162 54.683544 elev 16.0
+    block daily: 46 steps ['2026-11-11']..['2026-12-26']; base vars ['temperature_2m_mean', 'dew_point_2m_mean', 'relative_humidity_2m_mean', 'wind_speed_10m_mean', 'shortwave_radiation_sum']; n members 50
+    temperature_2m_mean: n=46 null=0 first=[29.1, 27.2, 26.6] last=[19.6, 18.7, 19.0]
+    dew_point_2m_mean: n=46 null=0 first=[19.5, 18.3, 16.4] last=[13.4, 14.3, 11.5]
+    relative_humidity_2m_mean: n=46 null=0 first=[57, 58, 54] last=[69, 77, 67]
+--- seasonal_6h46: HTTP 200, 169 bytes, URL https://seasonal-api.open-meteo.com/v1/seasonal?latitude=24.433&longitude=54.651&six_hourly=temperature_2m%2Cdew_point_2m%2Cwind_speed_10m%2Cshortwave_radiation&forecast_days=46&timezone=UTC
+    block six_hourly: 0 steps []..[]; base vars []; n members 0
+--- seasonal_past30: HTTP 200, 46639 bytes, URL https://seasonal-api.open-meteo.com/v1/seasonal?latitude=24.433&longitude=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&past_days=30&forecast_days=46&timezone=UTC
+    block daily: 76 steps ['2026-10-12']..['2026-12-26']; base vars ['temperature_2m_mean', 'dew_point_2m_mean']; n members 50
+    temperature_2m_mean: n=76 null=0 first=[32.7, 33.6, 33.6] last=[19.6, 18.7, 19.0]
+    dew_point_2m_mean: n=76 null=0 first=[22.1, 18.5, 20.0] last=[13.4, 14.3, 11.5]
+--- seasonal_past92: HTTP 200, 79064 bytes, URL https://seasonal-api.open-meteo.com/v1/seasonal?latitude=24.433&longitude=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&past_days=92&forecast_days=46&timezone=UTC
+    block daily: 138 steps ['2026-08-11']..['2026-12-26']; base vars ['temperature_2m_mean', 'dew_point_2m_mean']; n members 50
+    temperature_2m_mean: n=138 null=60 first=[None, None, None] last=[19.6, 18.7, 19.0]
+    dew_point_2m_mean: n=138 null=60 first=[None, None, None] last=[13.4, 14.3, 11.5]
+--- seasonal_past400: HTTP 200, 240149 bytes, URL https://seasonal-api.open-meteo.com/v1/seasonal?latitude=24.433&longitude=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&past_days=400&forecast_days=46&timezone=UTC
+    block daily: 446 steps ['2025-10-07']..['2026-12-26']; base vars ['temperature_2m_mean', 'dew_point_2m_mean']; n members 50
+    temperature_2m_mean: n=446 null=368 first=[None, None, None] last=[19.6, 18.7, 19.0]
+    dew_point_2m_mean: n=446 null=368 first=[None, None, None] last=[13.4, 14.3, 11.5]
+--- seasonal_hist_2025: HTTP 400, 102 bytes, URL https://seasonal-api.open-meteo.com/v1/seasonal?latitude=24.433&longitude=54.651&daily=temperature_2m_mean%2Cdew_point_2m_mean&start_date=2025-07-01&end_date=2025-08-15&timezone=UTC
+    {"error":true,"reason":"Parameter 'start_date' is out of allowed range from 2025-09-01 to 2027-06-15"}
+--- ensemble_gfs025: HTTP 200, 279756 bytes, URL https://ensemble-api.open-meteo.com/v1/ensemble?latitude=24.433&longitude=54.651&hourly=temperature_2m%2Cdew_point_2m&models=gfs025&forecast_days=35&timezone=UTC
+    block hourly: 840 steps ['2026-11-11T00:00']..['2026-12-15T23:00']; base vars ['temperature_2m', 'dew_point_2m']; n members 30
+    temperature_2m: n=840 null=597 first=[26.6, 26.4, 26.1] last=[None, None, None]
+    dew_point_2m: n=840 null=597 first=[19.0, 19.0, 19.5] last=[None, None, None]
+--- ensemble_gfs05: HTTP 200, 279809 bytes, URL https://ensemble-api.open-meteo.com/v1/ensemble?latitude=24.433&longitude=54.651&hourly=temperature_2m%2Cdew_point_2m&models=gfs05&forecast_days=35&timezone=UTC
+    block hourly: 840 steps ['2026-11-11T00:00']..['2026-12-15T23:00']; base vars ['temperature_2m', 'dew_point_2m']; n members 30
+    temperature_2m: n=840 null=21 first=[27.9, 27.8, 27.6] last=[None, None, None]
+    dew_point_2m: n=840 null=21 first=[19.7, 19.8, 20.5] last=[None, None, None]
+--- ensemble_ecmwf_ifs025: HTTP 200, 209016 bytes, URL https://ensemble-api.open-meteo.com/v1/ensemble?latitude=24.433&longitude=54.651&hourly=temperature_2m%2Cdew_point_2m&models=ecmwf_ifs025&forecast_days=16&timezone=UTC
+    block hourly: 384 steps ['2026-11-11T00:00']..['2026-11-26T23:00']; base vars ['temperature_2m', 'dew_point_2m']; n members 50
+    temperature_2m: n=384 null=33 first=[26.8, 26.4, 25.9] last=[None, None, None]
+    dew_point_2m: n=384 null=33 first=[19.2, 19.5, 20.0] last=[None, None, None]
