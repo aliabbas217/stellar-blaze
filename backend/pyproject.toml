@@ -201,7 +201,6 @@ DEP002 = [
     # TEMPORARY (preflight F1): declared up front by the stack doc but not imported until the task named on each
     # line lands, and `deptry src` must stay green on every task commit. Delete each entry in the task that first
     # imports it; the last B1 task must leave only the permanent entries above.
-    "thermofeel",  # Task 6
     "httpx2",  # Task 8
     "stamina",  # Task 8
     "pythermalcomfort",  # Task 14

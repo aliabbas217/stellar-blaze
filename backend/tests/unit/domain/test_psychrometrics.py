@@ -34,7 +34,7 @@ def test_saturation_vapor_pressure_is_strictly_increasing_over_the_bisection_bra
     assert np.all(np.diff(es) > 0.0)
 
 
-def test_functions_are_vectorised_and_return_float64_arrays() -> None:
+def test_functions_are_vectorized_and_return_float64_arrays() -> None:
     t = np.array([[20.0, 30.0], [35.0, 40.0]])
     es = saturation_vapor_pressure_kpa(t)
     assert isinstance(es, np.ndarray)

@@ -1,6 +1,6 @@
 """Psychrometric relations between dew point, wet bulb, vapor pressure and relative humidity.
 
-Every function is vectorised: it takes anything NumPy can read as floats (a scalar, a list, an array of any shape;
+Every function is vectorized: it takes anything NumPy can read as floats (a scalar, a list, an array of any shape;
 arguments broadcast against each other) and returns a ``float64`` array of the broadcast shape. A scalar argument gives
 a zero-dimensional array, which behaves as a float in arithmetic; use ``float(...)`` where a plain float is required.
 NaN in gives NaN out. Temperatures are in degrees Celsius, vapor pressures in kPa and air pressure in hPa.
@@ -73,7 +73,7 @@ def relative_humidity_pct(t_c: ArrayLike, td_c: ArrayLike) -> F64:
 def dewpoint_c_from_vapor_pressure(e_kpa: ArrayLike) -> F64:
     """Dew point in degrees Celsius: the inverse of ``saturation_vapor_pressure_kpa``.
 
-    Found by vectorised bisection on [-60, 60] degrees Celsius to within 1e-6 degrees Celsius, so the inverse is exact
+    Found by vectorized bisection on [-60, 60] degrees Celsius to within 1e-6 degrees Celsius, so the inverse is exact
     for the same formula that produced the vapor pressure. A vapor pressure that is NaN, or lies outside the range of
     that bracket (including zero and negative values), has no dew point there and gives NaN rather than a clamped
     value.
