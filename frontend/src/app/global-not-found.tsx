@@ -1,23 +1,33 @@
-import { hasLocale } from "next-intl";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { cookies } from "next/headers";
 import { fontClassFor } from "@/app/fonts";
+import { titleWithAppName } from "@/app/titles";
 import { themeScript } from "@/components/shell/theme-script";
 import { buttonVariants } from "@/components/ui/button";
+import { getCookieLocale } from "@/i18n/cookie-locale";
 import { dirFor } from "@/i18n/direction";
-import { routing } from "@/i18n/routing";
 import "@/styles/globals.css";
 
 /*
  * The 404 for every URL no route matches (see experimental.globalNotFound in next.config.ts). It renders
- * outside the [locale] layout, so there is no route parameter to read: the language is the NEXT_LOCALE cookie that
+ * outside the [locale] layout, so there is no route parameter to read: the language is the locale cookie that
  * the proxy sets from the URL prefix (so /ur/typo answers in Urdu), else the default. A page that calls notFound()
  * itself is not served by this file (Next.js returns 404 with a client-rendered shell); pages under [locale]
  * should show their own empty or error state instead.
+ *
+ * This file is outside the layout's metadata too, so it sets its own <title> (WCAG 2.4.2). No `robots` is set
+ * here: Next.js adds <meta name="robots" content="noindex"> to every 404 itself, and setting it again
+ * rendered the tag twice (checked in the production build).
  */
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getCookieLocale();
+  const t = await getTranslations({ locale, namespace: "shell.notFound" });
+  const common = await getTranslations({ locale, namespace: "common" });
+  return { title: titleWithAppName(t("title"), common("appName")) };
+}
+
 export default async function GlobalNotFound() {
-  const stored = (await cookies()).get("NEXT_LOCALE")?.value;
-  const locale = hasLocale(routing.locales, stored) ? stored : routing.defaultLocale;
+  const locale = await getCookieLocale();
   const t = await getTranslations({ locale, namespace: "shell.notFound" });
 
   return (

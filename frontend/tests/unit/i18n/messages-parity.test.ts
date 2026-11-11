@@ -116,6 +116,12 @@ describe("messages: copy fixed by the governance constraints", () => {
     expect(enFlat.get("alerts.limitation")).toBe(enFlat.get("today.limitation"));
   });
 
+  it("says what the alert subscription carries: the site and the optional crew, never 'anonymous' or 'nothing else'", () => {
+    const server = enFlat.get("profile.consent.server");
+    expect(server).toMatch(/crew/);
+    expect(server).not.toMatch(/anonymous|nothing else/i);
+  });
+
   it("keeps every action text a flagged draft placeholder (no invented safety wording)", () => {
     const actionKeys = [...enFlat.keys()].filter((k) => k.startsWith("actions."));
     expect(actionKeys.sort()).toEqual(["actions.draft", "actions.pending"]);

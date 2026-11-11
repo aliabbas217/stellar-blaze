@@ -3,6 +3,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { fontClassFor } from "@/app/fonts";
+import { titleTemplate } from "@/app/titles";
 import { themeScript } from "@/components/shell/theme-script";
 import { dirFor } from "@/i18n/direction";
 import { routing } from "@/i18n/routing";
@@ -23,7 +24,7 @@ export async function generateMetadata(props: LayoutProps<"/[locale]">): Promise
   if (!hasLocale(routing.locales, locale)) notFound();
   const t = await getTranslations({ locale, namespace: "common" });
   return {
-    title: { default: t("appName"), template: `%s · ${t("appName")}` },
+    title: { default: t("appName"), template: titleTemplate(t("appName")) },
     description: t("appDescription"),
   };
 }

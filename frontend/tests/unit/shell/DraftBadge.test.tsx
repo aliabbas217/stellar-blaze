@@ -30,6 +30,19 @@ describe("DraftBadge", () => {
   it("tells screen readers why, not only that, the translation is a draft", () => {
     const unknown = { ...enMessages, _meta: { review_status: "machine-draft" } };
     renderWithIntl(<DraftBadge />, { messages: unknown });
-    expect(screen.getByText(/machine draft/)).toHaveClass("sr-only");
+    const note = screen.getByText(/machine draft/);
+    expect(note).toHaveClass("sr-only");
+    // Exactly the message: no punctuation or spacing is added in code (it differs per script).
+    expect(note.textContent).toBe(enMessages.shell.draftTranslationNote);
+  });
+
+  it("keeps the label and the note in separate paragraphs, so they are read apart", () => {
+    const unknown = { ...enMessages, _meta: { review_status: "machine-draft" } };
+    renderWithIntl(<DraftBadge />, { messages: unknown });
+    const label = screen.getByText(enMessages.shell.draftTranslation);
+    const note = screen.getByText(enMessages.shell.draftTranslationNote);
+    expect(label.tagName).toBe("P");
+    expect(note.tagName).toBe("P");
+    expect(label).not.toBe(note);
   });
 });

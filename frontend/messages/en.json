@@ -101,7 +101,7 @@
       "storedHeading": "What is stored",
       "stored": "Your type of work, the date you started working in heat, and your clothing option. They are stored only on this phone.",
       "serverHeading": "What the server gets",
-      "server": "Nothing about you. If you turn on alerts, an anonymous alert subscription for your site is sent, and nothing else.",
+      "server": "Nothing from your profile. If you turn on alerts, an alert subscription for your site (and your crew, if you chose one) is sent. It is not linked to your name or profile.",
       "useHeading": "How it is used",
       "use": "It is never used for discipline or employment decisions.",
       "revokeHeading": "Taking it back",
