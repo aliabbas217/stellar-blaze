@@ -1,0 +1,23 @@
+# dependencies
+/node_modules
+.pnpm-debug.log*
+
+# next.js build output and generated types
+/.next/
+/out/
+next-env.d.ts
+
+# test output
+/coverage
+/playwright-report/
+/test-results/
+
+# typescript
+*.tsbuildinfo
+
+# env files with local values (committed templates such as .env.example stay tracked)
+.env*.local
+
+# misc
+.DS_Store
+*.pem

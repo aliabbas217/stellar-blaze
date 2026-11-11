@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1
+
+FROM node:24.22.2-trixie-slim AS build
+WORKDIR /app
+RUN npm i -g pnpm@12.18.0
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm build
+
+FROM node:24.22.2-trixie-slim AS runtime
+WORKDIR /app
+# ARG and ENV do not cross stages: APP_VERSION must be set here for GET /api/healthz to report it at request time.
+ARG APP_VERSION=dev
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 APP_VERSION=${APP_VERSION}
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/public ./public
+USER node
+EXPOSE 3000
+CMD ["node", "server.js"]
