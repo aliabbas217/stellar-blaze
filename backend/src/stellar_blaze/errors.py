@@ -14,7 +14,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from stellar_blaze.logging import mark_exception_reported
 
 PROBLEM_JSON = "application/problem+json"
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -22,8 +25,11 @@ REQUEST_ID_HEADER = "X-Request-ID"
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class Problem(BaseModel):
-    """An RFC 9457 problem. Extension members (``reason``, ``dependency``, ...) are kept as extra fields."""
+class ProblemDraft(BaseModel):
+    """What a layer knows when it raises: the problem itself, before the request (``instance``, ``request_id``) is.
+
+    Extension members (``reason``, ``dependency``, ...) are kept as extra fields.
+    """
 
     model_config = ConfigDict(extra="allow")
 
@@ -32,8 +38,27 @@ class Problem(BaseModel):
     status: int = Field(ge=100, le=599)
     detail: str | None = None
     instance: str | None = None
+
+
+class Problem(BaseModel):
+    """An RFC 9457 problem details object, sent as ``application/problem+json`` for every error response.
+
+    Extension members (for example ``dependency`` or ``errors``) may be present. ``detail`` is omitted when there is
+    none.
+    """
+
+    # The OpenAPI schema of every error response; the docstring above is client-facing. `_respond` assembles the body
+    # and tests/unit/api/test_openapi_contract.py validates what the API really sends against this model, so the two
+    # cannot drift apart. `detail` is never sent as null, hence SkipJsonSchema[None]: optional, without a null.
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    title: str
+    status: int = Field(ge=100, le=599)
+    detail: str | SkipJsonSchema[None] = None
+    instance: str
     # Not part of the RFC: the correlation id of the failing request, so a user can quote it to support.
-    request_id: str | None = None
+    request_id: str
 
 
 # Declared once on the app so OpenAPI documents the error body for every route (and F2 generates a type for it).
@@ -49,12 +74,12 @@ class DomainProblem(Exception):  # noqa: N818  (named for the RFC 9457 concept, 
         super().__init__(title)
         # A dict, not keyword arguments: mypy's pydantic plugin (init_forbid_extra) rejects extension kwargs.
         members = {**ext, "type": type_, "title": title, "status": status, "detail": detail}
-        self.problem = Problem.model_validate(members)
+        self.problem = ProblemDraft.model_validate(members)
 
 
 def _respond(
     request: Request,
-    problem: Problem,
+    problem: ProblemDraft,
     *,
     extra: Mapping[str, Any] | None = None,
     headers: Mapping[str, str] | None = None,
@@ -87,7 +112,7 @@ def install_problem_handlers(app: FastAPI) -> None:
     async def on_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
         # loc/msg/type only: `input` would echo the caller's payload back, and `ctx` may not be JSON serializable.
         errors = [{"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
-        problem = Problem(title=_phrase(422), status=422, detail="Request validation failed")
+        problem = ProblemDraft(title=_phrase(422), status=422, detail="Request validation failed")
         return _respond(request, problem, extra={"errors": errors})
 
     @app.exception_handler(StarletteHTTPException)
@@ -95,12 +120,13 @@ def install_problem_handlers(app: FastAPI) -> None:
         title = _phrase(exc.status_code)
         detail = str(exc.detail) if exc.detail != title else None
         # Keep headers Starlette sets itself (Allow on 405, WWW-Authenticate on 401).
-        return _respond(request, Problem(title=title, status=exc.status_code, detail=detail), headers=exc.headers)
+        return _respond(request, ProblemDraft(title=title, status=exc.status_code, detail=detail), headers=exc.headers)
 
     @app.exception_handler(Exception)
     async def on_unhandled(request: Request, exc: Exception) -> JSONResponse:
         # Runs in Starlette's ServerErrorMiddleware, outside CorrelationIdMiddleware, so the header is set here.
         logger.error("request.unhandled", method=request.method, path=request.url.path, exc_info=exc)
+        mark_exception_reported(exc)  # uvicorn re-logs every exception that escapes the app; tell it this one is done
         request_id = correlation_id.get()
         headers = {REQUEST_ID_HEADER: request_id} if request_id else None
-        return _respond(request, Problem(title=_phrase(500), status=500), headers=headers)
+        return _respond(request, ProblemDraft(title=_phrase(500), status=500), headers=headers)

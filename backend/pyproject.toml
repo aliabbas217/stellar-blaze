@@ -192,7 +192,8 @@ DEP003 = ["starlette"]
 DEP002 = [
     # runtime-loaded or used from B2/B3; remove each when first imported
     "uvicorn",
-    "asyncpg",
+    "asyncpg",  # the SQLAlchemy driver named in the URL (postgresql+asyncpg://), never imported directly
+    "alembic",  # imported only by alembic/env.py and the migrations, which `deptry src` does not scan
     "pyarrow",
     "lightgbm",
     "ortools",
@@ -200,9 +201,6 @@ DEP002 = [
     # TEMPORARY (preflight F1): declared up front by the stack doc but not imported until the task named on each
     # line lands, and `deptry src` must stay green on every task commit. Delete each entry in the task that first
     # imports it; the last B1 task must leave only the permanent entries above.
-    "sqlalchemy",  # Task 3
-    "alembic",  # Task 3
-    "opentelemetry-instrumentation-sqlalchemy",  # Task 3
     "numpy",  # Task 5
     "polars",  # Task 5
     "thermofeel",  # Task 6

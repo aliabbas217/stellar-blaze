@@ -10,45 +10,27 @@
             "type": "string"
           }
         },
+        "required": [
+          "status"
+        ],
         "title": "LiveResponse",
         "type": "object"
       },
       "Problem": {
         "additionalProperties": true,
-        "description": "An RFC 9457 problem. Extension members (``reason``, ``dependency``, ...) are kept as extra fields.",
+        "description": "An RFC 9457 problem details object, sent as ``application/problem+json`` for every error response.\n\nExtension members (for example ``dependency`` or ``errors``) may be present. ``detail`` is omitted when there is\nnone.",
         "properties": {
           "detail": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Detail"
+            "title": "Detail",
+            "type": "string"
           },
           "instance": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Instance"
+            "title": "Instance",
+            "type": "string"
           },
           "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
+            "title": "Request Id",
+            "type": "string"
           },
           "status": {
             "maximum": 599.0,
@@ -61,16 +43,52 @@
             "type": "string"
           },
           "type": {
-            "default": "about:blank",
             "title": "Type",
             "type": "string"
           }
         },
         "required": [
+          "type",
           "title",
-          "status"
+          "status",
+          "instance",
+          "request_id"
         ],
         "title": "Problem",
+        "type": "object"
+      },
+      "ReadyChecks": {
+        "properties": {
+          "database": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Database",
+            "type": "string"
+          }
+        },
+        "required": [
+          "database"
+        ],
+        "title": "ReadyChecks",
+        "type": "object"
+      },
+      "ReadyResponse": {
+        "properties": {
+          "checks": {
+            "$ref": "#/components/schemas/ReadyChecks"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "ReadyResponse",
         "type": "object"
       }
     }
@@ -84,7 +102,7 @@
     "/api/v1/health/live": {
       "get": {
         "description": "The process is up and serving requests. Checks no dependency, so an orchestrator never restarts on a DB blip.",
-        "operationId": "live_api_v1_health_live_get",
+        "operationId": "health_live",
         "responses": {
           "200": {
             "content": {
@@ -108,6 +126,48 @@
           }
         },
         "summary": "Liveness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "description": "The API can serve requests: its database answers a trivial query within the readiness timeout.\n\nAnswers 503 (problem details, ``dependency: database``) when it does not.",
+        "operationId": "health_ready",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A required dependency (the database) is unavailable."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)"
+          }
+        },
+        "summary": "Readiness probe",
         "tags": [
           "health"
         ]

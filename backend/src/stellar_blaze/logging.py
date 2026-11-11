@@ -7,6 +7,7 @@ per line); ``console`` is for a developer's terminal.
 
 import logging
 import sys
+from contextvars import ContextVar
 
 import structlog
 from asgi_correlation_id import correlation_id
@@ -34,6 +35,32 @@ class _LiveStdout:
 
 class _StructlogHandler(logging.StreamHandler[_LiveStdout]):
     """The one root handler this module installs; the type lets ``configure_logging`` replace it idempotently."""
+
+
+# The exception most recently logged by the application for the request being served (see mark_exception_reported).
+_reported_exception: ContextVar[BaseException | None] = ContextVar("sb_reported_exception", default=None)
+
+# What uvicorn logs (on `uvicorn.error`) for every exception that escapes the ASGI application.
+_UVICORN_ASGI_ERROR = "Exception in ASGI application"
+
+
+def mark_exception_reported(exc: BaseException) -> None:
+    """Record that the application already logged ``exc``, so uvicorn's own record of the same exception is dropped.
+
+    Starlette re-raises an unhandled exception after the 500 handler ran, and uvicorn then logs it again: two ERROR
+    records per failure. Only this exact exception object is dropped; one the application never logged (a failing error
+    handler, a ``BaseException``) still reaches the log through uvicorn.
+    """
+    _reported_exception.set(exc)
+
+
+class _DropReportedAsgiError(logging.Filter):
+    """Drops uvicorn's "Exception in ASGI application" record when the app already logged that exception."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not record.getMessage().startswith(_UVICORN_ASGI_ERROR) or record.exc_info is None:
+            return True
+        return record.exc_info[1] is not _reported_exception.get()
 
 
 def _add_request_id(_logger: WrappedLogger, _method_name: str, event_dict: EventDict) -> EventDict:
@@ -91,6 +118,10 @@ def configure_logging(settings: Settings) -> None:
         uvicorn_logger.handlers.clear()
         uvicorn_logger.setLevel(logging.NOTSET)
         uvicorn_logger.propagate = True
+    error_logger = logging.getLogger("uvicorn.error")
+    for existing_filter in [f for f in error_logger.filters if isinstance(f, _DropReportedAsgiError)]:
+        error_logger.removeFilter(existing_filter)
+    error_logger.addFilter(_DropReportedAsgiError())
     # request.completed (RequestLogMiddleware) replaces uvicorn's access log: same facts plus request_id and duration.
     access_logger = logging.getLogger("uvicorn.access")
     access_logger.handlers.clear()
