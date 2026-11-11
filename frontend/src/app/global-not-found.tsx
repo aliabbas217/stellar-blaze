@@ -39,6 +39,8 @@ export default async function GlobalNotFound() {
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-start gap-6 px-4 py-12">
           <h1 className="font-display text-3xl font-bold tracking-signage">{t("title")}</h1>
           <p className="text-lg text-ink-muted">{t("body")}</p>
+          {/* A full document load is intended: this 404 sits outside the locale layout and provider, and the proxy sends "/" to the visitor's locale. The rule reports it only because it reads app/[locale]/page.tsx as a page at "/" (its [param] regex also matches an empty segment). */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see the comment above */}
           <a href="/" className={buttonVariants()}>
             {t("home")}
           </a>
