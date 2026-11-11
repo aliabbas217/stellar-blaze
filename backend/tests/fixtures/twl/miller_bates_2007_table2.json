@@ -1,0 +1,29 @@
+{
+  "provenance": {
+    "published_source": "Miller and Bates (2007), Annals of Occupational Hygiene 51(6):553-561, doi:10.1093/annhyg/mem035, Table 2 (session means of the 11 chamber sessions).",
+    "published_fields": "t_c = dry-bulb temperature, twb_c = wet-bulb temperature, wind_ms = wind speed, published_twl = the paper's TWL in W/m2.",
+    "conventions": {
+      "clothing_clo": "0.12 (the note of Table 2)",
+      "mrt_c": "equal to t_c (climatic chamber)",
+      "pressure_kpa": 101.3,
+      "wind": "used as body-level wind, with no height correction",
+      "wet_bulb": "treated as an aspirated psychrometer reading: vapor pressure from the WMO psychrometer equation (domain/physics/psychrometrics.vapor_pressure_kpa_from_wet_bulb, 1013 hPa), then the dew point from that vapor pressure",
+      "vapor_permeability": "0.45 (the meteoHazard default; the paper does not print it)"
+    },
+    "scratch_port_w_m2": "TWL from an independent scratch port of meteoHazard solve_twl_single (pinned commit 5633d5719225d15d84f2608189e2b3d654dba73d), run on 2026-11-11 under the conventions above (vapor_permeability 0.45). It is NOT archived: the throwaway script was not kept (preflight F27), so these 11 numbers are an oracle that cannot be regenerated; test_agrees_with_independent_port compares the production port with them to 1.0 W/m2.",
+    "transcription": "The published column was taken from the task brief, which took it from Table 2; this repository has no copy of the paper. Free PDF: https://www.hqinc.net/wp-content/uploads/2012/05/ANNOHBatesThermalWorkLimitWBGT2007.pdf"
+  },
+  "rows": [
+    {"session": 1, "t_c": 38.7, "twb_c": 28.6, "wind_ms": 0.23, "published_twl": 154, "scratch_port_w_m2": 160.2},
+    {"session": 2, "t_c": 38.4, "twb_c": 28.7, "wind_ms": 0.24, "published_twl": 156, "scratch_port_w_m2": 162.9},
+    {"session": 3, "t_c": 39.0, "twb_c": 28.1, "wind_ms": 0.23, "published_twl": 160, "scratch_port_w_m2": 165.6},
+    {"session": 4, "t_c": 38.9, "twb_c": 27.6, "wind_ms": 0.21, "published_twl": 160, "scratch_port_w_m2": 166.3},
+    {"session": 5, "t_c": 38.7, "twb_c": 25.0, "wind_ms": 0.22, "published_twl": 198, "scratch_port_w_m2": 201.9},
+    {"session": 6, "t_c": 38.1, "twb_c": 27.9, "wind_ms": 0.21, "published_twl": 159, "scratch_port_w_m2": 166.0},
+    {"session": 7, "t_c": 39.1, "twb_c": 27.3, "wind_ms": 0.24, "published_twl": 172, "scratch_port_w_m2": 178.7},
+    {"session": 8, "t_c": 38.6, "twb_c": 27.3, "wind_ms": 0.22, "published_twl": 168, "scratch_port_w_m2": 174.6},
+    {"session": 9, "t_c": 38.3, "twb_c": 27.2, "wind_ms": 0.20, "published_twl": 164, "scratch_port_w_m2": 170.5},
+    {"session": 10, "t_c": 38.3, "twb_c": 27.6, "wind_ms": 0.21, "published_twl": 162, "scratch_port_w_m2": 168.9},
+    {"session": 11, "t_c": 38.2, "twb_c": 28.4, "wind_ms": 0.22, "published_twl": 156, "scratch_port_w_m2": 162.1}
+  ]
+}
