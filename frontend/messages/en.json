@@ -64,7 +64,6 @@
     }
   },
   "worker": {
-    "title": "Worker",
     "nav": {
       "label": "Worker navigation",
       "today": "Today",
