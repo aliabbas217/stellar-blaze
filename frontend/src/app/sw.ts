@@ -1,7 +1,9 @@
 import { defaultCache } from "@serwist/turbopack/worker";
 import { Serwist, type PrecacheEntry, type SerwistGlobalConfig } from "serwist";
 import { offlineFallbacks } from "@/features/pwa/fallback";
+import { readLocalePref } from "@/features/pwa/prefs";
 import { runtimeCachingWith } from "@/features/pwa/runtime-caching";
+import { openNotificationTarget, readPushData, showPushNotification } from "@/features/push/sw-handlers";
 
 /*
  * The service worker, bundled by esbuild at build time (src/app/serwist/[path]/route.ts) and served at /serwist/sw.js.
@@ -33,3 +35,34 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+/*
+ * Web Push (docs/contracts/web-push.md). The logic is in src/features/push/sw-handlers.ts, where it is unit tested; this
+ * file only connects it to the worker. Push subscriptions are POST and DELETE requests made by the page, which the
+ * runtime caching above has no route for: nothing about them is, or may ever be, added to its allow-list.
+ *
+ * A push whose payload is not exactly the contract's shows nothing and is not rethrown, as the contract says. The cost
+ * to know: with userVisibleOnly, Chrome then shows a generic notice of its own, and WebKit revokes a subscription whose
+ * pushes show nothing (https://webkit.org/blog/16535/meet-declarative-web-push/). Revisit if the API ever sends a
+ * payload this worker cannot parse.
+ */
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    showPushNotification(readPushData(event), {
+      readLocale: readLocalePref,
+      show: (title, options) => self.registration.showNotification(title, options),
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    openNotificationTarget(event.notification.data, {
+      origin: self.location.origin,
+      readLocale: readLocalePref,
+      windows: () => self.clients.matchAll({ type: "window", includeUncontrolled: true }),
+      openWindow: (url) => self.clients.openWindow(url),
+    }),
+  );
+});

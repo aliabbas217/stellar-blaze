@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { fontClassFor } from "@/app/fonts";
 import { titleTemplate } from "@/app/titles";
 import { themeScript } from "@/components/shell/theme-script";
+import { LocalePrefs } from "@/features/pwa/LocalePrefs";
 import { APPLE_TOUCH_ICON, MANIFEST_COLORS } from "@/features/pwa/manifest";
 import { dirFor } from "@/i18n/direction";
 import { routing } from "@/i18n/routing";
@@ -58,6 +59,8 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             half-filled profile form on a patchy site connection; TanStack Query already refetches on reconnect. */}
         <SerwistProvider swUrl="/serwist/sw.js" reloadOnOnline={false}>
           <NextIntlClientProvider>
+            {/* Leaves the language for the service worker, which shows push notifications with no page open. */}
+            <LocalePrefs />
             <QueryProvider>{children}</QueryProvider>
           </NextIntlClientProvider>
         </SerwistProvider>

@@ -1,0 +1,65 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { SW_STRINGS_FILE, pushStringsOf, readAllMessages, renderSwStrings } from "../../../../scripts/build-sw-strings.ts";
+import { SW_STRINGS } from "@/features/push/sw-strings";
+import { routing } from "@/i18n/routing";
+
+/*
+ * sw-strings.ts is generated from messages/*.json and committed (the service worker bundles it). Two guards:
+ *  - drift: the committed file is byte for byte what the generator produces from the current messages, so a message
+ *    edited without running `pnpm build` (prebuild) fails here instead of shipping stale notification text;
+ *  - the generator refuses what the worker cannot render (its substitution is `{level}` only, it is not ICU).
+ */
+
+describe("sw-strings.ts", () => {
+  it("equals what the messages produce (run `node scripts/build-sw-strings.ts` after editing push messages)", () => {
+    const committed = readFileSync(SW_STRINGS_FILE, "utf8");
+    expect(committed).toBe(renderSwStrings(readAllMessages()));
+  });
+
+  it("survives the pre-commit fixers unchanged: one final newline, no trailing whitespace, LF only", () => {
+    const committed = readFileSync(SW_STRINGS_FILE, "utf8");
+    expect(committed.endsWith("\n")).toBe(true);
+    expect(committed.endsWith("\n\n")).toBe(false);
+    expect(committed).not.toMatch(/[ \t]+$/m);
+    expect(committed).not.toContain("\r");
+  });
+
+  it("is the file the generator writes, next to the code that reads it", () => {
+    expect(path.relative(path.resolve(import.meta.dirname, "../../../.."), SW_STRINGS_FILE).split(path.sep).join("/")).toBe(
+      "src/features/push/sw-strings.ts",
+    );
+  });
+
+  it("has strings for exactly the routed locales", () => {
+    expect(Object.keys(SW_STRINGS).sort()).toEqual([...routing.locales].sort());
+  });
+});
+
+describe("pushStringsOf", () => {
+  const messages = {
+    push: {
+      title: { site: "Site: {level}", crew: "Crew: {level}" },
+      body: "Open the app.",
+      level: { green: "G", amber: "A", orange: "O", red: "R" },
+    },
+  };
+
+  it("reads the push namespace", () => {
+    expect(pushStringsOf(messages, "xx")).toEqual(messages.push);
+  });
+
+  it("throws, naming the locale and the key, when a key is missing", () => {
+    expect(() => pushStringsOf({ push: { ...messages.push, body: undefined } }, "xx")).toThrow(/xx\.json push\.body/);
+    expect(() => pushStringsOf({}, "xx")).toThrow(/xx\.json push/);
+  });
+
+  it("throws when a title uses a placeholder the worker cannot fill", () => {
+    const broken = { push: { ...messages.push, title: { site: "Site: {level} at {time}", crew: "Crew: {level}" } } };
+    expect(() => pushStringsOf(broken, "xx")).toThrow(/\{time\}/);
+  });
+
+  it("throws when the body uses a placeholder (the worker fills none there)", () => {
+    expect(() => pushStringsOf({ push: { ...messages.push, body: "Open {app}" } }, "xx")).toThrow(/\{app\}/);
+  });
+});

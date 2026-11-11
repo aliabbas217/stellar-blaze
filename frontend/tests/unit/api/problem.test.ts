@@ -1,4 +1,5 @@
-import { ApiProblem, ProblemSchema, toProblem } from "@/api/problem";
+import { ApiProblem, toProblem } from "@/api/problem";
+import { ProblemSchema } from "@/api/problem-schema";
 
 function problemJsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

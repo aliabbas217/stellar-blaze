@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { http, HttpResponse } from "msw/http";
 import type { components } from "@/api/schema";
-import { ProblemSchema } from "@/api/problem";
+import { ProblemSchema } from "@/api/problem-schema";
 import { problemOnce, staleToday } from "@/mocks/handlers";
 import { server } from "@/mocks/node";
 

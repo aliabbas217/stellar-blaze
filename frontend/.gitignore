@@ -17,6 +17,8 @@ next-env.d.ts
 
 # env files with local values (committed templates such as .env.example stay tracked)
 .env*.local
+# The real-phone push spike's VAPID keys (scripts/send-test-push.ts); also covered by the line above, named on purpose
+.env.spike.local
 
 # misc
 .DS_Store

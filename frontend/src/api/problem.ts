@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /*
  * Every non-2xx response of the API is application/problem+json (RFC 9457 shape plus request_id; see
  * openapi/stellar-blaze.mock.openapi.json, schema `Problem`). This module is the one place that reads that shape
@@ -10,26 +8,52 @@ import { z } from "zod";
  */
 
 /**
- * `request_id` is optional here although the API always sets it: a response that did not come from our API
- * (a proxy's HTML 502, a network layer) has none, and `toProblem` still has to describe it. Members this client
- * does not know yet are ignored, so the API can add some without breaking it.
+ * The members of a problem+json body that this client reads. `request_id` is optional here although the API always
+ * sets it: a response that did not come from our API (a proxy's HTML 502, a network layer) has none, and
+ * `toProblem` still has to describe it. Members this client does not know yet are ignored, so the API can add some
+ * without breaking it.
+ *
+ * Written by hand, with a hand-written reader below, and not as a zod schema, so that the browser bundle (the worker
+ * routes have a 170 KB budget) does not carry a validation library for six fields: zod costs about 15 KB gzip even
+ * as zod/mini. `ProblemSchema` in problem-schema.ts states the same contract for tests, and
+ * tests/unit/api/problem-parity.test.ts pins that the two agree, in types and in behaviour.
  */
-export const ProblemSchema = z.object({
-  type: z.string(),
-  title: z.string(),
-  status: z.number().int(),
-  detail: z.string().optional(),
-  instance: z.string().optional(),
-  request_id: z.string().optional(),
-});
-
-export type Problem = z.infer<typeof ProblemSchema>;
+export interface Problem {
+  type: string;
+  title: string;
+  status: number;
+  detail?: string | undefined;
+  instance?: string | undefined;
+  request_id?: string | undefined;
+}
 
 /** The BFF proxy could not get an answer from the API (unconfigured, unreachable, timed out). */
 export const UPSTREAM_UNAVAILABLE_TYPE = "urn:stellar-blaze:problem:upstream-unavailable";
 
 /** The browser could not reach the BFF at all (offline). Never sent over the wire, so it has no request_id. */
 export const NETWORK_ERROR_TYPE = "urn:stellar-blaze:problem:network-error";
+
+/**
+ * The members of a problem+json body that this client reads, or undefined when `body` is not one: the same rules as
+ * ProblemSchema (problem-schema.ts; tests/unit/api/problem-parity.test.ts pins that). Unknown members are dropped, as
+ * the schema drops them.
+ */
+function readProblemBody(body: unknown): Problem | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const members = body as Record<string, unknown>;
+  const { type, title, status } = members;
+  if (typeof type !== "string" || typeof title !== "string" || typeof status !== "number" || !Number.isSafeInteger(status)) {
+    return undefined;
+  }
+  const problem: Problem = { type, title, status };
+  for (const key of ["detail", "instance", "request_id"] as const) {
+    const value = members[key];
+    if (value === undefined) continue;
+    if (typeof value !== "string") return undefined;
+    problem[key] = value;
+  }
+  return problem;
+}
 
 /** A failed call, as a throwable, for code that prefers exceptions (a TanStack Query `queryFn`). */
 export class ApiProblem extends Error {
@@ -48,8 +72,8 @@ export class ApiProblem extends Error {
  * status, its reason phrase (empty over HTTP/2, so the status stands in for it) and its x-request-id header.
  */
 export function toProblem(res: Response, body: unknown): Problem {
-  const parsed = ProblemSchema.safeParse(body);
-  if (parsed.success) return parsed.data;
+  const problem = readProblemBody(body);
+  if (problem !== undefined) return problem;
   return {
     type: "about:blank",
     title: res.statusText === "" ? `HTTP ${String(res.status)}` : res.statusText,

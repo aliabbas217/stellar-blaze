@@ -141,10 +141,12 @@
     "enable": "Turn on alerts",
     "disable": "Turn off alerts",
     "working": "Please wait",
+    "noSite": "Choose your site first. Alerts are sent for one site.",
     "state": {
       "idle": "Alerts are off.",
       "subscribed": "Alerts are on for this site.",
-      "error": "We could not turn alerts on. Try again in a moment."
+      "error": "We could not turn alerts on. Try again in a moment.",
+      "disableError": "We could not turn alerts off. Try again in a moment."
     },
     "unsupported": {
       "title": "Alerts are not available on this phone",
