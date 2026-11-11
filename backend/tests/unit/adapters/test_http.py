@@ -130,10 +130,10 @@ def test_cache_put_that_fails_leaves_neither_a_partial_entry_nor_a_temp_file(
     def disk_full(self: Path, target: Path) -> Path:
         raise OSError("disk full")
 
-    monkeypatch.setattr(Path, "replace", disk_full)  # the rename is the commit point of the atomic write
-    with pytest.raises(OSError, match="disk full"):
-        cache.put(key, b"body")
-    monkeypatch.undo()
+    with monkeypatch.context() as patch:  # the rename is the commit point of the atomic write
+        patch.setattr(Path, "replace", disk_full)
+        with pytest.raises(OSError, match="disk full"):
+            cache.put(key, b"body")
 
     assert cache.get(key) is None
     assert cached_files(tmp_path) == []
@@ -345,6 +345,86 @@ async def test_an_empty_error_body_has_no_excerpt(settings: Settings) -> None:
             await get_bytes(client, URL, PARAMS, cache=None)
 
     assert caught.value.body_excerpt is None
+
+
+# === get_bytes: the production retry budget ========================================================================
+
+
+@pytest.mark.asyncio
+async def test_the_production_retry_budget_is_6_attempts_in_600_seconds_with_a_1_to_30_second_backoff(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # IEM answers 429 to a few quick requests; stamina's default backoff gives up within about 3 s, shorter than a rate
+    # limiter's window. The numbers are a decision, so a change to them must show up here. Pinned through the one call
+    # that carries them rather than by waiting: the retry loop is observed, not run with real sleeps.
+    seen: list[dict[str, object]] = []
+    real = stamina.retry_context
+
+    def spy(**kwargs: object) -> object:
+        seen.append(kwargs)
+        return real(**kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(stamina, "retry_context", spy)
+
+    async with client_for(settings, Calls(httpx2.Response(200, content=b"ok"))) as client:
+        await get_bytes(client, URL, PARAMS, cache=None)
+
+    assert len(seen) == 1
+    assert {key: seen[0][key] for key in ("attempts", "timeout", "wait_initial", "wait_max")} == {
+        "attempts": 6,
+        "timeout": 600.0,
+        "wait_initial": 1.0,
+        "wait_max": 30.0,
+    }
+
+
+# === get_bytes: pacing and a per-request timeout ====================================================================
+
+
+@pytest.mark.asyncio
+async def test_before_request_runs_once_per_network_request_and_not_on_a_cache_hit(
+    settings: Settings, tmp_path: Path
+) -> None:
+    cache = RawResponseCache(tmp_path)
+    calls = Calls(httpx2.Response(200, content=b"fresh"))
+    events: list[str] = []
+
+    async def before() -> None:
+        events.append(f"before after {len(calls.requests)} requests")
+
+    async with client_for(settings, calls) as client:
+        await get_bytes(client, URL, PARAMS, cache=cache, before_request=before)
+        await get_bytes(client, URL, PARAMS, cache=cache, before_request=before)  # served from the cache
+
+    assert events == ["before after 0 requests"]  # before the request, and not at all for the cache hit
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("retry_three_times")
+async def test_before_request_is_not_repeated_for_the_retries_of_one_call(settings: Settings) -> None:
+    calls = Calls(httpx2.Response(429), httpx2.Response(429), httpx2.Response(200, content=b"x"))
+    events: list[int] = []
+
+    async def before() -> None:
+        events.append(len(calls.requests))
+
+    async with client_for(settings, calls) as client:
+        await get_bytes(client, URL, PARAMS, cache=None, before_request=before)
+
+    assert events == [0]  # the retry backoff paces the retries
+
+
+@pytest.mark.asyncio
+async def test_a_call_can_carry_its_own_timeout_and_otherwise_uses_the_clients(settings: Settings) -> None:
+    calls = Calls(httpx2.Response(200, content=b"x"))
+
+    async with client_for(settings, calls) as client:
+        await get_bytes(client, URL, PARAMS, cache=None)
+        await get_bytes(client, URL, PARAMS, cache=None, timeout_s=180.0)
+
+    default, longer = calls.requests
+    assert default.extensions["timeout"]["read"] == settings.http_timeout_s
+    assert longer.extensions["timeout"] == {"connect": 180.0, "read": 180.0, "write": 180.0, "pool": 180.0}
 
 
 # === get_bytes: validation before caching ===========================================================================

@@ -13,6 +13,7 @@ import pytest
 
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import UpstreamError, build_async_client
+from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.weather.schemas import OBS_RAW_SCHEMA
@@ -59,7 +60,7 @@ def serve_fixture(request: httpx2.Request) -> httpx2.Response:
 
 
 def expected_params(first: tuple[int, int, int], last: tuple[int, int, int]) -> list[tuple[str, str]]:
-    """The query string the brief fixes, in order, for the dates (year, month, day) of the request."""
+    """The query string of the data-availability study, in its order, for the dates (year, month, day) asked for."""
     (y1, m1, d1), (y2, m2, d2) = first, last
     return [
         ("station", "OMAA"),
@@ -86,10 +87,10 @@ def expected_params(first: tuple[int, int, int], last: tuple[int, int, int]) -> 
 
 @asynccontextmanager
 async def iem_source(
-    settings: Settings, handler: Handler, cache: RawResponseCache | None = None
+    settings: Settings, handler: Handler, cache: RawResponseCache | None = None, pacer: RequestPacer | None = None
 ) -> AsyncIterator[IemMetarSource]:
     async with build_async_client(settings, httpx2.MockTransport(handler)) as client:
-        yield IemMetarSource(client, settings.iem_asos_url, cache)
+        yield IemMetarSource(client, settings.iem_asos_url, cache, pacer=pacer)
 
 
 def recorded(requests: list[httpx2.Request], answer: Handler) -> Handler:
@@ -98,6 +99,52 @@ def recorded(requests: list[httpx2.Request], answer: Handler) -> Handler:
         return answer(request)
 
     return handler
+
+
+# === pacing and timeout =============================================================================================
+
+
+class CountingTime:
+    """A clock and sleep for ``RequestPacer`` that record the sleeps and spend no time."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.sleeps: list[float] = []
+
+    def clock(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+@pytest.mark.asyncio
+async def test_iem_requests_are_paced_but_cache_hits_are_not(settings: Settings, tmp_path: Path) -> None:
+    time = CountingTime()
+    pacer = RequestPacer(2.0, clock=time.clock, sleep=time.sleep)
+    cache = RawResponseCache(tmp_path)
+    requests: list[httpx2.Request] = []
+
+    async with iem_source(settings, recorded(requests, serve_fixture), cache, pacer) as source:
+        await source.observations(station=OMAA, start=START, end=END)  # a request: first, so no wait
+        await source.observations(station=OMAA, start=START, end=END)  # the same request from the cache: no pacing
+        await source.observations(station=station("OMDB"), start=START, end=END)  # a second request: paced
+
+    assert len(requests) == 2
+    assert time.sleeps == [2.0]
+
+
+@pytest.mark.asyncio
+async def test_a_wide_window_request_waits_up_to_180_seconds_like_the_research_download(settings: Settings) -> None:
+    # The research's fetch_iem.py downloaded each 140-day station window with timeout=180; Settings.http_timeout_s
+    # (60 s) was never tried on a window that wide.
+    requests: list[httpx2.Request] = []
+
+    async with iem_source(settings, recorded(requests, serve_fixture)) as source:
+        await source.observations(station=OMAA, start=START, end=END)
+
+    assert requests[0].extensions["timeout"] == {"connect": 180.0, "read": 180.0, "write": 180.0, "pool": 180.0}
 
 
 # === request and parse ==============================================================================================

@@ -18,12 +18,14 @@ import pytest
 
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import UpstreamError, build_async_client
+from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA
 from stellar_blaze.domain.weather.stations import Station, station
-from tests.unit.adapters.http_support import cached_files, forbidden
+from stellar_blaze.logging import configure_logging
+from tests.unit.adapters.http_support import cached_files, forbidden, json_lines
 from tests.unit.contract.forecast_contract import check_forecast_source
 
 pytestmark = pytest.mark.unit
@@ -101,7 +103,7 @@ def recording(requests: list[httpx2.Request], answer: Handler) -> Handler:
 
 
 def expected_params(*, lat: str, lon: str, model: str, start: str, end: str, leads: list[int]) -> list[tuple[str, str]]:
-    """The query string the brief fixes, in order."""
+    """The query string of the data-availability study, in its order."""
     return [
         ("latitude", lat),
         ("longitude", lon),
@@ -115,10 +117,10 @@ def expected_params(*, lat: str, lon: str, model: str, start: str, end: str, lea
 
 @asynccontextmanager
 async def open_meteo_source(
-    settings: Settings, handler: Handler, cache: RawResponseCache | None = None
+    settings: Settings, handler: Handler, cache: RawResponseCache | None = None, pacer: RequestPacer | None = None
 ) -> AsyncIterator[OpenMeteoPreviousRunsSource]:
     async with build_async_client(settings, httpx2.MockTransport(handler)) as client:
-        yield OpenMeteoPreviousRunsSource(client, settings.open_meteo_previous_runs_url, cache)
+        yield OpenMeteoPreviousRunsSource(client, settings.open_meteo_previous_runs_url, cache, pacer=pacer)
 
 
 async def fetch(
@@ -336,6 +338,63 @@ async def test_a_series_missing_for_one_lead_is_null_for_that_lead_only(settings
     assert lead5["t_c"].null_count() == lead5.height
     assert lead5["td_c"].null_count() == 0
     assert frame.filter(pl.col("lead_days") != 5)["t_c"].null_count() == 0
+
+
+@pytest.mark.asyncio
+async def test_absent_series_are_named_in_one_warning(settings: Settings, capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging(settings)  # JSON on stdout, as in production
+    payload = recorded()
+    for name in ("temperature_2m_previous_day5", "direct_radiation"):
+        del payload["hourly"][name]
+        del payload["hourly_units"][name]
+
+    async with open_meteo_source(settings, serve(payload)) as source:
+        await fetch(source)
+
+    warnings = [line for line in json_lines(capsys.readouterr().out) if line["event"] == "open_meteo.series_absent"]
+    assert len(warnings) == 1
+    assert warnings[0]["level"] == "warning"
+    assert warnings[0]["station"] == "OMAA"
+    assert warnings[0]["model"] == "ecmwf_ifs025"
+    assert warnings[0]["absent"] == ["temperature_2m_previous_day5", "direct_radiation"]
+    assert warnings[0]["requested"] == 48
+
+
+@pytest.mark.asyncio
+async def test_a_complete_response_logs_no_absent_series_warning(
+    settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configure_logging(settings)
+
+    async with open_meteo_source(settings, serve(recorded())) as source:
+        await fetch(source)
+
+    assert [line for line in json_lines(capsys.readouterr().out) if line["event"] == "open_meteo.series_absent"] == []
+
+
+@pytest.mark.asyncio
+async def test_open_meteo_requests_are_paced_but_cache_hits_are_not(settings: Settings, tmp_path: Path) -> None:
+    sleeps: list[float] = []
+    now = [0.0]
+
+    async def sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    pacer = RequestPacer(6.0, clock=lambda: now[0], sleep=sleep)
+    requests: list[httpx2.Request] = []
+
+    async with open_meteo_source(
+        settings, recording(requests, serve(recorded())), RawResponseCache(tmp_path), pacer
+    ) as source:
+        await fetch(source)
+        await fetch(source)  # from the cache
+        await source.previous_runs(
+            station=OMDB, model=NwpModel.ECMWF_IFS025, start=START, end=END, leads_days=ALL_LEADS
+        )
+
+    assert len(requests) == 2
+    assert sleeps == [6.0]
 
 
 @pytest.mark.asyncio

@@ -15,6 +15,7 @@ import polars as pl
 
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import get_bytes
+from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources._common import (
     empty_observations,
     to_observations,
@@ -23,6 +24,11 @@ from stellar_blaze.adapters.sources._common import (
 from stellar_blaze.domain.weather.stations import Station
 
 _KNOTS_TO_MS: Final = 0.514444
+
+# How long one request may take to answer. IEM builds the CSV for a whole 140-day station window on the fly; the
+# research's ``fetch_iem.py`` downloaded exactly these windows with ``timeout=180``, so that is the value known to work,
+# where the client's default (``Settings.http_timeout_s``, 60 s) was never tried on a window that wide.
+_REQUEST_TIMEOUT_S: Final = 180.0
 
 
 def _params(station: Station, start: datetime, end: datetime) -> list[tuple[str, str]]:
@@ -96,11 +102,25 @@ class IemMetarSource:
 
     name = "iem"
 
-    def __init__(self, client: httpx2.AsyncClient, base_url: str, cache: RawResponseCache | None) -> None:
-        """Use ``client`` for ``base_url`` (``Settings.iem_asos_url``); bodies are kept in ``cache``, if given."""
+    def __init__(
+        self,
+        client: httpx2.AsyncClient,
+        base_url: str,
+        cache: RawResponseCache | None,
+        *,
+        pacer: RequestPacer | None = None,
+        timeout_s: float = _REQUEST_TIMEOUT_S,
+    ) -> None:
+        """Use ``client`` for ``base_url`` (``Settings.iem_asos_url``); bodies are kept in ``cache``, if given.
+
+        ``pacer`` spaces the requests that reach IEM (a cache hit is not one), which answers 429 to a few quick
+        requests; ``timeout_s`` is how long each request may take.
+        """
         self._client = client
         self._base_url = base_url
         self._cache = cache
+        self._pacer = pacer
+        self._timeout_s = timeout_s
 
     async def observations(self, *, station: Station, start: datetime, end: datetime) -> pl.DataFrame:
         """Return the station's METARs with ``start <= obs_time < end``, as ``OBS_RAW_SCHEMA`` rows.
@@ -116,7 +136,13 @@ class IemMetarSource:
         if start_utc >= end_utc:
             return empty_observations()
         body = await get_bytes(
-            self._client, self._base_url, _params(station, start_utc, end_utc), cache=self._cache, validate=_validate
+            self._client,
+            self._base_url,
+            _params(station, start_utc, end_utc),
+            cache=self._cache,
+            validate=_validate,
+            before_request=None if self._pacer is None else self._pacer.wait,
+            timeout_s=self._timeout_s,
         )
         parsed = await asyncio.to_thread(_parse, body)
         return to_observations(parsed, station=station, source=self.name, start=start_utc, end=end_utc)

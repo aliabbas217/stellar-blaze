@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from stellar_blaze.adapters.db.job_runs import JobRunNotRunningError, JobRunRepository, advisory_lock
 from stellar_blaze.adapters.db.tables import JobRun
+from stellar_blaze.config import Settings
+from stellar_blaze.logging import configure_logging
+from tests.unit.adapters.http_support import json_lines
 
 
 async def load(engine: AsyncEngine, run_id: UUID) -> JobRun:
@@ -150,3 +153,51 @@ async def test_a_connection_that_lost_the_lock_race_is_not_left_holding_one(engi
             assert second is False
         # The loser's connection went back to the pool without taking the lock; only the holder's session has it.
         assert len(await held_advisory_locks(engine)) == 1
+
+
+async def terminate_lock_holders(engine: AsyncEngine) -> None:
+    """Kill the database session that holds an advisory lock, as a failover or an idle cut-off would."""
+    async with engine.connect() as connection:
+        await connection.execute(
+            text(
+                "SELECT pg_terminate_backend(pid) FROM pg_locks l JOIN pg_stat_activity a USING (pid) "
+                "WHERE l.locktype = 'advisory' AND l.granted AND pid <> pg_backend_pid()"
+            )
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_failed_unlock_does_not_fail_a_job_that_succeeded(
+    engine: AsyncEngine, settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configure_logging(settings)
+
+    async with advisory_lock(engine, "ingest") as acquired:
+        assert acquired
+        await terminate_lock_holders(engine)  # the unlock on exit now fails: the session is gone
+    # reaching this line is the point: the block exited without raising
+
+    lost = [line for line in json_lines(capsys.readouterr().out) if line["event"] == "advisory lock lost"]
+    assert len(lost) == 1
+    assert lost[0]["level"] == "error"
+    assert lost[0]["key"] == "ingest"
+    assert await held_advisory_locks(engine) == []
+    async with advisory_lock(engine, "ingest") as again:  # the dead connection did not go back to the pool
+        assert again is True
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_failed_unlock_does_not_mask_the_exception_of_the_body(engine: AsyncEngine) -> None:
+    async def crash_after_losing_the_session() -> None:
+        async with advisory_lock(engine, "ingest") as acquired:
+            assert acquired
+            await terminate_lock_holders(engine)
+            msg = "job crashed"
+            raise RuntimeError(msg)
+
+    with pytest.raises(RuntimeError, match="job crashed"):
+        await crash_after_losing_the_session()
+
+    assert await held_advisory_locks(engine) == []

@@ -6,15 +6,18 @@ for every attempt, including the ones that were turned away.
 """
 
 from collections.abc import AsyncIterator, Mapping
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Literal
 from uuid import UUID
 
+import structlog
 from pydantic import JsonValue
 from sqlalchemy import func, insert, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from stellar_blaze.adapters.db.tables import JobRun
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 class JobRunNotRunningError(LookupError):
@@ -82,6 +85,11 @@ async def advisory_lock(engine: AsyncEngine, key: str) -> AsyncIterator[bool]:
     Never waits: a caller that yields ``False`` should skip its run (``record_skipped``). The lock lives on one
     dedicated connection for the whole block, in autocommit mode so that connection is not parked "idle in
     transaction" for the length of a job. It is released on exit, including when the body raises.
+
+    A failed release does not change the outcome of the block: the lock is tied to its session, so it is gone with the
+    session, and a job that succeeded has still succeeded. The connection is invalidated (never returned to the pool
+    holding an unknown lock state), an ERROR "advisory lock lost" is logged, and the body's own exception, if any,
+    propagates unmasked. Cancellation is not swallowed: it invalidates the connection and propagates.
     """
     async with engine.connect() as connection:
         await connection.execution_options(isolation_level="AUTOCOMMIT")
@@ -94,8 +102,11 @@ async def advisory_lock(engine: AsyncEngine, key: str) -> AsyncIterator[bool]:
             if acquired:
                 try:
                     await connection.execute(text("SELECT pg_advisory_unlock(hashtext(:key))"), {"key": key})
-                except BaseException:
-                    # State unknown: closing the session is what releases a session-level lock, and it must not be
-                    # returned to the pool still holding it.
-                    await connection.invalidate()
+                except Exception:
+                    with suppress(Exception):  # closing the session is what releases a session-level lock
+                        await connection.invalidate()
+                    logger.error("advisory lock lost", key=key, exc_info=True)
+                except BaseException:  # cancellation and interrupts propagate, after the same cleanup
+                    with suppress(Exception):
+                        await connection.invalidate()
                     raise

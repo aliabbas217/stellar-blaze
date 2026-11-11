@@ -6,7 +6,7 @@ the same for every source. ``opentelemetry-instrumentation-httpx`` does not inst
 """
 
 import asyncio
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Final
 
 import httpx2
@@ -112,6 +112,8 @@ async def get_bytes(
     *,
     cache: RawResponseCache | None,
     validate: Callable[[bytes], None] | None = None,
+    before_request: Callable[[], Awaitable[None]] | None = None,
+    timeout_s: float | None = None,
 ) -> bytes:
     """GET ``url`` with ``params`` and return the body, from ``cache`` when the request was stored before.
 
@@ -123,6 +125,10 @@ async def get_bytes(
     reported in a 200 response, a changed schema) is never stored and cannot fail every later call too. ``validate``
     raises ``ValueError`` to reject a body, and a cached body is not validated again.
 
+    ``before_request`` is awaited once, after a cache miss and before the first send, never for a cache hit and never
+    again for a retry (the retry backoff spaces those): a caller paces its upstream with it. ``timeout_s`` replaces the
+    client's timeout for this request (connect, read, write and pool alike); ``None`` keeps the client's.
+
     The call runs in one ``http.get`` span (``url.full``, ``http.response.status_code`` of the last response, and
     ``stellar_blaze.cache.hit`` when the cache answered); retries stay inside it.
 
@@ -133,7 +139,10 @@ async def get_bytes(
             propagates unchanged.
         OSError: The cache could not be read or written.
     """
-    request = client.build_request("GET", url, params=list(params))
+    if timeout_s is None:
+        request = client.build_request("GET", url, params=list(params))
+    else:  # not `timeout=None`, which httpx2 reads as "no timeout at all"
+        request = client.build_request("GET", url, params=list(params), timeout=httpx2.Timeout(timeout_s))
     full_url = str(request.url)
     with tracer.start_as_current_span("http.get", attributes={"url.full": full_url}) as span:
         key = RawResponseCache.key(url, params)
@@ -142,6 +151,8 @@ async def get_bytes(
             if cached is not None:
                 span.set_attribute("stellar_blaze.cache.hit", True)
                 return cached
+        if before_request is not None:
+            await before_request()
         response = await _send_with_retries(client, request, span)
         body = response.content
         if validate is not None:

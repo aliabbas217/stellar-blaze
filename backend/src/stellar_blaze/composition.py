@@ -8,7 +8,7 @@ only through composition" keeps ``api`` and ``jobs`` from importing ``adapters.s
 production registry below is read-only.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from types import MappingProxyType
@@ -21,13 +21,17 @@ from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.rulesets import load_catalog
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
 from stellar_blaze.adapters.http.cache import RawResponseCache
+from stellar_blaze.adapters.http.client import build_async_client
+from stellar_blaze.adapters.http.pacer import RequestPacer
+from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
+from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
 from stellar_blaze.application.runtime_config import ConfigSnapshot, SnapshotHolder
 from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig, config_sha256, validate_runtime_config
 from stellar_blaze.domain.rules.catalog import RulesetCatalog
-from stellar_blaze.ports.weather import WeatherForecastSource
+from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
 
 DUBAI = "Asia/Dubai"
 
@@ -54,7 +58,12 @@ class UnknownAdapterError(CompositionError):
 def _open_meteo(
     settings: Settings, client: httpx2.AsyncClient, cache: RawResponseCache | None
 ) -> WeatherForecastSource:
-    return OpenMeteoPreviousRunsSource(client, settings.open_meteo_previous_runs_url, cache)
+    return OpenMeteoPreviousRunsSource(
+        client,
+        settings.open_meteo_previous_runs_url,
+        cache,
+        pacer=RequestPacer(settings.open_meteo_request_interval_s),
+    )
 
 
 # Read-only on purpose: a fake can never be registered into the production path, only passed to build_forecast_source.
@@ -152,3 +161,46 @@ def build_forecast_source(
             f"no forecast source is registered for {settings.forecast_source!r}; registered: {registered}"
         )
     return factory(settings, client, cache)
+
+
+async def _nothing() -> None:
+    """The ``Sources.close`` of sources that hold nothing to release."""
+
+
+@dataclass(frozen=True, slots=True)
+class Sources:
+    """The upstream data a batch job reads from, and how to release what it holds.
+
+    Attributes:
+        observations: Observation sources by name: ``"iem"`` (the truth) and ``"ghcnh"`` (the audit).
+        forecasts: The forecast archive ``Settings.forecast_source`` names.
+        close: Awaited once the job is done; closes the HTTP client of the real sources.
+    """
+
+    observations: Mapping[str, ObservationSource]
+    forecasts: WeatherForecastSource
+    close: Callable[[], Awaitable[None]] = _nothing
+
+
+def build_sources(
+    settings: Settings, *, registry: Mapping[ForecastSourceKind, ForecastSourceFactory] = FORECAST_SOURCES
+) -> Sources:
+    """The HTTP client, the raw-response cache and the sources of the ingest jobs.
+
+    The cache lives under ``<data_dir>/bronze/http``. It never expires an entry, so a directory that already holds
+    responses is a snapshot of the day they were fetched; start from a fresh ``data_dir`` for a clean rebuild. Call this
+    inside the event loop that will use the sources, and await ``Sources.close`` when done.
+
+    Raises:
+        UnknownAdapterError: ``settings.forecast_source`` names a kind nobody registered in ``registry``.
+    """
+    client = build_async_client(settings)
+    cache = RawResponseCache(settings.data_dir / "bronze" / "http")
+    forecasts = build_forecast_source(settings, client, cache, registry)
+    iem = IemMetarSource(client, settings.iem_asos_url, cache, pacer=RequestPacer(settings.iem_request_interval_s))
+    ghcnh = GhcnhParquetSource(client, settings.ghcnh_base_url, cache)
+    return Sources(
+        observations={iem.name: iem, ghcnh.name: ghcnh},
+        forecasts=forecasts,
+        close=client.aclose,
+    )

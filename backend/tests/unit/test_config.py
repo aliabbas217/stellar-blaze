@@ -111,3 +111,21 @@ def test_runtime_config_seed_defaults_to_the_file_the_image_ships(monkeypatch: p
     assert Settings(_env_file=None).runtime_config_seed == Path("config/runtime/default.toml")
     monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", "/etc/sb/seed.toml")
     assert Settings(_env_file=None).runtime_config_seed == Path("/etc/sb/seed.toml")
+
+
+@pytest.mark.unit
+def test_request_pacing_defaults_follow_the_upstream_limits_and_refuse_a_negative_interval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SB_DATABASE_URL", DATABASE_URL)
+    settings = Settings(_env_file=None)
+    assert (settings.iem_request_interval_s, settings.open_meteo_request_interval_s) == (2.0, 6.0)
+    # 6 s per request is 10 a minute: 10 x about 48 weighted calls stays under the free tier's 600 a minute.
+    assert 60 / settings.open_meteo_request_interval_s * 48 <= 600
+
+    monkeypatch.setenv("SB_IEM_REQUEST_INTERVAL_S", "0")
+    assert Settings(_env_file=None).iem_request_interval_s == 0.0
+    for refused in ("-1", "inf", "nan"):
+        monkeypatch.setenv("SB_IEM_REQUEST_INTERVAL_S", refused)
+        with pytest.raises(ValidationError, match="iem_request_interval_s"):
+            Settings(_env_file=None)

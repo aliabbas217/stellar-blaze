@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from stellar_blaze import __version__
@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     open_meteo_previous_runs_url: str = "https://previous-runs-api.open-meteo.com/v1/forecast"
     iem_asos_url: str = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
     ghcnh_base_url: str = "https://www.ncei.noaa.gov/oa/global-historical-climatology-network/hourly/access/by-year"
+    # Seconds between the starts of two requests that reach one service (a cache hit is no request); 0 turns pacing off.
+    # IEM answered 429 to four requests in a few seconds. Open-Meteo's free tier allows 600 weighted calls a minute and
+    # one 139-day request for 6 variables at 8 leads weighs about 48 (139/14 x 48/10, the formula of
+    # docs/research/scripts/fetch_forecast_stations.py), so 6 s keeps it near 480.
+    iem_request_interval_s: float = Field(default=2.0, ge=0.0, allow_inf_nan=False)
+    open_meteo_request_interval_s: float = Field(default=6.0, ge=0.0, allow_inf_nan=False)
 
     # Health checks and heat-strain computation budgets.
     readiness_timeout_s: float = 2.0

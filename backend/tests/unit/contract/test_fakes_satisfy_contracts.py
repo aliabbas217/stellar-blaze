@@ -275,6 +275,17 @@ async def test_forecast_fake_honors_a_narrower_lead_request_and_an_empty_one() -
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("leads", [[8], [-1], [0, 1, 9]])
+async def test_forecast_fake_refuses_a_lead_outside_0_to_7_like_the_real_adapter(leads: list[int]) -> None:
+    source = InMemoryForecastSource({("OMAA", NwpModel.ECMWF_IFS025): forecast_frame(FC_STORED, (0, 1, 2, 3))})
+
+    with pytest.raises(ValueError, match=r"leads_days must be within 0\.\.7"):
+        await source.previous_runs(
+            station=OMAA, model=NwpModel.ECMWF_IFS025, start=FC_START, end=FC_END, leads_days=leads
+        )
+
+
+@pytest.mark.asyncio
 async def test_forecast_fake_returns_an_empty_frame_for_an_unseeded_station_or_model() -> None:
     source = InMemoryForecastSource({("OMAA", NwpModel.ECMWF_IFS025): forecast_frame(FC_STORED, LEADS)})
 

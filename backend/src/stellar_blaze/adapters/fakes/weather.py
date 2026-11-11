@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime, time, timedelta
 
 import polars as pl
 
-from stellar_blaze.domain.weather.models import NwpModel
+from stellar_blaze.domain.weather.models import LEADS_DAYS, NwpModel
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, OBS_RAW_SCHEMA, SchemaMismatchError, conform
 from stellar_blaze.domain.weather.stations import Station
 
@@ -90,7 +90,14 @@ class InMemoryForecastSource:
     async def previous_runs(
         self, *, station: Station, model: NwpModel, start: date, end: date, leads_days: Sequence[int]
     ) -> pl.DataFrame:
-        """Return the stored rows with a valid-time UTC date in ``[start, end]`` and a requested lead."""
+        """Return the stored rows with a valid-time UTC date in ``[start, end]`` and a requested lead.
+
+        Raises:
+            ValueError: A lead is outside ``LEADS_DAYS`` (0 to 7), as in the real adapter.
+        """
+        outside = sorted({lead for lead in leads_days if lead not in LEADS_DAYS})
+        if outside:
+            raise ValueError(f"leads_days must be within {LEADS_DAYS.start}..{LEADS_DAYS[-1]}, got {outside}")
         frame = self._frames.get((station.icao, model))
         if frame is None:
             return pl.DataFrame(schema=FORECAST_SCHEMA)

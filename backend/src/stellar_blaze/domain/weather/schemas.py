@@ -57,7 +57,57 @@ FORECAST_SCHEMA: Final = pl.Schema(
     }
 )
 
-# GOLD_PAIRS_SCHEMA is added to this module by Task 10 (dataset building), which defines its columns.
+# The gold pair dataset: one row per forecast row (station, model, valid hour and lead), carrying the geometry, the
+# forecast, the IFS lead-0 reference, the IEM truth, the GHCNh audit values and three WBGT variants. The column groups:
+#   keys      station, cluster, model, summer, valid_time, lead_days, hour_utc, doy, is_daytime
+#   geometry  station_elev_m and the forecast grid cell
+#   forecast  fc_*          the model's own values at that lead
+#   reference ref_*         IFS (ecmwf_ifs025) lead-0 radiation and pressure at the same station and hour
+#   truth     obs_*         IEM METAR, binned; has_joint_obs is true when all three are present
+#   audit     audit_*       GHCNh with lenient QC, binned (a QC-flagged value is null here and counted in the manifest)
+#   wbgt      wbgt_*_c      Liljegren WBGT (MIDPOINT) from obs + ref, from the forecast alone, and from the forecast
+#                           with the reference radiation and pressure; *_reject is the WbgtReject code.
+# A missing reference, truth or audit value is null. A WBGT that was rejected is NaN (not null, it is numpy output) and
+# its *_reject column says why; filter on ``*_reject == 0`` rather than on ``is_not_null``.
+GOLD_PAIRS_SCHEMA: Final = pl.Schema(
+    {
+        "station": pl.String(),
+        "cluster": pl.String(),
+        "model": pl.String(),
+        "summer": pl.Int16(),
+        "valid_time": _UTC_US,
+        "lead_days": pl.Int8(),
+        "hour_utc": pl.Int8(),
+        "doy": pl.Int16(),
+        "is_daytime": pl.Boolean(),
+        "station_elev_m": pl.Float64(),
+        "grid_lat": pl.Float64(),
+        "grid_lon": pl.Float64(),
+        "grid_elev_m": pl.Float64(),
+        "fc_t_c": pl.Float64(),
+        "fc_td_c": pl.Float64(),
+        "fc_wind_ms": pl.Float64(),
+        "fc_sw_wm2": pl.Float64(),
+        "fc_direct_wm2": pl.Float64(),
+        "fc_pressure_hpa": pl.Float64(),
+        "ref_sw_wm2": pl.Float64(),
+        "ref_direct_wm2": pl.Float64(),
+        "ref_pressure_hpa": pl.Float64(),
+        "obs_t_c": pl.Float64(),
+        "obs_td_c": pl.Float64(),
+        "obs_wind_ms": pl.Float64(),
+        "has_joint_obs": pl.Boolean(),
+        "audit_t_c": pl.Float64(),
+        "audit_td_c": pl.Float64(),
+        "audit_wind_ms": pl.Float64(),
+        "wbgt_obs_c": pl.Float64(),
+        "wbgt_fc_c": pl.Float64(),
+        "wbgt_fc_refrad_c": pl.Float64(),
+        "wbgt_obs_reject": pl.Int8(),
+        "wbgt_fc_reject": pl.Int8(),
+        "wbgt_fc_refrad_reject": pl.Int8(),
+    }
+)
 
 
 class SchemaMismatchError(ValueError):

@@ -42,5 +42,9 @@ class WeatherForecastSource(Protocol):
         ``start`` and ``end`` are inclusive UTC dates of the valid time. The frame has one row per valid hour and
         requested lead; a value the upstream service does not hold is null, not a missing row. Failures of the
         upstream service raise.
+
+        Raises:
+            ValueError: A lead is outside 0 to 7 (``LEADS_DAYS``), the range the Previous Runs archive serves. Real
+                adapters and the in-memory fake alike refuse it before any request.
         """
         ...

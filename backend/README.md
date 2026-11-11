@@ -118,4 +118,109 @@ plus the pre-commit hooks, a gitleaks scan of the full git history, Squawk, `pip
 
 ## Jobs
 
-Filled in with the ingest task (`sb-jobs` commands, their flags and the runbook).
+`sb-jobs` (Typer, `uv run sb-jobs --help`) builds the hindcast dataset that B2 trains on: observed truth, archived
+forecasts, and the joined "gold" pair dataset. The research it must reproduce is in
+[`docs/research/2026-11-11-data-availability.md`](../docs/research/2026-11-11-data-availability.md) (§5.1 for the pair
+counts) and [ADR 0005](../docs/decisions/0005-data-truth-features-and-validation.md).
+
+| Command | What it does |
+|---|---|
+| `ingest-observations --source iem\|ghcnh --summer YEAR ... [--station ICAO ...]` | Pulls the station's reports for 15 May 00:00 to 1 Oct 00:00 UTC, bins them to the nearest UTC hour (IEM: no QC codes; GHCNh: lenient, code `1` or blank), keeps the bins of 15 May 00:00 to 30 Sep 23:00, and stores them with what binning discarded. |
+| `ingest-forecasts --model ecmwf_ifs025\|gfs_seamless\|ecmwf_aifs025_single --summer YEAR ... [--station ICAO ...]` | Pulls the model's Previous Runs forecasts (15 May to 30 Sep, leads 0 to 7 days, six variables) at the station's coordinates. AIFS has 2025 and 2026 only; another summer is a usage error (exit 2) before any request. |
+| `build-dataset` | Joins every silver file into `gold/pairs.parquet` and writes `gold/manifest.json`. |
+
+`--summer` repeats; `--station` repeats and defaults to the eight core stations (`OMAA OMAD OMAL OMDB OMSJ OMDW OMFJ
+OMRK`). Stations and summers run one after another; the first failure stops the command, what was stored before it
+stays, and a rerun refetches nothing that the raw-response cache holds.
+
+Every command records a row in `job_run` (name, parameters, `SB_GIT_SHA`, status, a summary or the error) and takes a
+Postgres advisory lock named like the command. A second run of the same command while one is active records
+`skipped_locked` and exits 0. The lock is per command, so `ingest-observations --source iem` and `--source ghcnh` must
+not overlap (the second is skipped): run them one after the other. Exit codes: 0 succeeded or skipped, 1 failed
+(`job_run.error` is `<ExceptionType>: <message>` with URL credentials and `password=` pairs masked), 2 usage or
+configuration error (nothing recorded). The last runs:
+`SELECT job_name, status, started_at, error FROM job_run ORDER BY started_at DESC LIMIT 10;`.
+
+### Where the files go
+
+Under `SB_DATA_DIR` (default `data`, so `backend/data/`, git-ignored). Writes are atomic (a temporary file in the same
+directory, then a rename): a failed write leaves the previous file intact and no temporary file.
+
+```text
+bronze/http/<ab>/<sha256>.bin                                raw upstream responses, one per request (the cache)
+silver/observations/<source>/<summer>/<ICAO>.parquet         hourly t_c, td_c, wind_ms of one station-summer
+silver/observations/<source>/<summer>/<ICAO>.binning.json    what binning discarded: n_raw, n_implausible, n_qc_flagged
+silver/forecasts/<model>/<summer>/<ICAO>.parquet             forecasts at leads 0-7 with the grid cell
+gold/pairs.parquet                                           one row per forecast row: truth, audit, reference, WBGT
+gold/manifest.json                                           inputs (path, sha256, rows), output, summary, code version
+```
+
+**The raw-response cache never expires and is not re-validated on read.** A directory that already holds responses is a
+snapshot of the day they were fetched, and a window that reaches "now" (a summer still in progress) stays as it was. For
+a clean rebuild, point `SB_DATA_DIR` at a new directory.
+
+### What the gold dataset holds
+
+`GOLD_PAIRS_SCHEMA` (`domain/weather/schemas.py`) lists the columns: keys, grid geometry, forecast (`fc_*`), the IFS
+lead-0 radiation and pressure at the same station and hour (`ref_*`), the IEM truth (`obs_*`), the GHCNh audit values
+(`audit_*`) and three WBGT variants with their reject codes (Liljegren, mid-point of the preceding hour, at the
+station's coordinates).
+
+- `joint` (a pair that counts) is `has_joint_obs` (observed temperature, dew point and wind all present) **and** the
+  forecast's `fc_t_c`, `fc_td_c` and `fc_wind_ms` all present. This is the research's `pairs_joint` (`match_pairs.py`);
+  `has_joint_obs` alone would ignore the forecast side. `joint_daytime` is `joint` and `is_daytime` (06:00 to 14:59 UTC).
+- `wbgt_obs_c` is Liljegren of the observed temperature, dew point and wind with the IFS lead-0 radiation and pressure;
+  `wbgt_fc_c` of the forecast alone; `wbgt_fc_refrad_c` of the forecast temperature, dew point and wind with the same
+  IFS lead-0 radiation and pressure. **A rejected WBGT is NaN, not null** (it is numpy output, and Polars treats the two
+  differently: a mean over the column is NaN, not the average of the rest). `*_reject` is the `WbgtReject` code, so
+  filter on `wbgt_*_reject == 0`. A temperature or dew point outside -60 to 70 degrees, a pressure at or below 0 and a
+  negative wind are made missing before the solver (the row is rejected as `NONFINITE_INPUT`); the `fc_*` and `obs_*`
+  columns keep the value.
+- Values that binning excluded (outside the plausibility range, or a GHCNh value with a QC flag) are null in `obs_*` and
+  `audit_*` and are counted per source, station and summer in `manifest.json` under `summary.observation_qc`. ADR 0005
+  says QC-flagged rows are "kept and flagged"; what is built is "excluded and counted", which keeps the research's
+  counts, and the ADR text should say so.
+- `summary.pair_counts` and `summary.raw_errors` are keyed `model, summer, lead_days` (and `var`); the research CSV
+  `baseline_errors_pooled.csv` is keyed `model, year, lead_d, var`. `domain.weather.dataset.RESEARCH_CSV_KEYS` maps
+  `year -> summer` and `lead_d -> lead_days`. `summarize_pairs(pl.read_parquet("gold/pairs.parquet"))` recomputes the
+  summary from the dataset itself, so a check need not trust `manifest.json`.
+- `manifest.json` holds paths relative to `SB_DATA_DIR`, in POSIX form. Export `SB_GIT_SHA` so that `code_version` is
+  not `unknown`.
+
+### Fetch windows, pacing and limits
+
+- Observations are fetched for `[15 May 00:00, 1 Oct 00:00)` UTC, the research's IEM download, and binned from there. The
+  research read GHCNh's whole-year files, so its 15 May 00:00 audit bin could include a report from 14 May 23:30 to
+  23:59; here that report is not fetched. On the research's own files 1 cell of 476,991 compared differs (OMFJ 2026,
+  wind at 15 May 00:00: 6.2 against 5.7 m/s). It touches the audit columns only, which no gate checks.
+- Requests that reach a service are spaced: `SB_IEM_REQUEST_INTERVAL_S` (2 s) and `SB_OPEN_METEO_REQUEST_INTERVAL_S` (6
+  s; a 139-day request for 48 series weighs about 48 of the free tier's 600 weighted calls a minute). A cache hit is not
+  a request and is not delayed. A 429 or 5xx is retried (6 attempts within 10 minutes, backing off exponentially from 1 s).
+- An IEM request may take up to 180 s to answer (the research's value for these windows); every other call uses
+  `SB_HTTP_TIMEOUT_S`.
+- Open-Meteo's free tier allows 10,000 weighted calls a day and the full pull below is about 3,100. If the allowance
+  runs out the command fails; run it again after 00:00 UTC and it resumes from the cache.
+
+### The real-data run (Task 11)
+
+From `backend/`, in PowerShell, with Postgres running and migrated (see *Local Postgres and migrations*):
+
+```powershell
+$env:SB_DATABASE_URL = "postgresql+asyncpg://sb:sb@localhost:5432/stellar_blaze"
+$env:SB_GIT_SHA = (git rev-parse --short HEAD)       # recorded in job_run and in the manifest
+# $env:SB_DATA_DIR = "data-2026-11-12"               # a fresh directory for a clean rebuild (the cache never expires)
+
+uv run alembic upgrade head
+uv run sb-jobs ingest-observations --source iem --summer 2024 --summer 2025 --summer 2026
+uv run sb-jobs ingest-observations --source ghcnh --summer 2024 --summer 2025 --summer 2026
+uv run sb-jobs ingest-forecasts --model ecmwf_ifs025 --summer 2024 --summer 2025 --summer 2026
+uv run sb-jobs ingest-forecasts --model gfs_seamless --summer 2024 --summer 2025 --summer 2026
+uv run sb-jobs ingest-forecasts --model ecmwf_aifs025_single --summer 2025 --summer 2026
+uv run sb-jobs build-dataset
+```
+
+Every command must exit 0 (`$LASTEXITCODE`). `build-dataset` runs the WBGT solver over about 1.7 million rows and takes
+about 2 minutes (122 s on a laptop, 1,708,032 rows with radiation present). A `--station OMAA` run of each command is a
+quick trial of the whole chain. The pair counts and raw errors that `build-dataset` writes into `manifest.json` match the
+research's (`pair_counts.csv`, `baseline_errors_pooled.csv`) to floating-point rounding (about 1e-15). That was checked
+offline by serving the research's own downloads through the real adapters and job bodies.

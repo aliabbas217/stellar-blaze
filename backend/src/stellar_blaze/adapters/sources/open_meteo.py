@@ -24,12 +24,16 @@ from typing import Any, Final, TypeGuard
 
 import httpx2
 import polars as pl
+import structlog
 
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import get_bytes
+from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.domain.weather.models import LEADS_DAYS, NwpModel
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, conform
 from stellar_blaze.domain.weather.stations import Station
+
+logger = structlog.stdlib.get_logger(__name__)
 
 _KMH_PER_MS: Final = 3.6
 _TIME_FORMAT: Final = "%Y-%m-%dT%H:%M"  # what ``timezone=UTC`` makes Open-Meteo send: no offset suffix
@@ -233,11 +237,23 @@ def _to_frame(decoded: _Decoded, *, station: Station, model: NwpModel, leads: Se
 class OpenMeteoPreviousRunsSource:
     """A ``WeatherForecastSource`` over the Open-Meteo Previous Runs API."""
 
-    def __init__(self, client: httpx2.AsyncClient, base_url: str, cache: RawResponseCache | None) -> None:
-        """Use ``client`` for ``base_url`` (``Settings.open_meteo_previous_runs_url``); bodies are kept in ``cache``."""
+    def __init__(
+        self,
+        client: httpx2.AsyncClient,
+        base_url: str,
+        cache: RawResponseCache | None,
+        *,
+        pacer: RequestPacer | None = None,
+    ) -> None:
+        """Use ``client`` for ``base_url`` (``Settings.open_meteo_previous_runs_url``); bodies are kept in ``cache``.
+
+        ``pacer`` spaces the requests that reach Open-Meteo (a cache hit is not one): a 140-day request costs about 48
+        of the free tier's 600 weighted calls a minute.
+        """
         self._client = client
         self._base_url = base_url
         self._cache = cache
+        self._pacer = pacer
 
     async def previous_runs(
         self, *, station: Station, model: NwpModel, start: date, end: date, leads_days: Sequence[int]
@@ -270,6 +286,17 @@ class OpenMeteoPreviousRunsSource:
             _params(station, model, start, end, list(requested)),
             cache=self._cache,
             validate=_validator(requested),
+            before_request=None if self._pacer is None else self._pacer.wait,
         )
         decoded = await asyncio.to_thread(_decode, body, requested)
+        absent = [name for name in requested if name not in decoded.series]
+        if absent:
+            # The null columns that follow are correct, and silent drift in what a model publishes is not: say which.
+            logger.warning(
+                "open_meteo.series_absent",
+                station=station.icao,
+                model=model.value,
+                absent=absent,
+                requested=len(requested),
+            )
         return _to_frame(decoded, station=station, model=model, leads=leads)
