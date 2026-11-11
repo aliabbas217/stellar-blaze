@@ -122,9 +122,10 @@ export const crews: Schemas["Crew"][] = [
 ];
 
 /**
- * The crew's aggregate timeline for `date`. A crew smaller than k_suppression is suppressed: it keeps the crew
- * level but carries no share above amber (a share over three people would single them out).
- * Unknown crew: undefined.
+ * The crew's aggregate timeline for `date`. A crew smaller than k_suppression is suppressed: its share above amber is
+ * null on every hour (a share over three people would single them out). Its crew level is the site's level, an input
+ * the server holds that is derived from no member, so it stays; the contract rule is in docs/contracts/crew-timeline.md
+ * (aggregates never come from device-reported personal risk). Unknown crew: undefined.
  */
 export function crewTimeline(crewId: string, date: string): Schemas["CrewTimeline"] | undefined {
   const crew = crews.find((candidate) => candidate.id === crewId);

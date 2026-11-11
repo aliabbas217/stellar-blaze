@@ -207,8 +207,9 @@ export interface components {
         CrewHour: {
             /** Format: date-time */
             starts_at: string;
+            /** @description The crew's level for this hour. Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data. */
             crew_level: components["schemas"]["Level"] | null;
-            /** @description Share of the crew above amber, 0 to 1. Null when suppressed or without data. */
+            /** @description Share of the crew above amber, 0 to 1. Derived only from server-held crew inputs, never from personal risk reported by a device (ADR 0004). Null when the crew is suppressed (on every hour) or there is no data. The data source is for B3 Task 0 to name. */
             share_above_amber: number | null;
             ban_active: boolean;
         };
@@ -218,7 +219,7 @@ export interface components {
             site_id: string;
             /** Format: date */
             date: string;
-            /** @description True when the crew has fewer than k members. */
+            /** @description True when the crew has fewer than k members. When true, share_above_amber is null on every hour and crew_level carries no member-derived information (it comes from site and crew inputs, or is null): nothing in the response may single out a member. */
             suppressed: boolean;
             k: number;
             hours: components["schemas"]["CrewHour"][];

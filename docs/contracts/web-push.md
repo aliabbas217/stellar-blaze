@@ -35,7 +35,7 @@ The body is the browser's `PushSubscription.toJSON()` plus the scope the worker 
 
 The response is `201 {"id": "<subscription id>"}`. The client keeps the id so it can delete the subscription later. Unknown `site_id` or `crew_id` is `404`; a body that is not exactly this shape (an extra member included) is `422`.
 
-**The body has no other member, by design.** It carries no worker identifier, no name, no device or account id, no profile, and no personal level. `site_id` and the optional `crew_id` are the whole scope. The OpenAPI schema `PushSubscriptionCreate` sets `additionalProperties: false`, and the mock server rejects extra members with `422`, so a client that starts sending more fails its tests.
+**The body has no other member, by design.** It carries no worker identifier, no name, no account id, no profile, and no personal level. `site_id` and the optional `crew_id` are the whole scope. The one identifier in it is the browser's own: the push `endpoint` (with its keys) is a per-device address, so it is stored only to deliver a push and must never be logged, attached to a metric or put in an error report; log the subscription `id` instead. We add no identifier of our own beyond that. The OpenAPI schema `PushSubscriptionCreate` sets `additionalProperties: false`, and the mock server rejects extra members with `422`, so a client that starts sending more fails its tests.
 
 ### `DELETE /api/v1/push/subscriptions/{subscription_id}`
 
@@ -80,7 +80,7 @@ A `"site"` push goes to every subscription with that `site_id`. A `"crew"` push 
 | VAPID subject (`sub`) | a `mailto:` URI with a real, monitored address | See below. |
 | Body | the six-key JSON of section 2, encrypted as Web Push requires | |
 
-The `web-push` npm library names these options `urgency: "high"` and `TTL: 3600` (the Task 7 spike sender uses them). B3 sends from FastAPI through `WebPushChannel` (pywebpush 2.5.0, ADR 0004); map the same values to that library's parameters and check the names against its documentation, because this file was not checked against pywebpush.
+The `web-push` npm library names these options `urgency: "high"` and `TTL: 3600` (the frontend's developer script for sending a test push to a real phone sets the same two). B3 sends from FastAPI through `WebPushChannel` (pywebpush 2.5.0, ADR 0004); map the same values to that library's parameters and check the names against its documentation, because this file was not checked against pywebpush.
 
 ### The VAPID subject
 
@@ -90,7 +90,7 @@ The `sub` claim is the contact for the sender. The `web-push` README accepts "ei
 
 **No worker identifier, no free text, no personal level.** This holds in every direction and every environment.
 
-- No worker, member, employee, device or account id, name, phone number or email in a subscription, a payload or a log line tied to one.
+- No worker, member, employee or account id, name, phone number or email in a subscription, a payload or a log line tied to one. The only identifier is the browser's endpoint and keys; the endpoint is never logged (use the subscription `id`).
 - No free text in a payload. A template id and a level are the only things that select a message.
 - No personal risk level, workload class, clothing option, heat-work start date or any other profile value. The profile lives on the device.
 
@@ -106,4 +106,4 @@ These are not decided here.
 
 ## To B3
 
-This file and `frontend/openapi/stellar-blaze.mock.openapi.json` are a **proposal**, written so the frontend could be built and tested before the backend contract existed. They are yours to adopt or replace in B3 Task 0: if you replace them, keep the governance rules of section 4 (the frontend test above checks them against whatever OpenAPI document `api:gen` reads), keep the six-key payload unless ADR 0004 is amended, and regenerate `frontend/src/api/schema.d.ts` with `pnpm api:gen`. The frontend then deletes the mock spec once your spec covers every path in it.
+This file and `frontend/openapi/stellar-blaze.mock.openapi.json` are a **proposal**, written so the frontend could be built and tested before the backend contract existed. They are yours to adopt or replace in B3 Task 0: if you replace them, keep the governance rules of section 4 (the frontend test above checks them against whatever OpenAPI document `api:gen` reads), keep the six-key payload unless ADR 0004 is amended, and regenerate `frontend/src/api/schema.d.ts` with `pnpm api:gen`. The frontend then deletes the mock spec once your spec covers every path in it. The crew timeline has the same status and carries two questions for you: see `crew-timeline.md`.

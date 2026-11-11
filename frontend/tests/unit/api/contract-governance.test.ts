@@ -80,6 +80,33 @@ function propertyNames(doc: JsonObject, schemaName: string): string[] {
   return Object.keys(properties);
 }
 
+function propertyDescription(doc: JsonObject, schemaName: string, property: string): string {
+  const properties = schemas(doc)[schemaName]?.properties;
+  const schema = isObject(properties) ? properties[property] : undefined;
+  return isObject(schema) && typeof schema.description === "string" ? schema.description : "";
+}
+
+/**
+ * The k-suppression derivation rule must be written into the contract itself, because B3 adopts the contract and not
+ * a report: crew aggregates come only from server-held crew inputs, never from a device's personal risk (ADR 0004),
+ * and a suppressed crew exposes nothing derived from its members. Returns what the descriptions fail to say.
+ */
+function crewDerivationRuleGaps(doc: JsonObject): string[] {
+  const required: [string, string, string, RegExp][] = [
+    ["CrewHour", "crew_level", "server-held inputs", /server-held/],
+    ["CrewHour", "crew_level", "never from a device's personal risk", /never from personal risk reported by a device/],
+    ["CrewHour", "crew_level", "no member-derived information", /no member-derived information/],
+    ["CrewHour", "share_above_amber", "server-held inputs", /server-held/],
+    ["CrewHour", "share_above_amber", "never from a device's personal risk", /never from personal risk reported by a device/],
+    ["CrewHour", "share_above_amber", "null when suppressed", /null when the crew is suppressed/i],
+    ["CrewTimeline", "suppressed", "share_above_amber is null", /share_above_amber is null on every hour/],
+    ["CrewTimeline", "suppressed", "no member-derived information", /no member-derived information/],
+  ];
+  return required
+    .filter(([schemaName, property, , pattern]) => !pattern.test(propertyDescription(doc, schemaName, property)))
+    .map(([schemaName, property, statement]) => `${schemaName}.${property} does not say: ${statement}`);
+}
+
 /** Object schemas (inline ones too) that do not set `additionalProperties: false`. */
 function objectsOpenToExtraProperties(doc: Json): JsonObject[] {
   return [...walk(doc)].filter((node) => node.type === "object" && node.additionalProperties !== false);
@@ -121,6 +148,10 @@ describe("contract governance", () => {
 
   it("forbids extra properties on every object schema, inline ones included", () => {
     expect(objectsOpenToExtraProperties(spec)).toEqual([]);
+  });
+
+  it("states in the contract where crew aggregates come from and what a suppressed crew withholds", () => {
+    expect(crewDerivationRuleGaps(spec)).toEqual([]);
   });
 
   it("answers every error with application/problem+json that references Problem", () => {
@@ -184,6 +215,18 @@ describe("the guards themselves", () => {
     });
 
     expect(forbiddenNames(leaky)).toEqual(["worker_id"]);
+  });
+
+  it("flags a contract whose crew descriptions drop the derivation and suppression rule", () => {
+    const silent = doctored((copy) => {
+      const properties = schemas(copy).CrewHour?.properties as JsonObject;
+      delete (properties.crew_level as JsonObject).description;
+      (properties.share_above_amber as JsonObject).description = "Share of the crew above amber, 0 to 1.";
+      const timeline = schemas(copy).CrewTimeline?.properties as JsonObject;
+      (timeline.suppressed as JsonObject).description = "True when the crew has fewer than k members.";
+    });
+
+    expect(crewDerivationRuleGaps(silent)).toHaveLength(8);
   });
 
   it("flags an inline object that allows extra properties", () => {

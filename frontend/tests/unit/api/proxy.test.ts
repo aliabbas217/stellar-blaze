@@ -140,19 +140,14 @@ describe("GET", () => {
     expect(res.headers.get("content-type")).toBe(PROBLEM_JSON);
   });
 
-  it("does not cache: the upstream is called again for every request", async () => {
-    let calls = 0;
-    server.use(
-      http.get(`${UPSTREAM}/api/v1/sites`, () => {
-        calls += 1;
-        return HttpResponse.json([]);
-      }),
-    );
+  it("asks fetch for cache: no-store, so no layer (Next's data cache included) can serve an old answer", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    server.use(http.get(`${UPSTREAM}/api/v1/sites`, () => HttpResponse.json([])));
 
     await GET(incoming("/api/v1/sites"));
-    await GET(incoming("/api/v1/sites"));
 
-    expect(calls).toBe(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ cache: "no-store" });
   });
 });
 

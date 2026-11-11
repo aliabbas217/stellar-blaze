@@ -683,14 +683,15 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The crew's level for this hour. Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data."
           },
           "share_above_amber": {
             "type": [
               "number",
               "null"
             ],
-            "description": "Share of the crew above amber, 0 to 1. Null when suppressed or without data."
+            "description": "Share of the crew above amber, 0 to 1. Derived only from server-held crew inputs, never from personal risk reported by a device (ADR 0004). Null when the crew is suppressed (on every hour) or there is no data. The data source is for B3 Task 0 to name."
           },
           "ban_active": {
             "type": "boolean"
@@ -722,7 +723,7 @@
           },
           "suppressed": {
             "type": "boolean",
-            "description": "True when the crew has fewer than k members."
+            "description": "True when the crew has fewer than k members. When true, share_above_amber is null on every hour and crew_level carries no member-derived information (it comes from site and crew inputs, or is null): nothing in the response may single out a member."
           },
           "k": {
             "type": "integer"
