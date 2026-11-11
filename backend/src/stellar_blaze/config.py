@@ -1,7 +1,7 @@
 """Typed process configuration: every ``SB_*`` environment variable, validated once.
 
-Only ``composition`` (added with the ruleset task) turns these values into implementations; nothing else branches on
-them (ADR 0009 section 2). The one deliberate exception to "config only through ``SB_*``" is the standard
+Only ``composition`` turns these values into implementations; nothing else branches on them (ADR 0009 section 2).
+The one deliberate exception to "config only through ``SB_*``" is the standard
 ``OTEL_EXPORTER_OTLP_ENDPOINT`` variable, which ``tracing`` reads directly.
 """
 
@@ -13,6 +13,10 @@ from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from stellar_blaze import __version__
+
+# The kinds of forecast source `composition` knows how to ask for. Defined once here; `composition.FORECAST_SOURCES`
+# registers the factories, and `replay` is registered in B3 (ADR 0009 section 4).
+type ForecastSourceKind = Literal["open_meteo", "replay"]
 
 
 class Settings(BaseSettings):
@@ -43,13 +47,17 @@ class Settings(BaseSettings):
     readiness_timeout_s: float = 2.0
     phs_timeout_s: float = 10.0
 
-    # Evolvability (ADR 0009 sections 1, 3, 4). `replay` is registered in B3; selecting a source nobody registered
-    # fails in `composition` at startup, not here.
-    forecast_source: Literal["open_meteo", "replay"] = "open_meteo"
-    ruleset_id: str | None = None  # pin; None resolves the ruleset by date
+    # Evolvability (ADR 0009 sections 1, 3, 4; ADR 0010). `replay` is registered in B3; selecting a source nobody
+    # registered fails in `composition` at startup, not here.
+    forecast_source: ForecastSourceKind = "open_meteo"
+    # Pins for back-tests and database-less development runs only: `composition` refuses them with SB_ENV=prod, where
+    # the runtime config is the one source of truth (ADR 0010 section 4.6).
+    ruleset_id: str | None = None  # None resolves the ruleset by date
     model_id: str | None = None  # None serves the uncorrected forecast
     rulesets_dir: Path = Path("rulesets")
     models_dir: Path = Path("models")
+    # The git default of the runtime config: the initial snapshot until a database-active version exists (Task 7B).
+    runtime_config_seed: Path = Path("config/runtime/default.toml")
 
     @model_validator(mode="after")
     def _prod_logs_are_machine_readable(self) -> Self:

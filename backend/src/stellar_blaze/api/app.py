@@ -3,6 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import structlog
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -11,12 +12,14 @@ from stellar_blaze import __version__
 from stellar_blaze.adapters.db.engine import build_engine
 from stellar_blaze.api.middleware import RequestLogMiddleware
 from stellar_blaze.api.routers import health
+from stellar_blaze.composition import build_runtime, dubai_today
 from stellar_blaze.config import Settings, get_settings
 from stellar_blaze.errors import PROBLEM_RESPONSES, REQUEST_ID_HEADER, install_problem_handlers
-from stellar_blaze.logging import configure_logging
+from stellar_blaze.logging import bind_runtime_ids, configure_logging
 from stellar_blaze.tracing import configure_tracing, instrumented_engine
 
 API_PREFIX = "/api/v1"
+logger = structlog.stdlib.get_logger(__name__)
 
 
 def operation_id(route: APIRoute) -> str:
@@ -39,6 +42,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # The rules in force come first and fail startup on any ruleset, model or config error: the process never
+        # starts serving on wrong rules, and readiness cannot go green (ADR 0009: loud failure). The decision date is
+        # the Asia/Dubai local date. No engine exists yet, so a failure here leaves nothing to dispose.
+        runtime = build_runtime(settings, today=dubai_today())
+        app.state.runtime = runtime
+        bind_runtime_ids(runtime)
+        snapshot = runtime.config.current()
+        logger.info(
+            "runtime.ready",
+            config_source=snapshot.source,
+            config_version=snapshot.version_id,
+            config_sha256=snapshot.sha256,
+        )
+
         # Creating the engine opens no connection, so a database that is down never prevents startup: /health/ready
         # reports it (503) while /health/live keeps answering and the platform keeps the process.
         engine = build_engine(settings)

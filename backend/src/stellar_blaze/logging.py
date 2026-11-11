@@ -8,6 +8,7 @@ per line); ``console`` is for a developer's terminal.
 import logging
 import sys
 from contextvars import ContextVar
+from typing import TYPE_CHECKING
 
 import structlog
 from asgi_correlation_id import correlation_id
@@ -17,6 +18,9 @@ from structlog.tracebacks import ExceptionDictTransformer
 from structlog.typing import EventDict, Processor, WrappedLogger
 
 from stellar_blaze.config import Settings
+
+if TYPE_CHECKING:  # type only: importing composition here would load every adapter whenever logging is configured
+    from stellar_blaze.composition import Runtime
 
 
 class _LiveStdout:
@@ -127,3 +131,18 @@ def configure_logging(settings: Settings) -> None:
     access_logger.handlers.clear()
     access_logger.addHandler(logging.NullHandler())
     access_logger.propagate = False
+
+
+def bind_runtime_ids(runtime: "Runtime") -> None:
+    """Bind the loaded ruleset ids and model ids to the current context, so every log line names the rules in force.
+
+    ``ruleset_ids`` and ``model_ids`` are comma-joined and fixed for the life of the process. The active ruleset pin,
+    model id and config version can change at runtime, so they are bound per request by ``get_snapshot``.
+
+    A context variable bound inside the lifespan is visible only in uvicorn's lifespan task, not in request tasks
+    (probed with a real server), so the lifespan calls this for its own log lines and ``RequestLogMiddleware`` calls it
+    again for each request.
+    """
+    structlog.contextvars.bind_contextvars(
+        ruleset_ids=",".join(runtime.rulesets.ids()), model_ids=",".join(runtime.models.ids())
+    )

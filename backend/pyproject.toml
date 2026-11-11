@@ -185,6 +185,18 @@ forbidden_modules = [
     "stellar_blaze.jobs",
 ]
 
+[[tool.importlinter.contracts]]
+name = "Entrypoints reach swappable adapters only through composition"
+type = "forbidden"
+source_modules = ["stellar_blaze.api", "stellar_blaze.jobs"]
+forbidden_modules = [
+    "stellar_blaze.adapters.sources",
+    "stellar_blaze.adapters.fakes",
+    "stellar_blaze.adapters.compute",
+    "stellar_blaze.adapters.config",
+]
+allow_indirect_imports = true
+
 # Transitive dependency imported directly on purpose, instead of adding a new pin: errors.py (Task 2) uses starlette
 # types, and starlette is pinned by fastapi==0.162.4.
 [tool.deptry.per_rule_ignores]
@@ -198,9 +210,4 @@ DEP002 = [
     "lightgbm",
     "ortools",
     "duckdb",
-    # TEMPORARY (preflight F1): declared up front by the stack doc but not imported until the task named on each
-    # line lands, and `deptry src` must stay green on every task commit. Delete each entry in the task that first
-    # imports it; the last B1 task must leave only the permanent entries above.
-    "httpx2",  # Task 8
-    "stamina",  # Task 8
 ]

@@ -5,6 +5,8 @@ import time
 import structlog
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from stellar_blaze.logging import bind_runtime_ids
+
 logger = structlog.stdlib.get_logger(__name__)
 
 
@@ -12,7 +14,9 @@ class RequestLogMiddleware:
     """Emit exactly one ``request.completed`` event per HTTP request.
 
     Must sit inside ``CorrelationIdMiddleware`` so the event carries the request id. The query string is deliberately
-    not logged: it may carry tokens or personal data.
+    not logged: it may carry tokens or personal data. When the application lifespan has built the runtime, the request's
+    context also gets the loaded ``ruleset_ids`` and ``model_ids`` (a context bound in the lifespan does not reach
+    request tasks), so every line of the request, this one included, names the rules in force.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -22,6 +26,10 @@ class RequestLogMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+
+        runtime = getattr(getattr(scope.get("app"), "state", None), "runtime", None)
+        if runtime is not None:
+            bind_runtime_ids(runtime)
 
         started = time.perf_counter()
         # If the app raises before it responds, ServerErrorMiddleware (outside this middleware) answers 500.

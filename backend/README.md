@@ -50,6 +50,14 @@ All settings are `SB_*` environment variables (typed in `src/stellar_blaze/confi
 uv run uvicorn stellar_blaze.api.app:create_app --factory --reload    # http://127.0.0.1:8000/api/v1/health/live
 ```
 
+## Rulesets, models and the runtime config
+
+Policy values are data (ADR 0009, ADR 0010); the process loads them once at startup in `composition.build_runtime`, and any error there fails startup.
+
+- **Rulesets** (`rulesets/<id>.toml`, schema in `domain/rules/ruleset.py`): legal floors (ADOSH zone edges, withdrawal limits, NIOSH Table 3-2 clothing adjustments), cited sources, and the reviewed range of each tunable. A **released** ruleset is immutable: `rulesets/lock.json` holds the SHA-256 of its bytes (`sha256sum rulesets/<id>.toml`; the files are LF), and a changed byte fails startup. To change one, add a new file with a new id and `supersedes = ["<old id>"]`, its `tests/fixtures/rulesets/<id>.golden.json`, and its lock entry; the old file stays pinnable for audit replay. Drafts load only outside `SB_ENV=prod`. The ruleset in force is the one covering the Asia/Dubai local date; a date no ruleset covers is an error, never a default.
+- **Models** (`models/<model_id>/manifest.json` + artifacts): every file's hash is verified at startup. `models/` is empty until B2.
+- **Runtime config** (`config/runtime/default.toml`, schema in `domain/config/runtime.py`): the ruleset pin, the active model id, the tunables and the flags that may change without a release. Legal floors cannot be set here. In B1 this file is the initial snapshot; `SB_RULESET_ID` and `SB_MODEL_ID` pin a ruleset or model for back-tests and runs without a database, and are refused with `SB_ENV=prod`. Handlers read the snapshot through `Depends(get_snapshot)`.
+
 ## OpenAPI snapshot
 
 `openapi/v1.json` is the committed API contract (ADR 0009 section 5); a unit test fails when it drifts from the app. After changing a route or a response model:

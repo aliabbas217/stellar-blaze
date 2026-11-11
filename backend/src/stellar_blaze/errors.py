@@ -21,6 +21,8 @@ from stellar_blaze.logging import mark_exception_reported
 
 PROBLEM_JSON = "application/problem+json"
 REQUEST_ID_HEADER = "X-Request-ID"
+# `type` of the 503 problem for a dependency the API needs and cannot reach (database, active runtime config).
+DEPENDENCY_UNAVAILABLE = "urn:stellar-blaze:problem:dependency-unavailable"
 
 logger = structlog.stdlib.get_logger(__name__)
 

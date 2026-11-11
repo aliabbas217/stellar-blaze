@@ -1,0 +1,49 @@
+{
+  "id": "ae-heat-0.1",
+  "meta": {
+    "effective_from": "2024-01-01",
+    "effective_to": null,
+    "status": "released",
+    "supersedes": []
+  },
+  "source_ids": [
+    "niosh-2016",
+    "adosh-twl",
+    "meteohazard-5633d57",
+    "adr-0006"
+  ],
+  "sections": {
+    "niosh_clothing": {
+      "source": "niosh-2016",
+      "values_c": {
+        "work_clothes": 0.0,
+        "cloth_coveralls": 0.0,
+        "double_layer_woven": 3.0,
+        "sms_coveralls": 0.5,
+        "polyolefin_coveralls": 1.0,
+        "limited_use_vapor_barrier": 11.0
+      }
+    },
+    "twl_zones": {
+      "source": "adosh-twl",
+      "low_min_w_m2": 140.0,
+      "medium_min_w_m2": 115.0
+    },
+    "twl_withdrawal": {
+      "source": "meteohazard-5633d57",
+      "enabled": false,
+      "dry_bulb_c": 44.0,
+      "natural_wet_bulb_c": 32.0,
+      "cap_w_m2": 115.0
+    },
+    "tunables": {
+      "twl_margin_w_m2": {
+        "source": "adr-0006",
+        "default": 0.0,
+        "min": 0.0,
+        "max": 20.0,
+        "safer": "higher"
+      }
+    }
+  }
+}

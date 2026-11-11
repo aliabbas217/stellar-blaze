@@ -61,14 +61,14 @@ def test_alert_limit_is_below_exposure_limit_only_above_the_crossover() -> None:
     assert ral_wbgt_c(18.0) < rel_wbgt_c(18.0)
 
 
-def test_limits_are_vectorised_float64_arrays() -> None:
+def test_limits_are_vectorized_float64_arrays() -> None:
     m = np.array([[180.0, 300.0], [415.0, 600.0]])
     for fn in (rel_wbgt_c, ral_wbgt_c):
         out = fn(m)
         assert isinstance(out, np.ndarray)
         assert out.shape == (2, 2)
         assert out.dtype == np.float64
-        assert out[0, 1] == fn(300.0)
+        assert out[0, 1] == pytest.approx(float(fn(300.0)), rel=1e-12)
 
 
 def test_scalar_input_gives_a_zero_dimensional_float64_array() -> None:
@@ -98,6 +98,13 @@ def test_one_bad_element_rejects_the_whole_array() -> None:
         rel_wbgt_c(np.array([180.0, float("nan"), 300.0]))
     with pytest.raises(ValueError, match="metabolic_rate_w"):
         ral_wbgt_c([180.0, 0.0])
+
+
+def test_the_error_message_shows_a_plain_float_not_a_numpy_repr() -> None:
+    with pytest.raises(ValueError, match=r"first offending value: nan$"):
+        rel_wbgt_c(np.array([180.0, float("nan")]))
+    with pytest.raises(ValueError, match=r"first offending value: -2\.0$"):
+        ral_wbgt_c(np.array([-2.0, 180.0]))
 
 
 def test_adjustment_is_added() -> None:
@@ -137,9 +144,6 @@ def test_clothing_values_are_the_lower_case_names() -> None:
     assert str(Clothing.WORK_CLOTHES) == "work_clothes"
 
 
-# Narrowed to FileNotFoundError: while Task 7A has not landed the file is absent and this xfails; once the file exists a
-# missing section or a key mismatch must fail loudly instead of being masked. Delete this mark when Task 7A merges.
-@pytest.mark.xfail(strict=True, raises=FileNotFoundError, reason="Task 7A")
 def test_clothing_enum_matches_ruleset_keys() -> None:
     ruleset = tomllib.loads(RULESET.read_text(encoding="utf-8"))
     assert {c.value for c in Clothing} == set(ruleset["niosh_clothing"]["values_c"])

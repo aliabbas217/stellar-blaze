@@ -103,3 +103,11 @@ def test_env_example_lists_every_setting() -> None:
     listed = set(re.findall(r"^#? ?SB_([A-Z0-9_]+)=", text, flags=re.MULTILINE))
     declared = {name.upper() for name in Settings.model_fields}
     assert listed == declared
+
+
+@pytest.mark.unit
+def test_runtime_config_seed_defaults_to_the_file_the_image_ships(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SB_DATABASE_URL", DATABASE_URL)
+    assert Settings(_env_file=None).runtime_config_seed == Path("config/runtime/default.toml")
+    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", "/etc/sb/seed.toml")
+    assert Settings(_env_file=None).runtime_config_seed == Path("/etc/sb/seed.toml")

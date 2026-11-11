@@ -10,12 +10,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from stellar_blaze.api.deps import EngineDep, SettingsDep
 from stellar_blaze.api.schemas import ResponseModel
-from stellar_blaze.errors import DomainProblem, Problem
+from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem, Problem
 
 router = APIRouter(prefix="/health", tags=["health"])
 logger = structlog.stdlib.get_logger(__name__)
-
-DEPENDENCY_UNAVAILABLE = "urn:stellar-blaze:problem:dependency-unavailable"
 
 
 class LiveResponse(ResponseModel):

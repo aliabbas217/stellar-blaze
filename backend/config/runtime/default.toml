@@ -1,0 +1,12 @@
+# Runtime configuration seed (ADR 0010): every value is the ruleset default and nothing is pinned.
+#
+# This is the git default that is loaded at startup, and that `sb-jobs config seed` (Task 7B) writes to the database as
+# the first config version. A tunable is set only to move away from its ruleset default, within the range that the
+# ruleset declares under [tunables.<name>]; legal floors are not settable here at all. `model_id` stays absent until a
+# trained model exists (B2): absent means the uncorrected forecast.
+
+schema_version = 1
+
+[tunables]
+
+[flags]

@@ -18,7 +18,7 @@ def test_dubois_vector() -> None:
     assert body_surface_area_dubois_m2(70, 1.75) == pytest.approx(1.8438, abs=0.0005)
 
 
-def test_dubois_is_the_published_power_law() -> None:
+def test_dubois_uses_the_iso_7933_form() -> None:
     for weight, height in ((55.0, 1.60), (80.0, 1.80), (106.0, 1.80)):
         assert body_surface_area_dubois_m2(weight, height) == pytest.approx(
             0.202 * weight**0.425 * height**0.725, rel=1e-12
@@ -63,7 +63,7 @@ def test_phs_applicability_window_in_watts_per_square_meter() -> None:
     assert met_to_watts(4.3, 1.0) == pytest.approx(250.0, abs=0.5)
 
 
-def test_conversions_are_vectorised_float64_arrays() -> None:
+def test_conversions_are_vectorized_float64_arrays() -> None:
     met = np.array([[1.0, 2.0], [3.0, 4.0]])
     watts = met_to_watts(met, 1.8)
     assert isinstance(watts, np.ndarray)

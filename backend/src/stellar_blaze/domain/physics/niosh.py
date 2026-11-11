@@ -9,8 +9,9 @@ Source: NIOSH (2016), *Criteria for a Recommended Standard: Occupational Exposur
 They protect healthy workers in conventional one-layer work clothing. ``M`` is the whole-body metabolic rate in watts,
 not W/m2: convert with ``stellar_blaze.domain.physics.metabolic``. Bernard, Flach and Ashley (2023, Ann Work Expo
 Health 67:345) report small discrepancies between the equations and the figures of the NIOSH document and take the
-equations as intended; so does this module. Below M = 17 W (far under any resting rate) the two lines cross and the
-alert limit would exceed the exposure limit; the limits are not meant for that range.
+equations as intended; so does this module. The two equations cross at M = 17 W (59.9 - 14.1 log10 M equals
+56.7 - 11.5 log10 M at log10 M = 3.2 / 2.6); do not use them below it, where the alert limit would exceed the exposure
+limit. Every resting and working rate is far above 17 W.
 
 The clothing adjustment factors of NIOSH (2016) Table 3-2 (its "2006" column, adapted from ACGIH) are data, not code
 (ADR 0009 section 1): they live in the versioned ruleset under ``[niosh_clothing] values_c``, whose keys are the values
@@ -47,7 +48,7 @@ def _metabolic_rate_w(metabolic_rate_w: ArrayLike) -> F64:
     valid = np.isfinite(m) & (m > 0.0)
     if not np.all(valid):
         raise ValueError(
-            f"metabolic_rate_w must be finite and greater than 0 W; first offending value: {m[~valid].flat[0]!r}"
+            f"metabolic_rate_w must be finite and greater than 0 W; first offending value: {float(m[~valid].flat[0])!r}"
         )
     return m
 
