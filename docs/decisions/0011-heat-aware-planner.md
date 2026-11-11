@@ -285,3 +285,6 @@ Everything listed as "Cut / parked" in §1, plus the items already parked in v1.
 
 ## Revisit trigger
 Counsel answers §12; a pilot supplies commute, sleep-diary and timesheet data (calibrate the floor and buffers); §9 shows the rule plan does not reduce truth violations vs the ban-only policy; a sub-seasonal archive becomes back-testable; shoulder-season replication.
+
+## Amendments
+- **2026-11-11 (status: Accepted, v2; text unchanged):** Ali accepted v2 in chat (roadmap "Decisions recorded 2026-11-11"): decision 1 (MUST rule planner + independent validator + 2026 plan back-test; SHOULD CP-SAT, dropped 17 Nov 15:00 if MUST is not green); decision 2 (bedtime floor 21:30, labelled an assumption); decision 3 (Art. 18 protective reading behind a ruleset switch, listed as an open question); decision 4 (k = 10/5); decision 5 (no counsel before 20 Nov; the deck says "our reading of Art. 18, open question listed"). The cuts and parks are recorded as ADR 0022-0026; the superseded v1 numbers as ADR 0033.

@@ -5,6 +5,8 @@
 **Run date:** 2026-11-11. Scripts and result files: `docs/research/scripts/roster/` (section 8). No git commands were run.
 
 > **Erratum (2026-11-11, ADR 0011 v2; `docs/research/2026-11-11-planner-adversarial-review.md`).** The **absolute** numbers below (34.6% / 58.0% avoided, 53.1% / 83.0%, 75.0% / 98.1%, and the in-shift 7.8%) are **superseded for any pitch or design use**. They score 8.5 h rosters with 5.5-6.5 h runs, which break Art. 17/18. They also ignore sleep and compare against a non-compliant baseline. Under legal 8 h templates, a clock-time sleep model and a do-no-harm guard, see `scripts/roster/legal_sleep_templates.py` v2 and `results/legal_sleep_templates_output.txt`. Legalising the common roster removes 7.5% at ≥ 30 and 19.1% at ≥ 32 (per worked hour). A sleep-neutral shape change adds 0-10% at ≥ 30 depending on the assumed bedtime. The in-shift forecast gain on legal shifts is 1.8-5.9% (`within_shift_legal.py`). The **horizon comparisons** (fixed ≈ monthly ≈ weekly ≈ daily-forecast) were made on one library and still describe that library. Whether they hold on the legal library is untested [I].
+>
+> **Superseded by:** [ADR 0033](../decisions/0033-superseded-roster-headline-numbers.md) (2026-11-11), which lists every superseded number and the only replacements allowed in the pitch. The text below is kept unchanged.
 
 ## 0. Verdict
 

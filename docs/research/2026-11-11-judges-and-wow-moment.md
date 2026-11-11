@@ -6,6 +6,14 @@
 
 **Every number in the wow storyboard that does not exist yet is shown as `⟨name⟩`.** It is produced by B2/B3 code on real data, and the slot names the file that will hold it. Nothing in this document is a result we have not computed.
 
+## Changelog
+
+| Version | Date | Change |
+|---|---|---|
+| v1 | 2026-11-11 | First version: judges, competitor scan, feature ranking, wow moment "Summer 2026, replayed honestly", video spine |
+| v1.1 | 2026-11-11 | Controller steer: differentiation designed against an **assumed strong unseen field** (section 2.1). The competitor scan is shortened and labelled "visible sample, likely incomplete" (section 2.2) |
+| v2 | 2026-11-11 | Ali's revision after ADR 0011 v2 (planner). (1) Wow re-checked against the planner numbers; it holds, and the scoreboard gains a **Plans** row scored by the independent validator (section 4.6). (2) New **real-work layer**: three inspectable artefacts and an evidence chip on every number (section 8). (3) New **potential and future layer**: a labelled climate-sensitivity replay of 2026 at +ΔT from IPCC AR6, with a defensibility check, plus a one-screen roadmap (section 9). (4) Priorities, costs and cut order re-ranked (section 10; supersedes section 3 where they differ). The AR6 regional dataset (IPCC-WG1/Atlas, CC BY 4.0) was located; no ΔT has been extracted yet. (5) Corrected: the compliance-report LLM drafter is **kept** as one bounded read-only feature per ADR 0010 §8, not cut; it stays out of the demo spine. (6) Replay mode is the primary demo, because live weather at evaluation (20-30 Nov) and GITEX (7-11 Dec) is mild |
+
 ---
 
 ## 0. Bottom line
@@ -29,8 +37,19 @@
    - **(d) Raw AIFS (AI) vs IFS (physics) on Gulf humidity.** We found no published evaluation of this (plan E1).
 
    Points (a) to (c) are the wow moment. Point (d) is a technical-depth exhibit. The obvious entries (dashboard, wearable, chatbot, risk map) can each show a live screen. None can show a season of warnings it would have issued, scored against instruments it did not see.
-4. **Chosen wow moment: "Summer 2026, replayed honestly".** It is a 50-second scoreboard replay of the held-out 2026 summer at Abu Dhabi International (OMAA). Four policies run side by side: the midday ban alone, a naive WBGT ≥ 32 rule, the ADOSH zone on the raw forecast, and Stellar Blaze. The scoreboard counts what each would have warned the evening before against what the station's own instruments then recorded. It then zooms into one pre-registered day, then into the worker's phone card for that day. **Marginal build cost: about 1.5 days** on top of B2/B3 work that is already never-cut (section 4.4).
-5. **Top three features to prioritise:** the honest summer back-test (corrector + calibrated probabilities + policy scoreboard); the governance refusal shown live (employer → 403 → audit row the worker can see); and the ADOSH-zone engine with one clinician-signed escalation card. **Cut:** Landsat, 3D, all three LLM agents, the strain model, the population view, DRN, the adaptive conformal arm and the AIFS-feature corrector. **Demote:** voice audio (one language, pre-rendered, demo only), the full CP-SAT constraint set, and real-phone Web Push off the critical path (section 3).
+4. **Chosen wow moment: "Summer 2026, replayed honestly".** It is a 50-second scoreboard replay of the held-out 2026 summer at Abu Dhabi International (OMAA). Four policies run side by side: the midday ban alone, a naive WBGT ≥ 32 rule, the ADOSH zone on the raw forecast, and Stellar Blaze. The scoreboard counts what each would have warned the evening before against what the station's own instruments then recorded. It then zooms into one pre-registered day, then into the worker's phone card for that day. **Marginal build cost: about 1.5 days** on top of B2/B3 work that is already never-cut (section 4.4). **v2:** the wow still holds after ADR 0011. A second scoreboard row, **Plans**, scores the four shift plans with the independent validator against station truth (rule-violation minutes, missed protection). It adds about 0.25 day (section 4.6).
+5. **v2 demo spine: wow → real work → potential.**
+   - **Wow** (50 s): the summer scoreboard (Warnings + Plans), then one day, then the worker card.
+   - **Real work** (20 s): every number carries a "proof" chip opening its protocol line, script, commit and data file. Three artefacts can be inspected in seconds: the pre-registered protocol with the reliability diagram, the validator's clause-cited violation list, and the roster frontier (section 8).
+   - **Potential** (25 s): the same 2026 summer replayed at a +ΔT from IPCC AR6 for the Arabian Peninsula, labelled "sensitivity scenario, not a forecast", with humidity bracketed. Then a one-screen roadmap (section 9).
+   - **Total marginal build: about 3.1 days with the climate toggle, 2.4 without it**, cut in a fixed order when short (section 10).
+6. **Top three to prioritise:**
+   1. The honest summer back-test: corrector, calibrated probabilities, Warnings + Plans scoreboard.
+   2. The governance refusal shown live: employer → 403 → audit row the worker can see.
+   3. The evidence chips plus the independent validator, which makes the depth visibly not a mock-up.
+
+   **Cut:** Landsat, 3D, copilot and shift-drafter LLM agents, the strain model, the population view, DRN, the adaptive conformal arm, the AIFS-feature corrector. The compliance drafter is kept per ADR 0010 but is not in the demo.
+   **Demote:** voice audio to one pre-rendered clip; CP-SAT to SHOULD (ADR 0011); real-phone Web Push off the critical path.
 
 ---
 
@@ -217,11 +236,53 @@ Commit `docs/research/2026-11-12-evaluation-protocol.md` containing: section 4.2
 | The corrector helps at some clusters (e.g. OMFJ, with large T/Td biases [R]) but not OMAA | Keep OMAA as the replay (the site was pre-registered; never switch after looking). Put the per-cluster table in the report; the live variant lets a judge pick OMFJ | Switching the demo site after seeing results would be cherry-picking |
 | P3 is worse than ADOSH-on-raw | Ship the scoreboard anyway, with P2 as the recommended policy. Say "our AI did not beat the regulator's own zones on held-out data; here is why", the way a pre-registered study reports a failed arm | The honest negative is still the only instrument-scored, no-hindsight comparison in the field |
 
+### 4.6 Re-check after ADR 0011 v2 (the planner numbers), and the Plans row
+
+**Does the wow still hold? Yes.** Neither of the planner's findings undercuts it, and one sharpens it:
+- **"No roster shape outruns the heat under law, sleep and commute"** (legal templates + sleep model + do-no-harm guard: no change recommended in 18/18 folds at commutes of 30 min or more) [R: ADR 0011 Context 1; `results/roster_frontier.json`]. This removes a tempting false wow ("our optimiser moves the shift and saves X%"). The obvious optimiser entries will claim exactly that. We can show, on real data, why the claim does not survive the law and a night's sleep. It goes in the real-work layer (section 8), not the wow.
+- **Legalising the common roster removes 7.5% (≥ 30 °C) and 19.1% (≥ 32 °C) of exposure per worked hour** [R, ADR 0011]. **This gain belongs to the law, not to us.** It may be shown on the frontier chart with that attribution and is never added to our scoreboard.
+- **Forecast-driven in-shift ordering gains only 1.3-5.9%** over heavy-first [R]. It is not headlined anywhere.
+- **The forecast's real job is tomorrow's ADOSH zone per hour**, turned into the cycles, stop-work and people rules. That is exactly what the scoreboard measures. ADR 0011 §9 makes the planner's own metric the same frame: station truth zones, held-out 2026, the same policies. So the planner **strengthens** the wow. The Warnings row says who was warned; the Plans row says whose shift plan would have actually protected them.
+
+**Plans row** (second row of the same scoreboard; the same pre-registration as section 4.3, extended with ADR 0011 §9 metrics 1-3):
+
+| Column | Plan scored by the independent validator against **truth** zones (ADR 0011 §3) |
+|---|---|
+| Naive schedule | Every shift minute outside the ban (common practice) |
+| Ban only | The ban plus no other control |
+| Rule plan, raw forecast | ADR 0011 rule planner fed by raw IFS |
+| Rule plan, corrected protective quantile | The same planner fed by B2 |
+
+Counters per column, each with a 95% interval:
+- **rule-violation minutes per worker-season** `⟨plan_violation_min_*⟩`;
+- **share of truth-High heavy-work minutes the plan would have cycled 20/40** `⟨plan_high_cycled_*⟩`;
+- **missed protection**: truth-High/Red ticks scheduled at a lighter cycle, `⟨plan_missed_*⟩`;
+- **cost of protection**: rest minutes added vs naive, `⟨plan_rest_added_*⟩` (SIMULATED productivity).
+
+All are written to `artifacts/eval/2026/plan_scoreboard.json` (B3). Roster: the L1 legal default with the assumed crew mix (ADR 0011 §9), labelled.
+
+**What not to say:** "minutes avoided" or "illness prevented". The defensible statement is "rule-violation minutes against the regulator's own table, on instrument truth, that each plan would have scheduled". **Marginal cost: about 0.25 day.** The validator and §9 scoring are already MUST in ADR 0011; this adds only the export and the second row on the screen.
+
+**If the Plans row disappoints** (for example, the corrected and raw plans tie): show it. The tie means "the zone engine and validator do the protecting; the AI's contribution is the honest range". That matches the section 4.5 fallback.
+
 ---
 
 ## 5. The 3-minute video and pitch spine
 
 One number or one visual per beat. Each slot is filled by real output or the line is cut.
+
+**v2 spine (supersedes the v1 table below where they differ): wow → real work → potential.** Replay mode drives every beat; live weather in late November and December is mild, so a "Today" tab appears only as a 3-second aside ("live feed connected; today is Low zone").
+
+| Time | Beat | The one number or visual | Source |
+|---|---|---|---|
+| 0:00-0:15 | **Problem** | ~70% of dangerous hours outside the ban (station version if B3 has it) | as below |
+| 0:15-1:05 | **Wow** | Scoreboard **Warnings** row → **Plans** row (`⟨plan_violation_min_ban_only⟩` vs `⟨plan_violation_min_corrected⟩` rule-violation minutes per worker-season) → the pre-registered day → the Urdu card | `policy_scoreboard.json`, `plan_scoreboard.json`, `demo_day.json` |
+| 1:05-1:25 | **Real work** | Tap a proof chip on the headline number → protocol line (committed before scoring) + reliability diagram; then the validator lists a naive plan's violations with clause IDs; then the roster frontier with "no roster shape outruns the heat" | Section 8 |
+| 1:25-2:10 | **Product + governance** | Supervisor plan, worker card offline, break-things; employer → 403 → the worker sees the attempt | Code behaviour (REAL) |
+| 2:10-2:35 | **Potential** | The same 2026 summer replayed at +`⟨dT_gwl2⟩` °C (IPCC AR6, Arabian Peninsula): High-zone hours outside the ban `⟨hi_now⟩` → `⟨hi_lo⟩`-`⟨hi_hi⟩` (humidity bracket). Stamp: "sensitivity scenario, not a forecast" | Section 9.1 |
+| 2:35-3:00 | **Path to pilot** | One-screen roadmap (section 9.2) + the pilot ask | Section 9.2 |
+
+**v1 table** (kept for history; rows not superseded above still apply to the 7-minute version):
 
 | Time | Beat | The one number or visual | Source |
 |---|---|---|---|
@@ -261,6 +322,142 @@ One number or one visual per beat. Each slot is filled by real output or the lin
 - **Corrector gain is unknown until B2 runs.** Section 4.5 exists because Zill's airport numbers suggest the raw IFS WBGT bias at OMAA may be small. That cuts against an "AI fixes the forecast" headline and is why the wow compares *policies*.
 - **The ~70% and ~58% figures are from the 2025 Abu Dhabi city grid cell (IFS 9 km), not from stations.** B3 will produce station versions; use whichever is stated, never mix them.
 - Research subagent findings tagged S (fines, 2024 inspection counts, AI Builders Summit winners) are not cited in any pitch line above.
+- **v2:** the AR6 regional dataset was checked for existence, contents and licence only (section 9.1). No ΔT value has been extracted yet, so all climate numbers are slots.
+
+---
+
+## 8. Real-work layer: depth that is visibly not a mock-up (v2)
+
+**The problem it solves.** In a strong field, every entry looks finished: films, tests, sandboxes. A judge cannot tell real analysis from a well-styled mock-up unless the demo lets them **pull the thread on any number in seconds**. The obvious entries cannot offer that, because their numbers come from their own simulator.
+
+### 8.1 The three artefacts judges inspect
+
+| # | Artefact | What it proves | Already on the plan? |
+|---|---|---|---|
+| 1 | **Pre-registered evaluation protocol + evaluation report with reliability diagram.** `docs/research/2026-11-12-evaluation-protocol.md`, committed before 2026 is scored, so its commit time precedes the results commit; `evaluation-report.md` with the three regimes, CRPS, coverage, PIT and the reliability diagram | The numbers were not tuned after the fact. "When we say 70%, it happens `⟨obs_freq_at_70⟩` of the time" | Yes (section 4.3, B2) |
+| 2 | **Independent validator output.** Feed it any plan (the common 06:00-12:30 + 15:00-17:00 roster, our rule plan, a judge's hand edit) and it returns violations with rule id, clause (ADOSH Table 1, Labour Law Art. 18, ban) and tick ranges. It shares no code path with the planners (ADR 0011 §3) | Rules are enforced by code a stranger can poke, not described in a PDF | Yes (ADR 0011 MUST) |
+| 3 | **Roster frontier chart.** Exposure vs sleep for 14,596 legal templates, commute slider, B0 vs B1, the legalisation arrow attributed to the law. Caption: "no roster shape outruns the heat under law, sleep and commute" | We tested the obvious optimiser idea on real data and report that it does not survive. A negative result told plainly reads as competence | Yes (ADR 0011 MUST, static) |
+
+Also available, one click deeper (not in the video): the audit trail (append-only rows including the refused employer request), the governance test names in CI, the data declaration with SHA-256 manifests, and `uv run` one-command reproduction of every scoreboard number.
+
+### 8.2 How the demo surfaces them in seconds: proof chips
+
+- **Every number on every screen carries a small "proof" chip.** Tapping it opens a drawer with four lines:
+  - the protocol clause that defined the metric (link and commit);
+  - the script and function that computed it;
+  - the result file and its SHA-256;
+  - the label: REAL / REAL weather + assumed crew / SIMULATED.
+- **The drawer content is generated by the exporters**, never hand-written. Each JSON result carries a `provenance` block (protocol path, script path, git SHA, data manifest hash, label), and the UI only renders it.
+- **Video beat (20 s):**
+  1. Tap the chip on the headline scoreboard number. The protocol line appears, with a commit date before the results.
+  2. Switch to the validator. Paste the common roster; 2 seconds later a red list appears ("Art. 18: run 06:00-12:30 exceeds 5 h without a 1 h break …").
+  3. Cut to the frontier chart with the one-line verdict.
+- **Cost:** `provenance` block in the exporters 0.1 day; drawer component 0.25 day; validator "try a plan" input (a JSON or template picker over the existing validator endpoint) 0.25 day. **≈ 0.6 day.**
+
+---
+
+## 9. Potential and future layer (v2)
+
+### 9.1 Climate-resilience what-if: "the same summer, warmer"
+
+**What it is.** Replay the real 2026 station summer with a temperature increment for a stated global warming level. Recompute WBGT, TWL zones, ADOSH High-zone hours outside the ban, and the rule plan's protective rest minutes. Show how much heavier the same rules become. **It is a sensitivity scenario on a real summer, not a forecast**, and is stamped that way on every pixel.
+
+**Source (checked today, not yet extracted):** IPCC-WG1 Atlas repository, `datasets-aggregated-regionally/data/CMIP6/CMIP6_tas_{land,landsea}`. These are monthly near-surface temperature averaged over the AR6 reference region **ARP (Arabian Peninsula)**, one run per model. The repository also holds the per-model global-warming-level crossing years in `warming-levels/CMIP6_Atlas_WarmingLevels.csv` [G: github.com/IPCC-WG1/Atlas, read 11 Nov].
+- **Licence:** "All datasets and notebooks in this repository are provided under the Creative Commons Attribution 4.0 license (CC BY 4.0)". Cite Iturbide et al. 2022 (Sci Data 9, 629) and the IPCC AR6 WGI Atlas chapter [G: `LICENSE.md`].
+- **The dataset has temperature and precipitation only. It has no humidity.** That forces the humidity treatment below.
+
+**Method (pre-register with section 4.3 so the scenario numbers cannot be tuned):**
+1. **Use warming levels, not years.** AR6 frames regional change by global warming level (GWL); a year like "2050" is an emissions-scenario guess. Primary scenario **+2.0 °C GWL**; secondary +1.5 °C. The 2024-2026 station climatology already sits at a present-day GWL. Per model, take the JJAS mean ARP temperature in the 20-year window centred on the model's GWL-crossing year, minus the same model's 20-year window centred on its present-day level (the crossing of the level matching 2015-2034, from the same CSV). Report the ensemble median ΔT `⟨dT_gwl2⟩` and its 10-90% range. Uniform increment, monthly by JJAS month.
+2. **Region choice:** ARP **land** is dominated by the interior desert, where warming is likely larger than on the coast where the stations are. ARP **landsea** includes the Gulf and Red Sea. Report both and headline landsea for the coastal stations [I, stated].
+3. **Humidity, bracketed (the defensibility crux).** WBGT and TWL depend strongly on humidity, and the source gives no humidity change.
+   - **Lower bracket: hold specific humidity fixed** (keep observed Td, add ΔT to T only; RH falls).
+   - **Upper bracket: hold relative humidity fixed** (shift Td so RH is unchanged; specific humidity rises about 6-7% per °C by Clausius-Clapeyron).
+   - For the coastal Gulf stations, the moisture source is a warming sea, so the truth is plausibly between the brackets. **The scenario is shown as a range, never a single number.** Report which bracket drives each metric.
+   - *(AR6 assesses decreasing near-surface RH over many land regions. I have not verified the ARP-specific statement today, so it is not cited; the brackets cover it either way.)*
+4. **Held constant, and stated:**
+   - radiation, wind and pressure;
+   - the diurnal shape (a mean delta, which understates hot-extreme changes where those warm faster than the mean);
+   - ADOSH and the ban rules;
+   - the TWL withdrawal-limit decision (ADR 0006). Report how many extra hours fall into the High zone **only because of the >44 °C dry-bulb cap**, because the cap can dominate the result.
+5. **Outputs** (`artifacts/scenario/2026_gwl{15,20}.json`, label "SENSITIVITY SCENARIO"):
+   - ADOSH High-zone working hours outside the ban, now `⟨hi_now⟩` vs `⟨hi_lo⟩`-`⟨hi_hi⟩`;
+   - rule-plan rest minutes per worker-day `⟨rest_now⟩` → `⟨rest_lo⟩`-`⟨rest_hi⟩`;
+   - share of the day's ban-season hours outside the ban that are High zone.
+
+**Defensibility verdict: defensible if, and only if:**
+- the brackets are shown;
+- the GWL framing is used (no calendar year in the headline; "around mid-century under a middle scenario" may appear only in a footnote citing the crossing years from the same CSV);
+- the region choice is disclosed;
+- the label "sensitivity scenario on a real summer, not a forecast" is on screen.
+
+A judge from research methods will accept a delta-method sensitivity with stated brackets. They will not accept a single "in 2050 workers will lose X hours".
+
+**Value:** Health impact (the problem grows), scalability (the same engine and rules carry forward), commercial (the regulator's tables will bind more hours each decade), and the Summit's "to sense is to predict" framing. It is also unique to us: it needs the station truth replay and the zone engine we already have.
+
+**Cost and risk:**
+
+| Item | Days | Risk |
+|---|---|---|
+| Fetch the CSVs (small, public), compute per-model ΔT per GWL and month, tests on 2 models by hand | 0.25 | Low. The GWL crossing-year table format must be read correctly; verify on one model against the Atlas web figure |
+| Scenario run: shift T (and Td under the RH bracket), re-run Liljegren/TWL/zone + the rule planner on 2026 station truth | 0.25 | Low. It reuses the B1/B3 code paths. TWL cap saturation (above) |
+| Replay toggle "2026 · +1.5 °C · +2.0 °C" with the bracket band, plus the label | 0.25 | Low |
+| **Total** | **≈ 0.75** | **Main risk is framing**: misread as a forecast. Mitigation: stamp, brackets, GWL wording, proof chip to the method |
+
+**Placement:** SHOULD, built 17 Nov only if the MUST list is green at the 16 Nov gate. If cut, it becomes one static slide from the same computation (0.5 day), or a roadmap line.
+
+### 9.2 Future roadmap: one screen, not built
+
+Each line states what exists today and the trigger to build it. Nothing here is claimed as done.
+
+| Next step | Evidence it is real, not a wish | What exists now | Trigger |
+|---|---|---|---|
+| **Consented wearable signal** via the existing `ObservationSource` port (ADR 0002) as a per-worker adapter; personal strain computed on the phone (plan 8.7) | The port exists with real (IEM, GHCNh) and in-memory adapters; Kenzen at EGA shows employers will deploy wearables (EGA releases, claims doc §10) | Port + contract tests | A pilot employer with consented devices; freedom-to-operate check vs the Buller patent (plan F8) |
+| **Regulator view** (k-suppressed site/zone aggregates for ADPHC: High-zone hours, plans signed, stops) | k-suppression 10/5 and employer scoping already in ADR 0011 §7; CoP 11.0 cl. 4(a)(v) requires incident records | Aggregation rules | ADPHC interest; data-sharing agreement |
+| **Production data path: ECMWF open data** (CC BY 4.0, commercial use allowed; AWS replica holds every day since 2023-01-19) | Probed 11 Nov (data doc §3.3, §8) | Probe scripts; `WeatherForecastSource` port | Any commercial pilot (Open-Meteo free tier is non-commercial) |
+| **Sub-seasonal outlook (weeks 2-4)** | Rejected *for now* on evidence: no back-testable open archive; weekly anomaly autocorrelation 0.22 at lag 1, ~0 at lags 2-3 (ADR 0011 §10) | Nothing built, by design | An open EC46/GEFS hindcast archive becomes back-testable |
+| **Self-hosted LLM for anything touching personal data** | ADR 0010 §8 floor: PERSONAL never leaves our infrastructure; OpenAI-compatible self-hosted route | The routing rule and the bounded compliance drafter (aggregates only) | Pilot needs Arabic/Urdu supervisor Q&A; in-UAE GPU (parking lot) |
+| **Pilot design with ADPHC as regulator partner** (proposed; ADPHC not contacted) | KPIs = statement item 6 verbatim; one site group near the airport cluster; one summer (Jun-Sep 2027); shadow mode first (warnings logged, not acted on, for 4 weeks), then live; outcome data = ADOSH incident records + site clinic visits, k-suppressed | Pilot one-pager (D) | A contractor HSE lead says yes; DoH research route confirmed |
+| **Non-airport validation** (on-site WBGT/globe sensors at the pilot site) | ADR 0005 revisit trigger; the current claim is limited to held-out airport clusters | — | The pilot site installs a sensor |
+
+**Presentation:** one slide (deck) and the same content as the final screen of the replay ("What's next"), each line with a status chip: *exists* / *designed* / *needs pilot*. **Cost: about 0.1 day** (deck day D).
+
+---
+
+## 10. Re-ranked priorities, costs and cut order (v2; supersedes section 3 where they differ)
+
+Marginal days are on top of the never-cut plan (B1-B3, F1-F2, I1, D) and ADR 0011 MUST.
+
+| Rank | Item | Layer | Marginal days | When | Cut if short? |
+|---|---|---|---|---|---|
+| 1 | Pre-registration (metrics, demo-day rule, Plans metrics, climate-scenario method) | Wow + real work | 0.25 | 12 Nov | **Never** |
+| 2 | Warnings scoreboard exporters + replay screen (season → day → card) | Wow | 1.25 | 15 + 17 Nov | **Never** (fall back to a static chart of the same JSON, 0.25 day) |
+| 3 | Plans row (validator-scored, §9 metrics) | Wow | 0.25 | 16 Nov | 4th to cut: keep in the report and the deck |
+| 4 | Governance refusal visible to the worker (403 + audit row on the phone) | Product / RAI | 0.25 | 16-17 Nov | **Never** |
+| 5 | Proof chips + `provenance` blocks | Real work | 0.35 | 17 Nov | 3rd to cut: replace with a README criteria-to-evidence table linking the same files |
+| 6 | Validator "try a plan" input | Real work | 0.25 | 17 Nov | 2nd to cut: show a pre-recorded validator result |
+| 7 | Roster frontier chart | Real work | 0 (ADR 0011 MUST) | 15-16 Nov | Per ADR 0011 |
+| 8 | Climate what-if toggle | Potential | 0.75 | 17 Nov, if 16 Nov gate green | **1st to cut**: becomes a static slide (0.5 day) or a roadmap line |
+| 9 | Roadmap screen/slide | Potential | 0.1 | 19 Nov (D) | Never (it is a slide) |
+| 10 | Clinician-signed escalation card | Product | 0.25 + review | by 17 Nov | Never; label "not clinically reviewed" if no review |
+| — | One pre-rendered voice clip; CP-SAT (SHOULD per ADR 0011); Web Push real-phone | Product | per roadmap | — | Already demoted |
+| — | Landsat, 3D, copilot and shift-drafter agents, strain model, population view, DRN, adaptive conformal, AIFS-feature corrector | — | — | — | **Cut** (parking lot) |
+| — | Compliance drafter (LLM, aggregates only) | — | per ADR 0010 | — | Kept per ADR 0010; **not in the demo spine**; first thing dropped if B3 slips |
+
+**Total marginal: ≈ 3.1 days with the climate toggle, ≈ 2.4 days without it** (rows 1-6 and 9-10). The cuts in section 3 freed about 6-9 stretch days, so this fits, but only if the B1 Task 11 data gate passes on 12 Nov. **Cut order when behind:** climate toggle → validator input → proof chips → Plans row. The Warnings scoreboard, the pre-registration and the governance refusal are never cut.
+
+### 10.1 Decisions for Ali
+
+1. **Climate what-if: SHOULD (recommended) or roadmap line only?** It is defensible only with the humidity brackets, GWL framing and the "not a forecast" label. Cost 0.75 day; first to cut.
+2. **Headline region for ΔT: ARP landsea (recommended for coastal stations) or ARP land (larger, interior-dominated)?** Both are reported either way.
+3. **Accept that the planner's legalisation gain (7.5% / 19.1%) is attributed to the law and never counted in our scoreboard.** Recommended: it protects credibility.
+
+### 10.2 Added actions
+
+| # | Action | When | Owner |
+|---|---|---|---|
+| 9 | Extend the 12 Nov protocol with ADR 0011 §9 metrics (Plans row) and the climate-scenario method (section 9.1) | 12 Nov | Ali |
+| 10 | Add `plan_scoreboard` + `provenance` to B3 exporters; scenario exporter if decision 1 = SHOULD | 15-17 Nov | Backend architect |
+| 11 | Proof drawer, Plans row, validator input, climate toggle (if SHOULD), "What's next" screen in F2 | 16-17 Nov | Frontend architect |
 
 ## Sources
 
@@ -284,5 +481,7 @@ One number or one visual per beat. Each slot is filled by real output or the lin
   - https://github.com/Mariyah52/heatguard
   - https://github.com/abdulmannaan502/heatguard
   - https://github.com/Babigdk/heatshield-ai
+- IPCC-WG1 Atlas repository (G, read 11 Nov): https://github.com/IPCC-WG1/Atlas — `datasets-aggregated-regionally/README.md`, `warming-levels/`, `LICENSE.md` (CC BY 4.0). Cite Iturbide et al. 2022, https://doi.org/10.1038/s41597-022-01739-y, and IPCC AR6 WGI Atlas, https://doi.org/10.1017/9781009157896.021.
+- Planner evidence (R): `docs/decisions/0011-heat-aware-planner.md` v2; `docs/research/2026-11-11-roster-feasibility.md` (erratum); `docs/research/scripts/roster/results/roster_frontier.json`.
 - Vault (V): "Future Health Challenge", "Judges & Evaluation Mindset", "Past Winners & Participant Experiences", "Competitor Reconnaissance (2026-11)" under `C:\Users\LEGION\Documents\Compendium\Ali\Future-Health-Challenge\`.
 - Repo (R): `docs/research/2026-11-11-data-availability.md` §5-§7; `docs/research/2026-11-11-claims-verification.md` §1-§3, §11; ADRs 0004-0007; roadmap.

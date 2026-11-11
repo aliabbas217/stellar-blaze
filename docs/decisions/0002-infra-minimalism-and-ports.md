@@ -43,3 +43,6 @@ The demo workload is two small containers, scheduled jobs a few times a day, a s
 
 ## Revisit trigger
 Any trigger in the deferred table fires; or the API runs more than one replica (shared state then needs Redis or Postgres).
+
+## Amendments
+- **2026-11-11 (pointer, decision unchanged):** the `LlmClient` trigger ("the copilot or compliance-report agent is greenlit") has fired for the compliance-report drafter only (ADR 0015); the copilot is cut. ADR 0010 §8 governs that port's routing. The remaining deferred ports are indexed in `docs/parking-lot.md` per ADR 0012.
