@@ -1,0 +1,55 @@
+# Install every stage once with `uv run --project backend pre-commit install` (the types below are the defaults).
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # docs/research/ is archived evidence (recorded results and the scripts that produced them): the whitespace and
+      # EOF fixers would rewrite it, so they skip it. It is excluded from ruff below for the same reason.
+      - id: trailing-whitespace
+        exclude: &research ^docs/research/
+      - id: end-of-file-fixer
+        exclude: *research
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        exclude: *research
+      # ruff-pre-commit v0.17.4 also feeds Markdown to `ruff format` by default (it rewrites fenced Python blocks, which
+      # reformatted a quoted test snippet in a plan document), so Markdown is dropped from types_or.
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
+        exclude: *research
+
+  - repo: local
+    hooks:
+      # `uv run --project` does not change the working directory and mypy only reads config from the working
+      # directory (and its parents), so `--directory backend` is what makes backend/pyproject.toml [tool.mypy] apply.
+      - id: mypy
+        name: mypy (strict, backend)
+        entry: uv run --directory backend mypy src tests
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.19.3
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+      - id: commitizen-branch
+        stages: [pre-push]
