@@ -1,6 +1,7 @@
 # ADR 0014: Cut the 3D (three.js) site heat view
 
 - **Status:** Accepted
+- **Status amendment (2026-11-11):** Superseded by [ADR 0037](0037-reverse-0014-cinematic-3d-landing.md) for the judge landing; the cut of a 3D site view in the supervisor route stands
 - **Date:** 2026-11-11
 - **Deciders:** Ali; the architect (Claude)
 - **Supersedes / superseded by:** none (narrows plan §6 "should have" and §8.11 "three.js for the 3D site heat view")
@@ -28,3 +29,6 @@ A pilot supplies site geometry plus a spatial heat source worth showing in 3D, o
 
 ## Links
 [ADR 0013](0013-cut-landsat-site-heat-layer.md) · [ADR 0003](0003-frontend-single-nextjs-app-pwa.md) · [ADR 0034](0034-demo-strategy.md)
+
+## Amendments
+- **2026-11-11 (superseded in part, decision text unchanged):** ADR 0037 reverses this cut for the judge landing only: an IFS 0.25° WBGT field now exists as real spatial data (374 cells, our Liljegren module), and Ali asked for a 3D landing after rejecting the v1 front end. The supervisor-route 3D site view stays cut.

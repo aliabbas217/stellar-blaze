@@ -17,7 +17,7 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0011](0011-heat-aware-planner.md) | Heat-aware shift planner: rule-based ADOSH planner + independent validator; roster question answered statically | Accepted, v2 (amendment 2026-11-11; header still reads Proposed) | 2026-11-11 | v2 replaced v1 in place while Proposed; v1 numbers superseded by 0033 |
 | [0012](0012-decision-record-process.md) | Decision-record process | Accepted | 2026-11-11 | — |
 | [0013](0013-cut-landsat-site-heat-layer.md) | Cut the Landsat LST site heat layer | Accepted | 2026-11-11 | — |
-| [0014](0014-cut-3d-site-heat-view.md) | Cut the 3D (three.js) site heat view | Accepted | 2026-11-11 | — |
+| [0014](0014-cut-3d-site-heat-view.md) | Cut the 3D (three.js) site heat view | Accepted; superseded in part 2026-11-11 | 2026-11-11 | Superseded by 0037 for the judge landing |
 | [0015](0015-cut-llm-copilot-and-shift-drafter.md) | Cut the LLM supervisor copilot and shift-plan drafter; keep the compliance-report drafter | Accepted | 2026-11-11 | — |
 | [0016](0016-cut-personal-strain-model.md) | Cut the personal strain model | Accepted | 2026-11-11 | — |
 | [0017](0017-cut-population-view.md) | Cut the Challenge 06 population view | Accepted | 2026-11-11 | — |
@@ -40,6 +40,8 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0034](0034-demo-strategy.md) | Demo strategy: replay wow, Warnings + Plans scoreboard, real-work layer, climate what-if SHOULD, cut order | Accepted | 2026-11-11 | — |
 | [0035](0035-clinical-review-labelling.md) | Clinical review by an unnamed independent consultant; labelling rule | Accepted | 2026-11-11 | Supersedes Judges §3 "named clinician" wording |
 | [0036](0036-team-and-naming-in-submission.md) | Solo entrant; only Ali named in the submission | Accepted | 2026-11-10 | Supersedes the competition brief's "1–2 people" line |
+| [0037](0037-reverse-0014-cinematic-3d-landing.md) | Reverse 0014 for the judge landing: cinematic 3D heat field of real IFS data, 2D fallback, hard performance budget | Accepted (treatment follows the picked v2 direction) | 2026-11-11 | Supersedes 0014 for the landing only |
+| [0038](0038-agentic-workflows-and-voice.md) | Agentic workflows and voice: voice and free text are PERSONAL and self-hosted only (STT + LLM), fail closed; Deepgram and Web Speech rejected; Tier A ports/tests MUST, Tier B voice site-setup SHOULD (gated) | Proposed | 2026-11-11 | Extends 0010 §8 to audio; does not reopen 0015 or 0004 |
 
 ## Decisions recorded inside earlier ADRs (linked, not duplicated)
 | Cut / park / defer | Where decided |
