@@ -13,7 +13,7 @@
     "lint": "next typegen && eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "design:lint": "designmd lint ../DESIGN.md"
+    "design:lint": "node scripts/design-lint.mjs"
   },
   "dependencies": {
     "next": "16.4.6",

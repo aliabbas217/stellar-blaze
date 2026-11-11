@@ -32,43 +32,43 @@ colors:
   level-red-soft: "oklch(0.93 0.035 27)"
   on-level-red-soft: "oklch(0.42 0.16 27)"
 typography:
+  # lineHeight is quoted on purpose: @google/design.md 0.4.0 silently drops an unquoted numeric lineHeight.
+  # headline and title have none: they inherit the locale line height (1.5, 1.8 for ar, 2.1 for ur).
   numeral:
     fontFamily: Barlow Condensed
     fontSize: 4.768rem
     fontWeight: 700
-    lineHeight: 1
+    lineHeight: "1"
   display:
     fontFamily: Barlow Condensed
     fontSize: 3.052rem
     fontWeight: 700
-    lineHeight: 1
+    lineHeight: "1"
   headline:
     fontFamily: Barlow Condensed
     fontSize: 1.953rem
     fontWeight: 600
-    lineHeight: 1.1
     letterSpacing: 0.025em
   title:
     fontFamily: Barlow Condensed
     fontSize: 1.5625rem
     fontWeight: 600
-    lineHeight: 1.2
     letterSpacing: 0.025em
   lead:
     fontFamily: Noto Sans
     fontSize: 1.25rem
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: "1.5"
   body:
     fontFamily: Noto Sans
     fontSize: 1rem
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: "1.5"
   label:
     fontFamily: Noto Sans
     fontSize: 0.875rem
     fontWeight: 500
-    lineHeight: 1.5
+    lineHeight: "1.5"
 rounded:
   sign: 2px
 spacing:
@@ -208,7 +208,7 @@ and are referenced only by the semantic tier.
 |---|---|---|
 | `ink` on `surface` | 17.80 | 17.80 |
 | `ink-muted` on `surface` / on `surface-raised` | 7.94 / 7.37 | 11.28 / 9.74 |
-| `control` edge against `surface` / `surface-raised` (needs 3.0) | 3.69 / 3.43 | 3.46 / **2.99** |
+| `control` edge against `surface` / `surface-raised` (needs 3.0) | 3.69 / 3.43 | 4.82 / 4.16 |
 | `on-primary` on `primary` | 5.79 | 10.58 |
 | `focus` against `surface` | 7.67 | 10.58 |
 | `on-level-green` on `level-green` | 5.18 | 5.18 |
@@ -218,17 +218,21 @@ and are referenced only by the semantic tier.
 | `on-level-{green,amber,orange,red}-soft` on its soft fill | 7.97 / 6.55 / 6.35 / 7.44 | 12.40 / 12.68 / 12.84 / 12.95 |
 | level fill against `surface` (graphic edge, needs 3.0) | 4.81 / 1.65 / 2.63 / 6.16 | 3.70 / 10.82 / 6.78 / **2.89** |
 
-Three things in that table are known and deliberate, not silent. The two bold values sit a hair under 3:1 and are
-open for the human gate: a dark `control` edge on a raised surface, and the red fill's edge on the dark page. The
-amber and orange fills have a low edge contrast against the light page. None of these breaks WCAG 1.4.1 or 1.4.11
-because the level is never carried by the fill alone (see Do's and Don'ts), but they are the first things to revisit
-if a token value changes.
+Two things in that table are known and deliberate, not silent. The bold value, the red fill's edge on the dark page,
+sits a hair under 3:1 and is open for the human gate. The amber and orange fills also have a low edge contrast against
+the light page. Neither breaks WCAG 1.4.1 or 1.4.11 because the level is never carried by the fill alone (see Do's and
+Don'ts), but they are the first things to revisit if a token value changes.
+
+The text pairs, the `control` and `focus` edges, and the DESIGN.md-to-CSS parity are pinned by
+`frontend/tests/unit/styles/tokens.test.ts`, and `pnpm design:lint` fails on any linter warning (the stock CLI exits 0
+on a contrast warning). Edit a value in `tokens.css` and this file together, or the tests fail.
 
 ### Dark theme
 
 Selected by `[data-theme="dark"]` on any element, and by the system preference when no override is set. Same semantic
 names, swapped values: `surface` is sand-950 and `surface-raised` sand-900; `ink` is sand-50 and `ink-muted` sand-300;
-`hairline` is sand-700 and `control` sand-600; `primary` becomes the light falaj (`oklch(0.8 0.08 198)`) with sand-950
+`hairline` is sand-700 and `control` is sand-500, the same primitive as in light, because sand-600 fell to 2.99 on a
+raised dark surface; `primary` becomes the light falaj (`oklch(0.8 0.08 198)`) with sand-950
 text; `focus` is the same light falaj. The level fills and their on-colours do not change. The soft tints become a
 dark tint of the same hue (`oklch(0.3 0.05 h)`) with sand-50 text.
 
@@ -267,8 +271,15 @@ Scale (major-third steps, with a jump for display; rem, so browser text zoom wor
 | `body` | 1rem | `text-base` | Noto body | running text |
 | `label` | 0.875rem | `text-sm`, `text-xs` | Noto body | captions, hour labels |
 
-Line height is 1.5 for body text, 1.8 under `:lang(ar)` and 2.1 under `:lang(ur)` (Nastaliq clips at 1.5). Text
-containers never get a fixed height; use `min-height`.
+Line height is 1.5 for body text, 1.8 under `:lang(ar)` and 2.1 under `:lang(ur)` (Nastaliq clips at 1.5). The text
+steps set no line height of their own, so headings and titles inherit the locale value. Only `numeral` and `display`
+set `1` (`leading-solid`), because they hold Western digits; never put `leading-solid` on text that can be Arabic-script
+or Indic. Text containers never get a fixed height; use `min-height`.
+
+Tracking (0.025em on `headline` and `title`, class `tracking-signage`) is for uppercase Latin only. It resolves to 0 in
+every non-English language: browsers drop or break the joins of spaced Arabic-script text, and typographers report
+that spacing cuts the joined top bar of Devanagari and Bengali (the Indic part is a precaution, not a confirmed browser
+behaviour).
 
 ## Layout
 
@@ -324,6 +335,8 @@ about comprehension until then.
 - Do use logical properties only: `ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`, `text-start`, `text-end`. Don't use
   `ml-*`, `mr-*`, `pl-*`, `pr-*`, `left-*`, `right-*`, `text-left`, `text-right`, `rounded-l-*`, `rounded-r-*`.
 - Do render times, temperatures and numerals with Western digits in every locale.
+- Don't apply letter-spacing to Arabic-script text (or Devanagari and Bengali). Use `tracking-signage`, not `tracking-wide`.
+- Don't put `leading-solid` on anything but digits and Latin display words.
 - Don't put a hex or OKLCH literal in a component, and don't read a `--ref-*` primitive from one. Use the semantic names.
 - Don't use `dark:` variants in components. The theme swap happens in the tokens; a component has one set of classes.
 - Don't add a drop shadow, a gradient background, a second corner radius or a second accent colour.

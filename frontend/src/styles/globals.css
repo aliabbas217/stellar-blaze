@@ -119,6 +119,16 @@
   border-radius: var(--radius-sign);
 }
 
+/* line-height: 1 for Western digits and Latin display words. Everything else inherits the locale line height. */
+@utility leading-solid {
+  line-height: var(--leading-solid);
+}
+
+/* Letter-spacing for uppercase Latin headings; zero in every other language (see tokens.css). */
+@utility tracking-signage {
+  letter-spacing: var(--tracking-signage);
+}
+
 /* The only motion in F1: opacity on a state change, 0 ms under reduced motion. */
 @utility transition-state {
   transition-property: opacity;

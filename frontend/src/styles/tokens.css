@@ -21,7 +21,8 @@
  *   - The light values sit on `:root, [data-theme="light"]` so a nested
  *     data-theme="light" subtree still works on a page that follows a dark system.
  *   - The dark declarations appear twice (override, and system default). Change
- *     both together; a unit test should pin that they stay identical.
+ *     both together; tests/unit/styles/tokens.test.ts fails if they differ, if
+ *     DESIGN.md disagrees with this file, or if a contrast pair drops below its floor.
  *   - Names here must not equal a Tailwind theme key (--color-*, --text-*,
  *     --radius-*, --font-*) or a next/font variable. A self-referencing
  *     `--x: var(--x)` is emitted by `@theme inline` and silently breaks the value.
@@ -117,7 +118,7 @@
   --ink: var(--ref-sand-50);
   --ink-muted: var(--ref-sand-300);
   --hairline: var(--ref-sand-700);
-  --control: var(--ref-sand-600);
+  --control: var(--ref-sand-500);
   --action: var(--ref-falaj-300);
   --on-action: var(--ref-sand-950);
   --focus: var(--ref-falaj-300);
@@ -143,7 +144,7 @@
     --ink: var(--ref-sand-50);
     --ink-muted: var(--ref-sand-300);
     --hairline: var(--ref-sand-700);
-    --control: var(--ref-sand-600);
+    --control: var(--ref-sand-500);
     --action: var(--ref-falaj-300);
     --on-action: var(--ref-sand-950);
     --focus: var(--ref-falaj-300);
@@ -189,6 +190,7 @@
   --size-numeral: 4.768rem;
 
   /* line height: Arabic-script text needs more room than Latin; Nastaliq the most */
+  --leading-solid: 1; /* Western digits and Latin display words only, never text that can be Arabic-script or Indic */
   --leading-body: 1.5;
   --leading-ar: 1.8;
   --leading-ur: 2.1;
@@ -199,6 +201,20 @@
 
   /* motion: opacity on state change only, switched off for reduced motion */
   --duration-state: 150ms;
+}
+
+/*
+ * Letter-spacing (tracking) for uppercase signage headings: Latin only. Arabic-script text is
+ * cursive and browsers drop or break joins when it is spaced, and Devanagari and Bengali lose
+ * their joined top bar. Any non-English language therefore gets zero. The rules are mutually
+ * exclusive, so a nested lang="ar" span inside an English page still resets to zero.
+ */
+:lang(en) {
+  --tracking-signage: 0.025em;
+}
+
+:not(:lang(en)) {
+  --tracking-signage: 0em;
 }
 
 @media (prefers-reduced-motion: reduce) {

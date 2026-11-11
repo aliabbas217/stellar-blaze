@@ -115,7 +115,7 @@ const TYPE_STEPS = [
 function Section({ index, title, children }: { index: string; title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="flex items-baseline gap-3 border-b-2 border-ink pb-2 font-display text-2xl font-semibold uppercase tracking-wide">
+      <h2 className="flex items-baseline gap-3 border-b-2 border-ink pb-2 font-display text-2xl font-semibold uppercase tracking-signage">
         <span className="tabular-nums text-ink-muted">{index}</span>
         {title}
       </h2>
@@ -130,9 +130,9 @@ function LevelBadgePlaceholder({ level, name }: { level: Level; name: string }) 
     <li className={`${c.fill} ${c.on} ${c.pattern} rounded-sign`}>
       {/* The plate is solid so text never sits on the hatch; the hatch runs out past its end edge. */}
       <div className={`${c.fill} me-16 flex items-center gap-4 px-4 py-3`}>
-        <span className="font-display text-3xl font-bold leading-none tabular-nums">{levelIndex(level)}</span>
+        <span className="font-display text-3xl font-bold leading-solid tabular-nums">{levelIndex(level)}</span>
         <LevelPictogram level={level} className="size-10 shrink-0" />
-        <span className="font-display text-2xl font-semibold uppercase tracking-wide">{name}</span>
+        <span className="font-display text-2xl font-semibold uppercase tracking-signage">{name}</span>
       </div>
     </li>
   );
@@ -155,13 +155,13 @@ function ShadeBandPreview({ names }: { names: Readonly<Record<Level, string>> })
               className={`${c.fill} ${c.on} ${c.pattern} flex min-h-[var(--shade-cell-height)] flex-col justify-center rounded-sign`}
             >
               <span
-                className={`${c.fill} px-[var(--shade-plate-padding)] py-1 text-center font-display text-xl font-bold leading-none tabular-nums`}
+                className={`${c.fill} px-[var(--shade-plate-padding)] py-1 text-center font-display text-xl font-bold leading-solid tabular-nums`}
               >
                 {levelIndex(level)}
               </span>
             </div>
             <span
-              className={`rounded-sign py-0.5 text-center font-display text-sm font-semibold leading-none tabular-nums ${
+              className={`rounded-sign py-0.5 text-center font-display text-sm font-semibold leading-solid tabular-nums ${
                 isNow ? "bg-ink text-surface" : "text-ink-muted"
               }`}
             >
@@ -214,7 +214,7 @@ function Swatch({
   );
 }
 
-const SAMPLE_MARK = "font-display text-2xl font-bold leading-none";
+const SAMPLE_MARK = "font-display text-2xl font-bold leading-solid";
 
 function ThemePanel({ theme, title }: { theme: "light" | "dark"; title: string }) {
   return (
@@ -223,7 +223,7 @@ function ThemePanel({ theme, title }: { theme: "light" | "dark"; title: string }
       aria-label={title}
       className="flex flex-col gap-4 rounded-sign border-2 border-control bg-surface p-4 text-ink"
     >
-      <h3 className="font-display text-xl font-semibold uppercase tracking-wide">{title}</h3>
+      <h3 className="font-display text-xl font-semibold uppercase tracking-signage">{title}</h3>
       <ul className="grid grid-cols-2 gap-x-3 gap-y-4">
         <Swatch label="surface" boxClass="border-2 border-control bg-surface" />
         <Swatch label="surface-raised" boxClass="border border-hairline bg-surface-raised" />
@@ -283,10 +283,10 @@ export default async function SpecimenPage(props: PageProps<"/[locale]/dev/speci
       className={`${displayFont.variable} ${bodyFont.variable} mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 py-8 font-body`}
     >
       <header className="flex flex-col gap-3">
-        <p className="font-display text-sm font-semibold uppercase tracking-widest text-ink-muted">
+        <p className="font-display text-sm font-semibold uppercase tracking-signage text-ink-muted">
           Stellar Blaze · design specimen · {locale}
         </p>
-        <h1 className="font-display text-4xl font-bold uppercase leading-none tracking-wide">Arish Signal</h1>
+        <h1 className="font-display text-4xl font-bold uppercase leading-solid tracking-signage">Arish Signal</h1>
         <p className="text-lg text-ink-muted">
           Gulf shade meets industrial signage. Unmistakable at arm&apos;s length, calm under pressure, field-tough.
         </p>
