@@ -182,6 +182,57 @@ describe("subscribeToSiteAlerts", () => {
   });
 });
 
+describe("subscribeToSiteAlerts: a subscription made with another VAPID key", () => {
+  // What a browser throws when subscribe() is called with a key that differs from the existing subscription's.
+  const otherKey = () => new DOMException("A subscription with a different applicationServerKey already exists", "InvalidStateError");
+  const deps = (registration: RegistrationLike) => ({
+    registration,
+    vapidPublicKey: VAPID_KEY,
+    siteId: "s",
+    crewId: null,
+    post: () => Promise.resolve(created),
+  });
+
+  it("drops the existing subscription, then asks the browser once more", async () => {
+    const old = fakeSubscription();
+    const { registration, subscribe } = fakeRegistration(old);
+    subscribe.mockRejectedValueOnce(otherKey());
+
+    const outcome = await subscribeToSiteAlerts(deps(registration));
+
+    expect(old.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    expect(old.unsubscribe.mock.invocationCallOrder[0]).toBeLessThan(subscribe.mock.invocationCallOrder[1] ?? 0);
+    expect(outcome.serverId).toBe("sub-1");
+  });
+
+  it("asks only once more: a second refusal is reported, not retried again", async () => {
+    const { registration, subscribe } = fakeRegistration(fakeSubscription());
+    subscribe.mockRejectedValue(otherKey());
+
+    await expect(subscribeToSiteAlerts(deps(registration))).rejects.toMatchObject({ name: "InvalidStateError" });
+    expect(subscribe).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries even when the browser has no subscription to drop", async () => {
+    const { registration, subscribe } = fakeRegistration(null);
+    subscribe.mockRejectedValueOnce(otherKey());
+
+    await expect(subscribeToSiteAlerts(deps(registration))).resolves.toMatchObject({ serverId: "sub-1" });
+    expect(subscribe).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not drop anything for any other refusal", async () => {
+    const old = fakeSubscription();
+    const { registration, subscribe } = fakeRegistration(old);
+    subscribe.mockRejectedValueOnce(new DOMException("denied", "NotAllowedError"));
+
+    await expect(subscribeToSiteAlerts(deps(registration))).rejects.toMatchObject({ name: "NotAllowedError" });
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(old.unsubscribe).not.toHaveBeenCalled();
+  });
+});
+
 describe("unsubscribe", () => {
   it("unsubscribes locally and sends DELETE for the stored server id", async () => {
     const existing = fakeSubscription();

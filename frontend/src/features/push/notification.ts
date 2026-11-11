@@ -9,6 +9,7 @@ import { routing, type Locale } from "@/i18n/routing";
  */
 
 interface PushStrings {
+  readonly appName: string;
   readonly title: { readonly site: string; readonly crew: string };
   readonly body: string;
   readonly level: Readonly<Record<PushLevel, string>>;
@@ -50,16 +51,56 @@ export function notificationTargetUrl(locale: string, payload: PushPayload): str
   return `/${supportedLocale(locale)}/worker?from=push&level=${payload.level}`;
 }
 
+/**
+ * `template` with its `{level}` slot filled. A function replacer, so a level name that contains a dollar-ampersand,
+ * dollar-quote or dollar-digit sequence (a translation, which is data we do not control) is inserted as written
+ * instead of being read as a replacement pattern.
+ */
+export function fillLevel(template: string, levelName: string): string {
+  return template.replace("{level}", () => levelName);
+}
+
 /** The notification to show for `payload` in `locale`. */
 export function notificationContent(locale: string, payload: PushPayload): NotificationContent {
   const resolved = supportedLocale(locale);
   const strings = STRINGS[resolved];
   const levelName = strings.level[payload.level];
   return {
-    title: strings.title[payload.audience].replace("{level}", levelName),
+    title: fillLevel(strings.title[payload.audience], levelName),
     body: strings.body,
     tag: `${payload.audience}:${payload.target_id}`,
     vibrate: [...VIBRATION[payload.level]],
+    lang: resolved,
+    renotify: true,
+  };
+}
+
+/**
+ * The tag of the neutral notification. It has no colon, so it can never equal a level notification's
+ * `audience:target_id`, and it is never empty (`renotify` needs a tag).
+ */
+export const FALLBACK_NOTIFICATION_TAG = "fallback";
+
+/** Where a tap on the neutral notification goes: the worker route, no level (none was received). */
+export function fallbackTargetUrl(locale: string): string {
+  return `/${supportedLocale(locale)}/worker?from=push`;
+}
+
+/**
+ * The notification for a push the worker cannot read (no body, not JSON, not the contract's six keys, a version it does
+ * not know): the app's name and the generic "open the app" line, claiming no level. It exists because an installed
+ * Safari app has its push subscription revoked after pushes that show nothing (WebKit, "Meet Declarative Web Push"),
+ * and Chrome shows a notice of its own then; a notification that sends the worker to the app is safer than either.
+ */
+export function fallbackNotificationContent(locale: string): NotificationContent {
+  const resolved = supportedLocale(locale);
+  const strings = STRINGS[resolved];
+  return {
+    title: strings.appName,
+    body: strings.body,
+    tag: FALLBACK_NOTIFICATION_TAG,
+    // One buzz shorter than any level's pattern: it asks for attention without claiming a level.
+    vibrate: [100],
     lang: resolved,
     renotify: true,
   };

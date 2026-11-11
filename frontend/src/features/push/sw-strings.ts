@@ -5,6 +5,7 @@
  */
 export const SW_STRINGS = {
   "ar": {
+    "appName": "Stellar Blaze",
     "title": {
       "site": "تنبيه حرارة الموقع: {level}",
       "crew": "تنبيه حرارة الفريق: {level}"
@@ -18,6 +19,7 @@ export const SW_STRINGS = {
     }
   },
   "bn": {
+    "appName": "Stellar Blaze",
     "title": {
       "site": "সাইট তাপ সতর্কতা: {level}",
       "crew": "দল তাপ সতর্কতা: {level}"
@@ -31,6 +33,7 @@ export const SW_STRINGS = {
     }
   },
   "en": {
+    "appName": "Stellar Blaze",
     "title": {
       "site": "Site heat alert: {level}",
       "crew": "Crew heat alert: {level}"
@@ -44,6 +47,7 @@ export const SW_STRINGS = {
     }
   },
   "hi": {
+    "appName": "Stellar Blaze",
     "title": {
       "site": "साइट गर्मी अलर्ट: {level}",
       "crew": "टीम गर्मी अलर्ट: {level}"
@@ -57,6 +61,7 @@ export const SW_STRINGS = {
     }
   },
   "ne": {
+    "appName": "Stellar Blaze",
     "title": {
       "site": "साइट गर्मी अलर्ट: {level}",
       "crew": "समूह गर्मी अलर्ट: {level}"
@@ -70,6 +75,7 @@ export const SW_STRINGS = {
     }
   },
   "ur": {
+    "appName": "Stellar Blaze",
     "title": {
       "site": "سائٹ کا گرمی الرٹ: {level}",
       "crew": "ٹیم کا گرمی الرٹ: {level}"

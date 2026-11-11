@@ -1,7 +1,14 @@
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
 import ur from "../../../../messages/ur.json";
-import { notificationClickUrl, notificationContent, notificationTargetUrl } from "@/features/push/notification";
+import {
+  fallbackNotificationContent,
+  fallbackTargetUrl,
+  fillLevel,
+  notificationClickUrl,
+  notificationContent,
+  notificationTargetUrl,
+} from "@/features/push/notification";
 import type { PushPayload } from "@/features/push/payload";
 import { routing } from "@/i18n/routing";
 
@@ -86,6 +93,60 @@ describe("notificationContent", () => {
   it("never puts payload fields other than the level into the visible text", () => {
     const content = notificationContent("en", { ...base, target_id: "site-secret-id", template_id: "tpl-secret" });
     expect(`${content.title} ${content.body}`).not.toMatch(/secret/);
+  });
+});
+
+describe("fillLevel", () => {
+  it("fills the {level} slot", () => {
+    expect(fillLevel("Site heat alert: {level}", "Amber")).toBe("Site heat alert: Amber");
+  });
+
+  // String.prototype.replace reads these in a replacement string: the matched text, the text after it, a capture group.
+  it.each(["$&", "$'", "$`", "$1x", "$$"])("inserts the level name %s as written, not as a replacement pattern", (levelName) => {
+    expect(fillLevel("Alert: {level} !", levelName)).toBe(`Alert: ${levelName} !`);
+  });
+});
+
+describe("the neutral notification (a push the worker cannot read)", () => {
+  it.each([
+    ["en", en],
+    ["ar", ar],
+    ["ur", ur],
+  ] as const)("is the app name and the generic line from the %s messages", (locale, messages) => {
+    const neutral = fallbackNotificationContent(locale);
+    expect(neutral.lang).toBe(locale);
+    expect(neutral.title).toBe(messages.common.appName);
+    expect(neutral.body).toBe(messages.push.body);
+  });
+
+  it.each(routing.locales)("has a title and a body in %s", (locale) => {
+    const neutral = fallbackNotificationContent(locale);
+    expect(neutral.lang).toBe(locale);
+    expect(neutral.title.trim()).not.toBe("");
+    expect(neutral.body.trim()).not.toBe("");
+  });
+
+  it("has a fixed tag with no colon, so it never equals a level notification's audience:target tag", () => {
+    expect(fallbackNotificationContent("en").tag).toBe("fallback");
+    expect(notificationContent("en", base).tag).not.toBe(fallbackNotificationContent("en").tag);
+  });
+
+  it("vibrates once and shorter than every level's pattern, so it claims no level", () => {
+    const neutral = fallbackNotificationContent("en").vibrate;
+    expect(neutral).toEqual([100]);
+    for (const level of ["amber", "orange", "red"] as const) {
+      expect(notificationContent("en", { ...base, level }).vibrate[0]).toBeGreaterThan(100);
+    }
+  });
+
+  it("uses English for a locale it has no strings for", () => {
+    expect(fallbackNotificationContent("xx")).toEqual(fallbackNotificationContent("en"));
+    expect(fallbackNotificationContent("constructor")).toEqual(fallbackNotificationContent("en"));
+  });
+
+  it("opens the worker route in the worker's language, without a level", () => {
+    expect(fallbackTargetUrl("ur")).toBe("/ur/worker?from=push");
+    expect(fallbackTargetUrl("xx")).toBe("/en/worker?from=push");
   });
 });
 

@@ -7,6 +7,8 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export interface PushStrings {
+  /** The app's name: the title of the neutral notification shown for a push that carries nothing the worker can read. */
+  appName: string;
   title: { site: string; crew: string };
   body: string;
   level: Record<"green" | "amber" | "orange" | "red", string>;
@@ -32,13 +34,19 @@ function asString(value: unknown, where: string, allowed: readonly string[]): st
   return value;
 }
 
-/** The `push` namespace of one locale's messages, checked: a missing key or a placeholder the worker cannot fill throws. */
+/**
+ * The `push` namespace of one locale's messages plus `common.appName`, checked: a missing key or a placeholder the
+ * worker cannot fill throws.
+ */
 export function pushStringsOf(messages: unknown, locale: string): PushStrings {
-  const push = asRecord(asRecord(messages, `${locale}.json`)["push"], `${locale}.json push`);
+  const root = asRecord(messages, `${locale}.json`);
+  const push = asRecord(root["push"], `${locale}.json push`);
+  const common = asRecord(root["common"], `${locale}.json common`);
   const title = asRecord(push["title"], `${locale}.json push.title`);
   const level = asRecord(push["level"], `${locale}.json push.level`);
   const where = (key: string) => `${locale}.json push.${key}`;
   return {
+    appName: asString(common["appName"], `${locale}.json common.appName`, []),
     title: {
       site: asString(title["site"], where("title.site"), ["{level}"]),
       crew: asString(title["crew"], where("title.crew"), ["{level}"]),

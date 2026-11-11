@@ -38,6 +38,7 @@ describe("sw-strings.ts", () => {
 
 describe("pushStringsOf", () => {
   const messages = {
+    common: { appName: "App" },
     push: {
       title: { site: "Site: {level}", crew: "Crew: {level}" },
       body: "Open the app.",
@@ -45,21 +46,27 @@ describe("pushStringsOf", () => {
     },
   };
 
-  it("reads the push namespace", () => {
-    expect(pushStringsOf(messages, "xx")).toEqual(messages.push);
+  it("reads the push namespace and the app name", () => {
+    expect(pushStringsOf(messages, "xx")).toEqual({ appName: "App", ...messages.push });
+  });
+
+  it("throws, naming the key, when the app name is missing or empty", () => {
+    expect(() => pushStringsOf({ ...messages, common: {} }, "xx")).toThrow(/xx.json common.appName/);
+    expect(() => pushStringsOf({ ...messages, common: { appName: " " } }, "xx")).toThrow(/xx.json common.appName/);
+    expect(() => pushStringsOf({ push: messages.push }, "xx")).toThrow(/xx.json common/);
   });
 
   it("throws, naming the locale and the key, when a key is missing", () => {
-    expect(() => pushStringsOf({ push: { ...messages.push, body: undefined } }, "xx")).toThrow(/xx\.json push\.body/);
+    expect(() => pushStringsOf({ ...messages, push: { ...messages.push, body: undefined } }, "xx")).toThrow(/xx\.json push\.body/);
     expect(() => pushStringsOf({}, "xx")).toThrow(/xx\.json push/);
   });
 
   it("throws when a title uses a placeholder the worker cannot fill", () => {
-    const broken = { push: { ...messages.push, title: { site: "Site: {level} at {time}", crew: "Crew: {level}" } } };
+    const broken = { ...messages, push: { ...messages.push, title: { site: "Site: {level} at {time}", crew: "Crew: {level}" } } };
     expect(() => pushStringsOf(broken, "xx")).toThrow(/\{time\}/);
   });
 
   it("throws when the body uses a placeholder (the worker fills none there)", () => {
-    expect(() => pushStringsOf({ push: { ...messages.push, body: "Open {app}" } }, "xx")).toThrow(/\{app\}/);
+    expect(() => pushStringsOf({ ...messages, push: { ...messages.push, body: "Open {app}" } }, "xx")).toThrow(/\{app\}/);
   });
 });

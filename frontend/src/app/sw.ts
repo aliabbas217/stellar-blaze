@@ -41,10 +41,11 @@ serwist.addEventListeners();
  * file only connects it to the worker. Push subscriptions are POST and DELETE requests made by the page, which the
  * runtime caching above has no route for: nothing about them is, or may ever be, added to its allow-list.
  *
- * A push whose payload is not exactly the contract's shows nothing and is not rethrown, as the contract says. The cost
- * to know: with userVisibleOnly, Chrome then shows a generic notice of its own, and WebKit revokes a subscription whose
- * pushes show nothing (https://webkit.org/blog/16535/meet-declarative-web-push/). Revisit if the API ever sends a
- * payload this worker cannot parse.
+ * Every push shows exactly one notification. One whose payload is exactly the contract's six keys shows its level; anything
+ * else (no body, not JSON, an extra key, a version this worker does not know) shows a neutral one, the app's name and the
+ * generic "open the app" line, claiming no level. A push that showed nothing would get an installed iPhone app's
+ * subscription revoked by WebKit and a notice of Chrome's own on Chromium
+ * (https://webkit.org/blog/16535/meet-declarative-web-push/); docs/contracts/web-push.md section 2 says the same.
  */
 self.addEventListener("push", (event) => {
   event.waitUntil(

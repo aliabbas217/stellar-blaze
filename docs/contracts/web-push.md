@@ -58,14 +58,16 @@ The API sends exactly these six keys, as JSON, and nothing else (ADR 0002: the t
 
 | Key | Type | Meaning |
 |---|---|---|
-| `v` | `1` | Payload version. A service worker that does not know the version shows nothing. |
+| `v` | `1` | Payload version. A service worker that does not know the version cannot trust the rest, so it shows the neutral notification described below, never a level. |
 | `audience` | `"site"` or `"crew"` | Whether the message is for everyone at a site or for one crew. |
 | `target_id` | string | The site id when `audience` is `"site"`, the crew id when it is `"crew"`. |
 | `level` | `"green"`, `"amber"`, `"orange"` or `"red"` | The site or crew level. Not a personal level. |
-| `template_id` | string | A message template id owned by the backend ruleset (`backend/rulesets/*.toml`, ADR 0009). The frontend only holds the words for it. The `"level-change"` in the example is made up. |
+| `template_id` | string | A message template id owned by the backend ruleset (`backend/rulesets/*.toml`, ADR 0009). The frontend only holds the words for it, once reviewed wording exists (section 5); until then the text depends on `level` alone. The `"level-change"` in the example is made up. |
 | `valid_from` | ISO 8601 date-time | When the level applies from. |
 
-The payload carries **no text**. The service worker renders the localized message and the audio from strings bundled with the app, keyed by `level` and `template_id`. This is why the same push works in all six locales.
+The payload carries **no text**. The service worker renders the localized message from strings bundled with the app, keyed by the `level` and the `audience`; `template_id` selects no text yet (the words per template arrive with the reviewed wording, section 5). The pre-rendered audio cannot play from a notification (ADR 0004), so it plays in the app. This is why the same push works in all six locales.
+
+**A push the worker cannot read.** Every push shows exactly one notification, because a push that shows none gets the subscription revoked by WebKit (an installed iPhone app) and a generic notice of Chrome's own on Chromium. A payload that is missing, is not JSON, has an extra key, has a value outside the table above, or has a version the worker does not know therefore shows a neutral notification: the app's name as the title, the generic "open the app to see your own level" line as the body, a fixed tag `fallback`, and no level. Tapping it opens the worker route in the worker's language. It never shows text taken from the payload.
 
 A `"site"` push goes to every subscription with that `site_id`. A `"crew"` push goes to the subscriptions with that `crew_id`. A subscription with `crew_id: null` never receives a crew push.
 

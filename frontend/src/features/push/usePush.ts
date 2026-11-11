@@ -83,6 +83,41 @@ export interface UsePush {
 
 const SERVER_PERMISSION: NotificationPermission = "default";
 
+/**
+ * How long Enable and Turn off wait for the service worker. `navigator.serviceWorker.ready` never settles when no worker
+ * registers (a browser that blocks them, a failed install), and a tap that waits forever leaves the button disabled
+ * and the screen stuck on "please wait"; after this the tap ends in the error state and can be tried again.
+ */
+export const REGISTRATION_TIMEOUT_MS = 10_000;
+
+function readyRegistration(platform: PushPlatform): Promise<RegistrationLike> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("The service worker did not become ready."));
+    }, REGISTRATION_TIMEOUT_MS);
+    void platform
+      .registration()
+      .then(resolve, reject)
+      .finally(() => {
+        clearTimeout(timer);
+      });
+  });
+}
+
+/**
+ * Asks the API to delete a registration this app no longer uses (its subscription was replaced or is gone). Resolves
+ * true when the API no longer has it: deleted (the call is idempotent) or answered 4xx (it does not know it). Resolves
+ * false when the answer is not known (offline, 5xx), so the caller can keep the id and try again.
+ */
+async function deleteUnusedRegistration(serverId: string): Promise<boolean> {
+  try {
+    const result = await deleteSubscription(serverId);
+    return result.ok || (result.problem.status >= 400 && result.problem.status < 500);
+  } catch {
+    return false;
+  }
+}
+
 export function usePush(config: PushConfig, platform: PushPlatform = browserPlatform): UsePush {
   const { vapidPublicKey, siteId } = config;
   const crewId = config.crewId ?? null;
@@ -99,10 +134,15 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
 
   const register = useCallback(
     async (registration: RegistrationLike, key: string, site: string): Promise<SubscribeOutcome> => {
+      const previous = useProfile.getState().push;
       const outcome = await subscribeToSiteAlerts({ registration, vapidPublicKey: key, siteId: site, crewId, post: postSubscription });
       setSubscription(outcome.subscription);
       if (outcome.serverId !== null) {
         setPush({ serverId: outcome.serverId, endpoint: outcome.subscription.endpoint, siteId: site });
+        // The new registration replaces the one stored before (another site, or the browser's endpoint changed): delete
+        // the old one, or the API keeps pushing to an address this phone no longer uses. Best effort: if this call
+        // fails, the API's own pruning of dead endpoints (contract section 5) is what remains.
+        if (previous !== null && previous.serverId !== outcome.serverId) await deleteUnusedRegistration(previous.serverId);
       }
       return outcome;
     },
@@ -119,14 +159,19 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
     const stale = () => abort.signal.aborted || busy.current;
     void (async () => {
       try {
-        const registration = await platform.registration();
+        const registration = await readyRegistration(platform);
         const existing = await registration.pushManager.getSubscription();
         // A tap on Enable that started meanwhile registers by itself; this check must not race it.
         if (stale()) return;
 
         const stored = useProfile.getState().push;
         if (existing === null) {
-          if (stored !== null) setPush(null);
+          // The browser dropped the subscription: the API's registration is dead weight. Delete it before forgetting
+          // its id; when the API cannot be reached the id stays, and the next app open tries again.
+          if (stored !== null && (await deleteUnusedRegistration(stored.serverId))) {
+            // Unless a tap on Enable registered a new one while the delete was running.
+            if (useProfile.getState().push?.serverId === stored.serverId) setPush(null);
+          }
           return;
         }
         setSubscription({ ...existing.toJSON(), endpoint: existing.endpoint });
@@ -178,7 +223,7 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
         setState("idle");
         return;
       }
-      const outcome = await register(await platform.registration(), vapidPublicKey, siteId);
+      const outcome = await register(await readyRegistration(platform), vapidPublicKey, siteId);
       if (outcome.serverId === null) {
         setProblem(outcome.problem);
         setFailure("enable");
@@ -201,7 +246,7 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
     setFailure(null);
     setState("requesting");
     try {
-      const registration = await platform.registration();
+      const registration = await readyRegistration(platform);
       await unsubscribe({ registration, serverId: useProfile.getState().push?.serverId ?? null, remove: deleteSubscription });
       setPush(null);
       setSubscription(null);

@@ -65,7 +65,7 @@ describe("parsePushPayload", () => {
       expect(parsePushPayload({ ...valid, level: "AMBER" })).toBeNull();
     });
 
-    it("for a version it does not know (the contract: such a worker shows nothing)", () => {
+    it("for a version it does not know (the worker then shows only its neutral notification, never a level)", () => {
       expect(parsePushPayload({ ...valid, v: 2 })).toBeNull();
       expect(parsePushPayload({ ...valid, v: "1" })).toBeNull();
     });

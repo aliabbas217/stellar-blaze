@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import ar from "../../messages/ar.json";
 import en from "../../messages/en.json";
@@ -6,7 +7,9 @@ import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 
 /*
  * The Alerts screen and the service worker's push handling, against a production build (`pnpm build && pnpm start`,
- * API_ORIGIN pointing at `pnpm mock:api`, VAPID_PUBLIC_KEY set to any key). There is no real push service in CI: the
+ * API_ORIGIN pointing at `pnpm mock:api`, VAPID_PUBLIC_KEY set to a valid base64url P-256 public key, for example one
+ * from `pnpm exec web-push generate-vapid-keys`: the page decodes it before it calls the stubbed subscribe, so an arbitrary
+ * string fails the subscribe tests). There is no real push service in CI: the
  * browser's push calls are stubbed in the page (`addInitScript`), the API is the mock one, and a push is delivered to
  * the real service worker through the DevTools protocol.
  *
@@ -201,6 +204,10 @@ test.describe("limitation copy visible", () => {
 });
 
 test.describe("service worker push handling", () => {
+  // The neutral notification has one fixed tag, and on a Windows host every browser shares the system notification
+  // centre, which replaces a notification by origin and tag across browsers: two runs of this describe at the same
+  // time (`--repeat-each` with several workers, or several Playwright projects on one host) can make the neutral one
+  // vanish from the other's list. A normal run, and a serial repeat (`--workers=1`), are stable.
   interface Shown {
     title: string;
     body: string;
@@ -222,7 +229,7 @@ test.describe("service worker push handling", () => {
       })),
     );
 
-  test("shows a notification in the worker's own language and ignores a payload outside the contract", async ({ page, context }) => {
+  test("shows a notification in the worker's own language, and a neutral one for a payload it cannot read", async ({ page, context }) => {
     await context.grantPermissions(["notifications"]);
     await page.goto("/ur/worker/alerts");
 
@@ -247,23 +254,32 @@ test.describe("service worker push handling", () => {
     const origin = new URL(page.url()).origin;
     await expect.poll(() => registrations.has(`${origin}/`)).toBe(true);
     const registrationId = registrations.get(`${origin}/`) ?? "";
-    const deliver = (payload: unknown) =>
-      cdp.send("ServiceWorker.deliverPushMessage", { origin, registrationId, data: JSON.stringify(payload) });
+    const deliverRaw = (data: string) => cdp.send("ServiceWorker.deliverPushMessage", { origin, registrationId, data });
+    const deliver = (payload: unknown) => deliverRaw(JSON.stringify(payload));
 
     const tags = async () => (await shown(page)).map((notification) => notification.tag).sort();
-    const valid = { v: 1, audience: "site", target_id: SITE_DEMO, level: "red", template_id: "level-change", valid_from: "2026-11-11T09:00:00Z" };
+    // Ids unique to this run: on a Windows host the notification centre is shared by every browser, so two runs of this
+    // test at once (--repeat-each, several projects) would replace each other's notifications that have the same tag.
+    const run = randomUUID().slice(0, 8);
+    const siteTag = `site:${SITE_DEMO}-${run}`;
+    const crewTag = `crew:crew-${run}`;
+    const valid = { v: 1, audience: "site", target_id: `${SITE_DEMO}-${run}`, level: "red", template_id: "level-change", valid_from: "2026-11-11T09:00:00Z" };
 
     await deliver(valid);
-    await expect.poll(tags).toEqual([`site:${SITE_DEMO}`]);
+    await expect.poll(tags).toEqual([siteTag]);
 
-    // An extra key (a worker id) is outside the contract: nothing is shown for it. The next push, delivered after it,
-    // is shown, so the worker survived the bad one and the bad one left no notification of its own.
+    // An extra key (a worker id) is outside the contract. Every push must show exactly one notification (a push that
+    // shows none gets an installed iPhone app's subscription revoked), so the worker shows its neutral one: the app's
+    // name and the generic line, a fixed tag, no level, and nothing the payload said.
     await deliver({ ...valid, worker_id: "w-1", target_id: "site-not-shown" });
-    await deliver({ ...valid, audience: "crew", target_id: "crew-a", level: "amber" });
-    await expect.poll(tags).toEqual(["crew:crew-a", `site:${SITE_DEMO}`]);
+    await expect.poll(tags).toEqual(["fallback", siteTag].sort());
+
+    // The next push, delivered after it, is shown too: the worker survived the bad one.
+    await deliver({ ...valid, audience: "crew", target_id: `crew-${run}`, level: "amber" });
+    await expect.poll(tags).toEqual([crewTag, "fallback", siteTag].sort());
 
     const notifications = await shown(page);
-    const site = notifications.find((notification) => notification.tag === `site:${SITE_DEMO}`);
+    const site = notifications.find((notification) => notification.tag === siteTag);
     expect(site).toMatchObject({
       title: ur.push.title.site.replace("{level}", ur.push.level.red),
       body: ur.push.body,
@@ -271,11 +287,31 @@ test.describe("service worker push handling", () => {
       data: { url: "/ur/worker?from=push&level=red" },
       vibrate: [400, 100, 400, 100, 400],
     });
-    const crew = notifications.find((notification) => notification.tag === "crew:crew-a");
+    const crew = notifications.find((notification) => notification.tag === crewTag);
     expect(crew).toMatchObject({
       title: ur.push.title.crew.replace("{level}", ur.push.level.amber),
       data: { url: "/ur/worker?from=push&level=amber" },
       vibrate: [200],
     });
+
+    const neutral = notifications.find((notification) => notification.tag === "fallback");
+    expect(neutral).toMatchObject({
+      title: ur.common.appName,
+      body: ur.push.body,
+      lang: "ur",
+      data: { url: "/ur/worker?from=push" },
+      vibrate: [100],
+    });
+    const neutralText = `${neutral?.title ?? ""} ${neutral?.body ?? ""}`;
+    expect(Object.values(ur.push.level).some((word) => neutralText.includes(word))).toBe(false);
+    expect(JSON.stringify(neutral)).not.toMatch(/w-1|site-not-shown/);
+
+    // A body that is not JSON takes the same path: close the neutral notification, send garbage, it comes back.
+    await page.evaluate(async () => {
+      for (const notification of await (await navigator.serviceWorker.ready).getNotifications({ tag: "fallback" })) notification.close();
+    });
+    await expect.poll(tags).toEqual([crewTag, siteTag].sort());
+    await deliverRaw("this is not json");
+    await expect.poll(tags).toEqual([crewTag, "fallback", siteTag].sort());
   });
 });

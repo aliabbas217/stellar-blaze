@@ -73,11 +73,25 @@ function toBody(subscription: PushSubscriptionJSON, siteId: string, crewId: stri
   };
 }
 
+/**
+ * Asks the browser for a subscription with the VAPID key. A browser that already holds one made with another key
+ * (the VAPID keys were regenerated, which the real-phone spike does) refuses with an InvalidStateError and keeps
+ * refusing until that subscription is dropped: so drop it and ask once more. The dropped subscription's registration at
+ * the API is deleted by the caller once the new one is registered (it has another id).
+ */
+async function subscribeToPushService(manager: PushManagerLike, vapidPublicKey: string): Promise<SubscriptionLike> {
+  const options = { userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) };
+  try {
+    return await manager.subscribe(options);
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === "InvalidStateError")) throw error;
+    await (await manager.getSubscription())?.unsubscribe();
+    return manager.subscribe(options);
+  }
+}
+
 async function subscribeOnce(deps: SubscribeDeps): Promise<SubscribeOutcome> {
-  const subscription = await deps.registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(deps.vapidPublicKey),
-  });
+  const subscription = await subscribeToPushService(deps.registration.pushManager, deps.vapidPublicKey);
   const fromBrowser = subscription.toJSON();
   const body = toBody(fromBrowser, deps.siteId, deps.crewId);
   // toBody has proven the endpoint is there; the type says so.

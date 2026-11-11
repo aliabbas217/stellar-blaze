@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw/http";
 import { useProfile } from "@/features/profile/store";
 import type { SubscriptionLike } from "@/features/push/subscribe";
-import { usePush, type PushConfig, type PushPlatform } from "@/features/push/usePush";
+import { REGISTRATION_TIMEOUT_MS, usePush, type PushConfig, type PushPlatform } from "@/features/push/usePush";
 import { problemOnce } from "@/mocks/handlers";
 import { server } from "@/mocks/node";
 
@@ -197,7 +197,7 @@ describe("usePush: enable", () => {
     expect(result.current.failure).toBe("enable");
   });
 
-  it("does not throw when the service worker never becomes ready: the state is error", async () => {
+  it("does not throw when the service worker fails to become ready: the state is error", async () => {
     const { platform, registration } = fakePlatform();
     registration.mockRejectedValueOnce(new Error("no service worker"));
     const { result } = renderHook(() => usePush(CONFIG, platform));
@@ -207,6 +207,35 @@ describe("usePush: enable", () => {
     });
 
     expect(result.current.state).toBe("error");
+  });
+
+  it("does not hang when the service worker never becomes ready: after 10 s the state is error, and the next tap works", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { platform, registration } = fakePlatform();
+    // navigator.serviceWorker.ready never settles when no worker registers.
+    registration.mockImplementationOnce(() => new Promise<never>(() => undefined));
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    let running = Promise.resolve();
+    act(() => {
+      running = result.current.enable();
+    });
+    expect(result.current.state).toBe("requesting");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(REGISTRATION_TIMEOUT_MS);
+      await running;
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.failure).toBe("enable");
+
+    // The tap that waited released its lock: the button is usable again and the next tap goes through.
+    vi.useRealTimers();
+    spyOnApi();
+    await act(async () => {
+      await result.current.enable();
+    });
+    expect(result.current.state).toBe("subscribed");
   });
 
   it.each([
@@ -279,7 +308,7 @@ describe("usePush: app open", () => {
   it("registers again when the browser's endpoint differs from the stored one", async () => {
     useProfile.getState().setPush({ serverId: "sub-old", endpoint: "https://push.example/send/OLD", siteId: CONFIG.siteId ?? "" });
     const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription() });
-    const { posts } = spyOnApi();
+    const { posts, deletes } = spyOnApi();
 
     const { result } = renderHook(() => usePush(CONFIG, platform));
 
@@ -288,6 +317,54 @@ describe("usePush: app open", () => {
     });
     expect(posts).toHaveLength(1);
     expect(useProfile.getState().push).toEqual({ serverId: "sub-1", endpoint: ENDPOINT, siteId: "site-demo-mussafah" });
+    // The registration of the endpoint this phone no longer uses is deleted, once the new one is in.
+    await waitFor(() => {
+      expect(deletes).toEqual(["sub-old"]);
+    });
+  });
+
+  it("does not delete the stored registration when the API answers the new one with the same id", async () => {
+    useProfile.getState().setPush({ serverId: "sub-old", endpoint: "https://push.example/send/OLD", siteId: CONFIG.siteId ?? "" });
+    const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription() });
+    const { deletes } = spyOnApi();
+    // An API that treats the endpoint as the key (contract section 5) hands back the id it already has.
+    server.use(http.post("*/api/v1/push/subscriptions", () => HttpResponse.json({ id: "sub-old" }, { status: 201 })));
+
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(result.current.state).toBe("subscribed");
+    });
+    expect(useProfile.getState().push?.serverId).toBe("sub-old");
+    expect(deletes).toEqual([]);
+  });
+
+  it("deletes the registration of the previous site when the worker turns alerts on for another", async () => {
+    useProfile.getState().setPush({ serverId: "sub-other-site", endpoint: "https://push.example/send/OLD", siteId: "site-other" });
+    const { platform } = fakePlatform();
+    const { deletes } = spyOnApi();
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    await act(async () => {
+      await result.current.enable();
+    });
+
+    expect(useProfile.getState().push).toEqual({ serverId: "sub-1", endpoint: ENDPOINT, siteId: "site-demo-mussafah" });
+    expect(deletes).toEqual(["sub-other-site"]);
+  });
+
+  it("is still subscribed when deleting the previous registration fails", async () => {
+    useProfile.getState().setPush({ serverId: "sub-old", endpoint: "https://push.example/send/OLD", siteId: CONFIG.siteId ?? "" });
+    const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription() });
+    spyOnApi();
+    server.use(problemOnce("/api/v1/push/subscriptions/:subscription_id", 502));
+
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(result.current.state).toBe("subscribed");
+    });
+    expect(useProfile.getState().push?.serverId).toBe("sub-1");
   });
 
   it("registers a subscription the API was never told about (nothing stored)", async () => {
@@ -315,9 +392,10 @@ describe("usePush: app open", () => {
     expect(result.current.subscription?.endpoint).toBe(ENDPOINT);
   });
 
-  it("forgets the stored registration when the browser no longer has a subscription", async () => {
+  it("deletes the stored registration, then forgets it, when the browser no longer has a subscription", async () => {
     useProfile.getState().setPush({ serverId: "sub-old", endpoint: ENDPOINT, siteId: CONFIG.siteId ?? "" });
     const { platform, getSubscription } = fakePlatform({ permission: "granted", existing: null });
+    const { deletes } = spyOnApi();
 
     const { result } = renderHook(() => usePush(CONFIG, platform));
 
@@ -325,7 +403,41 @@ describe("usePush: app open", () => {
       expect(useProfile.getState().push).toBeNull();
     });
     expect(getSubscription).toHaveBeenCalled();
+    expect(deletes).toEqual(["sub-old"]);
     expect(result.current.state).toBe("idle");
+  });
+
+  it("keeps the stored registration, to try again on the next app open, when the delete cannot be made", async () => {
+    useProfile.getState().setPush({ serverId: "sub-old", endpoint: ENDPOINT, siteId: CONFIG.siteId ?? "" });
+    const failed = vi.fn();
+    server.use(
+      http.delete("*/api/v1/push/subscriptions/:id", () => {
+        failed();
+        return HttpResponse.json({ type: "about:blank", title: "Bad Gateway", status: 502 }, { status: 502 });
+      }),
+    );
+    const { platform } = fakePlatform({ permission: "granted", existing: null });
+
+    renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(failed).toHaveBeenCalledTimes(1);
+    });
+    // Give the failed delete time to settle: nothing may clear the id.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(useProfile.getState().push?.serverId).toBe("sub-old");
+  });
+
+  it("forgets the stored registration when the API does not know it (a 404 means it is gone)", async () => {
+    useProfile.getState().setPush({ serverId: "sub-gone", endpoint: ENDPOINT, siteId: CONFIG.siteId ?? "" });
+    server.use(problemOnce("/api/v1/push/subscriptions/:subscription_id", 404));
+    const { platform } = fakePlatform({ permission: "granted", existing: null });
+
+    renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(useProfile.getState().push).toBeNull();
+    });
   });
 
   it("does not register a stored subscription for another site as the current one", async () => {
@@ -353,6 +465,27 @@ describe("usePush: disable", () => {
     });
     return { ...fake, ...api, ...hook, unsubscribe };
   }
+
+  it("does not hang when the service worker never becomes ready: after 10 s Turn off ends in error, keeping the registration", async () => {
+    const { result, registration } = await subscribed();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    registration.mockImplementationOnce(() => new Promise<never>(() => undefined));
+
+    let running = Promise.resolve();
+    act(() => {
+      running = result.current.disable();
+    });
+    expect(result.current.state).toBe("requesting");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(REGISTRATION_TIMEOUT_MS);
+      await running;
+    });
+    vi.useRealTimers();
+
+    expect(result.current.state).toBe("error");
+    expect(result.current.failure).toBe("disable");
+    expect(useProfile.getState().push?.serverId).toBe("sub-1");
+  });
 
   it("unsubscribes in the browser, deletes the registration, forgets it and goes idle", async () => {
     const { result, unsubscribe, deletes } = await subscribed();

@@ -1,7 +1,10 @@
 import {
+  fallbackNotificationContent,
+  fallbackTargetUrl,
   notificationClickUrl,
   notificationContent,
   notificationTargetUrl,
+  type NotificationContent,
 } from "@/features/push/notification";
 import { parsePushPayload } from "@/features/push/payload";
 import { routing } from "@/i18n/routing";
@@ -35,26 +38,13 @@ export function readPushData(event: { readonly data: { json(): unknown } | null 
   try {
     return event.data?.json();
   } catch {
-    // Not JSON: the guard below sees undefined and shows nothing.
+    // Not JSON: undefined, which the guard rejects, which gets the neutral notification.
     return undefined;
   }
 }
 
-/**
- * Shows the notification for a push. A payload that is not exactly the contract's six keys with valid values shows
- * nothing and is not rethrown: a worker must never fail on a message it does not understand, and must never show
- * text it did not build itself. Resolves true when a notification was shown.
- *
- * A failure of `show` itself (permission withdrawn, no icon) is not swallowed: it surfaces in the worker's console,
- * which is where the real-phone spike looks for it.
- */
-export async function showPushNotification(data: unknown, deps: PushDeps): Promise<boolean> {
-  const payload = parsePushPayload(data);
-  if (payload === null) return false;
-
-  const locale = await deps.readLocale().catch(() => routing.defaultLocale);
-  const content = notificationContent(locale, payload);
-  await deps.show(content.title, {
+function toOptions(content: NotificationContent, url: string): PushNotificationOptions {
+  return {
     body: content.body,
     tag: content.tag,
     lang: content.lang,
@@ -62,15 +52,42 @@ export async function showPushNotification(data: unknown, deps: PushDeps): Promi
     renotify: content.renotify,
     icon: NOTIFICATION_ICON,
     // The tap reads this back (notificationClickUrl): the page it opens is decided when the notification is built.
-    data: { url: notificationTargetUrl(content.lang, payload) },
-  });
-  return true;
+    data: { url },
+  };
+}
+
+/**
+ * Shows exactly one notification for every push, because a push that shows none gets the subscription revoked by WebKit
+ * (an installed iPhone app) and a notice of Chrome's own on Chromium.
+ *
+ *  - A payload that is exactly the contract's six keys with valid values: the level notification built from it.
+ *    Resolves "payload".
+ *  - Anything else (no body, not JSON, an extra key, an unknown level or version, a malformed time): the neutral
+ *    notification, the app's name and the generic "open the app" line with a fixed tag, which claims no level and never
+ *    shows text the payload supplied. Resolves "fallback". It is not rethrown: a worker must never fail on a message it
+ *    does not understand.
+ *
+ * A failure of `show` itself (permission withdrawn, no icon) is not swallowed: it surfaces in the worker's console,
+ * which is where the real-phone spike looks for it.
+ */
+export async function showPushNotification(data: unknown, deps: PushDeps): Promise<"payload" | "fallback"> {
+  const payload = parsePushPayload(data);
+  const locale = await deps.readLocale().catch(() => routing.defaultLocale);
+  if (payload === null) {
+    const content = fallbackNotificationContent(locale);
+    await deps.show(content.title, toOptions(content, fallbackTargetUrl(content.lang)));
+    return "fallback";
+  }
+  const content = notificationContent(locale, payload);
+  await deps.show(content.title, toOptions(content, notificationTargetUrl(content.lang, payload)));
+  return "payload";
 }
 
 /** The part of `WindowClient` the tap handler uses. */
 export interface ClientLike {
   readonly url: string;
   focus(): Promise<unknown>;
+  navigate(url: string): Promise<unknown>;
 }
 
 export interface ClickDeps {
@@ -82,21 +99,33 @@ export interface ClickDeps {
 }
 
 /**
- * What a tap on a notification does: focus the window that is already on the target page, else open the target in a
- * new one. A window on another page of the app is left alone rather than navigated: it may hold a half-filled
- * form, and the target is one tap away from wherever it is.
+ * What a tap on a notification does: bring the window that is already on the target page to the front and give it the
+ * target's query (`?from=push&level=`, which the page reads), else open the target in a new window. A window on another
+ * page of the app is left alone rather than navigated: it may hold a half-filled form, and the target is one tap away
+ * from wherever it is. A window that cannot be focused (it went away) is replaced by a new one.
  */
 export async function openNotificationTarget(data: unknown, deps: ClickDeps): Promise<void> {
   const locale = await deps.readLocale().catch(() => routing.defaultLocale);
   const target = new URL(notificationClickUrl(data, locale), deps.origin);
+  const targetPath = `${target.pathname}${target.search}${target.hash}`;
 
   const open = (await deps.windows()).find((client) => {
     const url = new URL(client.url);
     return url.origin === target.origin && url.pathname === target.pathname;
   });
-  if (open !== undefined) {
-    await open.focus();
+  if (open === undefined) {
+    await deps.openWindow(targetPath);
     return;
   }
-  await deps.openWindow(`${target.pathname}${target.search}${target.hash}`);
+
+  try {
+    await open.focus();
+  } catch {
+    await deps.openWindow(targetPath);
+    return;
+  }
+  if (new URL(open.url).search !== target.search) {
+    // Only a window this worker controls can be navigated; an uncontrolled one is already in front, which is enough.
+    await open.navigate(targetPath).catch(() => undefined);
+  }
 }
