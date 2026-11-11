@@ -4,6 +4,8 @@
 **Plan reference:** `docs/context/challenge-07-plan.md` §8.3-§8.5; ADR 0005 (data), 0006 (physics), 0007 (ML); `docs/research/2026-11-11-data-availability.md`.
 **Run date:** 2026-11-11. Scripts and result files: `docs/research/scripts/roster/` (section 8). No git commands were run.
 
+> **Erratum (2026-11-11, ADR 0011 v2; `docs/research/2026-11-11-planner-adversarial-review.md`).** The **absolute** numbers below (34.6% / 58.0% avoided, 53.1% / 83.0%, 75.0% / 98.1%, and the in-shift 7.8%) are **superseded for any pitch or design use**. They score 8.5 h rosters with 5.5-6.5 h runs, which break Art. 17/18. They also ignore sleep and compare against a non-compliant baseline. Under legal 8 h templates, a clock-time sleep model and a do-no-harm guard, see `scripts/roster/legal_sleep_templates.py` v2 and `results/legal_sleep_templates_output.txt`. Legalising the common roster removes 7.5% at ≥ 30 and 19.1% at ≥ 32 (per worked hour). A sleep-neutral shape change adds 0-10% at ≥ 30 depending on the assumed bedtime. The in-shift forecast gain on legal shifts is 1.8-5.9% (`within_shift_legal.py`). The **horizon comparisons** (fixed ≈ monthly ≈ weekly ≈ daily-forecast) were made on one library and still describe that library. Whether they hold on the legal library is untested [I].
+
 ## 0. Verdict
 
 **The seasonal layer is feasible and is where nearly all the value is. The weekly layer is not worth building as a roster-changing layer, and the data say so before the forecast question even matters. The daily layer is worth building only inside the fixed shift.** Evidence wins over the framing; the framing's assumptions are corrected in section 6.

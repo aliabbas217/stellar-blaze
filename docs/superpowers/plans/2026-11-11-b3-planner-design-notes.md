@@ -1,85 +1,94 @@
-# B3 planner: design notes for the B3 plan (input, not the plan)
+# B3 planner: design notes for the B3 plan (input, not the plan), v2
 
-**Written:** 2026-11-11. **Decision:** `docs/decisions/0011-heat-aware-planner.md` (ADR 0011, Proposed). **Slot:** roadmap §1 Mon 16 Nov (planner), with exporters on Sun 15 Nov alongside the alert-burden task. **Interfaces used:** B1 physics `domain/physics/{wbgt,niosh,twl,phs}.py` (`rel_wbgt_c`, `effective_wbgt_c`, `twl_w_m2_array`, `apply_withdrawal_limits`), B1 Task 7A `Ruleset` / `TunableSpec` / `Floor` / `RuntimeConfig` / `EffectiveParams`, `composition.py` registries, B2 calibrated quantile grids (`calibration_pair`), ADR 0010 config snapshot and audit events. OR-Tools 9.15.6755 is already pinned (ADR 0008).
+- **Written:** 2026-11-11. **v2** replaces v1 the same day, after `docs/research/2026-11-11-planner-adversarial-review.md`. v1's seasonal-scorer service, publication flow, hysteresis engine, anomaly flag, second approver and pay block are **cut** (parked).
+- **Decision:** `docs/decisions/0011-heat-aware-planner.md` (ADR 0011 v2, Proposed).
+- **Slot:**
+  - MUST on Mon 16 Nov.
+  - SHOULD (CP-SAT) on Tue 17 Nov, only if the MUST set is green.
+  - The static roster chart's JSON is already produced by the research script (15-16 Nov, about 2 h to wire into the snapshot).
+- **Interfaces used:**
+  - B1 physics `domain/physics/{wbgt,niosh,twl}.py` (`rel_wbgt_c`, `effective_wbgt_c`, `twl_w_m2_array`, `apply_withdrawal_limits`).
+  - B1 Task 7A `Ruleset` / `TunableSpec` / `Floor` / `RuntimeConfig` / `EffectiveParams`, and the `composition.py` registries.
+  - B2 calibrated quantile grids (`calibration_pair`).
+  - B3's own zone/level policy engine (ADOSH zones + margin, Red band).
+  - ADR 0010 config snapshot and audit events.
+  - OR-Tools 9.15.6755 is pinned (ADR 0008).
 
 ## 1. Components
-| # | Component | Layer | Location (hexagonal, ADR 0009 contracts) | Must / Should |
-|---|---|---|---|---|
-| 1 | Ruleset `ae-heat-2026.1` sections `[labour]`, `[planner]`, `[stability]`, `[privacy]` + the ADR 0011 §6 tunables (`sleep_gate_h`, `rest_interval_h`, `notice_days`, `freeze_days`, `noise_floor_wh`, `earliest_start_flag`, `max_consecutive_days`, `stability_alpha`, `fairness_beta`, `planner_det_time_s`, `k_health`, `k_exposure`); floor comparators; golden file | both | `backend/rulesets/`, `domain/rules/ruleset.py` (additive) | Must |
-| 2 | Template generator: ruleset labour floors → legal template library (8 h, ban, ≤ 5 h runs + 1 h break, start/end bounds, juvenile variant) | S | `domain/planner/templates.py` (pure) | Must |
-| 3 | Roster metrics: E28/E30/E32, REL excess, sleep opportunity, day span, earliest bus departure, paid/overtime/night deltas, split-shift second run | S | `domain/planner/roster_metrics.py` (pure) | Must |
-| 4 | Roster scorer: climatology from the Parquet hourly obs WBGT per station, LOSO evaluation mode, gates, lexicographic pick, hysteresis recommendation | S | `application/roster_scorer.py` | Must |
-| 5 | Stability rules: freeze, notice, drift, monthly cap, exposure-reducing classifier, SS1-SS7 metrics | S | `domain/planner/stability.py` (pure) | Must (rules), Should (metrics on simulated logs) |
-| 6 | Zone and cap builder: forecast quantiles → protective-quantile WBGT/TWL → zone (minus margin) → per-hour work caps per workload class | D | `domain/planner/zones.py` (pure) | Must |
-| 7 | `DayPlanSolver` port + CP-SAT adapter (lexicographic 3-stage, `num_workers=1`, fixed seed, `max_deterministic_time`) + rule-based fallback planner | D | `ports/day_plan_solver.py`, `adapters/compute/cpsat_day_planner.py`, `domain/planner/fallback.py` | Must (simple constraint set), Should (pours, precedences, fairness, shelter, rotation behind `planner_full_constraints`) |
-| 8 | Day advisor use case: build the instance (sorted ids), solve, validate against the hard rules independently of the solver, attach clause citations + uncertainty band, persist the decision row with solver metadata | D | `application/day_advisor.py` | Must |
-| 9 | Governance: employer-of-record scoping, sign-off workflow (review required), input-change audit + edit-to-green anomaly flag + HSE second approver, pay-publish block + attestation, `plan.*` audit events, k-suppression by data class | both | `application/plan_governance.py`, audit table (B3 governance) | Must (scoping, sign-off, audit, pay block, k), Should (second approver UI, anomaly rate report) |
-| 10 | Persistence: `site_profile`, `roster_option_run`, `roster_publication`, `day_plan`, `plan_signoff`, `input_change` (all with `ruleset_id`, `ruleset_sha256`, `model_id`, `config_version_id`, `config_sha256`); expand-only migration | both | Alembic `0003_planner` | Must |
-| 11 | API (in the 14 Nov OpenAPI v1 draft): `GET /api/v1/sites/{site_id}/roster-options`, `POST /api/v1/sites/{site_id}/roster-publications`, `POST /api/v1/sites/{site_id}/day-plans`, `GET /api/v1/day-plans/{id}`, `POST /api/v1/day-plans/{id}/sign-off`, `GET /api/v1/sites/{site_id}/pay-panel`. All employer-scoped; problem types `plan-infeasible`, `pay-attestation-required`, `freeze-violation`, `notice-violation`, `review-required` | both | `api/routes/planner.py` | Must |
-| 12 | Demo exporters (static JSON for `ReplayForecastSource`): `artifacts/planner/roster_explorer.json`, `stability_frontier.json`, `inshift_day.json`, `pay_panel.json` | both | `jobs/export_planner.py` (`sb-jobs planner export`) | Must |
+| # | Component | Location (ADR 0009 contracts) | Priority |
+|---|---|---|---|
+| 1 | Ruleset `ae-heat-2026.1` `[labour]`: ban, exemptions, hours (8/48, OT 2 h, 144 h/3 wk **total**), Art. 18 (`art18_ban_gap_counts_as_break = false`), weekly rest, juveniles, Ramadan, Table 1 cycles + fluid + duties, the full acclimatisation and re-acclimatisation table, the 7-day heavy-work rule. `[privacy]`: `k_health` ≥ 10, `k_exposure` ≥ 5. Tunables per ADR 0011 §8; POLICY ranges give `policy-bound-violation`. Golden file | `backend/rulesets/`, `domain/rules/ruleset.py` (additive) | MUST |
+| 2 | Zone timeline: protective-quantile TWL − margin → zone per 5-min tick (interpolated from hourly), WBGT/REL cross-check, Red-level stop ticks | `domain/planner/zones.py` (pure) | MUST |
+| 3 | Rule planner: ADOSH cycles across hour boundaries (rest never shortened), rolling-60-min caps, Art. 18 break at the hottest hour of any > 5 h run, people rules (lone work, unacclimatised, ramp share, 7-day heavy, juveniles, task families), heavy-first ordering, ban, stop-work | `domain/planner/rule_planner.py` (pure) | MUST |
+| 4 | **Independent validator**: shares only the ruleset loader and the zone function with the planners; rolling windows; returns violations (rule id, clause, tick range) | `domain/planner/validator.py` (pure) | MUST |
+| 5 | Day-plan use case: build the instance (sorted ids), run the rule planner (and CP-SAT if `planner_cpsat_enabled`), validate, attach clause citations + uncertainty, persist the decision row, emit the zone timeline to the Tier A alert path. Unsigned → the rule plan labelled "unsigned fallback" | `application/day_plan.py` | MUST |
+| 6 | Sign-off: named supervisor of the employer of record; one-tap only if unchanged and Low-only; otherwise itemised acknowledgement; reason code on deviation. **Never gates alerts or stops** | `application/plan_signoff.py` | MUST |
+| 7 | Input-change audit: append-only before/after/actor/reason rows for protection-relevant inputs | B3 governance audit table | MUST |
+| 8 | Pay-impact display: paid hours, OT, night-premium position vs B0/B1, unpaid span, ADOSH rest + stops priced as paid. **No gate** | `domain/planner/pay_impact.py` (pure) | MUST (display) |
+| 9 | Back-test scorer for ADR 0011 §9: naive / ban-only / rule-plan-raw / rule-plan-corrected, scored by the validator against truth zones on held-out 2026 | `jobs/planner_backtest.py` (`sb-jobs planner backtest`) → `artifacts/eval/2026/planner_scoreboard.json` | MUST (feeds the pitch) |
+| 10 | Persistence: `site_profile`, `day_plan`, `plan_signoff`, `input_change` (all with `ruleset_id`, `ruleset_sha256`, `model_id`, `config_version_id`, `config_sha256`; solver metadata nullable). Expand-only migration | Alembic `0003_planner` | MUST |
+| 11 | API (in the 14 Nov OpenAPI v1 draft): `POST /api/v1/sites/{site_id}/day-plans`, `GET /api/v1/day-plans/{id}`, `POST /api/v1/day-plans/{id}/sign-off`, `GET /api/v1/sites/{site_id}/roster-frontier` (serves the static JSON). Employer-scoped; problems `plan-invalid` (validator), `review-required`, `policy-bound-violation` | `api/routes/planner.py` | MUST |
+| 12 | Static roster frontier: copy `docs/research/scripts/roster/results/roster_frontier.json` into the replay snapshot with a provenance block (script, sha256 of the parquet, run date) | `jobs/export_planner.py` | MUST |
+| 13 | CP-SAT sequencer: per-tick booleans, sliding-window caps, run limits (`AddAutomaton`), lexicographic stages 1 (unmet must-do) → 2 (strain) → 3 (deferrable + stability), incumbent fixing, `num_workers=1`, seed `20261111`, `max_deterministic_time` | `ports/day_plan_solver.py`, `adapters/compute/cpsat_day_planner.py` | SHOULD |
 
-Out of scope for B3: night-work modelling, commute heat exposure, cross-employer rotation, any LLM (ADR 0011 §4.9).
+Not in B3 (parked): seasonal scorer service, roster publications, hysteresis/freeze/notice engine, anomaly flag, HSE second approver, pay-block workflow, fairness, shelter, pours, rotation, SS metrics, night modelling, any LLM.
 
 ## 2. Demo views (F2 builds; B3 provides JSON + types)
-Every number is labelled **REAL** (station weather, forecasts as issued) or **SIMULATED** (crew, demand, pay baseline). Every view carries the floor banner ("Green is not permission …") and the "policy benchmark, not legal compliance" note next to sleep, notice and stability values.
+Every number is labelled **REAL** (station weather, forecasts as issued) or **SIMULATED** (crew, demand). Every plan view carries the floor banner. Sleep and bedtime values are labelled "assumption [I]" and "policy benchmark, not legal compliance".
 
-1. **Roster-exposure explorer.**
-   - Pick a station (6 clusters), a commute (30/45/60/90 min) and a sleep gate.
-   - See the legal templates as a scatter: exposure at ≥ 30 vs sleep opportunity, colour = earliest start. The baseline and the recommended template are marked.
-   - Each option's cost card shows E28/E30/E32, sleep h, bus departure, day span, paid-hours/overtime delta, night minutes, split-shift second run and a permit flag.
-   - Night templates appear greyed with "not eligible: <attestations missing>".
-   - The point of the view: at 45 min the best sleep-compatible template avoids ~16% (≥ 30), at 90 min none beats the baseline. Commute is a lever (`legal_sleep_templates_frontier.csv`).
-2. **Stability-frontier chart.**
-   - Left: exposure vs allowed roster changes per summer (0/1/2/3/6/14/19), hindsight and climatology lines, from Feasibility `frontier.csv`. 498 → 495 h at ≥ 30.
-   - Right: the weekly-regret histogram (`weekly_regret.csv`: median 0.4%, 95% of weeks within 5%).
-   - Caption: "Changing the roster weekly would buy < 1% at ≥ 30 °C; we hold it fixed and adapt inside the shift."
-3. **In-shift advisor (supervisor, tomorrow).**
-   - Hour-by-hour zone band (protective quantile, margin applied) with the uncertainty band.
-   - Crew lanes with task blocks and rest blocks per ADOSH Table 1, ban shaded, clause citation on hover.
-   - Counterfactual line: REL-excess vs the heavy-first rule.
-   - Status chip OPTIMAL/FEASIBLE/FALLBACK; the change list to acknowledge before sign-off; the anomaly flag if present.
-   - Uses the pre-registered demo day where possible (Judges §4.2) so it links to the scoreboard.
-4. **Pay-neutrality panel.**
-   - Per crew: paid hours, overtime, night premium status, unpaid day span vs baseline.
-   - Red "publish blocked" state until the employer attests compensation (reason code).
-   - Heat-stop minutes priced as paid, with the attestation tick.
-   - The worked 8 h-vs-8.5 h example shown (−7.2% daily pay without compensation).
+1. **Roster frontier chart** (one chart, `roster_frontier.json`).
+   - Scatter/front of E30 per worked hour vs sleep opportunity, with a commute slider (15-90 min).
+   - B0 "common practice (8.5 h, not compliant)" and B1 "legal default 06:00-11:00 + 15:00-18:00" are marked.
+   - A legalisation arrow: −7.5% at ≥ 30, −19.1% at ≥ 32.
+   - Caption: "Under UAE hours law and a night's sleep, no roster shape outruns the heat. Every 15 min of bus costs 30 min of sleep."
+   - No template is marked "recommended" unless it passes the do-no-harm guard. At commutes ≥ 30 min none does, so the chart says "no change recommended; binding constraint: commute".
+2. **In-shift planner (supervisor, tomorrow).**
+   - Hour-by-hour zone band (protective quantile, margin applied), with the uncertainty band.
+   - Crew lanes in 5-min ticks: work / ADOSH rest (20/40, 45/15) / Art. 18 break / ban / stop. Clause citation on hover; High-zone duties checklist.
+   - A validator badge ("0 violations"), and the same day validated for a **naive schedule** with its violation count.
+   - Status chip RULE / OPTIMAL / FEASIBLE / FALLBACK, and an "unsigned fallback" state.
+   - Pre-registered demo day where possible, to link with the Judges scoreboard.
+3. **Planner scoreboard (2026 held out).** From `planner_scoreboard.json`:
+   - truth violation minutes per worker-season for naive, ban-only, rule-plan-raw and rule-plan-corrected;
+   - the share of truth-High heavy minutes cycled 20/40;
+   - missed under-protected hours (POD/FAR);
+   - rest minutes added (SIMULATED).
+4. **Pay-impact panel.** Per crew: paid hours, OT, night-premium position vs B0/B1, unpaid span; ADOSH rest and stops shown as paid time. Display only.
 
-## 3. Acceptance tests (the B3 plan turns each into a task step)
+## 3. Acceptance tests
 | ID | Test | Marker |
 |---|---|---|
-| AT-1 | Template generator: every template has 8.0 h work, no tick in 12:30-15:00 in the ban season, no run > 5 h, ≥ 1 h break; count matches 136 day / 269 evening for the research bounds | unit (hypothesis) |
-| AT-2 | Scorer reproduces `docs/research/scripts/roster/results/legal_sleep_templates.csv` chosen template and shares (±0.001) for OMAA/OMDB/OMAL/OMFJ × 3 summers on the fixture parquet | regression |
-| AT-3 | Baseline exposure equals Feasibility `ladder.csv` (OMAA 2024: 1,011.5 / 791.0 / 484.5) | regression |
-| AT-4 | Hysteresis: no recommendation when the gain is below the noise floor; never 2 changes in a month; drift > 30 min rejected in-season; notice < `notice_days` rejected with `notice-violation`; inside the freeze only stop/shorten/rest/shade accepted, a delay rejected | unit |
-| AT-5 | **No added minutes:** for random instances, plan work minutes per worker ≤ roster minutes ≤ baseline minutes | unit (hypothesis) |
-| AT-6 | Hard rules hold on every solver output **and** on every fallback output, checked by an independent validator: ban, zone caps (20/40, 45/15), lone work, unacclimatised in Medium/High, acclimatisation ramp, shelter capacity, task families, juveniles | unit (hypothesis) |
-| AT-7 | Fallback never less protective than the ban; solver failure, stale forecast or wall-cap hit → fallback offered, status recorded | unit |
-| AT-8 | Determinism: the same instance + ruleset + config version solved twice (and in a fresh process) gives a byte-identical plan; parameters record `num_workers=1`, the seed and `max_deterministic_time` | unit |
-| AT-9 | Oracle: single crew, no side constraints → CP-SAT stage-1 objective equals the exact assignment from `within_shift.py` logic | unit |
-| AT-10 | Lexicographic order: stage 2/3 never worsen the stage-1 strain objective | unit |
-| AT-11 | Employer scoping: employer B cannot read or plan employer A's crews (403 + audit row); no cross-employer rotation in any plan | integration |
-| AT-12 | Sign-off: plans with changes or Medium/High work reject one-tap (`review-required`) until every item is acknowledged; a deviation without a reason code fails | integration |
-| AT-13 | Input-change audit: every protection-relevant edit writes before/after/actor/reason; a protection-lowering edit within 24 h before sign-off sets the anomaly flag and requires the HSE second approver | integration |
-| AT-14 | Pay block: publishing a roster with fewer paid hours than baseline returns `pay-attestation-required` until an attestation exists | integration |
-| AT-15 | k-suppression: health-related counts < 10 and exposure counts < 5 suppressed at site-week/employer level with complementary suppression; `k_health` < 10 or `k_exposure` < 5 rejected as `out-of-range` by config validation | unit + integration |
-| AT-16 | Floors: a runtime config that sets any §6 floor, or a tunable outside its range, is rejected (ADR 0010 `floor-violation` / `out-of-range`); every new floor field has a `Floor` comparator | unit |
-| AT-17 | Every plan view payload carries the floor banner code and every action carries a clause citation; every code has an `en` message key | unit |
-| AT-18 | Decision rows carry `ruleset_id`, `ruleset_sha256`, `model_id`, `config_version_id`, `config_sha256`, solver status, objective, bound and deterministic time | integration |
-| AT-19 | Exporters write the four JSON files from the replay snapshot; each value has a REAL/SIMULATED label; the F2 types generate from the committed OpenAPI | e2e |
-| AT-20 | Performance: demo instance (≤ 10 crews, ≤ 20 tasks, 5-min ticks) wall p95 ≤ 3 s on the `api` container | slow |
-| AT-21 | Purpose limitation: no planner export or endpoint joins stop events or adherence to a named worker | unit (CI) |
+| AT-1 | Ruleset `[labour]` loads; every floor field has a `Floor` comparator; POLICY tunables outside range → `policy-bound-violation`, floors → `floor-violation`; `k_health` < 10 or `k_exposure` < 5 rejected | unit |
+| AT-2 | Zone builder: protective quantile gives TWL ≤ the median TWL; margin subtraction; boundary conventions 140 → Low, 115 → Medium (ADR 0006) | unit |
+| AT-3 | Cycles cross hour boundaries: for random zone sequences, no rolling 60-min window exceeds its cap and no work run exceeds its cycle length (Medium heavy 45, High light 45, High heavy 20); rest is never shortened when the zone eases | unit (hypothesis) |
+| AT-4 | Art. 18: no work run > 5 h without a 1 h break; ban time and ADOSH rest are not credited when the switch is false; the break is placed in the hottest hour of the run; flipping the switch changes only Art. 18 results | unit |
+| AT-5 | Acclimatisation: the new/experienced ramps and every re-acclimatisation row (including illness days and the "R/E*" protective reading); unacclimatised workers never in Medium/High ticks; heavy work only from day 7 | unit (table-driven) |
+| AT-6 | People rules: no lone work in Medium/High; juveniles never on a template starting < 07:00 or ending > 19:00, ≤ 6 h, ≤ 4 h runs; task families respected | unit |
+| AT-7 | **No added minutes**: the plan's work minutes per worker ≤ the shift's minus mandatory breaks; the shift is never extended | unit (hypothesis) |
+| AT-8 | **Validator independence**: the validator flags hand-built violating plans for every rule (one fixture per rule id); every rule-planner and CP-SAT output on random instances passes; the validator module does not import either planner (import-linter contract) | unit + lint |
+| AT-9 | Fallback: no forecast, stale forecast, solver failure or wall-cap hit → the rule plan; never less protective than the ban (property) | unit |
+| AT-10 | **Sign-off never gates safety**: with no sign-off, Tier A alerts and Red stops still fire and crews see the "unsigned fallback" rule plan; one-tap is rejected (`review-required`) for changed or Medium/High plans | integration |
+| AT-11 | Employer scoping: employer B cannot read or plan employer A's crews (403 + audit row) | integration |
+| AT-12 | Input-change audit rows written with before/after/actor/reason for each protection-relevant field | integration |
+| AT-13 | Pay impact: B0 → B1 shows −0.5 h OT, about −7.2% daily pay at +25%; ADOSH rest and stops counted as paid; no planner endpoint returns a pay-related block for a day plan or a stop | unit |
+| AT-14 | Roster frontier: the exporter reproduces `roster_frontier.json` from the **committed fixture subset** (4 stations × 3 summers, the hours used; Review M7) within ±0.001; the guard marks nothing recommended at a 45-min commute and floor 21:30 | regression |
+| AT-15 | Back-test scorer: on a committed 10-day fixture, naive > ban-only ≥ rule-plan violation minutes, and the counts equal the hand-computed fixture values | regression |
+| AT-16 | Decision rows carry `ruleset_id`, `ruleset_sha256`, `model_id`, `config_version_id`, `config_sha256`, plus solver status/objective/bound/det-time when CP-SAT ran | integration |
+| AT-17 | Every plan payload carries the banner code and a clause per action state; every code has an `en` key | unit |
+| AT-18 | Purpose limitation: no planner export joins stop events or adherence to a named worker; the acclimatisation and juvenile fields are typed `Personal` and rejected by the managed LLM adapter type | unit (CI) |
+| AT-19 (SHOULD) | CP-SAT: stage-1 must-do work ≥ the rule plan's on the same instance; stage 2 never worsens stage 1; FEASIBLE stops fix the incumbent and record the gap; single crew without side constraints equals the exact assignment oracle; byte-identical re-solve in a fresh process with `num_workers=1`, seed and `max_deterministic_time` recorded | unit |
+| AT-20 (SHOULD) | Performance: demo instance (≤ 10 crews, ≤ 20 tasks, ≤ 108 ticks) wall p95 ≤ 3 s on the `api` container | slow |
 
-## 4. Order and budget (fits the roadmap's 15-16 Nov slot)
-1. Ruleset sections + tunables (component 1), half a morning.
-2. Template generator, metrics, scorer, exporters for the explorer and the frontier (2-4, 12), half a day. AT-1 to AT-3 pin it to the research.
-3. Zones, fallback, then the CP-SAT simple set (6-8), half a day.
-4. Governance, persistence and API (9-11), half a day, sharing B3's governance work.
-5. Should-have: the full constraint set behind `planner_full_constraints`, SS metrics on simulated logs, the anomaly rate report.
+## 4. Order and budget
+- **16 Nov (MUST, about 1 day for one implementer + reviewer):**
+  1. Component 1 → 2 → 3 → 4, test-first (AT-1 to AT-9).
+  2. Then 5-8 and 10-12 (AT-10 to AT-14, AT-16 to AT-18), sharing B3's governance work (RBAC, audit, k).
+  3. Then 9 (AT-15), which needs the B2 corrected quantiles. On raw IFS until they land.
+- **17 Nov (SHOULD):** component 13 behind `planner_cpsat_enabled` (AT-19, AT-20). If not green by 15:00, ship without it; the RULE chip is the demo.
+- **Never cut:** the validator, no-added-minutes, sign-off-never-gates, scoping, k, banner, determinism.
 
-Must-have total about 1.5-2 days; cut order if behind: SS metrics → full constraint set → anomaly rate report. The scoping, sign-off, no-added-minutes, pay block and k tests are never cut.
-
-## 5. Open inputs the B3 plan must not invent
-- Demo site profile (commute, shelter capacity, crew sizes, task list): state as SIMULATED assumptions in `backend/fixtures/demo_site.toml`.
-- Ali's decisions in ADR 0011 (earliest-start default, sleep gate, k split, pay block, counsel).
-- B2's chosen `calibration_pair` and B3's TWL margin and withdrawal-limit decisions (ADR 0006) feed the zone builder.
+## 5. Inputs the B3 plan must not invent
+- Demo site profile (shift = B1, days per week, commute, crew sizes, task list with must-do flags), stated as SIMULATED in `backend/fixtures/demo_site.toml`.
+- Ali's ADR 0011 decisions (scope, bedtime floor for the chart, Art. 18 reading, k split, counsel).
+- B2's `calibration_pair`; B3's TWL margin, withdrawal-limit decision and Red band (ADR 0006/0010).
+- The §9 metrics are pre-registered in `docs/research/2026-11-12-evaluation-protocol.md` before 2026 is scored.
