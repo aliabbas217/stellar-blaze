@@ -15,6 +15,7 @@ colors:
   hairline: "oklch(0.83 0.04 76)"
   control: "oklch(0.6 0.045 70)"
   focus: "oklch(0.42 0.07 208)"
+  scrim: "oklch(0.17 0.015 60)"
   level-green: "oklch(0.52 0.13 150)"
   on-level-green: "oklch(1 0 0)"
   level-green-soft: "oklch(0.93 0.05 150)"
@@ -160,6 +161,8 @@ components:
   focus-ring:
     backgroundColor: "{colors.focus}"
     size: 3px
+  overlay-scrim:
+    backgroundColor: "{colors.scrim}"
 ---
 
 ## Overview
@@ -192,10 +195,11 @@ and the four level hues are the traffic-signal set (green 150, amber 85, orange 
 |---|---|---|---|
 | `surface`, `surface-raised` | `--surface`, `--surface-raised` | `bg-surface`, `bg-surface-raised` | page, and one tonal step up |
 | `ink`, `ink-muted` | `--ink`, `--ink-muted` | `text-ink`, `text-ink-muted` | text |
-| `hairline` | `--hairline` | `border-hairline` | decorative divider, 1 px |
+| `hairline` | `--hairline` | `border-hairline`, `bg-hairline` | decorative divider, 1 px, and the neutral wash behind a selected or highlighted row |
 | `control` | `--control` | `border-control` | the edge of an input or toggle, 2 px |
 | `primary`, `on-primary` | `--action`, `--on-action` | `bg-action`, `text-on-action` | the one action colour (`primary` is the linter's name for it) |
 | `focus` | `--focus` | `outline-focus` | focus ring, 3 px, 2 px offset |
+| `scrim` | `--scrim` | `bg-scrim` | the veil behind a sheet or dialog; always used with an opacity (`bg-scrim/50`) |
 | `level-{l}`, `on-level-{l}` | `--level-{l}`, `--on-level-{l}` | `bg-level-{l}`, `text-on-level-{l}` | level fill and the text on it |
 | `level-{l}-soft`, `on-level-{l}-soft` | `--level-{l}-soft`, `--on-level-{l}-soft` | `bg-level-{l}-soft`, `text-on-level-{l}-soft` | quiet tint for chips and rows |
 
@@ -232,9 +236,9 @@ on a contrast warning). Edit a value in `tokens.css` and this file together, or 
 Selected by `[data-theme="dark"]` on any element, and by the system preference when no override is set. Same semantic
 names, swapped values: `surface` is sand-950 and `surface-raised` sand-900; `ink` is sand-50 and `ink-muted` sand-300;
 `hairline` is sand-700 and `control` is sand-500, the same primitive as in light, because sand-600 fell to 2.99 on a
-raised dark surface; `primary` becomes the light falaj (`oklch(0.8 0.08 198)`) with sand-950
-text; `focus` is the same light falaj. The level fills and their on-colours do not change. The soft tints become a
-dark tint of the same hue (`oklch(0.3 0.05 h)`) with sand-50 text.
+raised dark surface; `scrim` is sand-950 in light and pure black in dark, so the veil always darkens; `primary`
+becomes the light falaj (`oklch(0.8 0.08 198)`) with sand-950 text; `focus` is the same light falaj. The level fills and their
+on-colours do not change. The soft tints become a dark tint of the same hue (`oklch(0.3 0.05 h)`) with sand-50 text.
 
 ### The hatch
 
@@ -327,6 +331,11 @@ about comprehension until then.
 - **Shade band**: described under Layout; each cell is a level fill with the pattern, a solid numeral plate, and an
   accessible name that gives the hour, the level name and the numeral.
 - **Card**: `surface-raised`, hairline edge, 16 px padding, 2 px radius.
+- **shadcn/ui components** (`src/components/ui`, on Base UI): their palette, radii and overlay names are mapped onto
+  these tokens in one adapter block in `frontend/src/styles/globals.css`. `destructive` is `ink`, not red (red is the
+  level scale and nothing else), the neutral fills (`secondary`, `muted`) are `surface-raised`, the highlighted row of a
+  select is `hairline`, and `black` is the `scrim`. Buttons and select triggers are at least 48 px tall and grow with
+  their text; no component fixes the height of text.
 
 ## Do's and Don'ts
 

@@ -3,3 +3,6 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  # next-intl dependencies used only by its message-extraction feature (useExtracted), which F1 does not enable.
+  "@parcel/watcher": false
+  "@swc/core": false

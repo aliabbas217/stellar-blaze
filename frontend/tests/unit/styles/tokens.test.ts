@@ -151,8 +151,8 @@ const LEVELS = ["green", "amber", "orange", "red"] as const;
 // ---------- tests ----------
 
 describe("tokens.css structure", () => {
-  it("defines the nine base and sixteen level semantic colours", () => {
-    expect(Object.keys(semanticLight)).toHaveLength(9 + 4 * 4);
+  it("defines the ten base and sixteen level semantic colours", () => {
+    expect(Object.keys(semanticLight)).toHaveLength(10 + 4 * 4);
   });
 
   it("keeps the dark override and the system-default dark block identical", () => {

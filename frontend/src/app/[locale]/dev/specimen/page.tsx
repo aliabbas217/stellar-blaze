@@ -1,58 +1,31 @@
 import type { Metadata } from "next";
-import { Barlow_Condensed, Noto_Sans, Noto_Sans_Arabic } from "next/font/google";
+import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { LEVELS, levelIndex, type Level } from "@/components/level/level";
 import { LevelPictogram } from "@/components/level/pictograms";
+import { DraftBadge } from "@/components/shell/DraftBadge";
+import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
+import { ThemeToggle } from "@/components/shell/ThemeToggle";
 
 /*
  * Dev-only visual specimen for the "Arish Signal" direction (DESIGN.md).
  * Not part of the product: it returns 404 in production unless SB_SPECIMEN=1.
  *
- * TEMPORARY, until Task 3: the fonts below and the sample strings move into
- * src/app/fonts.ts and messages/{en,ar}.json. The Arabic strings are a machine draft
- * and must be reviewed by a native speaker before they leave this file.
- * The four level badges are inline placeholders until LevelBadge exists (Task 10).
+ * It renders in the language of its route, so /en, /ar, /ur, /hi, /bn and /ne/dev/specimen show the
+ * same page in each script with that locale's fonts, direction and line height. Its copy lives in
+ * messages (common.specimen.*, levels.*); the non-English text there is machine draft.
+ * The four level badges are inline placeholders until LevelBadge exists (Task 10). The shell controls
+ * (language, theme, draft badge) are mounted in the header so they can be seen and tried here before
+ * the app shell (Task 4) exists.
  */
 
-export const metadata: Metadata = {
-  title: "Arish Signal specimen",
-  robots: { index: false, follow: false },
-};
-
-const displayFont = Barlow_Condensed({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-display",
-  display: "swap",
-});
-const latinFont = Noto_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-const arabicFont = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-body", display: "swap" });
-
-type SampleLocale = "en" | "ar";
-
-interface Sample {
-  readonly dir: "ltr" | "rtl";
-  readonly phrase: string;
-  readonly numeral: string;
-  readonly levelNames: Readonly<Record<Level, string>>;
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common.specimen");
+  return { title: t("title"), robots: { index: false, follow: false } };
 }
-
-const SAMPLES: Readonly<Record<SampleLocale, Sample>> = {
-  en: {
-    dir: "ltr",
-    phrase: "Today's heat level",
-    numeral: "13:05",
-    levelNames: { green: "Green", amber: "Amber", orange: "Orange", red: "Red" },
-  },
-  ar: {
-    dir: "rtl",
-    phrase: "مستوى الحرارة اليوم",
-    numeral: "13:05",
-    levelNames: { green: "أخضر", amber: "كهرماني", orange: "برتقالي", red: "أحمر" },
-  },
-};
 
 // Full class names, never built by interpolation, so Tailwind's scanner finds them.
 const LEVEL_CLASS = {
@@ -102,6 +75,7 @@ const BAND: readonly { hour: string; level: Level }[] = [
 ];
 const NOW_HOUR = "13";
 
+// Token names and sizes are identifiers of the design system, not copy: they stay in code.
 const TYPE_STEPS = [
   { cls: "text-sm font-body", rem: "0.875", name: "label", numeral: false },
   { cls: "text-base font-body", rem: "1", name: "body", numeral: false },
@@ -124,7 +98,8 @@ function Section({ index, title, children }: { index: string; title: string; chi
   );
 }
 
-function LevelBadgePlaceholder({ level, name }: { level: Level; name: string }) {
+function LevelBadgePlaceholder({ level }: { level: Level }) {
+  const t = useTranslations("levels");
   const c = LEVEL_CLASS[level];
   return (
     <li className={`${c.fill} ${c.on} ${c.pattern} rounded-sign`}>
@@ -132,13 +107,16 @@ function LevelBadgePlaceholder({ level, name }: { level: Level; name: string }) 
       <div className={`${c.fill} me-16 flex items-center gap-4 px-4 py-3`}>
         <span className="font-display text-3xl font-bold leading-solid tabular-nums">{levelIndex(level)}</span>
         <LevelPictogram level={level} className="size-10 shrink-0" />
-        <span className="font-display text-2xl font-semibold uppercase tracking-signage">{name}</span>
+        <span className="font-display text-2xl font-semibold uppercase tracking-signage">
+          {t(`name.${level}`)}
+        </span>
       </div>
     </li>
   );
 }
 
-function ShadeBandPreview({ names }: { names: Readonly<Record<Level, string>> }) {
+function ShadeBandPreview() {
+  const t = useTranslations("levels");
   return (
     <ol className="grid auto-cols-fr grid-flow-col gap-[var(--shade-cell-gap)]">
       {BAND.map(({ hour, level }) => {
@@ -147,7 +125,11 @@ function ShadeBandPreview({ names }: { names: Readonly<Record<Level, string>> })
         return (
           <li
             key={hour}
-            aria-label={`${hour}:00, ${names[level]}, ${String(levelIndex(level))}`}
+            aria-label={t("cellLabel", {
+              time: `${hour}:00`,
+              name: t(`name.${level}`),
+              index: levelIndex(level),
+            })}
             aria-current={isNow ? "time" : undefined}
             className="flex min-w-0 flex-col gap-1"
           >
@@ -175,6 +157,7 @@ function ShadeBandPreview({ names }: { names: Readonly<Record<Level, string>> })
 }
 
 function TypeScale() {
+  const t = useTranslations("common.specimen");
   return (
     <div className="flex flex-col gap-6">
       {TYPE_STEPS.map((step) => (
@@ -182,12 +165,7 @@ function TypeScale() {
           <p className="font-body text-sm tabular-nums text-ink-muted">
             {step.name} · {step.rem}rem · {step.cls.split(" ")[0]}
           </p>
-          <p lang="en" dir="ltr" className={`${latinFont.variable} ${step.cls}`}>
-            {step.numeral ? SAMPLES.en.numeral : SAMPLES.en.phrase}
-          </p>
-          <p lang="ar" dir="rtl" className={`${arabicFont.variable} ${step.cls}`}>
-            {step.numeral ? SAMPLES.ar.numeral : SAMPLES.ar.phrase}
-          </p>
+          <p className={step.cls}>{step.numeral ? t("time") : t("phrase")}</p>
         </div>
       ))}
     </div>
@@ -239,6 +217,7 @@ function ThemePanel({ theme, title }: { theme: "light" | "dark"; title: string }
           <span className={SAMPLE_MARK}>Aa</span>
         </Swatch>
         <Swatch label="focus ring" boxClass="m-1 bg-surface outline-3 outline-offset-2 outline-focus" />
+        <Swatch label="scrim" sub="bg-scrim/50" boxClass="bg-scrim/50" />
         {LEVELS.map((level) => (
           <Swatch
             key={level}
@@ -272,49 +251,43 @@ export default async function SpecimenPage(props: PageProps<"/[locale]/dev/speci
   }
 
   const { locale } = await props.params;
-  const sample = SAMPLES[locale === "ar" ? "ar" : "en"];
-  const pageLang = locale === "ar" ? "ar" : "en";
-  const bodyFont = pageLang === "ar" ? arabicFont : latinFont;
+  const t = await getTranslations("common.specimen");
 
   return (
-    <main
-      lang={pageLang}
-      dir={sample.dir}
-      className={`${displayFont.variable} ${bodyFont.variable} mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 py-8 font-body`}
-    >
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 py-8 font-body">
       <header className="flex flex-col gap-3">
         <p className="font-display text-sm font-semibold uppercase tracking-signage text-ink-muted">
-          Stellar Blaze · design specimen · {locale}
+          {t("kicker", { locale })}
         </p>
-        <h1 className="font-display text-4xl font-bold uppercase leading-solid tracking-signage">Arish Signal</h1>
-        <p className="text-lg text-ink-muted">
-          Gulf shade meets industrial signage. Unmistakable at arm&apos;s length, calm under pressure, field-tough.
-        </p>
+        <h1 className="font-display text-4xl font-bold uppercase leading-solid tracking-signage">{t("title")}</h1>
+        <p className="text-lg text-ink-muted">{t("lead")}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <LocaleSwitcher />
+          <ThemeToggle />
+          <DraftBadge />
+        </div>
       </header>
 
-      <Section index="01" title="Levels">
+      <Section index="01" title={t("levelsHeading")}>
         <ul className="flex flex-col gap-3">
           {LEVELS.map((level) => (
-            <LevelBadgePlaceholder key={level} level={level} name={sample.levelNames[level]} />
+            <LevelBadgePlaceholder key={level} level={level} />
           ))}
         </ul>
       </Section>
 
-      <Section index="02" title="Shade band">
-        <ShadeBandPreview names={sample.levelNames} />
-        <p className="text-sm text-ink-muted">
-          Hatch density encodes the level: none, sparse, medium, dense cross-hatch. Each cell also carries the level
-          numeral, and the current hour is inverted.
-        </p>
+      <Section index="02" title={t("bandHeading")}>
+        <ShadeBandPreview />
+        <p className="text-sm text-ink-muted">{t("bandNote")}</p>
       </Section>
 
-      <Section index="03" title="Type">
+      <Section index="03" title={t("typeHeading")}>
         <TypeScale />
       </Section>
 
-      <Section index="04" title="Tokens, both themes">
-        <ThemePanel theme="light" title="Light" />
-        <ThemePanel theme="dark" title="Dark" />
+      <Section index="04" title={t("tokensHeading")}>
+        <ThemePanel theme="light" title={t("lightTheme")} />
+        <ThemePanel theme="dark" title={t("darkTheme")} />
       </Section>
     </main>
   );

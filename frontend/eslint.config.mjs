@@ -20,7 +20,24 @@ const eslintConfig = defineConfig([
   {
     // eslint-config-next already registers the jsx-a11y plugin; only the strict rule set is added here.
     files: ["**/*.{jsx,tsx}"],
-    rules: jsxA11y.flatConfigs.strict.rules,
+    rules: {
+      ...jsxA11y.flatConfigs.strict.rules,
+      // The shadcn <Label> is a label too: call sites must connect it to a control (htmlFor or nesting).
+      "jsx-a11y/label-has-associated-control": [
+        "error",
+        {
+          labelComponents: ["Label"],
+          controlComponents: ["SelectTrigger", "Switch", "RadioGroupItem"],
+          assert: "either",
+          depth: 3,
+        },
+      ],
+    },
+  },
+  {
+    // The generated <Label> only forwards props: htmlFor and the control arrive from the call site, which is checked above.
+    files: ["src/components/ui/label.tsx"],
+    rules: { "jsx-a11y/label-has-associated-control": "off" },
   },
   globalIgnores([
     ".next/**",

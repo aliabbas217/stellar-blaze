@@ -1,0 +1,258 @@
+{
+  "_meta": {
+    "review_status": "source"
+  },
+  "common": {
+    "appName": "Stellar Blaze",
+    "appDescription": "Heat-stress safety for outdoor workers in the UAE.",
+    "specimen": {
+      "kicker": "Stellar Blaze · design specimen · {locale}",
+      "title": "Arish Signal",
+      "lead": "Gulf shade meets industrial signage. Unmistakable at arm's length, calm under pressure, field-tough.",
+      "levelsHeading": "Levels",
+      "bandHeading": "Shade band",
+      "bandNote": "Hatch density encodes the level: none, sparse, medium, dense cross-hatch. Each cell also carries the level numeral, and the current hour is inverted.",
+      "typeHeading": "Type",
+      "tokensHeading": "Tokens, both themes",
+      "lightTheme": "Light",
+      "darkTheme": "Dark",
+      "phrase": "Today's heat level",
+      "time": "13:05"
+    }
+  },
+  "shell": {
+    "skipToContent": "Skip to content",
+    "close": "Close",
+    "language": "Language",
+    "locales": {
+      "en": "English",
+      "ar": "العربية",
+      "ur": "اردو",
+      "hi": "हिन्दी",
+      "bn": "বাংলা",
+      "ne": "नेपाली"
+    },
+    "theme": {
+      "current": "Theme: {mode}",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "draftTranslation": "Draft translation",
+    "draftTranslationNote": "This translation is a machine draft. A native speaker has not reviewed it yet.",
+    "roleChooser": {
+      "title": "Choose your role",
+      "intro": "Heat-stress safety for outdoor workers. Pick the view that matches your job.",
+      "demoNote": "This is a demo. There is no login, and all data shown is synthetic.",
+      "worker": {
+        "title": "Worker",
+        "line": "Today's heat level for your site, and your own limit."
+      },
+      "supervisor": {
+        "title": "Supervisor",
+        "line": "Heat timelines for your crews. Crew totals only, never individuals."
+      },
+      "hse": {
+        "title": "HSE",
+        "line": "Site-wide heat safety overview."
+      }
+    },
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page does not exist or has moved.",
+      "home": "Back to the start"
+    }
+  },
+  "worker": {
+    "nav": {
+      "label": "Worker navigation",
+      "today": "Today",
+      "alerts": "Alerts"
+    }
+  },
+  "today": {
+    "title": "Today",
+    "limitation": "When the app is closed you get site and crew warnings only. Your personal risk shows when you open the app or tap a warning. It is worked out on this phone and never sent to the server.",
+    "alertsLink": "Alerts and notifications",
+    "empty": {
+      "title": "Set up your heat profile",
+      "reason": "Set up once so we can work out your own heat limit. It takes about a minute.",
+      "primary": "Set up now",
+      "secondary": "See today's site level without setup"
+    },
+    "hero": {
+      "personal": "Your own level, worked out on this phone.",
+      "site": "Site level, the same for everyone at this site.",
+      "personalUnavailable": "Your own level is not available right now, so the site level is shown."
+    },
+    "band": {
+      "heading": "Heat level by hour",
+      "now": "Now"
+    },
+    "footer": {
+      "policy": "Levels: policy {version}",
+      "versions": "Levels: policy {policy}, config {config}"
+    }
+  },
+  "profile": {
+    "title": "Your heat profile",
+    "consent": {
+      "title": "Your profile stays on this phone",
+      "storedHeading": "What is stored",
+      "stored": "Your type of work, the date you started working in heat, and your clothing option. They are stored only on this phone.",
+      "serverHeading": "What the server gets",
+      "server": "Nothing about you. If you turn on alerts, an anonymous alert subscription for your site is sent, and nothing else.",
+      "useHeading": "How it is used",
+      "use": "It is never used for discipline or employment decisions.",
+      "revokeHeading": "Taking it back",
+      "revoke": "You can remove your data at any time from Alerts.",
+      "agree": "I have read this and I agree"
+    },
+    "form": {
+      "heading": "Set up your heat profile",
+      "site": "Site",
+      "crew": "Crew (optional)",
+      "noCrew": "No crew",
+      "workload": "Type of work",
+      "startDate": "Date you started working in heat",
+      "startDateHint": "Used to work out how used to the heat you are. It is not shared.",
+      "clothing": "Clothing",
+      "submit": "Save and continue"
+    },
+    "workload": {
+      "light": "Light",
+      "moderate": "Moderate",
+      "heavy": "Heavy"
+    },
+    "clothing": {
+      "work_clothes": "Normal work clothes",
+      "fallback": "Clothing option {code}"
+    },
+    "errors": {
+      "required": "This field is required.",
+      "futureDate": "The date cannot be in the future.",
+      "consent": "Tick the box to continue."
+    }
+  },
+  "alerts": {
+    "title": "Alerts",
+    "intro": "Get a warning on this phone when your site or crew level changes.",
+    "limitation": "When the app is closed you get site and crew warnings only. Your personal risk shows when you open the app or tap a warning. It is worked out on this phone and never sent to the server.",
+    "enable": "Turn on alerts",
+    "disable": "Turn off alerts",
+    "working": "Please wait",
+    "state": {
+      "idle": "Alerts are off.",
+      "subscribed": "Alerts are on for this site.",
+      "error": "We could not turn alerts on. Try again in a moment."
+    },
+    "unsupported": {
+      "title": "Alerts are not available on this phone",
+      "body": "This browser cannot receive alerts. You can still open the app to see today's levels."
+    },
+    "insecure": {
+      "title": "Alerts need a secure connection",
+      "body": "Open the app from its secure address (https) to turn on alerts."
+    },
+    "denied": {
+      "title": "Alerts are blocked",
+      "body": "You blocked alerts for this app. To turn them on, open your browser settings for this site and allow notifications, then come back."
+    },
+    "install": {
+      "title": "Add the app to your Home Screen first",
+      "body": "On iPhone, alerts only work after the app is added to the Home Screen.",
+      "step1": "Tap the Share button in Safari.",
+      "step2": "Choose Add to Home Screen.",
+      "step3": "Open the app from your Home Screen and turn on alerts."
+    },
+    "removeData": {
+      "button": "Remove my data from this phone",
+      "hint": "Deletes your profile and turns off alerts. You can set up again at any time."
+    },
+    "debug": {
+      "heading": "Subscription details",
+      "copy": "Copy",
+      "copied": "Copied",
+      "share": "Share"
+    }
+  },
+  "push": {
+    "title": {
+      "site": "Site heat alert: {level}",
+      "crew": "Crew heat alert: {level}"
+    },
+    "body": "Open the app to see your own level.",
+    "level": {
+      "green": "Green",
+      "amber": "Amber",
+      "orange": "Orange",
+      "red": "Red"
+    }
+  },
+  "supervisor": {
+    "title": "Crews",
+    "site": "Site",
+    "privacyNote": "Crew totals only. This view never shows individual workers.",
+    "members": "Members",
+    "openTimeline": "Open timeline",
+    "back": "All crews",
+    "empty": {
+      "title": "No crews yet",
+      "reason": "Crews appear here once they are added for this site.",
+      "primary": "Open the demo yard",
+      "secondary": "Download the crew template (CSV)"
+    },
+    "timeline": {
+      "title": "Crew heat timeline",
+      "levelRow": "Crew level",
+      "shareRow": "Share of crew above Amber",
+      "date": "Date"
+    },
+    "suppressed": "Fewer than {k} people — detail hidden to protect privacy"
+  },
+  "hse": {
+    "title": "HSE overview",
+    "empty": {
+      "title": "HSE overview",
+      "reason": "The site-wide HSE view is coming in the next release. Meanwhile, you can preview the supervisor view.",
+      "primary": "Preview the supervisor view"
+    }
+  },
+  "states": {
+    "retry": "Try again",
+    "loading": "Loading",
+    "noData": "No data",
+    "offline": "You are offline",
+    "error": {
+      "title": "Something went wrong",
+      "detail": "We could not load this. Check your connection and try again.",
+      "requestId": "Request ID: {id}",
+      "copy": "Copy request ID",
+      "copied": "Copied"
+    },
+    "stale": {
+      "title": "Last updated {time}",
+      "detail": "This may be out of date. Levels refresh when you are back online."
+    }
+  },
+  "levels": {
+    "label": "Heat level",
+    "name": {
+      "green": "Green",
+      "amber": "Amber",
+      "orange": "Orange",
+      "red": "Red"
+    },
+    "cellLabel": "{time}, {name}, level {index}",
+    "banActive": "Work ban window"
+  },
+  "actions": {
+    "draft": "Draft",
+    "pending": "Action wording for this level is awaiting review."
+  },
+  "offline": {
+    "title": "You are offline",
+    "body": "This page is not saved on this phone yet. Pages you opened before still work.",
+    "openToday": "Open today's levels"
+  }
+}
