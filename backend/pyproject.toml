@@ -194,21 +194,12 @@ DEP002 = [
     "uvicorn",
     "asyncpg",
     "pyarrow",
-    "opentelemetry-exporter-otlp-proto-http",
     "lightgbm",
     "ortools",
     "duckdb",
     # TEMPORARY (preflight F1): declared up front by the stack doc but not imported until the task named on each
     # line lands, and `deptry src` must stay green on every task commit. Delete each entry in the task that first
     # imports it; the last B1 task must leave only the permanent entries above.
-    "fastapi",  # Task 2
-    "pydantic",  # Task 2
-    "pydantic-settings",  # Task 2
-    "structlog",  # Task 2
-    "asgi-correlation-id",  # Task 2
-    "opentelemetry-api",  # Task 2
-    "opentelemetry-sdk",  # Task 2
-    "opentelemetry-instrumentation-fastapi",  # Task 2
     "sqlalchemy",  # Task 3
     "alembic",  # Task 3
     "opentelemetry-instrumentation-sqlalchemy",  # Task 3

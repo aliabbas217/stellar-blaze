@@ -41,6 +41,22 @@ uv run lint-imports             # layer and purity contracts
 uv run deptry src               # unused, missing and transitive dependencies
 ```
 
+## Configuration
+
+All settings are `SB_*` environment variables (typed in `src/stellar_blaze/config.py`). Copy `.env.example` to `.env` for local development; `SB_DATABASE_URL` is the only required one. Tracing stays off until the standard `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+```bash
+uv run uvicorn stellar_blaze.api.app:create_app --factory --reload    # http://127.0.0.1:8000/api/v1/health/live
+```
+
+## OpenAPI snapshot
+
+`openapi/v1.json` is the committed API contract (ADR 0009 section 5); a unit test fails when it drifts from the app. After changing a route or a response model:
+
+```bash
+uv run python -m stellar_blaze.api.export_openapi openapi/v1.json
+```
+
 ## Local Postgres and migrations
 
 ```bash
