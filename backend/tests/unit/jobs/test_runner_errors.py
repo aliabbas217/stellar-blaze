@@ -1,41 +1,11 @@
-"""What ``job_run.error`` may hold: the exception's type and message with credentials masked."""
+"""What ``job_run.error`` may hold: the exception's type and message with credentials masked (``redact`` itself is
+tested in ``tests/unit/test_redaction.py``)."""
 
 import pytest
 
-from stellar_blaze.jobs.runner import describe_error, redact
+from stellar_blaze.jobs.runner import describe_error
 
 pytestmark = pytest.mark.unit
-
-
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        (
-            "could not connect to postgresql+asyncpg://sb:hunter2@db.example:5432/stellar_blaze",
-            "could not connect to postgresql+asyncpg://***@db.example:5432/stellar_blaze",
-        ),
-        ("postgresql://user@host/db", "postgresql://***@host/db"),  # a user name alone is masked too
-        (
-            "redis://:p%40ss@cache:6379/0 and https://a:b@c.example/x",
-            "redis://***@cache:6379/0 and https://***@c.example/x",
-        ),
-        (
-            "a password with an @ in it: postgresql://sb:p@ss@host/db",
-            "a password with an @ in it: postgresql://***@host/db",
-        ),
-        ("host=db user=sb password=hunter2 dbname=x", "host=db user=sb password=*** dbname=x"),
-        ("PASSWORD: hunter2", "PASSWORD: ***"),
-        ("Authorization token=abc123 failed", "Authorization token=*** failed"),
-        ("api_key=k-1 and api-key: k-2", "api_key=*** and api-key: ***"),
-        (
-            "GET https://example.test/data?station=OMAA returned HTTP 503",
-            "GET https://example.test/data?station=OMAA returned HTTP 503",
-        ),
-        ("no secrets here", "no secrets here"),
-    ],
-)
-def test_redact_masks_credentials_and_nothing_else(text: str, expected: str) -> None:
-    assert redact(text) == expected
 
 
 def test_describe_error_is_the_type_name_and_a_redacted_message() -> None:
@@ -45,6 +15,13 @@ def test_describe_error_is_the_type_name_and_a_redacted_message() -> None:
 
     assert description == "ValueError: bad dsn postgresql+asyncpg://***@db/x"
     assert "hunter2" not in description
+
+
+def test_describe_error_masks_a_bearer_token_in_the_message() -> None:
+    description = describe_error(RuntimeError("upstream said no (Authorization: Bearer abc.def.ghi)"))
+
+    assert description == "RuntimeError: upstream said no (Authorization: ***"
+    assert "abc.def.ghi" not in description
 
 
 def test_describe_error_is_not_the_repr() -> None:

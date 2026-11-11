@@ -8,16 +8,18 @@ per line); ``console`` is for a developer's terminal.
 import logging
 import sys
 from contextvars import ContextVar
+from io import StringIO
+from types import TracebackType
 from typing import TYPE_CHECKING
 
 import structlog
 from asgi_correlation_id import correlation_id
 from structlog.dev import ConsoleRenderer, plain_traceback
-from structlog.processors import ExceptionRenderer, JSONRenderer
-from structlog.tracebacks import ExceptionDictTransformer
+from structlog.processors import JSONRenderer
 from structlog.typing import EventDict, Processor, WrappedLogger
 
 from stellar_blaze.config import Settings
+from stellar_blaze.redaction import redact_tree
 
 if TYPE_CHECKING:  # type only: importing composition here would load every adapter whenever logging is configured
     from stellar_blaze.composition import Runtime
@@ -74,6 +76,45 @@ def _add_request_id(_logger: WrappedLogger, _method_name: str, event_dict: Event
     return event_dict
 
 
+type _ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
+
+
+def _exc_info_tuple(value: object) -> _ExcInfo | None:
+    """The ``(type, value, traceback)`` of what a caller passed as ``exc_info``: ``True``, an exception or a tuple."""
+    if value is True:
+        value = sys.exc_info()
+    if isinstance(value, BaseException):
+        return type(value), value, value.__traceback__
+    if isinstance(value, tuple) and len(value) == 3 and isinstance(value[1], BaseException):
+        return value
+    return None
+
+
+def redact_exceptions(_logger: WrappedLogger, _method_name: str, event_dict: EventDict) -> EventDict:
+    """A processor that renders the exception of a log line itself and masks credentials in all of its text.
+
+    Exceptions quote what they were given: a connection string, a header, a request body. Left to the renderers, that
+    text reaches the log as it is. This processor takes ``exc_info`` out of the event (so no raw exception object
+    reaches a renderer), renders it as the plain traceback text into ``exception``, and runs ``redact`` over that, over
+    ``stack`` (the rendered ``stack_info``) and over the message ``event``. Frame locals are never in that text, so a
+    secret that only sat in a variable never gets as far as redaction.
+
+    It is the same for both output formats on purpose: the structlog chain is cached on first use, so a choice that
+    depended on the format would survive a later ``configure_logging`` with the other one. It runs in the shared chain,
+    so it covers structlog loggers and stdlib records alike, whichever logger raised them (the application's,
+    SQLAlchemy's, uvicorn's).
+    """
+    exc_info = _exc_info_tuple(event_dict.pop("exc_info", None))
+    if exc_info is not None:
+        buffer = StringIO()
+        plain_traceback(buffer, exc_info)
+        event_dict["exception"] = buffer.getvalue().rstrip()
+    for key in ("event", "exception", "stack", "stack_info"):
+        if key in event_dict:
+            event_dict[key] = redact_tree(event_dict[key])
+    return event_dict
+
+
 def configure_logging(settings: Settings) -> None:
     """Route all logging through structlog. Idempotent: a second call replaces the first call's handler."""
     shared: list[Processor] = [
@@ -84,11 +125,14 @@ def configure_logging(settings: Settings) -> None:
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         _add_request_id,
         structlog.processors.StackInfoRenderer(),
+        # After the stack is rendered and before any renderer: the one place where exceptions become text, so a
+        # credential in an exception message, a traceback or a stack never reaches the output (see its docstring).
+        redact_exceptions,
     ]
     renderers: list[Processor]
     if settings.log_format == "json":
-        # show_locals=False: a traceback in a log line must never carry local variables (settings, connection strings).
-        renderers = [ExceptionRenderer(ExceptionDictTransformer(show_locals=False)), JSONRenderer()]
+        # No exception renderer on purpose: redact_exceptions has rendered `exception` and removed `exc_info`.
+        renderers = [JSONRenderer()]
     else:
         renderers = [ConsoleRenderer(colors=sys.stdout.isatty(), exception_formatter=plain_traceback)]
 

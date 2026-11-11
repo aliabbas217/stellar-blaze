@@ -8,8 +8,9 @@ never references a fake.
 import asyncio
 import json
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -91,18 +92,16 @@ def test_cli_records_job_run(settings: Settings, data_dir: Path, monkeypatch: py
     ]
 
 
-@pytest.mark.integration
-def test_a_second_invocation_while_the_lock_is_held_is_recorded_as_skipped_locked(
-    settings: Settings, data_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    use_sources(monkeypatch, lambda _settings: fake_sources())
+@contextmanager
+def lock_held_elsewhere(settings: Settings, key: str) -> Iterator[None]:
+    """Hold the advisory lock ``key`` on another connection, thread and event loop while the block runs."""
     holding, release = threading.Event(), threading.Event()
 
     def hold_the_lock() -> None:
         async def hold() -> None:
             engine = build_engine(settings)
             try:
-                async with advisory_lock(engine, "ingest-observations") as acquired:
+                async with advisory_lock(engine, key) as acquired:
                     assert acquired
                     holding.set()
                     await asyncio.to_thread(release.wait, 60)
@@ -112,27 +111,85 @@ def test_a_second_invocation_while_the_lock_is_held_is_recorded_as_skipped_locke
         asyncio.run(hold())
 
     with ThreadPoolExecutor(max_workers=1) as pool:
-        holder = pool.submit(hold_the_lock)  # another connection, on another thread and event loop
+        holder = pool.submit(hold_the_lock)
         assert holding.wait(timeout=30)
         try:
-            result = invoke("ingest-observations", "--source", "iem", "--summer", str(SUMMER), "--station", "OMAA")
-            other_command = invoke(
-                "ingest-forecasts", "--model", "gfs_seamless", "--summer", str(SUMMER), "--station", "OMAA"
-            )
+            yield
         finally:
             release.set()
         holder.result(timeout=30)
 
+
+def statuses(settings: Settings) -> list[tuple[str, str]]:
+    return [(run["job_name"], run["status"]) for run in job_runs(settings)]
+
+
+@pytest.mark.integration
+def test_a_second_run_of_the_same_source_while_its_lock_is_held_is_recorded_as_skipped_locked(
+    settings: Settings, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_sources(monkeypatch, lambda _settings: fake_sources())
+
+    with lock_held_elsewhere(settings, "ingest-observations:iem"):
+        result = invoke("ingest-observations", "--source", "iem", "--summer", str(SUMMER), "--station", "OMAA")
+
     assert result.exit_code == 0, result.output  # a scheduler overlap is not an error
     assert [event["event"] for event in log_events(result) if "skipped" in event["event"]] == ["job.skipped_locked"]
-    assert not (data_dir / "silver").exists() or not list((data_dir / "silver" / "observations").rglob("*.parquet"))
-    assert other_command.exit_code == 0, other_command.output  # the lock is per command: this one ran
+    assert not (data_dir / "silver").exists()  # the work did not run
+    (run,) = job_runs(settings)
+    assert (run["job_name"], run["status"]) == ("ingest-observations", "skipped_locked")
+    assert run["params"] == {"source": "iem", "summers": [SUMMER], "stations": ["OMAA"]}
+
+
+@pytest.mark.integration
+def test_ingesting_the_other_source_or_another_command_is_not_blocked_by_a_held_lock(
+    settings: Settings, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_sources(monkeypatch, lambda _settings: fake_sources())
+
+    with lock_held_elsewhere(settings, "ingest-observations:iem"):
+        ghcnh = invoke("ingest-observations", "--source", "ghcnh", "--summer", str(SUMMER), "--station", "OMAA")
+        forecasts = invoke("ingest-forecasts", "--model", "gfs_seamless", "--summer", str(SUMMER), "--station", "OMAA")
+
+    assert ghcnh.exit_code == 0, ghcnh.output
+    assert forecasts.exit_code == 0, forecasts.output
+    assert statuses(settings) == [("ingest-observations", "succeeded"), ("ingest-forecasts", "succeeded")]
+    assert (data_dir / "silver" / "observations" / "ghcnh" / str(SUMMER) / "OMAA.parquet").is_file()
+    assert not (data_dir / "silver" / "observations" / "iem").exists()
+
+
+@pytest.mark.integration
+def test_forecast_ingests_of_different_models_do_not_block_each_other_but_the_same_model_does(
+    settings: Settings, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_sources(monkeypatch, lambda _settings: fake_sources())
+    args = ("--summer", str(SUMMER), "--station", "OMAA")
+
+    with lock_held_elsewhere(settings, "ingest-forecasts:gfs_seamless"):
+        other_model = invoke("ingest-forecasts", "--model", "ecmwf_ifs025", *args)
+        same_model = invoke("ingest-forecasts", "--model", "gfs_seamless", *args)
+
+    assert other_model.exit_code == 0, other_model.output
+    assert same_model.exit_code == 0, same_model.output
     runs = job_runs(settings)
-    assert [(run["job_name"], run["status"]) for run in runs] == [
-        ("ingest-observations", "skipped_locked"),
-        ("ingest-forecasts", "succeeded"),
+    assert [(run["status"], run["params"]["model"]) for run in runs] == [
+        ("succeeded", "ecmwf_ifs025"),
+        ("skipped_locked", "gfs_seamless"),
     ]
-    assert runs[0]["params"] == {"source": "iem", "summers": [SUMMER], "stations": ["OMAA"]}
+    assert (data_dir / "silver" / "forecasts" / "ecmwf_ifs025" / str(SUMMER) / "OMAA.parquet").is_file()
+    assert not (data_dir / "silver" / "forecasts" / "gfs_seamless").exists()
+
+
+@pytest.mark.integration
+def test_a_second_build_dataset_while_one_runs_is_skipped(
+    settings: Settings, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with lock_held_elsewhere(settings, "build-dataset"):
+        result = invoke("build-dataset")
+
+    assert result.exit_code == 0, result.output
+    assert statuses(settings) == [("build-dataset", "skipped_locked")]
+    assert not (data_dir / "gold").exists()
 
 
 @pytest.mark.integration

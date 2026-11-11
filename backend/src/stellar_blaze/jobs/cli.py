@@ -1,7 +1,9 @@
 """Command-line entry point for batch jobs, installed as ``sb-jobs``.
 
-Each command is one idempotent job: it records a ``job_run`` row and takes an advisory lock named like the command, so a
-second run while one is active is recorded as ``skipped_locked`` and exits 0::
+Each command is one idempotent job: it records a ``job_run`` row and takes an advisory lock named after the command and
+what it works on (``ingest-observations:iem``, ``ingest-forecasts:gfs_seamless``, ``build-dataset``), so a second run of
+the same thing while one is active is recorded as ``skipped_locked`` and exits 0, while runs of different sources or
+models may overlap::
 
     sb-jobs ingest-observations --source iem|ghcnh --summer YEAR [--summer YEAR ...] [--station ICAO ...]
     sb-jobs ingest-forecasts --model <nwp model> --summer YEAR [--summer YEAR ...] [--station ICAO ...]
@@ -88,9 +90,15 @@ def _execute(
     job_name: str,
     params: Mapping[str, JsonValue],
     work: Callable[[], Awaitable[Mapping[str, JsonValue]]],
+    *,
+    lock_key: str,
 ) -> None:
-    """Run the job to its end in a fresh event loop and exit with its code."""
-    raise typer.Exit(asyncio.run(run_job(settings, job_name, params, work)))
+    """Run the job to its end in a fresh event loop and exit with its code.
+
+    ``lock_key`` names what the run works on (``ingest-observations:iem``): two runs that work on different things may
+    overlap, two that work on the same thing may not.
+    """
+    raise typer.Exit(asyncio.run(run_job(settings, job_name, params, work, lock_key=lock_key)))
 
 
 @app.command("ingest-observations")
@@ -122,7 +130,7 @@ def ingest_observations_command(
         finally:
             await sources.close()
 
-    _execute(settings, "ingest-observations", params, work)
+    _execute(settings, "ingest-observations", params, work, lock_key=f"ingest-observations:{source.value}")
 
 
 @app.command("ingest-forecasts")
@@ -157,7 +165,7 @@ def ingest_forecasts_command(
         finally:
             await sources.close()
 
-    _execute(settings, "ingest-forecasts", params, work)
+    _execute(settings, "ingest-forecasts", params, work, lock_key=f"ingest-forecasts:{model.value}")
 
 
 @app.command("build-dataset")
@@ -168,4 +176,4 @@ def build_dataset_command() -> None:
     async def work() -> Mapping[str, JsonValue]:
         return await build_dataset(store=ParquetStore(settings.data_dir), code_version=settings.git_sha)
 
-    _execute(settings, "build-dataset", {}, work)
+    _execute(settings, "build-dataset", {}, work, lock_key="build-dataset")

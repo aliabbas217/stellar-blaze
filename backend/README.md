@@ -134,12 +134,17 @@ OMRK`). Stations and summers run one after another; the first failure stops the 
 stays, and a rerun refetches nothing that the raw-response cache holds.
 
 Every command records a row in `job_run` (name, parameters, `SB_GIT_SHA`, status, a summary or the error) and takes a
-Postgres advisory lock named like the command. A second run of the same command while one is active records
-`skipped_locked` and exits 0. The lock is per command, so `ingest-observations --source iem` and `--source ghcnh` must
-not overlap (the second is skipped): run them one after the other. Exit codes: 0 succeeded or skipped, 1 failed
-(`job_run.error` is `<ExceptionType>: <message>` with URL credentials and `password=` pairs masked), 2 usage or
+Postgres advisory lock named after the command and what it works on: `ingest-observations:iem`,
+`ingest-observations:ghcnh`, `ingest-forecasts:<model>`, `build-dataset`. A second run of the same thing while one is
+active records `skipped_locked` (under the command's name) and exits 0, so a script that must not miss an ingest should
+check `job_run` rather than the exit code alone; runs of different sources or models may overlap. Exit codes: 0
+succeeded or skipped, 1 failed (`job_run.error` is `<ExceptionType>: <message>` with credentials masked), 2 usage or
 configuration error (nothing recorded). The last runs:
 `SELECT job_name, status, started_at, error FROM job_run ORDER BY started_at DESC LIMIT 10;`.
+
+Log lines never carry a credential: the shared logging chain renders every exception itself and masks URL credentials,
+`password=`/`token=` pairs, `Authorization` headers, bearer tokens and cookies in the message, the traceback and the stack
+(`redaction.redact`, `logging.redact_exceptions`). The JSON `exception` field is that redacted traceback as text.
 
 ### Where the files go
 
@@ -196,8 +201,8 @@ station's coordinates).
 - Requests that reach a service are spaced: `SB_IEM_REQUEST_INTERVAL_S` (2 s) and `SB_OPEN_METEO_REQUEST_INTERVAL_S` (6
   s; a 139-day request for 48 series weighs about 48 of the free tier's 600 weighted calls a minute). A cache hit is not
   a request and is not delayed. A 429 or 5xx is retried (6 attempts within 10 minutes, backing off exponentially from 1 s).
-- An IEM request may take up to 180 s to answer (the research's value for these windows); every other call uses
-  `SB_HTTP_TIMEOUT_S`.
+- An IEM, GHCNh or Open-Meteo request may take up to 180 s to answer (the research scripts that downloaded exactly
+  these requests all used `timeout=180`); `SB_HTTP_TIMEOUT_S` is the client default for any other call.
 - Open-Meteo's free tier allows 10,000 weighted calls a day and the full pull below is about 3,100. If the allowance
   runs out the command fails; run it again after 00:00 UTC and it resumes from the cache.
 

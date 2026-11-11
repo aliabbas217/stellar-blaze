@@ -1,11 +1,19 @@
 """What the observation adapters share: the UTC window and the final shaping of a frame to ``OBS_RAW_SCHEMA``."""
 
 from datetime import UTC, datetime
+from typing import Final
 
 import polars as pl
 
 from stellar_blaze.domain.weather.schemas import OBS_RAW_SCHEMA, conform
 from stellar_blaze.domain.weather.stations import Station
+
+# How long one request to an upstream archive may take to answer. These archives build or serve a whole summer per
+# request (IEM's 140-day CSV is generated on the fly, GHCNh's by-year Parquet files arrive at about 35 kB/s per
+# connection, Open-Meteo's response is 24 to 48 series for 139 days), and the research scripts that downloaded exactly
+# these requests (``fetch_iem.py``, ``fetch_ghcnh.py``, ``fetch_forecast_stations.py``) all passed ``timeout=180``. That
+# is the value known to work; ``Settings.http_timeout_s`` (60 s) was never tried on a request this heavy.
+REQUEST_TIMEOUT_S: Final = 180.0
 
 
 def utc_window(start: datetime, end: datetime) -> tuple[datetime, datetime]:

@@ -17,6 +17,7 @@ import structlog
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import UpstreamError, get_bytes
 from stellar_blaze.adapters.sources._common import (
+    REQUEST_TIMEOUT_S,
     empty_observations,
     to_observations,
     utc_window,
@@ -71,11 +72,22 @@ class GhcnhParquetSource:
 
     name = "ghcnh"
 
-    def __init__(self, client: httpx2.AsyncClient, base_url: str, cache: RawResponseCache | None) -> None:
-        """Use ``client`` for ``base_url`` (``Settings.ghcnh_base_url``); files are kept in ``cache``, if given."""
+    def __init__(
+        self,
+        client: httpx2.AsyncClient,
+        base_url: str,
+        cache: RawResponseCache | None,
+        *,
+        timeout_s: float = REQUEST_TIMEOUT_S,
+    ) -> None:
+        """Use ``client`` for ``base_url`` (``Settings.ghcnh_base_url``); files are kept in ``cache``, if given.
+
+        ``timeout_s`` is how long each file download may take (a whole-year file arrives at about 35 kB/s).
+        """
         self._client = client
         self._base_url = base_url.rstrip("/")
         self._cache = cache
+        self._timeout_s = timeout_s
 
     async def observations(self, *, station: Station, start: datetime, end: datetime) -> pl.DataFrame:
         """Return the station's reports with ``start <= obs_time < end``, as ``OBS_RAW_SCHEMA`` rows.
@@ -95,7 +107,9 @@ class GhcnhParquetSource:
         for year in range(start_utc.year, last_year + 1):
             url = f"{self._base_url}/{year}/parquet/GHCNh_{station.ghcnh_id}_{year}.parquet"
             try:
-                body = await get_bytes(self._client, url, [], cache=self._cache, validate=_validate)
+                body = await get_bytes(
+                    self._client, url, [], cache=self._cache, validate=_validate, timeout_s=self._timeout_s
+                )
             except UpstreamError as exc:
                 if exc.status != 404:
                     raise

@@ -29,6 +29,7 @@ import structlog
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import get_bytes
 from stellar_blaze.adapters.http.pacer import RequestPacer
+from stellar_blaze.adapters.sources._common import REQUEST_TIMEOUT_S
 from stellar_blaze.domain.weather.models import LEADS_DAYS, NwpModel
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, conform
 from stellar_blaze.domain.weather.stations import Station
@@ -244,16 +245,18 @@ class OpenMeteoPreviousRunsSource:
         cache: RawResponseCache | None,
         *,
         pacer: RequestPacer | None = None,
+        timeout_s: float = REQUEST_TIMEOUT_S,
     ) -> None:
         """Use ``client`` for ``base_url`` (``Settings.open_meteo_previous_runs_url``); bodies are kept in ``cache``.
 
         ``pacer`` spaces the requests that reach Open-Meteo (a cache hit is not one): a 140-day request costs about 48
-        of the free tier's 600 weighted calls a minute.
+        of the free tier's 600 weighted calls a minute. ``timeout_s`` is how long each request may take to answer.
         """
         self._client = client
         self._base_url = base_url
         self._cache = cache
         self._pacer = pacer
+        self._timeout_s = timeout_s
 
     async def previous_runs(
         self, *, station: Station, model: NwpModel, start: date, end: date, leads_days: Sequence[int]
@@ -287,6 +290,7 @@ class OpenMeteoPreviousRunsSource:
             cache=self._cache,
             validate=_validator(requested),
             before_request=None if self._pacer is None else self._pacer.wait,
+            timeout_s=self._timeout_s,
         )
         decoded = await asyncio.to_thread(_decode, body, requested)
         absent = [name for name in requested if name not in decoded.series]

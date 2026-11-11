@@ -17,6 +17,7 @@ from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import get_bytes
 from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources._common import (
+    REQUEST_TIMEOUT_S,
     empty_observations,
     to_observations,
     utc_window,
@@ -24,11 +25,6 @@ from stellar_blaze.adapters.sources._common import (
 from stellar_blaze.domain.weather.stations import Station
 
 _KNOTS_TO_MS: Final = 0.514444
-
-# How long one request may take to answer. IEM builds the CSV for a whole 140-day station window on the fly; the
-# research's ``fetch_iem.py`` downloaded exactly these windows with ``timeout=180``, so that is the value known to work,
-# where the client's default (``Settings.http_timeout_s``, 60 s) was never tried on a window that wide.
-_REQUEST_TIMEOUT_S: Final = 180.0
 
 
 def _params(station: Station, start: datetime, end: datetime) -> list[tuple[str, str]]:
@@ -109,7 +105,7 @@ class IemMetarSource:
         cache: RawResponseCache | None,
         *,
         pacer: RequestPacer | None = None,
-        timeout_s: float = _REQUEST_TIMEOUT_S,
+        timeout_s: float = REQUEST_TIMEOUT_S,
     ) -> None:
         """Use ``client`` for ``base_url`` (``Settings.iem_asos_url``); bodies are kept in ``cache``, if given.
 

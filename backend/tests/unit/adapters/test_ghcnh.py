@@ -263,6 +263,22 @@ async def test_ghcnh_local_window_is_converted_to_utc_years(settings: Settings) 
     assert frame["obs_time"].to_list() == [datetime(2024, 12, 31, 22, tzinfo=UTC)]
 
 
+# === timeout ========================================================================================================
+
+
+@pytest.mark.asyncio
+async def test_a_ghcnh_file_request_waits_up_to_180_seconds_like_the_research_download(settings: Settings) -> None:
+    # fetch_ghcnh.py downloaded these whole-year files with timeout=180 (NCEI throttles a connection to about 35 kB/s);
+    # Settings.http_timeout_s (60 s) was never tried on a file that size.
+    requests: list[httpx2.Request] = []
+    files = {year_url(settings, OMAA.ghcnh_id, 2025): parquet_bytes(ghcnh_frame(["2025-07-01T00:00:00"]))}
+
+    async with ghcnh_source(settings, serving(files, requests)) as source:
+        await source.observations(station=OMAA, start=START, end=END)
+
+    assert requests[0].extensions["timeout"] == {"connect": 180.0, "read": 180.0, "write": 180.0, "pool": 180.0}
+
+
 # === missing years and failures =====================================================================================
 
 

@@ -1,15 +1,21 @@
 """Fake sources and seeded data for the job tests (kept apart from the ``test_*`` modules so it is imported, not
 collected)."""
 
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from uuid import UUID, uuid4
 
 import polars as pl
+import pytest
+from pydantic import JsonValue
 
 from stellar_blaze.adapters.fakes.weather import InMemoryForecastSource, InMemoryObservationSource
 from stellar_blaze.composition import Sources
 from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.domain.weather.stations import Station
+from stellar_blaze.jobs import runner
 from tests.unit.application.support import forecast_rows, hours_from, raw_reports
 
 SUMMER = 2025
@@ -95,3 +101,53 @@ class FailingForecasts:
         self, *, station: Station, model: NwpModel, start: date, end: date, leads_days: Any
     ) -> pl.DataFrame:
         raise self.error
+
+
+class FakeRuns:
+    """A ``JobRunRepository`` that records what it is told, and can fail to record a failure."""
+
+    def __init__(self, finish_error: Exception | None = None) -> None:
+        self.finish_error = finish_error
+        self.finished: list[tuple[str, Mapping[str, JsonValue] | None, str | None]] = []
+        self.skipped: list[tuple[str, Mapping[str, JsonValue]]] = []
+
+    async def start(self, job_name: str, params: Mapping[str, JsonValue], code_version: str | None) -> UUID:
+        return uuid4()
+
+    async def finish(
+        self, run_id: UUID, status: str, summary: Mapping[str, JsonValue] | None, error: str | None
+    ) -> None:
+        if self.finish_error is not None:
+            raise self.finish_error
+        self.finished.append((status, summary, error))
+
+    async def record_skipped(self, job_name: str, params: Mapping[str, JsonValue]) -> UUID:
+        self.skipped.append((job_name, params))
+        return uuid4()
+
+
+class FakeEngine:
+    async def dispose(self) -> None:
+        return None
+
+
+class FakeLock:
+    """Stands in for ``advisory_lock``: records the keys it is asked for and grants or refuses the lock."""
+
+    def __init__(self, *, granted: bool = True) -> None:
+        self.granted = granted
+        self.keys: list[str] = []
+
+    @asynccontextmanager
+    async def __call__(self, engine: object, key: str) -> AsyncIterator[bool]:
+        self.keys.append(key)
+        yield self.granted
+
+
+def use_fake_database(monkeypatch: pytest.MonkeyPatch, runs: FakeRuns, lock: FakeLock | None = None) -> FakeLock:
+    """Replace what ``run_job`` reaches the database through; returns the lock fake (granted unless one is given)."""
+    lock = FakeLock() if lock is None else lock
+    monkeypatch.setattr(runner, "build_engine", lambda settings: FakeEngine())
+    monkeypatch.setattr(runner, "JobRunRepository", lambda engine: runs)
+    monkeypatch.setattr(runner, "advisory_lock", lock)
+    return lock

@@ -373,6 +373,18 @@ async def test_a_complete_response_logs_no_absent_series_warning(
 
 
 @pytest.mark.asyncio
+async def test_an_open_meteo_request_waits_up_to_180_seconds_like_the_research_pull(settings: Settings) -> None:
+    # fetch_forecast_stations.py pulled these 139-day, 24-series windows with timeout=180; Settings.http_timeout_s
+    # (60 s) was never tried on a response that heavy.
+    requests: list[httpx2.Request] = []
+
+    async with open_meteo_source(settings, recording(requests, serve(recorded()))) as source:
+        await fetch(source)
+
+    assert requests[0].extensions["timeout"] == {"connect": 180.0, "read": 180.0, "write": 180.0, "pool": 180.0}
+
+
+@pytest.mark.asyncio
 async def test_open_meteo_requests_are_paced_but_cache_hits_are_not(settings: Settings, tmp_path: Path) -> None:
     sleeps: list[float] = []
     now = [0.0]
