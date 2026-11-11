@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     )
 
     env: Literal["dev", "test", "prod"] = "dev"
-    # Release identity, stamped by the image build / deploy so logs and traces name the exact code that ran.
+    # Release identity, set by the deploy (I1) in the container's environment, not stamped into the image, so logs and
+    # traces name the exact code that ran; "unknown" outside a release.
     git_sha: str = "unknown"
     database_url: SecretStr
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"

@@ -1,5 +1,5 @@
 # One workflow, one job per owner: `backend` (B1 plan, this block), `frontend` (added by the F1 plan as a sibling of
-# `backend`) and `infra` (added by the I1 plan, if it adds one). Do not edit the `backend` job from the F1 or I1 plans,
+# `backend`) and `infra` (added by the I1 plan). Do not edit the `backend` job from the F1 or I1 plans,
 # and do not edit their jobs from here. deploy.yml (I1) waits for this workflow by its name, `ci`.
 name: ci
 on:
@@ -15,6 +15,10 @@ jobs:
   backend:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # The interpreter the image ships (ARG PYTHON_IMAGE in backend/Dockerfile): CI tests what runs in production. UV_PYTHON
+      # outranks backend/.python-version, so every `uv sync` and `uv run` below uses it. Bump it with the Dockerfile.
+      UV_PYTHON: "3.13.15"
     defaults:
       run:
         working-directory: backend
@@ -34,15 +38,35 @@ jobs:
 
       - name: Install Python and the locked dependencies
         run: |
-          uv python install 3.13
+          uv python install "$UV_PYTHON"
           uv sync --locked
 
       - name: Lockfile is up to date
         run: uv lock --check
 
+      # gitleaks is skipped here and runs in the next step: its hook is `gitleaks git --pre-commit --staged`, which scans the
+      # staged changes only, so on a fresh checkout it scans nothing (and pre-commit would first build it from Go source).
       - name: Pre-commit hooks (whole repository)
         working-directory: .
+        env:
+          SKIP: gitleaks
         run: uv run --project backend pre-commit run --all-files --show-diff-on-failure
+
+      # The same gitleaks version as the hook (rev in .pre-commit-config.yaml; bump both together), over the whole history
+      # (hence fetch-depth: 0). It runs from the repository root, where gitleaks looks for .gitleaksignore; the flag says so.
+      - name: Secret scan (gitleaks, full history)
+        working-directory: .
+        run: |
+          version=8.30.1
+          archive="gitleaks_${version}_linux_x64.tar.gz"
+          checksums="gitleaks_${version}_checksums.txt"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
+          tool_dir="$RUNNER_TEMP/gitleaks"
+          mkdir -p "$tool_dir"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$checksums" "$url/$checksums"
+          (cd "$tool_dir" && sha256sum --ignore-missing -c "$checksums" && tar -xzf "$archive" gitleaks)
+          "$tool_dir/gitleaks" git --redact --verbose --no-banner --gitleaks-ignore-path .gitleaksignore .
 
       - name: Lint (ruff check)
         run: uv run ruff check .
@@ -97,8 +121,8 @@ jobs:
           url="https://github.com/oasdiff/oasdiff/releases/download/v${version}"
           tool_dir="$RUNNER_TEMP/oasdiff"
           mkdir -p "$tool_dir"
-          curl --fail --silent --show-error --location --output "$tool_dir/$archive" "$url/$archive"
-          curl --fail --silent --show-error --location --output "$tool_dir/checksums.txt" "$url/checksums.txt"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/checksums.txt" "$url/checksums.txt"
           (cd "$tool_dir" && sha256sum --ignore-missing -c checksums.txt && tar -xzf "$archive" oasdiff)
           "$tool_dir/oasdiff" breaking "${BASE_SHA}:${spec}" "${spec}"
 

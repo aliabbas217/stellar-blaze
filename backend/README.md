@@ -101,8 +101,9 @@ curl -s localhost:8000/api/v1/health/live        # {"status":"ok"}
 docker run --rm -e SB_DATABASE_URL=... stellar-blaze-api:dev alembic upgrade head
 ```
 
-CI (`.github/workflows/ci.yml`, job `backend`) runs every gate above plus the pre-commit hooks, Squawk, `pip-audit`, an
-`oasdiff` report on `openapi/v1.json`, and builds and smoke-tests this image.
+CI (`.github/workflows/ci.yml`, job `backend`) runs every gate above on Python 3.13.15 (the interpreter the image ships)
+plus the pre-commit hooks, a gitleaks scan of the full git history, Squawk, `pip-audit`, an `oasdiff` report on
+`openapi/v1.json`, and builds and smoke-tests this image.
 
 ## Jobs
 

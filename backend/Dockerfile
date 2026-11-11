@@ -48,6 +48,7 @@ FROM ${PYTHON_IMAGE} AS runtime
 # valid on any CPU: numba keys cached code on the CPU name and feature set, and with `generic` both are fixed
 # (numba/core/config.py: CPU_FEATURES defaults to "" when CPU_NAME is "generic"), so a cache warmed on the build host
 # is not discarded on the Container Apps host (preflight F17, ADR 0001).
+# The numba warm-up (Task 14) must run in this stage as uid 10001, or the cache it writes is not the one the app reads.
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     NUMBA_CACHE_DIR=/app/.numba-cache \
