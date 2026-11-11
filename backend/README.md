@@ -25,7 +25,8 @@ uv run --project backend pre-commit install
 Every test carries exactly one tier marker. Unit tests never touch the network (pytest-socket allows only loopback).
 
 ```bash
-uv run pytest -m unit           # fast, no network, no Docker
+uv run pytest -m unit           # no network, no Docker; includes the PHS worker-process tests (about a minute)
+uv run pytest -m "unit and not slow"   # the quick loop
 uv run pytest -m integration    # needs Docker (Postgres 18.6 via testcontainers, one migrated database per test)
 uv run pytest -m regression     # real-data gate (slow; added with the dataset task)
 uv run pytest -m e2e            # end to end
@@ -90,7 +91,9 @@ application creates its engine in the FastAPI lifespan, so the API starts even w
 
 `Dockerfile` builds the API image from this directory (context `backend/`). The base image and uv are pinned by digest;
 `rulesets/` and `models/` ship inside the image (ADR 0009), the app runs as uid 10001 with `/app` as its working
-directory, and `/app/.numba-cache` is the only writable path.
+directory, and `/app/.numba-cache` is the only writable path. The build warms that cache for the PHS heat-strain
+kernel as the app user (`warm()` in `adapters/compute/phs_process.py`), so a fresh container does not recompile it, and
+`THIRD_PARTY_NOTICES.md` ships in `/app`.
 
 ```bash
 docker build -t stellar-blaze-api:dev .

@@ -203,5 +203,4 @@ DEP002 = [
     # imports it; the last B1 task must leave only the permanent entries above.
     "httpx2",  # Task 8
     "stamina",  # Task 8
-    "pythermalcomfort",  # Task 14
 ]

@@ -147,10 +147,13 @@ def test_matches_miller_bates_within_8(request: pytest.FixtureRequest) -> None:
     # ADR 0006: the reference port's measured maximum deviation from the published values is 6.5-7.0 W/m2.
     computed = [_chamber_twl(row) for row in _rows()]
     table = _residual_table(computed, "published_twl")
-    # Visible with `pytest -rP` (assertion message on failure) and in the junit report (user_properties).
+    # Where the table can be read: in the assertion message when this fails, in the junit report as a user property
+    # (`--junit-xml`), and, for this published column, in the measured-bias table of the twl.py module docstring.
+    # (`pytest -rP` shows captured output of passing tests, which this test does not produce.)
     request.node.user_properties.append(("twl_residuals_vs_published", table))
-    worst = max(abs(twl - float(row["published_twl"])) for twl, row in zip(computed, _rows(), strict=True))
-    assert worst <= 8.0, f"largest |computed - published| is {worst:.2f} W/m2\n{table}"
+    deviations = [abs(twl - float(row["published_twl"])) for twl, row in zip(computed, _rows(), strict=True)]
+    # `all(d <= 8.0)`, not `max(deviations) <= 8.0`: max() skips a NaN that is not first; a NaN comparison is False.
+    assert all(d <= 8.0 for d in deviations), f"largest |computed - published| is {max(deviations):.2f} W/m2\n{table}"
 
 
 def test_matches_brake_bates_table1_as_transcribed_in_the_reference(request: pytest.FixtureRequest) -> None:
@@ -173,7 +176,7 @@ def test_matches_brake_bates_table1_as_transcribed_in_the_reference(request: pyt
             lines.append(
                 f"{set_id:>3}  {db:>2}  {wb:>2}  {published:>9}  {twl:6.1f}  {twl - published:+8.2f}  {tolerance:>9}"
             )
-            if abs(twl - published) > tolerance:
+            if not abs(twl - published) <= tolerance:  # `not <=`, not `>`: a NaN residual must fail, not pass
                 failures.append(f"set {set_id} db {db} wb {wb}: {twl:.1f} vs {published}")
     table = "\n".join(lines)
     request.node.user_properties.append(("twl_residuals_vs_brake_bates_table1", table))

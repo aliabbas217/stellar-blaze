@@ -283,7 +283,12 @@ def _solve_twl_w_m2(
     # M * (1 - resp_coeff) = H and M = H / (1 - resp_coeff); the coefficient is clamped to [0, 0.5].
     resp_coeff = 0.0014 * (34.0 - t_c) + 0.0173 * (5.87 - pa_kpa)
     resp_coeff = max(0.0, min(0.5, resp_coeff))
-    return max(TWL_FLOOR_W_M2, heat_throughput / (1.0 - resp_coeff))
+    twl = heat_throughput / (1.0 - resp_coeff)
+    # Finiteness is checked before the floor: Python's max(60.0, nan) is 60.0 (R's max propagates NaN), which would turn
+    # "no answer" into a plausible one.
+    if not math.isfinite(twl):
+        return math.nan
+    return max(TWL_FLOOR_W_M2, twl)
 
 
 def twl_w_m2(
@@ -327,9 +332,9 @@ def twl_w_m2(
     twl = _solve_twl_w_m2(
         t_c=t_c, td_c=td_c, wind_ms=wind_body_ms, pressure_kpa=pressure_kpa, mrt_c=mrt_c, pa_kpa=pa_kpa, params=params
     )
-    if not math.isfinite(twl):
-        return math.nan
-    return min(twl, TWL_CEILING_W_M2)
+    return min(
+        twl, TWL_CEILING_W_M2
+    )  # NaN passes through unchanged: the solver returns NaN rather than a clamped value
 
 
 def twl_w_m2_array(

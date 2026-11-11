@@ -1,7 +1,8 @@
 # Stellar Blaze API image. Build context is backend/:  docker build -t stellar-blaze-api:dev backend
 #
 # Two stages: `build` resolves and installs the locked runtime dependencies (no dev or train groups) with uv; `runtime`
-# is the same Python base plus the finished /app, run as an unprivileged user. Neither uv nor a compiler ships.
+# is the same Python base plus the finished virtualenv and the files the app reads, run as an unprivileged user. Neither
+# uv nor a compiler ships.
 
 # python:3.13.15-slim-trixie, pinned by the multi-arch index digest (resolved 2026-11-11 with
 # `docker buildx imagetools inspect python:3.13.15-slim-trixie`). Both stages use it, so tag and digest are bumped here,
@@ -22,7 +23,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 
-# WORKDIR /app makes the Settings defaults (SB_RULESETS_DIR=rulesets, SB_MODELS_DIR=models) and alembic.ini resolve.
+# The virtualenv lands in /app/.venv and the runtime stage copies it to the same path, so its shebangs stay valid.
 WORKDIR /app
 
 # Dependencies first: this layer is rebuilt only when pyproject.toml or uv.lock change.
@@ -30,12 +31,7 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-default-groups --no-install-project --no-editable
 
-# ADR 0009: rulesets and model artifacts ship inside the image.
 COPY src/ src/
-COPY alembic/ alembic/
-COPY alembic.ini ./
-COPY rulesets/ rulesets/
-COPY models/ models/
 
 # The project itself, as a regular (non-editable) install, so the venv does not depend on /app/src.
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -48,15 +44,15 @@ FROM ${PYTHON_IMAGE} AS runtime
 # valid on any CPU: numba keys cached code on the CPU name and feature set, and with `generic` both are fixed
 # (numba/core/config.py: CPU_FEATURES defaults to "" when CPU_NAME is "generic"), so a cache warmed on the build host
 # is not discarded on the Container Apps host (preflight F17, ADR 0001).
-# The numba warm-up (Task 14) must run in this stage as uid 10001, or the cache it writes is not the one the app reads.
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     NUMBA_CACHE_DIR=/app/.numba-cache \
     NUMBA_CPU_NAME=generic
 
+# WORKDIR /app makes the Settings defaults (SB_RULESETS_DIR=rulesets, SB_MODELS_DIR=models) and alembic.ini resolve.
 WORKDIR /app
-COPY --from=build /app /app
 
+# The layers that never change with the code come first, so a code change does not re-run apt or the user setup.
 # libgomp1: LightGBM's wheel links the OpenMP runtime, which python:slim does not ship. `import lightgbm` failed in this
 # image with "libgomp.so.1: cannot open shared object file" before the package was added; the B3 model artifacts need it.
 RUN apt-get update \
@@ -70,7 +66,24 @@ RUN groupadd --gid 10001 app \
     && mkdir /app/.numba-cache \
     && chown 10001:10001 /app/.numba-cache
 
+# Only what the app reads at run time, not all of /app: the virtualenv (which holds the installed project), the Alembic
+# migrations, and ADR 0009's rulesets and model artifacts. Sources, pyproject.toml and uv.lock stay in the build stage.
+COPY --from=build /app/.venv /app/.venv
+COPY alembic/ alembic/
+COPY alembic.ini ./
+COPY rulesets/ rulesets/
+COPY models/ models/
+# The MIT notice for the code ported from meteoHazard (domain/physics/twl.py) has to ship with that code.
+COPY THIRD_PARTY_NOTICES.md ./
+
 USER 10001:10001
+
+# Warm the numba cache as the app user, in this stage, so that /app/.numba-cache holds the kernels the app will load (a
+# cache written by another user or in the build stage is not the one the app reads). Without it the first PHS call in
+# every new worker compiles for 2 to 4 s (stack doc 6.3, ADR 0001). The step raises, and so fails the build, when PHS
+# gives no usable result.
+RUN python -c "from stellar_blaze.adapters.compute.phs_process import warm; warm()"
+
 EXPOSE 8000
 
 # --proxy-headers with --forwarded-allow-ips "*": the platform ingress terminates TLS and sets X-Forwarded-For/Proto, and
