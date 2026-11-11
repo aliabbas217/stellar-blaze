@@ -332,9 +332,9 @@ def twl_w_m2(
     twl = _solve_twl_w_m2(
         t_c=t_c, td_c=td_c, wind_ms=wind_body_ms, pressure_kpa=pressure_kpa, mrt_c=mrt_c, pa_kpa=pa_kpa, params=params
     )
-    return min(
-        twl, TWL_CEILING_W_M2
-    )  # NaN passes through unchanged: the solver returns NaN rather than a clamped value
+    # A NaN from the solver passes through unchanged because `twl` is min's first argument: min(nan, 380.0) is nan
+    # (380.0 < nan is False), whereas min(380.0, nan) would be 380.0. Keep the argument order.
+    return min(twl, TWL_CEILING_W_M2)
 
 
 def twl_w_m2_array(

@@ -32,6 +32,8 @@ from multiprocessing.process import BaseProcess
 from types import TracebackType
 from typing import Any, Final, Protocol, Self
 
+import structlog
+
 from stellar_blaze.domain.physics.phs import (
     PhsInputs,
     PhsOutcome,
@@ -40,6 +42,8 @@ from stellar_blaze.domain.physics.phs import (
     check_phs_output,
     validate_phs_inputs,
 )
+
+logger = structlog.stdlib.get_logger(__name__)
 
 KernelKwargs = Mapping[str, float | str]
 """Keyword arguments of ``pythermalcomfort.models.phs`` (its own names: ``tdb``, ``tr``, ``v``, ``weight``, ...)."""
@@ -239,13 +243,18 @@ class PhsRunner:
         try:
             conn.send(request)
             if not conn.poll(self._timeout_s):
-                self._discard_worker()
+                self._discard_worker("phs.worker_killed_timeout", timeout_s=self._timeout_s)
                 return PhsRejected(
                     reason="timeout", detail=f"no answer within {self._timeout_s:g} s; the worker was killed"
                 )
             message: Any = conn.recv()
         except (EOFError, OSError):
             return self._worker_lost("the worker connection broke")
+        except BaseException as exc:
+            # An interrupt (KeyboardInterrupt, a cancelled thread) between send and recv leaves the worker's reply
+            # unread; the next call would take it for its own answer. Drop the worker, then let the interrupt through.
+            self._discard_worker("phs.worker_discarded_interrupted", error=type(exc).__name__)
+            raise
         return self._interpret(message)
 
     def _interpret(self, message: Any) -> PhsOutcome:
@@ -256,13 +265,13 @@ class PhsRunner:
                 return PhsRejected(reason="invalid_input", detail=f"the kernel refused the input: {kind}: {text}")
             case ("error", str() as kind, str() as text):
                 # State after an unexpected failure is unknown; a fresh worker is cheap next to a wrong answer.
-                exit_code = self._discard_worker()
+                exit_code = self._discard_worker("phs.worker_replaced_kernel_error", error=kind, error_message=text)
                 return PhsRejected(
                     reason="worker_crashed",
                     detail=f"the kernel failed unexpectedly: {kind}: {text} (worker replaced, exit code {exit_code})",
                 )
             case _:
-                exit_code = self._discard_worker()
+                exit_code = self._discard_worker("phs.worker_replaced_protocol_error", reply=repr(message))
                 return PhsRejected(
                     reason="worker_crashed",
                     detail=f"unexpected message from the worker: {message!r} (exit code {exit_code})",
@@ -283,26 +292,33 @@ class PhsRunner:
         self._process, self._conn = process, parent_conn
         try:
             if not parent_conn.poll(self._startup_timeout_s):
-                self._discard_worker()
+                self._discard_worker("phs.worker_killed_startup_timeout", startup_timeout_s=self._startup_timeout_s)
                 return PhsRejected(
                     reason="timeout", detail=f"the worker was not ready within {self._startup_timeout_s:g} s"
                 )
             message: Any = parent_conn.recv()
         except (EOFError, OSError):
             return self._worker_lost("the worker died while starting")
+        except BaseException as exc:
+            self._discard_worker("phs.worker_discarded_interrupted", error=type(exc).__name__)
+            raise
         if message == ("ready",):
             return None
-        exit_code = self._discard_worker()
+        exit_code = self._discard_worker("phs.worker_start_failed", reply=repr(message))
         return PhsRejected(
             reason="worker_crashed", detail=f"the worker failed to start: {message!r} (exit code {exit_code})"
         )
 
     def _worker_lost(self, what: str) -> PhsRejected:
-        exit_code = self._discard_worker()
+        exit_code = self._discard_worker("phs.worker_crashed", what=what)
         return PhsRejected(reason="worker_crashed", detail=f"{what} (exit code {exit_code})")
 
-    def _discard_worker(self) -> int | None:
-        """Kill and reap the worker and forget it; the next call starts a fresh one. Returns its exit code if known."""
+    def _discard_worker(self, event: str | None = None, **fields: object) -> int | None:
+        """Kill and reap the worker and forget it; the next call starts a fresh one. Returns its exit code if known.
+
+        With ``event``, the replacement is logged at warning level (``pid``, ``exit_code`` and ``fields`` attached):
+        a killed or lost worker is an operational signal, whereas ``close`` discards quietly.
+        """
         process, conn = self._process, self._conn
         self._process = self._conn = None
         if conn is not None:
@@ -310,10 +326,13 @@ class PhsRunner:
                 conn.close()
         if process is None:
             return None
+        pid = process.pid
         if process.is_alive():
             process.kill()
         process.join(_REAP_TIMEOUT_S)
         exit_code = process.exitcode
         with contextlib.suppress(ValueError):  # still running after the join: it cannot be closed, leave it to the OS
             process.close()
+        if event is not None:
+            logger.warning(event, pid=pid, exit_code=exit_code, **fields)
         return exit_code

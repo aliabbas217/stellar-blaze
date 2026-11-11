@@ -41,7 +41,7 @@ def test_a_valid_case_passes() -> None:
     assert validate_phs_inputs(_inputs()) is None
 
 
-def test_defaults_are_the_iso_7933_reference_person() -> None:
+def test_defaults_are_the_kernel_reference_person() -> None:
     inputs = _inputs()
     assert (inputs.posture, inputs.weight_kg, inputs.height_m) == ("standing", 75.0, 1.8)
 
@@ -179,12 +179,37 @@ def test_plausible_output_passes(t_re_c: float) -> None:
     assert check_phs_output(_result(t_re_c=t_re_c)) is None
 
 
-@pytest.mark.parametrize("t_re_c", [43.5, 42.01, 35.99, 0.0])
+@pytest.mark.parametrize("t_re_c", [35.99, 30.0, 0.0])
 def test_implausible_output_rejected(t_re_c: float) -> None:
     # 0.0 is what the kernel returned for height 0 on 4.8.1: finite, not NaN, and not a body temperature.
     rejected = check_phs_output(_result(t_re_c=t_re_c))
     assert rejected is not None
     assert rejected.reason == "implausible_output"
+
+
+@pytest.mark.parametrize(("t_re_c", "d_lim_t_re_min"), [(42.01, 39.0), (43.5, 27.0), (46.3, 18.0), (48.8, 20.0)])
+def test_a_hot_prediction_exceeds_the_model_range_and_is_never_missing_data(
+    t_re_c: float, d_lim_t_re_min: float
+) -> None:
+    # Above 42 C the input was in the window and the model says "past my range": the most severe band, not garbage.
+    # ADR 0006 originally lumped this with `implausible_output`; the Task 14 review split it (the most dangerous
+    # valid cases).
+    rejected = check_phs_output(_result(t_re_c=t_re_c, d_lim_t_re_min=d_lim_t_re_min))
+    assert rejected is not None
+    assert rejected.reason == "exceeds_model_range"
+    assert "most severe band" in rejected.detail
+    assert "never as missing data" in rejected.detail
+    assert f"after {d_lim_t_re_min:g} min" in rejected.detail
+    assert f"{t_re_c:g} C" in rejected.detail
+
+
+def test_the_three_output_rejections_are_distinct() -> None:
+    reasons = {
+        _reason(check_phs_output(_result(t_re_c=30.0))),
+        _reason(check_phs_output(_result(t_re_c=45.0))),
+        _reason(check_phs_output(_result(t_re_c=math.nan))),
+    }
+    assert reasons == {"implausible_output", "exceeds_model_range", "nan_output"}
 
 
 @pytest.mark.parametrize(

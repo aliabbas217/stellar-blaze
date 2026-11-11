@@ -14,11 +14,22 @@ section 6.3):
   percent of samples drawn inside the other four ranges came back NaN: 38 C at 70 percent relative humidity is
   4.64 kPa, an ordinary Gulf summer reading, and PHS has no answer for it.
 
+Output guard. A validated input can still be hot enough to leave the model's range: in the Task 14 review probe, 154 of
+3,249 validator-accepted nominal inputs (4.7 percent) gave a rectal temperature of 42.2 to 45 C with the 38 C limit
+reached after 27 to 39 minutes, and the window allows values up to about 49 C (tdb 45, tr 100, 3.5 met). Those are the
+most dangerous valid cases, so a finite ``t_re`` above 42 C is ``exceeds_model_range`` (strain beyond the model's
+range: treat it as the most severe band, never as missing data), not an implausible output. Below 36 C is
+``implausible_output`` (garbage such as the 0.0 the kernel returns for a zero height), and a non-finite value is
+``nan_output``; for a validated input those last two mean the kernel changed or failed.
+
 Window conventions. ``validate_phs_inputs`` is narrower than or equal to the kernel's, so an input it accepts is never
 returned as NaN for being out of range. The kernel's limits are inclusive; ``tdb``, ``tr - tdb``, ``v`` and ``clo`` are
 exclusive here, as in ADR 0006 (``15 < tdb < 50``, ``0 < tr - tdb < 60``, ``0 < v < 3``, ``0.1 < clo < 1``). The
 metabolic rate is checked in W/m2 at the kernel's own 58.15 W/m2 per met: the quoted "0.96 to 4.3 met" is a rounding of
 56 to 250 W/m2, and the kernel returns NaN exactly at 0.96 and at 4.3 met (it accepts 0.9630 to 4.2992).
+
+Body size is not part of the standard's window and is not sourced here: ``weight_kg`` and ``height_m`` only have to be
+positive (and ``weight_kg`` at most 1000), so ``height_m=0.001`` passes validation.
 """
 
 import math
@@ -28,7 +39,13 @@ from pydantic import BaseModel, ConfigDict
 
 Posture = Literal["sitting", "standing", "crouching"]
 RejectionReason = Literal[
-    "invalid_input", "out_of_scope", "timeout", "nan_output", "implausible_output", "worker_crashed"
+    "invalid_input",
+    "out_of_scope",
+    "timeout",
+    "nan_output",
+    "implausible_output",
+    "exceeds_model_range",
+    "worker_crashed",
 ]
 
 TDB_RANGE_C: Final = (15.0, 50.0)
@@ -48,8 +65,9 @@ VAPOR_PRESSURE_RANGE_KPA: Final = (0.5, 4.5)
 """Partial water vapor pressure of the air, inclusive; the lower limit is the 2023 edition's (2004 has 0)."""
 MAX_WEIGHT_KG: Final = 1000.0
 """The kernel raises ``ValueError`` above this body mass."""
-T_RE_PLAUSIBLE_C: Final = (36.0, 42.0)
-"""Rectal temperatures outside this range are rejected as implausible (stack doc 6.3), inclusive."""
+T_RE_RANGE_C: Final = (36.0, 42.0)
+"""Rectal temperatures the output guard accepts, inclusive (stack doc 6.3). Below the lower end is
+``implausible_output``; above the upper end is ``exceeds_model_range`` (see ``check_phs_output``)."""
 
 
 class PhsInputs(BaseModel):
@@ -61,6 +79,13 @@ class PhsInputs(BaseModel):
 
     Non-finite values are representable on purpose: ``validate_phs_inputs`` is what turns them into a rejection, and it
     must be able to see them.
+
+    Everything else is left at the ISO 7933:2023 defaults of ``pythermalcomfort`` 4.8.1, which the adapter does not
+    change: an acclimatized worker (``acclimatized=100``) who can drink freely (``drink=1``), a 480-minute shift
+    (``duration=480``), static moisture permeability index 0.38 (``i_mst``), no walking (``walk_sp=0``, ``theta=0``), no
+    external work (``wme=0``), reflective-clothing fraction 0.54 with emissivity 0.42 (``a_p``, ``f_r``), and a start
+    state of 34.1 C mean skin, 36.8 C core and 36.8 C rectal temperature. Results therefore describe an acclimatized,
+    hydrated worker; an unacclimatized or dehydrated one is not modeled.
 
     Attributes:
         tdb_c: Dry-bulb air temperature, C.
@@ -91,7 +116,9 @@ class PhsResult(BaseModel):
     """What the kernel predicts for an 8-hour shift (the kernel's default duration of 480 minutes).
 
     The duration limits are capped at that 480-minute shift: 480.0 means "the limit is not reached during the shift",
-    not "reached after 480 minutes".
+    not "reached after 480 minutes". The prediction is for an acclimatized, hydrated worker (see ``PhsInputs``). A
+    ``PhsResult`` is only ever returned with a rectal temperature of 36 to 42 C; a hotter prediction comes back as
+    ``PhsRejected(reason="exceeds_model_range")``.
 
     Attributes:
         t_re_c: Predicted rectal temperature at the end of the shift, C.
@@ -115,9 +142,11 @@ class PhsRejected(BaseModel):
 
     Attributes:
         reason: ``invalid_input`` (not finite, or not a possible body or clothing value), ``out_of_scope`` (outside the
-            applicability window), ``timeout`` (no answer in time; the worker was killed), ``nan_output``,
-            ``implausible_output`` (rectal temperature outside 36 to 42 C), ``worker_crashed`` (the worker died, would
-            not start, or failed in an unexpected way).
+            applicability window), ``timeout`` (no answer in time; the worker was killed), ``nan_output`` (a non-finite
+            kernel result), ``implausible_output`` (rectal temperature below 36 C), ``exceeds_model_range`` (a finite
+            rectal temperature above 42 C: strain beyond the model's range, to be treated as the most severe band,
+            never as missing data; ``detail`` carries the rectal temperature and the time to the 38 C limit),
+            ``worker_crashed`` (the worker died, would not start, or failed in an unexpected way).
         detail: A sentence for logs, naming the offending fields and values.
     """
 
@@ -197,18 +226,31 @@ def validate_phs_inputs(i: PhsInputs) -> PhsRejected | None:
 
 
 def check_phs_output(r: PhsResult) -> PhsRejected | None:
-    """Return why ``r`` must not be believed, or ``None``.
+    """Return why ``r`` must not be returned as a normal PHS result, or ``None``.
 
-    Any NaN or infinite field gives ``nan_output``; a rectal temperature outside 36 to 42 C gives
-    ``implausible_output``. A validated input should never produce either (the output guard is the second line, for
-    a kernel that changes under us), so a rejection here is worth a log line at warning level or above.
+    * Any NaN or infinite field gives ``nan_output``.
+    * A rectal temperature below 36 C gives ``implausible_output`` (kernel garbage, for example 0.0).
+    * A rectal temperature above 42 C gives ``exceeds_model_range``. This is **not** missing data: the input was in the
+      applicability window and the model says the worker is past the range it can describe, so a caller must treat it
+      as the most severe band. ``detail`` ends "(rectal-temperature limit reached after N min)" with the kernel's
+      ``d_lim_t_re_min``.
+
+    For a validated input only the last of these is expected; ``nan_output`` and ``implausible_output`` mean the kernel
+    changed or failed and are worth a log line at warning level or above.
     """
     non_finite = [name for name, value in r.model_dump().items() if not math.isfinite(value)]
     if non_finite:
         return PhsRejected(reason="nan_output", detail="non-finite kernel output: " + ", ".join(non_finite))
-    if not T_RE_PLAUSIBLE_C[0] <= r.t_re_c <= T_RE_PLAUSIBLE_C[1]:
+    low, high = T_RE_RANGE_C
+    if r.t_re_c < low:
+        return PhsRejected(reason="implausible_output", detail=f"t_re_c {r.t_re_c:g} below {low:g} C")
+    if r.t_re_c > high:
         return PhsRejected(
-            reason="implausible_output",
-            detail=f"t_re_c {r.t_re_c:g} outside {T_RE_PLAUSIBLE_C[0]:g} to {T_RE_PLAUSIBLE_C[1]:g} C",
+            reason="exceeds_model_range",
+            detail=(
+                f"predicted rectal temperature {r.t_re_c:g} C is above {high:g} C: strain beyond the model's range,"
+                " to be treated as the most severe band, never as missing data"
+                f" (rectal-temperature limit reached after {r.d_lim_t_re_min:g} min)"
+            ),
         )
     return None
