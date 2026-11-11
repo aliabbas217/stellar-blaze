@@ -1,0 +1,168 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/*
+ * Tailwind vocabulary for Arish Signal. Values live in tokens.css; this file only
+ * names them. The default palette, type scale, radii and shadows are cleared so a
+ * class that is not in the design system generates nothing instead of drifting in
+ * from Tailwind's defaults.
+ */
+@theme {
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --spacing: var(--space-1);
+}
+
+/*
+ * `inline` makes each utility read the semantic variable directly, so a utility
+ * follows the [data-theme] of its nearest ancestor instead of freezing the :root
+ * value. Never give a key here the same name as a tokens.css variable.
+ */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-hairline: var(--hairline);
+  --color-control: var(--control);
+  --color-action: var(--action);
+  --color-on-action: var(--on-action);
+  --color-focus: var(--focus);
+
+  --color-level-green: var(--level-green);
+  --color-on-level-green: var(--on-level-green);
+  --color-level-green-soft: var(--level-green-soft);
+  --color-on-level-green-soft: var(--on-level-green-soft);
+
+  --color-level-amber: var(--level-amber);
+  --color-on-level-amber: var(--on-level-amber);
+  --color-level-amber-soft: var(--level-amber-soft);
+  --color-on-level-amber-soft: var(--on-level-amber-soft);
+
+  --color-level-orange: var(--level-orange);
+  --color-on-level-orange: var(--on-level-orange);
+  --color-level-orange-soft: var(--level-orange-soft);
+  --color-on-level-orange-soft: var(--on-level-orange-soft);
+
+  --color-level-red: var(--level-red);
+  --color-on-level-red: var(--on-level-red);
+  --color-level-red-soft: var(--level-red-soft);
+  --color-on-level-red-soft: var(--on-level-red-soft);
+
+  /* No text below 14 px: the smallest two steps are the same size. */
+  --text-xs: var(--size-label);
+  --text-sm: var(--size-label);
+  --text-base: var(--size-body);
+  --text-lg: var(--size-lead);
+  --text-xl: var(--size-title);
+  --text-2xl: var(--size-headline);
+  --text-3xl: var(--size-display);
+  --text-4xl: var(--size-numeral);
+
+  /* One corner radius everywhere; components built for other radii (shadcn) still land on it. */
+  --radius-xs: var(--radius-sign);
+  --radius-sm: var(--radius-sign);
+  --radius-md: var(--radius-sign);
+  --radius-lg: var(--radius-sign);
+  --radius-xl: var(--radius-sign);
+  --radius-2xl: var(--radius-sign);
+  --radius-3xl: var(--radius-sign);
+  --radius-4xl: var(--radius-sign);
+}
+
+/* Level hatch: none / sparse / medium / dense cross-hatch. Pair with bg-level-* and text-on-level-*. */
+@utility pattern-level-green {
+  background-image: var(--pattern-level-green);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@utility pattern-level-amber {
+  background-image: var(--pattern-level-amber);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@utility pattern-level-orange {
+  background-image: var(--pattern-level-orange);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@utility pattern-level-red {
+  background-image: var(--pattern-level-red);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/*
+ * Font families come from next/font as --font-display and --font-body. They are
+ * utilities, not @theme keys, because `@theme inline { --font-display: var(--font-display) }`
+ * would be emitted on :root as a self-reference and invalidate the font.
+ * Display falls through to the body family so Arabic-script and Indic headings still render.
+ */
+@utility font-display {
+  font-family:
+    var(--font-display, var(--font-display-fallback)), var(--font-body, var(--font-body-fallback)),
+    var(--font-display-fallback);
+}
+
+@utility font-body {
+  font-family: var(--font-body, var(--font-body-fallback)), var(--font-body-fallback);
+}
+
+@utility rounded-sign {
+  border-radius: var(--radius-sign);
+}
+
+/* The only motion in F1: opacity on a state change, 0 ms under reduced motion. */
+@utility transition-state {
+  transition-property: opacity;
+  transition-duration: var(--duration-state);
+  transition-timing-function: ease-out;
+}
+
+@layer base {
+  html {
+    background-color: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-body, var(--font-body-fallback)), var(--font-body-fallback);
+    line-height: var(--leading-body);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Nastaliq and Arabic marks clip at 1.5; never give text a fixed height. */
+  :lang(ar) {
+    line-height: var(--leading-ar);
+  }
+
+  :lang(ur) {
+    line-height: var(--leading-ur);
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--hairline);
+  }
+
+  :focus-visible {
+    outline: var(--focus-width) solid var(--focus);
+    outline-offset: var(--focus-offset);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
