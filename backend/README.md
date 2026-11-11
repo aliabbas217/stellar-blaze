@@ -86,6 +86,24 @@ rm -f "$SQL"
 (problem details, `dependency: database`) otherwise; `GET /api/v1/health/live` never looks at the database. The
 application creates its engine in the FastAPI lifespan, so the API starts even while the database is down.
 
+## Container image
+
+`Dockerfile` builds the API image from this directory (context `backend/`). The base image and uv are pinned by digest;
+`rulesets/` and `models/` ship inside the image (ADR 0009), the app runs as uid 10001 with `/app` as its working
+directory, and `/app/.numba-cache` is the only writable path.
+
+```bash
+docker build -t stellar-blaze-api:dev .
+docker run --rm -p 8000:8000 -e SB_DATABASE_URL=postgresql+asyncpg://sb:sb@host.docker.internal:5432/stellar_blaze stellar-blaze-api:dev
+curl -s localhost:8000/api/v1/health/live        # {"status":"ok"}
+
+# the migration job runs the same image:
+docker run --rm -e SB_DATABASE_URL=... stellar-blaze-api:dev alembic upgrade head
+```
+
+CI (`.github/workflows/ci.yml`, job `backend`) runs every gate above plus the pre-commit hooks, Squawk, `pip-audit`, an
+`oasdiff` report on `openapi/v1.json`, and builds and smoke-tests this image.
+
 ## Jobs
 
 Filled in with the ingest task (`sb-jobs` commands, their flags and the runbook).

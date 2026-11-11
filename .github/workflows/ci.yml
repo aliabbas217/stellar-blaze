@@ -1,0 +1,133 @@
+# One workflow, one job per owner: `backend` (B1 plan, this block), `frontend` (added by the F1 plan as a sibling of
+# `backend`) and `infra` (added by the I1 plan, if it adds one). Do not edit the `backend` job from the F1 or I1 plans,
+# and do not edit their jobs from here. deploy.yml (I1) waits for this workflow by its name, `ci`.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # the OpenAPI breaking-change report reads the base commit
+          persist-credentials: false  # pre-commit runs third-party hook code; it must not find the job token in .git
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install Python and the locked dependencies
+        run: |
+          uv python install 3.13
+          uv sync --locked
+
+      - name: Lockfile is up to date
+        run: uv lock --check
+
+      - name: Pre-commit hooks (whole repository)
+        working-directory: .
+        run: uv run --project backend pre-commit run --all-files --show-diff-on-failure
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run ruff format --check .
+
+      - name: Types (mypy strict)
+        run: uv run mypy src tests
+
+      - name: Import contracts (import-linter)
+        run: uv run lint-imports
+
+      - name: Dependency hygiene (deptry)
+        run: uv run deptry src
+
+      - name: Unit tests with coverage
+        run: uv run pytest -m unit --cov --cov-report=term-missing
+
+      - name: Integration tests (Postgres in Docker)
+        run: uv run pytest -m integration
+
+      - name: Lint the migrations (Squawk)
+        env:
+          SB_DATABASE_URL: postgresql+asyncpg://x:x@localhost/x  # offline --sql rendering never connects
+        run: |
+          uv run alembic upgrade head --sql > "$RUNNER_TEMP/migration.sql"
+          uv run squawk "$RUNNER_TEMP/migration.sql"
+
+      # --no-emit-project: without it the export starts with `-e .`, which pip-audit rejects ("does not contain a hash").
+      # --quiet: uv also prints the whole export (1,800 lines) to stdout when -o is given.
+      - name: Audit the locked dependencies (pip-audit)
+        run: |
+          uv export --locked --quiet --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+          uv run pip-audit --disable-pip --no-deps -r "$RUNNER_TEMP/req.txt"
+
+      # ADR 0009 section 5. Report-only until B3 Task 0 freezes v1 and adds `--fail-on ERR`.
+      - name: OpenAPI breaking-change report (oasdiff)
+        working-directory: .
+        env:
+          # Pull requests compare with the base branch tip, pushes with the previous head. All zeros (the first push of
+          # a branch) or a base without the spec (the file is new) means there is nothing to compare with.
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          spec=backend/openapi/v1.json
+          if [ -z "${BASE_SHA}" ] || ! git cat-file -e "${BASE_SHA}:${spec}" 2>/dev/null; then
+            echo "no base spec: ${spec} does not exist at '${BASE_SHA}'; skipping"
+            exit 0
+          fi
+          version=1.35.0
+          archive="oasdiff_${version}_linux_amd64.tar.gz"
+          url="https://github.com/oasdiff/oasdiff/releases/download/v${version}"
+          tool_dir="$RUNNER_TEMP/oasdiff"
+          mkdir -p "$tool_dir"
+          curl --fail --silent --show-error --location --output "$tool_dir/$archive" "$url/$archive"
+          curl --fail --silent --show-error --location --output "$tool_dir/checksums.txt" "$url/checksums.txt"
+          (cd "$tool_dir" && sha256sum --ignore-missing -c checksums.txt && tar -xzf "$archive" oasdiff)
+          "$tool_dir/oasdiff" breaking "${BASE_SHA}:${spec}" "${spec}"
+
+      - name: Build the image
+        run: docker build -t stellar-blaze-api:ci .
+
+      - name: Smoke-test the image
+        run: |
+          set -u
+          db_url=postgresql+asyncpg://x:x@localhost/x
+          container=sb-api-smoke
+          trap 'docker rm -f "$container" > /dev/null 2>&1 || true' EXIT
+
+          # Runs as the unprivileged user, and the migrations are one linear history (a second head breaks upgrade head).
+          test "$(docker run --rm stellar-blaze-api:ci id -u)" = "10001"
+          heads="$(docker run --rm -e SB_DATABASE_URL="$db_url" stellar-blaze-api:ci alembic heads)"
+          echo "$heads"
+          test "$(echo "$heads" | grep -c '(head)')" = "1"
+
+          # The server starts and answers; /health/live needs no database.
+          docker run -d --name "$container" -p 8000:8000 -e SB_DATABASE_URL="$db_url" stellar-blaze-api:ci
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://localhost:8000/api/v1/health/live; then
+              curl --fail --silent --show-error http://localhost:8000/api/v1/health/live
+              echo
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container"
+          echo "the API did not answer /api/v1/health/live within 30 s" >&2
+          exit 1

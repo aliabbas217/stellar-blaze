@@ -20,7 +20,10 @@ API_PREFIX = "/api/v1"
 
 
 def operation_id(route: APIRoute) -> str:
-    """The OpenAPI ``operationId`` is the route function's name (``health_live``), unique by construction.
+    """The OpenAPI ``operationId`` is the route function's name (``health_live``), unique by convention.
+
+    Nothing in FastAPI stops two routes from sharing a function name; the contract test
+    ``test_operation_ids_are_unique_and_are_the_route_function_names`` enforces it.
 
     FastAPI's default (``health_live_api_v1_health_live_get``) embeds the path and method, so it changes whenever a
     route moves; the generated TypeScript client names its functions after it, and the contract is frozen on 14 Nov.

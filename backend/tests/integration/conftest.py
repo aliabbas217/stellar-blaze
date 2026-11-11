@@ -34,10 +34,11 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     pytest-socket runs with ``--allow-hosts=127.0.0.1,::1`` and without ``--allow-unix-socket``, which blocks
     docker-py's ``/var/run/docker.sock`` on Linux CI. ``pytestmark`` in a conftest does not apply to the tests next to
     it, but the ``enable_socket`` marker added here does: pytest-socket reads it before fixtures are set up. Unit tests
-    are untouched (the hook only marks items under this directory).
+    are untouched (the hook only marks items under this directory). ``HERE`` is resolved, so ``item.path`` is resolved
+    too: a checkout reached through a symlink must not silently lose the marker.
     """
     for item in items:
-        if HERE in Path(str(item.path)).parents:
+        if item.path.resolve().is_relative_to(HERE):
             item.add_marker(pytest.mark.enable_socket)
 
 
