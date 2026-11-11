@@ -3,7 +3,9 @@
 Port of ``wbgt_variants`` in ``D:\\dev\\future-health-challenge\\scripts\\audit_wbgt.py`` (variant A, the mid-point of
 the preceding hour, is the default; variant B, the mean over the preceding hour, is ``CosZenithMode.MEAN``), with the
 guards of ADR 0006: an element whose inputs are not finite, whose radiation is incoherent with the sun, or whose solver
-result is missing or implausible is rejected with a reason code instead of being returned as a number.
+result is missing or implausible is rejected with a reason code instead of being returned as a number. The radiation
+guard has a known gap (a partly sunlit hour accepts any shortwave), described on ``wbgt_liljegren`` and parked in
+``docs/parking-lot.md``.
 
 This is the only module that imports thermofeel. ``calculate_wbgt_liljegren`` returns kelvin and takes instantaneous
 radiation; Open-Meteo radiation is the mean over the hour that ends at the label, so the solar geometry is evaluated for
@@ -39,11 +41,16 @@ such inputs (about 5,300 points/s against about 128,000 for coherent ones) and r
 """
 
 _MAX_BELOW_AIR_C: Final = 30.0
-_MAX_ABOVE_AIR_C: Final = 10.0
-"""Plausible band for the result, relative to air temperature: ``[t_c - 30, t_c + 10]`` (ADR 0006).
+"""Lower edge of the plausible band: a result more than this many degrees Celsius below air temperature is rejected.
 
-For coherent inputs the stack doc measured WBGT minus air temperature of at most +5.1 C; the band is deliberately wide
-and only catches solver garbage.
+The band is ``[t_c - 30, t_c + 10]`` (ADR 0006). It is deliberately wide and only catches solver garbage.
+"""
+
+_MAX_ABOVE_AIR_C: Final = 10.0
+"""Upper edge of the plausible band: a result more than this many degrees Celsius above air temperature is rejected.
+
+For coherent inputs the stack doc (section 6.6) measured WBGT minus air temperature of at most +5.1 C, so +10 leaves
+headroom while still catching the non-physical values (up to 120 C) that incoherent inputs produce.
 """
 
 
@@ -101,10 +108,17 @@ def wbgt_liljegren(
     Each element gets the first reason that applies, in this order:
 
     1. ``NONFINITE_INPUT``: any numeric input is NaN or infinite, or the time is NaT.
-    2. ``INCOHERENT_RADIATION``: ``sw_wm2`` is above 10 W/m2 while the mean cosine of the zenith over the preceding
-       hour is exactly 0 (the sun is down for the whole hour).
+    2. ``INCOHERENT_RADIATION``: either ``sw_wm2`` or ``direct_wm2`` is negative, or ``sw_wm2`` is above 10 W/m2
+       while the mean cosine of the zenith over the preceding hour is exactly 0 (the sun is down for the whole hour).
     3. ``NO_CONVERGENCE``: thermofeel returned NaN.
     4. ``OUT_OF_BOUNDS``: the result is outside ``[t_c - 30, t_c + 10]`` degrees Celsius.
+
+    Known gap in rule 2: it catches only those two cases. It does not bound ``sw_wm2`` in an hour that is partly
+    sunlit, that is, where the mean cosine is above 0. In ``MIDPOINT`` mode a twilight hour whose mid-point cosine is
+    clipped to 0 therefore accepts any shortwave: at OMAA, label 2025-07-15T01:50 UTC (mean cosine 0.0004, mid-point
+    cosine -0.09), with t 36 C, td 22 C, wind 3 m/s, 998 hPa and ``direct / sw`` 0.5, ``sw`` of 100, 300 and 1000 W/m2
+    give 29.4, 30.8 and 35.8 C, all with reject code 0. Only rule 4 can catch a non-physical result there. A ceiling
+    such as ``sw > a * mean_cos_zenith + b`` needs coefficients derived from data (``docs/parking-lot.md``, ADR 0006).
 
     Rejected elements are excluded from the thermofeel call, which is slow and non-physical on garbage (stack doc
     section 6.6): one vectorized call is made over the accepted elements only, and none when there are none. A rejected
@@ -151,7 +165,11 @@ def wbgt_liljegren(
 
     if candidates.size:
         mean_cz = mean_cos_zenith_prev_hour(lat, lon, utc[candidates])
-        incoherent = (sw[candidates] > _INCOHERENT_RADIATION_WM2) & (mean_cz == 0.0)
+        incoherent = (
+            ((sw[candidates] > _INCOHERENT_RADIATION_WM2) & (mean_cz == 0.0))
+            | (sw[candidates] < 0.0)
+            | (direct[candidates] < 0.0)
+        )
         reject[candidates[incoherent]] = WbgtReject.INCOHERENT_RADIATION
         coherent = ~incoherent
         accepted = candidates[coherent]

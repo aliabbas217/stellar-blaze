@@ -4,7 +4,7 @@ Ported from ``D:\\dev\\future-health-challenge\\scripts\\audit_wbgt.py`` (the Fu
 ``shift``, ``cos_zenith`` and ``mean_cos_zenith_prev_hour``. The numerical behavior is unchanged; only the parameter
 names (``lat`` and ``lon`` became ``lat_deg`` and ``lon_deg`` in the second function, matching the first) and the typing
 were tightened. Against pvlib 0.16.1 the FHC code differs by at most 5.0e-5 in the cosine over one Abu Dhabi day (stack
-doc section 6.6; pinned by ``tests/unit/physics/test_solar.py``).
+doc section 6.6); ``tests/unit/physics/test_solar.py`` bounds that difference by 1e-4.
 
 Times are naive ``datetime64`` arrays that mean UTC, in any unit; the code casts them to seconds.
 """

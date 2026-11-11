@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,8 @@ from hypothesis import strategies as st
 from numpy.typing import ArrayLike, NDArray
 
 from stellar_blaze.domain.physics import wbgt as wbgt_module
+from stellar_blaze.domain.physics.psychrometrics import relative_humidity_pct
+from stellar_blaze.domain.physics.solar import cos_zenith, mean_cos_zenith_prev_hour, shift
 from stellar_blaze.domain.physics.types import F64
 from stellar_blaze.domain.physics.wbgt import CosZenithMode, WbgtReject, WbgtResult, wbgt_liljegren
 
@@ -125,6 +128,33 @@ def test_wbgt_mean_mode_matches_fhc_variant_b_golden(golden: dict[str, Any]) -> 
     np.testing.assert_allclose(result.wbgt_c, np.array(golden["wbgt_c_mean"]), rtol=0.0, atol=1e-9)
 
 
+def test_golden_cosine_intermediates_match_the_solar_functions(golden: dict[str, Any]) -> None:
+    utc = np.array(golden["valid_time_utc"], dtype="datetime64[m]")
+    lat, lon = golden["lat"], golden["lon"]
+    midpoint = np.clip(cos_zenith(lat, lon, shift(utc, -np.timedelta64(30, "m"))), 0.0, None)
+    mean = mean_cos_zenith_prev_hour(lat, lon, utc)
+    np.testing.assert_allclose(midpoint, golden["intermediates"]["cz_midpoint"], rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(mean, golden["intermediates"]["cz_mean_prev_hour"], rtol=0.0, atol=1e-12)
+    # The golden shortwave was generated as 950 * the mean cosine, and the direct beam as 0.8 of it.
+    np.testing.assert_allclose(golden["sw_wm2"], 950.0 * mean, rtol=0.0, atol=1e-9)
+    np.testing.assert_allclose(golden["direct_wm2"], 0.8 * np.array(golden["sw_wm2"]), rtol=0.0, atol=1e-9)
+
+
+def test_golden_rh_and_fdir_intermediates_match_the_library(golden: dict[str, Any]) -> None:
+    rh = relative_humidity_pct(np.array(golden["t_c"]), np.array(golden["td_c"]))
+    np.testing.assert_allclose(rh, golden["intermediates"]["rh_pct"], rtol=0.0, atol=1e-12)
+    sw = np.array(golden["sw_wm2"])
+    fdir = np.where(sw > 1e-6, np.array(golden["direct_wm2"]) / np.where(sw > 1e-6, sw, 1.0), 0.0)
+    np.testing.assert_allclose(np.clip(fdir, 0.0, 0.9), golden["intermediates"]["fdir"], rtol=0.0, atol=1e-12)
+
+
+def test_golden_provenance_records_the_source_and_its_hash(golden: dict[str, Any]) -> None:
+    provenance = golden["provenance"]
+    assert provenance["source"].endswith("audit_wbgt.py")
+    assert re.fullmatch(r"[0-9a-f]{64}", provenance["source_sha256"])
+    assert provenance["thermofeel"] == "2.3.0"
+
+
 def test_midpoint_is_the_default_and_differs_from_mean(golden: dict[str, Any]) -> None:
     inputs = _golden_inputs(golden)
     default = wbgt_liljegren(**inputs)
@@ -187,6 +217,44 @@ def test_radiation_threshold_is_ten_watts_and_exclusive() -> None:
     assert above.reject[0] == WbgtReject.INCOHERENT_RADIATION
 
 
+@pytest.mark.parametrize(
+    ("at", "sw", "direct"),
+    [
+        pytest.param(LATE_NIGHT, -5.0, 0.0, id="night-negative-sw"),
+        pytest.param(LATE_NIGHT, 0.0, -5.0, id="night-negative-direct"),
+        pytest.param(MIDDAY, -5.0, 0.0, id="midday-negative-sw"),
+        pytest.param(MIDDAY, 900.0, -5.0, id="midday-negative-direct"),
+    ],
+)
+def test_negative_radiation_is_rejected_and_never_reaches_thermofeel(
+    monkeypatch: pytest.MonkeyPatch, at: np.datetime64, sw: float, direct: float
+) -> None:
+    calls: list[int] = []
+    monkeypatch.setattr(wbgt_module, "calculate_wbgt_liljegren", _fake_thermofeel_returning(0.0, calls))
+    result = _single(t_c=30.0, td_c=20.0, wind=3.0, pressure=998.0, sw=sw, direct=direct, at=at)
+    assert np.isnan(result.wbgt_c[0])
+    assert result.reject[0] == WbgtReject.INCOHERENT_RADIATION
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("at", "sw", "direct"),
+    [
+        pytest.param(LATE_NIGHT, 0.0, 0.0, id="night-zero"),
+        pytest.param(MIDDAY, 900.0, 0.0, id="midday-zero-direct"),
+    ],
+)
+def test_zero_radiation_is_not_negative(at: np.datetime64, sw: float, direct: float) -> None:
+    result = _single(t_c=30.0, td_c=20.0, wind=3.0, pressure=998.0, sw=sw, direct=direct, at=at)
+    assert result.reject[0] == WbgtReject.OK
+
+
+@pytest.mark.parametrize(("sw", "direct"), [(np.nan, -5.0), (-5.0, np.inf)])
+def test_non_finite_input_takes_precedence_over_negative_radiation(sw: float, direct: float) -> None:
+    result = _single(t_c=30.0, td_c=20.0, wind=3.0, pressure=998.0, sw=sw, direct=direct, at=MIDDAY)
+    assert result.reject[0] == WbgtReject.NONFINITE_INPUT
+
+
 def test_nan_input_is_rejected(golden: dict[str, Any]) -> None:
     inputs = _golden_inputs(golden)
     clean = wbgt_liljegren(**inputs)
@@ -235,6 +303,26 @@ def test_non_finite_input_takes_precedence_over_incoherent_radiation() -> None:
         valid_time_utc=_times(LATE_NIGHT, LATE_NIGHT),
     )
     assert result.reject.tolist() == [WbgtReject.NONFINITE_INPUT, WbgtReject.INCOHERENT_RADIATION]
+
+
+def test_mean_mode_keeps_the_zenith_aligned_with_interior_rejected_elements(golden: dict[str, Any]) -> None:
+    # `mean_cz[coherent]` must line up with the accepted elements: reject elements before and inside the daylight run.
+    inputs = _golden_inputs(golden)
+    inputs["td_c"] = inputs["td_c"].copy()
+    inputs["td_c"][3] = np.nan  # non-finite, before the daylight hours
+    inputs["direct_wm2"] = inputs["direct_wm2"].copy()
+    inputs["direct_wm2"][9] = -5.0  # negative radiation, in the middle of the day
+    inputs["sw_wm2"] = inputs["sw_wm2"].copy()
+    inputs["sw_wm2"][21] = 400.0  # radiation with the sun down
+    result = wbgt_liljegren(**inputs, mode=CosZenithMode.MEAN)
+    expected_reject = np.zeros(24, dtype=np.int8)
+    expected_reject[3] = WbgtReject.NONFINITE_INPUT
+    expected_reject[9] = WbgtReject.INCOHERENT_RADIATION
+    expected_reject[21] = WbgtReject.INCOHERENT_RADIATION
+    np.testing.assert_array_equal(result.reject, expected_reject)
+    kept = expected_reject == WbgtReject.OK
+    np.testing.assert_allclose(result.wbgt_c[kept], np.array(golden["wbgt_c_mean"])[kept], rtol=0.0, atol=1e-9)
+    assert np.all(np.isnan(result.wbgt_c[~kept]))
 
 
 def test_rejected_elements_are_excluded_from_the_thermofeel_call(

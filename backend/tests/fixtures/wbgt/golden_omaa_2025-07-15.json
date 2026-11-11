@@ -1,6 +1,7 @@
 {
   "provenance": {
     "source": "D:\\dev\\future-health-challenge\\scripts\\audit_wbgt.py",
+    "source_sha256": "7c92de5cfd9b3c2a6002a95fdd595a5002db686d8deae0edea0cb0fed9604d45",
     "functions": [
       "shift",
       "cos_zenith",
