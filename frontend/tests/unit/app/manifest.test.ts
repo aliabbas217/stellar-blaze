@@ -3,10 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { inflateSync } from "node:zlib";
 import { GET } from "@/app/[locale]/manifest.webmanifest/route";
-import { MANIFEST_COLORS, manifestFor, type ManifestTranslator } from "@/features/pwa/manifest";
+import { APPLE_TOUCH_ICON, MANIFEST_COLORS, manifestFor, type ManifestTranslator } from "@/features/pwa/manifest";
 import { dirFor } from "@/i18n/direction";
 import type { Messages } from "@/i18n/request";
 import { routing, type Locale } from "@/i18n/routing";
+import { loadTokens, oklchToHex, themeHex } from "../../utils/colour";
 
 /*
  * The per-locale web app manifest. Installability needs the icons and display mode right; the locale review
@@ -30,7 +31,6 @@ vi.mock("next-intl/server", async () => {
 });
 
 const frontendRoot = path.resolve(import.meta.dirname, "../../..");
-const tokensCss = readFileSync(path.join(frontendRoot, "src/styles/tokens.css"), "utf8");
 
 async function translatorFor(locale: Locale): Promise<ManifestTranslator> {
   const { getTranslations } = await import("next-intl/server");
@@ -39,58 +39,17 @@ async function translatorFor(locale: Locale): Promise<ManifestTranslator> {
 
 // ---------- the colours: the manifest holds sRGB hex, tokens.css holds OKLCH; they must stay the same colour ----------
 
-/** OKLCH to 8-bit sRGB hex (the same maths as tests/unit/styles/tokens.test.ts, which keeps its copy private). */
-function oklchToHex(value: string): string {
-  const m = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/.exec(value);
-  if (m?.[1] === undefined || m[2] === undefined || m[3] === undefined) throw new Error(`not an oklch() value: ${value}`);
-  const L = Number(m[1]);
-  const h = (Number(m[3]) * Math.PI) / 180;
-  const a = Number(m[2]) * Math.cos(h);
-  const b = Number(m[2]) * Math.sin(h);
-  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-  const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-  const linear = [
-    4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
-  ];
-  const byte = (c: number) => {
-    const clamped = Math.min(1, Math.max(0, c));
-    const encoded = clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * clamped ** (1 / 2.4) - 0.055;
-    return Math.round(encoded * 255)
-      .toString(16)
-      .padStart(2, "0");
-  };
-  return `#${linear.map(byte).join("")}`;
-}
-
-function primitive(name: string): string {
-  const match = new RegExp(`--${name}:\\s*(oklch\\([^)]*\\))`).exec(tokensCss);
-  if (match?.[1] === undefined) throw new Error(`tokens.css has no --${name}`);
-  return match[1];
-}
-
-/** The primitive a semantic token points at in the light rule (":root, [data-theme=\"light\"]") or the dark override. */
-function semantic(theme: "light" | "dark", token: string): string {
-  const selector = theme === "light" ? ':root,\\s*\\[data-theme="light"\\]' : '\\[data-theme="dark"\\]';
-  const rule = new RegExp(`${selector}\\s*\\{([^}]*)\\}`).exec(tokensCss.replace(/\/\*[\s\S]*?\*\//g, ""));
-  const body = rule?.[1];
-  if (body === undefined) throw new Error(`tokens.css has no ${theme} rule`);
-  const ref = new RegExp(`--${token}:\\s*var\\(--(ref-[\\w-]+)\\)`).exec(body)?.[1];
-  if (ref === undefined) throw new Error(`--${token} is not a var(--ref-*) in the ${theme} rule`);
-  return primitive(ref);
-}
-
 describe("MANIFEST_COLORS", () => {
+  const { primitives } = loadTokens();
+
   it("is the light --surface (sand-50) token, for the manifest and the light browser chrome", () => {
-    expect(MANIFEST_COLORS.light).toBe(oklchToHex(semantic("light", "surface")));
-    expect(MANIFEST_COLORS.light).toBe(oklchToHex(primitive("ref-sand-50")));
+    expect(MANIFEST_COLORS.light).toBe(themeHex().light["surface"]);
+    expect(MANIFEST_COLORS.light).toBe(oklchToHex(primitives["ref-sand-50"] ?? ""));
   });
 
   it("is the dark --surface (sand-950) token, for the dark browser chrome", () => {
-    expect(MANIFEST_COLORS.dark).toBe(oklchToHex(semantic("dark", "surface")));
-    expect(MANIFEST_COLORS.dark).toBe(oklchToHex(primitive("ref-sand-950")));
+    expect(MANIFEST_COLORS.dark).toBe(themeHex().dark["surface"]);
+    expect(MANIFEST_COLORS.dark).toBe(oklchToHex(primitives["ref-sand-950"] ?? ""));
   });
 });
 
@@ -131,6 +90,12 @@ describe("manifestFor", () => {
       expect(icon.src.startsWith("/icons/")).toBe(true);
       expect(icon.type).toBe("image/png");
     }
+  });
+
+  it("offers the 192 icon as the apple-touch-icon, so iOS does not fall back to a page screenshot", async () => {
+    const { icons = [] } = manifestFor("en", await translatorFor("en"));
+    expect(APPLE_TOUCH_ICON).toEqual({ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" });
+    expect(icons.map((icon) => icon.src)).toContain(APPLE_TOUCH_ICON.url);
   });
 
   it.each(routing.locales)("%s: lang, dir, start_url and a non-empty name", async (locale) => {

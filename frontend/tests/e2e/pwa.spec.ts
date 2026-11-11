@@ -1,12 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 import ur from "../../messages/ur.json";
-import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
+import { FIXTURE_DATE, SITE_DEMO, SITE_EMPTY } from "../../src/mocks/fixtures.ts";
 
 /*
  * The installable-app contract, against a production build (`pnpm build && pnpm start`, API_ORIGIN pointing at
  * `pnpm mock:api`): the service worker controls the worker route, an offline Urdu worker lands on the Urdu
  * offline page, each locale's manifest is shaped for installation, and the forecast and the risk policy outlive
  * the connection. The service worker is built only by `next build`; `next dev` does not precache.
+ *
+ * The server must be started with SB_MOCK_SCENARIOS=1: a production build only forwards the `x-sb-mock-scenario`
+ * header (used to make the API fail on purpose) when it is set. Task 12's webServer sets it.
  */
 
 // The worker registers after hydration and activates once the precache is filled.
@@ -72,6 +75,7 @@ test("offline navigation shows localized fallback", async ({ page, context }) =>
 test("manifest is installable-shaped", async ({ page, request }) => {
   await page.goto("/ur/worker");
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/ur/manifest.webmanifest");
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute("href", "/icons/icon-192.png");
 
   const response = await request.get("/en/manifest.webmanifest");
   expect(response.status()).toBe(200);
@@ -117,4 +121,76 @@ test("forecast and risk policy are served offline from the sb-api cache", async 
 
   await context.setOffline(true);
   expect({ forecast: await read(forecast), policy: await read(policy) }).toEqual(online);
+});
+
+/** Every entry of every Cache Storage cache, as "<cache> <path+query>". */
+async function cacheEntries(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    const entries: string[] = [];
+    for (const name of await caches.keys()) {
+      for (const request of await (await caches.open(name)).keys()) {
+        const url = new URL(request.url);
+        entries.push(`${name} ${url.pathname}${url.search}`);
+      }
+    }
+    return entries.sort();
+  });
+}
+
+test("no API response outside the allow-list is kept in any cache", async ({ page }) => {
+  await loadControlled(page, "/en/worker");
+
+  // Workers can share a phone: only the forecast and the policy may stay on it (ADR 0004/0009). These all answer 200,
+  // the kind of response a cache would keep if a rule let it.
+  const others = [
+    "/api/v1/sites",
+    `/api/v1/sites/${SITE_DEMO}/crews`,
+    `/api/v1/crews/crew-a/timeline?date=${FIXTURE_DATE}`,
+    "/api/healthz",
+  ];
+  for (const path of others) {
+    expect(await page.evaluate(async (url) => (await fetch(url)).status, path), path).toBe(200);
+  }
+
+  // The worker stores a response after it has handed it over, so a check straight after the requests could pass too
+  // early. The allow-listed policy goes last: once its copy is in the cache, the worker has also finished the
+  // requests before it, and only that one entry may be there.
+  expect(await page.evaluate(async () => (await fetch("/api/v1/risk-policy")).status)).toBe(200);
+  await expect.poll(() => cacheEntries(page).then((entries) => entries.filter((entry) => entry.includes("/api/")))).toEqual([
+    "sb-api /api/v1/risk-policy",
+  ]);
+});
+
+test("a 5xx from the server falls through to the cached forecast", async ({ page }) => {
+  await loadControlled(page, "/en/worker");
+
+  const forecast = `/api/v1/sites/${SITE_DEMO}/forecast/today`;
+  const read = (path: string, headers: Record<string, string> = {}) =>
+    page.evaluate(
+      async ({ url, extra }) => {
+        const response = await fetch(url, { headers: extra });
+        return { status: response.status, type: response.headers.get("content-type"), body: (await response.json()) as unknown };
+      },
+      { url: path, extra: headers },
+    );
+  // The mock API answers any request that carries this header with a 500 problem+json (request_id "mock-req-1").
+  const failing = { "x-sb-mock-scenario": "error" };
+
+  // A control: where nothing is cached, the failure reaches the page as the problem it is.
+  const control = await read("/api/v1/sites", failing);
+  expect(control.status).toBe(500);
+
+  const fresh = await read(forecast);
+  expect(fresh.status).toBe(200);
+  await expect.poll(() => cacheEntries(page)).toContain(`sb-api ${forecast}`);
+
+  // The server fails while the phone is online: the page gets the copy it already holds, not the error.
+  expect(await read(forecast, failing)).toEqual(fresh);
+
+  // And with no copy to fall back to, the page still gets the server's own error, problem body and request id
+  // included (the error screen shows it), not an anonymous network failure.
+  const noCopy = await read(`/api/v1/sites/${SITE_EMPTY}/forecast/today`, failing);
+  expect(noCopy.status).toBe(500);
+  expect(noCopy.type).toContain("application/problem+json");
+  expect(noCopy.body).toMatchObject({ request_id: "mock-req-1" });
 });

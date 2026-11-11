@@ -49,6 +49,8 @@ const UNRESTRICTED = [
   "src/app/sw.ts",
   "src/features/pwa/fallback.ts",
   "src/features/pwa/manifest.ts",
+  "src/features/pwa/api-cache.ts",
+  "src/features/pwa/runtime-caching.ts",
 ];
 
 async function rulesFor(rel: string): Promise<Rules> {
@@ -192,6 +194,8 @@ describe("route-group isolation: what the resolved rules report", () => {
     ["service worker, pwa feature", "src/app/sw.ts", 'import { offlineFallbacks } from "@/features/pwa/fallback"; import { isCachedApiPath } from "@/features/pwa/api-cache"; export { offlineFallbacks, isCachedApiPath };', []],
     ["worker route, pwa feature", WORKER_ROUTE, 'import { fallbackUrlFor } from "@/features/pwa/fallback"; export { fallbackUrlFor };', []],
     ["supervisor route, pwa feature", SUPERVISOR_ROUTE, 'import { fallbackUrlFor } from "@/features/pwa/fallback"; export { fallbackUrlFor };', []],
+    // Task 8's profile store (a worker feature) calls clearApiCaches when a worker revokes consent or changes profile.
+    ["worker feature, pwa feature (clearApiCaches)", "src/features/profile/x.ts", 'import { clearApiCaches } from "@/features/pwa/api-cache"; export { clearApiCaches };', []],
     ["pwa feature, shared code", "src/features/pwa/fallback.ts", 'import { routing } from "@/i18n/routing"; import { u } from "@/lib/utils"; export { routing, u };', []],
     ["shared code, shared code", "src/components/ui/button.tsx", 'import { cn } from "./utils"; import { u } from "@/lib/utils"; export const load = () => import("@/i18n/routing"); export { cn, u };', []],
   ];

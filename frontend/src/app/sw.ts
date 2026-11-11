@@ -1,20 +1,7 @@
 import { defaultCache } from "@serwist/turbopack/worker";
-import {
-  ExpirationPlugin,
-  NetworkFirst,
-  Serwist,
-  type PrecacheEntry,
-  type RuntimeCaching,
-  type SerwistGlobalConfig,
-} from "serwist";
-import {
-  API_CACHE_MAX_AGE_SECONDS,
-  API_CACHE_MAX_ENTRIES,
-  API_CACHE_NAME,
-  API_CACHE_NETWORK_TIMEOUT_SECONDS,
-  isCachedApiPath,
-} from "@/features/pwa/api-cache";
+import { Serwist, type PrecacheEntry, type SerwistGlobalConfig } from "serwist";
 import { offlineFallbacks } from "@/features/pwa/fallback";
+import { runtimeCachingWith } from "@/features/pwa/runtime-caching";
 
 /*
  * The service worker, bundled by esbuild at build time (src/app/serwist/[path]/route.ts) and served at /serwist/sw.js.
@@ -30,26 +17,17 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-// The two API responses kept for offline use (ADR 0010: the forecast and the policy that goes with it). Network
-// first, so a connected worker always gets fresh levels; a slow or absent network falls back to the last copy.
-// Registered before defaultCache, whose `/api/` rule would otherwise answer these first.
-const offlineApi: RuntimeCaching = {
-  matcher: ({ sameOrigin, url }) => sameOrigin && isCachedApiPath(url.pathname),
-  method: "GET",
-  handler: new NetworkFirst({
-    cacheName: API_CACHE_NAME,
-    networkTimeoutSeconds: API_CACHE_NETWORK_TIMEOUT_SECONDS,
-    plugins: [new ExpirationPlugin({ maxEntries: API_CACHE_MAX_ENTRIES, maxAgeSeconds: API_CACHE_MAX_AGE_SECONDS })],
-  }),
-};
-
 const serwist = new Serwist({
   // undefined in development, where Serwist does not build a precache manifest.
   precacheEntries: self.__SW_MANIFEST ?? [],
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: [offlineApi, ...defaultCache],
+  // /api/ first (src/features/pwa/runtime-caching.ts): two allow-listed responses are kept, every other /api/ request
+  // goes to the network and is never stored, ahead of defaultCache's own /api/ rule.
+  // defaultCache's document and RSC rules stay: F1's pages are prerendered, carry no personal data and need no login,
+  // so caching them is safe. Revisit them (and the precache) as soon as any page depends on who is looking at it.
+  runtimeCaching: runtimeCachingWith(defaultCache),
   // One precached page per locale, chosen by the path's locale: an Urdu worker offline reads Urdu.
   fallbacks: { entries: offlineFallbacks() },
 });

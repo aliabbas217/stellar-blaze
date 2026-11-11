@@ -32,6 +32,13 @@ const ICONS = [
   { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
 ] as const satisfies NonNullable<MetadataRoute.Manifest["icons"]>;
 
+/**
+ * The apple-touch-icon: the 192 icon. Safari reads manifest icons only since iOS 15.4 and still prefers a
+ * <link rel="apple-touch-icon">, and a page without either gets a screenshot tile. iOS scales it to its own size
+ * and rounds the corners itself, which is why the artwork is a full-bleed square.
+ */
+export const APPLE_TOUCH_ICON = { url: ICONS[0].src, sizes: ICONS[0].sizes, type: ICONS[0].type };
+
 export function manifestFor(locale: Locale, t: ManifestTranslator): MetadataRoute.Manifest {
   return {
     id: "/worker",

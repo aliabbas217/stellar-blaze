@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { fontClassFor } from "@/app/fonts";
 import { titleTemplate } from "@/app/titles";
 import { themeScript } from "@/components/shell/theme-script";
-import { MANIFEST_COLORS } from "@/features/pwa/manifest";
+import { APPLE_TOUCH_ICON, MANIFEST_COLORS } from "@/features/pwa/manifest";
 import { dirFor } from "@/i18n/direction";
 import { routing } from "@/i18n/routing";
 import { QueryProvider } from "@/providers/QueryProvider";
@@ -39,6 +39,7 @@ export async function generateMetadata(props: LayoutProps<"/[locale]">): Promise
     description: t("appDescription"),
     // One manifest per locale so the installed app opens on /<locale>/worker (features/pwa/manifest.ts).
     manifest: `/${locale}/manifest.webmanifest`,
+    icons: { apple: [APPLE_TOUCH_ICON] },
   };
 }
 
