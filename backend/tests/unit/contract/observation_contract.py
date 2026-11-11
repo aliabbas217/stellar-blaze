@@ -2,10 +2,13 @@
 
 Import it as ``from tests.unit.contract.observation_contract import check_observation_source``.
 
-The suite makes two calls, and each is a separate request to the source: the window ``[start, end)`` and then the
-empty window ``[start, start)``. An adapter that talks to an HTTP API is tested with an ``httpx2.MockTransport``, and
-the handler must answer by request: it keys its response on the window parameters each request carries and serves a
-header-only (no reports) body for the empty window. It must not assert a fixed request sequence or count.
+The suite makes two calls, and each may be a separate request to the source: the window ``[start, end)`` and then
+the empty window ``[start, start)``. An adapter that talks to an HTTP API is tested with an ``httpx2.MockTransport``,
+and the handler must answer by request: it keys its response on the window parameters each request carries and serves
+a body with no reports in the window (for IEM a header-only CSV). It must not assert a fixed request sequence or
+count: an adapter may answer the empty window without any request. GHCNh has no per-window request at all, because it
+downloads the whole by-year file and filters it, so a "body with no reports in the window" there is the same by-year
+file, which the adapter filters down to an empty frame.
 """
 
 from datetime import datetime
@@ -26,6 +29,7 @@ async def check_observation_source(source: ObservationSource, station: Station, 
     Checks, in this order:
         * the frame has exactly the ``OBS_RAW_SCHEMA`` columns, order and dtypes, and at least one row;
         * every row is for ``station`` and has a non-null ``obs_time`` with ``start <= obs_time < end``;
+        * every row's ``source`` is ``source.name`` (the port says ``name`` is what the column carries);
         * the empty window ``[start, start)`` returns zero rows with the full schema and does not raise.
 
     Args:
@@ -61,6 +65,12 @@ async def check_observation_source(source: ObservationSource, station: Station, 
     assert outside.height == 0, (
         f"{where}: {outside.height} rows have obs_time outside [start, end), "
         f"for example {outside['obs_time'].head(3).to_list()}"
+    )
+
+    other_sources = frame.filter(pl.col("source").ne_missing(source.name))
+    assert other_sources.height == 0, (
+        f"{where}: {other_sources.height} rows have a source other than {source.name!r}, "
+        f"found {other_sources['source'].unique().to_list()}"
     )
 
     empty_where = (

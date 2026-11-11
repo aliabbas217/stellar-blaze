@@ -412,9 +412,12 @@ def test_delivery_result_optional_fields_default_to_none() -> None:
 
 
 class StubObservationSource:
-    """Returns ``frame`` for any non-empty window and ``empty`` (a frame, or an exception to raise) for an empty one."""
+    """Returns ``frame`` for any non-empty window and ``empty`` (a frame, or an exception to raise) for an empty one.
 
-    name = "stub"
+    Named like the frames of ``obs_frame`` (``source`` column ``"fake"``), so only the defect a test injects fails.
+    """
+
+    name = "fake"
 
     def __init__(self, frame: pl.DataFrame, *, empty: pl.DataFrame | Exception | None = None) -> None:
         self.frame = frame
@@ -463,6 +466,8 @@ BAD_OBSERVATION_FRAMES = {
     "before-start": (obs_frame([START - timedelta(seconds=1), *OBS_IN_WINDOW]), "outside [start, end)"),
     "at-end": (obs_frame([*OBS_IN_WINDOW, END]), "outside [start, end)"),
     "null-obs-time": (GOOD_OBS.with_columns(pl.col("obs_time").shift(1)), "null obs_time"),
+    "source-is-not-the-source-name": (GOOD_OBS.with_columns(pl.lit("iem").alias("source")), "source other than 'fake'"),
+    "null-source": (GOOD_OBS.with_columns(pl.lit(None, dtype=pl.String).alias("source")), "source other than 'fake'"),
     "no-rows": (GOOD_OBS.clear(), "no rows"),
 }
 
