@@ -28,3 +28,5 @@ Access granted: run it as a post-submission comparison on the archived (CC BY 4.
 
 ## Links
 [ADR 0005](0005-data-truth-features-and-validation.md) · [ADR 0020](0020-cut-aifs-feature-corrector.md) · [ADR 0034](0034-demo-strategy.md)
+
+- **2026-11-11 (amendment):** Ali confirmed the WeatherNext 3 access form was NOT sent. The condition resolves to "not requested"; the decision (not used for the 20 Nov build) stands. Revisit trigger unchanged.

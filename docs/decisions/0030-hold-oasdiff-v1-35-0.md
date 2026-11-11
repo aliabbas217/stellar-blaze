@@ -1,6 +1,6 @@
 # ADR 0030: Hold oasdiff at v1.35.0; defer newer versions to the post-submission dependency sweep
 
-- **Status:** Proposed (inherits the status of ADR 0009 §5, where the pin was made; becomes Accepted when Ali accepts 0009)
+- **Status:** Accepted (inherits 0009, accepted 2026-11-11) (inherits the status of ADR 0009 §5, where the pin was made; becomes Accepted when Ali accepts 0009)
 - **Date:** 2026-11-11
 - **Deciders:** Ali; the architect (Claude)
 - **Supersedes / superseded by:** none. Records ADR 0009 §5's pin choice with a trigger, which 0009's own revisit trigger does not cover

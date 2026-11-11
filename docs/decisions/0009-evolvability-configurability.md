@@ -1,6 +1,6 @@
 # ADR 0009: Evolvability, configurability and low blast radius
 
-- **Status:** Proposed (2026-11-11), for Ali's acceptance. **Partially superseded by ADR 0010 (2026-11-11):** §1 "Rules never hot-reload" (operating values now change at runtime within ranges the ruleset declares; rules and floors stay files), §3 rollback via `SB_MODEL_ID` + new revision, §4 for flags safe to flip live, and the "Not doing now" rows on flag services and DB-edited values. The text below is kept as decided.
+- **Status:** Accepted (Ali, in chat, 2026-11-11); previously Proposed (2026-11-11), for Ali's acceptance. **Partially superseded by ADR 0010 (2026-11-11):** §1 "Rules never hot-reload" (operating values now change at runtime within ranges the ruleset declares; rules and floors stay files), §3 rollback via `SB_MODEL_ID` + new revision, §4 for flags safe to flip live, and the "Not doing now" rows on flag services and DB-edited values. The text below is kept as decided.
 - **Evidence:** ADR 0001 (single-revision ACA, migrate job before rollout), 0002 (ports), 0004 (WhatsApp never live), 0006 (TWL zone edges, withdrawal limits undecided), 0007 (artefact list); sources cited inline, checked 2026-11-11
 
 ## Context

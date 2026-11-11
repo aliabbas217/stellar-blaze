@@ -12,8 +12,8 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0006](0006-physics-wbgt-phs-niosh-twl.md) | Physics: Liljegren WBGT, guarded ISO 7933 PHS, in-house NIOSH RAL/REL, TWL ported from an MIT reference | Accepted | 2026-11-11 | — |
 | [0007](0007-ml-quantile-corrector-conformal.md) | ML: LightGBM quantile corrector with conformalised quantile regression | Accepted | 2026-11-11 | — |
 | [0008](0008-backend-stack.md) | Backend stack and tooling | Accepted | 2026-11-11 | — |
-| [0009](0009-evolvability-configurability.md) | Evolvability, configurability and low blast radius | Proposed | 2026-11-11 | Partially superseded by 0010 |
-| [0010](0010-runtime-tunable-configuration.md) | Runtime-tunable configuration without redeployment | Proposed (§8 and the drafter accepted in chat; amendment 2026-11-11) | 2026-11-11 | Partially supersedes 0009 |
+| [0009](0009-evolvability-configurability.md) | Evolvability, configurability and low blast radius | Accepted (2026-11-11) | 2026-11-11 | Partially superseded by 0010 |
+| [0010](0010-runtime-tunable-configuration.md) | Runtime-tunable configuration without redeployment | Accepted (2026-11-11) | 2026-11-11 | Partially supersedes 0009 |
 | [0011](0011-heat-aware-planner.md) | Heat-aware shift planner: rule-based ADOSH planner + independent validator; roster question answered statically | Accepted, v2 (amendment 2026-11-11; header still reads Proposed) | 2026-11-11 | v2 replaced v1 in place while Proposed; v1 numbers superseded by 0033 |
 | [0012](0012-decision-record-process.md) | Decision-record process | Accepted | 2026-11-11 | — |
 | [0013](0013-cut-landsat-site-heat-layer.md) | Cut the Landsat LST site heat layer | Accepted | 2026-11-11 | — |
@@ -33,7 +33,7 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0027](0027-skip-storybook.md) | Skip Storybook; Vitest + Playwright per-state snapshots | Accepted | 2026-11-11 | — |
 | [0028](0028-defer-data-and-ops-libraries.md) | Defer TimescaleDB, PostGIS, MLflow, granian, hishel/cachetools, pandera | Accepted | 2026-11-11 | — |
 | [0029](0029-reject-litellm.md) | Reject LiteLLM | Accepted | 2026-11-11 | — |
-| [0030](0030-hold-oasdiff-v1-35-0.md) | Hold oasdiff at v1.35.0 | Proposed (inherits 0009) | 2026-11-11 | — |
+| [0030](0030-hold-oasdiff-v1-35-0.md) | Hold oasdiff at v1.35.0 | Accepted (inherits 0009) | 2026-11-11 | — |
 | [0031](0031-defer-azure-extras.md) | Defer Azure extras: GPU VM, UAE Central | Accepted | 2026-11-11 | — |
 | [0032](0032-reject-cctv-computer-vision.md) | Reject CCTV and per-worker computer vision | Accepted | 2026-11-10 | — |
 | [0033](0033-superseded-roster-headline-numbers.md) | Supersede the roster headline numbers (34.6% / 58.0%; v1 16.1% / 17.2%) | Accepted | 2026-11-11 | Supersedes Feasibility §0/§2 absolute numbers and ADR 0011 v1 numbers |

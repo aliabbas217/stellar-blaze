@@ -1,6 +1,6 @@
 # ADR 0010: Runtime-tunable configuration without redeployment
 
-- **Status:** Proposed (2026-11-11), for Ali's acceptance. **Partially supersedes ADR 0009** (§1 "Loading": the last sentence; §3 the env-var rollback; §4 for flags that are safe to flip live; two rows of "Not doing now"). 0009's text is not rewritten; it carries a pointer to this ADR.
+- **Status:** Accepted (Ali, in chat, 2026-11-11); previously Proposed (2026-11-11), for Ali's acceptance. **Partially supersedes ADR 0009** (§1 "Loading": the last sentence; §3 the env-var rollback; §4 for flags that are safe to flip live; two rows of "Not doing now"). 0009's text is not rewritten; it carries a pointer to this ADR.
 - **Evidence:** ADR 0001, 0002, 0006, 0007, 0009; `docs/research/2026-11-11-judges-and-wow-moment.md` (cuts approved; the compliance-report LLM drafter is kept as one bounded, read-only feature). Sources checked 2026-11-11 are cited inline.
 
 ## Context
