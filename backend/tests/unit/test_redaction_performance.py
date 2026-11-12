@@ -6,12 +6,14 @@ word boundary, and the URL pattern read an unbounded scheme from every position.
 2026-11-12 with the old code, 8 KB of ``a-`` took 2.7 s, 8 KB of ``eyJ-`` 1.3 s and 8 KB of ``secret-`` 0.84 s; 64 KB of
 ``a-`` takes minutes.
 
-Measured with the fix, one ``redact`` call over 64 KB took 0.2 to 16 ms for every input below (the worst is ``eyJ-``
-repeated; most take 3 to 8 ms), and the unbounded-text scan itself is linear: 256 KB took four times what 64 KB took.
-The assertion is 0.5 s, thirty times the worst measurement, so that a loaded CI runner does not make it flaky, and it is
-still orders of magnitude under what a quadratic pattern needs at this size. Each input is tried at the ceiling
-(``MAX_REDACTED_CHARS``, scanned whole) and at 64 KB (cut to head and tail first), so a pattern that is slow cannot hide
-behind the cut.
+Measured with the fix, one ``redact`` call over 64 KB took 35 ms at worst for every input below (``eyJ-`` repeated; the
+mean is 12 ms). Since the masking moved in front of the cut (post-final fix), a text over the ceiling is masked in two
+windows of 36,832 characters (the kept part and the 20 KB of context past each cut), so the work is set by the windows
+and not by the input: 256 KB and 1 MB took what 64 KB took. At the ceiling itself the worst was 21 ms.
+The assertion is 0.5 s, fourteen times the worst measurement, so that a loaded CI runner does not make it flaky, and it
+is still orders of magnitude under what a quadratic pattern needs at this size. Each input is tried at the ceiling
+(``MAX_REDACTED_CHARS``, scanned whole) and at 64 KB (masked in two windows first), so a pattern that is slow cannot
+hide behind the cut.
 """
 
 import time

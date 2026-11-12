@@ -179,9 +179,10 @@ def test_redact_keeps_the_head_and_the_tail_of_a_text_over_the_ceiling_and_masks
     assert "hunter" not in out  # the masked head and tail, and the middle that is gone
 
 
-def test_redact_cuts_an_oversized_text_at_whitespace_so_that_no_credential_is_split() -> None:
+def test_redact_of_an_oversized_text_holds_no_fragment_of_a_credential_whichever_character_the_cut_falls_on() -> None:
     # The same URL, repeated, with the start shifted one character at a time: whichever character of the user name or
-    # password the nominal cut falls on, the output holds no fragment of either, because the cut moves to a space.
+    # password the nominal cut falls on, the output holds no fragment of either, because the text is masked before it
+    # is cut. (Every other credential shape, at every alignment with each cut: test_redaction_straddling.py.)
     for shift in range(30):
         word = "postgresql://sb:hunter2@db/x "
         text = "y" * shift + " " + word * (3 * MAX_REDACTED_CHARS // len(word))

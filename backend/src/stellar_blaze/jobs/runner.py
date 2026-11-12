@@ -2,7 +2,9 @@
 
 ``run_job`` is what every ``sb-jobs`` command goes through, so they all behave alike: a second run of the same command
 while one is active is recorded as ``skipped_locked`` and exits 0 (a scheduler's overlap, not an error); a run that
-raises is recorded as ``failed`` with a description that carries no credentials, and exits 1.
+raises is recorded as ``failed`` with a description of the exception and exits 1. The description is passed through
+``redaction.redact``, which masks the credentials it recognizes (URL userinfo, ``password=``-style pairs, headers,
+tokens): a pattern mask, not a guarantee, so the code that raises must still keep secrets out of its messages.
 """
 
 import asyncio
@@ -29,9 +31,10 @@ def describe_error(exc: BaseException) -> str:
     DSN, and the audit table must never hold a password.
 
     The cut to 2000 characters comes after the masking, never before it: a cut that fell inside a URL's credentials
-    would leave a password that no pattern recognizes. The work is bounded all the same, because ``redact`` itself keeps
-    only the head and the tail of anything over ``MAX_REDACTED_CHARS`` (cutting at whitespace where it can), so a
-    message that quotes a megabyte of response body costs what one of 32 KB costs.
+    would leave a password that no pattern recognizes. The work is bounded all the same, because ``redact`` itself
+    keeps only the head and the tail of anything over ``MAX_REDACTED_CHARS`` (each end masked, with the text around the
+    cut, before it is cut, never after), so a message that quotes a megabyte of response body costs what one of 74 KB
+    costs.
     """
     message = f"{type(exc).__name__}: {redact(str(exc))}".strip()
     return message if len(message) <= _MAX_ERROR_CHARS else message[:_MAX_ERROR_CHARS] + "..."

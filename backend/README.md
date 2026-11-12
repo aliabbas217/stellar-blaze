@@ -169,8 +169,10 @@ exception itself and masks what looks like a credential (URL user and password, 
 `Authorization` headers, bearer tokens, JSON Web Tokens and cookies) in the message, the traceback and the stack
 (`redaction.redact`, `logging.redact_exceptions`). A secret in any other shape is not recognized, and the other fields of
 a log line are not scanned, so code must keep secrets out of messages and fields; the mask is the last line of defense.
-Text over 32 KB keeps its first and last 16 KB around an elision marker. The JSON `exception` field is the redacted
-traceback as text.
+Text over 32 KB keeps its first and last 16 KB around an elision marker; each end is masked, together with 20 KB of the
+text past the cut, before it is cut, so a credential that straddles a cut is masked like any other (one with no bound
+in the patterns, such as a URL password or a quoted value, that runs over 20 KB past a cut is the exception). The JSON
+`exception` field is the redacted traceback as text.
 
 ### Where the files go
 

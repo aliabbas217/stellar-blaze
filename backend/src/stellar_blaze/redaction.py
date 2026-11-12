@@ -7,7 +7,8 @@ messages; it is also cheap enough to run over every log line's exception text (`
 
 "Cheap" is a property this module enforces, because the text it sees is not under our control (an exception can quote a
 whole response body): every pattern is either linear in the length of the text or bounded per position, and ``redact``
-never scans more than ``MAX_REDACTED_CHARS`` characters (a longer text keeps its head and its tail, see ``redact``).
+never scans more than twice ``_KEPT_CHARS + _CONTEXT_CHARS`` characters (about 74 KB) whatever the length of its
+input: a text over ``MAX_REDACTED_CHARS`` keeps its head and its tail (see ``redact``).
 ``tests/unit/test_redaction_performance.py`` holds the adversarial inputs and the measured times.
 """
 
@@ -17,13 +18,22 @@ from typing import Any, Final
 _MASK: Final = "***"
 
 MAX_REDACTED_CHARS: Final = 32_768
-"""The longest text ``redact`` scans whole. A longer one is cut to its head and its tail around an elision marker, so
-the work per call has a ceiling whatever the caller passes (a traceback is 1 to 10 KB; 32 KB is a deep chain)."""
+"""The longest text ``redact`` returns whole. A longer one is cut to its head and its tail around an elision marker, so
+that what a log line or a database row holds has a ceiling whatever the caller passes (a traceback is 1 to 10 KB; 32 KB
+is a deep chain)."""
 
 # Each kept part is a little under half of the ceiling, so that the two parts and the marker stay under it.
 _KEPT_CHARS: Final = (MAX_REDACTED_CHARS - 64) // 2
-# A cut is moved to the nearest whitespace within this many characters, so that it does not fall inside a URL or a
-# token (a credential split by a cut loses the context that identifies it).
+# How far past a cut the text is read before it is masked, so that a credential that straddles the cut is seen whole.
+# Masking after the cut is what leaked: a part that began at "Bearer", at "password:" or at a bare value has lost the
+# words that make the rest a credential. The longest span a pattern here recognizes and bounds is a JSON Web Token
+# (1,024 + 16,384 characters in its first two segments, then the signature, which is a few hundred); an Authorization
+# or Cookie header line is under 8 KB where a server accepts it. 20 KB covers all of them. A URL password, a quoted
+# value or a cookie line has no bound in the patterns, so one that runs more than this far past a cut is not seen whole
+# there; ``redact`` says so.
+_CONTEXT_CHARS: Final = 20_480
+# A cut is moved to the nearest whitespace within this many characters of the masked text, so that it does not leave
+# half a word. This is for the reader: what keeps a credential out of the output is that the text is masked first.
 _CUT_SLACK_CHARS: Final = 256
 
 # scheme://user:password@host. The credentials run, greedily, up to the last "@" of the whitespace-delimited word: a
@@ -109,18 +119,44 @@ def _mask(text: str) -> str:
     return _SECRET_PAIR.sub(rf"\g<key>\g<sep>{_MASK}", masked)
 
 
-def _head_and_tail(text: str) -> tuple[str, str]:
-    """The first and the last ``_KEPT_CHARS`` characters of ``text``, each cut back to a whitespace when one is near."""
-    head, tail = text[:_KEPT_CHARS], text[-_KEPT_CHARS:]
-    for index in range(len(head) - 1, len(head) - _CUT_SLACK_CHARS - 1, -1):
-        if head[index].isspace():
-            head = head[:index]
-            break
-    for index, char in enumerate(tail[:_CUT_SLACK_CHARS]):
-        if char.isspace():
-            tail = tail[index + 1 :]
-            break
-    return head, tail
+def _end_at_whitespace(masked: str, end: int) -> str:
+    """``masked[:end]``, ended at the nearest whitespace within ``_CUT_SLACK_CHARS`` before ``end`` if there is one."""
+    end = max(end, 0)
+    for index in range(end - 1, max(end - _CUT_SLACK_CHARS, 0) - 1, -1):
+        if masked[index].isspace():
+            return masked[:index]
+    return masked[:end]
+
+
+def _start_at_whitespace(masked: str, start: int) -> str:
+    """``masked[start:]``, started after the nearest whitespace within ``_CUT_SLACK_CHARS`` after ``start``, if any."""
+    for index in range(start, min(start + _CUT_SLACK_CHARS, len(masked))):
+        if masked[index].isspace():
+            return masked[index + 1 :]
+    return masked[start:]
+
+
+def _masked_head_and_tail(text: str) -> tuple[str, str]:
+    """The masked first and last ``_KEPT_CHARS`` characters or so of ``text``, masked before they are cut.
+
+    Each end is read with ``_CONTEXT_CHARS`` more characters, past the cut, masked as a whole, and then trimmed; the raw
+    text is never cut. A credential that straddles the nominal cut is therefore masked as it is anywhere else, and the
+    trim only removes characters from text that is already masked.
+
+    The trim also keeps ``_CONTEXT_CHARS`` of masked text between what is shown and the outer edge of each window. A
+    window is cut out of the text, so a credential that crosses its outer edge is cut as well and may not be recognized
+    (a URL whose ``@`` is past the edge, a quoted value whose closing quote is). What is left of it is in the last
+    ``_CONTEXT_CHARS`` characters of the masked head, or the first of the masked tail, and none of that is shown. The
+    offsets are taken in the masked text, so what masking took out of a window is not given back: a text that is mostly
+    credentials shows less, and one that is nothing but credentials shows nothing. (A cut by the length of the kept
+    part alone would show up to the very edge of a window that masking had shortened, unfinished credential and all.)
+    """
+    reach = _KEPT_CHARS + _CONTEXT_CHARS
+    head, tail = _mask(text[:reach]), _mask(text[-reach:])
+    return (
+        _end_at_whitespace(head, min(_KEPT_CHARS, len(head) - _CONTEXT_CHARS)),
+        _start_at_whitespace(tail, max(len(tail) - _KEPT_CHARS, _CONTEXT_CHARS)),
+    )
 
 
 def redact(text: str) -> str:
@@ -130,17 +166,26 @@ def redact(text: str) -> str:
     ``Authorization`` headers, bearer tokens, JSON Web Tokens, cookies, and ``password=...``, ``token: ...`` and
     ``"api_key": "..."`` pairs.
 
-    A text longer than ``MAX_REDACTED_CHARS`` is not scanned whole: it keeps its first and its last 16,000 characters
-    or so, each masked on its own, around ``[... N chars elided ...]``. What is in the elided middle is gone, secret or
-    not, so nothing in it can reach a log or a database. A cut that falls inside a credential cannot be recognized as
-    one, so the cuts are moved to a whitespace when there is one within 256 characters; the credentials this masks are
-    words without whitespace.
+    A text longer than ``MAX_REDACTED_CHARS`` keeps its first and its last 16,000 characters or so around
+    ``[... N chars elided ...]``. What is in the elided middle is gone, secret or not, so nothing in it can reach a log
+    or a database. The masking comes before the cut, never after: each end is masked together with ``_CONTEXT_CHARS``
+    (20,480) characters past the cut, and the cut is made in the masked text. A credential with whitespace in it
+    (``Authorization: Bearer <token>``, ``password: <value>``, a JSON pair, a quoted value of several words, a cookie
+    line) is masked whichever of its characters the cut falls on, because the words that identify it are in the text
+    that is masked; cutting the raw text first left the part after the cut starting at a bare value.
+
+    What this does not cover is a credential that no pattern bounds and that runs more than ``_CONTEXT_CHARS``
+    characters past a cut: a URL password, a quoted value or a cookie line of over 20 KB. (A JSON Web Token is covered:
+    its pattern accepts at most 17 KB before the signature.)
+
+    ``N`` is the length of ``text`` minus the lengths of the two masked parts that are shown, so it differs from the
+    number of characters left out by what the masking added or removed in those parts.
     """
     if len(text) <= MAX_REDACTED_CHARS:
         return _mask(text)
-    head, tail = _head_and_tail(text)
+    head, tail = _masked_head_and_tail(text)
     elided = len(text) - len(head) - len(tail)
-    return f"{_mask(head)} [... {elided} chars elided ...] {_mask(tail)}"
+    return f"{head} [... {elided} chars elided ...] {tail}"
 
 
 def describe_exception(exc: BaseException, *, max_chars: int = 500) -> str:
