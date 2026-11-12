@@ -5,15 +5,15 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | # | Title | Status | Date | Supersedes / superseded by |
 |---|---|---|---|---|
 | [0001](0001-hosting-azure-uae-north.md) | Host on Azure UAE North (Container Apps + Postgres Flexible), Render as fallback | Accepted | 2026-11-11 | — |
-| [0002](0002-infra-minimalism-and-ports.md) | Postgres-only infrastructure; three ports now, four deferred with triggers | Accepted (amended 2026-11-11: pointer) | 2026-11-11 | — |
+| [0002](0002-infra-minimalism-and-ports.md) | Postgres-only infrastructure; three ports now, four deferred with triggers | Accepted (amended 2026-11-11: pointer; 2026-11-12: B1 as built) | 2026-11-11 | — |
 | [0003](0003-frontend-single-nextjs-app-pwa.md) | One Next.js 16 app with worker / supervisor / hse route groups; worker view is an installable PWA (no native app) | Accepted | 2026-11-11 | — |
 | [0004](0004-tiered-alert-delivery.md) | Tiered alert delivery: site/crew Web Push, personal risk on app open, supervisor crew relay (WhatsApp/SMS adapter-only) | Accepted | 2026-11-11 | — |
-| [0005](0005-data-truth-features-and-validation.md) | Data: IEM METAR truth, GHCNh audit, Open-Meteo Previous Runs features, cluster-held-out validation | Accepted | 2026-11-11 | — |
-| [0006](0006-physics-wbgt-phs-niosh-twl.md) | Physics: Liljegren WBGT, guarded ISO 7933 PHS, in-house NIOSH RAL/REL, TWL ported from an MIT reference | Accepted | 2026-11-11 | — |
+| [0005](0005-data-truth-features-and-validation.md) | Data: IEM METAR truth, GHCNh audit, Open-Meteo Previous Runs features, cluster-held-out validation | Accepted (amended 2026-11-12: B1 as built) | 2026-11-11 | — |
+| [0006](0006-physics-wbgt-phs-niosh-twl.md) | Physics: Liljegren WBGT, guarded ISO 7933 PHS, in-house NIOSH RAL/REL, TWL ported from an MIT reference | Accepted (amended 2026-11-12: B1 as built) | 2026-11-11 | — |
 | [0007](0007-ml-quantile-corrector-conformal.md) | ML: LightGBM quantile corrector with conformalised quantile regression | Accepted | 2026-11-11 | — |
-| [0008](0008-backend-stack.md) | Backend stack and tooling | Accepted | 2026-11-11 | — |
-| [0009](0009-evolvability-configurability.md) | Evolvability, configurability and low blast radius | Accepted (2026-11-11) | 2026-11-11 | Partially superseded by 0010 |
-| [0010](0010-runtime-tunable-configuration.md) | Runtime-tunable configuration without redeployment | Accepted (2026-11-11) | 2026-11-11 | Partially supersedes 0009 |
+| [0008](0008-backend-stack.md) | Backend stack and tooling | Accepted (amended 2026-11-12: B1 as built) | 2026-11-11 | — |
+| [0009](0009-evolvability-configurability.md) | Evolvability, configurability and low blast radius | Accepted (2026-11-11; amended 2026-11-12: B1 as built) | 2026-11-11 | Partially superseded by 0010 |
+| [0010](0010-runtime-tunable-configuration.md) | Runtime-tunable configuration without redeployment | Accepted (2026-11-11; amended 2026-11-12: B1 as built) | 2026-11-11 | Partially supersedes 0009 |
 | [0011](0011-heat-aware-planner.md) | Heat-aware shift planner: rule-based ADOSH planner + independent validator; roster question answered statically | Accepted, v2 (amendment 2026-11-11; header still reads Proposed) | 2026-11-11 | v2 replaced v1 in place while Proposed; v1 numbers superseded by 0033 |
 | [0012](0012-decision-record-process.md) | Decision-record process | Accepted | 2026-11-11 | — |
 | [0013](0013-cut-landsat-site-heat-layer.md) | Cut the Landsat LST site heat layer | Accepted | 2026-11-11 | — |
@@ -42,6 +42,12 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0036](0036-team-and-naming-in-submission.md) | Solo entrant; only Ali named in the submission | Accepted | 2026-11-10 | Supersedes the competition brief's "1–2 people" line |
 | [0037](0037-reverse-0014-cinematic-3d-landing.md) | Reverse 0014 for the judge landing: cinematic 3D heat field of real IFS data, 2D fallback, hard performance budget | Accepted (treatment follows the picked v2 direction) | 2026-11-11 | Supersedes 0014 for the landing only |
 | [0038](0038-agentic-workflows-and-voice.md) | Agentic workflows and voice: voice and free text are PERSONAL and self-hosted only (STT + LLM), fail closed; Deepgram and Web Speech rejected; Tier A ports/tests MUST, Tier B voice site-setup SHOULD (gated) | Proposed | 2026-11-11 | Extends 0010 §8 to audio; does not reopen 0015 or 0004 |
+| [0039](0039-phs-exceeds-model-range-is-the-most-severe-band.md) | A PHS result above 42 °C is `exceeds_model_range`, the most severe band, never "missing" | Accepted-by-controller (B1 ruling, awaiting Ali's review) | 2026-11-12 | Refines the PHS output guard of 0006 (0006 amended, text unchanged) |
+| [0040](0040-task-11-gate-stricter-than-the-brief.md) | The gold-dataset regression gate is stricter than the B1 brief: 1e-6, exact group sets, a WBGT check that cannot pass with the axis dead | Accepted-by-controller (B1 ruling, awaiting Ali's review) | 2026-11-12 | Departs from B1 plan Task 11 wording; implements 0005 "a mismatch stops B2" |
+| [0041](0041-config-rollback-token-and-dev-pin-precedence.md) | Config rollback carries an expected-previous token; a dev environment pin is not overridden by DB activations | Accepted-by-controller (B1 ruling, awaiting Ali's review) | 2026-11-12 | Fills gaps in 0010 §3 and §4.6 (0010 amended) |
+| [0042](0042-postgres-tls-must-be-verified-in-prod.md) | The production Postgres connection verifies the server (`ssl=verify-full`, Azure roots via `PGSSLROOTCERT`); I1 enforces it at deploy time | Accepted-by-controller (B1 ruling, awaiting Ali's review) | 2026-11-12 | Corrects `ssl=require` in the I1 plan and a parking-lot row; extends 0001 |
+| [0043](0043-structural-log-redaction.md) | Credentials are masked structurally by one log processor in front of every renderer, not at each call site | Accepted-by-controller (B1 ruling, awaiting Ali's review) | 2026-11-12 | Extends 0008 (0008 amended) |
+| [0044](0044-defer-tunable-range-pin-comparison-to-b3.md) | Defer the comparison of tunable defaults and ranges in the prod pin check to B3, gated before `ae-heat-2026.1` | Accepted-by-controller (B1 ruling, awaiting Ali's review); needs Ali's attention | 2026-11-12 | Qualifies 0010 §4.3 (0010 amended) |
 
 ## Decisions recorded inside earlier ADRs (linked, not duplicated)
 | Cut / park / defer | Where decided |
