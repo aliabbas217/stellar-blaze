@@ -2,7 +2,14 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { browserEffects, type ProfileEffects } from "@/features/profile/effects";
 import { isNonEmptyString, toProfile, type Profile } from "@/features/profile/profile-shape";
-import { clearRevokeIncomplete, markRevokeIncomplete, readRevokeIncomplete, type RevokeStep } from "@/features/profile/revoke-marker";
+import {
+  beginRevokeActivity,
+  clearRevokeIncomplete,
+  endRevokeActivity,
+  markRevokeIncomplete,
+  readRevokeIncomplete,
+  type RevokeStep,
+} from "@/features/profile/revoke-marker";
 import {
   hasUnpersistedPendingDeletes,
   readPendingDeletes,
@@ -79,7 +86,9 @@ export interface ProfileState {
    * Finishes what an earlier revoke did not (ruling R36), for Alerts opening and the app's push reconcile: the caches and
    * the expiration record again, and the registrations owed to the API. It never touches the profile, the push state or
    * the browser's subscription, because the worker may have set up again since. Resolves the outcome of what it tried, or
-   * null when there was nothing to do. A call while a revoke runs waits for it; calls do not overlap.
+   * null when there was nothing to tell (nothing to do, an owed registration retried quietly, or a revoke began meanwhile).
+   * A call while a revoke runs returns that revoke's outcome; a revoke that starts while a resume runs supersedes it (the
+   * resume finishes, leaves the marker alone and resolves null); two resumes do not overlap.
    */
   readonly resume: () => Promise<RevokeOutcome | null>;
 }
@@ -126,6 +135,12 @@ async function clearBoth(effects: ProfileEffects): Promise<void> {
  * Clears the caches and the expiration record, then looks: a response the service worker was still fetching when the
  * clearing ran is written after it (a NetworkFirst answer arriving late), and brings a cache and a row back (ruling R36).
  * If anything is there, or the look cannot be made, the whole clearing is done once more; a second failure is thrown.
+ *
+ * KNOWN LIMIT (ruling R38): the look is made once, straight after the clearing, and there is no settling delay. A response
+ * that reaches Cache Storage later than that re-creates its cache, and "done" has already been said. It is accepted: a delay
+ * would hold the worker's screen on "please wait" for a guess, and the worker is still on the page, which the service
+ * worker caches again by design (so no check could ever promise an empty Cache Storage while the app is open). What is
+ * cached is the same for everyone at a site (ADR 0004) and expires after 48 hours.
  */
 async function clearDeviceData(effects: ProfileEffects): Promise<void> {
   let reason: unknown;
@@ -182,6 +197,9 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
   const effects: ProfileEffects = { ...browserEffects, ...options.effects };
   let revoking: Promise<RevokeOutcome> | null = null;
   let resuming: Promise<RevokeOutcome | null> | null = null;
+  // Counts the revokes that have started. A resume remembers the count it began under: if it has moved when the resume
+  // ends, a revoke began meanwhile, owns the marker, and the resume must not write or clear it (ruling R36).
+  let generation = 0;
 
   const store = create<ProfileState>()(
     persist(
@@ -212,6 +230,10 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
           // it. A page that dies in the middle still leaves both. The id's write is read back; if it did not take, the
           // id is kept in memory and retried below, and reported if it is still owed at the end.
           const serverId = get().push?.serverId ?? null;
+          generation += 1;
+          // The screen is told a removal is running before the marker exists: the marker names every step as unfinished,
+          // and a screen that read it without knowing would announce a failure that has not happened (NB1).
+          beginRevokeActivity();
           markRevokeIncomplete(["storage", "alerts", "cache"]);
           if (serverId !== null) rememberPendingDelete(serverId);
 
@@ -253,8 +275,10 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
             else markRevokeIncomplete(failed);
             return outcome;
           });
+          // Over only after the marker has its last word (cleared, or naming what failed).
           revoking = started.finally(() => {
             revoking = null;
+            endRevokeActivity();
           });
           return revoking;
         },
@@ -264,6 +288,12 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
 
           const marker = readRevokeIncomplete();
           if (marker === null && readPendingDeletes().length === 0) return Promise.resolve(null);
+
+          // A revoke and a resume can overlap in one direction only: a revoke does not wait for a resume (the worker's tap
+          // is not held up), it supersedes it. The resume then finishes what it was doing, and leaves the marker alone.
+          const mine = generation;
+          // Visible to the screen only when there is an unfinished removal to report on; an owed registration alone is a quiet retry.
+          if (marker !== null) beginRevokeActivity();
 
           const run = async (): Promise<RevokeOutcome> => {
             // Only what is idempotent and owed: the caches, if that step was unfinished, and the API's registrations.
@@ -275,17 +305,20 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
             const failed: RevokeStep[] = (marker?.steps ?? []).filter((step) => step !== "cache" || cacheStep.status === "rejected");
             if (hasUnpersistedPendingDeletes() && !failed.includes("storage")) failed.unshift("storage");
             const outcome: RevokeOutcome = { failed, pending: readPendingDeletes().length > 0 };
-            if (marker !== null) {
+            // Only if no revoke began meanwhile: the marker is then that revoke's, and what this resume read is out of date.
+            if (marker !== null && generation === mine) {
               if (isRevokeComplete(outcome)) clearRevokeIncomplete();
               else markRevokeIncomplete(failed);
             }
             return outcome;
           };
           // With no unfinished revoke behind it (an owed registration alone) it is a quiet retry: nothing to tell the worker.
+          // A superseded resume tells the page nothing either: the revoke that superseded it has its own outcome.
           resuming = run()
-            .then((outcome) => (marker === null ? null : outcome))
+            .then((outcome) => (marker === null || generation !== mine ? null : outcome))
             .finally(() => {
               resuming = null;
+              if (marker !== null) endRevokeActivity();
             });
           return resuming;
         },

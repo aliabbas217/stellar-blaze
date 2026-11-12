@@ -7,7 +7,16 @@ import {
   type PushRegistration,
 } from "@/features/profile/store";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
-import { clearRevokeIncomplete, INCOMPLETE_KEY, markRevokeIncomplete, readRevokeIncomplete } from "@/features/profile/revoke-marker";
+import {
+  clearRevokeIncomplete,
+  endRevokeActivity,
+  INCOMPLETE_KEY,
+  markRevokeIncomplete,
+  readRevokeActive,
+  readRevokeIncomplete,
+  subscribeRevokeActive,
+  subscribeRevokeIncomplete,
+} from "@/features/profile/revoke-marker";
 import {
   forgetPendingDelete,
   hasUnpersistedPendingDeletes,
@@ -45,6 +54,7 @@ function forgetEverythingOwed(): void {
   vi.restoreAllMocks();
   for (const id of readPendingDeletes()) forgetPendingDelete(id);
   clearRevokeIncomplete();
+  while (readRevokeActive()) endRevokeActivity();
 }
 
 beforeEach(() => {
@@ -1070,5 +1080,255 @@ describe("the epoch moves without writing (ruling R37, M3)", () => {
       expect(thisTab.getState().revokeEpoch).toBe(1);
     });
     expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
+  });
+});
+
+/** A promise a test settles by hand. */
+function gate<T = void>() {
+  let open: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    open = resolve;
+  });
+  return { promise, open };
+}
+
+describe("a removal that is running is not a removal that failed (ruling R36, NB1)", () => {
+  it("is active from before the marker is written until after its last word, and not a moment longer", async () => {
+    const seen: { event: string; active: boolean; marker: string | null }[] = [];
+    const stopMarker = subscribeRevokeIncomplete(() => {
+      seen.push({ event: "marker", active: readRevokeActive(), marker: localStorage.getItem(INCOMPLETE_KEY) });
+    });
+    const stopActive = subscribeRevokeActive(() => {
+      seen.push({ event: readRevokeActive() ? "on" : "off", active: readRevokeActive(), marker: localStorage.getItem(INCOMPLETE_KEY) });
+    });
+    const store = createProfileStore({ effects: fakeEffects() });
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+    stopMarker();
+    stopActive();
+
+    // On first. Then the marker is written (the screen would read it, and must already know a removal is running)...
+    expect(seen[0]).toMatchObject({ event: "on", active: true });
+    expect(seen[1]).toMatchObject({ event: "marker", active: true });
+    // ...and it goes off only after the marker has been cleared: a complete removal leaves nothing to misread.
+    expect(seen.at(-1)).toMatchObject({ event: "off", active: false, marker: null });
+  });
+
+  it("is active while the effects run, with the marker already naming every step", async () => {
+    const mid: { active: boolean; marker: string | null }[] = [];
+    const effects = fakeEffects({
+      unsubscribe: vi.fn(() => {
+        mid.push({ active: readRevokeActive(), marker: localStorage.getItem(INCOMPLETE_KEY) });
+        return Promise.resolve();
+      }),
+    });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+
+    expect(mid).toHaveLength(1);
+    expect(mid[0]?.active).toBe(true);
+    expect(JSON.parse(mid[0]?.marker ?? "null")).toMatchObject({ steps: ["storage", "alerts", "cache"] });
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it.each([
+    ["an effect fails", { unsubscribe: vi.fn(() => Promise.reject(new Error("offline"))) }],
+    [
+      "an effect throws",
+      {
+        clearCaches: vi.fn(() => {
+          throw new TypeError("no caches");
+        }),
+      },
+    ],
+    ["the check cannot be made", { deviceDataRemains: vi.fn(() => Promise.reject(new Error("unavailable"))) }],
+  ])("is not left on when %s", async (_name, overrides) => {
+    const store = createProfileStore({ effects: fakeEffects(overrides) });
+    store.getState().save(profile);
+
+    const outcome = await store.getState().revoke();
+
+    expect(isRevokeComplete(outcome)).toBe(false);
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it("is not left on when an effect never answers: the step limit ends it", async () => {
+    vi.useFakeTimers();
+    const effects = fakeEffects({ unsubscribe: vi.fn(() => new Promise<void>(() => undefined)) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    const running = store.getState().revoke();
+    expect(readRevokeActive()).toBe(true);
+    await vi.advanceTimersByTimeAsync(REVOKE_STEP_TIMEOUT_MS);
+    await running;
+
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it("counts a revoke that joins a running one once", async () => {
+    const hold = gate();
+    const effects = fakeEffects({ unsubscribe: vi.fn(() => hold.promise) });
+    const store = createProfileStore({ effects });
+    store.getState().setPush(registration);
+
+    const first = store.getState().revoke();
+    const second = store.getState().revoke();
+    hold.open();
+    await Promise.all([first, second]);
+
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it("is active while resume finishes an unfinished removal, and not afterwards", async () => {
+    markRevokeIncomplete(["cache"]);
+    const mid: boolean[] = [];
+    const effects = fakeEffects({
+      clearCaches: vi.fn(() => {
+        mid.push(readRevokeActive());
+        return Promise.resolve();
+      }),
+    });
+    const store = createProfileStore({ effects });
+
+    await store.getState().resume();
+
+    expect(mid).toEqual([true]);
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it("is never active for a quiet resume (an owed registration alone): there is nothing to announce", async () => {
+    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+    const mid: boolean[] = [];
+    const effects = fakeEffects({
+      deleteRegistration: vi.fn(() => {
+        mid.push(readRevokeActive());
+        return Promise.resolve(true);
+      }),
+    });
+    const store = createProfileStore({ effects });
+
+    await store.getState().resume();
+
+    expect(mid).toEqual([false]);
+  });
+
+  it("is not left on when resume is superseded by a revoke", async () => {
+    markRevokeIncomplete(["cache"]);
+    const hold = gate();
+    const effects = fakeEffects({
+      clearCaches: vi
+        .fn()
+        .mockImplementationOnce(() => hold.promise)
+        .mockResolvedValue(undefined),
+    });
+    const store = createProfileStore({ effects });
+
+    const resuming = store.getState().resume();
+    await store.getState().revoke();
+    hold.open();
+    await resuming;
+
+    expect(readRevokeActive()).toBe(false);
+  });
+});
+
+describe("revoke and resume do not overlap (ruling R36, NB2)", () => {
+  /** A store whose first cache clearing (the resume's) waits for the test, and whose revoke waits on a second gate. */
+  function overlapping() {
+    markRevokeIncomplete(["cache", "alerts"]);
+    const resumeClearing = gate();
+    const revokeBrowserStep = gate();
+    const effects = fakeEffects({
+      clearCaches: vi
+        .fn()
+        .mockImplementationOnce(() => resumeClearing.promise)
+        .mockResolvedValue(undefined),
+      unsubscribe: vi.fn(() => revokeBrowserStep.promise),
+    });
+    return { store: createProfileStore({ effects }), effects, resumeClearing, revokeBrowserStep };
+  }
+
+  it("a resume that ends after a revoke began does not erase the revoke's marker, and tells the page nothing", async () => {
+    const { store, resumeClearing, revokeBrowserStep } = overlapping();
+    const resuming = store.getState().resume();
+    store.getState().save(profile);
+    const revoking = store.getState().revoke();
+    const writtenByRevoke = readRevokeIncomplete();
+    expect(writtenByRevoke?.steps).toEqual(["storage", "alerts", "cache"]);
+
+    resumeClearing.open();
+    expect(await resuming).toBeNull();
+
+    // The resume saw nothing left to do and would have cleared the marker: the revoke is still running and owns it.
+    expect(readRevokeIncomplete()).toEqual(writtenByRevoke);
+    expect(localStorage.getItem(INCOMPLETE_KEY)).not.toBeNull();
+
+    revokeBrowserStep.open();
+    expect(await revoking).toEqual(COMPLETE);
+    expect(readRevokeIncomplete()).toBeNull();
+  });
+
+  it("a resume that ends after a revoke has finished does not write the old steps back", async () => {
+    const { store, resumeClearing, revokeBrowserStep } = overlapping();
+    const resuming = store.getState().resume();
+    const revoking = store.getState().revoke();
+    revokeBrowserStep.open();
+    expect(await revoking).toEqual(COMPLETE);
+    expect(readRevokeIncomplete()).toBeNull();
+
+    resumeClearing.open();
+    expect(await resuming).toBeNull();
+
+    // The marker the resume read named "alerts"; written back now, it would claim an unfinished removal that finished.
+    expect(readRevokeIncomplete()).toBeNull();
+    expect(localStorage.getItem(INCOMPLETE_KEY)).toBeNull();
+  });
+
+  it("a resume that ends after a revoke began does not hide the revoke's own failure", async () => {
+    markRevokeIncomplete(["cache"]);
+    const resumeClearing = gate();
+    const effects = fakeEffects({
+      clearCaches: vi
+        .fn()
+        .mockImplementationOnce(() => resumeClearing.promise)
+        .mockRejectedValue(new Error("quota")),
+    });
+    const store = createProfileStore({ effects });
+
+    const resuming = store.getState().resume();
+    const outcome = await store.getState().revoke();
+    resumeClearing.open();
+    await resuming;
+
+    expect(outcome).toEqual({ failed: ["cache"], pending: false });
+    expect(readRevokeIncomplete()?.steps).toEqual(["cache"]);
+  });
+
+  it("resume works as before once a revoke has finished", async () => {
+    const effects = fakeEffects({ clearCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
+    const store = createProfileStore({ effects });
+    await store.getState().revoke();
+    expect(readRevokeIncomplete()?.steps).toEqual(["cache"]);
+
+    vi.mocked(effects.clearCaches).mockResolvedValue(undefined);
+
+    expect(await store.getState().resume()).toEqual(COMPLETE);
+    expect(readRevokeIncomplete()).toBeNull();
+  });
+
+  it("a revoke does not wait for a resume: the worker's tap is not held up", async () => {
+    const { store, effects, revokeBrowserStep } = overlapping();
+    void store.getState().resume();
+    const revoking = store.getState().revoke();
+
+    await vi.waitFor(() => {
+      expect(effects.unsubscribe).toHaveBeenCalledTimes(1);
+    });
+    revokeBrowserStep.open();
+    await revoking;
   });
 });

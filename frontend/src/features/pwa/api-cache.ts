@@ -263,6 +263,11 @@ async function countDeviceRows(factory: Pick<IDBFactory, "open">): Promise<numbe
  * how a clearing is checked afterwards. A response the worker was still fetching when the clearing ran is written
  * after it, and re-creates the cache and its row (ruling R36); asking again finds that. Rejects when it cannot tell, which
  * is not an all-clear.
+ *
+ * KNOWN LIMIT (ruling R38): it looks once, straight after the clearing, with no settling delay. A response that reaches
+ * Cache Storage after that look is not caught. That is accepted: no delay can promise an empty Cache Storage while the app
+ * is open, because the worker caches the page the worker is looking at, again, by design. See `clearDeviceData` in the
+ * profile store.
  */
 export async function deviceDataRemains(
   storage: Pick<CacheStorage, "keys"> | undefined = typeof caches === "undefined" ? undefined : caches,

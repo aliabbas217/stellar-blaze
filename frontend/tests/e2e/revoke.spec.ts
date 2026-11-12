@@ -139,6 +139,22 @@ async function removeMyData(page: Page): Promise<void> {
 /** The live region that carries the result of a removal (the last one on the page). */
 const result = (page: Page) => page.getByRole("status").last();
 
+/** From now on, remembers every text the result region holds, so that what it said on the way can be read afterwards. */
+async function recordResultRegion(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const regions = document.querySelectorAll('[role="status"]');
+    const region = regions[regions.length - 1];
+    if (region === undefined) throw new Error("There is no live region on the page.");
+    const texts = [region.textContent];
+    new MutationObserver(() => {
+      texts.push(region.textContent);
+    }).observe(region, { childList: true, characterData: true, subtree: true });
+    Object.defineProperty(window, "resultTexts", { value: texts, configurable: true });
+  });
+}
+
+const recordedTexts = (page: Page) => page.evaluate(() => (window as unknown as { resultTexts: (string | null)[] }).resultTexts);
+
 /** Fills the API cache and the expiration record with what a worker's visit leaves behind. */
 async function visitLikeAWorker(page: Page): Promise<void> {
   await loadControlled(page, "/en/worker");
@@ -161,9 +177,16 @@ test("removing my data leaves no API entry, page URL or expiration row on the ph
   await visitLikeAWorker(page);
   expect((await storedKeys(page)).profile).not.toBeNull();
 
+  await recordResultRegion(page);
   await removeMyData(page);
 
   await expect(result(page)).toHaveText(en.alerts.removeData.done);
+  // On the way it never said the removal had failed or was only partly done: the marker is written when a removal begins,
+  // naming every step as unfinished, and a screen that read it without knowing one was running would have announced that.
+  const said = await recordedTexts(page);
+  expect(said).toContain(en.alerts.removeData.done);
+  expect(said).not.toContain(en.alerts.removeData.failed);
+  expect(said).not.toContain(en.alerts.removeData.pending);
   const after = await deviceState(page);
   // Cache Storage: none of the API caches or the page caches. The precache stays, so the app still opens offline.
   for (const gone of ["sb-api", "apis", "pages", "pages-rsc", "pages-rsc-prefetch", "others"]) expect(after.caches, gone).not.toContain(gone);

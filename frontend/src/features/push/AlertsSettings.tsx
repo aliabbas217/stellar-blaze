@@ -2,7 +2,12 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
-import { readRevokeIncomplete, subscribeRevokeIncomplete } from "@/features/profile/revoke-marker";
+import {
+  readRevokeActive,
+  readRevokeIncomplete,
+  subscribeRevokeActive,
+  subscribeRevokeIncomplete,
+} from "@/features/profile/revoke-marker";
 import { isRevokeComplete, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
 import { InstallCard } from "@/features/push/InstallCard";
@@ -79,6 +84,13 @@ export function AlertsSettings(props: AlertsSettingsProps) {
   // and the first client render agree (null) and the real answer appears right after hydration, and a reload, or a change
   // in another tab, is followed.
   const incomplete = useSyncExternalStore(subscribeRevokeIncomplete, readRevokeIncomplete, () => null);
+  // Whether a removal, or the finishing of one, is running on this page. The marker is written when a removal begins and
+  // names every step as unfinished: read while it runs, it would announce a failure that has not happened (NB1).
+  const active = useSyncExternalStore(subscribeRevokeActive, readRevokeActive, () => false);
+  // Whether the retry on open has finished. The marker is not the news before that: a marker that is there when the page
+  // opens is what the retry is about to work on, and saying "could not finish" for the moment before it starts, then
+  // "removing", then the result, would be three announcements for one.
+  const [checked, setChecked] = useState(false);
 
   // Alerts opened: finish what an earlier removal did not (the caches, and the registrations the API has not confirmed
   // deleting; rulings R32, R36). Once per open, not on the restart after a removal, which has just tried. What it
@@ -89,16 +101,22 @@ export function AlertsSettings(props: AlertsSettingsProps) {
       .resume()
       .then((outcome) => {
         if (outcome !== null) setRemoval(outcome);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        setChecked(true);
       });
   }, []);
 
-  // What to say: this page's own news first (a removal just made here, or the retry on open), otherwise what the marker
-  // remembers from before the page was opened. "Done" only when nothing is left: a failed step, or a registration the
-  // API has not confirmed, is said as it is.
+  // What to say. While a removal runs: that it does. Otherwise this page's own news first (a removal just made here, or the
+  // retry on open), then what the marker remembers from before the page was opened. "Done" only when nothing is left: a
+  // failed step, or a registration the API has not confirmed, is said as it is.
   const outcome: RevokeOutcome | null =
-    removal ?? (incomplete === null ? null : { failed: incomplete.steps, pending: incomplete.steps.length === 0 });
+    removal ?? (!checked || incomplete === null ? null : { failed: incomplete.steps, pending: incomplete.steps.length === 0 });
   let result: string | null = null;
-  if (outcome !== null) {
+  if (active) {
+    result = t("removing");
+  } else if (outcome !== null) {
     if (isRevokeComplete(outcome)) result = t("done");
     else result = outcome.failed.length > 0 ? t("failed") : t("pending");
   }
@@ -109,6 +127,11 @@ export function AlertsSettings(props: AlertsSettingsProps) {
         key={generation}
         {...props}
         afterRemoval={removal !== null}
+        // What the page last knew is stale from the moment another removal starts: while it runs the screen says so, and
+        // when it ends the marker (just written) and the new outcome are the news.
+        onRemoving={() => {
+          setRemoval(null);
+        }}
         onRemoved={(outcome) => {
           setRemoval(outcome);
           // Unless alerts may still be on: then the screen keeps its state, and "Turn off alerts" can be tried again.
@@ -129,8 +152,9 @@ function AlertsPanel({
   siteId,
   debug,
   afterRemoval,
+  onRemoving,
   onRemoved,
-}: AlertsSettingsProps & { afterRemoval: boolean; onRemoved: (outcome: RevokeOutcome) => void }) {
+}: AlertsSettingsProps & { afterRemoval: boolean; onRemoving: () => void; onRemoved: (outcome: RevokeOutcome) => void }) {
   const t = useTranslations("alerts");
   const capability = useSyncExternalStore(noopSubscribe, readCapability, () => null);
   const push = usePush({ vapidPublicKey, siteId });
@@ -151,7 +175,7 @@ function AlertsPanel({
       {debug ? <DebugPanel subscription={push.subscription} /> : null}
 
       {/* Always offered, whatever the phone can do about alerts: the consent copy promises revocation from here. */}
-      <RemoveData disabled={push.state === "requesting"} afterRemoval={afterRemoval} onRemoved={onRemoved} />
+      <RemoveData disabled={push.state === "requesting"} afterRemoval={afterRemoval} onRemoving={onRemoving} onRemoved={onRemoved} />
     </div>
   );
 }
@@ -167,11 +191,14 @@ type RemoveStep = "idle" | "confirm" | "working";
 function RemoveData({
   disabled,
   afterRemoval,
+  onRemoving,
   onRemoved,
 }: {
   disabled: boolean;
   /** This is the panel rebuilt after a removal: the button it replaced had the focus. */
   afterRemoval: boolean;
+  /** The removal is starting. */
+  onRemoving: () => void;
   onRemoved: (outcome: RevokeOutcome) => void;
 }) {
   const t = useTranslations("alerts.removeData");
@@ -195,6 +222,7 @@ function RemoveData({
 
   async function remove() {
     setStep("working");
+    onRemoving();
     let outcome: RevokeOutcome;
     try {
       outcome = await revoke();

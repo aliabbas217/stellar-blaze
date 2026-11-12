@@ -7,7 +7,7 @@ import { CONSENT_VERSION } from "@/features/profile/profile-shape";
 import { PROFILE_STORAGE_KEY, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { AlertsSettings, type AlertsSettingsProps } from "@/features/push/AlertsSettings";
 import type { PushEnv } from "@/features/push/capability";
-import { clearRevokeIncomplete, markRevokeIncomplete } from "@/features/profile/revoke-marker";
+import { clearRevokeIncomplete, INCOMPLETE_KEY, markRevokeIncomplete } from "@/features/profile/revoke-marker";
 import type { UsePush } from "@/features/push/usePush";
 import { renderWithIntl } from "../../../utils/intl";
 
@@ -23,7 +23,21 @@ const hoisted = vi.hoisted(() => ({
   push: undefined as unknown as { value: UsePush },
   /** How many times the alerts state machine was mounted: removing the data starts it again from the browser's state. */
   mounts: 0,
+  /**
+   * When set, the real store's clearing of Cache Storage (its slowest, most visible step) waits for this instead. It lets a
+   * test hold a REAL removal in flight, with the real marker written, and look at the screen meanwhile.
+   */
+  cacheGate: null as (() => Promise<void>) | null,
 }));
+
+vi.mock("@/features/pwa/api-cache", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/features/pwa/api-cache")>();
+  return {
+    ...original,
+    clearDeviceCaches: (...args: Parameters<typeof original.clearDeviceCaches>) =>
+      hoisted.cacheGate === null ? original.clearDeviceCaches(...args) : hoisted.cacheGate(),
+  };
+});
 
 vi.mock("@/features/push/usePush", () => ({
   usePush: () => {
@@ -213,6 +227,7 @@ describe("AlertsSettings: removing the worker's data", () => {
   });
 
   afterEach(() => {
+    hoisted.cacheGate = null;
     useProfile.setState({ revoke: realRevoke, resume: realResume, profile: null, push: null });
     clearRevokeIncomplete();
   });
@@ -503,6 +518,136 @@ describe("AlertsSettings: removing the worker's data", () => {
 
     await waitFor(() => {
       expect(screen.queryByText(en.alerts.removeData.failed)).not.toBeInTheDocument();
+    });
+  });
+
+  /** Every text the live region that carries the result of a removal ever holds, in order, from now on. */
+  function watchResultRegion() {
+    const regions = screen.getAllByRole("status");
+    const region = regions[regions.length - 1] as HTMLElement;
+    const history = [region.textContent];
+    const observer = new MutationObserver(() => {
+      history.push(region.textContent);
+    });
+    observer.observe(region, { childList: true, characterData: true, subtree: true });
+    return {
+      region,
+      history,
+      stop: () => {
+        observer.disconnect();
+      },
+    };
+  }
+
+  const failures = [en.alerts.removeData.failed, en.alerts.removeData.pending];
+
+  it("with the REAL store, never announces a failure while a removal is still running, and ends on done", async () => {
+    let open: () => void = () => undefined;
+    const hold = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    hoisted.cacheGate = () => hold;
+    setup({});
+    const { region, history, stop } = watchResultRegion();
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    // In flight: the screen says so. The marker is already written and names every step as unfinished, which is exactly
+    // what a screen reading it without knowing a removal is running would announce as a failure.
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.removing);
+    });
+    expect(JSON.parse(localStorage.getItem(INCOMPLETE_KEY) ?? "null")).toMatchObject({ steps: ["storage", "alerts", "cache"] });
+    expect(failures).not.toContain(region.textContent);
+
+    open();
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.done);
+    });
+    stop();
+    for (const text of history) {
+      expect(failures, `the region held "${text}"`).not.toContain(text);
+      expect(["", en.alerts.removeData.removing, en.alerts.removeData.done]).toContain(text);
+    }
+    expect(history).toContain(en.alerts.removeData.removing);
+    expect(localStorage.getItem(INCOMPLETE_KEY)).toBeNull();
+  });
+
+  it("with the REAL store, says 'could not finish' only once a removal has actually failed", async () => {
+    hoisted.cacheGate = () => Promise.reject(new Error("quota"));
+    setup({});
+    const { region, history, stop } = watchResultRegion();
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.failed);
+    });
+    stop();
+    // Whatever the region held before that, it was never "failed" ahead of the removing status.
+    const firstFailure = history.indexOf(en.alerts.removeData.failed);
+    expect(history.slice(0, firstFailure)).not.toContain(en.alerts.removeData.failed);
+    expect(history.slice(0, firstFailure)).toContain(en.alerts.removeData.removing);
+  });
+
+  it("with the REAL store, does not announce 'could not finish' while the retry on open is still running, and ends on done", async () => {
+    markRevokeIncomplete(["cache"]);
+    let open: () => void = () => undefined;
+    const hold = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    hoisted.cacheGate = () => hold;
+    // The region exists from the first render; the marker is already there when the page opens.
+    setup({});
+    const { region, history, stop } = watchResultRegion();
+
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.removing);
+    });
+    expect(failures).not.toContain(region.textContent);
+
+    open();
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.done);
+    });
+    stop();
+    for (const text of history) expect(failures, `the region held "${text}"`).not.toContain(text);
+    expect(localStorage.getItem(INCOMPLETE_KEY)).toBeNull();
+  });
+
+  it("with the REAL store, keeps saying it could not finish when the retry on open fails too, after saying it was trying", async () => {
+    markRevokeIncomplete(["cache"]);
+    hoisted.cacheGate = () => Promise.reject(new Error("quota"));
+    setup({});
+    const { region, history, stop } = watchResultRegion();
+
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.failed);
+    });
+    stop();
+    const firstFailure = history.indexOf(en.alerts.removeData.failed);
+    expect(history.slice(0, firstFailure)).not.toContain(en.alerts.removeData.failed);
+  });
+
+  it("says nothing about a marker until the retry on open has had its say (no failure flashed before it starts)", async () => {
+    markRevokeIncomplete(["cache"]);
+    let release: (outcome: null) => void = () => undefined;
+    useProfile.setState({
+      resume: () =>
+        new Promise<null>((resolve) => {
+          release = resolve;
+        }),
+    });
+    setup({});
+    const regions = screen.getAllByRole("status");
+    const region = regions[regions.length - 1] as HTMLElement;
+
+    expect(region).toBeEmptyDOMElement();
+    release(null);
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.failed);
     });
   });
 

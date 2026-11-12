@@ -175,7 +175,8 @@
       "cancel": "No, keep it",
       "done": "Your data was removed from this phone.",
       "failed": "We could not finish removing your data from this phone. Alerts may still be on, or saved data may remain. Check your connection and try again.",
-      "pending": "Your data was removed from this phone. We could not reach the server yet to cancel your alert subscription. It will be tried again each time you open Alerts."
+      "pending": "Your data was removed from this phone. We could not reach the server yet to cancel your alert subscription. It will be tried again each time you open Alerts.",
+      "removing": "Removing your data from this phone. Please wait."
     },
     "debug": {
       "heading": "Subscription details",

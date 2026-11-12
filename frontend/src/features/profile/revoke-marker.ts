@@ -106,6 +106,38 @@ export function clearRevokeIncomplete(): void {
   notify();
 }
 
+// Whether a removal, or the finishing of one, is running on this page. In memory only: it says nothing that outlives the page.
+// Counted, because a revoke and a resume can overlap.
+let activity = 0;
+const activityListeners = new Set<() => void>();
+
+/** Says that a removal (or the finishing of one) has started on this page. Call `endRevokeActivity` when it has settled. */
+export function beginRevokeActivity(): void {
+  activity += 1;
+  if (activity === 1) for (const listener of activityListeners) listener();
+}
+
+export function endRevokeActivity(): void {
+  if (activity === 0) return;
+  activity -= 1;
+  if (activity === 0) for (const listener of activityListeners) listener();
+}
+
+/**
+ * Whether a removal is running on this page. While it is, the marker is not the news: it was written when the removal
+ * began, naming every step as unfinished, and reading it as "could not finish" would announce a failure that has not happened.
+ */
+export function readRevokeActive(): boolean {
+  return activity > 0;
+}
+
+export function subscribeRevokeActive(onChange: () => void): () => void {
+  activityListeners.add(onChange);
+  return () => {
+    activityListeners.delete(onChange);
+  };
+}
+
 /** Calls `onChange` when the marker changes here, or in another tab of the app. Returns the unsubscribe. */
 export function subscribeRevokeIncomplete(onChange: () => void): () => void {
   listeners.add(onChange);

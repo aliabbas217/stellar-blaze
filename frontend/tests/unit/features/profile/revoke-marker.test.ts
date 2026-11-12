@@ -1,8 +1,12 @@
 import {
+  beginRevokeActivity,
   clearRevokeIncomplete,
+  endRevokeActivity,
   INCOMPLETE_KEY,
   markRevokeIncomplete,
+  readRevokeActive,
   readRevokeIncomplete,
+  subscribeRevokeActive,
   subscribeRevokeIncomplete,
 } from "@/features/profile/revoke-marker";
 
@@ -142,6 +146,59 @@ describe("subscribeRevokeIncomplete", () => {
     subscribeRevokeIncomplete(onChange)();
     markRevokeIncomplete(["cache"]);
     window.dispatchEvent(new StorageEvent("storage", { key: INCOMPLETE_KEY, storageArea: localStorage }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("the activity flag (a removal, or the finishing of one, is running on this page)", () => {
+  afterEach(() => {
+    while (readRevokeActive()) endRevokeActivity();
+  });
+
+  it("is off until an activity begins, on while it runs, and off when it ends", () => {
+    expect(readRevokeActive()).toBe(false);
+    beginRevokeActivity();
+    expect(readRevokeActive()).toBe(true);
+    endRevokeActivity();
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it("stays on until every overlapping activity has ended", () => {
+    beginRevokeActivity();
+    beginRevokeActivity();
+    endRevokeActivity();
+    expect(readRevokeActive()).toBe(true);
+    endRevokeActivity();
+    expect(readRevokeActive()).toBe(false);
+  });
+
+  it("does not go below off when an end is called too often", () => {
+    endRevokeActivity();
+    expect(readRevokeActive()).toBe(false);
+    beginRevokeActivity();
+    expect(readRevokeActive()).toBe(true);
+  });
+
+  it("is in memory only: it is never written to storage", () => {
+    beginRevokeActivity();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("calls back when it turns on and off, and not when only the count changes", () => {
+    const onChange = vi.fn();
+    const stop = subscribeRevokeActive(onChange);
+    beginRevokeActivity();
+    beginRevokeActivity();
+    endRevokeActivity();
+    endRevokeActivity();
+    expect(onChange).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it("stops calling back after the unsubscribe", () => {
+    const onChange = vi.fn();
+    subscribeRevokeActive(onChange)();
+    beginRevokeActivity();
     expect(onChange).not.toHaveBeenCalled();
   });
 });
