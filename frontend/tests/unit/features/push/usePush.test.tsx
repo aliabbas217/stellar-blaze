@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw/http";
 import { useProfile } from "@/features/profile/store";
+import { markRevokeIncomplete, readRevokeIncomplete, clearRevokeIncomplete } from "@/features/profile/revoke-marker";
 import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
 import type { SubscriptionLike } from "@/features/push/subscribe";
 import { REGISTRATION_TIMEOUT_MS, usePush, type PushConfig, type PushPlatform } from "@/features/push/usePush";
@@ -78,6 +79,7 @@ function spyOnApi() {
 
 beforeEach(() => {
   localStorage.clear();
+  clearRevokeIncomplete();
   useProfile.setState({ push: null });
 });
 
@@ -719,6 +721,20 @@ describe("usePush: registrations the API has not confirmed deleting (ruling R32)
     await waitFor(() => {
       expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-old"]));
     });
+  });
+
+  it("app open finishes an unfinished revoke (ruling R36): the marker goes once the caches are checked clean, and the push state is untouched", async () => {
+    markRevokeIncomplete(["cache"]);
+    useProfile.getState().setPush({ serverId: "sub-1", endpoint: ENDPOINT, siteId: CONFIG.siteId ?? "" });
+    const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription() });
+    spyOnApi();
+
+    renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(readRevokeIncomplete()).toBeNull();
+    });
+    expect(useProfile.getState().push?.serverId).toBe("sub-1");
   });
 
   it("app open keeps one the API still does not confirm", async () => {

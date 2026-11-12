@@ -2,10 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
+import { readRevokeIncomplete, subscribeRevokeIncomplete } from "@/features/profile/revoke-marker";
 import { isRevokeComplete, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
 import { InstallCard } from "@/features/push/InstallCard";
-import { retryPendingDeletes } from "@/features/push/pending-delete";
 import { usePush } from "@/features/push/usePush";
 
 /*
@@ -75,17 +75,32 @@ export function AlertsSettings(props: AlertsSettingsProps) {
   const [removal, setRemoval] = useState<RevokeOutcome | null>(null);
   const [generation, setGeneration] = useState(0);
 
-  // Alerts opened: ask the API again about the registrations it has not confirmed deleting (ruling R32). Once per open,
-  // not on the restart after a removal, which has just asked.
+  // The durable marker of a removal that did not finish (ruling R36). It is read through an external store, so the server
+  // and the first client render agree (null) and the real answer appears right after hydration, and a reload, or a change
+  // in another tab, is followed.
+  const incomplete = useSyncExternalStore(subscribeRevokeIncomplete, readRevokeIncomplete, () => null);
+
+  // Alerts opened: finish what an earlier removal did not (the caches, and the registrations the API has not confirmed
+  // deleting; rulings R32, R36). Once per open, not on the restart after a removal, which has just tried. What it
+  // reports replaces what this page last knew.
   useEffect(() => {
-    void retryPendingDeletes();
+    void useProfile
+      .getState()
+      .resume()
+      .then((outcome) => {
+        if (outcome !== null) setRemoval(outcome);
+      });
   }, []);
 
+  // What to say: this page's own news first (a removal just made here, or the retry on open), otherwise what the marker
+  // remembers from before the page was opened. "Done" only when nothing is left: a failed step, or a registration the
+  // API has not confirmed, is said as it is.
+  const outcome: RevokeOutcome | null =
+    removal ?? (incomplete === null ? null : { failed: incomplete.steps, pending: incomplete.steps.length === 0 });
   let result: string | null = null;
-  if (removal !== null) {
-    // "Done" only when nothing is left: a failed step, or a registration the API has not confirmed, is said as it is.
-    if (isRevokeComplete(removal)) result = t("done");
-    else result = removal.failed.length > 0 ? t("failed") : t("pending");
+  if (outcome !== null) {
+    if (isRevokeComplete(outcome)) result = t("done");
+    else result = outcome.failed.length > 0 ? t("failed") : t("pending");
   }
 
   return (

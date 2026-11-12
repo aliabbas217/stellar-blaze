@@ -10,6 +10,7 @@ import {
   clearApiCaches,
   clearDeviceCaches,
   clearExpirationMetadata,
+  deviceDataRemains,
   isCachedApiPath,
 } from "@/features/pwa/api-cache";
 
@@ -165,11 +166,20 @@ describe("clearDeviceCaches", () => {
   });
 });
 
+interface FakeRow {
+  readonly id: string;
+  readonly cacheName: string;
+}
+
 interface FakeDatabaseOptions {
   /** False: opening creates the database (an `upgradeneeded` event), as it does for a name that was never used. */
   exists?: boolean;
-  /** The object stores and how many rows each holds. */
-  stores?: Record<string, number>;
+  /** The rows of Serwist's "cache-entries" store: the cache each belongs to and its key. */
+  rows?: FakeRow[];
+  /** The object stores the database has. */
+  stores?: string[];
+  /** Whether "cache-entries" has the "cacheName" index. */
+  indexed?: boolean;
   /** How many `open` calls fail before one succeeds. */
   failOpens?: number;
   /** The clearing transaction aborts. */
@@ -178,56 +188,158 @@ interface FakeDatabaseOptions {
 
 type Handler = (() => void) | null;
 
+interface FakeRequest {
+  result: unknown;
+  error: DOMException | null;
+  onsuccess: Handler;
+  onerror: Handler;
+}
+
+const row = (cacheName: string, n: number): FakeRow => ({ id: `${cacheName}|https://app.example/${String(n)}`, cacheName });
+
+/** One row for each cache Serwist's worker keeps, so that a clearing can be told from a wipe. */
+const WORKER_ROWS: FakeRow[] = [
+  row("sb-api", 1),
+  row("sb-api", 2),
+  row("apis", 1),
+  row("pages", 1),
+  row("pages-rsc", 1),
+  row("pages-rsc-prefetch", 1),
+  row("others", 1),
+  row("others", 2),
+  row("static-font-assets", 1),
+  row("static-font-assets", 2),
+  row("static-js-assets", 1),
+];
+
 /**
- * An IDBFactory with one database, `serwist-expiration`: just enough of `open`, `transaction`, `objectStore().clear()`
- * and `close()` for clearExpirationMetadata, settling its requests in a microtask like the browser does.
+ * An IDBFactory with one database, `serwist-expiration`: its "cache-entries" store with a "cacheName" index, rows kept in
+ * memory, and just enough of `open`, `transaction`, `index().openKeyCursor()`, `index().count()`, `delete()` and `close()`
+ * for the module under test. Requests settle in microtasks, as the browser's do, and a transaction completes when its last
+ * request has.
  */
 function fakeIndexedDb(options: FakeDatabaseOptions = {}) {
-  const { exists = true, stores = { "cache-entries": 3 }, failOpens = 0 } = options;
-  const rows: Record<string, number> = { ...stores };
-  const log = { created: false, aborted: false, closed: 0, transactions: [] as { names: string[]; mode: string }[] };
+  const { exists = true, stores = ["cache-entries"], indexed = true, failOpens = 0 } = options;
+  const rows: FakeRow[] = [...(options.rows ?? WORKER_ROWS)];
+  const log = {
+    created: false,
+    aborted: false,
+    closed: 0,
+    transactions: [] as { stores: string[]; mode: string; durability: string | undefined }[],
+  };
   let remainingFailures = failOpens;
 
+  function transaction(names: string | string[], mode: string, transactionOptions?: { durability?: string }) {
+    const wanted = [names].flat();
+    for (const name of wanted) if (!stores.includes(name)) throw new DOMException(`No object store ${name}`, "NotFoundError");
+    log.transactions.push({ stores: wanted, mode, durability: transactionOptions?.durability });
+
+    let pending = 0;
+    let finished = false;
+    let aborted = false;
+    const handle: { oncomplete: Handler; onabort: Handler; onerror: Handler; error: DOMException | null } = {
+      oncomplete: null,
+      onabort: null,
+      onerror: null,
+      error: null,
+    };
+    const check = () => {
+      queueMicrotask(() => {
+        if (finished || aborted || pending > 0) return;
+        finished = true;
+        handle.oncomplete?.();
+      });
+    };
+    const newRequest = (): FakeRequest => ({ result: undefined, error: null, onsuccess: null, onerror: null });
+    /** A request that does `work` in a microtask and then counts as settled. */
+    const settle = (work: (request: FakeRequest) => void) => {
+      pending += 1;
+      const request = newRequest();
+      queueMicrotask(() => {
+        if (aborted) return;
+        work(request);
+        request.onsuccess?.();
+        pending -= 1;
+        check();
+      });
+      return request;
+    };
+
+    if (options.failTransaction === true) {
+      queueMicrotask(() => {
+        aborted = true;
+        handle.error = new DOMException("quota", "QuotaExceededError");
+        handle.onabort?.();
+      });
+    }
+
+    const index = (indexName: string) => {
+      if (!indexed || indexName !== "cacheName") throw new DOMException(`No index ${indexName}`, "NotFoundError");
+      return {
+        count: (key: string) =>
+          settle((request) => {
+            request.result = rows.filter((candidate) => candidate.cacheName === key).length;
+          }),
+        openKeyCursor: (key: string) => {
+          pending += 1;
+          const request = newRequest();
+          const matching = rows.filter((candidate) => candidate.cacheName === key).map((candidate) => candidate.id);
+          const step = (at: number) => {
+            if (aborted) return;
+            if (at >= matching.length) {
+              request.result = null;
+              request.onsuccess?.();
+              pending -= 1;
+              check();
+              return;
+            }
+            request.result = {
+              primaryKey: matching[at],
+              continue: () => {
+                queueMicrotask(() => {
+                  step(at + 1);
+                });
+              },
+            };
+            request.onsuccess?.();
+          };
+          queueMicrotask(() => {
+            step(0);
+          });
+          return request;
+        },
+      };
+    };
+
+    const objectStore = () => ({
+      index,
+      delete: (id: string) =>
+        settle(() => {
+          const at = rows.findIndex((candidate) => candidate.id === id);
+          if (at >= 0) rows.splice(at, 1);
+        }),
+    });
+
+    return Object.assign(handle, { objectStore });
+  }
+
   const database = {
-    objectStoreNames: Object.keys(rows),
+    objectStoreNames: stores,
     close: () => {
       log.closed += 1;
     },
-    transaction: (names: string[], mode: string) => {
-      log.transactions.push({ names: [...names], mode });
-      const transaction: { oncomplete: Handler; onerror: Handler; onabort: Handler; error: DOMException | null; objectStore: (name: string) => { clear: () => object } } = {
-        oncomplete: null,
-        onerror: null,
-        onabort: null,
-        error: null,
-        objectStore: (name) => ({
-          clear: () => {
-            if (options.failTransaction !== true) rows[name] = 0;
-            return {};
-          },
-        }),
-      };
-      queueMicrotask(() => {
-        if (options.failTransaction === true) {
-          transaction.error = new DOMException("quota", "QuotaExceededError");
-          transaction.onabort?.();
-        } else {
-          transaction.oncomplete?.();
-        }
-      });
-      return transaction;
-    },
+    transaction,
   };
 
   const factory = {
     open: vi.fn((name: string) => {
       expect(name).toBe("serwist-expiration");
-      const request: { onsuccess: Handler; onerror: Handler; onupgradeneeded: Handler; result: typeof database; error: DOMException | null; transaction: { abort: () => void } } = {
+      const request: FakeRequest & { onupgradeneeded: Handler; transaction: { abort: () => void } } = {
+        result: database,
+        error: null,
         onsuccess: null,
         onerror: null,
         onupgradeneeded: null,
-        result: database,
-        error: null,
         transaction: {
           abort: () => {
             log.aborted = true;
@@ -256,22 +368,37 @@ function fakeIndexedDb(options: FakeDatabaseOptions = {}) {
   return { factory, rows, log };
 }
 
+const names = (rows: FakeRow[]) => rows.map((candidate) => candidate.cacheName);
+const KEPT = ["static-font-assets", "static-font-assets", "static-js-assets"];
+
 describe("clearExpirationMetadata", () => {
-  it("empties every object store of Serwist's expiration database in one write transaction, and lets go of the connection", async () => {
-    const { factory, rows, log } = fakeIndexedDb({ stores: { "cache-entries": 5, "something-new": 2 } });
+  it("deletes the rows of the caches revoke clears, by the cacheName index, and keeps the rows of the caches it keeps", async () => {
+    // Static asset caches survive a revoke; their rows must too, or their entries would never expire.
+    const { factory, rows, log } = fakeIndexedDb();
     await expect(clearExpirationMetadata(factory)).resolves.toBe("cleared");
-    expect(rows).toEqual({ "cache-entries": 0, "something-new": 0 });
-    expect(log.transactions).toEqual([{ names: ["cache-entries", "something-new"], mode: "readwrite" }]);
+    expect(names(rows)).toEqual(KEPT);
     expect(log.closed).toBe(1);
+  });
+
+  it("uses one strict-durability write transaction on the cache-entries store only", async () => {
+    const { factory, log } = fakeIndexedDb();
+    await clearExpirationMetadata(factory);
+    expect(log.transactions).toEqual([{ stores: ["cache-entries"], mode: "readwrite", durability: "strict" }]);
   });
 
   it("completes while a service worker holds its own connection open: it never asks for the database to be deleted", async () => {
     // Serwist's worker opens this database on its first cached response and never closes it, so deleteDatabase would be
     // `blocked` until the browser stops the worker, and would leave a request in the queue that holds up the worker's
-    // next open. Clearing the rows needs no cooperation from the worker: it completes when the transaction does.
+    // next open. Clearing rows needs no cooperation from the worker: it completes when the transaction does.
     const { factory } = fakeIndexedDb();
     expect(Object.keys(factory)).toEqual(["open"]);
     await expect(clearExpirationMetadata(factory)).resolves.toBe("cleared");
+  });
+
+  it("is a clean no-op when there is no row to delete", async () => {
+    const { factory, rows } = fakeIndexedDb({ rows: [row("static-js-assets", 1)] });
+    await expect(clearExpirationMetadata(factory)).resolves.toBe("cleared");
+    expect(names(rows)).toEqual(["static-js-assets"]);
   });
 
   it("does not create the database when it does not exist", async () => {
@@ -281,31 +408,44 @@ describe("clearExpirationMetadata", () => {
     expect(log.transactions).toEqual([]);
   });
 
-  it("resolves for a database with no object store", async () => {
-    const { factory, log } = fakeIndexedDb({ stores: {} });
+  it("resolves for a database with no object store at all", async () => {
+    const { factory, log } = fakeIndexedDb({ stores: [] });
     await expect(clearExpirationMetadata(factory)).resolves.toBe("cleared");
     expect(log.transactions).toEqual([]);
     expect(log.closed).toBe(1);
+  });
+
+  it("rejects, deleting nothing, when Serwist's store is not the one it knows (a changed Serwist is not guessed at)", async () => {
+    const { factory, rows } = fakeIndexedDb({ stores: ["something-new"] });
+    await expect(clearExpirationMetadata(factory)).rejects.toThrow(/cache-entries/);
+    expect(rows).toHaveLength(WORKER_ROWS.length);
+  });
+
+  it("rejects, deleting nothing, when the store has no cacheName index", async () => {
+    const { factory, rows } = fakeIndexedDb({ indexed: false });
+    await expect(clearExpirationMetadata(factory)).rejects.toThrow(/index/);
+    expect(rows).toHaveLength(WORKER_ROWS.length);
   });
 
   it("tries once more when the first attempt fails", async () => {
     const { factory, rows } = fakeIndexedDb({ failOpens: 1 });
     await expect(clearExpirationMetadata(factory)).resolves.toBe("cleared");
     expect(factory.open).toHaveBeenCalledTimes(2);
-    expect(rows).toEqual({ "cache-entries": 0 });
+    expect(names(rows)).toEqual(KEPT);
   });
 
   it("does not hide a failure: after the second attempt it rejects, because the data may still be there", async () => {
     const { factory, rows } = fakeIndexedDb({ failOpens: 2 });
     await expect(clearExpirationMetadata(factory)).rejects.toThrow("denied");
     expect(factory.open).toHaveBeenCalledTimes(2);
-    expect(rows).toEqual({ "cache-entries": 3 });
+    expect(rows).toHaveLength(WORKER_ROWS.length);
   });
 
   it("rejects, and lets go of the connection each time, when the clearing transaction aborts", async () => {
-    const { factory, log } = fakeIndexedDb({ failTransaction: true });
+    const { factory, rows, log } = fakeIndexedDb({ failTransaction: true });
     await expect(clearExpirationMetadata(factory)).rejects.toThrow("quota");
     expect(log.closed).toBe(2);
+    expect(rows).toHaveLength(WORKER_ROWS.length);
   });
 
   it("rejects when the browser throws instead of answering (a SecurityError on a blocked origin)", async () => {
@@ -337,18 +477,21 @@ describe("clearExpirationMetadata", () => {
     vi.stubGlobal("indexedDB", factory);
     try {
       await expect(clearExpirationMetadata()).resolves.toBe("cleared");
-      expect(rows).toEqual({ "cache-entries": 0 });
+      expect(names(rows)).toEqual(KEPT);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it("names the database the installed Serwist writes its URL timestamps to", () => {
+  it("names the database, the store and the index the installed Serwist writes its URL timestamps to", () => {
     // ExpirationPlugin keeps the URL and fetch time of every entry of every cache it expires, in this one database.
-    // Clearing Cache Storage does not touch it, and a renamed database in a later Serwist would silently stop being
-    // cleared: this fails first.
+    // Clearing Cache Storage does not touch it, and a renamed database, store or index in a later Serwist would silently
+    // stop being cleared: this fails first.
     expect(EXPIRATION_DB_NAME).toBe("serwist-expiration");
-    expect(readFileSync(SERWIST_CORE, "utf8")).toContain(`const DB_NAME = "serwist-expiration";`);
+    const source = readFileSync(SERWIST_CORE, "utf8");
+    expect(source).toContain(`const DB_NAME = "serwist-expiration";`);
+    expect(source).toContain(`const CACHE_OBJECT_STORE = "cache-entries";`);
+    expect(source).toContain(`objStore.createIndex("cacheName", "cacheName", { unique: false });`);
   });
 
   it("pins why the page clears the rows itself: Serwist's own delete() empties one cache's rows, and its worker never closes the connection", () => {
@@ -358,5 +501,64 @@ describe("clearExpirationMetadata", () => {
     // And the worker's connection is cached and never closed, so a deleteDatabase from the page is blocked while it runs.
     expect(source).toContain("if (!this._db) this._db = await openDB(DB_NAME, 1,");
     expect(source).not.toContain("this._db.close()");
+  });
+});
+
+describe("deviceDataRemains: what the verification after a clearing looks at", () => {
+  const cachesWith = (...present: string[]) => ({ keys: () => Promise.resolve(present) });
+
+  it("is true when a cache revoke clears exists again (a response written after the clearing)", async () => {
+    const { factory } = fakeIndexedDb({ rows: [] });
+    await expect(deviceDataRemains(cachesWith("serwist-precache-v2", "sb-api"), factory)).resolves.toBe(true);
+  });
+
+  it.each(DEVICE_CACHE_NAMES)("is true for the %s cache alone", async (name) => {
+    const { factory } = fakeIndexedDb({ rows: [] });
+    await expect(deviceDataRemains(cachesWith(name), factory)).resolves.toBe(true);
+  });
+
+  it("is true when an expiration row of one of those caches exists again, even with no cache", async () => {
+    const { factory } = fakeIndexedDb({ rows: [row("sb-api", 1)] });
+    await expect(deviceDataRemains(cachesWith(), factory)).resolves.toBe(true);
+  });
+
+  it("is false when only the caches and rows revoke keeps are left", async () => {
+    const { factory, log } = fakeIndexedDb({ rows: [row("static-font-assets", 1), row("static-js-assets", 1)] });
+    await expect(deviceDataRemains(cachesWith("serwist-precache-v2", "sb-prefs", "static-font-assets"), factory)).resolves.toBe(false);
+    expect(log.transactions).toEqual([{ stores: ["cache-entries"], mode: "readonly", durability: undefined }]);
+  });
+
+  it("is false, without creating the database, when there is none", async () => {
+    const { factory, log } = fakeIndexedDb({ exists: false });
+    await expect(deviceDataRemains(cachesWith(), factory)).resolves.toBe(false);
+    expect(log.aborted).toBe(true);
+  });
+
+  it("does not open the database at all when a cache already answers", async () => {
+    const { factory } = fakeIndexedDb();
+    await deviceDataRemains(cachesWith("pages"), factory);
+    expect(factory.open).not.toHaveBeenCalled();
+  });
+
+  it("rejects when it cannot tell: not knowing is not 'cleared'", async () => {
+    const { factory } = fakeIndexedDb({ failOpens: 1 });
+    await expect(deviceDataRemains(cachesWith(), factory)).rejects.toThrow("denied");
+    const broken = { keys: () => Promise.reject(new Error("storage unavailable")) };
+    await expect(deviceDataRemains(broken, fakeIndexedDb().factory)).rejects.toThrow("storage unavailable");
+  });
+
+  it("is false where neither Cache Storage nor IndexedDB exists", async () => {
+    await expect(deviceDataRemains(undefined, undefined)).resolves.toBe(false);
+  });
+
+  it("uses the browser's CacheStorage and indexedDB by default", async () => {
+    const { factory } = fakeIndexedDb({ rows: [row("pages", 1)] });
+    vi.stubGlobal("caches", cachesWith());
+    vi.stubGlobal("indexedDB", factory);
+    try {
+      await expect(deviceDataRemains()).resolves.toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

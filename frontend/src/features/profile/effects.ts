@@ -1,7 +1,7 @@
 import { deleteSubscription } from "@/features/push/api";
 import { deleteRegistration } from "@/features/push/pending-delete";
 import { unsubscribe } from "@/features/push/subscribe";
-import { clearDeviceCaches, clearExpirationMetadata } from "@/features/pwa/api-cache";
+import { clearDeviceCaches, clearExpirationMetadata, deviceDataRemains } from "@/features/pwa/api-cache";
 
 /*
  * What taking a worker's data back does outside the on-device store: the places the browser and the API keep something
@@ -22,8 +22,13 @@ export interface ProfileEffects {
   readonly deleteRegistration: (serverId: string) => Promise<boolean>;
   /** Deletes the Cache Storage caches that can hold an API response or a page URL. */
   readonly clearCaches: () => Promise<unknown>;
-  /** Empties Serwist's IndexedDB record of what it cached and when. */
+  /** Deletes Serwist's IndexedDB record of what those caches held and when. */
   readonly clearCacheMetadata: () => Promise<unknown>;
+  /**
+   * Whether any cache of that kind, or any row of the record, exists now: how a clearing is checked, because a response the
+   * service worker was still fetching is written after it. Rejects when it cannot tell.
+   */
+  readonly deviceDataRemains: () => Promise<boolean>;
 }
 
 export const browserEffects: ProfileEffects = {
@@ -38,4 +43,5 @@ export const browserEffects: ProfileEffects = {
   deleteRegistration,
   clearCaches: () => clearDeviceCaches(),
   clearCacheMetadata: () => clearExpirationMetadata(),
+  deviceDataRemains: () => deviceDataRemains(),
 };

@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw/http";
 import {
   deleteRegistration,
   forgetPendingDelete,
+  hasUnpersistedPendingDeletes,
   MAX_PENDING_DELETES,
   PASS_TIMEOUT_MS,
   PENDING_DELETE_KEY,
@@ -17,12 +18,19 @@ import { server } from "@/mocks/node";
  * gone. The id says nothing about the worker; the endpoint, the site and the profile are not kept.
  */
 
+/** Lets go of every owed id, including any kept only in memory by a test that refused the storage. */
+function forgetAll(): void {
+  for (const id of readPendingDeletes()) forgetPendingDelete(id);
+}
+
 beforeEach(() => {
+  forgetAll();
   localStorage.clear();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  forgetAll();
 });
 
 describe("the pending list", () => {
@@ -82,7 +90,12 @@ describe("the pending list", () => {
     expect(readPendingDeletes()).toEqual(["sub-1", "sub-2"]);
   });
 
-  it("does not throw when localStorage is blocked", () => {
+  it("says whether the id reached storage: true when it did", () => {
+    expect(rememberPendingDelete("sub-1")).toBe(true);
+    expect(hasUnpersistedPendingDeletes()).toBe(false);
+  });
+
+  it("does not throw when localStorage is blocked, and the id is still owed (kept in memory)", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new DOMException("blocked", "SecurityError");
     });
@@ -92,11 +105,42 @@ describe("the pending list", () => {
     vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
       throw new DOMException("blocked", "SecurityError");
     });
+    expect(rememberPendingDelete("sub-1")).toBe(false);
+    expect(readPendingDeletes()).toEqual(["sub-1"]);
+    expect(hasUnpersistedPendingDeletes()).toBe(true);
     expect(() => {
-      rememberPendingDelete("sub-1");
       forgetPendingDelete("sub-1");
     }).not.toThrow();
     expect(readPendingDeletes()).toEqual([]);
+    expect(hasUnpersistedPendingDeletes()).toBe(false);
+  });
+
+  it("keeps the id in memory when a full storage refuses the write", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    expect(rememberPendingDelete("sub-1")).toBe(false);
+    expect(readPendingDeletes()).toEqual(["sub-1"]);
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+  });
+
+  it("checks the write by reading it back: a storage that accepts and drops it is not trusted", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+    expect(rememberPendingDelete("sub-1")).toBe(false);
+    expect(readPendingDeletes()).toEqual(["sub-1"]);
+    expect(hasUnpersistedPendingDeletes()).toBe(true);
+  });
+
+  it("lists stored ids first and the ones kept only in memory after them, each once", () => {
+    rememberPendingDelete("sub-1");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+    rememberPendingDelete("sub-2");
+    vi.restoreAllMocks();
+    expect(readPendingDeletes()).toEqual(["sub-1", "sub-2"]);
+    // Once storage works again, writing the same id puts it there and it stops being memory-only.
+    expect(rememberPendingDelete("sub-2")).toBe(true);
+    expect(readPendingDeletes()).toEqual(["sub-1", "sub-2"]);
+    expect(hasUnpersistedPendingDeletes()).toBe(false);
   });
 });
 
@@ -210,6 +254,27 @@ describe("retryPendingDeletes", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("also tries an id that could only be kept in memory, and forgets it once the API confirms", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+    rememberPendingDelete("sub-1");
+    vi.restoreAllMocks();
+    const remove = vi.fn(() => Promise.resolve(true));
+
+    expect(await retryPendingDeletes(remove)).toEqual([]);
+
+    expect(remove).toHaveBeenCalledExactlyOnceWith("sub-1");
+    expect(hasUnpersistedPendingDeletes()).toBe(false);
+  });
+
+  it("keeps an unconfirmed memory-only id, and says it is not in storage", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+    rememberPendingDelete("sub-1");
+    vi.restoreAllMocks();
+
+    expect(await retryPendingDeletes(() => Promise.resolve(false))).toEqual(["sub-1"]);
+    expect(hasUnpersistedPendingDeletes()).toBe(true);
   });
 
   it("uses the real DELETE by default: a 204 clears the id, a 502 keeps it", async () => {

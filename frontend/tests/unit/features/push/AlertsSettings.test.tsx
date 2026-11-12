@@ -7,7 +7,7 @@ import { CONSENT_VERSION } from "@/features/profile/profile-shape";
 import { PROFILE_STORAGE_KEY, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { AlertsSettings, type AlertsSettingsProps } from "@/features/push/AlertsSettings";
 import type { PushEnv } from "@/features/push/capability";
-import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
+import { clearRevokeIncomplete, markRevokeIncomplete } from "@/features/profile/revoke-marker";
 import type { UsePush } from "@/features/push/usePush";
 import { renderWithIntl } from "../../../utils/intl";
 
@@ -23,15 +23,7 @@ const hoisted = vi.hoisted(() => ({
   push: undefined as unknown as { value: UsePush },
   /** How many times the alerts state machine was mounted: removing the data starts it again from the browser's state. */
   mounts: 0,
-  /** A spy around the real `retryPendingDeletes`: the Alerts screen retries what the API has not confirmed deleting. */
-  retry: undefined as unknown as ReturnType<typeof vi.fn<(typeof import("@/features/push/pending-delete"))["retryPendingDeletes"]>>,
 }));
-
-vi.mock("@/features/push/pending-delete", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/features/push/pending-delete")>();
-  hoisted.retry = vi.fn(original.retryPendingDeletes);
-  return { ...original, retryPendingDeletes: hoisted.retry };
-});
 
 vi.mock("@/features/push/usePush", () => ({
   usePush: () => {
@@ -87,7 +79,7 @@ const alertButtons = () => screen.queryAllByRole("button").filter((button) => bu
 
 beforeEach(() => {
   hoisted.mounts = 0;
-  hoisted.retry.mockClear();
+  clearRevokeIncomplete();
 });
 
 describe("AlertsSettings: what the phone can do", () => {
@@ -207,6 +199,7 @@ describe("AlertsSettings: the closed-app limitation", () => {
 
 describe("AlertsSettings: removing the worker's data", () => {
   const realRevoke = useProfile.getState().revoke;
+  const realResume = useProfile.getState().resume;
 
   /** A revoke that resolves with `outcome`; `useProfile.setState` swaps it in for the real one. */
   function stubRevoke(outcome: RevokeOutcome = { failed: [], pending: false }) {
@@ -220,7 +213,8 @@ describe("AlertsSettings: removing the worker's data", () => {
   });
 
   afterEach(() => {
-    useProfile.setState({ revoke: realRevoke, profile: null, push: null });
+    useProfile.setState({ revoke: realRevoke, resume: realResume, profile: null, push: null });
+    clearRevokeIncomplete();
   });
 
   it.each([
@@ -411,25 +405,105 @@ describe("AlertsSettings: removing the worker's data", () => {
     expect(screen.getAllByRole("status").at(-1)).toBe(region);
   });
 
-  it("retries the registrations the API has not confirmed deleting each time Alerts opens", () => {
-    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
-    hoisted.retry.mockResolvedValueOnce([]);
+  it("finishes an unfinished revoke each time Alerts opens (resume), once, and not again when the section is rebuilt after a removal", async () => {
+    const resume = vi.fn(() => Promise.resolve(null));
+    useProfile.setState({ resume, revoke: vi.fn(() => Promise.resolve({ failed: [], pending: false })) });
 
     setup({ isSecureContext: false });
-
-    expect(hoisted.retry).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not retry again when the alerts section is rebuilt after a removal", async () => {
-    stubRevoke();
-    setup({});
-    expect(hoisted.retry).toHaveBeenCalledTimes(1);
+    expect(resume).toHaveBeenCalledTimes(1);
 
     await userEvent.click(removeData() as HTMLElement);
     await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
     await screen.findByText(en.alerts.removeData.done);
 
-    expect(hoisted.retry).toHaveBeenCalledTimes(1);
+    expect(resume).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the data may remain when a removal was left unfinished, from the marker alone, with no removal on this page (a reload)", async () => {
+    markRevokeIncomplete(["cache"]);
+    useProfile.setState({ resume: vi.fn(() => Promise.resolve(null)) });
+
+    setup({});
+
+    expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+  });
+
+  it("says only the registration is outstanding when the marker names no step", async () => {
+    markRevokeIncomplete([]);
+    useProfile.setState({ resume: vi.fn(() => Promise.resolve(null)) });
+
+    setup({});
+
+    expect(await screen.findByText(en.alerts.removeData.pending)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.failed)).not.toBeInTheDocument();
+  });
+
+  it("says nothing about a removal when there is no marker and nothing was removed here", () => {
+    useProfile.setState({ resume: vi.fn(() => Promise.resolve(null)) });
+    setup({});
+    const regions = screen.getAllByRole("status");
+    expect(regions[regions.length - 1]).toBeEmptyDOMElement();
+  });
+
+  it("shows the marker's message in the same live region that announces a removal, and keeps it across a rebuild", async () => {
+    markRevokeIncomplete(["cache"]);
+    useProfile.setState({ resume: vi.fn(() => Promise.resolve(null)) });
+    setup({});
+    const regions = screen.getAllByRole("status");
+    const region = regions[regions.length - 1] as HTMLElement;
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.failed);
+    });
+
+    // The worker tries again and it fails the same way: the message stays, in the same node.
+    useProfile.setState({ revoke: vi.fn(() => Promise.resolve<RevokeOutcome>({ failed: ["cache"], pending: false })) });
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    await waitFor(() => {
+      expect(hoisted.mounts).toBe(2);
+    });
+    expect(region).toHaveTextContent(en.alerts.removeData.failed);
+    expect(screen.getAllByRole("status").at(-1)).toBe(region);
+  });
+
+  it("turns the message to 'done' when the retry on open finishes everything, in the same node", async () => {
+    markRevokeIncomplete(["cache"]);
+    useProfile.setState({
+      resume: vi.fn(() => {
+        clearRevokeIncomplete();
+        return Promise.resolve({ failed: [], pending: false });
+      }),
+    });
+
+    setup({});
+
+    expect(await screen.findByText(en.alerts.removeData.done)).toHaveAttribute("role", "status");
+    expect(screen.queryByText(en.alerts.removeData.failed)).not.toBeInTheDocument();
+  });
+
+  it("keeps saying so when the retry on open could not finish either", async () => {
+    markRevokeIncomplete(["cache", "alerts"]);
+    useProfile.setState({ resume: vi.fn(() => Promise.resolve({ failed: ["alerts"], pending: false } as const)) });
+
+    setup({});
+
+    expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+  });
+
+  it("follows the marker when another tab clears it (a storage event), so a stale warning does not stay", async () => {
+    markRevokeIncomplete(["cache"]);
+    useProfile.setState({ resume: vi.fn(() => Promise.resolve(null)) });
+    setup({});
+    await screen.findByText(en.alerts.removeData.failed);
+
+    clearRevokeIncomplete();
+
+    await waitFor(() => {
+      expect(screen.queryByText(en.alerts.removeData.failed)).not.toBeInTheDocument();
+    });
   });
 
   it("gives the question's buttons the same 48 px target (min-h-12) as every other button", async () => {

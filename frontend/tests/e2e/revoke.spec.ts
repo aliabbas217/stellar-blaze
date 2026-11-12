@@ -13,6 +13,7 @@ import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 const INSTALL_TIMEOUT_MS = 20_000;
 const PROFILE_KEY = "sb-profile-v1";
 const PENDING_KEY = "sb-push-pending-delete-v1";
+const INCOMPLETE_KEY = "sb-revoke-incomplete-v1";
 const FORECAST = `/api/v1/sites/${SITE_DEMO}/forecast/today`;
 const POLICY = "/api/v1/risk-policy";
 const SUBSCRIPTION_ID = "sub-e2e-1";
@@ -50,8 +51,13 @@ interface DeviceState {
   readonly caches: string[];
   /** The URLs in the API cache. */
   readonly api: string[];
-  /** Rows across every object store of Serwist's expiration database (0 when there is none). */
-  readonly rows: number;
+  /**
+   * Rows of Serwist's expiration database that belong to a cache a removal clears (the URL and fetch time of each entry).
+   * The rows of the static asset caches, which a removal keeps, are not counted: they must stay, or those entries would never expire.
+   */
+  readonly deviceRows: number;
+  /** Of those, the rows that belong to the API cache. */
+  readonly apiRows: number;
 }
 
 /** What the phone holds, read in the page. Opening the expiration database here does not keep a connection. */
@@ -59,7 +65,8 @@ function deviceState(page: Page): Promise<DeviceState> {
   return page.evaluate(async () => {
     const names = await caches.keys();
     const api = names.includes("sb-api") ? (await (await caches.open("sb-api")).keys()).map((request) => new URL(request.url).pathname).sort() : [];
-    const rows = await new Promise<number>((resolve, reject) => {
+    const cleared = ["sb-api", "apis", "pages", "pages-rsc", "pages-rsc-prefetch", "others"];
+    const counts = await new Promise<{ deviceRows: number; apiRows: number }>((resolve, reject) => {
       const open = indexedDB.open("serwist-expiration");
       open.onerror = () => {
         reject(open.error ?? new Error("open failed"));
@@ -69,26 +76,28 @@ function deviceState(page: Page): Promise<DeviceState> {
         const stores = Array.from(database.objectStoreNames);
         if (stores.length === 0) {
           database.close();
-          resolve(0);
+          resolve({ deviceRows: 0, apiRows: 0 });
           return;
         }
-        const transaction = database.transaction(stores, "readonly");
-        let total = 0;
-        let left = stores.length;
-        for (const store of stores) {
-          const count = transaction.objectStore(store).count();
+        const index = database.transaction("cache-entries", "readonly").objectStore("cache-entries").index("cacheName");
+        let deviceRows = 0;
+        let apiRows = 0;
+        let left = cleared.length;
+        for (const name of cleared) {
+          const count = index.count(name);
           count.onsuccess = () => {
-            total += count.result;
+            deviceRows += count.result;
+            if (name === "sb-api") apiRows = count.result;
             left -= 1;
             if (left === 0) {
               database.close();
-              resolve(total);
+              resolve({ deviceRows, apiRows });
             }
           };
         }
       };
     });
-    return { caches: names.sort(), api, rows };
+    return { caches: names.sort(), api, ...counts };
   });
 }
 
@@ -106,12 +115,19 @@ function seedStore(page: Page, withPush: boolean): Promise<void> {
   );
 }
 
-/** What the app keeps in localStorage that a removal must empty: the profile and push state, and the ids owed to the API. */
-function storedKeys(page: Page): Promise<{ profile: string | null; pending: string | null }> {
-  return page.evaluate(({ profile, pending }) => ({ profile: localStorage.getItem(profile), pending: localStorage.getItem(pending) }), {
-    profile: PROFILE_KEY,
-    pending: PENDING_KEY,
-  });
+/**
+ * What the app keeps in localStorage around a removal: the profile and push state (a removal empties them), the ids owed to
+ * the API, and the marker that says a removal did not finish (written before it starts, removed only when it has).
+ */
+function storedKeys(page: Page): Promise<{ profile: string | null; pending: string | null; incomplete: string | null }> {
+  return page.evaluate(
+    ({ profile, pending, incomplete }) => ({
+      profile: localStorage.getItem(profile),
+      pending: localStorage.getItem(pending),
+      incomplete: localStorage.getItem(incomplete),
+    }),
+    { profile: PROFILE_KEY, pending: PENDING_KEY, incomplete: INCOMPLETE_KEY },
+  );
 }
 
 /** Opens Alerts for a site and removes the worker's data through the control: two taps, the second on "Yes". */
@@ -135,7 +151,9 @@ async function visitLikeAWorker(page: Page): Promise<void> {
   await expect
     .poll(() => deviceState(page), { message: "the worker's visit is cached: the API responses, a page cache and their URLs in IndexedDB" })
     .toMatchObject({ api: [FORECAST, POLICY].sort(), caches: expect.arrayContaining(["sb-api", "others"]) });
-  expect((await deviceState(page)).rows).toBeGreaterThanOrEqual(3);
+  const visited = await deviceState(page);
+  expect(visited.deviceRows).toBeGreaterThanOrEqual(3);
+  expect(visited.apiRows).toBe(2);
 }
 
 test("removing my data leaves no API entry, page URL or expiration row on the phone, with the service worker running", async ({ page, context }) => {
@@ -150,10 +168,11 @@ test("removing my data leaves no API entry, page URL or expiration row on the ph
   // Cache Storage: none of the API caches or the page caches. The precache stays, so the app still opens offline.
   for (const gone of ["sb-api", "apis", "pages", "pages-rsc", "pages-rsc-prefetch", "others"]) expect(after.caches, gone).not.toContain(gone);
   expect(after.caches.some((name) => name.startsWith("serwist-precache"))).toBe(true);
-  // IndexedDB: Serwist's record of what it cached holds no URL.
-  expect(after.rows).toBe(0);
+  // IndexedDB: Serwist's record of what it cached holds no row of those caches (the static assets' rows stay).
+  expect(after.deviceRows).toBe(0);
   // Local storage: the profile and the push state are gone, and nothing is owed to the API.
-  expect(await storedKeys(page)).toEqual({ profile: null, pending: null });
+  // The marker is gone too: everything finished.
+  expect(await storedKeys(page)).toEqual({ profile: null, pending: null, incomplete: null });
 
   // Still an app: an unvisited route offline is answered by the precached offline page.
   await context.setOffline(true);
@@ -170,11 +189,19 @@ test("with the API out of reach it says the registration is still owed, keeps on
   await expect(result(page)).toHaveText(en.alerts.removeData.pending);
   await expect(page.getByText(en.alerts.removeData.done, { exact: true })).toHaveCount(0);
   // The local data is gone, and what the phone still holds about the subscription is its id and nothing else.
-  expect(await storedKeys(page)).toEqual({ profile: null, pending: JSON.stringify([SUBSCRIPTION_ID]) });
+  const owed = await storedKeys(page);
+  expect(owed.profile).toBeNull();
+  expect(owed.pending).toBe(JSON.stringify([SUBSCRIPTION_ID]));
+  // And the marker says so across a reload: it names no step, only the API's confirmation is outstanding.
+  expect(JSON.parse(owed.incomplete ?? "null")).toMatchObject({ v: 1, steps: [] });
   // The caches and the expiration record were cleared all the same: only the API's answer is missing.
   const after = await deviceState(page);
   expect(after.api).toEqual([]);
-  expect(after.rows).toBe(0);
+  expect(after.deviceRows).toBe(0);
+
+  // After a reload, with the API still out of reach, the screen still says so (from the marker alone).
+  await page.reload();
+  await expect(result(page)).toHaveText(en.alerts.removeData.pending);
 
   // The API is reachable again: opening Alerts asks it, and its answer clears the id.
   const deleted: string[] = [];
@@ -184,8 +211,10 @@ test("with the API out of reach it says the registration is still owed, keeps on
     return route.fulfill({ status: 204 });
   });
   await page.goto("/en/worker/alerts");
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), PENDING_KEY)).toBeNull();
+  await expect.poll(() => storedKeys(page)).toEqual({ profile: null, pending: null, incomplete: null });
   expect(deleted).toEqual([`/api/v1/push/subscriptions/${SUBSCRIPTION_ID}`]);
+  // Nothing outstanding any more: the screen says the data was removed, in the same live region.
+  await expect(result(page)).toHaveText(en.alerts.removeData.done);
 });
 
 test("when the expiration record cannot be cleared it says it could not finish, and never that the data was removed", async ({ page }) => {
@@ -204,6 +233,47 @@ test("when the expiration record cannot be cleared it says it could not finish, 
 
   await expect(result(page)).toHaveText(en.alerts.removeData.failed);
   await expect(page.getByText(en.alerts.removeData.done, { exact: true })).toHaveCount(0);
-  // The profile is gone from the phone all the same.
-  expect((await storedKeys(page)).profile).toBeNull();
+  // The profile is gone from the phone all the same, and the marker names the step that did not finish.
+  const stored = await storedKeys(page);
+  expect(stored.profile).toBeNull();
+  expect(JSON.parse(stored.incomplete ?? "null")).toMatchObject({ steps: ["cache"] });
+});
+
+test("a removal that could not finish is still said after a reload, is retried each time Alerts opens, and says 'removed' only when it has finished", async ({ page }) => {
+  await page.route("**/api/v1/push/subscriptions/*", (route) => route.fulfill({ status: 204 }));
+  // The page's IndexedDB refuses the expiration database for as long as a flag in localStorage says so, on every load.
+  await page.addInitScript(() => {
+    const open = indexedDB.open.bind(indexedDB);
+    indexedDB.open = (name: string, version?: number) => {
+      if (name === "serwist-expiration" && localStorage.getItem("e2e-break-idb") === "1") throw new DOMException("simulated failure", "UnknownError");
+      return open(name, version);
+    };
+  });
+  await visitLikeAWorker(page);
+  await page.evaluate(() => {
+    localStorage.setItem("e2e-break-idb", "1");
+  });
+
+  await removeMyData(page);
+  await expect(result(page)).toHaveText(en.alerts.removeData.failed);
+
+  // Reloaded, with the fault still there: the page opens saying the data may remain, and its retry fails the same way.
+  await page.reload();
+  await expect(result(page)).toHaveText(en.alerts.removeData.failed);
+  await expect(page.getByText(en.alerts.removeData.done, { exact: true })).toHaveCount(0);
+  expect(JSON.parse((await storedKeys(page)).incomplete ?? "null")).toMatchObject({ steps: ["cache"] });
+
+  // The fault is gone. Opening Alerts finishes the clearing on its own, checks it, and only then says it is done.
+  await page.evaluate(() => {
+    localStorage.removeItem("e2e-break-idb");
+  });
+  await page.reload();
+  await expect(result(page)).toHaveText(en.alerts.removeData.done);
+  expect(await storedKeys(page)).toEqual({ profile: null, pending: null, incomplete: null });
+  // What the failed removal left, the retry took: the API responses and the rows that recorded them. (The page itself,
+  // visited again after the removal, is cached again by the worker, as any visit is; that is not what was removed.)
+  const after = await deviceState(page);
+  expect(after.api).toEqual([]);
+  expect(after.apiRows).toBe(0);
+  expect(after.caches).not.toContain("sb-api");
 });

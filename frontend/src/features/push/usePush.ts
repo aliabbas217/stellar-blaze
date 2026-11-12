@@ -174,8 +174,9 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
     const epoch = useProfile.getState().revokeEpoch;
     // A function, so the check is read again after each await instead of being narrowed away.
     const stale = () => abort.signal.aborted || busy.current || useProfile.getState().revokeEpoch !== epoch;
-    // Registrations an earlier revoke could not delete (ruling R32): the API is asked again each time the app opens.
-    void retryPendingDeletes();
+    // What an earlier revoke did not finish (rulings R32, R36): the registrations the API has not confirmed deleting, and
+    // the caches, asked again each time the app opens. It never touches the profile or the push state.
+    void useProfile.getState().resume();
     void (async () => {
       try {
         const registration = await readyRegistration(platform);

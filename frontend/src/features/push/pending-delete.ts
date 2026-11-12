@@ -9,6 +9,10 @@ import { deleteSubscription } from "@/features/push/api";
  * under its own key until the API confirms the registration is gone. It is retried on the next revoke, when the Alerts
  * screen opens and when the app reconciles its push state (usePush).
  *
+ * The write is checked by reading it back (a localStorage that is full, blocked, or accepts and drops the write must not
+ * leave an id owed to no one). An id that could not be written down is kept in memory for the life of the page, is retried
+ * with the rest, and is reported by `hasUnpersistedPendingDeletes` so that nobody says "done" over it (ruling R36).
+ *
  * Governance (ADR 0004): the id is what the API returned for the subscription. It names no worker; the endpoint, the site
  * and the profile are not kept here, so a phone that has revoked holds nothing about the worker but this number.
  */
@@ -21,27 +25,17 @@ export const PENDING_DELETE_KEY = "sb-push-pending-delete-v1";
  */
 export const MAX_PENDING_DELETES = 10;
 
+/** Ids that could not be written to storage: owed all the same, for as long as this page lives. */
+const unsaved = new Set<string>();
+
 // Every access is guarded, like the profile store's: localStorage throws when it is blocked or full.
-function readRaw(): string | null {
+function readStored(): readonly string[] {
+  let raw: string | null;
   try {
-    return localStorage.getItem(PENDING_DELETE_KEY);
+    raw = localStorage.getItem(PENDING_DELETE_KEY);
   } catch {
-    return null;
+    return [];
   }
-}
-
-function write(ids: readonly string[]): void {
-  try {
-    if (ids.length === 0) localStorage.removeItem(PENDING_DELETE_KEY);
-    else localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(ids));
-  } catch {
-    // Nothing more can be done on a phone that refuses storage; the id is lost with the page.
-  }
-}
-
-/** The ids still owed to the API, oldest first. Anything in storage that is not a list of non-empty strings is ignored. */
-export function readPendingDeletes(): readonly string[] {
-  const raw = readRaw();
   if (raw === null) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -52,15 +46,45 @@ export function readPendingDeletes(): readonly string[] {
   }
 }
 
-export function rememberPendingDelete(serverId: string): void {
-  const ids = readPendingDeletes();
-  if (ids.includes(serverId)) return;
-  write([...ids, serverId].slice(-MAX_PENDING_DELETES));
+function write(ids: readonly string[]): void {
+  try {
+    if (ids.length === 0) localStorage.removeItem(PENDING_DELETE_KEY);
+    else localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(ids));
+  } catch {
+    // The caller reads the key back to learn whether it took.
+  }
+}
+
+/** The ids still owed to the API, oldest first: the stored ones, then any that could only be kept in memory. */
+export function readPendingDeletes(): readonly string[] {
+  const stored = readStored();
+  return [...stored, ...[...unsaved].filter((id) => !stored.includes(id))];
+}
+
+/** Whether an owed id could not be written to storage: it is lost if this page is, so it must not be called settled. */
+export function hasUnpersistedPendingDeletes(): boolean {
+  return unsaved.size > 0;
+}
+
+/**
+ * Writes an id down as owed, and checks by reading the key back. Returns true when it is in storage; false when it could
+ * only be kept in memory (it is still owed and still retried, but it will not survive the page).
+ */
+export function rememberPendingDelete(serverId: string): boolean {
+  const stored = readStored();
+  if (!stored.includes(serverId)) write([...stored, serverId].slice(-MAX_PENDING_DELETES));
+  if (readStored().includes(serverId)) {
+    unsaved.delete(serverId);
+    return true;
+  }
+  unsaved.add(serverId);
+  return false;
 }
 
 export function forgetPendingDelete(serverId: string): void {
-  const ids = readPendingDeletes();
-  if (ids.includes(serverId)) write(ids.filter((id) => id !== serverId));
+  unsaved.delete(serverId);
+  const stored = readStored();
+  if (stored.includes(serverId)) write(stored.filter((id) => id !== serverId));
 }
 
 /**

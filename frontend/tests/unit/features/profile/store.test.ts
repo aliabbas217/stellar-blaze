@@ -7,7 +7,14 @@ import {
   type PushRegistration,
 } from "@/features/profile/store";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
-import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
+import { clearRevokeIncomplete, INCOMPLETE_KEY, markRevokeIncomplete, readRevokeIncomplete } from "@/features/profile/revoke-marker";
+import {
+  forgetPendingDelete,
+  hasUnpersistedPendingDeletes,
+  PENDING_DELETE_KEY,
+  readPendingDeletes,
+  rememberPendingDelete,
+} from "@/features/push/pending-delete";
 
 /*
  * The on-device store (ADR 0004): the push registration (Task 7) and the worker's profile (Task 8), persisted under
@@ -33,13 +40,22 @@ async function freshStore() {
   return (await import("@/features/profile/store")).useProfile;
 }
 
+/** Lets go of every owed registration id and of the marker, including any kept only in memory by a test that refused storage. */
+function forgetEverythingOwed(): void {
+  vi.restoreAllMocks();
+  for (const id of readPendingDeletes()) forgetPendingDelete(id);
+  clearRevokeIncomplete();
+}
+
 beforeEach(() => {
+  forgetEverythingOwed();
   localStorage.clear();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+  forgetEverythingOwed();
 });
 
 describe("useProfile (push slice)", () => {
@@ -207,6 +223,7 @@ function fakeEffects(overrides: Partial<ProfileEffects> = {}) {
     deleteRegistration: vi.fn<ProfileEffects["deleteRegistration"]>(() => Promise.resolve(true)),
     clearCaches: vi.fn(() => Promise.resolve()),
     clearCacheMetadata: vi.fn(() => Promise.resolve("cleared")),
+    deviceDataRemains: vi.fn<ProfileEffects["deviceDataRemains"]>(() => Promise.resolve(false)),
     ...overrides,
   };
 }
@@ -327,7 +344,9 @@ describe("revoke", () => {
     expect(outcome).toEqual({ failed: ["cache"], pending: false });
     expect(isRevokeComplete(outcome)).toBe(false);
     expect(effects.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(1);
+    // The whole clearing is tried twice before it is reported as failed.
+    expect(effects.clearCaches).toHaveBeenCalledTimes(2);
+    expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(2);
   });
 
   it("reports a failed clearing of the expiration metadata as a cache failure, and never as done", async () => {
@@ -339,7 +358,7 @@ describe("revoke", () => {
 
     expect(outcome).toEqual({ failed: ["cache"], pending: false });
     expect(isRevokeComplete(outcome)).toBe(false);
-    expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(2);
   });
 
   it("survives an effect that throws instead of rejecting", async () => {
@@ -675,5 +694,381 @@ describe("save: a change of site", () => {
     });
 
     expect(store.getState().profile?.siteId).toBe("site-demo-jebel-ali");
+  });
+});
+
+describe("revoke: the owed registration id could not be written down (ruling R36, N1)", () => {
+  afterEach(forgetEverythingOwed);
+
+  /** A registration is stored, and then the phone refuses every write: what revoke starts from. */
+  function storeThatCannotWrite(effects: ReturnType<typeof fakeEffects>, how: "throws" | "drops") {
+    const store = createProfileStore({ effects });
+    store.getState().setPush(registration);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      if (how === "throws") throw new DOMException("full", "QuotaExceededError");
+    });
+    return store;
+  }
+
+  it.each(["throws", "drops"] as const)("asks the API to delete it straight away (storage %s the write), and is complete when the API confirms", async (how) => {
+    const effects = fakeEffects();
+    const store = storeThatCannotWrite(effects, how);
+
+    const outcome = await store.getState().revoke();
+
+    expect(effects.deleteRegistration).toHaveBeenCalledExactlyOnceWith("sub-1");
+    expect(outcome).toEqual(COMPLETE);
+    expect(hasUnpersistedPendingDeletes()).toBe(false);
+  });
+
+  it.each(["throws", "drops"] as const)(
+    "is never an all-clear while the API has not confirmed it and it exists nowhere but in memory (storage %s the write)",
+    async (how) => {
+      const effects = fakeEffects({ deleteRegistration: vi.fn(() => Promise.resolve(false)) });
+      const store = storeThatCannotWrite(effects, how);
+
+      const outcome = await store.getState().revoke();
+
+      expect(outcome).toEqual({ failed: ["storage"], pending: true });
+      expect(isRevokeComplete(outcome)).toBe(false);
+      // Still owed, and a second revoke in this page asks again.
+      vi.mocked(effects.deleteRegistration).mockResolvedValue(true);
+      expect(await store.getState().revoke()).toEqual(COMPLETE);
+      expect(effects.deleteRegistration).toHaveBeenCalledTimes(2);
+    },
+  );
+});
+
+describe("revoke: the clearing is checked afterwards (ruling R36, N2)", () => {
+  it("clears again when a response written meanwhile brought a cache back, and is complete once a second look finds nothing", async () => {
+    const effects = fakeEffects({ deviceDataRemains: vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    const outcome = await store.getState().revoke();
+
+    expect(effects.clearCaches).toHaveBeenCalledTimes(2);
+    expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(2);
+    expect(effects.deviceDataRemains).toHaveBeenCalledTimes(2);
+    expect(outcome).toEqual(COMPLETE);
+  });
+
+  it("reports the cache as not cleared when it is still there after the second clearing", async () => {
+    const effects = fakeEffects({ deviceDataRemains: vi.fn(() => Promise.resolve(true)) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    const outcome = await store.getState().revoke();
+
+    expect(effects.clearCaches).toHaveBeenCalledTimes(2);
+    expect(outcome).toEqual({ failed: ["cache"], pending: false });
+    expect(isRevokeComplete(outcome)).toBe(false);
+  });
+
+  it("does not call the clearing done when it cannot check: not knowing is not an all-clear", async () => {
+    const effects = fakeEffects({ deviceDataRemains: vi.fn(() => Promise.reject(new Error("storage unavailable"))) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    expect(await store.getState().revoke()).toEqual({ failed: ["cache"], pending: false });
+  });
+
+  it("looks only after both the caches and the expiration record have been dealt with", async () => {
+    const order: string[] = [];
+    const effects = fakeEffects({
+      clearCaches: vi.fn(async () => {
+        await Promise.resolve();
+        order.push("caches");
+      }),
+      clearCacheMetadata: vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        order.push("metadata");
+        return "cleared";
+      }),
+      deviceDataRemains: vi.fn(() => {
+        order.push("check");
+        return Promise.resolve(false);
+      }),
+    });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+
+    expect(order).toEqual(["caches", "metadata", "check"]);
+  });
+
+  it("tries the whole clearing once more when it failed the first time, and is complete if that works", async () => {
+    const effects = fakeEffects({ clearCaches: vi.fn().mockRejectedValueOnce(new Error("quota")).mockResolvedValue(undefined) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    expect(await store.getState().revoke()).toEqual(COMPLETE);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(2);
+  });
+
+  it("checks a clearing after a change of site too", async () => {
+    const effects = fakeEffects();
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+    store.getState().save({ ...profile, siteId: "site-demo-jebel-ali" });
+
+    await vi.waitFor(() => {
+      expect(effects.deviceDataRemains).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("the durable 'data may remain' marker (ruling R36, N3)", () => {
+  afterEach(forgetEverythingOwed);
+
+  it("is written before the first step starts, naming every step as not yet finished", async () => {
+    const seen: (string | null)[] = [];
+    const effects = fakeEffects({
+      unsubscribe: vi.fn(() => {
+        seen.push(localStorage.getItem(INCOMPLETE_KEY));
+        return Promise.resolve();
+      }),
+    });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+
+    const marker = JSON.parse(seen[0] ?? "null") as { steps: string[] };
+    expect(marker.steps).toEqual(["storage", "alerts", "cache"]);
+  });
+
+  it("is removed when every step finished", async () => {
+    const store = createProfileStore({ effects: fakeEffects() });
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+
+    expect(localStorage.getItem(INCOMPLETE_KEY)).toBeNull();
+    expect(readRevokeIncomplete()).toBeNull();
+  });
+
+  it("is left, naming only the steps that failed, when one did not finish", async () => {
+    const effects = fakeEffects({ clearCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+
+    expect(readRevokeIncomplete()?.steps).toEqual(["cache"]);
+  });
+
+  it("is left, naming no step, when only the API's confirmation of a registration is outstanding", async () => {
+    const effects = fakeEffects({ deleteRegistration: vi.fn(() => Promise.resolve(false)) });
+    const store = createProfileStore({ effects });
+    store.getState().setPush(registration);
+
+    await store.getState().revoke();
+
+    expect(readRevokeIncomplete()).not.toBeNull();
+    expect(readRevokeIncomplete()?.steps).toEqual([]);
+  });
+
+  it("holds no personal data and no id: a version, a time and step names", async () => {
+    const effects = fakeEffects({ unsubscribe: vi.fn(() => Promise.reject(new Error("offline"))) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+    store.getState().setPush(registration);
+
+    await store.getState().revoke();
+
+    const raw = localStorage.getItem(INCOMPLETE_KEY) ?? "";
+    expect(Object.keys(JSON.parse(raw) as object).sort()).toEqual(["at", "steps", "v"]);
+    for (const secret of ["sub-1", "site-demo", "crew-a", "heavy", "work_clothes", "push.example"]) expect(raw).not.toContain(secret);
+  });
+
+  describe("resume (Alerts opens, and the app reconciles its push state)", () => {
+    it("does nothing, and touches nothing, when no revoke is unfinished and nothing is owed", async () => {
+      const effects = fakeEffects();
+      const store = createProfileStore({ effects });
+
+      expect(await store.getState().resume()).toBeNull();
+
+      for (const effect of Object.values(effects)) expect(effect).not.toHaveBeenCalled();
+    });
+
+    it("clears the caches and the expiration record again, checks them, and removes the marker", async () => {
+      markRevokeIncomplete(["cache"]);
+      const effects = fakeEffects();
+      const store = createProfileStore({ effects });
+
+      const outcome = await store.getState().resume();
+
+      expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+      expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(1);
+      expect(effects.deviceDataRemains).toHaveBeenCalledTimes(1);
+      expect(outcome).toEqual(COMPLETE);
+      expect(readRevokeIncomplete()).toBeNull();
+    });
+
+    it("never touches the profile, the push state or the browser's subscription: the worker may have set up again since", async () => {
+      markRevokeIncomplete(["cache", "alerts"]);
+      const effects = fakeEffects();
+      const store = createProfileStore({ effects });
+      store.getState().save(profile);
+      store.getState().setPush(registration);
+
+      await store.getState().resume();
+
+      expect(store.getState().profile).toEqual(profile);
+      expect(store.getState().push).toEqual(registration);
+      expect(effects.unsubscribe).not.toHaveBeenCalled();
+      expect(localStorage.getItem(PROFILE_STORAGE_KEY)).not.toBeNull();
+    });
+
+    it("keeps the marker, naming what is left, when a step it cannot finish by itself was unfinished (the browser's subscription)", async () => {
+      markRevokeIncomplete(["alerts", "cache"]);
+      const store = createProfileStore({ effects: fakeEffects() });
+
+      const outcome = await store.getState().resume();
+
+      expect(outcome).toEqual({ failed: ["alerts"], pending: false });
+      expect(readRevokeIncomplete()?.steps).toEqual(["alerts"]);
+    });
+
+    it("does not clear the caches again when the cache step had finished: a new session's cache is not its business", async () => {
+      markRevokeIncomplete(["alerts"]);
+      const effects = fakeEffects();
+      const store = createProfileStore({ effects });
+
+      await store.getState().resume();
+
+      expect(effects.clearCaches).not.toHaveBeenCalled();
+      expect(effects.clearCacheMetadata).not.toHaveBeenCalled();
+    });
+
+    it("keeps the cache step in the marker when the clearing fails again", async () => {
+      markRevokeIncomplete(["cache"]);
+      const effects = fakeEffects({ clearCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
+      const store = createProfileStore({ effects });
+
+      expect(await store.getState().resume()).toEqual({ failed: ["cache"], pending: false });
+      expect(readRevokeIncomplete()?.steps).toEqual(["cache"]);
+    });
+
+    it("keeps the cache step when the second look still finds data", async () => {
+      markRevokeIncomplete(["cache"]);
+      const effects = fakeEffects({ deviceDataRemains: vi.fn(() => Promise.resolve(true)) });
+      const store = createProfileStore({ effects });
+
+      expect(await store.getState().resume()).toEqual({ failed: ["cache"], pending: false });
+    });
+
+    it("retries the registrations owed to the API, and removes the marker once the API has confirmed them", async () => {
+      markRevokeIncomplete([]);
+      localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+      const effects = fakeEffects();
+      const store = createProfileStore({ effects });
+
+      const outcome = await store.getState().resume();
+
+      expect(effects.deleteRegistration).toHaveBeenCalledExactlyOnceWith("sub-owed");
+      expect(outcome).toEqual(COMPLETE);
+      expect(readRevokeIncomplete()).toBeNull();
+      expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+    });
+
+    it("keeps the marker while the API still does not confirm", async () => {
+      markRevokeIncomplete([]);
+      localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+      const effects = fakeEffects({ deleteRegistration: vi.fn(() => Promise.resolve(false)) });
+      const store = createProfileStore({ effects });
+
+      expect(await store.getState().resume()).toEqual({ failed: [], pending: true });
+      expect(readRevokeIncomplete()).not.toBeNull();
+    });
+
+    it("retries an owed registration even when no revoke was unfinished, and leaves no marker behind", async () => {
+      localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+      const effects = fakeEffects({ deleteRegistration: vi.fn(() => Promise.resolve(false)) });
+      const store = createProfileStore({ effects });
+
+      expect(await store.getState().resume()).toBeNull();
+
+      expect(effects.deleteRegistration).toHaveBeenCalledTimes(1);
+      expect(effects.clearCaches).not.toHaveBeenCalled();
+      expect(readRevokeIncomplete()).toBeNull();
+    });
+
+    it("keeps 'storage' in the marker when an owed id is still only in memory", async () => {
+      markRevokeIncomplete([]);
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+      rememberPendingDelete("sub-memory");
+      vi.restoreAllMocks();
+      const effects = fakeEffects({ deleteRegistration: vi.fn(() => Promise.resolve(false)) });
+      const store = createProfileStore({ effects });
+
+      const outcome = await store.getState().resume();
+
+      expect(outcome).toEqual({ failed: ["storage"], pending: true });
+    });
+
+    it("waits for a revoke that is running instead of racing it", async () => {
+      let finish: () => void = () => undefined;
+      const effects = fakeEffects({
+        unsubscribe: vi.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              finish = resolve;
+            }),
+        ),
+      });
+      const store = createProfileStore({ effects });
+      store.getState().setPush(registration);
+
+      const revoking = store.getState().revoke();
+      const resuming = store.getState().resume();
+      finish();
+
+      expect(await resuming).toEqual(await revoking);
+      expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs one resume at a time", async () => {
+      markRevokeIncomplete(["cache"]);
+      let release: () => void = () => undefined;
+      const effects = fakeEffects({
+        clearCaches: vi.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              release = resolve;
+            }),
+        ),
+      });
+      const store = createProfileStore({ effects });
+
+      const first = store.getState().resume();
+      const second = store.getState().resume();
+      await vi.waitFor(() => {
+        expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+      });
+      release();
+
+      expect(await first).toEqual(await second);
+      expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("the epoch moves without writing (ruling R37, M3)", () => {
+  it("a revoke in another tab does not make this tab write the key back", async () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    thisTab.getState().save(profile);
+    const otherTab = createProfileStore({ effects: fakeEffects() });
+
+    await otherTab.getState().revoke();
+    expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
+    window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_STORAGE_KEY, storageArea: localStorage }));
+
+    await vi.waitFor(() => {
+      expect(thisTab.getState().revokeEpoch).toBe(1);
+    });
+    expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
   });
 });
