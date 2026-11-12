@@ -12,7 +12,7 @@ Because only bootstrap creates role assignments, CI needs no rights over authori
 
 **Tech Stack:** Bicep CLI v0.49.2 · Azure CLI 2.92.0 (+ `containerapp` extension) · API versions: `Microsoft.App/*` 2026-07-01 · `Microsoft.DBforPostgreSQL/flexibleServers` 2026-10-01 · `Microsoft.ContainerRegistry/registries` 2025-11-01 · `Microsoft.OperationalInsights/workspaces` 2026-03-01 · `Microsoft.ManagedIdentity/userAssignedIdentities` (+ `/federatedIdentityCredentials`) 2024-11-30 · `Microsoft.Consumption/budgets` 2026-06-01 · `Microsoft.Insights/diagnosticSettings` 2021-05-01-preview (the only version published) · `Microsoft.Authorization/roleAssignments` (latest GA, confirmed by the linter in Task 2) · GitHub Actions: `actions/checkout@v7.0.1`, `azure/login@v3.1.0`, `docker/setup-buildx-action@v4.4.1`, `docker/build-push-action@v7.4.0` · actionlint v1.7.12 · shellcheck (runner-provided).
 
-**Spec:** `docs/decisions/0001-hosting-azure-uae-north.md`, `docs/decisions/0002-infra-minimalism-and-ports.md`, `docs/decisions/0009-evolvability-configurability.md` (amended Tasks 3, 5 and 7 on 2026-11-11), `docs/decisions/0010-runtime-tunable-configuration.md` (amended Global Constraints and Task 7 the same day; **no new Azure resource**: runtime config lives in the existing Postgres), `docs/research/2026-11-11-deployment-options.md` (§0, §5.4, §6.1, §8.1, §9, §10), `docs/superpowers/plans/2026-11-11-roadmap.md` (I1 dates, coordination points), `docs/superpowers/plans/2026-11-11-b1-backend-foundation.md` (Task 2 `Settings`, Task 3 health routes, Task 4 Dockerfile).
+**Spec:** `docs/decisions/0001-hosting-azure-uae-north.md`, `docs/decisions/0002-infra-minimalism-and-ports.md`, `docs/decisions/0009-evolvability-configurability.md` (amended Tasks 3, 5 and 7 on 2026-11-11), `docs/decisions/0010-runtime-tunable-configuration.md` (amended Global Constraints and Task 7 the same day; **no new Azure resource**: runtime config lives in the existing Postgres), `docs/research/2026-11-11-deployment-options.md` (§0, §5.4, §6.1, §8.1, §9, §10), `docs/superpowers/plans/2026-11-11-roadmap.md` (I1 dates, coordination points), `docs/superpowers/plans/2026-11-11-b1-backend-foundation.md` (Task 2 `Settings`, Task 3 health routes, Task 4 Dockerfile). **Amended 2026-11-12 after B1 executed:** also `docs/decisions/0042-postgres-tls-must-be-verified-in-prod.md` (database URL `ssl=verify-full`, the root file, a deploy-time check) and the B1 branch's Task 7B (runtime config store), which makes the `job-migrate` seed a prerequisite of the first real `api` deploy, not a later step.
 
 ## Global Constraints
 
@@ -25,6 +25,8 @@ Because only bootstrap creates role assignments, CI needs no rights over authori
   - `job-refresh`: Schedule trigger, cron `0 */6 * * *`. Container Apps evaluates cron in **UTC**, so it runs at 04:00, 10:00, 16:00 and 22:00 Gulf time. `replicaTimeout` 1800 s, `replicaRetryLimit` 1. Command `["sb-jobs","refresh"]`, enabled only when the GitHub variable `REFRESH_JOB_READY == "true"` (B3 ships `refresh` on `ReplayForecastSource`, so the judged demo never calls the free Open-Meteo API). Until then it runs the placeholder jobs image.
   - `job-migrate`: Manual trigger, command `["alembic","upgrade","head"]`, run before every real `api` rollout, never at app start-up (ADR 0001).
 - **Postgres:** Flexible Server, Burstable `Standard_B1ms`, 32 GiB, version `18` if preflight shows it GA in UAE North, else `17`. Password auth only (Entra auth parked). Public access with the "Allow Azure services" rule `0.0.0.0–0.0.0.0` (stage 1; VNet is stage 2). TLS required. HA off. Backups 7 days, no geo-redundancy. Database `stellar_blaze`, admin `sbadmin`. The password is **64 hex chars** (`openssl rand -hex 32`), so it never needs URL encoding.
+- **Database TLS (ADR 0042, amended 2026-11-12):** the server already requires TLS (`require_secure_transport` stays ON); the **client must verify it too**. `databaseUrl` ends `?ssl=verify-full`, and `api`, `job-migrate` and `job-refresh` set `PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt` (asyncpg reads the root file from that variable; `sslrootcert` cannot be passed through a SQLAlchemy URL). `ssl=require` is **not** acceptable: with asyncpg 0.32.0 it is encryption without authentication (`CERT_NONE`, no host-name check), and so is asyncpg's default. The Debian bundle in the B1 image holds both roots Microsoft names for Azure Database for PostgreSQL (DigiCert Global Root G2 and Microsoft RSA Root CA 2017; checked 2026-11-12). Never trust intermediate CAs or pin server certificates. A Private Endpoint or VNet (stage 2) may force `verify-ca` because the host name then differs; decide then. `check-db-tls.sh` (Task 4) fails the deploy when any of this is missing.
+- **Migration job and runtime config (ADR 0010, B1 Task 7B; amended 2026-11-12):** B1's image refuses to serve without a seeded runtime config (readiness answers 503, `dependency=config`). `job-migrate` therefore runs `sb-jobs db upgrade` (Alembic `upgrade head`, then the idempotent seed) **from the first real deploy**: Task 3's job definition, Task 4's `run-migrate.sh` (which overrides the command on every run) and Task 7 Step 1b all say so. Task 7B and this change ship together, or the first deploy fails the health gate (the old revision keeps serving, and the deploy is blocked).
 - **Registry: ACR Basic, not GHCR.** Reason: ACR gives a keyless path end to end. CI pushes with the OIDC-federated `id-sb-deployer` (AcrPush), and Container Apps pulls with `id-sb-apps` (AcrPull) through `registries[].identity`. GHCR would need a registry username and a long-lived GitHub token stored as a Container Apps secret, or public images. That contradicts "no long-lived secrets" for $5.06/month of savings (deployment doc §6.1). `adminUserEnabled: false`, `anonymousPullEnabled: false`.
 - **Secrets:** Container Apps secrets now, filled from GitHub environment secrets at deploy time. Key Vault references are stage 2 (ADR 0001). The only GitHub secrets are `PG_ADMIN_PASSWORD` and `VAPID_PRIVATE_KEY`. There is no Azure credential secret anywhere.
 - **Logging:** environment `appLogsConfiguration.destination: "azure-monitor"` plus a diagnostic setting routing `ContainerAppConsoleLogs` and `ContainerAppSystemLogs` to the Log Analytics workspace. The `log-analytics` destination is legacy since Aug 2026 (ACA issue #1812; Microsoft Learn "Change Container Apps logging from Log Analytics to Azure Monitor", 2026-08-12). Workspace `PerGB2018`, 30-day retention, `dailyQuotaGb: 1`.
@@ -42,6 +44,7 @@ Because only bootstrap creates role assignments, CI needs no rights over authori
 3. **Migration ordering.** A new `api` revision must not start against an un-migrated schema. Expected: `job-migrate` runs with the new image and succeeds before `main.bicep` rolls out the new `api` image, and the deploy stops if it fails. Pinned by Task 4 test `run-migrate skips when placeholder and fails on Failed execution`.
 4. **Budget start date on re-deploy.** Re-running bootstrap in a later month with a past `startDate`, or a non-first-of-month date, is rejected. Expected: the parameter is derived as the first of the current UTC month at deploy time, and the runbook says to pass the original value when re-running. Pinned by Task 2 step `budget start date is first-of-month`.
 5. **OIDC subject mismatch.** Owner or repo casing, or a portal-generated subject with numeric IDs, gives `AADSTS700213`. Expected: the subject is built from parameters Ali types exactly as GitHub shows them, and the runbook includes the troubleshooting line. Pinned by the Task 2 what-if output check and the Task 6 first-login step.
+6. **Unverified TLS reaching production (ADR 0042, added 2026-11-12).** `ssl=require` (the earlier wiring) and asyncpg's default both encrypt without authenticating the server, and nothing would show it. Expected: `ssl=verify-full` plus `PGSSLROOTCERT` on `api`, `job-migrate` and `job-refresh`, and a deploy that fails when any is missing. Pinned by the Task 4 tests `check-db-tls --template fails on ssl=require` and `... fails without PGSSLROOTCERT`, and by the first real `job-migrate` under `verify-full` (Task 7 Step 1).
 
 ---
 
@@ -70,6 +73,7 @@ infra/
     run-migrate.sh                # migrate-first step
     healthcheck.sh                # HTTP + active-revision gate
     smoke.sh                      # §10 automatable checks after deploy
+    check-db-tls.sh               # ADR 0042: template, deployed and image TLS-verification checks
     measure-cold-start.sh         # §10 check 6 (Ali-run, off-hours)
     tests/run.sh                  # self-tests with stubbed az/curl
     tests/stubs/{az,curl}
@@ -265,7 +269,8 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
   - `environment.bicep`: workload profiles `[{name: 'Consumption', workloadProfileType: 'Consumption'}]`, `appLogsConfiguration: {destination: 'azure-monitor'}`, `zoneRedundant: false`, and a `Microsoft.Insights/diagnosticSettings` named `to-log-analytics` scoped to the environment with `logs: [{category: 'ContainerAppConsoleLogs', enabled: true}, {category: 'ContainerAppSystemLogs', enabled: true}]` and `workspaceId`.
   - `postgres.bicep`: the server per Global Constraints, child `databases/stellar_blaze` (UTF8, `en_US.utf8`), child `firewallRules/AllowAllAzureServices` (`0.0.0.0`–`0.0.0.0`). Outputs `fqdn`.
   - Wiring in `main.bicep`:
-    - `databaseUrl = 'postgresql+asyncpg://sbadmin:${pgAdminPassword}@${postgres.outputs.fqdn}:5432/stellar_blaze?ssl=require'` goes into the secret `sb-database-url`.
+    - `databaseUrl = 'postgresql+asyncpg://sbadmin:${pgAdminPassword}@${postgres.outputs.fqdn}:5432/stellar_blaze?ssl=verify-full'` goes into the secret `sb-database-url` (**amended 2026-11-12, ADR 0042: it was `?ssl=require`, which does not authenticate the server**).
+    - (ADR 0042) `PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt` is an env entry on `api`, `job-migrate` and `job-refresh` whenever they carry `SB_DATABASE_URL` (so not on placeholders).
     - The `api` env:
       - `SB_ENV=prod`, `SB_LOG_FORMAT=json`, `SB_LOG_LEVEL=INFO`, `SB_GIT_SHA`;
       - `SB_DATABASE_URL` secretRef `sb-database-url`;
@@ -275,7 +280,7 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
     - When `apiIsPlaceholder`, env and secrets are empty and all three probe paths are `/`.
     - `web` env: `API_ORIGIN = 'https://${api.outputs.fqdn}'`, `VAPID_PUBLIC_KEY`, `APP_VERSION = gitSha`. When `webIsPlaceholder`, the env is empty and the probe paths are `/`.
     - `job-refresh`: image `refreshEnabled ? apiImage : jobsImage`, command `refreshEnabled ? ['sb-jobs','refresh'] : []`, the same env and secrets as `api` when enabled **plus `SB_FORECAST_SOURCE = forecastSource`** (default `replay`, so the judged demo never calls the free Open-Meteo API; ADR 0009 §4), cron per Global Constraints, 1 vCPU / 2 GiB.
-    - `job-migrate`: image `apiIsPlaceholder ? jobsImage : apiImage`, command `apiIsPlaceholder ? [] : ['alembic','upgrade','head']`, env `SB_ENV`, `SB_LOG_FORMAT`, `SB_DATABASE_URL`, `replicaTimeout` 600, retry 0, 0.5 vCPU / 1 GiB.
+    - `job-migrate`: image `apiIsPlaceholder ? jobsImage : apiImage`, command `apiIsPlaceholder ? [] : ['sb-jobs','db','upgrade']` (**amended 2026-11-12, ADR 0010: it was `['alembic','upgrade','head']`**), env `SB_ENV`, `SB_LOG_FORMAT`, `SB_DATABASE_URL`, `SB_GIT_SHA` (the seed actor is `seed:<sha>`), `PGSSLROOTCERT`, `replicaTimeout` 600, retry 0, 0.5 vCPU / 1 GiB.
   - Tags on every resource: `project: stellar-blaze`, `env: demo`, `managedBy: bicep`.
 
 - [ ] **Step 1: Write the modules and `main.bicep`.**
@@ -293,7 +298,7 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
 ### Task 4: Deploy scripts (resolve image, migrate-first, health gate, smoke)
 
 **Files:**
-- Create: `infra/scripts/{resolve-image,run-migrate,healthcheck,smoke,measure-cold-start}.sh`
+- Create: `infra/scripts/{resolve-image,run-migrate,healthcheck,smoke,measure-cold-start,check-db-tls}.sh`
 - Modify: `infra/scripts/tests/run.sh`, `infra/scripts/tests/stubs/{az,curl}`
 
 **Interfaces:**
@@ -308,7 +313,7 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
   - `run-migrate.sh <rg> <apiImage> <placeholder:true|false>`:
     - exits 0 with `skip: placeholder` when the placeholder is true;
     - exits 0 with `skip: job not created yet` when `az containerapp job show -n job-migrate` fails;
-    - otherwise runs `az containerapp job update -n job-migrate --image <apiImage> --command alembic upgrade head`, then `az containerapp job start`, then polls `az containerapp job execution show` every 10 s for up to 600 s. It exits 0 on `Succeeded` and 1 on `Failed` or timeout (printing the execution name and the log query hint).
+    - otherwise runs `az containerapp job update -n job-migrate --image <apiImage> --command sb-jobs db upgrade` (**amended 2026-11-12, ADR 0010: it was `alembic upgrade head`. This override wins over the Bicep command at every deploy, so the two must agree**), then `az containerapp job start`, then polls `az containerapp job execution show` every 10 s for up to 600 s. It exits 0 on `Succeeded` and 1 on `Failed` or timeout (printing the execution name and the log query hint).
   - `healthcheck.sh --url <https url> --app <name> --rg <rg> --image <image> [--expect-json-key status --expect-json-value ok] [--timeout 300]` exits 0 only when, within the timeout, all of these hold:
     - (a) `curl -fsS --max-time 10 <url>` returns 200;
     - (b) the active revision with traffic > 0 (`az containerapp revision list -n <app> -g <rg> --query "[?properties.active && properties.trafficWeight > \`0\`]"`) has `properties.template.containers[0].image == <image>`;
@@ -325,7 +330,12 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
     | S5 | `az containerapp job start -n job-refresh` then the execution is `Succeeded` within 900 s | §10.4 ("run the job once") |
     | S6 | every resource in the RG has `location == uaenorth` (or the `--expect-location` value) | residency claim |
     | S7 | `http://<web>/` does not serve 200 over plain HTTP (redirect or refusal) | TLS |
+| S8 | when `api` is not a placeholder: `check-db-tls.sh --deployed <rg>` passes (otherwise `skip: placeholder`) | ADR 0042 |
 
+  - `check-db-tls.sh` (added 2026-11-12, ADR 0042; prints `PASS|FAIL T<n> <subject>` and exits 1 on any FAIL; never prints the database URL). Three modes:
+    - `--template <main.bicep>` (static, no login): compiles the template with `az bicep build --stdout` and requires **T1** the `sb-database-url` secret expression contains `ssl=verify-full`; **T2** the compiled template contains none of `ssl=require`, `ssl=prefer`, `ssl=allow`, `ssl=disable`, `ssl=false`, `sslmode=`; **T3** `PGSSLROOTCERT` is defined for `api`, `job-migrate` and `job-refresh`.
+    - `--deployed <rg>` (deployer login, after `az deployment group create`): **T4** for `api` (`az containerapp secret show`) and for `job-migrate` and `job-refresh` (`az containerapp job secret show`; the implementer inspects `--help` once and fixes the flags), the value of `sb-database-url` matches `ssl=verify-full`, tested by piping the CLI's stdout straight into `grep -q`, with `set +x` and no `-o json`, so the URL is never printed, logged or stored; **T5** each one's `properties.template.containers[0].env` has `PGSSLROOTCERT` with the expected path. This catches a secret or env changed outside the template.
+    - `--image <image>` (real images only, in `build-api` after the push): **T6** `docker run --rm -e PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt --entrypoint python <image> -c "$SCRIPT"` exits 0, where the script loads that file with `ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(cafile=...)` and requires the common names `DigiCert Global Root G2` and `Microsoft RSA Root Certificate Authority 2017` among `get_ca_certs()` (a base-image change that drops one fails the build; the script was run against `stellar-blaze-api:dev` on 2026-11-12, exit 0, and exit 1 with a name that is not there).
   - `measure-cold-start.sh <rg> <app> <path>` (Ali-run, off-hours, never between 20 Nov and 11 Dec):
     - sets `--min-replicas 0`;
     - polls `az containerapp replica list` until it is empty (max 20 min);
@@ -341,6 +351,8 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
   - `healthcheck fails when the active image differs` (curl 200 but the revision image is `old` → exit 1 within a 30 s timeout set by the test)
   - `healthcheck passes` (scenario `healthy`)
   - `smoke reports FAIL S1 on dedicated profile` (scenario `dedicated`)
+  - (added 2026-11-12) `run-migrate starts job-migrate with sb-jobs db upgrade`: the stubbed `az` records its arguments; assert `--command` carries `sb-jobs db upgrade` and never `alembic upgrade head`
+  - (added 2026-11-12) `check-db-tls --template fails on ssl=require` (T1/T2), `check-db-tls --template fails without PGSSLROOTCERT` (T3), `check-db-tls --template passes on ssl=verify-full with the root file` (fixture templates), `check-db-tls --deployed fails when the secret lacks verify-full` and its output never contains the stubbed URL
 
   Run `bash infra/scripts/tests/run.sh`. Expected: the new cases FAIL.
 - [ ] **Step 2: Implement** the five scripts. Run the self-tests: PASS. Run shellcheck: clean.
@@ -361,15 +373,15 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
   - **Checkout ref:** `${{ github.event.workflow_run.head_sha || github.sha }}`, exported once as `GIT_SHA`.
   - **Workflow settings:** `permissions: {contents: read, id-token: write}`; `concurrency: {group: deploy-demo, cancel-in-progress: false}`; env `AZURE_CORE_OUTPUT: none` (azure/login README warning about secrets in stdout; commands that need output pass `-o tsv`).
   - **Jobs:**
-    1. `build-api` and `build-web` (parallel, `environment: demo`, `ubuntu-24.04`): checkout → `resolve-image.sh` (step id `img`) → if `steps.img.outputs.placeholder == 'false'`: `azure/login@v3.1.0` (`client-id`, `tenant-id`, `subscription-id` from vars) → `az acr login -n $ACR_NAME` → `docker/setup-buildx-action@v4.4.1` → `docker/build-push-action@v7.4.0` (`context: backend` or `frontend`, `push: true`, `tags: <image>`, `build-args: APP_VERSION=<sha>` for web, `cache-from/to: type=gha,scope=<svc>`). Job outputs pass all `img` outputs through.
+    1. `build-api` and `build-web` (parallel, `environment: demo`, `ubuntu-24.04`): checkout → `resolve-image.sh` (step id `img`) → if `steps.img.outputs.placeholder == 'false'`: `azure/login@v3.1.0` (`client-id`, `tenant-id`, `subscription-id` from vars) → `az acr login -n $ACR_NAME` → `docker/setup-buildx-action@v4.4.1` → `docker/build-push-action@v7.4.0` (`context: backend` or `frontend`, `push: true`, `tags: <image>`, `build-args: APP_VERSION=<sha>` for web, `cache-from/to: type=gha,scope=<svc>`). Job outputs pass all `img` outputs through. (Amended 2026-11-12, ADR 0042: when `placeholder == 'false'`, `build-api` also runs `bash infra/scripts/check-db-tls.sh --image <image>` after the push.)
     2. `deploy` (`needs: [build-api, build-web]`, `environment: demo`), in order:
        1. checkout
        2. azure/login
        3. `az bicep install --version v0.49.2`
        4. `run-migrate.sh "$AZURE_RESOURCE_GROUP" "$API_IMAGE" "$API_IS_PLACEHOLDER"`
        5. export every `main.bicepparam` variable from job outputs, vars and secrets (`REFRESH_ENABLED` = `vars.REFRESH_JOB_READY == 'true' && api placeholder == 'false'`; `JOBS_IMAGE=mcr.microsoft.com/k8se/quickstart-jobs:latest`; `SB_RULESET_ID=${{ vars.SB_RULESET_ID }}` and `SB_MODEL_ID=${{ vars.SB_MODEL_ID }}`, empty when unset)
-       6. `az deployment group what-if -g … --template-file infra/bicep/main.bicep --parameters infra/bicep/main.bicepparam -o none` (fails the run on template errors)
-       7. `az deployment group create --name main-${GIT_SHA::12} …`
+       6. `bash infra/scripts/check-db-tls.sh --template infra/bicep/main.bicep` (amended 2026-11-12, ADR 0042: fails the run before anything is created if the database URL would not verify the server), then `az deployment group what-if -g … --template-file infra/bicep/main.bicep --parameters infra/bicep/main.bicepparam -o none` (fails the run on template errors)
+       7. `az deployment group create --name main-${GIT_SHA::12} …`, then `bash infra/scripts/check-db-tls.sh --deployed "$AZURE_RESOURCE_GROUP"` (amended 2026-11-12: the deployed secret and env still verify)
        8. read the `apiFqdn`/`webFqdn` outputs (`-o tsv`)
        9. `healthcheck.sh` for `api` (url `https://$API_FQDN$API_READY_PATH`, image `$API_IMAGE`)
        10. `healthcheck.sh` for `web` (url `https://$WEB_FQDN$WEB_HEALTH_PATH`, image `$WEB_IMAGE`)
@@ -383,6 +395,7 @@ gh variable set POSTGRES_VERSION      --env demo --repo $r --body "<18 or 17 fro
   - `az bicep build-params` with dummy env;
   - `shellcheck infra/scripts/*.sh infra/scripts/tests/*.sh`;
   - `bash infra/scripts/tests/run.sh`;
+  - `bash infra/scripts/check-db-tls.sh --template infra/bicep/main.bicep` with the dummy env (ADR 0042, amended 2026-11-12);
   - actionlint v1.7.12, downloaded as a pinned release binary with its checksum verified, on `.github/workflows/*.yml`.
 
 - [ ] **Step 1: Write both workflow changes.**
@@ -407,8 +420,8 @@ Placeholders prove the whole path (OIDC login → Bicep → ACA → Postgres →
 
 Triggered automatically. As soon as `backend/Dockerfile` (B1 Task 4) and `frontend/Dockerfile` (F1 Task 1) are on `main` and CI is green, `deploy.yml` builds and pushes them.
 
-- [ ] **Step 1: First real `api` run.** `run-migrate` updates `job-migrate` to the new image and runs `alembic upgrade head` (B1's `0001_create_job_run`) → `Succeeded`. The `api` gate passes on `/api/v1/health/ready` with the new image active. If the readiness probe fails, check `SB_DATABASE_URL`: an asyncpg `ssl=require` problem shows in `ContainerAppConsoleLogs`. Query it with `ContainerAppConsoleLogs | where ContainerAppName == "api" | order by TimeGenerated desc | take 50` in the workspace (Azure Monitor destination; tables without `_CL`).
-- [ ] **Step 1b: Seed the runtime config (ADR 0010). Push this change in the same push as B1 Task 7B.** Before Task 7B, `sb-jobs db upgrade` does not exist. After Task 7B, a prod `api` with no seeded config is 503 by design, so the first 7B deploy would fail the health gate; the old revision keeps serving, which is safe, but the deploy is blocked. Change `job-migrate`'s command in `main.bicep` from `['alembic','upgrade','head']` to `['sb-jobs','db','upgrade']` (Alembic `upgrade head`, then the idempotent `config seed`), and give `job-migrate` `SB_GIT_SHA` so the seed actor is `seed:<sha>`. Re-run deploy. The `api` gate then shows `checks.config == "ok"` (before the seed, readiness is 503 `dependency=config` by design). Commit `build(infra): migrate job seeds the runtime config`.
+- [ ] **Step 1: First real `api` run.** `run-migrate` updates `job-migrate` to the new image and runs `sb-jobs db upgrade` (B1's migrations `0001` and `0002`, then the idempotent config seed; amended 2026-11-12) → `Succeeded`. The `api` gate passes on `/api/v1/health/ready` with the new image active. If the readiness probe fails, check `SB_DATABASE_URL`: with `ssl=verify-full` (ADR 0042) a missing or wrong root file shows in `ContainerAppConsoleLogs` as `ClientConfigurationError: root certificate file ... does not exist` or `FileNotFoundError` (asyncpg fails closed), and an untrusted chain or a wrong host name as `ssl.SSLCertVerificationError`. **This first real database connection is the end-to-end proof that verification works against Azure; it has not been exercised yet** (the day-1 placeholder deploy opens no database connection). If Microsoft's cross-signed-roots warning applies, point `PGSSLROOTCERT` at a file holding the Microsoft RSA Root CA 2017 (Microsoft Learn, "Configure TLS Connection") and record it in the Deploy log. Query it with `ContainerAppConsoleLogs | where ContainerAppName == "api" | order by TimeGenerated desc | take 50` in the workspace (Azure Monitor destination; tables without `_CL`).
+- [ ] **Step 1b: Seed the runtime config (ADR 0010). Push this change in the same push as B1 Task 7B.** **Amended 2026-11-12: B1 is executed and its branch already contains Task 7B, so this is no longer a later step. The `job-migrate` command and `SB_GIT_SHA` below are now in Task 3's job definition and Task 4's `run-migrate.sh` (which overrides the command at every deploy), and must be on `main` no later than the B1 merge. If 7B reaches `main` without them, the first real deploy fails the `api` readiness gate with a 503 (`dependency=config`): the old revision keeps serving, and the deploy is blocked.** The rest of this step is the original text, kept as the rationale and for the check that `checks.config == "ok"` after the first deploy. Before Task 7B, `sb-jobs db upgrade` does not exist. After Task 7B, a prod `api` with no seeded config is 503 by design, so the first 7B deploy would fail the health gate; the old revision keeps serving, which is safe, but the deploy is blocked. Change `job-migrate`'s command in `main.bicep` from `['alembic','upgrade','head']` to `['sb-jobs','db','upgrade']` (Alembic `upgrade head`, then the idempotent `config seed`), and give `job-migrate` `SB_GIT_SHA` so the seed actor is `seed:<sha>`. Re-run deploy. The `api` gate then shows `checks.config == "ok"` (before the seed, readiness is 503 `dependency=config` by design). Commit `build(infra): migrate job seeds the runtime config`.
 - [ ] **Step 2: First real `web` run.** The gate passes on `/api/healthz` with `"version":"<sha>"`. S4 passes (web → api proxy). Open `https://<web>/en/worker` on a phone; this is the HTTPS URL for the F1 Task 15 spike.
 - [ ] **Step 3: Refresh job (when B3 ships `sb-jobs refresh` on `ReplayForecastSource`).** Ali sets `gh variable set REFRESH_JOB_READY --env demo --body true` and re-runs deploy. S5 then runs the real refresh once and must be `Succeeded`. The source is selected by `SB_FORECAST_SOURCE=replay`, which Task 3 already sets on `job-refresh` (ADR 0009 §4); B3 only registers `replay` in `composition.FORECAST_SOURCES`.
 - [ ] **Step 3b: Runtime switch-and-rollback drill (ADR 0010; replaces 0009's env-var drill).** Do this once B3's admin API is deployed and B2 has shipped two model ids in the image.
@@ -470,6 +483,7 @@ Triggered automatically. As soon as `backend/Dockerfile` (B1 Task 4) and `fronte
 | Automatic rollback on failed gate | Single-revision mode keeps the old revision serving when the new one never gets ready | Multiple deploys per day, or multi-revision traffic splitting |
 | PR-time `what-if` (needs a second, read-only federated credential for `pull_request`) | Contributor identity must not run on PRs | When a second contributor opens PRs |
 | Render Frankfurt Blueprint (`render.yaml`) | Fallback ladder step 2, only if Azure fails by end of 13 Nov | That decision |
+| Narrow CA bundle (only the Azure roots) instead of the image's Debian bundle (ADR 0042; already a row in `docs/parking-lot.md`) | The default trusts about 150 public roots, bounded by the `verify-full` host-name check; Microsoft also says to keep the complete Azure root set, which then needs maintenance | Stage 2, a pilot with regulated data, Microsoft announces a root change, or the first real `job-migrate` fails verification |
 
 ## Execution
 
