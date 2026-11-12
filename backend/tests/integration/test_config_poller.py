@@ -26,6 +26,7 @@ from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, body_sha256, config_body, config_sha256
 from stellar_blaze.errors import PROBLEM_JSON
 from stellar_blaze.logging import configure_logging
+from stellar_blaze.ports.config_store import StaleActivationError
 from tests.integration.db_admin import fetch_all
 from tests.unit.config.support import FIXTURE_MODELS, SEED_CATALOG, TODAY, eventually, log_events, margin, models
 from tests.unit.rules.support import RULESETS_DIR
@@ -173,6 +174,39 @@ async def test_a_row_inserted_by_hand_that_fails_validation_is_refused_and_the_l
         assert poller.status == "stale"
         (rejected,) = log_events(capsys.readouterr().out, "config_rejected")
         assert (rejected["version_id"], rejected["codes"]) == (2, ["out-of-range"])
+
+
+@pytest.mark.asyncio
+async def test_concurrent_rollbacks_with_the_same_expected_previous_exactly_one_wins(settings: Settings) -> None:
+    # The lost update the activation log exists to prevent: four requests to roll back from the same activation (a
+    # retry, a double click, two operators) produce one rollback, not a rollback and its undoing.
+    async with (
+        replica(settings) as (first, _, _),
+        replica(settings) as (second, _, _),
+        replica(settings) as (third, _, _),
+        replica(settings) as (fourth, _, _),
+    ):
+        seeded = await first.seed(RuntimeConfig(), actor="seed:abc1234", reason=SEEDED)
+        assert seeded.activation is not None
+        version = await first.propose(margin(7.0), ACTOR, REASON)
+        activated = await first.activate(version.id, seeded.activation.id, ACTOR, "margin trial")
+
+        results = await asyncio.gather(
+            *(
+                service.rollback(ACTOR, "revert the margin trial", expected_previous=activated.id)
+                for service in (first, second, third, fourth)
+            ),
+            return_exceptions=True,
+        )
+
+        winners = [r for r in results if not isinstance(r, BaseException)]
+        losers = [r for r in results if isinstance(r, BaseException)]
+        assert len(winners) == 1
+        assert all(isinstance(r, StaleActivationError) for r in losers), losers
+        assert winners[0].kind == "rollback"
+        assert winners[0].config_version_id == seeded.version.id
+        history = await first.history(10)
+        assert [h.kind for h in history] == ["rollback", "activate", "seed"]  # not rolled back and forward again
 
 
 # --- the API ------------------------------------------------------------------------------------------------------

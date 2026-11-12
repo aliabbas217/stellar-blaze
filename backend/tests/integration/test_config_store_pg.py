@@ -9,14 +9,20 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from stellar_blaze.adapters.db.config_store import PostgresConfigStore
+from stellar_blaze.adapters.db.engine import build_engine
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, Tunables, body_sha256, config_body, config_sha256
-from stellar_blaze.ports.config_store import ActivationKind, StaleActivationError
+from stellar_blaze.ports.config_store import (
+    ActivationKind,
+    StaleActivationError,
+    StoreUnavailableError,
+    VersionNotFoundError,
+)
 from tests.integration.db_admin import fetch_all
 from tests.unit.contract.config_store_contract import CHECKS
 
@@ -286,8 +292,30 @@ async def test_reads_are_bounded_by_the_read_timeout(settings: Settings, engine:
     # Another session holds the table: a read would wait for the engine's 3 s lock_timeout; the store gives up sooner.
     async with exclusive_lock(settings, "config_activation"):
         started = asyncio.get_running_loop().time()
-        with pytest.raises(TimeoutError):
+        with pytest.raises(StoreUnavailableError) as raised:
             await store.latest_activation()
+        assert isinstance(raised.value.__cause__, TimeoutError)
         assert asyncio.get_running_loop().time() - started < 2.0
 
     assert await store.latest_activation() is None  # and the store works again once the lock is gone
+
+
+async def test_reads_on_a_database_that_was_never_migrated_are_store_unavailable_and_name_the_table(
+    empty_settings: Settings,
+) -> None:
+    # The port says what the caller can do about a failed read: the store cannot answer. The driver's error is chained,
+    # and its text (with the table) is in the message for whoever reads the log or the CLI's stderr.
+    engine = build_engine(empty_settings)
+    try:
+        store = PostgresConfigStore(engine, read_timeout_s=5.0)
+        for read in (store.latest_activation(), store.get_version(1), store.history(1)):
+            with pytest.raises(StoreUnavailableError, match=r"relation .config_\w+. does not exist") as raised:
+                await read
+            assert isinstance(raised.value.__cause__, SQLAlchemyError)
+    finally:
+        await engine.dispose()
+
+
+async def test_a_missing_version_is_not_found_and_not_unavailable(store: PostgresConfigStore) -> None:
+    with pytest.raises(VersionNotFoundError):
+        await store.get_version(1)

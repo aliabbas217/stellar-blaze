@@ -34,13 +34,16 @@ from stellar_blaze.ports.config_store import (
     ActivationRecord,
     RuntimeConfigStore,
     StaleActivationError,
+    StoreUnavailableError,
     VersionRecord,
 )
+from stellar_blaze.redaction import redact
 
 logger = structlog.stdlib.get_logger(__name__)
 
 REASON_MIN_CHARS = 10
 REASON_MAX_CHARS = 500
+_MAX_LOGGED_ERROR_CHARS = 500
 
 type ConfigStatus = Literal["ok", "stale", "missing"]
 
@@ -236,15 +239,23 @@ class ConfigService:
             version_id, expected_previous=expected_previous, kind=kind, actor=actor, reason=reason
         )
 
-    async def rollback(self, actor: str, reason: str) -> ActivationRecord:
+    async def rollback(self, actor: str, reason: str, *, expected_previous: int | None = None) -> ActivationRecord:
         """Activate the version of the activation before the latest one, as a ``rollback``. A second rollback undoes
         the first: "the previous activation" is then the one the first rollback replaced.
 
+        ``expected_previous`` is the latest activation the caller saw (as for ``activate``); ``None`` means whatever is
+        latest when this reads it. Two rollbacks, or one request sent twice, that both name the activation they saw
+        cannot both succeed: the second is stale, instead of silently undoing the first. **A caller that acts for a
+        person on a view it showed them (B3's HTTP route) must require it**; the default is for a command line whose
+        operator reads the history first.
+
         Raises:
             AuditFieldsError: ``actor`` or ``reason`` is unusable.
-            NothingToRollBackError: There are fewer than two activations.
+            NothingToRollBackError: There are fewer than two activations, or the previous activation holds the version
+                that is already active (a rollback would change nothing).
+            StaleActivationError: ``expected_previous`` is not the latest activation (or another activation landed while
+                this one was being made); nothing was written.
             ConfigInvalidError: That version no longer validates (a rollback goes through the same checks).
-            StaleActivationError: Another activation landed while this one was being made.
         """
         actor, reason = audit_fields(actor, reason)
         recent = await self._store.history(2)
@@ -252,6 +263,11 @@ class ConfigService:
             msg = "there is no activation before the current one to roll back to"
             raise NothingToRollBackError(msg)
         latest, previous = recent
+        if expected_previous is not None and expected_previous != latest.id:
+            raise StaleActivationError(expected_previous)
+        if previous.config_version_id == latest.config_version_id:
+            msg = "the activation before the current one holds the same version, so rolling back would change nothing"
+            raise NothingToRollBackError(msg)
         return await self._activate(
             previous.config_version_id, expected_previous=latest.id, kind="rollback", actor=actor, reason=reason
         )
@@ -360,6 +376,14 @@ class ConfigService:
         )
 
 
+def _describe(exc: BaseException) -> str:
+    """``"<ExceptionType>: <message>"`` for a log line: credentials masked (``redact``) and bounded."""
+    text = redact(f"{type(exc).__name__}: {exc}").strip()
+    if len(text) <= _MAX_LOGGED_ERROR_CHARS:
+        return text
+    return text[:_MAX_LOGGED_ERROR_CHARS] + "..."
+
+
 class ConfigPoller:
     """Follows the activation log so a running process applies a config activated elsewhere, with no restart.
 
@@ -367,7 +391,13 @@ class ConfigPoller:
     is not the one the holder serves does it load, re-validate and swap. A failure of any kind (the database, a version
     that does not validate) leaves the last good snapshot serving and makes ``status`` ``"stale"``; ``"missing"`` means
     there is no snapshot at all. A change of ``status`` is logged once (``config.status_changed``), at ``error`` for
-    ``stale`` and ``missing``, so a replica that cannot follow does not repeat itself every interval.
+    ``stale`` and ``missing``, so a replica that cannot follow does not repeat itself every interval. The reason says
+    what failed: ``database-unavailable`` (the store could not answer), ``rejected-activation`` (the version does not
+    validate) or ``poll-error`` (anything else, which is a bug and not an outage).
+
+    A snapshot built from ``SB_RULESET_ID`` / ``SB_MODEL_ID`` (``source="env"``, never in prod) is never replaced:
+    those pins are for back-tests and runs without a database (ADR 0010 section 4.6), so the poller does not read the
+    database and says so once (``config.db_activations_ignored``).
     """
 
     def __init__(self, service: ConfigService, holder: SnapshotHolder, interval_s: float) -> None:
@@ -378,10 +408,11 @@ class ConfigPoller:
         self._holder = holder
         self._interval_s = interval_s
         self._task: asyncio.Task[None] | None = None
-        self._stale_reason: Literal["database-unavailable", "rejected-activation"] | None = None
+        self._stale_reason: Literal["database-unavailable", "rejected-activation", "poll-error"] | None = None
         self._error: str | None = None
         self._rejected_activation: int | None = None
         self._logged_status: ConfigStatus | None = None
+        self._warned_about_env_pins = False
 
     @property
     def interval_s(self) -> float:
@@ -409,6 +440,7 @@ class ConfigPoller:
             msg = "the config poller is already started"
             raise RuntimeError(msg)
         self._task = asyncio.get_running_loop().create_task(self._run(), name="config-poller")
+        self._warn_if_env_pinned()
         self._log_status()
 
     async def stop(self) -> None:
@@ -431,7 +463,9 @@ class ConfigPoller:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # the supervisor of a background loop: any failure is a stale poll, not a dead poller
-            self._stale_reason, self._error = "database-unavailable", type(exc).__name__
+            unavailable = isinstance(exc, StoreUnavailableError | OSError | TimeoutError)
+            self._stale_reason = "database-unavailable" if unavailable else "poll-error"
+            self._error = _describe(exc)
         self._log_status()
 
     async def _run(self) -> None:
@@ -440,6 +474,9 @@ class ConfigPoller:
             await self.poll_once()
 
     async def _poll(self) -> None:
+        if self._warn_if_env_pinned():
+            self._settled()
+            return
         latest = await self._service.latest_activation()
         current = self._holder.peek()
         if latest is None or (current is not None and current.version_id == latest.config_version_id):
@@ -465,6 +502,20 @@ class ConfigPoller:
             previous_version=None if current is None else current.version_id,
         )
         self._settled()
+
+    def _warn_if_env_pinned(self) -> bool:
+        """Whether the snapshot is an ``env`` one, which the database must not replace; logs that once."""
+        snapshot = self._holder.peek()
+        if snapshot is None or snapshot.source != "env":
+            return False
+        if not self._warned_about_env_pins:
+            self._warned_about_env_pins = True
+            logger.warning(
+                "config.db_activations_ignored",
+                reason="SB_RULESET_ID or SB_MODEL_ID is set, so activations in the database are not applied",
+                config_sha256=snapshot.sha256,
+            )
+        return True
 
     def _settled(self) -> None:
         self._stale_reason, self._error = None, None

@@ -5,17 +5,19 @@ lock: ``config_activation.previous_activation_id`` is ``UNIQUE NULLS NOT DISTINC
 same predecessor exactly one insert succeeds and the other is a unique violation, which this adapter reports as
 ``StaleActivationError``. The tables are append-only (triggers; migration 0002).
 
-Reads are bounded by ``read_timeout_s``: the poller and the startup load call them, and a database that accepts the
-connection and then hangs must not hang them (the engine's ``statement_timeout`` alone would take 30 s).
+Reads are bounded by ``read_timeout_s``: the poller, the startup load and the CLI call them, and a database that
+accepts the connection and then hangs must not hang them (the engine's ``statement_timeout`` alone would take 30 s). A
+read that fails raises ``StoreUnavailableError`` (driver error chained).
 """
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 
 import asyncpg.exceptions
 from sqlalchemy import RowMapping, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from stellar_blaze.adapters.db.tables import ConfigActivation, ConfigVersion
@@ -24,6 +26,7 @@ from stellar_blaze.ports.config_store import (
     ActivationKind,
     ActivationRecord,
     StaleActivationError,
+    StoreUnavailableError,
     VersionNotFoundError,
     VersionRecord,
 )
@@ -53,6 +56,15 @@ _ACTIVATION_COLUMNS = (
 )
 
 
+@contextmanager
+def _reads_may_be_unavailable() -> Iterator[None]:
+    """A failed read (the database unreachable, refusing, slow, or without the tables) is ``StoreUnavailableError``."""
+    try:
+        yield
+    except (SQLAlchemyError, OSError, TimeoutError) as exc:
+        raise StoreUnavailableError(f"{type(exc).__name__}: {exc}") from exc
+
+
 def _version(row: RowMapping) -> VersionRecord:
     return VersionRecord.model_validate(dict(row))
 
@@ -70,14 +82,16 @@ class PostgresConfigStore:
 
     async def latest_activation(self) -> ActivationRecord | None:
         statement = select(*_ACTIVATION_COLUMNS).order_by(ConfigActivation.id.desc()).limit(1)
-        async with asyncio.timeout(self._read_timeout_s), self._engine.connect() as connection:
-            row = (await connection.execute(statement)).mappings().first()
+        with _reads_may_be_unavailable():
+            async with asyncio.timeout(self._read_timeout_s), self._engine.connect() as connection:
+                row = (await connection.execute(statement)).mappings().first()
         return None if row is None else _activation(row)
 
     async def get_version(self, version_id: int) -> VersionRecord:
         statement = select(*_VERSION_COLUMNS).where(ConfigVersion.id == version_id)
-        async with asyncio.timeout(self._read_timeout_s), self._engine.connect() as connection:
-            row = (await connection.execute(statement)).mappings().first()
+        with _reads_may_be_unavailable():
+            async with asyncio.timeout(self._read_timeout_s), self._engine.connect() as connection:
+                row = (await connection.execute(statement)).mappings().first()
         if row is None:
             raise VersionNotFoundError(version_id)
         return _version(row)
@@ -127,8 +141,9 @@ class PostgresConfigStore:
             msg = f"limit must be at least 1, got {limit}"
             raise ValueError(msg)
         statement = select(*_ACTIVATION_COLUMNS).order_by(ConfigActivation.id.desc()).limit(limit)
-        async with asyncio.timeout(self._read_timeout_s), self._engine.connect() as connection:
-            rows = (await connection.execute(statement)).mappings().all()
+        with _reads_may_be_unavailable():
+            async with asyncio.timeout(self._read_timeout_s), self._engine.connect() as connection:
+                rows = (await connection.execute(statement)).mappings().all()
         return [_activation(row) for row in rows]
 
 

@@ -18,7 +18,7 @@ from stellar_blaze.application.runtime_config import (
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, config_body, config_sha256
 from stellar_blaze.logging import configure_logging
-from stellar_blaze.ports.config_store import ActivationRecord, VersionRecord
+from stellar_blaze.ports.config_store import ActivationRecord, StoreUnavailableError, VersionRecord
 from tests.unit.config.support import eventually, log_events, make_service, margin, settle
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
@@ -309,8 +309,143 @@ async def test_status_changes_are_logged_once_per_change(
         ("ok", "stale", "error"),
         ("stale", "ok", "info"),
     ]
-    assert changes[1]["error"] == "ConnectionRefusedError"
-    assert "database is down" not in str(changes[1])  # the exception class only: its message can carry the host
+    assert changes[1]["reason"] == "database-unavailable"
+    assert changes[1]["error"] == "ConnectionRefusedError: database is down"
+    assert changes[2]["reason"] is None
+    assert changes[2]["error"] is None
+
+
+@pytest.mark.parametrize(
+    ("failure", "reason"),
+    [
+        (ConnectionRefusedError("down"), "database-unavailable"),
+        (TimeoutError(), "database-unavailable"),
+        (StoreUnavailableError("OperationalError: the database is starting up"), "database-unavailable"),
+        (RuntimeError("a bug, not a database error"), "poll-error"),
+        (KeyError("surprise"), "poll-error"),
+    ],
+    ids=["refused", "timeout", "store-unavailable", "runtime-error", "key-error"],
+)
+async def test_a_database_failure_and_a_bug_get_different_reasons(
+    capsys: pytest.CaptureFixture[str], settings: Settings, failure: Exception, reason: str
+) -> None:
+    configure_logging(settings)
+    store = InMemoryConfigStore()
+    replica = Replica(store, initial=file_snapshot())
+    store.fail_on["latest_activation"] = failure
+
+    await replica.poller.poll_once()
+
+    stale = [c for c in log_events(capsys.readouterr().out, "config.status_changed") if c["status"] == "stale"]
+    assert [(c["reason"], c["level"]) for c in stale] == [(reason, "error")]
+    assert stale[0]["error"].startswith(type(failure).__name__)
+
+
+async def test_the_logged_error_carries_the_message_with_credentials_masked(
+    capsys: pytest.CaptureFixture[str], settings: Settings
+) -> None:
+    configure_logging(settings)
+    store = InMemoryConfigStore()
+    replica = Replica(store, initial=file_snapshot())
+    store.fail_on["*"] = ConnectionRefusedError("cannot connect to postgresql+asyncpg://sb:hunter2@db:5432/x")
+
+    await replica.poller.poll_once()
+
+    out = capsys.readouterr().out
+    (stale,) = [c for c in log_events(out, "config.status_changed") if c["status"] == "stale"]
+    assert stale["error"] == "ConnectionRefusedError: cannot connect to postgresql+asyncpg://***@db:5432/x"
+    assert "hunter2" not in out
+
+
+async def test_the_logged_error_is_bounded(capsys: pytest.CaptureFixture[str], settings: Settings) -> None:
+    configure_logging(settings)
+    store = InMemoryConfigStore()
+    replica = Replica(store, initial=file_snapshot())
+    store.fail_on["*"] = RuntimeError("x" * 10_000)
+
+    await replica.poller.poll_once()
+
+    (stale,) = [c for c in log_events(capsys.readouterr().out, "config.status_changed") if c["status"] == "stale"]
+    assert len(stale["error"]) < 600
+
+
+# --- env pins -----------------------------------------------------------------------------------------------------
+
+
+def env_snapshot() -> ConfigSnapshot:
+    config = RuntimeConfig(ruleset_pin="ae-heat-0.1")
+    return ConfigSnapshot(version_id=None, sha256=config_sha256(config), config=config, source="env", model=None)
+
+
+async def test_an_env_snapshot_is_never_replaced_by_a_database_activation(
+    capsys: pytest.CaptureFixture[str], settings: Settings
+) -> None:
+    # ADR 0010 section 4.6: SB_RULESET_ID / SB_MODEL_ID are for back-tests and runs without a database; a database
+    # activation must not silently replace what the operator pinned. The poller does not even read the database.
+    configure_logging(settings)
+    store = InMemoryConfigStore()
+    admin, _, _ = make_service(store)
+    await seed_and_activate(admin, 7.0)
+    replica = Replica(store, initial=env_snapshot())
+    held = replica.holder.current()
+    store.calls.clear()
+
+    for _ in range(3):
+        await replica.poller.poll_once()
+
+    assert replica.holder.current() is held
+    assert status_of(replica.poller) == "ok"
+    assert store.calls == []
+    (warning,) = log_events(capsys.readouterr().out, "config.db_activations_ignored")
+    assert warning["level"] == "warning"
+    assert "SB_RULESET_ID" in warning["reason"]
+    assert warning["config_sha256"] == held.sha256
+
+
+async def test_the_env_pin_warning_comes_when_the_poller_starts_not_one_interval_later(
+    capsys: pytest.CaptureFixture[str], settings: Settings
+) -> None:
+    configure_logging(settings)
+    replica = Replica(InMemoryConfigStore(), initial=env_snapshot(), interval_s=3600)
+
+    replica.poller.start()
+    try:
+        assert len(log_events(capsys.readouterr().out, "config.db_activations_ignored")) == 1  # before any poll
+    finally:
+        await settle(replica.poller.stop())
+
+
+async def test_the_env_pin_warning_is_logged_once_however_many_polls_follow(
+    capsys: pytest.CaptureFixture[str], settings: Settings
+) -> None:
+    configure_logging(settings)
+    replica = Replica(InMemoryConfigStore(), initial=env_snapshot(), interval_s=0.01)
+
+    replica.poller.start()
+    await asyncio.sleep(0.1)  # several passes
+    await settle(replica.poller.stop())
+
+    assert len(log_events(capsys.readouterr().out, "config.db_activations_ignored")) == 1
+
+
+async def test_an_activation_made_through_this_process_still_replaces_an_env_snapshot() -> None:
+    # `ConfigService.activate` is an explicit decision in this process (the CLI, B3's admin API): it swaps, and from
+    # then on the snapshot is a database one that the poller follows.
+    store = InMemoryConfigStore()
+    service, _, holder = make_service(store, holder=SnapshotHolder(env_snapshot()))
+    poller = ConfigPoller(service, holder, 0.02)
+    version = await service.propose(margin(7.0), ACTOR, REASON)
+    await service.activate(version.id, None, ACTOR, REASON)
+    assert holder.current().source == "db"
+
+    admin, _, _ = make_service(store)
+    next_version = await admin.propose(margin(3.0), ACTOR, REASON)
+    latest = await store.latest_activation()
+    assert latest is not None
+    await admin.activate(next_version.id, latest.id, ACTOR, REASON)
+    await poller.poll_once()
+
+    assert holder.current().version_id == next_version.id
 
 
 async def test_loading_a_new_version_is_logged_with_its_identity(

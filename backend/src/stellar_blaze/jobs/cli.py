@@ -18,7 +18,7 @@ activation log itself records who changed what and why)::
     sb-jobs config validate FILE           # offline
     sb-jobs config propose FILE --actor A --reason R
     sb-jobs config activate VERSION_ID --actor A --reason R [--expected-previous ID]
-    sb-jobs config rollback --actor A --reason R
+    sb-jobs config rollback --actor A --reason R [--expected-previous ID]
 
 Configuration is the ``SB_*`` environment (``SB_DATABASE_URL`` is required; ``SB_DATA_DIR`` says where the files go).
 The sources come from ``composition.build_sources`` and the config store from ``composition.build_config_store``, both
@@ -69,7 +69,12 @@ from stellar_blaze.domain.weather.stations import STATIONS, Station, station
 from stellar_blaze.jobs.runner import describe_error, run_job
 from stellar_blaze.jobs.work import build_dataset, ingest_forecasts, ingest_observations
 from stellar_blaze.logging import configure_logging
-from stellar_blaze.ports.config_store import ActivationRecord, StaleActivationError, VersionNotFoundError
+from stellar_blaze.ports.config_store import (
+    ActivationRecord,
+    StaleActivationError,
+    StoreUnavailableError,
+    VersionNotFoundError,
+)
 
 # No rich traceback with locals: the locals of a failing command hold its settings, and so its connection string.
 app = typer.Typer(
@@ -327,7 +332,7 @@ def _run[T](settings: Settings, runtime: Runtime, work: Callable[[ConfigService]
         _fail(f"not found: {exc}")
     except NothingToRollBackError as exc:
         _fail(f"nothing to roll back: {exc}")
-    except (SQLAlchemyError, OSError, TimeoutError) as exc:
+    except (StoreUnavailableError, SQLAlchemyError, OSError, TimeoutError) as exc:
         _fail(f"error: {describe_error(exc)}")
 
 
@@ -499,14 +504,25 @@ def config_activate_command(
 
 
 @config_app.command("rollback")
-def config_rollback_command(actor: ActorOption, reason: ReasonOption) -> None:
+def config_rollback_command(
+    actor: ActorOption,
+    reason: ReasonOption,
+    expected_previous: Annotated[
+        int | None,
+        typer.Option(
+            "--expected-previous",
+            help="The activation you saw as the latest. Default: the latest now. A stale one is refused (exit 1), "
+            "so a rollback sent twice, or two at once, rolls back once.",
+        ),
+    ] = None,
+) -> None:
     """Activate the version that was active before the current one. A second rollback undoes the first."""
     _audit(actor, reason)
     settings = _settings()
     runtime = _runtime(settings)
 
     async def work(service: ConfigService) -> dict[str, Any]:
-        return _activation_payload(await service.rollback(actor, reason))
+        return _activation_payload(await service.rollback(actor, reason, expected_previous=expected_previous))
 
     _emit(_run(settings, runtime, work))
 

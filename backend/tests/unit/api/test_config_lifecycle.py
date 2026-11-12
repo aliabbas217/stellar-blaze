@@ -298,3 +298,26 @@ def test_a_probe_that_finds_no_config_binds_nothing(
 
     (ready,) = [line for line in log_events(capsys.readouterr().out, "request.completed") if line["status"] == 503]
     assert "config_version" not in ready
+
+
+def test_pinned_by_the_environment_the_api_keeps_its_snapshot_and_says_why_once(
+    settings: Settings, store: InMemoryConfigStore, capsys: pytest.CaptureFixture[str]
+) -> None:
+    asyncio.run(seed(store, 7.0))
+    store.calls.clear()  # what the seeding itself read is not what the API reads
+    app = create_app(
+        settings.model_copy(
+            update={"ruleset_id": "ae-heat-0.1", "rulesets_dir": RULESETS_DIR, "models_dir": FIXTURE_MODELS}
+        )
+    )
+    with TestClient(app) as client:
+        assert client.portal is not None
+        assert app.state.runtime.config.current().source == "env"
+        for _ in range(3):
+            poll(client, app)
+
+        snapshot = app.state.runtime.config.current()
+        assert (snapshot.source, snapshot.version_id) == ("env", None)  # the activation in the database is ignored
+        assert store.calls == []  # the poller never reads the database while the pins hold
+
+    assert len(log_events(capsys.readouterr().out, "config.db_activations_ignored")) == 1

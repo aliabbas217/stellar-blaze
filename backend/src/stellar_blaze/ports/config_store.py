@@ -85,6 +85,16 @@ class VersionNotFoundError(LookupError):
         self.version_id = version_id
 
 
+class StoreUnavailableError(Exception):
+    """A read could not be answered: the store was unreachable, refused the query, or did not answer in time.
+
+    Raised by the read methods (``latest_activation``, ``get_version``, ``history``) with the driver's error chained and
+    its text in the message (which may name a host: redact it before it leaves the process). It tells the caller what
+    it can do about a failed read (keep what it has and try again), without the application layer knowing the driver.
+    A write that fails for infrastructure reasons raises the driver's own error.
+    """
+
+
 class RuntimeConfigStore(Protocol):
     """Port of the config versions and the activation log. Postgres in production, an in-memory fake in tests."""
 

@@ -49,7 +49,8 @@ class Settings(BaseSettings):
     iem_request_interval_s: float = Field(default=2.0, ge=0.0, allow_inf_nan=False)
     open_meteo_request_interval_s: float = Field(default=6.0, ge=0.0, allow_inf_nan=False)
 
-    # Health checks and heat-strain computation budgets.
+    # Health checks and heat-strain computation budgets. `readiness_timeout_s` is the budget of one dependency call, so
+    # it also bounds every read of the runtime-config store: the startup load, each poll, and `sb-jobs config`.
     readiness_timeout_s: float = 2.0
     phs_timeout_s: float = 10.0
 
@@ -57,7 +58,8 @@ class Settings(BaseSettings):
     # registered fails in `composition` at startup, not here.
     forecast_source: ForecastSourceKind = "open_meteo"
     # Pins for back-tests and database-less development runs only: `composition` refuses them with SB_ENV=prod, where
-    # the runtime config is the one source of truth (ADR 0010 section 4.6).
+    # the runtime config is the one source of truth (ADR 0010 section 4.6). While one is set the snapshot is an `env`
+    # one, and the config poller never replaces it with a database activation (it logs that once).
     ruleset_id: str | None = None  # None resolves the ruleset by date
     model_id: str | None = None  # None serves the uncorrected forecast
     rulesets_dir: Path = Path("rulesets")

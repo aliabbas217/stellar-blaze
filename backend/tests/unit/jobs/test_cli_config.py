@@ -15,7 +15,7 @@ from stellar_blaze.adapters.fakes.config_store import InMemoryConfigStore
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
 from stellar_blaze.jobs import cli
-from stellar_blaze.ports.config_store import RuntimeConfigStore
+from stellar_blaze.ports.config_store import RuntimeConfigStore, StoreUnavailableError
 from tests.unit.config.support import FIRST_MODEL, FIXTURE_MODELS, margin
 from tests.unit.rules.support import BACKEND_ROOT, RULESETS_DIR
 
@@ -273,6 +273,72 @@ def test_rollback_returns_to_the_previous_version(store: InMemoryConfigStore, tm
     assert shown["config_version_id"] == seeded["version_id"]
 
 
+def test_rollback_with_a_stale_expected_previous_exits_1_and_changes_nothing(
+    store: InMemoryConfigStore, tmp_path: Path
+) -> None:
+    seeded = seed_it()
+    proposed = out(invoke("config", "propose", str(margin_file(tmp_path, 7.0)), *REASON_ARGS))
+    activated = out(
+        invoke("config", "activate", str(proposed["version_id"]), "--actor", "ali", "--reason", "margin trial")
+    )
+
+    stale = invoke(
+        "config",
+        "rollback",
+        "--actor",
+        "ali",
+        "--reason",
+        "revert trial",
+        "--expected-previous",
+        str(seeded["activation_id"]),
+    )
+    assert stale.exit_code == 1
+    assert "stale" in stale.stderr.lower()
+    assert str(seeded["activation_id"]) in stale.stderr
+    assert len(invoke("config", "history").stdout.splitlines()) == 2
+
+    fresh = invoke(
+        "config",
+        "rollback",
+        "--actor",
+        "ali",
+        "--reason",
+        "revert trial",
+        "--expected-previous",
+        str(activated["activation_id"]),
+    )
+    assert fresh.exit_code == 0, fresh.output
+    assert out(fresh)["config_version_id"] == seeded["version_id"]
+
+    retried = invoke(
+        "config",
+        "rollback",
+        "--actor",
+        "ali",
+        "--reason",
+        "revert trial",
+        "--expected-previous",
+        str(activated["activation_id"]),
+    )
+    assert retried.exit_code == 1  # the same request again does not undo itself
+    assert len(invoke("config", "history").stdout.splitlines()) == 3
+
+
+def test_rollback_to_the_version_that_is_already_active_exits_1(store: InMemoryConfigStore) -> None:
+    seeded = seed_it()
+    assert (
+        invoke(
+            "config", "activate", str(seeded["version_id"]), "--actor", "ali", "--reason", "activate the same version"
+        ).exit_code
+        == 0
+    )
+
+    result = invoke("config", "rollback", *REASON_ARGS)
+
+    assert result.exit_code == 1
+    assert "same version" in result.stderr
+
+
 def test_rollback_with_nothing_to_roll_back_exits_1(store: InMemoryConfigStore) -> None:
     seed_it()
 
@@ -399,6 +465,20 @@ def test_a_database_error_exits_1_with_the_exception_class_and_no_credentials(st
         result = invoke("config", *command)
         assert result.exit_code == 1, command
         assert "ConnectionRefusedError" in result.stderr
+        assert PASSWORD not in result.output
+        assert "Traceback" not in result.output
+
+
+def test_a_store_that_cannot_answer_exits_1_with_the_reason_and_no_credentials(store: InMemoryConfigStore) -> None:
+    # What the Postgres adapter raises for a failed read (the port's own error), as opposed to a raw driver error.
+    store.fail_on["*"] = StoreUnavailableError(
+        f"OperationalError: connection to postgresql+asyncpg://sb:{PASSWORD}@db:5432/x failed"
+    )
+
+    for command in (["show"], ["history"], ["rollback", *REASON_ARGS]):
+        result = invoke("config", *command)
+        assert result.exit_code == 1, command
+        assert "StoreUnavailableError: OperationalError: connection to" in result.stderr
         assert PASSWORD not in result.output
         assert "Traceback" not in result.output
 

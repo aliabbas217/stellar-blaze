@@ -301,6 +301,72 @@ async def test_rollback_with_no_activation_is_refused() -> None:
         await service.rollback(ACTOR, "revert trial")
 
 
+async def test_rollback_with_a_stale_expected_previous_writes_and_swaps_nothing() -> None:
+    # The caller saw the seed as the latest activation; meanwhile version 2 was activated. Rolling back "from the seed"
+    # would now undo the wrong thing, so it is refused like any activation made on a stale view.
+    service, store, holder = make_service()
+    seeded = await service.seed(RuntimeConfig(), actor="seed:abc1234", reason="seed from git default")
+    assert seeded.activation is not None
+    v2 = await service.propose(margin(7.0), ACTOR, REASON)
+    activated = await service.activate(v2.id, seeded.activation.id, ACTOR, REASON)
+    before = holder.current()
+
+    with pytest.raises(StaleActivationError) as raised:
+        await service.rollback(ACTOR, "revert trial", expected_previous=seeded.activation.id)
+
+    assert raised.value.expected_previous == seeded.activation.id
+    assert holder.current() is before
+    assert await store.latest_activation() == activated
+    assert len(await store.history(10)) == 2
+
+
+async def test_rollback_with_the_latest_as_expected_previous_is_the_same_as_without_it() -> None:
+    service, store, holder = make_service()
+    seeded = await service.seed(RuntimeConfig(), actor="seed:abc1234", reason="seed from git default")
+    assert seeded.activation is not None
+    v2 = await service.propose(margin(7.0), ACTOR, REASON)
+    activated = await service.activate(v2.id, seeded.activation.id, ACTOR, REASON)
+
+    rolled_back = await service.rollback(ACTOR, "revert trial", expected_previous=activated.id)
+
+    assert (rolled_back.kind, rolled_back.previous_activation_id) == ("rollback", activated.id)
+    assert holder.current().version_id == seeded.version.id
+    assert await store.latest_activation() == rolled_back
+
+
+async def test_a_retried_rollback_with_the_same_expected_previous_does_not_undo_itself() -> None:
+    # The lost update the activation log exists to prevent: the same request sent twice (a retry, a double click) must
+    # roll back once, not roll back and then forward again.
+    service, store, holder = make_service()
+    seeded = await service.seed(RuntimeConfig(), actor="seed:abc1234", reason="seed from git default")
+    assert seeded.activation is not None
+    v2 = await service.propose(margin(7.0), ACTOR, REASON)
+    activated = await service.activate(v2.id, seeded.activation.id, ACTOR, REASON)
+
+    await service.rollback(ACTOR, "revert trial", expected_previous=activated.id)
+    with pytest.raises(StaleActivationError):
+        await service.rollback(ACTOR, "revert trial", expected_previous=activated.id)
+
+    assert holder.current().version_id == seeded.version.id
+    assert len(await store.history(10)) == 3
+
+
+async def test_rollback_to_the_version_that_is_already_active_is_refused() -> None:
+    # The previous activation holds the same version as the latest one (it was activated twice in a row): a rollback
+    # would append an entry that changes nothing.
+    service, store, holder = make_service()
+    seeded = await service.seed(RuntimeConfig(), actor="seed:abc1234", reason="seed from git default")
+    assert seeded.activation is not None
+    await service.activate(seeded.version.id, seeded.activation.id, ACTOR, "activate the very same version")
+    before = holder.current()
+
+    with pytest.raises(NothingToRollBackError, match="same version"):
+        await service.rollback(ACTOR, "revert trial")
+
+    assert holder.current() is before
+    assert len(await store.history(10)) == 2
+
+
 async def test_rollback_goes_through_the_same_validation() -> None:
     # Version 1 was valid when it was active; under a ruleset whose margin range tightened it is not, and a rollback
     # to it is refused like any other activation.
