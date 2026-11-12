@@ -12,7 +12,7 @@ def test_ready_ok_with_database(settings: Settings) -> None:
         response = client.get("/api/v1/health/ready")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "checks": {"database": "ok"}}
+    assert response.json() == {"status": "ok", "checks": {"database": "ok", "config": "ok"}}
     assert response.headers["X-Request-ID"]
 
 

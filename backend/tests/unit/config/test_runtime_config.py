@@ -2,13 +2,14 @@
 
 import dataclasses
 import hashlib
+import json
 import tomllib
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 
 from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
@@ -19,6 +20,8 @@ from stellar_blaze.domain.config.runtime import (
     RuntimeConfig,
     RuntimeFlags,
     Tunables,
+    body_sha256,
+    config_body,
     config_sha256,
     resolve_effective,
     validate_runtime_config,
@@ -304,3 +307,22 @@ def test_tunables_are_checked_against_the_pinned_ruleset_not_the_one_in_force() 
     c = config(tunables={"twl_margin_w_m2": 10.0})
     assert codes(validate(c, catalog=catalog)) == [("out-of-range", "tunables.twl_margin_w_m2")]
     assert validate(config(ruleset_pin=OLD, tunables={"twl_margin_w_m2": 10.0}), catalog=catalog) == []
+
+
+# --- the hash of a stored body ------------------------------------------------------------------------------------
+
+
+def test_body_sha256_is_the_canonical_json_formula_and_ignores_key_order() -> None:
+    body: dict[str, JsonValue] = {"b": [1, 2.5, None], "a": {"y": True, "x": "é"}}
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
+
+    assert canonical == r'{"a":{"x":"\u00e9","y":true},"b":[1,2.5,null]}'  # ASCII only, so the bytes never vary
+    assert body_sha256(body) == hashlib.sha256(canonical.encode()).hexdigest()
+    reordered: dict[str, JsonValue] = {"a": {"x": "é", "y": True}, "b": [1, 2.5, None]}
+    assert body_sha256(reordered) == body_sha256(body)
+
+
+def test_config_sha256_is_the_hash_of_the_config_body() -> None:
+    for c in (RuntimeConfig(), config(tunables={"twl_margin_w_m2": 7.5}), config(model_id=MODEL, ruleset_pin="x")):
+        assert config_body(c) == c.model_dump(mode="json")
+        assert config_sha256(c) == body_sha256(config_body(c))

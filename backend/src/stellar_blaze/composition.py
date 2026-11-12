@@ -11,26 +11,30 @@ production registry below is read-only.
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 from types import MappingProxyType
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
 import httpx2
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.rulesets import load_catalog
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
+from stellar_blaze.adapters.db.config_store import PostgresConfigStore
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import build_async_client
 from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
-from stellar_blaze.application.runtime_config import ConfigSnapshot, SnapshotHolder
+from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, SnapshotHolder
 from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig, config_sha256, validate_runtime_config
 from stellar_blaze.domain.rules.catalog import RulesetCatalog
+from stellar_blaze.ports.config_store import RuntimeConfigStore
 from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
 
 DUBAI = "Asia/Dubai"
@@ -75,7 +79,11 @@ FORECAST_SOURCES: Final[Mapping[ForecastSourceKind, ForecastSourceFactory]] = Ma
 
 @dataclass(frozen=True)
 class Runtime:
-    """Everything the process loads at startup: settings, rulesets, models and the holder of the active config."""
+    """Everything the process loads at startup: settings, rulesets, models and the holder of the active config.
+
+    The holder starts with the file or env snapshot outside prod, and empty in prod, where the database-active version
+    is loaded into it by the application lifespan (``ConfigService.load_active``) and followed by the poller.
+    """
 
     settings: Settings
     rulesets: RulesetCatalog
@@ -105,19 +113,22 @@ def _initial_config(settings: Settings) -> tuple[RuntimeConfig, Literal["file", 
 
 
 def build_runtime(settings: Settings, *, today: date) -> Runtime:
-    """Load the rulesets and models, build the initial config snapshot, and validate it.
+    """Load the rulesets and models and build the holder of the active config.
 
-    ``today`` is the Asia/Dubai local date (``dubai_today()``). With ``SB_ENV=prod`` drafts are refused and the env pins
-    are not accepted (the runtime config is the one source of truth, ADR 0010 section 4.6); in dev and test the pins
-    make an ``env`` snapshot, for back-tests and runs without a database. Task 7B replaces the prod path with the
-    database-active version.
+    ``today`` is the Asia/Dubai local date (``dubai_today()``). With ``SB_ENV=prod`` drafts are refused, the env pins
+    are not accepted (the runtime config is the one source of truth, ADR 0010 section 4.6) and the holder starts empty:
+    the active version lives in the database, and the lifespan loads it (a database that is down leaves the holder
+    empty, which readiness reports as 503). Outside prod the file seed, with the env pins applied when there are any,
+    is validated and becomes the first snapshot (an ``env`` snapshot for back-tests and runs without a database); the
+    poller replaces it once the database has an activation.
 
     Raises:
-        ConfigSourceError: A pin is set in prod, the seed is missing, or the config violates its ruleset (the message
-            names every violation, and for an unknown ruleset or model the ids that exist).
+        ConfigSourceError: A pin is set in prod; or outside prod the seed is missing or the config violates its ruleset
+            (the message names every violation, and for an unknown ruleset or model the ids that exist).
         RulesetLoadError: A ruleset file is unusable (``RulesetLockError`` for a changed, unlisted or draft one).
         RulesetCatalogError: The rulesets contradict each other.
-        NoRulesetError: No ruleset is in force on ``today`` and none is pinned.
+        NoRulesetError: No ruleset is in force on ``today`` and none is pinned (in prod: none is in force at all, so no
+            config could be valid).
         ModelIntegrityError: A model directory does not match its manifest.
     """
     prod = settings.env == "prod"
@@ -126,8 +137,11 @@ def build_runtime(settings: Settings, *, today: date) -> Runtime:
 
     catalog = load_catalog(settings.rulesets_dir, allow_drafts=not prod)
     models = scan_models(settings.models_dir)
-    config, source = _initial_config(settings)
+    if prod:
+        catalog.for_local_date(today)  # a day no ruleset covers has no valid config: fail now, not at the first request
+        return Runtime(settings=settings, rulesets=catalog, models=models, config=SnapshotHolder())
 
+    config, source = _initial_config(settings)
     violations = validate_runtime_config(config, catalog=catalog, models=models, today=today, prod=prod)
     if violations:
         detail = "; ".join(f"{v.code} at {v.path}: {v.message}" for v in violations)
@@ -141,6 +155,35 @@ def build_runtime(settings: Settings, *, today: date) -> Runtime:
         model=models.get(config.model_id) if config.model_id is not None else None,
     )
     return Runtime(settings=settings, rulesets=catalog, models=models, config=SnapshotHolder(snapshot))
+
+
+def build_config_store(engine: AsyncEngine, settings: Settings) -> RuntimeConfigStore:
+    """The Postgres store of config versions and activations over ``engine``. Reads give up after
+    ``SB_READINESS_TIMEOUT_S``, the same budget the readiness probe has for one dependency call."""
+    return PostgresConfigStore(engine, read_timeout_s=settings.readiness_timeout_s)
+
+
+def build_config_service(
+    runtime: Runtime, store: RuntimeConfigStore, *, clock: Callable[[], date] = dubai_today
+) -> ConfigService:
+    """The service that proposes, activates and loads configs for ``runtime``: its rulesets and models, and its holder
+    (an activation made through the service swaps the very snapshot the API serves). ``clock`` is the date validation
+    uses, the Asia/Dubai date unless a test says otherwise; the strict pin rules apply with ``SB_ENV=prod``."""
+    return ConfigService(
+        store, runtime.rulesets, runtime.models, runtime.config, clock, prod=runtime.settings.env == "prod"
+    )
+
+
+def load_runtime_config(path: Path) -> RuntimeConfig:
+    """Parse and validate the TOML file at ``path`` (the git seed, or an operator's proposal).
+
+    Raises:
+        FileNotFoundError: ``path`` does not exist.
+        tomllib.TOMLDecodeError: The file is not TOML.
+        pydantic.ValidationError: The content is not a ``RuntimeConfig`` (unknown keys, including any attempt to set a
+            legal floor, are rejected).
+    """
+    return load_runtime_config_file(path)
 
 
 def build_forecast_source(

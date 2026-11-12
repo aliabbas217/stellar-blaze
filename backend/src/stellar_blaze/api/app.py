@@ -12,7 +12,8 @@ from stellar_blaze import __version__
 from stellar_blaze.adapters.db.engine import build_engine
 from stellar_blaze.api.middleware import RequestLogMiddleware
 from stellar_blaze.api.routers import health
-from stellar_blaze.composition import build_runtime, dubai_today
+from stellar_blaze.application.runtime_config import ConfigPoller, ConfigService, SnapshotHolder
+from stellar_blaze.composition import build_config_service, build_config_store, build_runtime, dubai_today
 from stellar_blaze.config import Settings, get_settings
 from stellar_blaze.errors import PROBLEM_RESPONSES, REQUEST_ID_HEADER, install_problem_handlers
 from stellar_blaze.logging import bind_runtime_ids, configure_logging
@@ -34,6 +35,23 @@ def operation_id(route: APIRoute) -> str:
     return route.name
 
 
+async def load_initial_config(service: ConfigService, holder: SnapshotHolder) -> None:
+    """Put the database-active config into ``holder``, once, before the app serves (the first step of prod startup).
+
+    A database that is down, or an active version this release refuses, does not stop startup: ``/health/live`` keeps
+    answering, the holder stays empty, readiness is 503 (``dependency: config``) and decision routes answer 503, and the
+    poller loads the config as soon as there is one. Only the exception class is logged: its message can carry the host
+    or the user.
+    """
+    try:
+        snapshot = await service.load_active()
+    except Exception as exc:  # startup must survive any failure to read: readiness reports what is wrong
+        logger.error("config.startup_load_failed", error=type(exc).__name__)
+        return
+    if snapshot is not None:
+        holder.swap(snapshot)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the API. ``settings=None`` reads the environment (the production path)."""
     if settings is None:
@@ -48,21 +66,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         runtime = build_runtime(settings, today=dubai_today())
         app.state.runtime = runtime
         bind_runtime_ids(runtime)
-        snapshot = runtime.config.current()
-        logger.info(
-            "runtime.ready",
-            config_source=snapshot.source,
-            config_version=snapshot.version_id,
-            config_sha256=snapshot.sha256,
-        )
 
         # Creating the engine opens no connection, so a database that is down never prevents startup: /health/ready
         # reports it (503) while /health/live keeps answering and the platform keeps the process.
         engine = build_engine(settings)
         app.state.engine = engine
         try:
-            with instrumented_engine(engine):
-                yield
+            service = build_config_service(runtime, build_config_store(engine, settings))
+            poller = ConfigPoller(service, runtime.config, settings.config_poll_interval_s)
+            app.state.config_poller = poller
+            if settings.env == "prod":
+                # In prod the database holds the only config: read it before serving anything. Outside prod the file or
+                # env snapshot is already in the holder and the poller replaces it once the database has an activation.
+                await load_initial_config(service, runtime.config)
+            snapshot = runtime.config.peek()
+            logger.info(
+                "runtime.ready",
+                config_source=None if snapshot is None else snapshot.source,
+                config_version=None if snapshot is None else snapshot.version_id,
+                config_sha256=None if snapshot is None else snapshot.sha256,
+            )
+            poller.start()
+            try:
+                with instrumented_engine(engine):
+                    yield
+            finally:
+                await poller.stop()
         finally:
             await engine.dispose()
 

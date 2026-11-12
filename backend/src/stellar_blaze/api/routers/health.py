@@ -8,9 +8,10 @@ from fastapi import APIRouter
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from stellar_blaze.api.deps import EngineDep, SettingsDep
+from stellar_blaze.api.deps import ConfigPollerDep, EngineDep, RuntimeDep, SettingsDep
 from stellar_blaze.api.schemas import ResponseModel
 from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem, Problem
+from stellar_blaze.logging import bind_config_identity
 
 router = APIRouter(prefix="/health", tags=["health"])
 logger = structlog.stdlib.get_logger(__name__)
@@ -22,6 +23,9 @@ class LiveResponse(ResponseModel):
 
 class ReadyChecks(ResponseModel):
     database: Literal["ok"] = "ok"
+    # "stale": serving the last good config, but the latest activation could not be read or was refused (logged once per
+    # change). "missing" (no config at all) is never a 200: it is the 503 below.
+    config: Literal["ok", "stale"] = "ok"
 
 
 class ReadyResponse(ResponseModel):
@@ -38,12 +42,22 @@ async def health_live() -> LiveResponse:
 @router.get(
     "/ready",
     summary="Readiness probe",
-    responses={503: {"model": Problem, "description": "A required dependency (the database) is unavailable."}},
+    responses={
+        503: {
+            "model": Problem,
+            "description": "A required dependency (the database, or the active config) is unavailable.",
+        }
+    },
 )
-async def health_ready(engine: EngineDep, settings: SettingsDep) -> ReadyResponse:
-    """The API can serve requests: its database answers a trivial query within the readiness timeout.
+async def health_ready(
+    engine: EngineDep, settings: SettingsDep, poller: ConfigPollerDep, runtime: RuntimeDep
+) -> ReadyResponse:
+    """The API can serve requests: its database answers a trivial query within the readiness timeout, and it has a
+    runtime config to decide with.
 
-    Answers 503 (problem details, ``dependency: database``) when it does not.
+    Answers 503 (problem details, ``dependency: database``) when the database does not answer, and 503 with
+    ``dependency: config`` when no config has been loaded (nothing seeded, or the database was down at startup). A
+    config that is loaded but cannot follow the latest activation is still ready: ``checks.config`` says ``stale``.
     """
     # One budget (SB_READINESS_TIMEOUT_S) for connecting and for SELECT 1: a hung database must not hang the probe.
     try:
@@ -56,4 +70,10 @@ async def health_ready(engine: EngineDep, settings: SettingsDep) -> ReadyRespons
         raise DomainProblem(
             type_=DEPENDENCY_UNAVAILABLE, title="Dependency unavailable", status=503, dependency="database"
         ) from exc
-    return ReadyResponse(checks=ReadyChecks())
+    config_status = poller.status
+    if config_status == "missing":
+        raise DomainProblem(
+            type_=DEPENDENCY_UNAVAILABLE, title="Dependency unavailable", status=503, dependency="config"
+        )
+    bind_config_identity(runtime.config.current())  # the probe's own log line names the config this replica serves
+    return ReadyResponse(checks=ReadyChecks(config=config_status))

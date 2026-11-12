@@ -8,19 +8,31 @@ protective than the ruleset in force today.
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.rules.catalog import RulesetCatalog
 from stellar_blaze.domain.rules.floors import floor_violations
 from stellar_blaze.domain.rules.ruleset import Ruleset
 
+# The first six are what `validate_runtime_config` finds in a config that parsed. The last two are about a stored
+# version that cannot become a config at all: its body is not a `RuntimeConfig` (an unknown key, which includes any
+# attempt to set a legal floor; a wrong type; a schema version this release does not know), or its stored hash is not
+# the hash of its body. `ConfigService` reports them for a row that was not written through the service.
 type ViolationCode = Literal[
-    "unknown-tunable", "out-of-range", "floor-violation", "unknown-model", "unknown-ruleset", "pin-out-of-range"
+    "unknown-tunable",
+    "out-of-range",
+    "floor-violation",
+    "unknown-model",
+    "unknown-ruleset",
+    "pin-out-of-range",
+    "invalid-config",
+    "hash-mismatch",
 ]
 
 
@@ -48,14 +60,33 @@ class RuntimeConfig(_Model):
     flags: RuntimeFlags = Field(default_factory=RuntimeFlags)
 
 
+def body_sha256(body: Mapping[str, JsonValue]) -> str:
+    """SHA-256 of the canonical JSON of ``body`` (sorted keys, compact separators, ASCII).
+
+    This is the hash of a stored ``config_version.body``: it is computed from the bytes that were stored, never from a
+    model dumped again on read, so adding a field to ``Tunables`` or ``RuntimeFlags`` later cannot change the hash of a
+    version that already exists (the dump of a newer model would add a ``null`` key). Key order and whitespace do not
+    matter, which is also what lets Postgres ``jsonb`` re-order and re-space the body without changing its hash.
+    """
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def config_body(c: RuntimeConfig) -> dict[str, JsonValue]:
+    """The JSON body that is stored for ``c`` (``config_version.body``)."""
+    body: dict[str, JsonValue] = c.model_dump(mode="json")
+    return body
+
+
 def config_sha256(c: RuntimeConfig) -> str:
-    """SHA-256 of the canonical JSON of ``c`` (sorted keys, compact separators).
+    """SHA-256 of the canonical JSON of ``c``: ``body_sha256(config_body(c))``.
 
     The same configuration always has the same hash, whatever order its keys were written in. The hash is stored with
-    every config version and every decision that used it, so the formula is part of the persisted contract.
+    every config version and every decision that used it, so the formula is part of the persisted contract. For a
+    config built in memory (the file seed) this is the hash; for a stored version, use the stored one
+    (``body_sha256`` of the stored body), which does not move when the schema grows.
     """
-    canonical = json.dumps(c.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    return body_sha256(config_body(c))
 
 
 @dataclass(frozen=True)

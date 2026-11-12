@@ -62,8 +62,12 @@ class Settings(BaseSettings):
     model_id: str | None = None  # None serves the uncorrected forecast
     rulesets_dir: Path = Path("rulesets")
     models_dir: Path = Path("models")
-    # The git default of the runtime config: the initial snapshot until a database-active version exists (Task 7B).
+    # The git default of the runtime config. `sb-jobs config seed` writes it to the database as the first version;
+    # outside prod it is also the initial snapshot until the poller finds a database activation (ADR 0010 section 3).
     runtime_config_seed: Path = Path("config/runtime/default.toml")
+    # How often each process reads the latest config activation from the database. Under 1 s would hammer the database
+    # for no benefit; over 60 s is no longer "without a restart" (ADR 0010 section 6).
+    config_poll_interval_s: float = Field(default=5.0, ge=1.0, le=60.0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def _prod_logs_are_machine_readable(self) -> Self:

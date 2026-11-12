@@ -22,6 +22,7 @@ from stellar_blaze.config import Settings
 from stellar_blaze.redaction import redact_tree
 
 if TYPE_CHECKING:  # type only: importing composition here would load every adapter whenever logging is configured
+    from stellar_blaze.application.runtime_config import ConfigSnapshot
     from stellar_blaze.composition import Runtime
 
 
@@ -189,4 +190,19 @@ def bind_runtime_ids(runtime: "Runtime") -> None:
     """
     structlog.contextvars.bind_contextvars(
         ruleset_ids=",".join(runtime.rulesets.ids()), model_ids=",".join(runtime.models.ids())
+    )
+
+
+def bind_config_identity(snapshot: "ConfigSnapshot") -> None:
+    """Bind the identity of the config a request is served with, so every line of that request names it.
+
+    ``config_version`` is ``None`` for a file or env snapshot. Called from the ``get_snapshot`` dependency and from the
+    readiness probe (whose log line then shows which version each replica serves, which is how a rollout of a config
+    change is watched). Request-scoped: the next request starts clean.
+    """
+    structlog.contextvars.bind_contextvars(
+        config_version=snapshot.version_id,
+        config_sha256=snapshot.sha256,
+        ruleset_pin=snapshot.config.ruleset_pin,
+        model_id=snapshot.config.model_id,
     )

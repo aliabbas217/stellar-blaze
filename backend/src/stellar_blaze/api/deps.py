@@ -2,14 +2,14 @@
 
 from typing import Annotated
 
-import structlog
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from stellar_blaze.application.runtime_config import ConfigSnapshot, ConfigUnavailableError
+from stellar_blaze.application.runtime_config import ConfigPoller, ConfigSnapshot, ConfigUnavailableError
 from stellar_blaze.composition import Runtime
 from stellar_blaze.config import Settings
 from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem
+from stellar_blaze.logging import bind_config_identity
 
 
 def get_app_settings(request: Request) -> Settings:
@@ -36,6 +36,15 @@ def get_runtime(request: Request) -> Runtime:
     return runtime
 
 
+def get_config_poller(request: Request) -> ConfigPoller:
+    """The poller the application lifespan started: it follows the config activations and reports their status."""
+    poller: ConfigPoller | None = getattr(request.app.state, "config_poller", None)
+    if poller is None:
+        msg = "No config poller: it is created by the application lifespan. Run the app through its lifespan."
+        raise RuntimeError(msg)
+    return poller
+
+
 async def get_snapshot(runtime: Annotated[Runtime, Depends(get_runtime)]) -> ConfigSnapshot:
     """The active config snapshot, read once for the request, with its identity bound to the request's log context.
 
@@ -53,12 +62,7 @@ async def get_snapshot(runtime: Annotated[Runtime, Depends(get_runtime)]) -> Con
         raise DomainProblem(
             type_=DEPENDENCY_UNAVAILABLE, title="Dependency unavailable", status=503, dependency="config"
         ) from exc
-    structlog.contextvars.bind_contextvars(
-        config_version=snapshot.version_id,
-        config_sha256=snapshot.sha256,
-        ruleset_pin=snapshot.config.ruleset_pin,
-        model_id=snapshot.config.model_id,
-    )
+    bind_config_identity(snapshot)
     return snapshot
 
 
@@ -66,3 +70,4 @@ SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 EngineDep = Annotated[AsyncEngine, Depends(get_engine)]
 RuntimeDep = Annotated[Runtime, Depends(get_runtime)]
 SnapshotDep = Annotated[ConfigSnapshot, Depends(get_snapshot)]
+ConfigPollerDep = Annotated[ConfigPoller, Depends(get_config_poller)]

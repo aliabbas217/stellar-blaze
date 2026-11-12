@@ -59,7 +59,8 @@ def test_response_models_mark_always_present_fields_required(spec: dict[str, Any
 
     assert schemas["LiveResponse"]["required"] == ["status"]
     assert sorted(schemas["ReadyResponse"]["required"]) == ["checks", "status"]
-    assert schemas["ReadyChecks"]["required"] == ["database"]
+    assert schemas["ReadyChecks"]["required"] == ["database", "config"]
+    assert schemas["ReadyChecks"]["properties"]["config"]["enum"] == ["ok", "stale"]  # "missing" is a 503, never a 200
 
 
 @pytest.mark.unit

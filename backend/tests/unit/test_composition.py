@@ -10,17 +10,24 @@ import time_machine
 from pydantic import SecretStr
 
 from stellar_blaze.adapters.config.rulesets import RulesetLockError
+from stellar_blaze.adapters.db.config_store import PostgresConfigStore
+from stellar_blaze.adapters.db.engine import build_engine
+from stellar_blaze.adapters.fakes.config_store import InMemoryConfigStore
 from stellar_blaze.adapters.fakes.weather import InMemoryForecastSource
 from stellar_blaze.adapters.http.client import build_async_client
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
+from stellar_blaze.application.runtime_config import ConfigUnavailableError
 from stellar_blaze.composition import (
     FORECAST_SOURCES,
     ConfigSourceError,
     Runtime,
     UnknownAdapterError,
+    build_config_service,
+    build_config_store,
     build_forecast_source,
     build_runtime,
     dubai_today,
+    load_runtime_config,
 )
 from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
@@ -128,10 +135,26 @@ def test_prod_refuses_the_env_pins(pins: dict[str, str]) -> None:
     assert str(raised.value) == PROD_PINS_MESSAGE
 
 
-def test_prod_without_pins_starts_from_the_file_seed() -> None:
-    snapshot = build_runtime(make_settings(env="prod"), today=TODAY).config.current()
-    assert snapshot.source == "file"
-    assert snapshot.version_id is None
+def test_prod_starts_with_an_empty_holder_because_the_database_is_the_source_of_truth() -> None:
+    runtime = build_runtime(make_settings(env="prod"), today=TODAY)
+    assert runtime.config.peek() is None
+    with pytest.raises(ConfigUnavailableError):
+        runtime.config.current()
+    # The rulesets and models are still loaded and verified: the DB-active config is validated against them.
+    assert runtime.rulesets.ids() == ("ae-heat-0.1",)
+    assert runtime.models.ids() == (FIRST, SECOND)
+
+
+def test_prod_does_not_read_the_file_seed_at_startup(tmp_path: Path) -> None:
+    # `sb-jobs config seed` reads it (in the migration job); the API in prod never does.
+    runtime = build_runtime(make_settings(env="prod", runtime_config_seed=tmp_path / "nowhere.toml"), today=TODAY)
+    assert runtime.config.peek() is None
+
+
+def test_prod_still_fails_startup_on_a_day_no_ruleset_covers() -> None:
+    # No valid config can exist then (a prod pin must cover today), so starting would only defer the failure.
+    with pytest.raises(NoRulesetError, match="2023-12-31"):
+        build_runtime(make_settings(env="prod"), today=date(2023, 12, 31))
 
 
 def test_prod_refuses_a_draft_ruleset_but_dev_loads_it(tmp_path: Path) -> None:
@@ -241,3 +264,49 @@ async def test_a_registry_passed_in_wins_so_fakes_enter_only_through_tests() -> 
     # Passing a registry replaces nothing: the module registry still builds the real adapter.
     assert FORECAST_SOURCES["open_meteo"] is registered
     assert isinstance(real, OpenMeteoPreviousRunsSource)
+
+
+# --- the config store, the service and the seed file ---------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_config_store_is_postgres_over_the_given_engine() -> None:
+    settings = make_settings()
+    engine = build_engine(settings)  # opens no connection
+    try:
+        assert isinstance(build_config_store(engine, settings), PostgresConfigStore)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("env", "prod"), [("dev", False), ("test", False), ("prod", True)])
+async def test_the_config_service_shares_the_runtimes_holder_and_is_strict_in_prod_only(env: str, prod: bool) -> None:
+    runtime = build_runtime(make_settings(env=env), today=TODAY)
+    service = build_config_service(runtime, InMemoryConfigStore(), clock=lambda: TODAY)
+    assert service.prod is prod
+
+    version = await service.propose(RuntimeConfig(), "ali", "composition test run")
+    await service.activate(version.id, None, "ali", "composition test run")
+
+    assert runtime.config.current().version_id == version.id  # the very holder the API serves from
+
+
+@pytest.mark.asyncio
+async def test_the_config_service_clock_defaults_to_the_asia_dubai_date() -> None:
+    runtime = build_runtime(make_settings(env="prod"), today=TODAY)
+    service = build_config_service(runtime, InMemoryConfigStore())
+    # 2023-12-31 in Dubai: no ruleset covers it, which the validation reports loudly rather than defaulting.
+    with (
+        time_machine.travel(datetime(2023, 12, 31, 19, 0, tzinfo=UTC), tick=False),
+        pytest.raises(NoRulesetError, match="2023-12-31"),
+    ):
+        service.validate(RuntimeConfig())
+
+
+def test_load_runtime_config_parses_and_validates_a_toml_file(tmp_path: Path) -> None:
+    path = tmp_path / "proposal.toml"
+    path.write_text("schema_version = 1\n[tunables]\ntwl_margin_w_m2 = 7.0\n[flags]\n", encoding="utf-8")
+
+    assert load_runtime_config(path).tunables.twl_margin_w_m2 == 7.0
+    assert load_runtime_config(BACKEND_ROOT / "config" / "runtime" / "default.toml") == RuntimeConfig()

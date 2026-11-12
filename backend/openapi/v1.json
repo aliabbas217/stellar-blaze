@@ -59,6 +59,15 @@
       },
       "ReadyChecks": {
         "properties": {
+          "config": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "stale"
+            ],
+            "title": "Config",
+            "type": "string"
+          },
           "database": {
             "const": "ok",
             "default": "ok",
@@ -67,7 +76,8 @@
           }
         },
         "required": [
-          "database"
+          "database",
+          "config"
         ],
         "title": "ReadyChecks",
         "type": "object"
@@ -133,7 +143,7 @@
     },
     "/api/v1/health/ready": {
       "get": {
-        "description": "The API can serve requests: its database answers a trivial query within the readiness timeout.\n\nAnswers 503 (problem details, ``dependency: database``) when it does not.",
+        "description": "The API can serve requests: its database answers a trivial query within the readiness timeout, and it has a\nruntime config to decide with.\n\nAnswers 503 (problem details, ``dependency: database``) when the database does not answer, and 503 with\n``dependency: config`` when no config has been loaded (nothing seeded, or the database was down at startup). A\nconfig that is loaded but cannot follow the latest activation is still ready: ``checks.config`` says ``stale``.",
         "operationId": "health_ready",
         "responses": {
           "200": {
@@ -154,7 +164,7 @@
                 }
               }
             },
-            "description": "A required dependency (the database) is unavailable."
+            "description": "A required dependency (the database, or the active config) is unavailable."
           },
           "default": {
             "content": {

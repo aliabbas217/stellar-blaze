@@ -129,3 +129,17 @@ def test_request_pacing_defaults_follow_the_upstream_limits_and_refuse_a_negativ
         monkeypatch.setenv("SB_IEM_REQUEST_INTERVAL_S", refused)
         with pytest.raises(ValidationError, match="iem_request_interval_s"):
             Settings(_env_file=None)
+
+
+@pytest.mark.unit
+def test_config_poll_interval_defaults_to_5_seconds_and_stays_between_1_and_60(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SB_DATABASE_URL", DATABASE_URL)
+    assert Settings(_env_file=None).config_poll_interval_s == 5.0
+    for accepted in ("1", "1.0", "30", "60"):
+        monkeypatch.setenv("SB_CONFIG_POLL_INTERVAL_S", accepted)
+        assert Settings(_env_file=None).config_poll_interval_s == float(accepted)
+    # Under 1 s would hammer the database for no benefit (ADR 0010 section 6); over 60 s is not "without a restart".
+    for refused in ("0.99", "0", "-5", "60.01", "inf", "nan"):
+        monkeypatch.setenv("SB_CONFIG_POLL_INTERVAL_S", refused)
+        with pytest.raises(ValidationError, match="config_poll_interval_s"):
+            Settings(_env_file=None)
