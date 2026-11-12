@@ -169,7 +169,12 @@
     },
     "removeData": {
       "button": "Remove my data from this phone",
-      "hint": "Deletes your profile and turns off alerts. You can set up again at any time."
+      "hint": "Deletes your profile and turns off alerts. You can set up again at any time.",
+      "confirmTitle": "Remove your data from this phone?",
+      "confirm": "Yes, remove it",
+      "cancel": "No, keep it",
+      "done": "Your data was removed from this phone.",
+      "failed": "Your profile was removed from this phone, but we could not finish turning off alerts or clearing saved data. Check your connection and try again."
     },
     "debug": {
       "heading": "Subscription details",

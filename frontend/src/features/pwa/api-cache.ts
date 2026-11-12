@@ -50,7 +50,7 @@ export function isCachedApiPath(pathname: string): boolean {
 
 /**
  * Deletes every cache that can hold an API response. Call it from the page when a worker takes consent back or
- * changes their profile (Task 8 wires that), so what the worker's phone remembers of the API goes with the
+ * changes their site (features/profile/store.ts does both), so what the worker's phone remembers of the API goes with the
  * profile. It only touches the API caches: pages and the precache stay, so the app still opens offline.
  *
  * Every deletion is attempted; if any fails the returned promise rejects with the first failure, because a caller
@@ -64,4 +64,46 @@ export async function clearApiCaches(
   const results = await Promise.allSettled(API_CACHE_NAMES.map((name) => storage.delete(name)));
   const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
   if (failed !== undefined) throw failed.reason;
+}
+
+/**
+ * The IndexedDB database in which Serwist's `ExpirationPlugin` records, for every cache it expires, the URL and the
+ * fetch time of each cached entry (serwist 9.5.13, `CacheTimestampsModel`: `DB_NAME`, object store "cache-entries").
+ * The URLs are the allow-listed ones, so they name the sites a worker looked at. `clearApiCaches` does not touch it.
+ * tests/unit/features/pwa/api-cache.test.ts reads the installed Serwist's source and fails if the name changes.
+ */
+export const EXPIRATION_DB_NAME = "serwist-expiration";
+
+/**
+ * "deleted": the browser removed the database. "queued": the service worker still holds it open, so the browser will
+ * remove it as soon as the worker lets go (see `deleteExpirationMetadata`).
+ */
+export type MetadataDeletion = "deleted" | "queued";
+
+/**
+ * Deletes the expiration database, so that what the worker's phone remembers about the API goes with the profile
+ * (call it with `clearApiCaches`).
+ *
+ * Serwist's worker opens the database when it first caches a response and never closes it. While the worker runs,
+ * `deleteDatabase` therefore fires `blocked`, and the browser finishes the deletion only when it stops the worker (it
+ * does so when the worker is idle). Waiting for that would leave the caller waiting, so `blocked` resolves as "queued":
+ * the deletion is not cancelled, it is pending in the browser. A failure is not swallowed, for the reason given at
+ * `clearApiCaches`. Where IndexedDB does not exist there is nothing to delete and it resolves.
+ */
+export async function deleteExpirationMetadata(
+  factory: Pick<IDBFactory, "deleteDatabase"> | undefined = typeof indexedDB === "undefined" ? undefined : indexedDB,
+): Promise<MetadataDeletion> {
+  if (factory === undefined) return "deleted";
+  return await new Promise<MetadataDeletion>((resolve, reject) => {
+    const request = factory.deleteDatabase(EXPIRATION_DB_NAME);
+    request.onsuccess = () => {
+      resolve("deleted");
+    };
+    request.onerror = () => {
+      reject(request.error ?? new Error(`Deleting the ${EXPIRATION_DB_NAME} database failed.`));
+    };
+    request.onblocked = () => {
+      resolve("queued");
+    };
+  });
 }

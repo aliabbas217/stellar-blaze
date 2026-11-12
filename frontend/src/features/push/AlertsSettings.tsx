@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
+import { useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
 import { InstallCard } from "@/features/push/InstallCard";
 import { usePush } from "@/features/push/usePush";
@@ -32,15 +33,17 @@ function ActionButton({
   variant = "primary",
   disabled = false,
   onClick,
+  ref,
   children,
 }: {
   variant?: keyof typeof BUTTON_VARIANTS;
   disabled?: boolean;
   onClick?: () => void;
+  ref?: Ref<HTMLButtonElement>;
   children: ReactNode;
 }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} className={`${BUTTON_BASE} ${BUTTON_VARIANTS[variant]}`}>
+    <button ref={ref} type="button" disabled={disabled} onClick={onClick} className={`${BUTTON_BASE} ${BUTTON_VARIANTS[variant]}`}>
       {children}
     </button>
   );
@@ -63,7 +66,34 @@ export interface AlertsSettingsProps {
   readonly debug: boolean;
 }
 
-export function AlertsSettings({ vapidPublicKey, siteId, debug }: AlertsSettingsProps) {
+export function AlertsSettings(props: AlertsSettingsProps) {
+  // What the last removal of the worker's data reported, and a counter that starts the alerts section again after it:
+  // the alerts state machine holds the browser's subscription in React state, which a removal made behind its back
+  // would leave saying "on". The result lives here, above the key, so that it survives that restart.
+  const [removal, setRemoval] = useState<RevokeOutcome | null>(null);
+  const [generation, setGeneration] = useState(0);
+
+  return (
+    <AlertsPanel
+      key={generation}
+      {...props}
+      removal={removal}
+      onRemoved={(outcome) => {
+        setRemoval(outcome);
+        // Unless alerts may still be on: then the screen keeps its state, and "Turn off alerts" can be tried again.
+        if (!outcome.failed.includes("alerts")) setGeneration((current) => current + 1);
+      }}
+    />
+  );
+}
+
+function AlertsPanel({
+  vapidPublicKey,
+  siteId,
+  debug,
+  removal,
+  onRemoved,
+}: AlertsSettingsProps & { removal: RevokeOutcome | null; onRemoved: (outcome: RevokeOutcome) => void }) {
   const t = useTranslations("alerts");
   const capability = useSyncExternalStore(noopSubscribe, readCapability, () => null);
   const push = usePush({ vapidPublicKey, siteId });
@@ -81,7 +111,107 @@ export function AlertsSettings({ vapidPublicKey, siteId, debug }: AlertsSettings
       {/* Always visible, whatever the state: the honest limit of alerts on a closed app (ADR 0004). */}
       <p>{t("limitation")}</p>
 
+      {/* Always offered, whatever the phone can do about alerts: the consent copy promises revocation from here. */}
+      <RemoveData disabled={push.state === "requesting"} removal={removal} onRemoved={onRemoved} />
+
       {debug ? <DebugPanel subscription={push.subscription} /> : null}
+    </div>
+  );
+}
+
+type RemoveStep = "idle" | "confirm" | "working";
+
+/**
+ * "Remove my data from this phone" (ruling R7: the consent copy promises it from Alerts). A first tap only asks; the
+ * second, on "Yes, remove it", calls the store's revoke. Which answer is the safe one gets the focus, and focus goes back
+ * to the button afterwards, so a keyboard or screen-reader user is never left on nothing.
+ */
+function RemoveData({
+  disabled,
+  removal,
+  onRemoved,
+}: {
+  disabled: boolean;
+  removal: RevokeOutcome | null;
+  onRemoved: (outcome: RevokeOutcome) => void;
+}) {
+  const t = useTranslations("alerts.removeData");
+  const tAlerts = useTranslations("alerts");
+  const revoke = useProfile((state) => state.revoke);
+  const [step, setStep] = useState<RemoveStep>("idle");
+  const titleId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const keep = useRef<HTMLButtonElement>(null);
+  // Set when the button has just come back (a "No", or a finished removal), so that the focus follows it.
+  const refocus = useRef(removal !== null);
+
+  useEffect(() => {
+    if (step === "confirm") {
+      keep.current?.focus();
+    } else if (step === "idle" && refocus.current) {
+      refocus.current = false;
+      trigger.current?.focus();
+    }
+  }, [step]);
+
+  async function remove() {
+    setStep("working");
+    let outcome: RevokeOutcome;
+    try {
+      outcome = await revoke();
+    } catch {
+      // revoke does not reject; if it ever does, nothing is known to have been removed.
+      outcome = { failed: ["storage", "alerts", "cache"] };
+    }
+    refocus.current = true;
+    setStep("idle");
+    onRemoved(outcome);
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {step === "confirm" ? (
+        <div role="group" aria-labelledby={titleId} className="flex flex-col gap-3">
+          <h2 id={titleId} className="font-display text-xl">
+            {t("confirmTitle")}
+          </h2>
+          <div className="flex flex-wrap gap-3">
+            <ActionButton
+              ref={keep}
+              variant="secondary"
+              onClick={() => {
+                refocus.current = true;
+                setStep("idle");
+              }}
+            >
+              {t("cancel")}
+            </ActionButton>
+            <ActionButton
+              onClick={() => {
+                void remove();
+              }}
+            >
+              {t("confirm")}
+            </ActionButton>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ActionButton
+            ref={trigger}
+            variant="secondary"
+            disabled={disabled || step === "working"}
+            onClick={() => {
+              setStep("confirm");
+            }}
+          >
+            {step === "working" ? tAlerts("working") : t("button")}
+          </ActionButton>
+          <p>{t("hint")}</p>
+        </>
+      )}
+      {/* A live region from the first render, so the result is announced. */}
+      <p role="status">{removal === null ? null : removal.failed.length === 0 ? t("done") : t("failed")}</p>
     </div>
   );
 }

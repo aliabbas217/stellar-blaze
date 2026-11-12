@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   API_CACHE_NAME,
   API_CACHE_NAMES,
+  EXPIRATION_DB_NAME,
   OFFLINE_API_ALLOW_LIST,
   clearApiCaches,
+  deleteExpirationMetadata,
   isCachedApiPath,
 } from "@/features/pwa/api-cache";
 
@@ -101,5 +105,98 @@ describe("clearApiCaches", () => {
     };
     await expect(clearApiCaches(storage)).rejects.toThrow("boom");
     expect(storage.delete).toHaveBeenCalledTimes(API_CACHE_NAMES.length);
+  });
+});
+
+/**
+ * An IDBFactory whose `deleteDatabase` hands back a request the test settles by hand, like the browser does: through
+ * `onsuccess`, `onerror` and `onblocked`.
+ */
+function fakeFactory() {
+  const request: {
+    onsuccess: (() => void) | null;
+    onerror: (() => void) | null;
+    onblocked: (() => void) | null;
+    error: DOMException | null;
+  } = { onsuccess: null, onerror: null, onblocked: null, error: null };
+  const factory = { deleteDatabase: vi.fn<IDBFactory["deleteDatabase"]>(() => request as unknown as IDBOpenDBRequest) };
+  return { factory, request };
+}
+
+describe("deleteExpirationMetadata", () => {
+  it("deletes Serwist's expiration database, and says so once the browser has", async () => {
+    const { factory, request } = fakeFactory();
+    const done = deleteExpirationMetadata(factory);
+    request.onsuccess?.();
+    await expect(done).resolves.toBe("deleted");
+    expect(factory.deleteDatabase).toHaveBeenCalledExactlyOnceWith("serwist-expiration");
+  });
+
+  it("names the database the installed Serwist writes its URL timestamps to", () => {
+    // ExpirationPlugin keeps the URL and fetch time of every cached entry, for every cache it expires, in one
+    // IndexedDB database. Clearing Cache Storage does not touch it, and a renamed database in a later Serwist would
+    // silently stop being deleted: this fails first.
+    expect(EXPIRATION_DB_NAME).toBe("serwist-expiration");
+    const source = readFileSync(path.resolve(import.meta.dirname, "../../../../node_modules/serwist/dist/index.mjs"), "utf8");
+    expect(source).toContain(`const DB_NAME = "serwist-expiration";`);
+  });
+
+  it("does not wait for a service worker that still holds the database open: the deletion is queued", async () => {
+    // The worker opens the database on its first cached response and never closes it (Serwist's CacheTimestampsModel
+    // keeps the connection), so while the worker runs, deleteDatabase fires `blocked` and completes only when the
+    // browser stops the worker. Waiting for that would hang the screen.
+    const { factory, request } = fakeFactory();
+    const done = deleteExpirationMetadata(factory);
+    request.onblocked?.();
+    await expect(done).resolves.toBe("queued");
+  });
+
+  it("keeps the answer it gave when the queued deletion completes later", async () => {
+    const { factory, request } = fakeFactory();
+    const done = deleteExpirationMetadata(factory);
+    request.onblocked?.();
+    request.onsuccess?.();
+    await expect(done).resolves.toBe("queued");
+  });
+
+  it("does not hide a failure: a caller that is revoking consent must know the data may still be there", async () => {
+    const { factory, request } = fakeFactory();
+    request.error = new DOMException("denied", "UnknownError");
+    const done = deleteExpirationMetadata(factory);
+    request.onerror?.();
+    await expect(done).rejects.toBe(request.error);
+  });
+
+  it("rejects when the browser throws instead of answering (a SecurityError on a blocked origin)", async () => {
+    const factory = {
+      deleteDatabase: vi.fn(() => {
+        throw new DOMException("blocked", "SecurityError");
+      }),
+    };
+    await expect(deleteExpirationMetadata(factory)).rejects.toThrow("blocked");
+  });
+
+  it("rejects with a real error when the browser reports a failure without one", async () => {
+    const { factory, request } = fakeFactory();
+    const done = deleteExpirationMetadata(factory);
+    request.onerror?.();
+    await expect(done).rejects.toBeInstanceOf(Error);
+  });
+
+  it("resolves quietly where IndexedDB does not exist", async () => {
+    await expect(deleteExpirationMetadata(undefined)).resolves.toBe("deleted");
+  });
+
+  it("uses the browser's indexedDB by default", async () => {
+    const { factory, request } = fakeFactory();
+    vi.stubGlobal("indexedDB", factory);
+    try {
+      const done = deleteExpirationMetadata();
+      request.onsuccess?.();
+      await expect(done).resolves.toBe("deleted");
+      expect(factory.deleteDatabase).toHaveBeenCalledWith(EXPIRATION_DB_NAME);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

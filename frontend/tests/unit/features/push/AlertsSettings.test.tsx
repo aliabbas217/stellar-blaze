@@ -1,7 +1,10 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
+import { CONSENT_VERSION } from "@/features/profile/profile-shape";
+import { PROFILE_STORAGE_KEY, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { AlertsSettings, type AlertsSettingsProps } from "@/features/push/AlertsSettings";
 import type { PushEnv } from "@/features/push/capability";
 import type { UsePush } from "@/features/push/usePush";
@@ -9,16 +12,26 @@ import { renderWithIntl } from "../../../utils/intl";
 
 /*
  * The Alerts screen's content for every state the plan names: what the phone can do, the Enable and Turn off buttons,
- * denied, the iPhone install steps, the always-visible closed-app limitation, and the spike's debug panel. The state
- * machine and the environment are replaced (they have their own tests); this checks what each of them puts on screen.
+ * denied, the iPhone install steps, the always-visible closed-app limitation, the "remove my data" control the consent
+ * copy promises (ruling R7), and the spike's debug panel. The state machine and the environment are replaced (they have
+ * their own tests); this checks what each of them puts on screen.
  */
 
 const hoisted = vi.hoisted(() => ({
   env: undefined as unknown as { value: PushEnv },
   push: undefined as unknown as { value: UsePush },
+  /** How many times the alerts state machine was mounted: removing the data starts it again from the browser's state. */
+  mounts: 0,
 }));
 
-vi.mock("@/features/push/usePush", () => ({ usePush: () => hoisted.push.value }));
+vi.mock("@/features/push/usePush", () => ({
+  usePush: () => {
+    useEffect(() => {
+      hoisted.mounts += 1;
+    }, []);
+    return hoisted.push.value;
+  },
+}));
 vi.mock("@/features/push/capability", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/push/capability")>()),
   readPushEnv: () => hoisted.env.value,
@@ -59,20 +72,27 @@ function setup(env: Partial<PushEnv>, push: Partial<UsePush> = {}, props: Partia
 
 const enable = () => screen.queryByRole("button", { name: en.alerts.enable });
 const disable = () => screen.queryByRole("button", { name: en.alerts.disable });
+const removeData = () => screen.queryByRole("button", { name: en.alerts.removeData.button });
+/** The buttons of the alerts controls: every button except the one that removes the worker's data. */
+const alertButtons = () => screen.queryAllByRole("button").filter((button) => button !== removeData());
+
+beforeEach(() => {
+  hoisted.mounts = 0;
+});
 
 describe("AlertsSettings: what the phone can do", () => {
   it("explains an insecure address and offers no button", () => {
     setup({ isSecureContext: false });
     expect(screen.getByRole("heading", { name: en.alerts.insecure.title })).toBeInTheDocument();
     expect(screen.getByText(en.alerts.insecure.body)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(alertButtons()).toHaveLength(0);
   });
 
   it("explains a browser without push and offers no button", () => {
     setup({ hasPushManager: false });
     expect(screen.getByRole("heading", { name: en.alerts.unsupported.title })).toBeInTheDocument();
     expect(screen.getByText(en.alerts.unsupported.body)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(alertButtons()).toHaveLength(0);
   });
 
   it("shows the install steps on an iPhone browser tab, as a numbered list, and no Enable button", () => {
@@ -110,12 +130,12 @@ describe("AlertsSettings: supported", () => {
     setup({}, { state: "denied" });
     expect(screen.getByRole("heading", { name: en.alerts.denied.title })).toBeInTheDocument();
     expect(screen.getByText(en.alerts.denied.body)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(alertButtons()).toHaveLength(0);
   });
 
   it("requesting: one disabled button that says to wait", () => {
     setup({}, { state: "requesting" });
-    const buttons = screen.getAllByRole("button");
+    const buttons = alertButtons();
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toBeDisabled();
     expect(buttons[0]).toHaveTextContent(en.alerts.working);
@@ -137,7 +157,9 @@ describe("AlertsSettings: supported", () => {
 
   it("announces a change of state through a live region", () => {
     setup({}, { state: "subscribed", subscription: SUBSCRIPTION });
-    expect(within(screen.getByRole("status")).getByText(en.alerts.state.subscribed)).toBeInTheDocument();
+    // More than one live region on the screen now (the removal result has its own): find the one that holds the state.
+    const region = screen.getAllByRole("status").find((candidate) => within(candidate).queryByText(en.alerts.state.subscribed) !== null);
+    expect(region).toBeDefined();
   });
 
   it("gives every button a 48 px target (min-h-12), above the 44 px a gloved hand needs", () => {
@@ -170,6 +192,191 @@ describe("AlertsSettings: the closed-app limitation", () => {
   it("is shown in Arabic from the Arabic messages", () => {
     setup({}, {}, {}, "ar");
     expect(screen.getByText(ar.alerts.limitation)).toBeInTheDocument();
+  });
+});
+
+describe("AlertsSettings: removing the worker's data", () => {
+  const realRevoke = useProfile.getState().revoke;
+
+  /** A revoke that resolves with `outcome`; `useProfile.setState` swaps it in for the real one. */
+  function stubRevoke(outcome: RevokeOutcome = { failed: [] }) {
+    const revoke = vi.fn(() => Promise.resolve(outcome));
+    useProfile.setState({ revoke });
+    return revoke;
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    useProfile.setState({ revoke: realRevoke, profile: null, push: null });
+  });
+
+  it.each([
+    ["insecure", { isSecureContext: false }, {}],
+    ["unsupported", { hasServiceWorker: false }, {}],
+    ["ios-needs-install", { isIos: true, hasPushManager: false }, {}],
+    ["idle", {}, {}],
+    ["subscribed", {}, { state: "subscribed" as const }],
+    ["denied", {}, { state: "denied" as const }],
+    ["error", {}, { state: "error" as const, failure: "disable" as const }],
+  ])("is offered, with what it does, when %s: the consent copy promises it from Alerts", (_name, env, push) => {
+    stubRevoke();
+    setup(env, push);
+    expect(removeData()).toBeEnabled();
+    expect(screen.getByText(en.alerts.removeData.hint)).toBeInTheDocument();
+  });
+
+  it("is disabled while a tap on Enable or Turn off is running, so it cannot race the registration", () => {
+    stubRevoke();
+    setup({}, { state: "requesting" });
+    expect(removeData()).toBeDisabled();
+  });
+
+  it("asks before it removes anything: the first tap only shows the question, with the safe answer focused", async () => {
+    const revoke = stubRevoke();
+    setup({});
+
+    await userEvent.click(removeData() as HTMLElement);
+
+    expect(revoke).not.toHaveBeenCalled();
+    const group = screen.getByRole("group", { name: en.alerts.removeData.confirmTitle });
+    expect(within(group).getByRole("button", { name: en.alerts.removeData.cancel })).toHaveFocus();
+    expect(within(group).getByRole("button", { name: en.alerts.removeData.confirm })).toBeEnabled();
+    expect(removeData()).not.toBeInTheDocument();
+  });
+
+  it("'No, keep it' goes back to the button, with focus on it, and removes nothing", async () => {
+    const revoke = stubRevoke();
+    setup({});
+    await userEvent.click(removeData() as HTMLElement);
+
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.cancel }));
+
+    expect(revoke).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(removeData()).toHaveFocus();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+  });
+
+  it("'Yes, remove it' removes the data once, says so in a live region, and starts the alerts screen again", async () => {
+    const revoke = stubRevoke();
+    setup({}, { state: "subscribed", subscription: SUBSCRIPTION });
+    expect(hoisted.mounts).toBe(1);
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(revoke).toHaveBeenCalledTimes(1);
+    const done = await screen.findByText(en.alerts.removeData.done);
+    expect(done).toHaveAttribute("role", "status");
+    expect(screen.queryByText(en.alerts.removeData.failed)).not.toBeInTheDocument();
+    // The state machine of the alerts section was rebuilt, so it reads the browser's state again (no stale "subscribed").
+    expect(hoisted.mounts).toBe(2);
+    expect(removeData()).toHaveFocus();
+  });
+
+  it("shows that it is working, and offers nothing else, until the removal finishes", async () => {
+    let finish: (outcome: RevokeOutcome) => void = () => undefined;
+    useProfile.setState({
+      revoke: () =>
+        new Promise<RevokeOutcome>((resolve) => {
+          finish = resolve;
+        }),
+    });
+    setup({});
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.alerts.working })).toBeDisabled();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+
+    finish({ failed: [] });
+    expect(await screen.findByText(en.alerts.removeData.done)).toBeInTheDocument();
+    expect(removeData()).toBeEnabled();
+  });
+
+  it("says plainly when alerts may still be on, and keeps the alerts screen as it is so Turn off can be tried again", async () => {
+    stubRevoke({ failed: ["alerts"] });
+    setup({}, { state: "subscribed", subscription: SUBSCRIPTION });
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+    expect(hoisted.mounts).toBe(1);
+    expect(disable()).toBeEnabled();
+  });
+
+  it.each([["cache"], ["storage"]] as const)(
+    "says it could not finish when only the %s step failed, and still starts the alerts screen again",
+    async (step) => {
+      stubRevoke({ failed: [step] });
+      setup({});
+
+      await userEvent.click(removeData() as HTMLElement);
+      await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+      expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
+      expect(hoisted.mounts).toBe(2);
+    },
+  );
+
+  it("does not break the screen if the removal throws", async () => {
+    useProfile.setState({ revoke: () => Promise.reject(new Error("unexpected")) });
+    setup({});
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
+    expect(removeData()).toBeEnabled();
+  });
+
+  it("gives the question's buttons the same 48 px target (min-h-12) as every other button", async () => {
+    stubRevoke();
+    setup({});
+    expect(removeData()?.className).toContain("min-h-12");
+
+    await userEvent.click(removeData() as HTMLElement);
+    for (const button of within(screen.getByRole("group")).getAllByRole("button")) expect(button.className).toContain("min-h-12");
+  });
+
+  it("is shown in Arabic from the Arabic messages", async () => {
+    stubRevoke();
+    setup({}, {}, {}, "ar");
+
+    await userEvent.click(screen.getByRole("button", { name: ar.alerts.removeData.button }));
+
+    expect(screen.getByRole("group", { name: ar.alerts.removeData.confirmTitle })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: ar.alerts.removeData.confirm })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: ar.alerts.removeData.cancel })).toBeInTheDocument();
+  });
+
+  it("removes the real stored profile and push registration (the store's own revoke, in jsdom)", async () => {
+    useProfile.getState().save({
+      consentVersion: CONSENT_VERSION,
+      consentedAt: "2026-11-11T08:30:00.000Z",
+      siteId: "site-demo-mussafah",
+      crewId: null,
+      workloadClass: "light",
+      heatWorkStartDate: "2026-10-01",
+      clothingCode: "work_clothes",
+    });
+    useProfile.getState().setPush({ serverId: "sub-1", endpoint: "https://push.example/send/abc", siteId: "site-demo-mussafah" });
+    expect(localStorage.getItem(PROFILE_STORAGE_KEY)).not.toBeNull();
+    setup({});
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(await screen.findByText(en.alerts.removeData.done)).toBeInTheDocument();
+    expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
+    expect(useProfile.getState().profile).toBeNull();
+    expect(useProfile.getState().push).toBeNull();
   });
 });
 
