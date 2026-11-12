@@ -37,7 +37,7 @@ from stellar_blaze.ports.config_store import (
     StoreUnavailableError,
     VersionRecord,
 )
-from stellar_blaze.redaction import redact
+from stellar_blaze.redaction import describe_exception
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -46,6 +46,7 @@ REASON_MAX_CHARS = 500
 _MAX_LOGGED_ERROR_CHARS = 500
 
 type ConfigStatus = Literal["ok", "stale", "missing"]
+type StaleReason = Literal["database-unavailable", "rejected-activation", "poll-error"]
 
 
 class ConfigUnavailableError(RuntimeError):
@@ -376,24 +377,19 @@ class ConfigService:
         )
 
 
-def _describe(exc: BaseException) -> str:
-    """``"<ExceptionType>: <message>"`` for a log line: credentials masked (``redact``) and bounded."""
-    text = redact(f"{type(exc).__name__}: {exc}").strip()
-    if len(text) <= _MAX_LOGGED_ERROR_CHARS:
-        return text
-    return text[:_MAX_LOGGED_ERROR_CHARS] + "..."
-
-
 class ConfigPoller:
     """Follows the activation log so a running process applies a config activated elsewhere, with no restart.
 
     Every ``interval_s`` it reads the latest activation (one single-row read); only when that activation's version
     is not the one the holder serves does it load, re-validate and swap. A failure of any kind (the database, a version
     that does not validate) leaves the last good snapshot serving and makes ``status`` ``"stale"``; ``"missing"`` means
-    there is no snapshot at all. A change of ``status`` is logged once (``config.status_changed``), at ``error`` for
-    ``stale`` and ``missing``, so a replica that cannot follow does not repeat itself every interval. The reason says
-    what failed: ``database-unavailable`` (the store could not answer), ``rejected-activation`` (the version does not
-    validate) or ``poll-error`` (anything else, which is a bug and not an outage).
+    there is no snapshot at all. A change of ``status`` **or of the reason** is logged once (``config.status_changed``),
+    at ``error`` for ``stale`` and ``missing``, so a replica that cannot follow does not repeat itself every interval.
+    The reason says what failed: ``database-unavailable`` (the store could not answer), ``rejected-activation`` (the
+    version does not validate) or ``poll-error`` (anything else, which is a bug and not an outage); ``error`` is the
+    exception, with the cause it was raised from and credentials masked (``describe_exception``). The reason matters
+    while the status stays ``missing`` (a process that started with its database down has no snapshot, so its status
+    does not change when the first poll fails): the line for that poll is the first to say why.
 
     A snapshot built from ``SB_RULESET_ID`` / ``SB_MODEL_ID`` (``source="env"``, never in prod) is never replaced:
     those pins are for back-tests and runs without a database (ADR 0010 section 4.6), so the poller does not read the
@@ -408,10 +404,10 @@ class ConfigPoller:
         self._holder = holder
         self._interval_s = interval_s
         self._task: asyncio.Task[None] | None = None
-        self._stale_reason: Literal["database-unavailable", "rejected-activation", "poll-error"] | None = None
+        self._stale_reason: StaleReason | None = None
         self._error: str | None = None
         self._rejected_activation: int | None = None
-        self._logged_status: ConfigStatus | None = None
+        self._logged: tuple[ConfigStatus, StaleReason | None] | None = None
         self._warned_about_env_pins = False
 
     @property
@@ -465,7 +461,7 @@ class ConfigPoller:
         except Exception as exc:  # the supervisor of a background loop: any failure is a stale poll, not a dead poller
             unavailable = isinstance(exc, StoreUnavailableError | OSError | TimeoutError)
             self._stale_reason = "database-unavailable" if unavailable else "poll-error"
-            self._error = _describe(exc)
+            self._error = describe_exception(exc, max_chars=_MAX_LOGGED_ERROR_CHARS)
         self._log_status()
 
     async def _run(self) -> None:
@@ -521,9 +517,18 @@ class ConfigPoller:
         self._stale_reason, self._error = None, None
 
     def _log_status(self) -> None:
-        status = self.status
-        if status == self._logged_status:
+        """Log the status and the reason once per change of either (the first call logs the starting state)."""
+        current = (self.status, self._stale_reason)
+        if current == self._logged:
             return
-        previous, self._logged_status = self._logged_status, status
+        previous, self._logged = self._logged, current
+        status, reason = current
         log = logger.info if status == "ok" else logger.error
-        log("config.status_changed", status=status, previous=previous, reason=self._stale_reason, error=self._error)
+        log(
+            "config.status_changed",
+            status=status,
+            previous=None if previous is None else previous[0],
+            reason=reason,
+            previous_reason=None if previous is None else previous[1],
+            error=self._error,
+        )

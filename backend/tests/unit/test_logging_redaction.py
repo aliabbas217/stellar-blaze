@@ -10,6 +10,7 @@ import asyncio
 import io
 import json
 import logging
+import time
 from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Any, cast
@@ -291,3 +292,27 @@ def test_control_without_the_processor_the_same_exception_leaks(
     out: Any = stream.getvalue()
     assert PASSWORD in out
     assert TOKEN in out
+
+
+def test_an_exception_that_quotes_a_megabyte_costs_a_bounded_time_and_still_masks_and_keeps_its_end(
+    log_format: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Final review I1: redact() runs over every logged traceback, and an exception can quote a whole response body. The
+    # traceback is cut to its head and tail around an elision marker; the exception line's end (here the secret, then a
+    # last word) is in the tail, masked.
+    body = "a-" * (512 * 1024)
+    log = structlog.stdlib.get_logger("test.oversized")
+
+    try:
+        raise RuntimeError(f"upstream answered {body} password={PASSWORD} last-word")
+    except RuntimeError:
+        started = time.perf_counter()
+        log.error("upstream.failed", exc_info=True)
+        elapsed = time.perf_counter() - started
+
+    out = capsys.readouterr().out
+    assert elapsed < 1.0
+    assert_no_secret(out)
+    assert "RuntimeError: upstream answered" in out
+    assert "chars elided" in out
+    assert "password=*** last-word" in out

@@ -315,6 +315,55 @@ async def test_status_changes_are_logged_once_per_change(
     assert changes[2]["error"] is None
 
 
+async def test_a_change_of_reason_is_logged_even_when_the_status_does_not_change(
+    capsys: pytest.CaptureFixture[str], settings: Settings
+) -> None:
+    # A replica that started with no snapshot is "missing" before and after its first failed poll; only the reason
+    # (and the error) tell an operator what is wrong, so a new reason is a new line.
+    configure_logging(settings)
+    store = InMemoryConfigStore()
+    replica = Replica(store)
+    store.fail_on["latest_activation"] = ConnectionRefusedError("database is down")
+
+    await replica.poller.poll_once()  # missing, database-unavailable
+    await replica.poller.poll_once()  # the same again: nothing
+    store.fail_on["latest_activation"] = RuntimeError("a bug, not a database error")
+    await replica.poller.poll_once()  # still missing, but for another reason
+    await replica.poller.poll_once()
+
+    changes = log_events(capsys.readouterr().out, "config.status_changed")
+    assert [(c["status"], c["reason"], c["previous_reason"], c["error"]) for c in changes] == [
+        ("missing", "database-unavailable", None, "ConnectionRefusedError: database is down"),
+        ("missing", "poll-error", "database-unavailable", "RuntimeError: a bug, not a database error"),
+    ]
+    assert {c["level"] for c in changes} == {"error"}
+
+
+async def test_a_stale_replica_logs_again_when_the_reason_it_cannot_follow_changes(
+    capsys: pytest.CaptureFixture[str], settings: Settings
+) -> None:
+    configure_logging(settings)
+    store = InMemoryConfigStore()
+    admin, _, _ = make_service(store)
+    await seed_and_activate(admin)
+    replica = Replica(store, initial=file_snapshot())
+    await replica.poller.poll_once()  # ok
+    store.fail_on["*"] = TimeoutError()
+    await replica.poller.poll_once()  # stale: the database does not answer
+    del store.fail_on["*"]
+    bad = store.add_raw_version({**config_body(RuntimeConfig()), "tunables": {"twl_margin_w_m2": 99.0}})
+    store.add_raw_activation(bad.id)
+    await replica.poller.poll_once()  # stale, still: the database answers but its latest version is refused
+    await replica.poller.poll_once()
+
+    changes = log_events(capsys.readouterr().out, "config.status_changed")
+    assert [(c["status"], c["reason"], c["previous"], c["previous_reason"]) for c in changes] == [
+        ("ok", None, None, None),
+        ("stale", "database-unavailable", "ok", None),
+        ("stale", "rejected-activation", "stale", "database-unavailable"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("failure", "reason"),
     [

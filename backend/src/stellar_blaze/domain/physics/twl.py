@@ -130,8 +130,10 @@ class TwlParams:
 class WithdrawalLimits:
     """The reference's two "withdrawal limits" on TWL: a cap that applies in very hot conditions.
 
-    The values are the reference's. Under ADR 0009 the ruleset's ``[twl_withdrawal]`` section carries the operative
-    values and the ``enabled`` switch, and B3 builds this dataclass from it.
+    The defaults are the reference's values. They are not what any caller applies: ``apply_withdrawal_limits`` takes no
+    default for its ``limits``, because under ADR 0009 the ruleset's ``[twl_withdrawal]`` section carries the operative
+    values and the ``enabled`` switch, and B3 builds this dataclass from that section. The defaults stay so that
+    ``tests/unit/rules/test_rulesets_golden.py`` can pin the seed ruleset's section to the reference's numbers.
 
     Attributes:
         dry_bulb_c: Dry-bulb temperature above which TWL is capped, in degrees Celsius.
@@ -146,7 +148,6 @@ class WithdrawalLimits:
 
 # A frozen dataclass is safe as a default argument value; one shared instance also keeps ruff B008 quiet.
 _DEFAULT_PARAMS: Final = TwlParams()
-_DEFAULT_LIMITS: Final = WithdrawalLimits()
 
 
 def _three_zone_evaporation_w_m2(sweat_supply_w_m2: float, max_evaporation_w_m2: float) -> float:
@@ -403,7 +404,7 @@ def apply_withdrawal_limits(
     *,
     t_c: ArrayLike,
     natural_wet_bulb_c: ArrayLike | None,
-    limits: WithdrawalLimits = _DEFAULT_LIMITS,
+    limits: WithdrawalLimits,
 ) -> F64:
     """Cap TWL at ``limits.cap_w_m2`` when the dry bulb or the natural wet bulb exceeds its limit.
 
@@ -413,11 +414,16 @@ def apply_withdrawal_limits(
     (``None`` or NaN) wet bulb applies no wet-bulb cap, and a NaN TWL stays NaN. The arguments broadcast against each
     other.
 
+    ``limits`` has no default, on purpose: the operative values and the ``enabled`` switch are the ruleset's
+    ``[twl_withdrawal]`` section (ADR 0009), and a caller that could omit the argument would apply the reference's
+    numbers whatever the ruleset in force says. The caller builds ``WithdrawalLimits`` from the ruleset and decides
+    whether to call this at all (``enabled``).
+
     Args:
         twl: TWL in W/m2 (a scalar or an array).
         t_c: Dry-bulb temperature in degrees Celsius.
         natural_wet_bulb_c: Natural wet-bulb temperature in degrees Celsius, or ``None`` if there is none.
-        limits: The limits and the cap; the defaults are the reference's.
+        limits: The limits and the cap, from the ruleset in force.
     """
     twl_arr = np.asarray(twl, dtype=np.float64)
     capped = np.asarray(t_c, dtype=np.float64) > limits.dry_bulb_c

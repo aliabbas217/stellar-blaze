@@ -58,14 +58,17 @@ jobs:
         working-directory: .
         run: |
           version=8.30.1
+          # The archive's sha256 is pinned here, in the repository, and not read from a checksums file served next to the
+          # archive: a file from the same place proves nothing when that place is what an attacker controls. Taken on
+          # 2026-11-12 from gitleaks_8.30.1_checksums.txt of the v8.30.1 release; the release asset's `digest` in the GitHub
+          # API says the same. Change `version` and `sha256` together.
+          sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
           archive="gitleaks_${version}_linux_x64.tar.gz"
-          checksums="gitleaks_${version}_checksums.txt"
           url="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
           tool_dir="$RUNNER_TEMP/gitleaks"
           mkdir -p "$tool_dir"
           curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
-          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$checksums" "$url/$checksums"
-          (cd "$tool_dir" && sha256sum --ignore-missing -c "$checksums" && tar -xzf "$archive" gitleaks)
+          (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" gitleaks)
           "$tool_dir/gitleaks" git --redact --verbose --no-banner --gitleaks-ignore-path .gitleaksignore .
 
       - name: Lint (ruff check)
@@ -117,13 +120,16 @@ jobs:
             exit 0
           fi
           version=1.35.0
+          # Pinned in the repository, not read from the release's checksums.txt (see the gitleaks step). Taken on 2026-11-12
+          # from checksums.txt of the v1.35.0 release; the release asset's `digest` in the GitHub API says the same.
+          # Change `version` and `sha256` together (ADR 0030 holds the version).
+          sha256=a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140
           archive="oasdiff_${version}_linux_amd64.tar.gz"
           url="https://github.com/oasdiff/oasdiff/releases/download/v${version}"
           tool_dir="$RUNNER_TEMP/oasdiff"
           mkdir -p "$tool_dir"
           curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
-          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/checksums.txt" "$url/checksums.txt"
-          (cd "$tool_dir" && sha256sum --ignore-missing -c checksums.txt && tar -xzf "$archive" oasdiff)
+          (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" oasdiff)
           "$tool_dir/oasdiff" breaking "${BASE_SHA}:${spec}" "${spec}"
 
       - name: Build the image

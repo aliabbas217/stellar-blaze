@@ -17,6 +17,7 @@ from stellar_blaze.composition import build_config_service, build_config_store, 
 from stellar_blaze.config import Settings, get_settings
 from stellar_blaze.errors import PROBLEM_RESPONSES, REQUEST_ID_HEADER, install_problem_handlers
 from stellar_blaze.logging import bind_runtime_ids, configure_logging
+from stellar_blaze.redaction import describe_exception
 from stellar_blaze.tracing import configure_tracing, instrumented_engine
 
 API_PREFIX = "/api/v1"
@@ -40,13 +41,15 @@ async def load_initial_config(service: ConfigService, holder: SnapshotHolder) ->
 
     A database that is down, or an active version this release refuses, does not stop startup: ``/health/live`` keeps
     answering, the holder stays empty, readiness is 503 (``dependency: config``) and decision routes answer 503, and the
-    poller loads the config as soon as there is one. Only the exception class is logged: its message can carry the host
-    or the user.
+    poller loads the config as soon as there is one. The exception is logged with its message and the cause it was
+    raised from, credentials masked (``describe_exception``), because an operator needs the cause (refused, timed out,
+    authentication failed) to act on it. The poller's own line (``config.status_changed``, status ``missing``) follows
+    when its first poll fails, with the same cause, and again if the reason changes.
     """
     try:
         snapshot = await service.load_active()
     except Exception as exc:  # startup must survive any failure to read: readiness reports what is wrong
-        logger.error("config.startup_load_failed", error=type(exc).__name__)
+        logger.error("config.startup_load_failed", error=describe_exception(exc))
         return
     if snapshot is not None:
         holder.swap(snapshot)
@@ -77,7 +80,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.config_poller = poller
             if settings.env == "prod":
                 # In prod the database holds the only config: read it before serving anything. Outside prod the file or
-                # env snapshot is already in the holder and the poller replaces it once the database has an activation.
+                # env snapshot is already in the holder: the poller replaces a file snapshot once the database has an
+                # activation, and never replaces an env one (the pins are for runs without a database, ADR 0010 4.6).
                 await load_initial_config(service, runtime.config)
             snapshot = runtime.config.peek()
             logger.info(

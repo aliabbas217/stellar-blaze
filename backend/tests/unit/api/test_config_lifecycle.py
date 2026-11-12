@@ -19,7 +19,7 @@ from stellar_blaze.application.runtime_config import ConfigPoller
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, config_body
 from stellar_blaze.errors import PROBLEM_JSON
-from stellar_blaze.ports.config_store import RuntimeConfigStore
+from stellar_blaze.ports.config_store import RuntimeConfigStore, StoreUnavailableError
 from tests.unit.config.support import FIXTURE_MODELS, SECOND_MODEL, TODAY, log_events, make_service, margin
 from tests.unit.rules.support import RULESETS_DIR
 
@@ -187,8 +187,46 @@ def test_prod_startup_survives_a_failing_store_and_catches_up_when_it_recovers(
     out = capsys.readouterr().out
     (failure,) = log_events(out, "config.startup_load_failed")
     assert failure["level"] == "error"
-    assert failure["error"] == "ConnectionRefusedError"
+    assert failure["error"] == "ConnectionRefusedError: postgresql+asyncpg://***@db:5432/x refused"
     assert "hunter2" not in out  # the credentials in the exception message never reach the log
+
+
+def unreachable_database(password: str) -> StoreUnavailableError:
+    """What ``PostgresConfigStore`` raises when it cannot read: a ``StoreUnavailableError`` chained to the driver's."""
+    failure = StoreUnavailableError("the activation log could not be read")
+    failure.__cause__ = ConnectionRefusedError(f"cannot connect to postgresql+asyncpg://sb:{password}@db:5432/x")
+    return failure
+
+
+def test_prod_start_with_an_unreachable_database_logs_the_redacted_cause_once_and_never_the_password(
+    settings: Settings, store: InMemoryConfigStore, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Final review I2: the line said only "StoreUnavailableError" (the class of every failed read), and the poller's
+    # status stayed "missing" for ever, so a replica that never loaded its config never said why.
+    store.fail_on["*"] = unreachable_database("hunter2")
+    app = app_for(settings, env="prod")
+
+    with TestClient(app) as client:
+        poll(client, app)
+        poll(client, app)
+        assert client.get("/api/v1/health/ready").status_code == 503
+
+    out = capsys.readouterr().out
+    cause = (
+        "StoreUnavailableError: the activation log could not be read <- "
+        "ConnectionRefusedError: cannot connect to postgresql+asyncpg://***@db:5432/x"
+    )
+    (failure,) = log_events(out, "config.startup_load_failed")
+    assert failure["error"] == cause
+    # Two polls that fail the same way after the start say it once: the status is still "missing", but the reason
+    # (none until the first poll failed, then "database-unavailable") changed.
+    changes = log_events(out, "config.status_changed")
+    assert [(c["status"], c["previous"], c["reason"], c["previous_reason"]) for c in changes] == [
+        ("missing", None, None, None),
+        ("missing", "missing", "database-unavailable", None),
+    ]
+    assert changes[1]["error"] == cause
+    assert "hunter2" not in out
 
 
 def test_a_rejected_activation_is_stale_with_a_200_and_the_last_good_version_keeps_serving(

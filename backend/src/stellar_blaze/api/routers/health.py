@@ -12,6 +12,7 @@ from stellar_blaze.api.deps import ConfigPollerDep, EngineDep, RuntimeDep, Setti
 from stellar_blaze.api.schemas import ResponseModel
 from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem, Problem
 from stellar_blaze.logging import bind_config_identity
+from stellar_blaze.redaction import describe_exception
 
 router = APIRouter(prefix="/health", tags=["health"])
 logger = structlog.stdlib.get_logger(__name__)
@@ -64,9 +65,10 @@ async def health_ready(
         async with asyncio.timeout(settings.readiness_timeout_s), engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
     except (SQLAlchemyError, OSError, TimeoutError) as exc:
-        # The exception class only: the message can carry the host, port or user, and a failing probe repeats every few
-        # seconds, so no traceback either. The response names the dependency, nothing else.
-        logger.warning("health.ready.database_unavailable", error=type(exc).__name__)
+        # The type, the message and the cause it was raised from, credentials masked (the class alone does not tell a
+        # refused connection from a failed login or a timeout); no traceback, because a failing probe repeats every few
+        # seconds. The response names the dependency, nothing else.
+        logger.warning("health.ready.database_unavailable", error=describe_exception(exc))
         raise DomainProblem(
             type_=DEPENDENCY_UNAVAILABLE, title="Dependency unavailable", status=503, dependency="database"
         ) from exc

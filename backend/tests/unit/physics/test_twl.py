@@ -39,6 +39,10 @@ CHAMBER_CLOTHING_CLO = 0.12
 CHAMBER_PRESSURE_KPA = 101.3
 CHAMBER_PRESSURE_HPA = 1013.0
 
+# The reference implementation's withdrawal limits (44 C dry bulb, 32 C natural wet bulb, 115 W/m2): `limits` has no
+# default, so every test that applies them says so. The ruleset's own values are pinned in tests/unit/rules.
+REFERENCE_LIMITS = WithdrawalLimits()
+
 # A hot, moderately humid, calm reference case for the single-factor tests.
 BASE_INPUTS: dict[str, float] = {"t_c": 38.0, "td_c": 20.0, "wind_body_ms": 1.0, "pressure_kpa": 101.3, "mrt_c": 38.0}
 
@@ -385,7 +389,9 @@ def test_body_level_wind_rejects_impossible_arguments() -> None:
 
 
 def test_withdrawal_limits_cap_at_115() -> None:
-    capped = apply_withdrawal_limits([200, 200, 200], t_c=[45, 40, 40], natural_wet_bulb_c=[25, 33, 25])
+    capped = apply_withdrawal_limits(
+        [200, 200, 200], t_c=[45, 40, 40], natural_wet_bulb_c=[25, 33, 25], limits=REFERENCE_LIMITS
+    )
     assert capped.tolist() == [115.0, 115.0, 200.0]
     relaxed = apply_withdrawal_limits(
         [200, 200, 200],
@@ -400,31 +406,41 @@ def test_withdrawal_limits_are_the_reference_values() -> None:
     assert WithdrawalLimits() == WithdrawalLimits(dry_bulb_c=44.0, natural_wet_bulb_c=32.0, cap_w_m2=115.0)
 
 
+def test_the_limits_are_a_required_argument_so_that_the_ruleset_cannot_be_bypassed() -> None:
+    # Final review: with a default, a caller that forgot to pass the ruleset's limits capped at the reference's 115.
+    with pytest.raises(TypeError, match="limits"):
+        apply_withdrawal_limits(200.0, t_c=45.0, natural_wet_bulb_c=None)  # type: ignore[call-arg]
+
+
 def test_withdrawal_limits_are_strict_inequalities() -> None:
     # solve_twl / generate_twl.R: `temp > 44` and `wet_bulb > 32`; exactly at the limit nothing is capped.
-    out = apply_withdrawal_limits([200, 200], t_c=[44.0, 30.0], natural_wet_bulb_c=[20.0, 32.0])
+    out = apply_withdrawal_limits(
+        [200, 200], t_c=[44.0, 30.0], natural_wet_bulb_c=[20.0, 32.0], limits=REFERENCE_LIMITS
+    )
     assert out.tolist() == [200.0, 200.0]
 
 
 def test_withdrawal_limits_cap_only_downward() -> None:
-    out = apply_withdrawal_limits([90.0, 130.0], t_c=[47.0, 47.0], natural_wet_bulb_c=None)
+    out = apply_withdrawal_limits([90.0, 130.0], t_c=[47.0, 47.0], natural_wet_bulb_c=None, limits=REFERENCE_LIMITS)
     assert out.tolist() == [90.0, 115.0]
 
 
 def test_withdrawal_limits_without_wet_bulb_use_dry_bulb_only() -> None:
-    out = apply_withdrawal_limits([200, 200], t_c=[45, 30], natural_wet_bulb_c=None)
+    out = apply_withdrawal_limits([200, 200], t_c=[45, 30], natural_wet_bulb_c=None, limits=REFERENCE_LIMITS)
     assert out.tolist() == [115.0, 200.0]
 
 
 def test_withdrawal_limits_missing_wet_bulb_does_not_cap_and_nan_twl_stays_nan() -> None:
     # generate_twl.R: `!is.na(wet_bulb) && wet_bulb > 32`, so a missing wet bulb applies no wet-bulb cap.
-    out = apply_withdrawal_limits([200.0, math.nan], t_c=[30.0, 47.0], natural_wet_bulb_c=[math.nan, 20.0])
+    out = apply_withdrawal_limits(
+        [200.0, math.nan], t_c=[30.0, 47.0], natural_wet_bulb_c=[math.nan, 20.0], limits=REFERENCE_LIMITS
+    )
     assert out[0] == 200.0
     assert math.isnan(out[1])
 
 
 def test_withdrawal_limits_return_float64_and_zero_dimensional_for_scalars() -> None:
-    out = apply_withdrawal_limits(200.0, t_c=45.0, natural_wet_bulb_c=None)
+    out = apply_withdrawal_limits(200.0, t_c=45.0, natural_wet_bulb_c=None, limits=REFERENCE_LIMITS)
     assert out.dtype == np.float64
     assert out.ndim == 0
     assert out == 115.0

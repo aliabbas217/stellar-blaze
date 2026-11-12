@@ -119,8 +119,9 @@ def build_runtime(settings: Settings, *, today: date) -> Runtime:
     are not accepted (the runtime config is the one source of truth, ADR 0010 section 4.6) and the holder starts empty:
     the active version lives in the database, and the lifespan loads it (a database that is down leaves the holder
     empty, which readiness reports as 503). Outside prod the file seed, with the env pins applied when there are any,
-    is validated and becomes the first snapshot (an ``env`` snapshot for back-tests and runs without a database); the
-    poller replaces it once the database has an activation.
+    is validated and becomes the first snapshot: a ``file`` snapshot, which the poller replaces once the database has an
+    activation, or an ``env`` snapshot (back-tests and runs without a database), which it never replaces (ADR 0010
+    section 4.6).
 
     Raises:
         ConfigSourceError: A pin is set in prod; or outside prod the seed is missing or the config violates its ruleset

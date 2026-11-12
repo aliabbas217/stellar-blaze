@@ -98,7 +98,9 @@ def redact_exceptions(_logger: WrappedLogger, _method_name: str, event_dict: Eve
     text reaches the log as it is. This processor takes ``exc_info`` out of the event (so no raw exception object
     reaches a renderer), renders it as the plain traceback text into ``exception``, and runs ``redact`` over that, over
     ``stack`` (the rendered ``stack_info``) and over the message ``event``. Frame locals are never in that text, so a
-    secret that only sat in a variable never gets as far as redaction.
+    secret that only sat in a variable never gets as far as redaction. A traceback longer than
+    ``redaction.MAX_REDACTED_CHARS`` keeps its first and last 16 KB or so around an elision marker (the exception
+    message is at the end), so what a log line costs has a ceiling whatever an exception quotes.
 
     It is the same for both output formats on purpose: the structlog chain is cached on first use, so a choice that
     depended on the format would survive a later ``configure_logging`` with the other one. It runs in the shared chain,

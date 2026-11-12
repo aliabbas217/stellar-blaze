@@ -1,4 +1,5 @@
 import asyncio
+import json
 import socket
 import threading
 import time
@@ -98,6 +99,41 @@ def test_ready_503_does_not_leak_connection_details() -> None:
     assert PASSWORD not in response.text
     assert "127.0.0.1" not in response.text
     assert "detail" not in response.json()
+
+
+class RefusingEngine:
+    """Stands in for an engine whose database refuses the connection, with a driver message that quotes the DSN."""
+
+    def connect(self) -> "RefusingEngine":
+        return self
+
+    async def __aenter__(self) -> "RefusingEngine":
+        raise ConnectionRefusedError(f"cannot connect to postgresql+asyncpg://sb:{PASSWORD}@db:5432/x")
+
+    async def __aexit__(self, *_exc: object) -> None:
+        return None
+
+
+@pytest.mark.unit
+def test_ready_503_logs_the_cause_of_the_failure_without_the_password(capsys: pytest.CaptureFixture[str]) -> None:
+    # The class alone ("ConnectionRefusedError") does not tell a refused connection from a failed login or a timeout;
+    # the message does. The log may name the host (the response may not), and never a credential.
+    app = create_app(settings_for("postgresql+asyncpg://sb:sb@127.0.0.1:1/x"))
+    app.dependency_overrides[get_engine] = lambda: cast("AsyncEngine", RefusingEngine())
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/health/ready")
+
+    out = capsys.readouterr().out
+    (line,) = [
+        parsed
+        for parsed in (json.loads(raw) for raw in out.splitlines() if raw.startswith("{"))
+        if parsed.get("event") == "health.ready.database_unavailable"
+    ]
+    assert line["level"] == "warning"
+    assert line["error"] == "ConnectionRefusedError: cannot connect to postgresql+asyncpg://***@db:5432/x"
+    assert PASSWORD not in out
+    assert PASSWORD not in response.text
 
 
 @pytest.mark.unit
