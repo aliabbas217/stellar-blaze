@@ -174,7 +174,8 @@
       "confirm": "Yes, remove it",
       "cancel": "No, keep it",
       "done": "Your data was removed from this phone.",
-      "failed": "Your profile was removed from this phone, but we could not finish turning off alerts or clearing saved data. Check your connection and try again."
+      "failed": "We could not finish removing your data from this phone. Alerts may still be on, or saved data may remain. Check your connection and try again.",
+      "pending": "Your data was removed from this phone. We could not reach the server yet to cancel your alert subscription. It will be tried again each time you open Alerts."
     },
     "debug": {
       "heading": "Subscription details",

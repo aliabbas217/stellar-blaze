@@ -2,9 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
-import { useProfile, type RevokeOutcome } from "@/features/profile/store";
+import { isRevokeComplete, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
 import { InstallCard } from "@/features/push/InstallCard";
+import { retryPendingDeletes } from "@/features/push/pending-delete";
 import { usePush } from "@/features/push/usePush";
 
 /*
@@ -67,23 +68,44 @@ export interface AlertsSettingsProps {
 }
 
 export function AlertsSettings(props: AlertsSettingsProps) {
+  const t = useTranslations("alerts.removeData");
   // What the last removal of the worker's data reported, and a counter that starts the alerts section again after it:
   // the alerts state machine holds the browser's subscription in React state, which a removal made behind its back
-  // would leave saying "on". The result lives here, above the key, so that it survives that restart.
+  // would leave saying "on". Both live here, above the key, so that they survive that restart.
   const [removal, setRemoval] = useState<RevokeOutcome | null>(null);
   const [generation, setGeneration] = useState(0);
 
+  // Alerts opened: ask the API again about the registrations it has not confirmed deleting (ruling R32). Once per open,
+  // not on the restart after a removal, which has just asked.
+  useEffect(() => {
+    void retryPendingDeletes();
+  }, []);
+
+  let result: string | null = null;
+  if (removal !== null) {
+    // "Done" only when nothing is left: a failed step, or a registration the API has not confirmed, is said as it is.
+    if (isRevokeComplete(removal)) result = t("done");
+    else result = removal.failed.length > 0 ? t("failed") : t("pending");
+  }
+
   return (
-    <AlertsPanel
-      key={generation}
-      {...props}
-      removal={removal}
-      onRemoved={(outcome) => {
-        setRemoval(outcome);
-        // Unless alerts may still be on: then the screen keeps its state, and "Turn off alerts" can be tried again.
-        if (!outcome.failed.includes("alerts")) setGeneration((current) => current + 1);
-      }}
-    />
+    <div className="flex flex-col gap-3">
+      <AlertsPanel
+        key={generation}
+        {...props}
+        afterRemoval={removal !== null}
+        onRemoved={(outcome) => {
+          setRemoval(outcome);
+          // Unless alerts may still be on: then the screen keeps its state, and "Turn off alerts" can be tried again.
+          if (!outcome.failed.includes("alerts")) setGeneration((current) => current + 1);
+        }}
+      />
+      {/*
+       * The result of a removal. A live region only announces a change of text inside a node that was already there, so
+       * it sits outside the keyed panel: the restart above replaces the panel's nodes, and this one stays.
+       */}
+      <p role="status">{result}</p>
+    </div>
   );
 }
 
@@ -91,9 +113,9 @@ function AlertsPanel({
   vapidPublicKey,
   siteId,
   debug,
-  removal,
+  afterRemoval,
   onRemoved,
-}: AlertsSettingsProps & { removal: RevokeOutcome | null; onRemoved: (outcome: RevokeOutcome) => void }) {
+}: AlertsSettingsProps & { afterRemoval: boolean; onRemoved: (outcome: RevokeOutcome) => void }) {
   const t = useTranslations("alerts");
   const capability = useSyncExternalStore(noopSubscribe, readCapability, () => null);
   const push = usePush({ vapidPublicKey, siteId });
@@ -111,10 +133,10 @@ function AlertsPanel({
       {/* Always visible, whatever the state: the honest limit of alerts on a closed app (ADR 0004). */}
       <p>{t("limitation")}</p>
 
-      {/* Always offered, whatever the phone can do about alerts: the consent copy promises revocation from here. */}
-      <RemoveData disabled={push.state === "requesting"} removal={removal} onRemoved={onRemoved} />
-
       {debug ? <DebugPanel subscription={push.subscription} /> : null}
+
+      {/* Always offered, whatever the phone can do about alerts: the consent copy promises revocation from here. */}
+      <RemoveData disabled={push.state === "requesting"} afterRemoval={afterRemoval} onRemoved={onRemoved} />
     </div>
   );
 }
@@ -123,16 +145,18 @@ type RemoveStep = "idle" | "confirm" | "working";
 
 /**
  * "Remove my data from this phone" (ruling R7: the consent copy promises it from Alerts). A first tap only asks; the
- * second, on "Yes, remove it", calls the store's revoke. Which answer is the safe one gets the focus, and focus goes back
- * to the button afterwards, so a keyboard or screen-reader user is never left on nothing.
+ * second, on "Yes, remove it", calls the store's revoke and hands the outcome up, where it is said. Which answer is the
+ * safe one gets the focus, and focus goes back to the button afterwards, so a keyboard or screen-reader user is never
+ * left on nothing.
  */
 function RemoveData({
   disabled,
-  removal,
+  afterRemoval,
   onRemoved,
 }: {
   disabled: boolean;
-  removal: RevokeOutcome | null;
+  /** This is the panel rebuilt after a removal: the button it replaced had the focus. */
+  afterRemoval: boolean;
   onRemoved: (outcome: RevokeOutcome) => void;
 }) {
   const t = useTranslations("alerts.removeData");
@@ -143,7 +167,7 @@ function RemoveData({
   const trigger = useRef<HTMLButtonElement>(null);
   const keep = useRef<HTMLButtonElement>(null);
   // Set when the button has just come back (a "No", or a finished removal), so that the focus follows it.
-  const refocus = useRef(removal !== null);
+  const refocus = useRef(afterRemoval);
 
   useEffect(() => {
     if (step === "confirm") {
@@ -161,7 +185,7 @@ function RemoveData({
       outcome = await revoke();
     } catch {
       // revoke does not reject; if it ever does, nothing is known to have been removed.
-      outcome = { failed: ["storage", "alerts", "cache"] };
+      outcome = { failed: ["storage", "alerts", "cache"], pending: false };
     }
     refocus.current = true;
     setStep("idle");
@@ -210,8 +234,6 @@ function RemoveData({
           <p>{t("hint")}</p>
         </>
       )}
-      {/* A live region from the first render, so the result is announced. */}
-      <p role="status">{removal === null ? null : removal.failed.length === 0 ? t("done") : t("failed")}</p>
     </div>
   );
 }

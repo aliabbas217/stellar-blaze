@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import ar from "../../../../messages/ar.json";
@@ -7,6 +7,7 @@ import { CONSENT_VERSION } from "@/features/profile/profile-shape";
 import { PROFILE_STORAGE_KEY, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { AlertsSettings, type AlertsSettingsProps } from "@/features/push/AlertsSettings";
 import type { PushEnv } from "@/features/push/capability";
+import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
 import type { UsePush } from "@/features/push/usePush";
 import { renderWithIntl } from "../../../utils/intl";
 
@@ -22,7 +23,15 @@ const hoisted = vi.hoisted(() => ({
   push: undefined as unknown as { value: UsePush },
   /** How many times the alerts state machine was mounted: removing the data starts it again from the browser's state. */
   mounts: 0,
+  /** A spy around the real `retryPendingDeletes`: the Alerts screen retries what the API has not confirmed deleting. */
+  retry: undefined as unknown as ReturnType<typeof vi.fn<(typeof import("@/features/push/pending-delete"))["retryPendingDeletes"]>>,
 }));
+
+vi.mock("@/features/push/pending-delete", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/features/push/pending-delete")>();
+  hoisted.retry = vi.fn(original.retryPendingDeletes);
+  return { ...original, retryPendingDeletes: hoisted.retry };
+});
 
 vi.mock("@/features/push/usePush", () => ({
   usePush: () => {
@@ -78,6 +87,7 @@ const alertButtons = () => screen.queryAllByRole("button").filter((button) => bu
 
 beforeEach(() => {
   hoisted.mounts = 0;
+  hoisted.retry.mockClear();
 });
 
 describe("AlertsSettings: what the phone can do", () => {
@@ -199,7 +209,7 @@ describe("AlertsSettings: removing the worker's data", () => {
   const realRevoke = useProfile.getState().revoke;
 
   /** A revoke that resolves with `outcome`; `useProfile.setState` swaps it in for the real one. */
-  function stubRevoke(outcome: RevokeOutcome = { failed: [] }) {
+  function stubRevoke(outcome: RevokeOutcome = { failed: [], pending: false }) {
     const revoke = vi.fn(() => Promise.resolve(outcome));
     useProfile.setState({ revoke });
     return revoke;
@@ -293,13 +303,13 @@ describe("AlertsSettings: removing the worker's data", () => {
     expect(screen.getByRole("button", { name: en.alerts.working })).toBeDisabled();
     expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
 
-    finish({ failed: [] });
+    finish({ failed: [], pending: false });
     expect(await screen.findByText(en.alerts.removeData.done)).toBeInTheDocument();
     expect(removeData()).toBeEnabled();
   });
 
   it("says plainly when alerts may still be on, and keeps the alerts screen as it is so Turn off can be tried again", async () => {
-    stubRevoke({ failed: ["alerts"] });
+    stubRevoke({ failed: ["alerts"], pending: false });
     setup({}, { state: "subscribed", subscription: SUBSCRIPTION });
 
     await userEvent.click(removeData() as HTMLElement);
@@ -314,7 +324,7 @@ describe("AlertsSettings: removing the worker's data", () => {
   it.each([["cache"], ["storage"]] as const)(
     "says it could not finish when only the %s step failed, and still starts the alerts screen again",
     async (step) => {
-      stubRevoke({ failed: [step] });
+      stubRevoke({ failed: [step], pending: false });
       setup({});
 
       await userEvent.click(removeData() as HTMLElement);
@@ -334,6 +344,92 @@ describe("AlertsSettings: removing the worker's data", () => {
 
     expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
     expect(removeData()).toBeEnabled();
+  });
+
+  it("is not 'done' while the API has not confirmed deleting the registration: it says what is outstanding", async () => {
+    stubRevoke({ failed: [], pending: true });
+    setup({}, { state: "subscribed", subscription: SUBSCRIPTION });
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(await screen.findByText(en.alerts.removeData.pending)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.failed)).not.toBeInTheDocument();
+    // The browser's subscription is gone, so the alerts section starts again from it.
+    expect(hoisted.mounts).toBe(2);
+  });
+
+  it("says it could not finish, not 'pending', when a step failed as well as the registration being unconfirmed", async () => {
+    stubRevoke({ failed: ["cache"], pending: true });
+    setup({});
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    expect(await screen.findByText(en.alerts.removeData.failed)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.done)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.removeData.pending)).not.toBeInTheDocument();
+  });
+
+  it("shows the result in one live region that is never replaced: the same node, its text changing, so it is announced (WCAG 4.1.3)", async () => {
+    stubRevoke();
+    setup({}, { state: "subscribed", subscription: SUBSCRIPTION });
+    const regions = screen.getAllByRole("status");
+    const region = regions[regions.length - 1] as HTMLElement;
+    expect(region).toBeEmptyDOMElement();
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.done);
+    });
+    // The alerts section was rebuilt around it, and the region is still the very same element, still in the page.
+    expect(hoisted.mounts).toBe(2);
+    expect(region.isConnected).toBe(true);
+    expect(screen.getAllByRole("status").at(-1)).toBe(region);
+  });
+
+  it("keeps the same live region when the result changes from one removal to the next", async () => {
+    const revoke = vi.fn().mockResolvedValueOnce({ failed: ["cache"], pending: false }).mockResolvedValueOnce({ failed: [], pending: false });
+    useProfile.setState({ revoke });
+    setup({});
+    const regions = screen.getAllByRole("status");
+    const region = regions[regions.length - 1] as HTMLElement;
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.failed);
+    });
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+    await waitFor(() => {
+      expect(region).toHaveTextContent(en.alerts.removeData.done);
+    });
+    expect(screen.getAllByRole("status").at(-1)).toBe(region);
+  });
+
+  it("retries the registrations the API has not confirmed deleting each time Alerts opens", () => {
+    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+    hoisted.retry.mockResolvedValueOnce([]);
+
+    setup({ isSecureContext: false });
+
+    expect(hoisted.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry again when the alerts section is rebuilt after a removal", async () => {
+    stubRevoke();
+    setup({});
+    expect(hoisted.retry).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(removeData() as HTMLElement);
+    await userEvent.click(screen.getByRole("button", { name: en.alerts.removeData.confirm }));
+    await screen.findByText(en.alerts.removeData.done);
+
+    expect(hoisted.retry).toHaveBeenCalledTimes(1);
   });
 
   it("gives the question's buttons the same 48 px target (min-h-12) as every other button", async () => {

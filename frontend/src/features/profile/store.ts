@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { browserEffects, type ProfileEffects } from "@/features/profile/effects";
 import { isNonEmptyString, toProfile, type Profile } from "@/features/profile/profile-shape";
+import { readPendingDeletes, rememberPendingDelete, retryPendingDeletes } from "@/features/push/pending-delete";
 
 /*
  * The on-device store (ADR 0004, plan section 8.8): what the app remembers on this phone and never sends to the
@@ -34,19 +35,35 @@ export interface PushRegistration {
 export type RevokeStep =
   /** The stored data could not be removed from localStorage. */
   | "storage"
-  /** The browser's push subscription or the API's registration could not be removed: alerts may still arrive. */
+  /** The browser's push subscription could not be dropped (or the step did not finish in time): alerts may still arrive. */
   | "alerts"
-  /** The cached API responses or Serwist's record of them could not be removed. */
+  /** The cached API responses and pages, or Serwist's record of them, could not be removed. */
   | "cache";
 
 export interface RevokeOutcome {
-  /** The steps that did not finish; empty when everything was removed. The profile is cleared in memory either way. */
+  /** The steps that did not finish; empty when each one did. The profile is cleared in memory either way. */
   readonly failed: readonly RevokeStep[];
+  /**
+   * True while the API has not confirmed deleting a push registration (ruling R32): its id is kept under
+   * `sb-push-pending-delete-v1` and is retried on the next revoke, when Alerts opens and when push state is reconciled.
+   */
+  readonly pending: boolean;
+}
+
+/** Whether revoking finished everything. Anything else must never be shown to the worker as "removed". */
+export function isRevokeComplete(outcome: RevokeOutcome): boolean {
+  return outcome.failed.length === 0 && !outcome.pending;
 }
 
 export interface ProfileState {
   readonly profile: Profile | null;
   readonly push: PushRegistration | null;
+  /**
+   * Counts the times the worker's data was taken back on this phone, by `revoke()` here or by another tab (see below).
+   * Not persisted. A flow that began before a revoke and finishes after it compares the count it read at the start:
+   * when it moved, the flow must not write its result back (usePush does this before it stores a registration).
+   */
+  readonly revokeEpoch: number;
   readonly setPush: (push: PushRegistration | null) => void;
   /**
    * Keeps the worker's profile (already validated by the form). When the site differs from the stored profile's, the
@@ -55,8 +72,9 @@ export interface ProfileState {
   readonly save: (profile: Profile) => void;
   /**
    * Takes the worker's data back: clears the profile and the push registration (memory and localStorage) first, then,
-   * best effort and each with a time limit, turns alerts off, clears the cached API responses and deletes Serwist's
-   * expiration record. Never rejects: what did not finish is in the outcome. A second call while one runs joins it.
+   * best effort and each with a time limit, drops the browser's subscription, deletes the API's registration, clears the
+   * caches and empties Serwist's expiration record. Never rejects, and never reports more than it did: what did not
+   * finish is in the outcome (`isRevokeComplete`). A second call while one runs joins it.
    */
   readonly revoke: () => Promise<RevokeOutcome>;
 }
@@ -85,14 +103,14 @@ function within<T>(run: () => Promise<T>, ms: number): Promise<T> {
   });
 }
 
-/** Clears Cache Storage and Serwist's expiration record: both are attempted, and a failure of either is thrown. */
+/** Clears the caches and Serwist's expiration record: both are attempted, and a failure of either is thrown. */
 async function clearDeviceApiData(effects: ProfileEffects): Promise<void> {
   const results = await Promise.allSettled([
     new Promise((started) => {
-      started(effects.clearApiCaches());
+      started(effects.clearCaches());
     }),
     new Promise((started) => {
-      started(effects.deleteApiCacheMetadata());
+      started(effects.clearCacheMetadata());
     }),
   ]);
   const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
@@ -137,20 +155,21 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
   const effects: ProfileEffects = { ...browserEffects, ...options.effects };
   let revoking: Promise<RevokeOutcome> | null = null;
 
-  return create<ProfileState>()(
+  const store = create<ProfileState>()(
     persist(
       (set, get, api) => ({
         profile: null,
         push: null,
+        revokeEpoch: 0,
         setPush: (push) => {
           set({ push });
         },
         save: (profile) => {
           const previous = get().profile;
           set({ profile });
-          // A different site: what the phone cached for the old one (forecasts, and Serwist's record of their URLs)
-          // is not this worker's any more. Not on the first save: nothing was stored, and the policy the form just
-          // used should stay cached. A failure is logged, not thrown: the profile is saved either way.
+          // A different site: what the phone cached for the old one (forecasts, page URLs, and Serwist's record of
+          // them) is not this worker's any more. Not on the first save: nothing was stored, and the policy the form
+          // just used should stay cached. A failure is logged, not thrown: the profile is saved either way.
           if (previous !== null && previous.siteId !== profile.siteId) {
             clearDeviceApiData(effects).catch((error: unknown) => {
               console.error("Could not clear the cached API responses after the site changed.", error);
@@ -160,23 +179,43 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
         revoke: () => {
           if (revoking !== null) return revoking;
 
-          // Local data first, before anything that waits on a browser API or the network: the worker's data is gone
-          // from this phone whatever happens next. The registration id is read first, because alerts need it.
+          // The registration's id is written down first, under its own key, because everything after this clears the
+          // push slice that held it: a DELETE the API never confirms must still be owed after the page is gone.
           const serverId = get().push?.serverId ?? null;
-          set({ profile: null, push: null });
+          if (serverId !== null) rememberPendingDelete(serverId);
+
+          // Local data next, before anything that waits on a browser API or the network: the worker's data is gone
+          // from this phone whatever happens after.
+          set({ profile: null, push: null, revokeEpoch: get().revokeEpoch + 1 });
           api.persist.clearStorage();
           // The guarded storage swallows a failed removal; reading the key back is how it is noticed.
           const stored = guardedLocalStorage.getItem(PROFILE_STORAGE_KEY) !== null;
 
+          // The browser's subscription, then every registration still owed to the API (this one, and any an earlier
+          // revoke could not delete). A failure of the first does not skip the second.
+          const alerts = async () => {
+            let dropped = true;
+            let reason: unknown;
+            try {
+              await effects.unsubscribe();
+            } catch (error) {
+              dropped = false;
+              reason = error;
+            }
+            await retryPendingDeletes(effects.deleteRegistration);
+            if (!dropped) throw reason instanceof Error ? reason : new Error("The browser's push subscription was not dropped.");
+          };
+
           const started = Promise.allSettled([
-            within(() => effects.unsubscribe(serverId), REVOKE_STEP_TIMEOUT_MS),
+            within(alerts, REVOKE_STEP_TIMEOUT_MS),
             within(() => clearDeviceApiData(effects), REVOKE_STEP_TIMEOUT_MS),
-          ]).then(([alerts, cache]): RevokeOutcome => {
+          ]).then(([alertsStep, cacheStep]): RevokeOutcome => {
             const failed: RevokeStep[] = [];
             if (stored) failed.push("storage");
-            if (alerts.status === "rejected") failed.push("alerts");
-            if (cache.status === "rejected") failed.push("cache");
-            return { failed };
+            if (alertsStep.status === "rejected") failed.push("alerts");
+            if (cacheStep.status === "rejected") failed.push("cache");
+            // Read when everything has settled: an id is outstanding if the API has not confirmed it, however that came about.
+            return { failed, pending: readPendingDeletes().length > 0 };
           });
           revoking = started.finally(() => {
             revoking = null;
@@ -199,6 +238,24 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
       },
     ),
   );
+
+  // Another tab of the app changed the stored data (ruling R34). Without this, a tab that was open during a revoke in
+  // another keeps the revoked data in memory, and its next write (a push registration, a saved profile) puts the data
+  // back into localStorage. So the change is read in at once; and when it removed what this tab held, that counts as a
+  // revoke here too, so that a flow still running in this tab can tell. `rehydrate` does not write what it reads.
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", (event) => {
+      if (event.key !== null && event.key !== PROFILE_STORAGE_KEY) return;
+      const before = store.getState();
+      void Promise.resolve(store.persist.rehydrate()).then(() => {
+        const after = store.getState();
+        const held = before.profile !== null || before.push !== null;
+        if (held && after.profile === null && after.push === null) store.setState({ revokeEpoch: after.revokeEpoch + 1 });
+      });
+    });
+  }
+
+  return store;
 }
 
 export const useProfile = createProfileStore();

@@ -1,11 +1,13 @@
 import {
   createProfileStore,
+  isRevokeComplete,
   PROFILE_STORAGE_KEY,
   REVOKE_STEP_TIMEOUT_MS,
   type ProfileEffects,
   type PushRegistration,
 } from "@/features/profile/store";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
+import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
 
 /*
  * The on-device store (ADR 0004): the push registration (Task 7) and the worker's profile (Task 8), persisted under
@@ -202,11 +204,14 @@ describe("useProfile (the worker's profile)", () => {
 function fakeEffects(overrides: Partial<ProfileEffects> = {}) {
   return {
     unsubscribe: vi.fn<ProfileEffects["unsubscribe"]>(() => Promise.resolve()),
-    clearApiCaches: vi.fn(() => Promise.resolve()),
-    deleteApiCacheMetadata: vi.fn(() => Promise.resolve("deleted")),
+    deleteRegistration: vi.fn<ProfileEffects["deleteRegistration"]>(() => Promise.resolve(true)),
+    clearCaches: vi.fn(() => Promise.resolve()),
+    clearCacheMetadata: vi.fn(() => Promise.resolve("cleared")),
     ...overrides,
   };
 }
+
+const COMPLETE = { failed: [], pending: false };
 
 describe("revoke", () => {
   it("empties the storage key, clears both slices and calls unsubscribe once", async () => {
@@ -222,20 +227,21 @@ describe("revoke", () => {
     expect(store.getState().profile).toBeNull();
     expect(store.getState().push).toBeNull();
     expect(effects.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(outcome).toEqual({ failed: [] });
+    expect(outcome).toEqual(COMPLETE);
+    expect(isRevokeComplete(outcome)).toBe(true);
   });
 
-  it("hands unsubscribe the registration id that was stored before the state was cleared", async () => {
+  it("asks the API to delete the registration that was stored before the state was cleared", async () => {
     const effects = fakeEffects();
     const store = createProfileStore({ effects });
     store.getState().setPush(registration);
 
     await store.getState().revoke();
 
-    expect(effects.unsubscribe).toHaveBeenCalledWith("sub-1");
+    expect(effects.deleteRegistration).toHaveBeenCalledExactlyOnceWith("sub-1");
   });
 
-  it("still turns the browser's subscription off when no registration id is stored", async () => {
+  it("still turns the browser's subscription off when no registration id is stored, and asks the API nothing", async () => {
     const effects = fakeEffects();
     const store = createProfileStore({ effects });
     store.getState().save(profile);
@@ -243,7 +249,7 @@ describe("revoke", () => {
     await store.getState().revoke();
 
     expect(effects.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(effects.unsubscribe).toHaveBeenCalledWith(null);
+    expect(effects.deleteRegistration).not.toHaveBeenCalled();
   });
 
   it("a reload after revoking finds nothing", async () => {
@@ -257,24 +263,29 @@ describe("revoke", () => {
     expect(reloaded.push).toBeNull();
   });
 
-  it("clears the API caches and deletes Serwist's expiration metadata", async () => {
+  it("clears the device's caches (API and page caches) and Serwist's expiration record", async () => {
     const effects = fakeEffects();
     const store = createProfileStore({ effects });
     store.getState().save(profile);
 
     await store.getState().revoke();
 
-    expect(effects.clearApiCaches).toHaveBeenCalledTimes(1);
-    expect(effects.deleteApiCacheMetadata).toHaveBeenCalledTimes(1);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+    expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(1);
   });
 
   it("has already cleared the local data when the first effect starts: nothing waits on the network", async () => {
-    const seen: { profile: Profile | null; push: PushRegistration | null; stored: string | null }[] = [];
+    const seen: { profile: Profile | null; push: PushRegistration | null; stored: string | null; pending: string | null }[] = [];
     const holder: { store?: ReturnType<typeof createProfileStore> } = {};
     const effects = fakeEffects({
       unsubscribe: vi.fn(() => {
         const state = holder.store?.getState();
-        seen.push({ profile: state?.profile ?? null, push: state?.push ?? null, stored: localStorage.getItem(PROFILE_STORAGE_KEY) });
+        seen.push({
+          profile: state?.profile ?? null,
+          push: state?.push ?? null,
+          stored: localStorage.getItem(PROFILE_STORAGE_KEY),
+          pending: localStorage.getItem(PENDING_DELETE_KEY),
+        });
         return Promise.resolve();
       }),
     });
@@ -284,7 +295,8 @@ describe("revoke", () => {
 
     await holder.store.getState().revoke();
 
-    expect(seen).toEqual([{ profile: null, push: null, stored: null }]);
+    // The profile and push state are gone, and the registration's id is already written where a retry will find it.
+    expect(seen).toEqual([{ profile: null, push: null, stored: null, pending: JSON.stringify(["sub-1"]) }]);
   });
 
   it("clears local data even when unsubscribe fails, and reports that alerts may still be on", async () => {
@@ -297,30 +309,37 @@ describe("revoke", () => {
 
     expect(store.getState().profile).toBeNull();
     expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
-    expect(outcome).toEqual({ failed: ["alerts"] });
-    expect(effects.clearApiCaches).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ failed: ["alerts"], pending: false });
+    expect(isRevokeComplete(outcome)).toBe(false);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(1);
+    // The API's registration is deleted all the same: a failed browser step does not skip it.
+    expect(effects.deleteRegistration).toHaveBeenCalledExactlyOnceWith("sub-1");
   });
 
   it("clears local data and still unsubscribes when the cache clearing fails", async () => {
-    const effects = fakeEffects({ clearApiCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
+    const effects = fakeEffects({ clearCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
     const store = createProfileStore({ effects });
     store.getState().save(profile);
 
     const outcome = await store.getState().revoke();
 
     expect(store.getState().profile).toBeNull();
-    expect(outcome).toEqual({ failed: ["cache"] });
+    expect(outcome).toEqual({ failed: ["cache"], pending: false });
+    expect(isRevokeComplete(outcome)).toBe(false);
     expect(effects.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(effects.deleteApiCacheMetadata).toHaveBeenCalledTimes(1);
+    expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(1);
   });
 
-  it("reports a failed deletion of the expiration metadata as a cache failure", async () => {
-    const effects = fakeEffects({ deleteApiCacheMetadata: vi.fn(() => Promise.reject(new Error("blocked"))) });
+  it("reports a failed clearing of the expiration metadata as a cache failure, and never as done", async () => {
+    const effects = fakeEffects({ clearCacheMetadata: vi.fn(() => Promise.reject(new Error("aborted"))) });
     const store = createProfileStore({ effects });
     store.getState().save(profile);
 
-    expect(await store.getState().revoke()).toEqual({ failed: ["cache"] });
-    expect(effects.clearApiCaches).toHaveBeenCalledTimes(1);
+    const outcome = await store.getState().revoke();
+
+    expect(outcome).toEqual({ failed: ["cache"], pending: false });
+    expect(isRevokeComplete(outcome)).toBe(false);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(1);
   });
 
   it("survives an effect that throws instead of rejecting", async () => {
@@ -332,7 +351,7 @@ describe("revoke", () => {
     const store = createProfileStore({ effects });
     store.getState().save(profile);
 
-    expect(await store.getState().revoke()).toEqual({ failed: ["alerts"] });
+    expect(await store.getState().revoke()).toEqual({ failed: ["alerts"], pending: false });
     expect(store.getState().profile).toBeNull();
   });
 
@@ -345,7 +364,7 @@ describe("revoke", () => {
     const pending = store.getState().revoke();
     await vi.advanceTimersByTimeAsync(REVOKE_STEP_TIMEOUT_MS);
 
-    expect(await pending).toEqual({ failed: ["alerts"] });
+    expect(await pending).toEqual({ failed: ["alerts"], pending: false });
     expect(store.getState().profile).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -360,6 +379,7 @@ describe("revoke", () => {
     const outcome = await store.getState().revoke();
 
     expect(outcome.failed).toContain("storage");
+    expect(isRevokeComplete(outcome)).toBe(false);
     expect(store.getState().profile).toBeNull();
   });
 
@@ -382,7 +402,7 @@ describe("revoke", () => {
 
     expect(await first).toEqual(await second);
     expect(effects.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(effects.clearApiCaches).toHaveBeenCalledTimes(1);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(1);
   });
 
   it("can run again after it finished (a retry after a failure)", async () => {
@@ -390,8 +410,8 @@ describe("revoke", () => {
     const store = createProfileStore({ effects });
     store.getState().save(profile);
 
-    expect(await store.getState().revoke()).toEqual({ failed: ["alerts"] });
-    expect(await store.getState().revoke()).toEqual({ failed: [] });
+    expect(await store.getState().revoke()).toEqual({ failed: ["alerts"], pending: false });
+    expect(await store.getState().revoke()).toEqual(COMPLETE);
     expect(effects.unsubscribe).toHaveBeenCalledTimes(2);
   });
 
@@ -399,24 +419,219 @@ describe("revoke", () => {
     const effects = fakeEffects();
     const store = createProfileStore({ effects });
 
-    expect(await store.getState().revoke()).toEqual({ failed: [] });
+    expect(await store.getState().revoke()).toEqual(COMPLETE);
     expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
   });
 });
 
+describe("revoke: a registration the API has not confirmed deleting (ruling R32)", () => {
+  it("is not done while the DELETE fails: the id, and only the id, is kept under its own key", async () => {
+    const effects = fakeEffects({ deleteRegistration: vi.fn(() => Promise.resolve(false)) });
+    const store = createProfileStore({ effects });
+    store.getState().save(profile);
+    store.getState().setPush(registration);
+
+    const outcome = await store.getState().revoke();
+
+    expect(outcome).toEqual({ failed: [], pending: true });
+    expect(isRevokeComplete(outcome)).toBe(false);
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-1"]));
+    // Nothing else about the worker or the subscription survives: not the endpoint, the site or the profile.
+    expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).not.toContain("push.example");
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).not.toContain("site-demo");
+  });
+
+  it("a retry finds the id, and is not done until the DELETE succeeds", async () => {
+    const deleteRegistration = vi.fn<ProfileEffects["deleteRegistration"]>(() => Promise.resolve(false));
+    const store = createProfileStore({ effects: fakeEffects({ deleteRegistration }) });
+    store.getState().setPush(registration);
+
+    expect(await store.getState().revoke()).toEqual({ failed: [], pending: true });
+
+    // The second revoke has no stored registration at all: the id comes from the pending key.
+    expect(store.getState().push).toBeNull();
+    expect(await store.getState().revoke()).toEqual({ failed: [], pending: true });
+    expect(deleteRegistration).toHaveBeenCalledTimes(2);
+    expect(deleteRegistration).toHaveBeenNthCalledWith(2, "sub-1");
+
+    deleteRegistration.mockResolvedValue(true);
+    const outcome = await store.getState().revoke();
+
+    expect(outcome).toEqual(COMPLETE);
+    expect(isRevokeComplete(outcome)).toBe(true);
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+  });
+
+  it("retries ids left by an earlier session, whatever the store holds now", async () => {
+    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-old-1", "sub-old-2"]));
+    const effects = fakeEffects();
+    const store = createProfileStore({ effects });
+
+    const outcome = await store.getState().revoke();
+
+    expect(vi.mocked(effects.deleteRegistration).mock.calls.map(([id]) => id)).toEqual(["sub-old-1", "sub-old-2"]);
+    expect(outcome).toEqual(COMPLETE);
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+  });
+
+  it("keeps only the ids the API did not confirm", async () => {
+    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-a", "sub-b"]));
+    const effects = fakeEffects({ deleteRegistration: vi.fn((id: string) => Promise.resolve(id !== "sub-b")) });
+    const store = createProfileStore({ effects });
+    store.getState().setPush(registration);
+
+    expect(await store.getState().revoke()).toEqual({ failed: [], pending: true });
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-b"]));
+  });
+
+  it("reports both failures when the browser step failed and the DELETE is unconfirmed", async () => {
+    const effects = fakeEffects({
+      unsubscribe: vi.fn(() => Promise.reject(new Error("no worker"))),
+      deleteRegistration: vi.fn(() => Promise.resolve(false)),
+    });
+    const store = createProfileStore({ effects });
+    store.getState().setPush(registration);
+
+    expect(await store.getState().revoke()).toEqual({ failed: ["alerts"], pending: true });
+  });
+
+  it("is pending, not done, when the DELETE never answers: the id stays for the next time", async () => {
+    vi.useFakeTimers();
+    const effects = fakeEffects({ deleteRegistration: vi.fn(() => new Promise<boolean>(() => undefined)) });
+    const store = createProfileStore({ effects });
+    store.getState().setPush(registration);
+
+    const running = store.getState().revoke();
+    await vi.advanceTimersByTimeAsync(REVOKE_STEP_TIMEOUT_MS);
+
+    const outcome = await running;
+    expect(outcome.pending).toBe(true);
+    expect(outcome.failed).toContain("alerts");
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-1"]));
+  });
+
+  it("writes the id before the profile is cleared, so a page that dies mid-revoke still owes the DELETE", () => {
+    const store = createProfileStore({ effects: fakeEffects({ unsubscribe: vi.fn(() => new Promise<void>(() => undefined)) }) });
+    store.getState().setPush(registration);
+    store.getState().save(profile);
+
+    void store.getState().revoke();
+
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-1"]));
+    expect(localStorage.getItem(PROFILE_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe("revoke epoch and other tabs (ruling R34)", () => {
+  it("counts every revoke, and is never persisted", async () => {
+    const store = createProfileStore({ effects: fakeEffects() });
+    expect(store.getState().revokeEpoch).toBe(0);
+    store.getState().save(profile);
+
+    await store.getState().revoke();
+    expect(store.getState().revokeEpoch).toBe(1);
+    await store.getState().revoke();
+    expect(store.getState().revokeEpoch).toBe(2);
+
+    store.getState().save(profile);
+    expect(Object.keys((JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) ?? "{}") as { state: object }).state).sort()).toEqual(["profile", "push"]);
+  });
+
+  /** What the browser does in the other tab when it changes localStorage. */
+  function storageEvent(key: string | null = PROFILE_STORAGE_KEY) {
+    window.dispatchEvent(new StorageEvent("storage", { key, storageArea: localStorage }));
+  }
+
+  it("a revoke in another tab empties this tab's memory, so this tab cannot write the data back", async () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    thisTab.getState().save(profile);
+    thisTab.getState().setPush(registration);
+    // The same phone, another tab: a second store over the same localStorage.
+    const otherTab = createProfileStore({ effects: fakeEffects() });
+    expect(otherTab.getState().profile).toEqual(profile);
+
+    await otherTab.getState().revoke();
+    storageEvent();
+
+    expect(thisTab.getState().profile).toBeNull();
+    expect(thisTab.getState().push).toBeNull();
+    // Without the listener this write would bring the revoked profile back from this tab's stale memory.
+    thisTab.getState().setPush({ serverId: "sub-2", endpoint: "https://push.example/send/new", siteId: "site-demo-mussafah" });
+    const stored = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) ?? "{}") as { state: { profile: unknown } };
+    expect(stored.state.profile).toBeNull();
+    expect(thisTab.getState().profile).toBeNull();
+  });
+
+  it("counts that as a revoke here too, so an in-flight subscribe in this tab can tell", async () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    thisTab.getState().save(profile);
+    const otherTab = createProfileStore({ effects: fakeEffects() });
+    const before = thisTab.getState().revokeEpoch;
+
+    await otherTab.getState().revoke();
+    storageEvent();
+
+    await vi.waitFor(() => {
+      expect(thisTab.getState().revokeEpoch).toBe(before + 1);
+    });
+  });
+
+  it("takes a profile saved in another tab, and a cleared localStorage (key null)", () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    createProfileStore({ effects: fakeEffects() }).getState().save(profile);
+    storageEvent();
+    expect(thisTab.getState().profile).toEqual(profile);
+
+    localStorage.clear();
+    storageEvent(null);
+    expect(thisTab.getState().profile).toBeNull();
+  });
+
+  it("ignores a change to any other key", () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    thisTab.getState().save(profile);
+    localStorage.removeItem(PROFILE_STORAGE_KEY);
+
+    storageEvent("something-else");
+
+    expect(thisTab.getState().profile).toEqual(profile);
+  });
+
+  it("does not write back what it read, so two tabs cannot send each other's changes round and round", () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    const writer = vi.spyOn(Storage.prototype, "setItem");
+    createProfileStore({ effects: fakeEffects() }).getState().save(profile);
+    writer.mockClear();
+
+    storageEvent();
+
+    expect(thisTab.getState().profile).toEqual(profile);
+    expect(writer).not.toHaveBeenCalled();
+  });
+
+  it("does not move the epoch when nothing was removed", async () => {
+    const thisTab = createProfileStore({ effects: fakeEffects() });
+    createProfileStore({ effects: fakeEffects() }).getState().save(profile);
+    storageEvent();
+    await Promise.resolve();
+    expect(thisTab.getState().revokeEpoch).toBe(0);
+  });
+});
+
 describe("save: a change of site", () => {
-  it("clears the API caches and the expiration metadata when the saved site differs from the stored one", async () => {
+  it("clears the device's caches and the expiration record when the saved site differs from the stored one", async () => {
     const effects = fakeEffects();
     const store = createProfileStore({ effects });
     store.getState().save(profile);
-    expect(effects.clearApiCaches).not.toHaveBeenCalled();
+    expect(effects.clearCaches).not.toHaveBeenCalled();
 
     store.getState().save({ ...profile, siteId: "site-demo-jebel-ali" });
     await vi.waitFor(() => {
-      expect(effects.clearApiCaches).toHaveBeenCalledTimes(1);
+      expect(effects.clearCaches).toHaveBeenCalledTimes(1);
     });
 
-    expect(effects.deleteApiCacheMetadata).toHaveBeenCalledTimes(1);
+    expect(effects.clearCacheMetadata).toHaveBeenCalledTimes(1);
     expect(store.getState().profile?.siteId).toBe("site-demo-jebel-ali");
   });
 
@@ -424,8 +639,8 @@ describe("save: a change of site", () => {
     const effects = fakeEffects();
     const store = createProfileStore({ effects });
     store.getState().save(profile);
-    expect(effects.clearApiCaches).not.toHaveBeenCalled();
-    expect(effects.deleteApiCacheMetadata).not.toHaveBeenCalled();
+    expect(effects.clearCaches).not.toHaveBeenCalled();
+    expect(effects.clearCacheMetadata).not.toHaveBeenCalled();
   });
 
   it("does not clear anything when only the crew, the work or the clothing changes", () => {
@@ -433,7 +648,7 @@ describe("save: a change of site", () => {
     const store = createProfileStore({ effects });
     store.getState().save(profile);
     store.getState().save({ ...profile, crewId: null, workloadClass: "light", clothingCode: "other" });
-    expect(effects.clearApiCaches).not.toHaveBeenCalled();
+    expect(effects.clearCaches).not.toHaveBeenCalled();
   });
 
   it("compares with the profile restored from storage after a reload", () => {
@@ -443,12 +658,12 @@ describe("save: a change of site", () => {
     const reloaded = createProfileStore({ effects });
     reloaded.getState().save({ ...profile, siteId: "site-demo-jebel-ali" });
 
-    expect(effects.clearApiCaches).toHaveBeenCalledTimes(1);
+    expect(effects.clearCaches).toHaveBeenCalledTimes(1);
   });
 
   it("still saves, and does not throw or leave an unhandled rejection, when the clearing fails", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const effects = fakeEffects({ clearApiCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
+    const effects = fakeEffects({ clearCaches: vi.fn(() => Promise.reject(new Error("quota"))) });
     const store = createProfileStore({ effects });
     store.getState().save(profile);
 

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw/http";
 import { useProfile } from "@/features/profile/store";
+import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
 import type { SubscriptionLike } from "@/features/push/subscribe";
 import { REGISTRATION_TIMEOUT_MS, usePush, type PushConfig, type PushPlatform } from "@/features/push/usePush";
 import { problemOnce } from "@/mocks/handlers";
@@ -522,5 +523,221 @@ describe("usePush: disable", () => {
     expect(deletes).toEqual(["sub-1"]);
     expect(result.current.state).toBe("idle");
     expect(useProfile.getState().push).toBeNull();
+  });
+});
+
+/*
+ * Ruling R34: a flow that began before the worker took their data back must not write its result after it. The store
+ * counts each revoke (`revokeEpoch`); usePush reads the count when it starts and checks it before it stores anything.
+ */
+describe("usePush: the worker takes their data back while it runs", () => {
+  /** An API whose POST answers only when the test lets it, so that a revoke can land in between. */
+  function gatedApi() {
+    const posts: unknown[] = [];
+    const deletes: string[] = [];
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.post("*/api/v1/push/subscriptions", async ({ request }) => {
+        posts.push(await request.json());
+        await gate;
+        return HttpResponse.json({ id: `sub-${String(posts.length)}` }, { status: 201 });
+      }),
+      http.delete("*/api/v1/push/subscriptions/:id", ({ params }) => {
+        deletes.push(String(params["id"]));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    return { posts, deletes, release };
+  }
+
+  it("Enable: a registration made across a revoke is not stored; the browser's subscription and the API's registration are undone", async () => {
+    const unsubscribe = vi.fn(() => Promise.resolve(true));
+    const { platform } = fakePlatform({ existing: browserSubscription(ENDPOINT, unsubscribe) });
+    const { posts, deletes, release } = gatedApi();
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    let running = Promise.resolve();
+    act(() => {
+      running = result.current.enable();
+    });
+    await waitFor(() => {
+      expect(posts).toHaveLength(1);
+    });
+    // The worker removes their data from another tab (or this one) while the API is still answering.
+    await useProfile.getState().revoke();
+    await act(async () => {
+      release();
+      await running;
+    });
+
+    expect(useProfile.getState().push).toBeNull();
+    expect(result.current.state).toBe("idle");
+    expect(result.current.subscription).toBeNull();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(deletes).toEqual(["sub-1"]);
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+  });
+
+  it("Enable: if the API's registration cannot be deleted afterwards, its id is kept to try again", async () => {
+    const { platform } = fakePlatform();
+    const { posts, release } = gatedApi();
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    let running = Promise.resolve();
+    act(() => {
+      running = result.current.enable();
+    });
+    await waitFor(() => {
+      expect(posts).toHaveLength(1);
+    });
+    await useProfile.getState().revoke();
+    server.use(
+      http.delete("*/api/v1/push/subscriptions/:id", () => HttpResponse.json({ type: "about:blank", title: "Bad Gateway", status: 502 }, { status: 502 })),
+    );
+    await act(async () => {
+      release();
+      await running;
+    });
+
+    expect(useProfile.getState().push).toBeNull();
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-1"]));
+  });
+
+  it("Enable: a revoke while the permission prompt is open stops it before anything is subscribed", async () => {
+    const { platform, subscribe } = fakePlatform();
+    spyOnApi();
+    let answer: (permission: NotificationPermission) => void = () => undefined;
+    const prompt = new Promise<NotificationPermission>((resolve) => {
+      answer = resolve;
+    });
+    const { result } = renderHook(() => usePush(CONFIG, { ...platform, requestPermission: () => prompt }));
+
+    let running = Promise.resolve();
+    act(() => {
+      running = result.current.enable();
+    });
+    expect(result.current.state).toBe("requesting");
+    await useProfile.getState().revoke();
+    await act(async () => {
+      answer("granted");
+      await running;
+    });
+
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(useProfile.getState().push).toBeNull();
+    expect(result.current.state).toBe("idle");
+  });
+
+  it("app open: a re-registration that a revoke overtakes does not bring the registration back", async () => {
+    useProfile.getState().setPush({ serverId: "sub-old", endpoint: "https://push.example/send/old", siteId: CONFIG.siteId ?? "" });
+    const unsubscribe = vi.fn(() => Promise.resolve(true));
+    const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription(ENDPOINT, unsubscribe) });
+    const { posts, deletes, release } = gatedApi();
+
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+    await waitFor(() => {
+      expect(posts).toHaveLength(1);
+    });
+    await useProfile.getState().revoke();
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(deletes).toEqual(["sub-old", "sub-1"]);
+    });
+    expect(useProfile.getState().push).toBeNull();
+    expect(result.current.state).toBe("idle");
+    expect(unsubscribe).toHaveBeenCalled();
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+  });
+
+  it("app open: a revoke before the browser answers stops the check without registering anything", async () => {
+    useProfile.getState().setPush({ serverId: "sub-old", endpoint: "https://push.example/send/old", siteId: CONFIG.siteId ?? "" });
+    const { platform, registration } = fakePlatform({ permission: "granted", existing: browserSubscription(ENDPOINT) });
+    let ready: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    registration.mockImplementation(async () => {
+      await gate;
+      return {
+        pushManager: {
+          subscribe: vi.fn(() => Promise.resolve(browserSubscription(ENDPOINT))),
+          getSubscription: vi.fn(() => Promise.resolve<SubscriptionLike | null>(browserSubscription(ENDPOINT))),
+        },
+      };
+    });
+    const { posts } = spyOnApi();
+
+    renderHook(() => usePush(CONFIG, platform));
+    await useProfile.getState().revoke();
+    await act(async () => {
+      ready();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(posts).toHaveLength(0);
+    expect(useProfile.getState().push).toBeNull();
+  });
+});
+
+describe("usePush: registrations the API has not confirmed deleting (ruling R32)", () => {
+  it("app open retries them, and the API's answer clears them", async () => {
+    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+    useProfile.getState().setPush({ serverId: "sub-1", endpoint: ENDPOINT, siteId: CONFIG.siteId ?? "" });
+    const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription() });
+    const { deletes } = spyOnApi();
+
+    renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(deletes).toEqual(["sub-owed"]);
+    });
+    await waitFor(() => {
+      expect(localStorage.getItem(PENDING_DELETE_KEY)).toBeNull();
+    });
+  });
+
+  it("a replaced registration the API does not confirm deleting is owed, and the new one is stored", async () => {
+    useProfile.getState().setPush({ serverId: "sub-old", endpoint: "https://push.example/send/old", siteId: CONFIG.siteId ?? "" });
+    const { platform } = fakePlatform({ permission: "granted", existing: browserSubscription(ENDPOINT) });
+    server.use(
+      http.post("*/api/v1/push/subscriptions", () => HttpResponse.json({ id: "sub-new" }, { status: 201 })),
+      http.delete("*/api/v1/push/subscriptions/:id", () => HttpResponse.json({ type: "about:blank", title: "Bad Gateway", status: 502 }, { status: 502 })),
+    );
+
+    renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(useProfile.getState().push?.serverId).toBe("sub-new");
+    });
+    await waitFor(() => {
+      expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-old"]));
+    });
+  });
+
+  it("app open keeps one the API still does not confirm", async () => {
+    localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(["sub-owed"]));
+    const { platform } = fakePlatform({ permission: "granted", existing: null });
+    const attempted = vi.fn();
+    server.use(
+      http.delete("*/api/v1/push/subscriptions/:id", () => {
+        attempted();
+        return HttpResponse.json({ type: "about:blank", title: "Bad Gateway", status: 502 }, { status: 502 });
+      }),
+    );
+
+    renderHook(() => usePush(CONFIG, platform));
+
+    await waitFor(() => {
+      expect(attempted).toHaveBeenCalledTimes(1);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(localStorage.getItem(PENDING_DELETE_KEY)).toBe(JSON.stringify(["sub-owed"]));
   });
 });

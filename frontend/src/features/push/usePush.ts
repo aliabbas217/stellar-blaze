@@ -5,6 +5,7 @@ import { ApiProblem, type Problem } from "@/api/problem";
 import { useProfile } from "@/features/profile/store";
 import { deleteSubscription, postSubscription } from "@/features/push/api";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
+import { deleteRegistration, rememberPendingDelete, retryPendingDeletes } from "@/features/push/pending-delete";
 import { subscribeToSiteAlerts, unsubscribe, type RegistrationLike, type SubscribeOutcome } from "@/features/push/subscribe";
 
 /*
@@ -105,17 +106,18 @@ function readyRegistration(platform: PushPlatform): Promise<RegistrationLike> {
 }
 
 /**
- * Asks the API to delete a registration this app no longer uses (its subscription was replaced or is gone). Resolves
- * true when the API no longer has it: deleted (the call is idempotent) or answered 4xx (it does not know it). Resolves
- * false when the answer is not known (offline, 5xx), so the caller can keep the id and try again.
+ * A browser subscription made while a revoke was running (the worker took their data back from another tab, or this
+ * one, between the tap and the API's answer) must not outlive it: drop it, and delete the API's registration, or owe
+ * the DELETE when the API cannot be reached. Best effort, and it never throws.
  */
-async function deleteUnusedRegistration(serverId: string): Promise<boolean> {
+async function undoAfterRevoke(registration: RegistrationLike, serverId: string | null): Promise<void> {
+  if (serverId !== null) rememberPendingDelete(serverId);
   try {
-    const result = await deleteSubscription(serverId);
-    return result.ok || (result.problem.status >= 400 && result.problem.status < 500);
+    await (await registration.pushManager.getSubscription())?.unsubscribe();
   } catch {
-    return false;
+    // The subscription stays; the next revoke, or the next app open, drops it.
   }
+  await retryPendingDeletes();
 }
 
 export function usePush(config: PushConfig, platform: PushPlatform = browserPlatform): UsePush {
@@ -132,17 +134,29 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
   // A second tap while one is running joins it instead of starting another.
   const busy = useRef(false);
 
+  /**
+   * Subscribes in the browser and registers with the API. `epoch` is the store's revoke count when the flow began: when it
+   * has moved by the time the API answers, the worker took their data back meanwhile (ruling R34), so nothing is stored,
+   * what was made is undone, and null is returned.
+   */
   const register = useCallback(
-    async (registration: RegistrationLike, key: string, site: string): Promise<SubscribeOutcome> => {
+    async (registration: RegistrationLike, key: string, site: string, epoch: number): Promise<SubscribeOutcome | null> => {
       const previous = useProfile.getState().push;
       const outcome = await subscribeToSiteAlerts({ registration, vapidPublicKey: key, siteId: site, crewId, post: postSubscription });
+      if (useProfile.getState().revokeEpoch !== epoch) {
+        await undoAfterRevoke(registration, outcome.serverId);
+        return null;
+      }
       setSubscription(outcome.subscription);
       if (outcome.serverId !== null) {
         setPush({ serverId: outcome.serverId, endpoint: outcome.subscription.endpoint, siteId: site });
         // The new registration replaces the one stored before (another site, or the browser's endpoint changed): delete
-        // the old one, or the API keeps pushing to an address this phone no longer uses. Best effort: if this call
-        // fails, the API's own pruning of dead endpoints (contract section 5) is what remains.
-        if (previous !== null && previous.serverId !== outcome.serverId) await deleteUnusedRegistration(previous.serverId);
+        // the old one, or the API keeps pushing to an address this phone no longer uses. If the API does not confirm it,
+        // the id is owed (pending-delete.ts) and retried on a later open; the API's own pruning of dead endpoints
+        // (contract section 5) is what remains after that.
+        if (previous !== null && previous.serverId !== outcome.serverId && !(await deleteRegistration(previous.serverId))) {
+          rememberPendingDelete(previous.serverId);
+        }
       }
       return outcome;
     },
@@ -155,8 +169,13 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
     if (permission !== "granted" || platform.capability() !== "supported") return;
 
     const abort = new AbortController();
+    // Read when the check begins: a revoke after this point means the worker took their data back, and what this check
+    // finds is no longer theirs to act on (ruling R34).
+    const epoch = useProfile.getState().revokeEpoch;
     // A function, so the check is read again after each await instead of being narrowed away.
-    const stale = () => abort.signal.aborted || busy.current;
+    const stale = () => abort.signal.aborted || busy.current || useProfile.getState().revokeEpoch !== epoch;
+    // Registrations an earlier revoke could not delete (ruling R32): the API is asked again each time the app opens.
+    void retryPendingDeletes();
     void (async () => {
       try {
         const registration = await readyRegistration(platform);
@@ -168,7 +187,7 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
         if (existing === null) {
           // The browser dropped the subscription: the API's registration is dead weight. Delete it before forgetting
           // its id; when the API cannot be reached the id stays, and the next app open tries again.
-          if (stored !== null && (await deleteUnusedRegistration(stored.serverId))) {
+          if (stored !== null && (await deleteRegistration(stored.serverId))) {
             // Unless a tap on Enable registered a new one while the delete was running.
             if (useProfile.getState().push?.serverId === stored.serverId) setPush(null);
           }
@@ -182,8 +201,9 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
         }
         if (vapidPublicKey === null || siteId === null) return;
 
-        const outcome = await register(registration, vapidPublicKey, siteId);
-        if (abort.signal.aborted) return;
+        const outcome = await register(registration, vapidPublicKey, siteId, epoch);
+        // Null: a revoke overtook the registration and it was undone. The screen is idle, as the revoke left it.
+        if (outcome === null || abort.signal.aborted) return;
         if (outcome.serverId === null) {
           setProblem(outcome.problem);
           setFailure("enable");
@@ -213,6 +233,8 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
         return;
       }
       setState("requesting");
+      // The revoke count at the tap (ruling R34); read here, and the prompt below still comes first with no await before it.
+      const epoch = useProfile.getState().revokeEpoch;
       // First, with no await before it: browsers (iOS above all) only show the permission prompt inside the tap.
       const answer = await platform.requestPermission();
       if (answer === "denied") {
@@ -223,7 +245,17 @@ export function usePush(config: PushConfig, platform: PushPlatform = browserPlat
         setState("idle");
         return;
       }
-      const outcome = await register(await readyRegistration(platform), vapidPublicKey, siteId);
+      // The worker took their data back while the prompt was open (another tab): that tap is not theirs any more.
+      if (useProfile.getState().revokeEpoch !== epoch) {
+        setState("idle");
+        return;
+      }
+      const outcome = await register(await readyRegistration(platform), vapidPublicKey, siteId, epoch);
+      if (outcome === null) {
+        setSubscription(null);
+        setState("idle");
+        return;
+      }
       if (outcome.serverId === null) {
         setProblem(outcome.problem);
         setFailure("enable");

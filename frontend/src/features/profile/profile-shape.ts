@@ -63,9 +63,12 @@ export function localCalendarDate(now: Date): string {
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
-/** An ISO 8601 date and time with a zone ("Z" or an offset), such as `new Date().toISOString()` gives. */
+/**
+ * An ISO 8601 date and time with a zone ("Z" or an offset), such as `new Date().toISOString()` gives. The date part is
+ * checked as a calendar date because `Date.parse` accepts "2026-02-30" and rolls it to March.
+ */
 export function isIsoTimestamp(value: string): boolean {
-  return ISO_TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
+  return ISO_TIMESTAMP.test(value) && isCalendarDate(value.slice(0, 10)) && !Number.isNaN(Date.parse(value));
 }
 
 /**

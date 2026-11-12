@@ -120,7 +120,17 @@ describe("ProfileSchema", () => {
     expect(issues({ ...valid, consentVersion: "2026-01-01" })).toEqual([{ path: "consentVersion", message: "required" }]);
   });
 
-  it.each(["", "yesterday", "2026-11-11", "2026-11-11 08:30:00", "2026-13-11T08:30:00Z", "2026-11-11T25:00:00Z"])(
+  it.each([
+    "",
+    "yesterday",
+    "2026-11-11",
+    "2026-11-11 08:30:00",
+    "2026-13-11T08:30:00Z",
+    "2026-11-11T25:00:00Z",
+    // V8's Date.parse accepts a 30 February and rolls it to March: the date part is checked as a calendar date.
+    "2026-02-30T08:30:00Z",
+    "2026-04-31T08:30:00Z",
+  ])(
     "rejects %j as the moment of consent",
     (consentedAt) => {
       expect(issues({ ...valid, consentedAt })).toEqual([{ path: "consentedAt", message: "required" }]);
@@ -162,6 +172,7 @@ describe("toProfile (what the store trusts from storage) agrees with ProfileSche
     ["a consent time that is not ISO 8601", { ...valid, consentedAt: "yesterday" }],
     ["an empty consent time", { ...valid, consentedAt: "" }],
     ["a consent time with an offset", { ...valid, consentedAt: "2026-11-11T12:30:00+04:00" }],
+    ["a consent time on an impossible day", { ...valid, consentedAt: "2026-02-30T08:30:00Z" }],
     ["an impossible start date", { ...valid, heatWorkStartDate: "2026-02-30" }],
     ["a start date in another format", { ...valid, heatWorkStartDate: "11/11/2026" }],
     ["an empty start date", { ...valid, heatWorkStartDate: "" }],
