@@ -29,15 +29,37 @@ type specimen is at `/en/dev/specimen` (any language prefix works; it returns 40
 | `pnpm lint` | `next typegen`, then ESLint with zero warnings allowed |
 | `pnpm typecheck` | `next typegen`, then `tsc --noEmit` |
 | `pnpm test` | Vitest unit tests (`tests/unit`) |
-| `pnpm e2e` | Playwright (`tests/e2e`: PWA, Alerts, data removal, axe) in `mobile-chromium` and `desktop-chromium`, against the production build. Run `pnpm build` first and `pnpm exec playwright install chromium` once. It starts and stops the mock API and the standalone server itself (`playwright.config.ts`), so ports 3000 and 4010 must be free. One worker, because the push tests share the OS notification centre |
+| `pnpm e2e` | Playwright (`tests/e2e`: PWA, Alerts, data removal, security headers, axe) in `mobile-chromium` and `desktop-chromium`, against the production build. Run `pnpm build` first and `pnpm exec playwright install chromium` once. It starts and stops the mock API and the standalone server itself (`playwright.config.ts`), so ports 3000 and 4010 must be free. One worker, because the push tests share the OS notification centre |
 | `pnpm exec lhci autorun` | Lighthouse CI (`lighthouserc.json`): `/en/worker` and `/en/worker/alerts`, 3 mobile runs each, against the performance, accessibility, LCP, CLS, TBT and 170 KB script budgets. Run `pnpm build` first; it starts and stops the same stack through `scripts/serve-stack.mjs`. Reports go to `.lighthouseci/` |
 | `pnpm design:lint` | Lints `../DESIGN.md`; any warning fails |
 | `pnpm api:gen` | Regenerates `src/api/schema.d.ts` from `openapi/stellar-blaze.mock.openapi.json` |
 | `pnpm api:check` | `api:gen`, then fails if `schema.d.ts` differs from the committed file (it needs the file to be tracked: an untracked one passes) |
 | `pnpm mock:api` | The MSW handlers behind <http://127.0.0.1:4010> (the mock API; used by e2e and Lighthouse CI). Ctrl+C stops it |
 
+## Runtime configuration
+
+One image serves every environment, so what differs between them is the container's environment, which the server
+reads while it runs. None of it is `NEXT_PUBLIC_*`: Next.js inlines those at `next build` and would freeze them into the
+image (ADR 0009). These variables are wiring only; tunable values (bands, lead times, live flags) come from the API
+(ADR 0010).
+
+| Variable | Read by | What it is |
+|---|---|---|
+| `API_ORIGIN` | the BFF proxy (`src/app/api/v1/[...path]/route.ts`), `serverApiClient()` (`src/api/server-client.ts`) | The backend API's origin, for example `http://api:8000`. Required: unset, the proxy answers 502 `application/problem+json` and `serverApiClient()` throws. The browser never calls it; it calls same-origin `/api/v1/*` |
+| `VAPID_PUBLIC_KEY` | the Alerts page (`src/app/[locale]/(worker)/worker/alerts/page.tsx`) | The Web Push application server key, public half only, base64url. Unset, the page logs an error and cannot turn alerts on; the rest of the app is unaffected |
+| `APP_VERSION` | `GET /api/healthz` (returns it as `version`, `dev` when unset) | The release id, which the Dockerfile takes as `ARG APP_VERSION` and sets in the runtime stage. The build also uses it, when set, as the revision of the offline pages the service worker precaches (`src/app/serwist/[path]/route.ts`); unset, each build gets a random one |
+| `PORT`, `HOSTNAME` | the standalone server (`server.js`) | Where it listens. The Dockerfile sets `3000` and `0.0.0.0` |
+
+The deployment sets `API_ORIGIN`, `VAPID_PUBLIC_KEY` and `APP_VERSION` on the `web` container app and gates a release
+on `GET /api/healthz`, which answers on port 3000 and is never under the proxied `/api/v1`.
+
 ## Where things live
 
+- `next.config.ts`: the security headers of every response except the hashed build output (CSP, `Referrer-Policy`,
+  `X-Content-Type-Options`, `Permissions-Policy`); `tests/e2e/headers.spec.ts` pins the exact values. The CSP allows
+  only the same origin, plus inline scripts and styles until nonces are wired (parked, trigger "before any pilot"), so a
+  new third-party script, font host, image host or API origin needs a change there first. `next dev` adds
+  `'unsafe-eval'` to `script-src`, as the Next.js CSP guide requires; a production build never has it.
 - `messages/*.json`: every user-visible string. `en` is the source; the other five are machine drafts
   (`_meta.review_status`) and show a "Draft translation" badge. A unit test keeps all six in step (same keys,
   same placeholders, Western digits only).
