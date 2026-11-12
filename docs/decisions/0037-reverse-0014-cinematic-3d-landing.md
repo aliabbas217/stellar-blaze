@@ -39,3 +39,6 @@ The landing fails the budget in CI twice after optimisation; or a user test show
 
 ## Links
 [ADR 0014](0014-cut-3d-site-heat-view.md) · [ADR 0013](0013-cut-landsat-site-heat-layer.md) · [ADR 0003](0003-frontend-single-nextjs-app-pwa.md) · [ADR 0005](0005-data-truth-features-and-validation.md) · [ADR 0034](0034-demo-strategy.md)
+
+## Amendments
+- **2026-11-12 (treatment picked, decision unchanged):** Ali picked the dark v2-final direction "Qaylula" (A Isotherm + C Watch, B's story; `stellar-blaze-f1/docs/design/v2/DESIGN.md`). The prototype landing renders the IFS WBGT terrain with **plain WebGL2 in a worker on an OffscreenCanvas** (`docs/design/v2/prototype/assets/terrain-worker.js`, main-thread fallback kept), not three.js, which removes the three.js download. Lighthouse 13.5.0 mobile, median of 3 runs on a loaded dev machine: **performance 93 with WebGL and 93 on `?fallback`**, accessibility 100, LCP 3.1 s / 3.0 s (at the §3 limit; most of it is Google Fonts, fixed by self-hosting via `next/font`), TBT 40 / 110 ms (`docs/design/v2/gate/lh-final-*.json`). The production port (plain WebGL module vs R3F) is F2's call against the §3 budget; the measured prototype shows the plain-WebGL path fits it.
