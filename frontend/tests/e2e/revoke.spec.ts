@@ -4,7 +4,7 @@ import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 
 /*
  * Taking a worker's data back ("Remove my data from this phone" on Alerts, rulings R7, R25, R31 to R33), against a
- * production build (`pnpm build && pnpm start`, API_ORIGIN pointing at `pnpm mock:api`, SB_MOCK_SCENARIOS=1; see pwa.spec.ts).
+ * production build (`pnpm build && pnpm e2e`; playwright.config.ts starts the mock API and the standalone server, see pwa.spec.ts).
  * It runs with the real service worker active and controlling the page, because that is the case that matters: Serwist's
  * worker holds its IndexedDB connection open, so a deleteDatabase from the page would be blocked until the browser stops
  * the worker. Clearing the rows completes anyway, and these tests read the browser to prove it.

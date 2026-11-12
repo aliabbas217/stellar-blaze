@@ -6,14 +6,14 @@ import ur from "../../messages/ur.json";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 
 /*
- * The Alerts screen and the service worker's push handling, against a production build (`pnpm build && pnpm start`,
- * API_ORIGIN pointing at `pnpm mock:api`, VAPID_PUBLIC_KEY set to a valid base64url P-256 public key, for example one
- * from `pnpm exec web-push generate-vapid-keys`: the page decodes it before it calls the stubbed subscribe, so an arbitrary
- * string fails the subscribe tests). There is no real push service in CI: the
+ * The Alerts screen and the service worker's push handling, against the production build (`pnpm build && pnpm e2e`:
+ * playwright.config.ts starts the mock API and the standalone server itself, with a generated VAPID_PUBLIC_KEY that is a
+ * valid base64url P-256 public key: the page decodes it before it calls the stubbed subscribe, so an arbitrary string
+ * would fail the subscribe tests). There is no real push service in CI: the
  * browser's push calls are stubbed in the page (`addInitScript`), the API is the mock one, and a push is delivered to
  * the real service worker through the DevTools protocol.
  *
- * The server must be started with SB_MOCK_SCENARIOS=1 (see pwa.spec.ts) for the failing-API test.
+ * The harness starts the server with SB_MOCK_SCENARIOS=1 (see pwa.spec.ts), which the failing-API test needs.
  */
 
 // Playwright's default headless build (chromium-headless-shell) answers "denied" to every notification permission,

@@ -25,13 +25,16 @@ type specimen is at `/en/dev/specimen` (any language prefix works; it returns 40
 | `pnpm dev` | Next.js dev server |
 | `pnpm build` | Production build (`output: "standalone"`) |
 | `pnpm start` | `next start`. It warns because the build is standalone; the Docker image runs `node server.js` |
+| `pnpm start:standalone` | Runs the standalone build as the Docker image does (`node .next/standalone/server.js`, with `public/` and `.next/static` copied in). Needs `pnpm build` first; configured by `PORT`, `HOSTNAME`, `API_ORIGIN`, `VAPID_PUBLIC_KEY` |
 | `pnpm lint` | `next typegen`, then ESLint with zero warnings allowed |
 | `pnpm typecheck` | `next typegen`, then `tsc --noEmit` |
 | `pnpm test` | Vitest unit tests (`tests/unit`) |
+| `pnpm e2e` | Playwright (`tests/e2e`: PWA, Alerts, data removal, axe) in `mobile-chromium` and `desktop-chromium`, against the production build. Run `pnpm build` first and `pnpm exec playwright install chromium` once. It starts and stops the mock API and the standalone server itself (`playwright.config.ts`), so ports 3000 and 4010 must be free. One worker, because the push tests share the OS notification centre |
+| `pnpm exec lhci autorun` | Lighthouse CI (`lighthouserc.json`): `/en/worker` and `/en/worker/alerts`, 3 mobile runs each, against the performance, accessibility, LCP, CLS, TBT and 170 KB script budgets. Run `pnpm build` first; it starts and stops the same stack through `scripts/serve-stack.mjs`. Reports go to `.lighthouseci/` |
 | `pnpm design:lint` | Lints `../DESIGN.md`; any warning fails |
 | `pnpm api:gen` | Regenerates `src/api/schema.d.ts` from `openapi/stellar-blaze.mock.openapi.json` |
 | `pnpm api:check` | `api:gen`, then fails if `schema.d.ts` differs from the committed file (it needs the file to be tracked: an untracked one passes) |
-| `pnpm mock:api` | The MSW handlers behind <http://localhost:4010> (the mock API; used by e2e). Ctrl+C stops it |
+| `pnpm mock:api` | The MSW handlers behind <http://127.0.0.1:4010> (the mock API; used by e2e and Lighthouse CI). Ctrl+C stops it |
 
 ## Where things live
 

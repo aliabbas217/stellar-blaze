@@ -2,6 +2,10 @@
 // server" command (Lighthouse CI: lighthouserc.json). Playwright starts the same two servers itself, as the two
 // entries of `webServer` in playwright.config.ts, and keeps the wiring below in step with it.
 //
+// It deliberately leaves out SB_MOCK_SCENARIOS, which playwright.config.ts sets: that variable makes a production
+// build forward the `x-sb-mock-scenario` header that fails the API on purpose, and Lighthouse should measure the
+// behaviour users get, with no such hook in the server.
+//
 // One process, so that stopping it stops both servers on every platform (a shell-spawned pnpm leaves its children running on Windows).
 // Usage: pnpm build && node scripts/serve-stack.mjs
 import { createECDH } from "node:crypto";

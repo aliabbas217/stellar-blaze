@@ -3,13 +3,13 @@ import ur from "../../messages/ur.json";
 import { FIXTURE_DATE, SITE_DEMO, SITE_EMPTY } from "../../src/mocks/fixtures.ts";
 
 /*
- * The installable-app contract, against a production build (`pnpm build && pnpm start`, API_ORIGIN pointing at
- * `pnpm mock:api`): the service worker controls the worker route, an offline Urdu worker lands on the Urdu
- * offline page, each locale's manifest is shaped for installation, and the forecast and the risk policy outlive
- * the connection. The service worker is built only by `next build`; `next dev` does not precache.
+ * The installable-app contract, against the production build (`pnpm build && pnpm e2e`: playwright.config.ts starts the
+ * mock API and the standalone server itself): the service worker controls the worker route, an offline Urdu worker
+ * lands on the Urdu offline page, each locale's manifest is shaped for installation, and the forecast and the risk
+ * policy outlive the connection. The service worker is built only by `next build`; `next dev` does not precache.
  *
- * The server must be started with SB_MOCK_SCENARIOS=1: a production build only forwards the `x-sb-mock-scenario`
- * header (used to make the API fail on purpose) when it is set. Task 12's webServer sets it.
+ * The harness starts the server with SB_MOCK_SCENARIOS=1: a production build only forwards the `x-sb-mock-scenario`
+ * header (used to make the API fail on purpose) when it is set.
  */
 
 // The worker registers after hydration and activates once the precache is filled.
