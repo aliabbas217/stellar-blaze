@@ -11,7 +11,8 @@ concurrency:
 jobs:
   frontend:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Raised from 15 for the browser install, e2e (35 s on a laptop) and Lighthouse (77 s, plus a cold `pnpm dlx` of about 50 s).
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: frontend
@@ -33,3 +34,21 @@ jobs:
       - run: pnpm api:check
       - run: pnpm test
       - run: pnpm build
+      # The full Chromium (not the headless shell): the push tests need a browser that honours a notification permission grant.
+      - run: pnpm exec playwright install --with-deps chromium
+      # Starts the mock API and the standalone production server itself (webServer in playwright.config.ts).
+      - run: pnpm e2e
+      - run: pnpm design:lint
+      # Starts the same stack (scripts/serve-stack.mjs), then audits /en/worker and /en/worker/alerts against the budgets in lighthouserc.json.
+      - run: pnpm dlx @lhci/cli@0.16.0 autorun
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: frontend-reports
+          # .lighthouseci is a hidden folder: it is only uploaded with include-hidden-files.
+          path: |
+            frontend/playwright-report/
+            frontend/.lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7

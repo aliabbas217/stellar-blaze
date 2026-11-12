@@ -3,6 +3,7 @@ node_modules
 out
 coverage
 playwright-report
+.lighthouseci
 test-results
 tests
 *.tsbuildinfo

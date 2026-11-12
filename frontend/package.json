@@ -11,9 +11,11 @@
     "prebuild": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-sw-strings.ts",
     "build": "next build",
     "start": "next start",
+    "start:standalone": "node scripts/start-standalone.mjs",
     "lint": "next typegen && eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "e2e": "playwright test",
     "design:lint": "node scripts/design-lint.mjs",
     "api:gen": "openapi-typescript openapi/stellar-blaze.mock.openapi.json -o src/api/schema.d.ts",
     "api:check": "pnpm api:gen && git diff --exit-code src/api/schema.d.ts",
@@ -37,6 +39,7 @@
     "zustand": "5.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@google/design.md": "0.4.0",
     "@msw/serve": "0.11.0",
     "@playwright/test": "1.65.0",
