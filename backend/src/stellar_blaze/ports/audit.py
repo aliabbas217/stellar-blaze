@@ -3,22 +3,23 @@
 Every row stores ``prev_hash`` (the previous row's ``row_hash``; 64 zeros for the first) and
 ``row_hash = sha256(prev_hash + canonical_json(payload))``. The payload is the row without ``id``, ``prev_hash`` and
 ``row_hash``; it includes ``epoch_id`` (architect ruling R-P: the chain itself records which epoch an event belonged
-to; ``null`` for events that have none). Both stores (Postgres, the in-memory fake) call ``row_hash_of`` so the
-formula exists once.
+to; ``null`` for events that have none). The arithmetic lives in ``domain.audit`` (pure); ``row_hash_of`` applies it
+to an ``AuditEvent`` at append time. Verification never builds an ``AuditEvent``: it hashes the raw stored values.
 
 ``detail`` holds rule ids, codes and counts, never a person: a key that looks like a member field is refused
 (``MEMBER_LIKE``, the regex of the API contract test), and floats are refused so that the JSON a row hashes is the JSON
 Postgres ``jsonb`` gives back (``jsonb`` is ``numeric``: ``1e22`` would come back as an integer and break the chain).
 """
 
-import hashlib
-import json
 import re
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Final, Literal, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, JsonValue, field_validator
+
+from stellar_blaze.domain.audit import hash_row
 
 # The one list of audit kinds (supplement section 2). `config.auth_failed` has no source until an HTTP admin route
 # exists (ADR 0052), so it is not listed.
@@ -42,7 +43,6 @@ type AuditKind = Literal[
 # Same pattern as `tests/unit/api/test_openapi_v1_contract.py::MEMBER_LIKE` (Task 0): no per-member name in a log row.
 MEMBER_LIKE: Final = re.compile(r"(worker|member|employee|heart|symptom|acclimat|juvenile)", re.IGNORECASE)
 
-ZERO_HASH: Final = "0" * 64
 AUDIT_LOCK_KEY: Final = 0x5B_A0D1
 """``pg_advisory_xact_lock`` key that serialises appends so the chain has one writer at a time."""
 
@@ -100,51 +100,24 @@ class AuditRecord(AuditEvent):
     row_hash: str
 
 
-def format_instant(at: datetime) -> str:
-    """The one text form of an instant inside the hashed payload: UTC, microseconds, ``Z``."""
-    return at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def canonical_payload(event: AuditEvent, at: datetime) -> str:
-    """The canonical JSON a row hash covers: sorted keys, compact separators, ASCII."""
-    payload: dict[str, JsonValue] = {
-        "at": format_instant(at),
-        "kind": event.kind,
-        "actor": event.actor,
-        "actor_role": event.actor_role,
-        "employer_id": event.employer_id,
-        "site_id": event.site_id,
-        "epoch_id": event.epoch_id,
-        "outcome": event.outcome,
-        "detail": dict(event.detail),
-        "ruleset_id": event.ruleset_id,
-        "ruleset_sha256": event.ruleset_sha256,
-        "model_id": event.model_id,
-        "config_version_id": event.config_version_id,
-        "config_sha256": event.config_sha256,
-    }
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
-
-
 def row_hash_of(prev_hash: str, event: AuditEvent, at: datetime) -> str:
-    """``sha256(prev_hash + canonical_json(payload))`` as lower-case hex."""
-    return hashlib.sha256((prev_hash + canonical_payload(event, at)).encode()).hexdigest()
+    """``sha256(prev_hash + canonical_json(payload))`` of ``event`` appended at ``at`` after ``prev_hash``."""
+    return hash_row(prev_hash, at, event.model_dump())
 
 
-def link_holds(record: AuditRecord, previous_hash: str) -> bool:
-    """Whether ``record`` links to ``previous_hash`` and its ``row_hash`` is the hash of its own content."""
-    event = AuditEvent.model_validate(record.model_dump(exclude={"id", "at", "prev_hash", "row_hash"}))
-    return record.prev_hash == previous_hash and record.row_hash == row_hash_of(previous_hash, event, record.at)
+@dataclass(frozen=True)
+class ChainReport:
+    """The outcome of walking the whole chain on one snapshot.
 
+    ``broken_id`` is the first broken row or ``None``. When it is ``None``, ``rows`` is the row count, ``head_id`` the
+    id of the newest row (``None`` when empty) and ``head`` its ``row_hash`` (``ZERO_HASH`` when empty): the value to
+    record outside the database, because deleting the newest rows leaves a shorter, still consistent chain.
+    """
 
-def first_broken(records: Sequence[AuditRecord]) -> int | None:
-    """The id of the first row (in the given, ascending order) whose hash or link does not hold; ``None`` if intact."""
-    previous = ZERO_HASH
-    for record in records:
-        if not link_holds(record, previous):
-            return record.id
-        previous = record.row_hash
-    return None
+    broken_id: int | None
+    rows: int
+    head_id: int | None
+    head: str
 
 
 class AuditLog(Protocol):
@@ -165,5 +138,12 @@ class AuditLog(Protocol):
         ...
 
     async def verify(self) -> int | None:
-        """Recompute the whole chain: the id of the first broken row, or ``None`` when it is intact."""
+        """Recompute the whole chain: the id of the first broken row, or ``None`` when it is intact.
+
+        Never raises for a tampered row: it hashes the raw stored values.
+        """
+        ...
+
+    async def chain_report(self) -> ChainReport:
+        """Like ``verify``, and also the row count and the head to anchor outside the database (review I3)."""
         ...

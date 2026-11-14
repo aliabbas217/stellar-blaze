@@ -10,7 +10,8 @@ import pytest
 from pydantic import ValidationError
 
 from stellar_blaze.adapters.fakes.audit import InMemoryAuditLog
-from stellar_blaze.ports.audit import ZERO_HASH, AuditEvent, AuditRecord, row_hash_of
+from stellar_blaze.domain.audit import ZERO_HASH
+from stellar_blaze.ports.audit import AuditEvent, AuditRecord, ChainReport, row_hash_of
 from tests.unit.contract.audit_contract import CHECKS, event
 from tests.unit.contract.b3_world import fake_world
 
@@ -70,6 +71,46 @@ async def test_verify_names_the_first_row_that_was_edited(field: str) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tampered",
+    [
+        {"kind": "made.up"},  # a kind AuditEvent refuses
+        {"detail": {"worker_ref": "w-1"}},  # a member-like key AuditEvent refuses
+        {"detail": {"lat": 24.36}},  # a float AuditEvent refuses
+        {"detail": {"rule": "ADR 0004; PDPL purpose limitation", "tag": float("nan")}},
+    ],
+)
+async def test_verify_names_a_row_edited_to_a_value_validation_refuses_and_never_raises(
+    tampered: dict[str, Any],
+) -> None:
+    log = InMemoryAuditLog()
+    for i in range(3):
+        await log.append(event(epoch_id=1, tag=str(i)))
+
+    log.records[1] = log.records[1].model_copy(update=tampered)  # model_copy does not validate
+
+    assert await log.verify() == 2
+    assert (await log.chain_report()).broken_id == 2
+
+
+@pytest.mark.asyncio
+async def test_the_chain_report_gives_the_head_that_a_truncation_changes() -> None:
+    log = InMemoryAuditLog()
+    assert await log.chain_report() == ChainReport(None, 0, None, ZERO_HASH)
+    for i in range(3):
+        await log.append(event(epoch_id=1, tag=str(i)))
+    full = await log.chain_report()
+
+    del log.records[2:]  # tail truncation: the shorter chain is still internally consistent ...
+    shorter = await log.chain_report()
+
+    assert (full.broken_id, full.rows, full.head_id) == (None, 3, 3)
+    assert shorter.broken_id is None  # ... so only the anchored head and count betray it
+    assert (shorter.rows, shorter.head_id) == (2, 2)
+    assert shorter.head != full.head
+
+
+@pytest.mark.asyncio
 async def test_verify_notices_a_deleted_and_a_reordered_row() -> None:
     log = InMemoryAuditLog()
     for i in range(4):
@@ -109,6 +150,17 @@ def test_the_hash_is_the_sha256_of_prev_hash_and_the_canonical_row() -> None:
         separators=(",", ":"),
     )
     assert row_hash_of(ZERO_HASH, e, at) == hashlib.sha256((ZERO_HASH + payload).encode()).hexdigest()
+
+
+def test_the_hash_covers_the_epoch_id_and_nothing_else_differs() -> None:
+    at = datetime(2026, 11, 15, 8, 30, tzinfo=UTC)  # the same instant, the same predecessor, the same everything ...
+    in_epoch_1 = event(epoch_id=1)
+    in_epoch_2 = event(epoch_id=2)
+    assert in_epoch_1.model_copy(update={"epoch_id": 2}) == in_epoch_2
+
+    # ... but the epoch id: the two rows must still hash differently (architect ruling R-P).
+    assert row_hash_of(ZERO_HASH, in_epoch_1, at) != row_hash_of(ZERO_HASH, in_epoch_2, at)
+    assert row_hash_of(ZERO_HASH, in_epoch_1, at) == row_hash_of(ZERO_HASH, event(epoch_id=1), at)  # deterministic
 
 
 @pytest.mark.parametrize(

@@ -4,7 +4,8 @@ import asyncio
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
-from stellar_blaze.ports.audit import ZERO_HASH, AuditEvent, AuditKind, AuditRecord, first_broken, row_hash_of
+from stellar_blaze.domain.audit import HASHED_FIELDS, ZERO_HASH, link_holds
+from stellar_blaze.ports.audit import AuditEvent, AuditKind, AuditRecord, ChainReport, row_hash_of
 
 
 class InMemoryAuditLog:
@@ -38,4 +39,14 @@ class InMemoryAuditLog:
         return list(reversed(wanted))[:limit]
 
     async def verify(self) -> int | None:
-        return first_broken(self.records)
+        return (await self.chain_report()).broken_id
+
+    async def chain_report(self) -> ChainReport:
+        previous = ZERO_HASH
+        for record in self.records:
+            # Raw attribute values, not a validated model: a tampered record may hold what validation refuses.
+            raw = {name: getattr(record, name) for name in (*HASHED_FIELDS, "at", "prev_hash", "row_hash")}
+            if not link_holds(raw, previous):
+                return ChainReport(record.id, 0, None, ZERO_HASH)
+            previous = record.row_hash
+        return ChainReport(None, len(self.records), self.records[-1].id if self.records else None, previous)

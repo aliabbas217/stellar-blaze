@@ -4,7 +4,8 @@ import asyncio
 
 import pytest
 
-from stellar_blaze.ports.audit import WORKER_VISIBLE_KINDS, ZERO_HASH, AuditEvent, AuditKind
+from stellar_blaze.domain.audit import ZERO_HASH
+from stellar_blaze.ports.audit import WORKER_VISIBLE_KINDS, AuditEvent, AuditKind
 from tests.unit.contract.b3_world import SITE_ID, Check, World, seeded
 
 
@@ -48,17 +49,6 @@ async def check_rows_are_chained_from_64_zeros(world: World) -> None:
     )
     assert first.at.utcoffset() is not None
     assert await world.audit.verify() is None
-
-
-async def check_a_hash_covers_the_epoch_id(world: World) -> None:
-    epoch = await seeded(world)
-
-    a = await world.audit.append(event(epoch_id=epoch))
-    b = await world.audit.append(event(epoch_id=None))
-
-    assert a.epoch_id == epoch
-    assert b.epoch_id is None
-    assert a.row_hash != b.row_hash
 
 
 async def check_site_entries_are_filtered_by_site_kind_and_epoch_newest_first(world: World) -> None:

@@ -1,5 +1,6 @@
 """Serving wiring in the composition root: the corrector of the active model, and the replay default date setting."""
 
+import threading
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,33 @@ def test_a_model_is_loaded_once_and_reused(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert first is second
     assert loaded == [model.manifest.model_id]
+
+
+@pytest.mark.asyncio
+async def test_warm_loads_the_model_in_a_worker_thread_so_a_later_request_loads_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loaded_in: list[int] = []
+
+    class Loaded:
+        model_id = "corrector-20261101-abcdef1-123456"
+        needs_history_forecasts = False
+
+    def fake_load(model: LoadedModel) -> Loaded:
+        loaded_in.append(threading.get_ident())
+        return Loaded()
+
+    monkeypatch.setattr("stellar_blaze.composition.LightGbmCorrector.load", fake_load)
+    model = _model("corrector-20261101-abcdef1-123456")
+    provider = CorrectorProvider()
+
+    await provider.warm(snapshot(model))
+    later = provider.for_snapshot(snapshot(model))  # what a request does: no second load
+
+    assert len(loaded_in) == 1
+    assert loaded_in[0] != threading.get_ident()  # offloaded, not run on the event loop's thread
+    assert isinstance(later, Loaded)
+    await provider.warm(snapshot(None))  # no model: nothing to load, no error
 
 
 def _model(model_id: str) -> LoadedModel:

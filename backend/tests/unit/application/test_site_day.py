@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime, timedelta
 
+import httpx2
+import polars as pl
 import pytest
 
 from stellar_blaze.adapters.fakes.corrector import FakeCorrector
@@ -152,6 +154,30 @@ async def test_a_failing_forecast_source_is_a_fallback_not_an_error() -> None:
     assert all(day.zones.fallback)
     assert [hour.level for hour in day.hours] == [None] * 14
     assert day.generated_at == now
+
+
+@pytest.mark.parametrize("error", [TypeError("a bug"), AttributeError("a bug"), RuntimeError("a bug")])
+async def test_a_programming_error_in_the_forecast_path_propagates(error: Exception) -> None:
+    class Buggy:
+        async def previous_runs(self, **_: object) -> pl.DataFrame:
+            raise error
+
+    with pytest.raises(type(error), match="a bug"):
+        await make_site_day(Buggy(), mode="live", now=datetime(2026, 7, 1, 1, tzinfo=UTC))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "error", [httpx2.ConnectError("down"), TimeoutError("slow"), ValueError("malformed"), KeyError("row")]
+)
+async def test_upstream_and_data_errors_are_a_labelled_fallback(error: Exception) -> None:
+    class Down:
+        async def previous_runs(self, **_: object) -> pl.DataFrame:
+            raise error
+
+    day = await make_site_day(Down(), mode="live", now=datetime(2026, 7, 1, 1, tzinfo=UTC))  # type: ignore[arg-type]
+
+    assert day.forecast_status == "fallback"
+    assert set(day.zones.zones) == {Zone.HIGH}
 
 
 async def test_replay_never_stale() -> None:

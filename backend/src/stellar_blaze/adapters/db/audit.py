@@ -14,15 +14,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from stellar_blaze.adapters.db.tables import AuditEvent as AuditEventRow
-from stellar_blaze.ports.audit import (
-    AUDIT_LOCK_KEY,
-    ZERO_HASH,
-    AuditEvent,
-    AuditKind,
-    AuditRecord,
-    link_holds,
-    row_hash_of,
-)
+from stellar_blaze.domain.audit import ZERO_HASH, link_holds
+from stellar_blaze.ports.audit import AUDIT_LOCK_KEY, AuditEvent, AuditKind, AuditRecord, ChainReport, row_hash_of
 
 _COLUMNS = (
     AuditEventRow.id,
@@ -54,9 +47,19 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-async def append_in(connection: AsyncConnection, event: AuditEvent, at: datetime) -> AuditRecord:
-    """Append ``event`` to the chain inside ``connection``'s open transaction and return the stored row."""
+async def append_in(connection: AsyncConnection, event: AuditEvent, clock: Callable[[], datetime]) -> AuditRecord:
+    """Append ``event`` to the chain inside ``connection``'s open transaction and return the stored row.
+
+    ``clock`` is read AFTER the advisory lock is held, so ``at`` is monotonic with ``id`` (two writers cannot take
+    their instants before the lock and append them in the other order).
+
+    Raises:
+        ValueError: ``clock`` returned a naive datetime.
+    """
     await connection.execute(select(func.pg_advisory_xact_lock(AUDIT_LOCK_KEY)))
+    at = clock()
+    if at.tzinfo is None or at.utcoffset() is None:
+        raise ValueError("the audit clock must return a timezone-aware datetime")
     tail = (
         await connection.execute(select(AuditEventRow.row_hash).order_by(AuditEventRow.id.desc()).limit(1))
     ).scalar_one_or_none()
@@ -83,7 +86,7 @@ class PostgresAuditLog:
 
     async def append(self, event: AuditEvent) -> AuditRecord:
         async with self._engine.begin() as connection:
-            return await append_in(connection, event, self._clock())
+            return await append_in(connection, event, self._clock)
 
     async def site_entries(
         self, site_id: str, kinds: Sequence[AuditKind], limit: int, epoch_id: int
@@ -100,8 +103,12 @@ class PostgresAuditLog:
             return [_record(row) for row in (await connection.execute(statement)).mappings()]
 
     async def verify(self) -> int | None:
-        """Walk the chain in id order, in batches, on one snapshot; the id of the first broken row, else ``None``."""
-        previous, last_id = ZERO_HASH, 0
+        return (await self.chain_report()).broken_id
+
+    async def chain_report(self) -> ChainReport:
+        """Walk the chain in id order, in batches, on one snapshot, hashing the raw stored values (never a validated
+        ``AuditEvent``, so a tampered kind, key or float names its row instead of raising)."""
+        previous, last_id, rows = ZERO_HASH, 0, 0
         async with self._engine.connect() as connection:
             snapshot = await connection.execution_options(isolation_level="REPEATABLE READ")
             while True:
@@ -118,10 +125,10 @@ class PostgresAuditLog:
                     .all()
                 )
                 if not batch:
-                    return None
+                    return ChainReport(None, rows, last_id or None, previous)
                 for row in batch:
-                    record = _record(row)
-                    if not link_holds(record, previous):
-                        return record.id
-                    previous, last_id = record.row_hash, record.id
+                    raw = dict(row)
+                    if not link_holds(raw, previous):
+                        return ChainReport(int(raw["id"]), rows, None, ZERO_HASH)
+                    previous, last_id, rows = str(raw["row_hash"]), int(raw["id"]), rows + 1
                 await asyncio.sleep(0)

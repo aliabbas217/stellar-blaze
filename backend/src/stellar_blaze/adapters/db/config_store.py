@@ -124,7 +124,7 @@ class PostgresConfigStore:
                     config_version_id=row["id"],
                     config_sha256=sha256,
                 )
-                await append_in(connection, event, self._clock())
+                await append_in(connection, event, self._clock)
         return _version(row)
 
     async def activate(
@@ -162,7 +162,7 @@ class PostgresConfigStore:
                     config_version_id=version_id,
                     config_sha256=sha256,
                 )
-                await append_in(connection, event, self._clock())
+                await append_in(connection, event, self._clock)
         except IntegrityError as exc:
             translated = _translate(exc, version_id=version_id, expected_previous=expected_previous)
             if translated is None:

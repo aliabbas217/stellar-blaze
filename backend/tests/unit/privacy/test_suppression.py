@@ -63,7 +63,7 @@ def test_k_is_a_strict_threshold_a_group_of_exactly_k_is_published() -> None:
 
 
 def test_the_group_size_decides_not_the_count() -> None:
-    small_group = Cell("a", count=30, group_size=4)
+    small_group = Cell("a", count=3, group_size=4)
     big_group = Cell("b", count=0, group_size=20)
 
     result = by_key(suppress([small_group, big_group], k=5, publish_total=False))
@@ -168,18 +168,98 @@ def test_k_floor_from_params() -> None:
     assert k_for(DataClass.EXPOSURE, params(k_exposure=8)) == 8
 
 
-@pytest.mark.parametrize("counts", [c for n in (2, 3, 4) for c in itertools.product((0, 1, 4, 5, 9, 20), repeat=n)])
-def test_no_single_suppressed_value_is_recoverable_by_differencing_exhaustive(counts: tuple[int, ...]) -> None:
-    """For every small table, if any cell is hidden and the total is published, at least two cells are hidden."""
+def hidden_ranges(
+    published: tuple[SuppressedCell, ...], source: list[Cell], k: int, data_class: DataClass
+) -> dict[str, tuple[int, int]]:
+    """What a reader who knows k, the reason labels, the total and every visible cell can say of each hidden cell.
+
+    A primary-hidden cell is in ``[lo, k - 1]`` (``lo`` is 1 for a health count whose group is at least ``k``); a
+    complementary cell is in ``[0, H]``, ``H`` being the hidden sum. The per-cell range is then tightened with the sum
+    constraint ``sum(hidden) == H`` (interval propagation, exact for a sum of interval-bounded integers).
+    """
+    group = {c.key: c.group_size for c in source}
+    total = sum(c.count for c in source)
+    hidden_sum = total - sum(c.count for c in published if c.count is not None)
+    bounds: dict[str, tuple[int, int]] = {}
+    for cell in published:
+        if not cell.suppressed:
+            continue
+        if cell.reason == "below_k":
+            lo = 1 if data_class is DataClass.HEALTH and group[cell.key] >= k else 0
+            bounds[cell.key] = (lo, k - 1)
+        else:
+            bounds[cell.key] = (0, hidden_sum)
+    tightened: dict[str, tuple[int, int]] = {}
+    for key, (lo, hi) in bounds.items():
+        others_lo = sum(b[0] for other, b in bounds.items() if other != key)
+        others_hi = sum(b[1] for other, b in bounds.items() if other != key)
+        tightened[key] = (max(lo, hidden_sum - others_hi), min(hi, hidden_sum - others_lo))
+    return tightened
+
+
+def assert_nothing_is_pinned(source: list[Cell], k: int, data_class: DataClass) -> bool:
+    """Publish ``source`` with its total; False if the total was refused, else assert no hidden cell is pinned."""
     try:
-        published = suppress(cells(*counts), k=5, publish_total=True)
+        published = suppress(source, k=k, publish_total=True, data_class=data_class)
     except TotalWouldDiscloseError:
-        assert len(counts) == 1
-        return
-    hidden = [c for c in published if c.suppressed]
-    assert len(hidden) != 1
-    # A below-k cell is never published, whatever else happens.
-    for cell, n in zip(published, counts, strict=True):
-        if n < 5:
-            assert cell.suppressed
+        return False
+    for key, (lo, hi) in hidden_ranges(published, source, k, data_class).items():
+        assert lo < hi, f"{key} is pinned to {lo} in {[(c.count, c.group_size) for c in source]}"
+    for cell, original in zip(published, source, strict=True):
+        if cell.suppressed:
             assert cell.count is None
+        else:
+            assert cell.count == original.count
+    return True
+
+
+def test_no_hidden_value_is_pinned_by_the_interval_attack_exhaustive_exposure() -> None:
+    """For every table of 1-4 cells over counts (0, 1, 4, 5, 9, 20), each cell's group being its count (so every cell
+    below k=5 is hidden), the published total plus the visible cells leave every hidden cell a range of at least two
+    values (the reader knows k, the reasons and the total). A refusal (``TotalWouldDiscloseError``) is the only other
+    outcome; the sweep requires both outcomes to occur, so the check is not vacuous."""
+    published_tables = refused = 0
+    for n in (1, 2, 3, 4):
+        for counts in itertools.product((0, 1, 4, 5, 9, 20), repeat=n):
+            if assert_nothing_is_pinned(cells(*counts), 5, DataClass.EXPOSURE):
+                published_tables += 1
+            else:
+                refused += 1
+    assert published_tables > 1000
+    assert refused > 0
+
+
+def test_no_hidden_value_is_pinned_by_the_interval_attack_exhaustive_health() -> None:
+    """The same sweep for a health table (k=10, every group 25, counts 0, 1, 3, 9, 10, 15): a count of 1..9 is
+    hidden and the reader knows it is at least 1."""
+    refused = 0
+    for n in (1, 2, 3, 4):
+        for counts in itertools.product((0, 1, 3, 9, 10, 15), repeat=n):
+            table = [Cell(f"c{i}", n_, 25) for i, n_ in enumerate(counts)]
+            refused += not assert_nothing_is_pinned(table, 10, DataClass.HEALTH)
+    assert refused > 0
+
+
+@pytest.mark.parametrize(
+    ("table", "k", "data_class", "hidden_keys"),
+    [
+        # Review I4 reproductions: each used to publish two hidden cells that are exactly pinned.
+        ([(7, 9), (6, 12), (0, 3), (0, 9)], 5, DataClass.EXPOSURE, {"c2", "c3", "c1"}),
+        ([(7, 20), (5, 20), (4, 4), (4, 4)], 5, DataClass.EXPOSURE, {"c2", "c3", "c1"}),
+        ([(9, 11), (9, 11), (20, 20)], 10, DataClass.HEALTH, {"c0", "c1", "c2"}),
+    ],
+)
+def test_the_review_reproductions_no_longer_pin_two_hidden_cells(
+    table: list[tuple[int, int]], k: int, data_class: DataClass, hidden_keys: set[str]
+) -> None:
+    source = [Cell(f"c{i}", count, group) for i, (count, group) in enumerate(table)]
+
+    assert assert_nothing_is_pinned(source, k, data_class)
+    published = suppress(source, k=k, publish_total=True, data_class=data_class)
+    assert {c.key for c in published if c.suppressed} == hidden_keys
+
+
+def test_a_cell_cannot_count_more_people_than_its_group() -> None:
+    with pytest.raises(ValueError, match="exceeds group_size"):
+        Cell("a", count=6, group_size=5)
+    Cell("a", count=5, group_size=5)

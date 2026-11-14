@@ -15,6 +15,7 @@ from stellar_blaze.ports.sites import (
     SiteFixture,
     SiteNotFoundError,
     SiteRecord,
+    SiteSyntheticChangeError,
     spec_of,
 )
 
@@ -31,7 +32,8 @@ def _members(crew: CrewFixture) -> list[CrewMember]:
 
 class InMemorySiteStore:
     """``SiteRepository``, ``EpochStore`` and ``SiteFixtureStore`` over dicts. ``audit`` is where an epoch's
-    ``demo_reset`` row goes (Postgres appends it in the epoch's own transaction)."""
+    ``demo_reset`` row goes (Postgres appends it in the epoch's own transaction); a store built without one refuses
+    every call that would produce an audit event instead of silently dropping it."""
 
     def __init__(self, audit: InMemoryAuditLog | None = None) -> None:
         self._audit = audit
@@ -72,14 +74,19 @@ class InMemorySiteStore:
             raise NotADemoSiteError(site_id)
         previous = max(self._epochs[site_id])
         new = self._allocate_epoch(site_id)
-        if audit is not None and self._audit is not None:
-            await self._audit.append(audit(previous, new))
+        if audit is not None:
+            await self._require_audit().append(audit(previous, new))
         return new
 
     async def upsert_fixture(
         self, fixture: SiteFixture, actor: str, *, audit_events: Sequence[AuditEvent] = ()
     ) -> None:
         site = fixture.site
+        stored = self._sites.get(site.id)
+        if stored is not None and stored.synthetic != site.synthetic:
+            raise SiteSyntheticChangeError(site.id, stored=stored.synthetic)
+        if audit_events:
+            self._require_audit()
         self._sites[site.id] = site
         if site.id not in self._epochs:
             self._allocate_epoch(site.id)
@@ -96,9 +103,13 @@ class InMemorySiteStore:
                 member_count=len(crew.members),
             )
             self._crews[crew.id] = _Crew(record, _members(crew))
-        if self._audit is not None:
-            for event in audit_events:
-                await self._audit.append(event)
+        for event in audit_events:
+            await self._require_audit().append(event)
+
+    def _require_audit(self) -> InMemoryAuditLog:
+        if self._audit is None:
+            raise RuntimeError("this InMemorySiteStore has no audit log: build it with one to record audit events")
+        return self._audit
 
     def _allocate_epoch(self, site_id: str) -> int:
         epoch = self._next_epoch

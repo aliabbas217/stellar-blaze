@@ -8,6 +8,8 @@ only through composition" keeps ``api`` and ``jobs`` from importing ``adapters.s
 production registry below is read-only.
 """
 
+import asyncio
+import threading
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -315,14 +317,25 @@ class CorrectorProvider:
     A snapshot with no model (``model is None``: the file or env seed without a ``model_id``) is served by
     ``FakeCorrector(0.0)``, the uncorrected raw forecast, whose ``model_id`` is ``None`` so every decision row says so
     (ADR 0010). A snapshot that names a released model is served by B2's ``LightGbmCorrector``, loaded from the verified
-    model directory the first time it is asked for and kept: loading reads 19 boosters per target, which no request may
-    pay. The provider is cheap to keep for the life of the process; a config activation that changes ``model_id`` just
-    asks for another key.
+    model directory and kept. Loading reads 19 boosters per target, which no request should pay: ``warm`` does it off
+    the event loop (for the API lifespan and a config activation to call). ``for_snapshot`` still
+    loads synchronously on a miss, so a model nobody warmed is loaded by the first request that needs it. The provider
+    is cheap to keep for the life of the process; a config activation that changes ``model_id`` just asks for another
+    key.
     """
 
     def __init__(self) -> None:
         self._uncorrected = FakeCorrector(0.0)
         self._loaded: dict[str, ForecastCorrector] = {}
+        self._lock = threading.Lock()  # `warm` runs `for_snapshot` in a thread: one load per model, not two
+
+    async def warm(self, snapshot: ConfigSnapshot) -> None:
+        """Load the corrector ``snapshot`` selects in a worker thread, so no request pays for it.
+
+        Raises:
+            FileNotFoundError, pydantic.ValidationError, ValueError: As ``for_snapshot``.
+        """
+        await asyncio.to_thread(self.for_snapshot, snapshot)
 
     def for_snapshot(self, snapshot: ConfigSnapshot) -> ForecastCorrector:
         """The corrector ``snapshot`` selects.
@@ -336,10 +349,11 @@ class CorrectorProvider:
         if model is None:
             return self._uncorrected
         key = model.manifest.model_id
-        corrector = self._loaded.get(key)
-        if corrector is None:
-            corrector = self._loaded[key] = LightGbmCorrector.load(model)
-        return corrector
+        with self._lock:
+            corrector = self._loaded.get(key)
+            if corrector is None:
+                corrector = self._loaded[key] = LightGbmCorrector.load(model)
+            return corrector
 
 
 async def build_api_services(settings: Settings, engine: AsyncEngine) -> tuple[Services, Callable[[], Awaitable[None]]]:

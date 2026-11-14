@@ -356,6 +356,7 @@ class AuditEvent(Base):
     __tablename__ = "audit_event"
     __table_args__ = (
         UniqueConstraint("row_hash"),
+        UniqueConstraint("prev_hash"),  # a fork is impossible at the database level (review I3)
         CheckConstraint(f"prev_hash {_HEX64}", name="prev_hash_format"),
         CheckConstraint(f"row_hash {_HEX64}", name="row_hash_format"),
         CheckConstraint("jsonb_typeof(detail) = 'object'", name="detail_is_object"),

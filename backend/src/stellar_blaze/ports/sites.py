@@ -7,17 +7,16 @@ are epoch-scoped. A site's active epoch is its highest ``epoch_id``; a non-synth
 
 import re
 from collections.abc import Callable, Sequence
-from datetime import time
 from typing import Literal, Protocol, Self
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from stellar_blaze.domain.plans.model import CrewMember, CrewSpec, ShiftBlock, Workload
+from stellar_blaze.domain.plans.model import GRID_START, CrewMember, CrewSpec, ShiftBlock, Workload
+from stellar_blaze.domain.weather.stations import station as known_station
 from stellar_blaze.ports.audit import AuditEvent
 
 E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
-DAY_START = time(4, 0)
-DAY_END = time(22, 0)  # the planner's day grid is 04:00-22:00 local (domain.plans.ticks)
 
 
 class _Frozen(BaseModel):
@@ -37,6 +36,24 @@ class SiteRecord(_Frozen):
     synthetic: bool
     supervisor_phone: str | None = None
     first_aider_phone: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError(f"timezone {value!r} is not an IANA time zone") from error
+        return value
+
+    @field_validator("station")
+    @classmethod
+    def _known_station(cls, value: str) -> str:
+        try:
+            known_station(value)
+        except KeyError as error:
+            raise ValueError(f"station {value!r} is not a known observing station") from error
+        return value
 
     @field_validator("supervisor_phone", "first_aider_phone")
     @classmethod
@@ -88,21 +105,18 @@ class CrewFixture(_Frozen):
 
     @model_validator(mode="after")
     def _members_and_shift_are_plannable(self) -> Self:
-        """Refuse what the planner would raise on or silently truncate (the day grid is 04:00-22:00 local)."""
+        """Refuse what the planner would raise on or silently truncate."""
         if len(self.members) != self.headcount:
             raise ValueError(
                 f"crew {self.id}: headcount is {self.headcount} but {len(self.members)} members are listed"
             )
         if not self.shift:
             raise ValueError(f"crew {self.id} has no shift block")
-        previous_end = DAY_START
+        # ShiftBlock itself refuses a block that ends before it starts or leaves the 04:00-22:00 planning grid.
+        previous_end = GRID_START
         for block in self.shift:
-            if not block.start < block.end:
-                raise ValueError(f"crew {self.id}: shift block {block.start}-{block.end} must start before it ends")
             if block.start < previous_end:
                 raise ValueError(f"crew {self.id}: shift blocks must be sorted and must not overlap ({block.start})")
-            if block.end > DAY_END:
-                raise ValueError(f"crew {self.id}: shift block ends after {DAY_END:%H:%M} ({block.end})")
             previous_end = block.end
         return self
 
@@ -137,6 +151,14 @@ class NotADemoSiteError(Exception):
 
     def __init__(self, site_id: str) -> None:
         super().__init__(f"site {site_id!r} is not a demo site: only a synthetic site can start a new epoch")
+        self.site_id = site_id
+
+
+class SiteSyntheticChangeError(Exception):
+    """A fixture load tried to flip the ``synthetic`` flag of an existing site: it gates the demo reset (ADR 0066)."""
+
+    def __init__(self, site_id: str, *, stored: bool) -> None:
+        super().__init__(f"site {site_id!r} is stored with synthetic={stored}: a load never changes that flag")
         self.site_id = site_id
 
 
@@ -196,7 +218,11 @@ class EpochStore(Protocol):
 
 
 class SiteFixtureStore(Protocol):
-    """Write side of ``sb-jobs site load``: an idempotent upsert of a site, its crews and members."""
+    """Write side of ``sb-jobs site load``: an idempotent upsert of a site, its crews and members.
+
+    A crew that left the fixture is NOT deleted: epoch-scoped rows (stops, plans, sign-offs, alert events) reference it,
+    so it stays stored and listed until a migration removes it.
+    """
 
     async def upsert_fixture(
         self, fixture: SiteFixture, actor: str, *, audit_events: Sequence[AuditEvent] = ()
@@ -205,6 +231,9 @@ class SiteFixtureStore(Protocol):
 
         ``audit_events`` are appended to the audit chain in the same transaction, so a change and its record commit or
         roll back together.
+
+        Raises:
+            SiteSyntheticChangeError: The site exists and ``fixture.site.synthetic`` differs from the stored flag.
         """
         ...
 

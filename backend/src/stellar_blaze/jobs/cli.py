@@ -23,7 +23,7 @@ activation log itself records who changed what and why)::
 and the governance data (ADR 0054, 0057; not jobs either)::
 
     sb-jobs site load PATH --actor A --reason R   # idempotent upsert; one input.changed audit row per change
-    sb-jobs audit verify                          # recompute the hash chain: exit 0, or 1 with audit.chain_broken id=N
+    sb-jobs audit verify                          # recompute the chain: exit 0 + head JSON, else 1
 
 and the replay snapshots of the forecast corrector (``jobs/ml_cli.py``, also not jobs: no ``job_run`` row, no database,
 no lock; it copies silver files into ``SB_REPLAY_DIR`` and is documented there)::
@@ -85,6 +85,7 @@ from stellar_blaze.jobs.ml_cli import ml_app
 from stellar_blaze.jobs.runner import describe_error, run_job
 from stellar_blaze.jobs.work import build_dataset, ingest_forecasts, ingest_observations
 from stellar_blaze.logging import configure_logging
+from stellar_blaze.ports.audit import ChainReport
 from stellar_blaze.ports.config_store import (
     ActivationRecord,
     StaleActivationError,
@@ -625,13 +626,17 @@ def site_load_command(
 
 @audit_app.command("verify")
 def audit_verify_command() -> None:
-    """Recompute the audit hash chain; exit 0 when intact, exit 1 naming the first broken row."""
+    """Recompute the audit hash chain; exit 0 when intact, exit 1 naming the first broken row.
+
+    On success one JSON line carries the row count and the head: record the head outside the database (the demo
+    checklist, the CI log), because deleting the newest rows leaves a shorter chain that still verifies by itself.
+    """
     settings = _settings()
 
-    async def work(engine: AsyncEngine) -> int | None:
-        return await build_audit_log(engine).verify()
+    async def work(engine: AsyncEngine) -> ChainReport:
+        return await build_audit_log(engine).chain_report()
 
-    broken = _run_db(settings, work)
-    if broken is not None:
-        _fail(f"audit.chain_broken id={broken}")
-    _emit({"chain": "intact"})
+    report = _run_db(settings, work)
+    if report.broken_id is not None:
+        _fail(f"audit.chain_broken id={report.broken_id}")
+    _emit({"chain": "intact", "rows": report.rows, "head_id": report.head_id, "head": report.head})

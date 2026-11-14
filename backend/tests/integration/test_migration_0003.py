@@ -36,14 +36,18 @@ def test_0003_up_down_up_is_clean_and_leaves_no_drift(empty_settings: Settings) 
     migrate(empty_settings, "upgrade", "0003")
     assert all(table_exists(empty_settings, t) for t in B3_TABLES)
     assert sorted(b3_triggers(empty_settings)) == sorted(
-        f"trg_{t}_{kind}" for t in APPEND_ONLY for kind in ("append_only", "no_truncate")
+        [f"trg_{t}_{kind}" for t in APPEND_ONLY for kind in ("append_only", "no_truncate")]
+        + [f"trg_crew_stop_{kind}" for kind in ("clear_once", "no_delete", "no_truncate")]
     )
     check_no_drift(empty_settings)
 
-    migrate(empty_settings, "downgrade", "0002")  # drops the ten triggers and the ten tables, nothing of 0002
+    migrate(
+        empty_settings, "downgrade", "0002"
+    )  # drops the 13 triggers, the guard function and the ten tables, nothing of 0002
     assert not any(table_exists(empty_settings, t) for t in B3_TABLES)
     assert b3_triggers(empty_settings) == []
     assert function_exists(empty_settings, "sb_reject_mutation")
+    assert not function_exists(empty_settings, "sb_crew_stop_guard")
     assert table_exists(empty_settings, "config_version")
     assert table_exists(empty_settings, "job_run")
 

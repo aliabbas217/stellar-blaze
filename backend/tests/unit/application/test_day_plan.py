@@ -136,6 +136,36 @@ async def test_plan_is_validated_persisted_with_identity_and_epoch() -> None:
     assert await w.audit_rows() == []
 
 
+async def test_two_identical_calls_store_one_row_and_return_the_same_record() -> None:
+    w = await world()
+    day = await amber_day()
+    crew = await w.crew("crew-b")
+
+    first = await w.run(day, crew)
+    second = await w.run(day, crew)
+
+    assert len(w.plans.records) == 1  # a public GET per request must not append a row per request
+    assert first.record is not None
+    assert second.record == first.record  # the same id and created_at: the sign-off plan_hash stays stable
+
+
+async def test_a_changed_zone_timeline_stores_a_second_row() -> None:
+    w = await world()
+    crew = await w.crew("crew-b")
+    first = await w.run(await amber_day(), crew)
+
+    changed = await w.run(await make_site_day(forecasts_of(day_of(GREEN_DAY))), crew)
+    again = await w.run(await make_site_day(forecasts_of(day_of(GREEN_DAY))), crew)
+
+    assert first.record is not None
+    assert changed.record is not None
+    assert changed.record.id != first.record.id
+    assert changed.record.plan != first.record.plan
+    assert again.record == changed.record
+    assert len(w.plans.records) == 2
+    assert (await w.plans.latest("crew-b", DAY, w.epoch)) == changed.record
+
+
 async def test_no_persist_without_db_snapshot() -> None:
     w = await world()
 

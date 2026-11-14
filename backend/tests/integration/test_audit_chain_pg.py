@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from stellar_blaze.adapters.db.audit import PostgresAuditLog
 from stellar_blaze.adapters.db.sites import PostgresSiteStore
 from stellar_blaze.config import Settings
-from stellar_blaze.ports.audit import ZERO_HASH, AuditEvent
+from stellar_blaze.domain.audit import ZERO_HASH
+from stellar_blaze.ports.audit import AuditEvent
 from tests.integration.db_admin import fetch_all
 from tests.unit.contract.audit_contract import event
 from tests.unit.contract.b3_world import SITE_ID, demo_fixture
@@ -30,6 +31,10 @@ async def audit(engine: AsyncEngine) -> AsyncIterator[PostgresAuditLog]:
 
 def sql(settings: Settings, statement: str) -> list[dict[str, Any]]:
     return fetch_all(settings.database_url.get_secret_value(), statement)
+
+
+def row_count(settings: Settings) -> int:
+    return int(sql(settings, "SELECT count(*) AS n FROM audit_event")[0]["n"])
 
 
 async def three_rows(audit: PostgresAuditLog) -> list[int]:
@@ -89,6 +94,61 @@ async def test_verify_detects_every_hashed_column(
     sql(settings, f"UPDATE audit_event SET {assignment} WHERE id = {ids[2]}")  # noqa: S608
 
     assert await audit.verify() == ids[2]
+
+
+TAMPERED_VALUES = [
+    "kind = 'made.up'",  # a kind AuditEvent refuses (review I1)
+    """detail = '{"worker_ref": "w-1"}'::jsonb""",  # a member-like key
+    """detail = '{"lat": 24.36}'::jsonb""",  # a float
+    """detail = '{"rule": "x", "n": 1e22}'::jsonb""",  # a number jsonb returns as a huge integer
+]
+
+
+@pytest.mark.parametrize("assignment", TAMPERED_VALUES)
+async def test_verify_names_a_row_edited_to_a_value_validation_refuses_and_never_raises(
+    audit: PostgresAuditLog, settings: Settings, assignment: str
+) -> None:
+    ids = await three_rows(audit)
+    sql(settings, "DROP TRIGGER trg_audit_event_append_only ON audit_event")
+
+    sql(settings, f"UPDATE audit_event SET {assignment} WHERE id = {ids[1]}")  # noqa: S608
+
+    assert await audit.verify() == ids[1]
+
+
+async def test_the_chain_report_head_betrays_a_tail_truncation_that_verify_cannot(
+    audit: PostgresAuditLog, settings: Settings
+) -> None:
+    ids = await three_rows(audit)
+    full = await audit.chain_report()
+    before = row_count(settings)
+    sql(settings, "DROP TRIGGER trg_audit_event_append_only ON audit_event")
+
+    sql(settings, f"DELETE FROM audit_event WHERE id = {ids[2]}")  # noqa: S608
+    truncated = await audit.chain_report()
+
+    assert (full.broken_id, full.head_id) == (None, ids[2])
+    assert full.rows == before
+    assert truncated.broken_id is None  # the shorter chain is internally consistent ...
+    assert (truncated.rows, truncated.head_id) == (
+        full.rows - 1,
+        ids[1],
+    )  # ... and only the anchored head and count show it
+    assert truncated.head != full.head
+
+
+async def test_a_second_row_with_the_same_prev_hash_is_refused(audit: PostgresAuditLog, engine: AsyncEngine) -> None:
+    first = await audit.append(event(epoch_id=1))
+    insert = text(
+        "INSERT INTO audit_event (at, kind, actor, actor_role, outcome, detail, prev_hash, row_hash) "
+        "VALUES (now(), 'input.changed', 'a', 'operator', 'x', '{}'::jsonb, :prev, :row)"
+    )
+
+    with pytest.raises(DBAPIError, match="uq_audit_event_prev_hash"):
+        async with engine.begin() as connection:
+            await connection.execute(insert, {"prev": first.prev_hash, "row": "f" * 64})  # a fork off the same parent
+
+    assert await audit.verify() is None
 
 
 async def test_verify_detects_a_deleted_row(audit: PostgresAuditLog, settings: Settings) -> None:

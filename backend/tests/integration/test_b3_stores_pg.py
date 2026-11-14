@@ -20,7 +20,7 @@ from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, Tunables, config_sha256
 from tests.integration.db_admin import fetch_all
 from tests.unit.contract import audit_contract, decisions_contract, push_contract, sites_contract
-from tests.unit.contract.b3_world import SHA, World, seeded
+from tests.unit.contract.b3_world import SHA, SITE_ID, World, seeded
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
@@ -104,16 +104,39 @@ async def test_stores_refuse_mutation(world: World, engine: AsyncEngine, table: 
             await connection.execute(text(statement))
 
 
-async def test_a_crew_stop_and_a_subscription_stay_mutable(world: World, engine: AsyncEngine) -> None:
+async def test_a_crew_stop_can_only_be_cleared_once_and_a_subscription_stays_deletable(
+    world: World, engine: AsyncEngine
+) -> None:
     epoch = await seeded(world)
     stop = await world.stops.start("crew-b", "heat", "sup", epoch)
 
-    async with engine.begin() as connection:
-        await connection.execute(text("UPDATE crew_stop SET reason_code = 'other' WHERE id = :id"), {"id": stop.id})
+    for statement in (
+        "UPDATE crew_stop SET reason_code = 'other' WHERE id = :id",  # any column but the two clear columns
+        "UPDATE crew_stop SET actor = 'someone' WHERE id = :id",
+        "UPDATE crew_stop SET cleared_at = now() WHERE id = :id",  # cleared_by must be set with it
+        "UPDATE crew_stop SET cleared_by = 'sup' WHERE id = :id",
+        "UPDATE crew_stop SET cleared_at = started_at - interval '1 second', cleared_by = 'sup' WHERE id = :id",
+        "DELETE FROM crew_stop WHERE id = :id",
+        "TRUNCATE crew_stop",
+    ):
+        with pytest.raises(DBAPIError, match=r"crew_stop is not allowed|append-only"):
+            async with engine.begin() as connection:
+                await connection.execute(text(statement), {"id": stop.id} if ":id" in statement else {})
+    untouched = await world.stops.get(stop.id)
+    assert untouched is not None
+    assert (untouched.reason_code, untouched.cleared_at, untouched.cleared_by) == ("heat", None, None)
 
-    changed = await world.stops.get(stop.id)
-    assert changed is not None
-    assert changed.reason_code == "other"
+    await world.stops.clear(stop.id, "sup")  # NULL -> value on both columns: the one allowed update
+    cleared = await world.stops.get(stop.id)
+    assert cleared is not None
+    assert cleared.cleared_by == "sup"
+    with pytest.raises(DBAPIError, match="crew_stop is not allowed"):
+        async with engine.begin() as connection:  # a cleared stop never changes again
+            await connection.execute(text("UPDATE crew_stop SET cleared_by = 'other' WHERE id = :id"), {"id": stop.id})
+
+    subscription = await world.push.upsert_by_endpoint(push_contract.sub(), epoch)
+    await world.push.delete(subscription)
+    assert await world.push.for_site(SITE_ID, epoch) == []
 
 
 async def exec_sql(engine: AsyncEngine, statement: str, **params: Any) -> None:

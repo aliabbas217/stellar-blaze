@@ -64,6 +64,9 @@ class Corrector:
     def for_snapshot(self, snapshot: ConfigSnapshot) -> ForecastCorrector:
         return self._corrector
 
+    async def warm(self, snapshot: ConfigSnapshot) -> None:
+        return None
+
 
 @dataclass
 class World:

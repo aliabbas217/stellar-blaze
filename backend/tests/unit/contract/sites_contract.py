@@ -1,5 +1,6 @@
 """Contract suite of ``SiteRepository``, ``EpochStore`` and ``SiteFixtureStore`` (fake in unit, Postgres in integ.)."""
 
+import asyncio
 from datetime import time
 
 import pytest
@@ -10,6 +11,7 @@ from stellar_blaze.ports.sites import (
     NotADemoSiteError,
     SiteFixture,
     SiteNotFoundError,
+    SiteSyntheticChangeError,
 )
 from tests.unit.contract.b3_world import SITE_ID, Check, World, demo_fixture, seeded
 
@@ -131,6 +133,25 @@ async def check_start_epoch_is_refused_for_a_site_that_is_not_synthetic(world: W
         await world.sites.start_epoch("nope", "demo-token")
 
     assert await world.sites.active_epoch("site-real") == before  # nothing was written
+
+
+async def check_a_load_never_flips_the_synthetic_flag_of_an_existing_site(world: World) -> None:
+    await seeded(world)
+    flipped = demo_fixture().site.model_copy(update={"synthetic": False})
+
+    with pytest.raises(SiteSyntheticChangeError):
+        await world.sites.upsert_fixture(SiteFixture(site=flipped, crews=()), "ali")
+
+    stored = await world.sites.get_site(SITE_ID)
+    assert stored is not None
+    assert stored.synthetic is True  # a demo site cannot be turned into a real one (or back) by a load
+
+
+async def check_concurrent_first_loads_create_one_epoch(world: World) -> None:
+    await asyncio.gather(*(world.sites.upsert_fixture(demo_fixture(), "ali") for _ in range(4)))
+
+    first = await world.sites.active_epoch(SITE_ID)
+    assert await world.sites.start_epoch(SITE_ID, "demo-token") == first + 1  # exactly one epoch existed before
 
 
 async def check_start_epoch_appends_its_audit_row_in_the_same_unit_of_work(world: World) -> None:

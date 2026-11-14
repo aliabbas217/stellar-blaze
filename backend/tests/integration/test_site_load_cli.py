@@ -102,7 +102,9 @@ def test_a_changed_field_writes_one_input_changed_row_and_member_changes_are_cou
     assert "days_on_site" not in json.dumps([r["detail"] for r in changed(settings)])
     verified = invoke("audit", "verify")
     assert verified.exit_code == 0
-    assert last_json(verified) == {"chain": "intact"}
+    report = last_json(verified)
+    assert (report["chain"], report["rows"], report["head_id"]) == ("intact", len(changed(settings)), report["rows"])
+    assert len(report["head"]) == 64
 
 
 CREW_A_SHIFT = 'shift = [{ start = "06:00", end = "11:00" }, { start = "15:00", end = "18:00" }]'
@@ -112,9 +114,9 @@ BAD_MEMBER = 'days_away = 0, away_reason = "none", experienced = false'
 @pytest.mark.parametrize(
     ("old", "new", "message"),
     [
-        (CREW_A_SHIFT, 'shift = [{ start = "03:00", end = "11:00" }]', "must be sorted and must not overlap"),
-        (CREW_A_SHIFT, 'shift = [{ start = "06:00", end = "23:00" }]', "ends after 22:00"),
-        (CREW_A_SHIFT, 'shift = [{ start = "11:00", end = "06:00" }]', "must start before it ends"),
+        (CREW_A_SHIFT, 'shift = [{ start = "03:00", end = "11:00" }]', "a shift block starts before 04:00"),
+        (CREW_A_SHIFT, 'shift = [{ start = "06:00", end = "23:00" }]', "a shift block ends after 22:00"),
+        (CREW_A_SHIFT, 'shift = [{ start = "11:00", end = "06:00" }]', "a shift block must start before it ends"),
         (
             CREW_A_SHIFT,
             'shift = [{ start = "15:00", end = "18:00" }, { start = "06:00", end = "11:00" }]',
@@ -150,9 +152,14 @@ def test_site_load_usage_errors(settings: Settings, tmp_path: Path) -> None:
     assert rows(settings, "SELECT count(*) AS n FROM audit_event") == [{"n": 0}]
 
 
-def test_audit_verify_is_clean_then_names_the_first_broken_row(settings: Settings) -> None:
+def test_audit_verify_prints_the_head_and_names_the_first_broken_row(settings: Settings) -> None:
     invoke("site", "load", str(FIXTURE_PATH), *ARGS)
-    assert invoke("audit", "verify").exit_code == 0
+    clean = invoke("audit", "verify")
+    assert clean.exit_code == 0
+    report = last_json(clean)
+    assert report["chain"] == "intact"
+    assert report["rows"] == report["head_id"] == 5  # the site and its four crews
+    assert report["head"] == rows(settings, "SELECT row_hash FROM audit_event ORDER BY id DESC LIMIT 1")[0]["row_hash"]
 
     fetch_all(settings.database_url.get_secret_value(), "DROP TRIGGER trg_audit_event_append_only ON audit_event")
     fetch_all(settings.database_url.get_secret_value(), "UPDATE audit_event SET outcome = 'forged' WHERE id = 3")
@@ -160,3 +167,23 @@ def test_audit_verify_is_clean_then_names_the_first_broken_row(settings: Setting
 
     assert result.exit_code == 1
     assert "audit.chain_broken id=3" in result.output
+
+
+@pytest.mark.parametrize(
+    "assignment",
+    [
+        "kind = 'made.up'",
+        """detail = '{"worker_ref": "w-1"}'::jsonb""",
+        """detail = '{"lat": 24.36}'::jsonb""",
+    ],
+)
+def test_audit_verify_names_a_row_edited_to_a_value_validation_refuses(settings: Settings, assignment: str) -> None:
+    invoke("site", "load", str(FIXTURE_PATH), *ARGS)
+    fetch_all(settings.database_url.get_secret_value(), "DROP TRIGGER trg_audit_event_append_only ON audit_event")
+    fetch_all(settings.database_url.get_secret_value(), f"UPDATE audit_event SET {assignment} WHERE id = 2")  # noqa: S608
+
+    result = invoke("audit", "verify")
+
+    assert result.exit_code == 1
+    assert "audit.chain_broken id=2" in result.output
+    assert "Traceback" not in result.output

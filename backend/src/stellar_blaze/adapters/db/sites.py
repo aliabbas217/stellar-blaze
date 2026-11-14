@@ -27,6 +27,7 @@ from stellar_blaze.ports.sites import (
     SiteFixture,
     SiteNotFoundError,
     SiteRecord,
+    SiteSyntheticChangeError,
     spec_of,
 )
 
@@ -169,7 +170,7 @@ class PostgresSiteStore:
                 )
             ).scalar_one()
             if audit is not None:
-                await append_in(connection, audit(int(previous), int(new)), self._clock())
+                await append_in(connection, audit(int(previous), int(new)), self._clock)
         return int(new)
 
     # --- SiteFixtureStore ---------------------------------------------------------------------------------------
@@ -179,6 +180,14 @@ class PostgresSiteStore:
     ) -> None:
         site = fixture.site
         async with self._engine.begin() as connection:
+            # The site row lock is the serialisation point (`start_epoch` takes it too): the first writer of a new site
+            # holds the unique-index entry until it commits, a second `upsert_fixture` waits there and then sees the
+            # epoch row, so the "first epoch" check below cannot race.
+            stored_synthetic = (
+                await connection.execute(select(SiteRow.synthetic).where(SiteRow.id == site.id).with_for_update())
+            ).scalar_one_or_none()
+            if stored_synthetic is not None and stored_synthetic != site.synthetic:
+                raise SiteSyntheticChangeError(site.id, stored=stored_synthetic)
             values = site.model_dump()
             await connection.execute(
                 pg_insert(SiteRow)
@@ -193,7 +202,7 @@ class PostgresSiteStore:
             for crew in fixture.crews:
                 await _upsert_crew(connection, site, crew)
             for event in audit_events:
-                await append_in(connection, event, self._clock())
+                await append_in(connection, event, self._clock)
 
 
 async def _members(connection: AsyncConnection, crew_id: str) -> list[CrewMember]:

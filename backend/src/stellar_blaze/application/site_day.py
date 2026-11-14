@@ -34,6 +34,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
+import httpx2
 import numpy as np
 import polars as pl
 import structlog
@@ -177,6 +178,11 @@ class _Hourly:
     newest_issue: datetime | None
 
 
+# What an unavailable or malformed forecast looks like: an HTTP or I/O failure, a malformed payload or frame
+# (`ValueError` includes pydantic's `ValidationError`), a missing row or key, a Polars data error.
+_DATA_ERRORS: Final = (httpx2.HTTPError, OSError, ValueError, KeyError, pl.exceptions.PolarsError)
+
+
 async def _hourly(
     *,
     labels: list[datetime],
@@ -314,8 +320,10 @@ async def site_day(
             observations=observations,
             corrector=corrector,
         )
-    except Exception as error:
-        logger.warning("site_day.forecast_unavailable", site_id=site.id, error=type(error).__name__)
+    except _DATA_ERRORS as error:
+        # Only upstream and data faults make the day protective (every on-shift tick High, `forecast_status` fallback).
+        # A TypeError or AttributeError is a programming error and must surface, not be disguised as "no forecast".
+        logger.error("site_day.forecast_unavailable", site_id=site.id, error=type(error).__name__)
         hourly = None
 
     if hourly is None:

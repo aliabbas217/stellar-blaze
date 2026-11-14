@@ -231,7 +231,7 @@ async def day_plan(
         snapshot: The active config snapshot; a plan row is stored only when it has a ``version_id``.
         sites: Resolves the site's active epoch.
         stops: The crew-lead stops (epoch-scoped).
-        plans: Where a validated plan is stored.
+        plans: Where a validated plan is stored (only when it differs from the newest stored one).
         audit: Where a rejected or failed plan is recorded.
         k_exposure: The suppression threshold; a crew below it is ``suppressed``.
 
@@ -367,21 +367,27 @@ async def day_plan(
             "stopped_minutes": plan.stopped_minutes,
             "forecast_status": site_day.forecast_status,
         }
-        stored = await plans.insert(
-            DayPlanInput(
-                ruleset_id=loaded.ruleset.meta.id,
-                ruleset_sha256=loaded.sha256,
-                model_id=site_day.identity.model_id,
-                config_version_id=snapshot.version_id,
-                config_sha256=snapshot.sha256,
-                epoch_id=epoch,
-                crew_id=crew.crew_id,
-                local_date=local_date,
-                status=status,
-                plan=body,
-                violations=0,
+        # `day_plan` is append-only and unprunable, and a public GET plans on every request: store a row only when
+        # the body or status changed since the newest stored plan (keeps the sign-off plan_hash and the trail stable).
+        latest = await plans.latest(crew.crew_id, local_date, epoch)
+        if latest is not None and latest.plan == body and latest.status == status:
+            stored = latest
+        else:
+            stored = await plans.insert(
+                DayPlanInput(
+                    ruleset_id=loaded.ruleset.meta.id,
+                    ruleset_sha256=loaded.sha256,
+                    model_id=site_day.identity.model_id,
+                    config_version_id=snapshot.version_id,
+                    config_sha256=snapshot.sha256,
+                    epoch_id=epoch,
+                    crew_id=crew.crew_id,
+                    local_date=local_date,
+                    status=status,
+                    plan=body,
+                    violations=0,
+                )
             )
-        )
     return DayPlanResult(
         plan=plan,
         validation=validation,

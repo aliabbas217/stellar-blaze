@@ -22,6 +22,25 @@ depends_on: str | Sequence[str] | None = None
 # `audit_event` the hash chain makes that visible (`sb-jobs audit verify`).
 APPEND_ONLY_TABLES = ("site_epoch", "alert_event", "day_plan", "plan_signoff", "audit_event")
 
+# `crew_stop` is the one mutable B3 table, and only by setting `cleared_at` and `cleared_by` once, together, on an open
+# stop (review minor). Any other UPDATE, every DELETE and TRUNCATE is refused.
+CREW_STOP_GUARD = """
+CREATE FUNCTION sb_crew_stop_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.cleared_at IS NULL AND OLD.cleared_by IS NULL
+       AND NEW.cleared_at IS NOT NULL AND NEW.cleared_by IS NOT NULL
+       AND NEW.cleared_at >= OLD.started_at
+       AND (NEW.id, NEW.crew_id, NEW.epoch_id, NEW.started_at, NEW.reason_code, NEW.actor)
+           IS NOT DISTINCT FROM (OLD.id, OLD.crew_id, OLD.epoch_id, OLD.started_at, OLD.reason_code, OLD.actor)
+    THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'UPDATE on crew_stop is not allowed: only cleared_at and cleared_by may be set, once'
+        USING ERRCODE = 'restrict_violation';
+END;
+$$
+"""
+
 HEX64 = "~ '^[0-9a-f]{64}$'"
 E164 = "~ '^\\+[1-9][0-9]{6,14}$'"
 
@@ -289,6 +308,8 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_audit_event")),
         sa.UniqueConstraint("row_hash", name=op.f("uq_audit_event_row_hash")),
+        # One successor per row (the first row's prev_hash is 64 zeros, unique too): no fork, whatever the lock does.
+        sa.UniqueConstraint("prev_hash", name=op.f("uq_audit_event_prev_hash")),
     )
     op.create_index("ix_audit_event_site_kind", "audit_event", ["site_id", "kind", sa.text("id DESC")])
     for table in APPEND_ONLY_TABLES:
@@ -300,12 +321,24 @@ def upgrade() -> None:
             f"CREATE TRIGGER trg_{table}_no_truncate BEFORE TRUNCATE ON {table} "
             "FOR EACH STATEMENT EXECUTE FUNCTION sb_reject_mutation()"
         )
+    op.execute(CREW_STOP_GUARD)
+    for name, event, scope, function in (
+        ("clear_once", "UPDATE", "ROW", "sb_crew_stop_guard"),
+        ("no_delete", "DELETE", "ROW", "sb_reject_mutation"),
+        ("no_truncate", "TRUNCATE", "STATEMENT", "sb_reject_mutation"),
+    ):
+        op.execute(
+            f"CREATE TRIGGER trg_crew_stop_{name} BEFORE {event} ON crew_stop "
+            f"FOR EACH {scope} EXECUTE FUNCTION {function}()"
+        )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     op.execute("SET lock_timeout = '3s'")
     op.execute("SET statement_timeout = '15s'")
+    for trigger in ("trg_crew_stop_no_truncate", "trg_crew_stop_no_delete", "trg_crew_stop_clear_once"):
+        op.execute(f"DROP TRIGGER {trigger} ON crew_stop")
     for table in reversed(APPEND_ONLY_TABLES):
         op.execute(f"DROP TRIGGER trg_{table}_no_truncate ON {table}")
         op.execute(f"DROP TRIGGER trg_{table}_append_only ON {table}")
@@ -313,3 +346,4 @@ def downgrade() -> None:
         op.drop_table(table)
     for table in ("crew_member", "crew", "site_epoch", "site"):
         op.drop_table(table)
+    op.execute("DROP FUNCTION sb_crew_stop_guard()")

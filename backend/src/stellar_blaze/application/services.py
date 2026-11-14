@@ -32,6 +32,10 @@ class CorrectorSource(Protocol):
 
     def for_snapshot(self, snapshot: ConfigSnapshot) -> ForecastCorrector: ...
 
+    async def warm(self, snapshot: ConfigSnapshot) -> None:
+        """Load the corrector of ``snapshot`` ahead of the first request (off the event loop)."""
+        ...
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)

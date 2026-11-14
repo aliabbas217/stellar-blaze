@@ -110,6 +110,8 @@ def create_app(settings: Settings | None = None, *, services: Services | None = 
                 # activation, and never replaces an env one (the pins are for runs without a database, ADR 0010 4.6).
                 await load_initial_config(service, runtime.config)
             snapshot = runtime.config.peek()
+            if snapshot is not None:
+                await built.correctors.warm(snapshot)  # the model load is not paid by the first request
             logger.info(
                 "runtime.ready",
                 config_source=None if snapshot is None else snapshot.source,

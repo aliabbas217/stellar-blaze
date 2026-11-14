@@ -8,6 +8,7 @@ import math
 from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
 
+import httpx2
 import polars as pl
 
 from stellar_blaze.adapters.config.rulesets import load_catalog
@@ -117,7 +118,7 @@ class ExplodingForecasts:
     async def previous_runs(
         self, *, station: Station, model: NwpModel, start: date, end: date, leads_days: Sequence[int]
     ) -> pl.DataFrame:
-        raise RuntimeError("upstream is down")
+        raise httpx2.ConnectError("upstream is down")
 
 
 def newest_run(valid_date: date = DAY, lead: int = 1) -> datetime:

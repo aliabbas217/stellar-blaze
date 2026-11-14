@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 from stellar_blaze.adapters.config.site_fixture import load_site_fixture
-from stellar_blaze.ports.sites import CrewFixture, MemberFixture
+from stellar_blaze.adapters.fakes.sites import InMemorySiteStore
+from stellar_blaze.ports.audit import AuditEvent
+from stellar_blaze.ports.sites import CrewFixture, MemberFixture, SiteRecord
 from tests.unit.contract.b3_world import FIXTURE_PATH, SITE_ID, fake_world
 from tests.unit.contract.sites_contract import CHECKS
 
@@ -43,7 +45,8 @@ def test_the_demo_fixture_is_plain_ascii_with_lf_line_ends() -> None:
 
     raw.decode("ascii")  # the file that is hashed has no editor-dependent bytes
     assert b"\r" not in raw  # LF only, so the SHA-256 is the same on every platform (git autocrlf)
-    assert len(hashlib.sha256(raw).hexdigest()) == 64
+    # The real hash (a change to the fixture is deliberate and updates this value, ADR 0057 section 2).
+    assert hashlib.sha256(raw).hexdigest() == "e76e930fa1cb1c0fb1f1b3716d3edea6504535ba0cd09eba2852f4969fe3a83f"
 
 
 def test_a_member_group_needs_a_positive_integer_count(tmp_path: Path) -> None:
@@ -70,12 +73,18 @@ def _crew_with(**changes: object) -> CrewFixture:
 @pytest.mark.parametrize(
     ("shift", "message"),
     [
-        ([{"start": "03:55", "end": "11:00"}], "must be sorted and must not overlap|ends after|before"),
-        ([{"start": "06:00", "end": "22:05"}], "ends after 22:00"),
-        ([{"start": "11:00", "end": "11:00"}], "must start before it ends"),
-        ([{"start": "12:00", "end": "11:00"}], "must start before it ends"),
-        ([{"start": "06:00", "end": "12:00"}, {"start": "11:00", "end": "15:00"}], "must not overlap"),
-        ([{"start": "15:00", "end": "18:00"}, {"start": "06:00", "end": "11:00"}], "sorted"),
+        ([{"start": "03:55", "end": "11:00"}], "a shift block starts before 04:00, the start of the planning grid"),
+        ([{"start": "06:00", "end": "22:05"}], "a shift block ends after 22:00, the end of the planning grid"),
+        ([{"start": "11:00", "end": "11:00"}], "a shift block must start before it ends"),
+        ([{"start": "12:00", "end": "11:00"}], "a shift block must start before it ends"),
+        (
+            [{"start": "06:00", "end": "12:00"}, {"start": "11:00", "end": "15:00"}],
+            "shift blocks must be sorted and must not overlap",
+        ),
+        (
+            [{"start": "15:00", "end": "18:00"}, {"start": "06:00", "end": "11:00"}],
+            "shift blocks must be sorted and must not overlap",
+        ),
         ([], "no shift block"),
     ],
 )
@@ -109,3 +118,30 @@ def test_the_edge_shifts_are_accepted() -> None:
     crew = _crew_with(shift=[{"start": "04:00", "end": "12:00"}, {"start": "12:00", "end": "22:00"}])
 
     assert len(crew.shift) == 2
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("timezone", "Mars/Olympus", "is not an IANA time zone"),
+        ("timezone", "", "is not an IANA time zone"),
+        ("station", "ZZZZ", "is not a known observing station"),
+    ],
+)
+def test_a_site_needs_a_real_time_zone_and_a_known_station(field: str, value: str, message: str) -> None:
+    site = load_site_fixture(FIXTURE_PATH).site.model_dump()
+
+    with pytest.raises(ValueError, match=message):
+        SiteRecord.model_validate({**site, field: value})
+
+
+@pytest.mark.asyncio
+async def test_an_in_memory_site_store_without_an_audit_log_refuses_to_drop_audit_events() -> None:
+    store = InMemorySiteStore()
+    event = AuditEvent(kind="input.changed", actor="a", actor_role="operator", outcome="x", detail={})
+    fixture = load_site_fixture(FIXTURE_PATH)
+    await store.upsert_fixture(fixture, "ali")  # no audit events: fine
+    with pytest.raises(RuntimeError, match="no audit log"):
+        await store.upsert_fixture(fixture, "ali", audit_events=[event])
+    with pytest.raises(RuntimeError, match="no audit log"):
+        await store.start_epoch(fixture.site.id, "demo-token", audit=lambda previous, new: event)
