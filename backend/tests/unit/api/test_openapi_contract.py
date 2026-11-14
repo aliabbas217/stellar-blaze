@@ -117,6 +117,7 @@ def test_ready_503_validates_against_the_problem_schema() -> None:
         response = client.get("/api/v1/health/ready")
 
     assert response.status_code == 503
+    assert response.headers["content-type"].startswith("application/problem+json")
     assert Problem.model_validate(response.json()).status == 503
 
 
@@ -125,5 +126,18 @@ def test_ready_documents_its_503_problem(spec: dict[str, Any]) -> None:
     responses = spec["paths"]["/api/v1/health/ready"]["get"]["responses"]
 
     assert "200" in responses
-    problem_ref = responses["503"]["content"]["application/json"]["schema"]["$ref"]
+    # The wire is application/problem+json (RFC 9457); the document says so, for 503 and for every other problem.
+    assert list(responses["503"]["content"]) == ["application/problem+json"]
+    problem_ref = responses["503"]["content"]["application/problem+json"]["schema"]["$ref"]
     assert problem_ref == "#/components/schemas/Problem"
+    assert list(responses["default"]["content"]) == ["application/problem+json"]
+
+
+@pytest.mark.unit
+def test_health_live_documents_its_default_problem(spec: dict[str, Any]) -> None:
+    responses = spec["paths"]["/api/v1/health/live"]["get"]["responses"]
+
+    assert list(responses["default"]["content"]) == ["application/problem+json"]
+    schemas = spec["components"]["schemas"]
+    for name in ("LiveResponse", "ReadyChecks", "ReadyResponse"):
+        assert schemas[name]["additionalProperties"] is False, name

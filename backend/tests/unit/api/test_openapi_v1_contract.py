@@ -6,18 +6,36 @@ route bodies of later tasks cannot change it without a test saying so (except th
 and Task 11 replace route by route).
 """
 
-from typing import Any, cast
+import datetime
+import types
+from typing import Annotated, Any, cast, get_args, get_origin
 
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, ValidationError
+from pydantic import AwareDatetime, BaseModel, ValidationError
 
+from stellar_blaze.api import models as api_models
 from stellar_blaze.api.app import create_app
-from stellar_blaze.api.models import PROBLEM_MODELS, REQUEST_MODELS, RESPONSE_MODELS, DayPlan, PlanValidateRequest, Site
+from stellar_blaze.api.models import (
+    PROBLEM_MODELS,
+    REQUEST_MODELS,
+    RESPONSE_MODELS,
+    AckItem,
+    DayPlan,
+    PlanValidateRequest,
+    PlanValidateResponse,
+    PushSubscriptionCreate,
+    PushSubscriptionDetails,
+    ReviewRequiredProblem,
+    RosterInvalidProblem,
+    Site,
+    ValidationProblem,
+)
 from stellar_blaze.api.responses import PROBLEM_EXAMPLES
 from stellar_blaze.api.security import employer_bearer
 from stellar_blaze.config import Settings
+from stellar_blaze.domain import scoreboard
 from stellar_blaze.errors import NOT_IMPLEMENTED, Problem
 
 HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
@@ -99,11 +117,8 @@ SUCCESS_STATUS = {
 
 # Problem schemas keep `additionalProperties: true` on purpose: RFC 9457 extension members (`errors`, `missing_items`,
 # `dependency`, ...) travel next to the standard members.
+RFC9457_MEMBERS = {"type", "title", "status", "detail", "instance", "request_id"}
 OPEN_PROBLEM_SCHEMAS = {"Problem", "ValidationProblem", "RosterInvalidProblem", "ReviewRequiredProblem"}
-
-# B1's health response models do not forbid extra members; they are not part of the B3 contract surface. F1's governance
-# test does flag them (its walker covers the whole document): the controller decides whether B1's models are tightened.
-B1_HEALTH_SCHEMAS = {"LiveResponse", "ReadyChecks", "ReadyResponse"}
 
 # (schema, property) pairs that match the member-like regex and are allowed. Nothing else may.
 MEMBER_LIKE = r"(worker|member|employee|heart|symptom|acclimat|juvenile)"
@@ -182,7 +197,7 @@ def test_parameters_names_and_types(spec: dict[str, Any]) -> None:
     assert params("list_sites") == {}
     assert params("get_risk_policy") == {}
     assert params("get_site_forecast_today") == {"site_id": ("path", True), "date": ("query", False)}
-    assert params("list_site_crews") == {"site_id": ("path", True)}
+    assert params("list_site_crews") == {"site_id": ("path", True), "date": ("query", False)}
     assert params("get_crew_timeline") == {"crew_id": ("path", True), "date": ("query", False)}
     assert params("get_crew_day_plan") == {"crew_id": ("path", True), "date": ("query", False)}
     assert params("sign_off_day_plan") == {"crew_id": ("path", True), "date": ("query", False)}
@@ -368,7 +383,7 @@ def test_every_object_forbids_additional_properties(spec: dict[str, Any]) -> Non
     open_inline = [
         node
         for name, schema in components.items()
-        if name not in OPEN_PROBLEM_SCHEMAS | B1_HEALTH_SCHEMAS
+        if name not in OPEN_PROBLEM_SCHEMAS
         for node in walk(schema)
         if node.get("type") == "object" and node.get("additionalProperties") is not False
     ]
@@ -413,13 +428,15 @@ def test_crew_and_policy_shapes(spec: dict[str, Any]) -> None:
             "id",
             "site_id",
             "name",
-            "task",
+            "task_label",
             "workload",
             "member_count",
             "shift",
             "signoff_state",
             "plan_status",
             "stopped",
+            "active_stop_id",
+            "stopped_at",
         ]
     )
     assert sorted(found["Crew"]["required"]) == sorted(found["Crew"]["properties"])
@@ -459,7 +476,7 @@ def test_ban_window_is_data_on_every_timeline_response(spec: dict[str, Any]) -> 
     found = schemas(spec)
 
     assert sorted(found["BanWindow"]["required"]) == sorted(
-        ["start", "end", "season_start", "season_end", "timezone", "active_on_date"]
+        ["start", "end", "season_start", "season_end", "timezone", "active_on_date", "starts_at", "ends_at"]
     )
     for name in ("SiteForecastToday", "CrewTimeline", "DayPlan", "PlanValidateResponse"):
         assert ref_name(found[name]["properties"]["ban_window"]) == "BanWindow", name
@@ -472,11 +489,11 @@ def test_day_plan_shape(spec: dict[str, Any]) -> None:
 
     assert sorted(plan["required"]) == sorted(plan["properties"])
     assert plan["properties"]["banner_code"]["const"] == "plan.floor_banner"
-    assert plan["properties"]["signoff_state"]["enum"] == ["unsigned", "signed"]
+    assert plan["properties"]["signoff_state"]["enum"] == ["unsigned", "signed", "changed_since_signed"]
     assert plan["properties"]["status"]["enum"] == ["rule", "fallback"]
     assert "ack_items" in plan["properties"]
     assert "review_items" not in plan["properties"]
-    for field in ("signoff_label_code", "signed_at", "signed_by", "restricted_headcount", "model_id"):
+    for field in ("signoff_label_code", "signed_at", "signed_by_role", "restricted_headcount", "model_id"):
         variants = plan["properties"][field]["anyOf"]
         assert {"type": "null"} in variants, field
     ack = schemas(spec)["AckItem"]
@@ -489,28 +506,169 @@ def test_day_plan_shape(spec: dict[str, Any]) -> None:
     assert states == ["work", "adosh_rest", "art18_break", "ban", "stopped", "off"]
 
 
+def leaf_types(annotation: Any) -> set[Any]:
+    """Every class an annotation is made of, looking through unions, lists and Annotated."""
+    args = get_args(annotation)
+    if not args:
+        return {annotation}
+    if get_origin(annotation) is Annotated:
+        return leaf_types(args[0])
+    found: set[Any] = set()
+    for arg in args:
+        found |= leaf_types(arg)
+    return found
+
+
+def models_of(module: Any) -> list[type[BaseModel]]:
+    return [
+        model
+        for model in vars(module).values()
+        if isinstance(model, type) and issubclass(model, BaseModel) and model.__module__ == module.__name__
+    ]
+
+
+def naive_datetime_fields(module: Any) -> list[str]:
+    return [
+        f"{model.__name__}.{field}"
+        for model in models_of(module)
+        for field, info in model.model_fields.items()
+        if datetime.datetime in leaf_types(info.annotation)
+    ]
+
+
+def aware_datetime_fields(module: Any) -> int:
+    return sum(
+        AwareDatetime in leaf_types(info.annotation)
+        for model in models_of(module)
+        for info in model.model_fields.values()
+    )
+
+
 @pytest.mark.unit
-def test_every_instant_is_timezone_aware(spec: dict[str, Any]) -> None:
-    for name, schema in schemas(spec).items():
-        for prop, definition in schema.get("properties", {}).items():
-            variants = definition.get("anyOf", [definition])
-            for variant in variants:
-                if variant.get("format") == "date-time":
-                    assert variant["type"] == "string", f"{name}.{prop}"
+def test_every_instant_is_timezone_aware() -> None:
+    """A plain `datetime` field would accept a naive instant, and the JSON schema of `AwareDatetime` looks the same,
+    so this inspects the annotations."""
+    assert naive_datetime_fields(api_models) == []
+    assert naive_datetime_fields(scoreboard) == []
+    # Not vacuous: both modules hold aware instants, and the walker flags a plain datetime.
+    assert aware_datetime_fields(api_models) > 15
+    assert aware_datetime_fields(scoreboard) >= 2
+
+    leaky = types.ModuleType("leaky")
+
+    class Leaky(BaseModel):
+        at: datetime.datetime | None
+
+    Leaky.__module__ = "leaky"
+    leaky.Leaky = Leaky  # type: ignore[attr-defined]
+    assert naive_datetime_fields(leaky) == ["Leaky.at"]
 
 
 @pytest.mark.unit
 def test_every_public_field_has_a_description(spec: dict[str, Any]) -> None:
-    obvious_names = {"id", "name", "site_id", "crew_id", "crew_name", "detail"}  # an id or label says what it is
+    """Every field of every component, nested models included, says what it is (an id or label says it itself)."""
+    obvious_names = {"id", "name", "site_id", "crew_id", "crew_name"}
     missing = [
         f"{name}.{prop}"
         for name, schema in schemas(spec).items()
-        if name in {m.__name__ for m in RESPONSE_MODELS + REQUEST_MODELS}
+        if name not in {"Problem", "LiveResponse", "ReadyChecks", "ReadyResponse"}  # B1 health models
         for prop, definition in schema.get("properties", {}).items()
-        if not definition.get("description") and prop not in obvious_names
+        if not definition.get("description")
+        and prop not in obvious_names
+        and not (name in OPEN_PROBLEM_SCHEMAS and prop in RFC9457_MEMBERS)
     ]
 
     assert missing == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("model", [DayPlan, PlanValidateResponse], ids=lambda m: m.__name__)
+def test_every_plan_payload_carries_the_floor_banner(spec: dict[str, Any], model: type[BaseModel]) -> None:
+    schema = schemas(spec)[model.__name__]
+
+    assert schema["properties"]["banner_code"]["const"] == "plan.floor_banner"
+    assert "banner_code" in schema["required"]
+    assert examples_of(model)[0]["banner_code"] == "plan.floor_banner"
+
+
+@pytest.mark.unit
+def test_signoff_states_and_labels(spec: dict[str, Any]) -> None:
+    found = schemas(spec)
+    three = ["unsigned", "signed", "changed_since_signed"]
+
+    for name in ("DayPlan", "Crew", "CrewTimeline"):
+        assert found[name]["properties"]["signoff_state"]["enum"] == three, name
+    assert found["PlanSignOff"]["properties"]["signoff_state"]["const"] == "signed"
+    label = found["DayPlan"]["properties"]["signoff_label_code"]["anyOf"]
+    assert {"type": "string", "enum": ["plan.unsigned_fallback", "plan.changed_since_signed"]} in label
+    assert {"type": "null"} in label
+    assert "changed_since_signed" in found["DayPlan"]["properties"]["signoff_state"]["description"]
+    for name in ("DayPlan", "PlanSignOff"):
+        assert "signed_by" not in found[name]["properties"], name
+    assert found["PlanSignOff"]["properties"]["signed_by_role"]["const"] == "supervisor"
+
+
+@pytest.mark.unit
+def test_crew_status_can_clear_a_stop_after_a_reload(spec: dict[str, Any]) -> None:
+    crew = schemas(spec)["Crew"]
+
+    for field in ("active_stop_id", "stopped_at"):
+        assert field in crew["required"]
+        assert {"type": "null"} in crew["properties"][field]["anyOf"]
+    for field in ("signoff_state", "plan_status"):
+        description = crew["properties"][field]["description"]
+        assert "response date" in description, field
+        assert "today" not in description, field
+
+
+@pytest.mark.unit
+def test_f2_alignment_fields(spec: dict[str, Any]) -> None:
+    found = schemas(spec)
+
+    assert "task_label" in found["Crew"]["properties"]
+    assert "task" not in found["Crew"]["properties"]
+    timeline = found["CrewTimeline"]
+    assert ref_name(timeline["properties"]["shift"]["items"]) == "TimeRange"
+    assert {"shift", "signoff_state"} <= set(timeline["required"])
+    ban = found["BanWindow"]
+    for field in ("starts_at", "ends_at"):
+        assert field in ban["required"]
+        assert {"type": "null"} in ban["properties"][field]["anyOf"]
+    assert "never a null object" in found["SiteForecastToday"]["properties"]["ban_window"]["description"]
+    assert found["AckItem"]["properties"]["text_code"]["type"] == "string"
+    assert "text_code" in found["AckItem"]["required"]
+    assert examples_of(AckItem)[0]["text_code"] == "cycle.high.heavy.20-40"
+
+
+@pytest.mark.unit
+def test_scoreboards_say_which_evaluation_they_are(spec: dict[str, Any]) -> None:
+    found = schemas(spec)
+
+    for name in ("PolicyScoreboard", "PlanScoreboard", "DemoDay"):
+        assert found[name]["properties"]["evaluation_set"]["enum"] == ["dev_2025", "scored_2026"], name
+        assert "evaluation_set" in found[name]["required"], name
+    assert "evaluation_set" not in found["ThetaDecision"]["properties"]
+    hour = found["DemoDayHour"]
+    quantiles = next(v for v in hour["properties"]["corrected_wbgt_c"]["anyOf"] if "$ref" in v)
+    assert ref_name(quantiles) == "WbgtQuantiles"
+    assert "corrected_wbgt_c" in hour["required"]
+    assert "high_hours_outside_ban" in found["DemoDay"]["properties"]["score"]["description"]
+
+
+@pytest.mark.unit
+def test_push_subscription_accepts_only_the_browser_names() -> None:
+    example = examples_of(PushSubscriptionDetails)[0]
+    snake = {k: v for k, v in example.items() if k != "expirationTime"} | {"expiration_time": None}
+
+    with pytest.raises(ValidationError):
+        PushSubscriptionDetails.model_validate(snake)
+
+
+@pytest.mark.unit
+def test_crew_id_has_its_own_id_alias() -> None:
+    crew_id = get_args(PushSubscriptionCreate.model_fields["crew_id"].annotation)[0]
+
+    assert get_args(crew_id)[1:] == get_args(api_models.EntityId)[1:]
 
 
 @pytest.mark.unit
@@ -552,7 +710,13 @@ def test_every_problem_type_has_a_valid_example() -> None:
     }
 
     assert set(PROBLEM_EXAMPLES) == expected_types
+    own_models: dict[str, type[Problem]] = {
+        "validation-failed": ValidationProblem,
+        "roster-invalid": RosterInvalidProblem,
+        "review-required": ReviewRequiredProblem,
+    }
     for key, example in PROBLEM_EXAMPLES.items():
+        own_models.get(key, Problem).model_validate(example)
         parsed = Problem.model_validate(example)
         assert parsed.request_id
         assert parsed.instance
@@ -641,7 +805,7 @@ def test_site_carries_epoch_and_unwell_contacts(spec: dict[str, Any]) -> None:
     site = schemas(spec)["Site"]
 
     assert sorted(site["required"]) == sorted(
-        ["id", "name", "timezone", "synthetic", "demo_epoch", "supervisor_phone", "first_aider_phone"]
+        ["id", "name", "timezone", "synthetic", "epoch_id", "supervisor_phone", "first_aider_phone"]
     )
     for field in ("supervisor_phone", "first_aider_phone"):
         variants = site["properties"][field]["anyOf"]
@@ -651,22 +815,28 @@ def test_site_carries_epoch_and_unwell_contacts(spec: dict[str, Any]) -> None:
         assert "SYNTHETIC" in site["properties"][field]["description"]
     example = examples_of(Site)[0]
     assert (example["supervisor_phone"], example["first_aider_phone"]) == ("+12025550143", "+12025550144")
-    assert {"type": "null"} in site["properties"]["demo_epoch"]["anyOf"]
+    assert {"type": "null"} in site["properties"]["epoch_id"]["anyOf"]
     for bad in ("12025550143", "+0123456789", "+1202", "+1202555014312345", "tel:+12025550143"):
         with pytest.raises(ValidationError):
             Site.model_validate({**example, "supervisor_phone": bad})
-    Site.model_validate({**example, "supervisor_phone": None, "first_aider_phone": None, "demo_epoch": None})
+    Site.model_validate({**example, "supervisor_phone": None, "first_aider_phone": None, "epoch_id": None})
 
 
 @pytest.mark.unit
 def test_demo_reset_is_an_epoch_not_a_deletion(spec: dict[str, Any]) -> None:
     reset = schemas(spec)["DemoReset"]
 
-    assert sorted(reset["properties"]) == ["epoch", "previous_epoch", "reset_at", "site_id"]
+    assert sorted(reset["properties"]) == ["epoch_id", "previous_epoch_id", "reset_at", "site_id"]
     assert sorted(reset["required"]) == sorted(reset["properties"])
     operation = operations(spec)["reset_demo_site"][2]
-    text = operation["description"] + reset["properties"]["epoch"]["description"]
-    for phrase in ("Nothing is deleted", "epoch", "demo_reset", "not-a-demo-site"):
+    text = operation["description"] + reset["properties"]["epoch_id"]["description"]
+    for phrase in (
+        "Nothing is deleted",
+        "`epoch_id` increases by one",
+        "alert events and push subscriptions",
+        "records `demo_reset` (not visible to workers)",
+        "not-a-demo-site",
+    ):
         assert phrase in text, phrase
 
 
@@ -696,7 +866,6 @@ def test_stop_and_sign_off_copy_never_claims_delivery(spec: dict[str, Any]) -> N
     texts = [
         *stop_texts,
         operations(spec)["sign_off_day_plan"][2]["description"],
-        operations(spec)["reset_demo_site"][2]["description"],
         schemas(spec)["CrewStop"]["description"],
     ]
     for text in texts:

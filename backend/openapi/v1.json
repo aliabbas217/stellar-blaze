@@ -9,6 +9,7 @@
             "ends_at": "2026-07-01T03:00:00Z",
             "id": "high-0600",
             "starts_at": "2026-07-01T02:00:00Z",
+            "text_code": "cycle.high.heavy.20-40",
             "zone": "high"
           }
         ],
@@ -30,6 +31,11 @@
             "title": "Starts At",
             "type": "string"
           },
+          "text_code": {
+            "description": "Ruleset action code of the run's cycle for the crew's workload and the run's zone, for example `cycle.medium.heavy.45-15` or `cycle.high.heavy.20-40`; the client maps it to copy.",
+            "title": "Text Code",
+            "type": "string"
+          },
           "zone": {
             "description": "The zone of the run; Low runs need no acknowledgement.",
             "enum": [
@@ -45,7 +51,8 @@
           "id",
           "zone",
           "starts_at",
-          "ends_at"
+          "ends_at",
+          "text_code"
         ],
         "title": "AckItem",
         "type": "object"
@@ -68,9 +75,11 @@
           {
             "active_on_date": true,
             "end": "15:00",
+            "ends_at": "2026-07-01T11:00:00Z",
             "season_end": "09-15",
             "season_start": "06-15",
             "start": "12:30",
+            "starts_at": "2026-07-01T08:30:00Z",
             "timezone": "Asia/Dubai"
           }
         ],
@@ -85,6 +94,19 @@
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
             "title": "End",
             "type": "string"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UTC instant the ban ends (exclusive) on the response's own date; null when `active_on_date` is false.",
+            "title": "Ends At"
           },
           "season_end": {
             "description": "Last local date of the ban season, `MM-DD`, inclusive (09-15).",
@@ -104,6 +126,19 @@
             "title": "Start",
             "type": "string"
           },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UTC instant the ban starts on the response's own date; null when `active_on_date` is false.",
+            "title": "Starts At"
+          },
           "timezone": {
             "description": "IANA time zone `start`, `end` and the season dates are in.",
             "title": "Timezone",
@@ -116,7 +151,9 @@
           "season_start",
           "season_end",
           "timezone",
-          "active_on_date"
+          "active_on_date",
+          "starts_at",
+          "ends_at"
         ],
         "title": "BanWindow",
         "type": "object"
@@ -130,6 +167,7 @@
             "type": "number"
           },
           "code": {
+            "description": "Clothing option code; the client holds the words.",
             "title": "Code",
             "type": "string"
           },
@@ -168,11 +206,23 @@
             "signoff_state": "unsigned",
             "site_id": "site-demo-mussafah",
             "stopped": false,
-            "task": "Concrete pour",
+            "task_label": "Concrete pour",
             "workload": "heavy"
           }
         ],
         "properties": {
+          "active_stop_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Id of the active stop, to pass to `delete_crew_stop` after a reload; null when `stopped` is false.",
+            "title": "Active Stop Id"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -187,7 +237,7 @@
             "type": "string"
           },
           "plan_status": {
-            "description": "Status of today's plan: `rule` (from the forecast) or `fallback` (no fresh forecast: protective plan).",
+            "description": "Status of the plan for the response date: `rule` (from the forecast) or `fallback` (no fresh forecast: protective plan).",
             "enum": [
               "rule",
               "fallback"
@@ -204,10 +254,11 @@
             "type": "array"
           },
           "signoff_state": {
-            "description": "Sign-off of today's plan (site-local today): `unsigned` or `signed`.",
+            "description": "Sign-off of the plan for the response date: `unsigned`; `signed`; or `changed_since_signed` (a plan was signed earlier that day and the current rule plan differs from the signed one).",
             "enum": [
               "unsigned",
-              "signed"
+              "signed",
+              "changed_since_signed"
             ],
             "title": "Signoff State",
             "type": "string"
@@ -217,13 +268,26 @@
             "type": "string"
           },
           "stopped": {
-            "description": "True while a crew-lead stop is active now.",
+            "description": "True while a crew-lead stop is active at the time of the response. Equivalent to `active_stop_id` being non-null.",
             "title": "Stopped",
             "type": "boolean"
           },
-          "task": {
+          "stopped_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UTC time the active stop was recorded; null when `stopped` is false.",
+            "title": "Stopped At"
+          },
+          "task_label": {
             "description": "What the crew does, for example `Concrete pour`.",
-            "title": "Task",
+            "title": "Task Label",
             "type": "string"
           },
           "workload": {
@@ -241,13 +305,15 @@
           "id",
           "site_id",
           "name",
-          "task",
+          "task_label",
           "workload",
           "member_count",
           "shift",
           "signoff_state",
           "plan_status",
-          "stopped"
+          "stopped",
+          "active_stop_id",
+          "stopped_at"
         ],
         "title": "Crew",
         "type": "object"
@@ -373,9 +439,11 @@
             "ban_window": {
               "active_on_date": true,
               "end": "15:00",
+              "ends_at": "2026-07-01T11:00:00Z",
               "season_end": "09-15",
               "season_start": "06-15",
               "start": "12:30",
+              "starts_at": "2026-07-01T08:30:00Z",
               "timezone": "Asia/Dubai"
             },
             "crew_id": "crew-b",
@@ -390,6 +458,17 @@
               }
             ],
             "k": 5,
+            "shift": [
+              {
+                "ends_at": "2026-07-01T07:00:00Z",
+                "starts_at": "2026-07-01T02:00:00Z"
+              },
+              {
+                "ends_at": "2026-07-01T14:00:00Z",
+                "starts_at": "2026-07-01T11:00:00Z"
+              }
+            ],
+            "signoff_state": "unsigned",
             "site_id": "site-demo-mussafah",
             "suppressed": false
           }
@@ -397,7 +476,7 @@
         "properties": {
           "ban_window": {
             "$ref": "#/components/schemas/BanWindow",
-            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date."
+            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object."
           },
           "crew_id": {
             "title": "Crew Id",
@@ -436,6 +515,24 @@
             "title": "K",
             "type": "integer"
           },
+          "shift": {
+            "description": "The crew's published shift blocks on this date as UTC instants, in time order.",
+            "items": {
+              "$ref": "#/components/schemas/TimeRange"
+            },
+            "title": "Shift",
+            "type": "array"
+          },
+          "signoff_state": {
+            "description": "Sign-off of the crew's plan for this date: `unsigned`, `signed` or `changed_since_signed`.",
+            "enum": [
+              "unsigned",
+              "signed",
+              "changed_since_signed"
+            ],
+            "title": "Signoff State",
+            "type": "string"
+          },
           "site_id": {
             "title": "Site Id",
             "type": "string"
@@ -454,6 +551,8 @@
           "suppressed",
           "k",
           "forecast_status",
+          "signoff_state",
+          "shift",
           "ban_window",
           "hours"
         ],
@@ -512,15 +611,18 @@
                 "ends_at": "2026-07-01T03:00:00Z",
                 "id": "high-0600",
                 "starts_at": "2026-07-01T02:00:00Z",
+                "text_code": "cycle.high.heavy.20-40",
                 "zone": "high"
               }
             ],
             "ban_window": {
               "active_on_date": true,
               "end": "15:00",
+              "ends_at": "2026-07-01T11:00:00Z",
               "season_end": "09-15",
               "season_start": "06-15",
               "start": "12:30",
+              "starts_at": "2026-07-01T08:30:00Z",
               "timezone": "Asia/Dubai"
             },
             "banner_code": "plan.floor_banner",
@@ -593,11 +695,11 @@
           },
           "ban_window": {
             "$ref": "#/components/schemas/BanWindow",
-            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date."
+            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object."
           },
           "banner_code": {
             "const": "plan.floor_banner",
-            "description": "Always present: the client shows the floor banner (\"Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.\").",
+            "description": "Always present on every plan payload: the client shows the floor banner (\"Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.\").",
             "title": "Banner Code",
             "type": "string"
           },
@@ -681,39 +783,44 @@
                 "type": "null"
               }
             ],
-            "description": "UTC time of the sign-off; null while unsigned.",
+            "description": "UTC time of the sign-off; null while `unsigned`; the time of the earlier sign-off when `changed_since_signed`.",
             "title": "Signed At"
           },
-          "signed_by": {
+          "signed_by_role": {
             "anyOf": [
               {
+                "const": "supervisor",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Actor string of the employer's signing supervisor; null while unsigned.",
-            "title": "Signed By"
+            "description": "Role of the signer; null while unsigned. The API never exposes a person's name.",
+            "title": "Signed By Role"
           },
           "signoff_label_code": {
             "anyOf": [
               {
-                "const": "plan.unsigned_fallback",
+                "enum": [
+                  "plan.unsigned_fallback",
+                  "plan.changed_since_signed"
+                ],
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Non-null exactly when `signoff_state` is `unsigned`: the client shows the unsigned-fallback label.",
+            "description": "Non-null exactly when `signoff_state` is not `signed`: `plan.unsigned_fallback` for `unsigned`, `plan.changed_since_signed` for `changed_since_signed`. The client shows the matching label.",
             "title": "Signoff Label Code"
           },
           "signoff_state": {
-            "description": "`unsigned` until a supervisor of the employer signs; never gates an alert or stop.",
+            "description": "`unsigned` until a supervisor of the employer signs; `signed`; `changed_since_signed` when a plan was signed earlier that day and the current rule plan differs from it. Never gates an alert or a stop.",
             "enum": [
               "unsigned",
-              "signed"
+              "signed",
+              "changed_since_signed"
             ],
             "title": "Signoff State",
             "type": "string"
@@ -760,7 +867,7 @@
           "restricted_headcount",
           "restrictions",
           "signed_at",
-          "signed_by",
+          "signed_by_role",
           "forecast_status",
           "ban_window",
           "policy_version",
@@ -785,13 +892,22 @@
             "title": "Date",
             "type": "string"
           },
+          "evaluation_set": {
+            "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
+            "enum": [
+              "dev_2025",
+              "scored_2026"
+            ],
+            "title": "Evaluation Set",
+            "type": "string"
+          },
           "high_hours": {
             "description": "Observed High-or-Red working hours on the date, ban hours included (demo_high_h).",
             "title": "High Hours",
             "type": "number"
           },
           "high_hours_outside_ban": {
-            "description": "The score: High-or-Red hours outside the ban, weighted (demo_high_outside_ban_h).",
+            "description": "High-or-Red working hours outside the ban window, weighted (demo_high_outside_ban_h); equals `score`.",
             "title": "High Hours Outside Ban",
             "type": "number"
           },
@@ -814,7 +930,8 @@
             "type": "number"
           },
           "provenance": {
-            "$ref": "#/components/schemas/Provenance"
+            "$ref": "#/components/schemas/Provenance",
+            "description": "Where the numbers in this file came from."
           },
           "raw_hits": {
             "description": "Danger hours the raw-forecast policy P2 warned (demo_raw_hits).",
@@ -838,7 +955,7 @@
             "description": "Second-best candidate; null when there was only one."
           },
           "score": {
-            "description": "Observed High-zone working hours outside the ban window on that date (weighted).",
+            "description": "The pre-registration 7.4 selection score: observed High-zone working hours outside the ban window, weighted by the non-ban fraction. It equals `high_hours_outside_ban`; it is kept under this name because it is the quantity the selection rule maximizes.",
             "title": "Score",
             "type": "number"
           },
@@ -849,6 +966,7 @@
           }
         },
         "required": [
+          "evaluation_set",
           "station",
           "date",
           "score",
@@ -874,6 +992,17 @@
             "description": "Non-ban fraction of the hour, 0 to 1 (0.5 for the hour 08:00 UTC, which holds 30 minutes of ban).",
             "title": "Ban Weight",
             "type": "number"
+          },
+          "corrected_wbgt_c": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WbgtQuantiles"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Corrected WBGT range (5th, 50th, 95th percentile) in degrees Celsius; null when no finite sample."
           },
           "p_high": {
             "anyOf": [
@@ -993,6 +1122,7 @@
           "raw_wbgt_c",
           "raw_twl_eff_w_m2",
           "raw_zone",
+          "corrected_wbgt_c",
           "p_high",
           "protective_twl_w_m2",
           "warned_by"
@@ -1002,24 +1132,24 @@
       },
       "DemoReset": {
         "additionalProperties": false,
-        "description": "A reset starts a fresh epoch of a synthetic demo site. Nothing is deleted.",
+        "description": "A reset starts a new epoch of a synthetic demo site. Nothing is deleted.",
         "examples": [
           {
-            "epoch": 2,
-            "previous_epoch": 1,
+            "epoch_id": 2,
+            "previous_epoch_id": 1,
             "reset_at": "2026-07-01T05:00:00Z",
             "site_id": "site-demo-mussafah"
           }
         ],
         "properties": {
-          "epoch": {
-            "description": "The new current epoch. Plans, sign-offs, stop events and data requests of earlier epochs are no longer visible; the append-only audit chain continues unbroken and records `demo_reset`.",
-            "title": "Epoch",
+          "epoch_id": {
+            "description": "A reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events and push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not epoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted.",
+            "title": "Epoch Id",
             "type": "integer"
           },
-          "previous_epoch": {
-            "description": "The epoch that was current before the reset (`epoch` minus 1).",
-            "title": "Previous Epoch",
+          "previous_epoch_id": {
+            "description": "The epoch that was current before the reset (`epoch_id` minus 1).",
+            "title": "Previous Epoch Id",
             "type": "integer"
           },
           "reset_at": {
@@ -1035,8 +1165,8 @@
         },
         "required": [
           "site_id",
-          "epoch",
-          "previous_epoch",
+          "epoch_id",
+          "previous_epoch_id",
           "reset_at"
         ],
         "title": "DemoReset",
@@ -1230,6 +1360,7 @@
         "type": "object"
       },
       "LiveResponse": {
+        "additionalProperties": false,
         "properties": {
           "status": {
             "const": "ok",
@@ -1429,6 +1560,15 @@
             "title": "Crew Label",
             "type": "string"
           },
+          "evaluation_set": {
+            "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
+            "enum": [
+              "dev_2025",
+              "scored_2026"
+            ],
+            "title": "Evaluation Set",
+            "type": "string"
+          },
           "fixture_sha256": {
             "description": "SHA-256 of `backend/fixtures/demo_site.toml` (frozen, ADR 0057).",
             "title": "Fixture Sha256",
@@ -1459,7 +1599,8 @@
             "type": "integer"
           },
           "provenance": {
-            "$ref": "#/components/schemas/Provenance"
+            "$ref": "#/components/schemas/Provenance",
+            "description": "Where the numbers in this file came from."
           },
           "roster": {
             "description": "The roster in words, for example `L1: 06:00-11:00 + 15:00-18:00 GST`.",
@@ -1516,6 +1657,7 @@
           }
         },
         "required": [
+          "evaluation_set",
           "station",
           "site_id",
           "crew_id",
@@ -1562,7 +1704,8 @@
             "type": "string"
           },
           "state": {
-            "$ref": "#/components/schemas/PlanState"
+            "$ref": "#/components/schemas/PlanState",
+            "description": "What the crew does in this segment."
           },
           "zone": {
             "anyOf": [
@@ -1597,7 +1740,7 @@
             "crew_id": "crew-b",
             "date": "2026-07-01",
             "signed_at": "2026-07-01T01:10:00Z",
-            "signed_by": "supervisor.demo",
+            "signed_by_role": "supervisor",
             "signoff_state": "signed"
           }
         ],
@@ -1638,9 +1781,10 @@
             "title": "Signed At",
             "type": "string"
           },
-          "signed_by": {
-            "description": "Actor string of the employer principal that signed, never a worker.",
-            "title": "Signed By",
+          "signed_by_role": {
+            "const": "supervisor",
+            "description": "Role of the signer. The API never exposes a person's name, and a worker never signs.",
+            "title": "Signed By Role",
             "type": "string"
           },
           "signoff_state": {
@@ -1655,7 +1799,7 @@
           "date",
           "signoff_state",
           "signed_at",
-          "signed_by",
+          "signed_by_role",
           "acknowledged_items",
           "deviation_reason_code"
         ],
@@ -1794,11 +1938,14 @@
             "ban_window": {
               "active_on_date": true,
               "end": "15:00",
+              "ends_at": "2026-07-01T11:00:00Z",
               "season_end": "09-15",
               "season_start": "06-15",
               "start": "12:30",
+              "starts_at": "2026-07-01T08:30:00Z",
               "timezone": "Asia/Dubai"
             },
+            "banner_code": "plan.floor_banner",
             "config_version": 1,
             "forecast_status": "fresh",
             "model_id": "corrector-20261112-0000000-000001",
@@ -1839,7 +1986,13 @@
         "properties": {
           "ban_window": {
             "$ref": "#/components/schemas/BanWindow",
-            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date."
+            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object."
+          },
+          "banner_code": {
+            "const": "plan.floor_banner",
+            "description": "Always present on every plan payload: the client shows the floor banner (\"Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.\").",
+            "title": "Banner Code",
+            "type": "string"
           },
           "config_version": {
             "description": "Active runtime configuration id; 0 when running without a database configuration.",
@@ -1887,6 +2040,7 @@
           }
         },
         "required": [
+          "banner_code",
           "validator",
           "zone_hours",
           "forecast_status",
@@ -2011,6 +2165,15 @@
             "title": "Assumed Crew Size",
             "type": "integer"
           },
+          "evaluation_set": {
+            "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
+            "enum": [
+              "dev_2025",
+              "scored_2026"
+            ],
+            "title": "Evaluation Set",
+            "type": "string"
+          },
           "leads": {
             "description": "One entry per lead 1, 2, 3, 5, 7, in that order.",
             "items": {
@@ -2030,7 +2193,8 @@
             "type": "integer"
           },
           "provenance": {
-            "$ref": "#/components/schemas/Provenance"
+            "$ref": "#/components/schemas/Provenance",
+            "description": "Where the numbers in this file came from."
           },
           "ruleset_id": {
             "description": "Frozen ruleset id the zones come from.",
@@ -2097,6 +2261,7 @@
           }
         },
         "required": [
+          "evaluation_set",
           "station",
           "season_start",
           "season_end",
@@ -2123,6 +2288,7 @@
         "description": "An RFC 9457 problem details object, sent as ``application/problem+json`` for every error response.\n\nExtension members (for example ``dependency`` or ``errors``) may be present. ``detail`` is omitted when there is\nnone.",
         "properties": {
           "detail": {
+            "default": null,
             "title": "Detail",
             "type": "string"
           },
@@ -2135,8 +2301,8 @@
             "type": "string"
           },
           "status": {
-            "maximum": 599.0,
-            "minimum": 100.0,
+            "maximum": 599,
+            "minimum": 100,
             "title": "Status",
             "type": "integer"
           },
@@ -2383,6 +2549,7 @@
         "type": "object"
       },
       "ReadyChecks": {
+        "additionalProperties": false,
         "properties": {
           "config": {
             "default": "ok",
@@ -2408,6 +2575,7 @@
         "type": "object"
       },
       "ReadyResponse": {
+        "additionalProperties": false,
         "properties": {
           "checks": {
             "$ref": "#/components/schemas/ReadyChecks"
@@ -2677,6 +2845,7 @@
             "type": "string"
           },
           "errors": {
+            "description": "Every line of the roster that could not be read.",
             "items": {
               "$ref": "#/components/schemas/RosterError"
             },
@@ -2856,7 +3025,7 @@
         "additionalProperties": false,
         "examples": [
           {
-            "demo_epoch": 1,
+            "epoch_id": 1,
             "first_aider_phone": "+12025550144",
             "id": "site-demo-mussafah",
             "name": "Mussafah M-14 yard (synthetic)",
@@ -2866,7 +3035,7 @@
           }
         ],
         "properties": {
-          "demo_epoch": {
+          "epoch_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -2875,8 +3044,8 @@
                 "type": "null"
               }
             ],
-            "description": "Current demo epoch of a synthetic site (1 or more); null for a site that is not synthetic. Plans, sign-offs, stop events and data requests belong to one epoch; `reset_demo_site` starts the next.",
-            "title": "Demo Epoch"
+            "description": "Current demo epoch of a synthetic site (1 or more); null for a site that is not synthetic. Plans, sign-offs, stop events, data requests, alert events and push subscriptions are scoped to one epoch and resolved server-side; `reset_demo_site` starts the next.",
+            "title": "Epoch Id"
           },
           "first_aider_phone": {
             "anyOf": [
@@ -2928,7 +3097,7 @@
           "name",
           "timezone",
           "synthetic",
-          "demo_epoch",
+          "epoch_id",
           "supervisor_phone",
           "first_aider_phone"
         ],
@@ -2942,9 +3111,11 @@
             "ban_window": {
               "active_on_date": true,
               "end": "15:00",
+              "ends_at": "2026-07-01T11:00:00Z",
               "season_end": "09-15",
               "season_start": "06-15",
               "start": "12:30",
+              "starts_at": "2026-07-01T08:30:00Z",
               "timezone": "Asia/Dubai"
             },
             "config_version": 1,
@@ -2977,7 +3148,7 @@
         "properties": {
           "ban_window": {
             "$ref": "#/components/schemas/BanWindow",
-            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date."
+            "description": "The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object."
           },
           "config_version": {
             "description": "Id of the active runtime configuration; 0 when the API runs without a database configuration.",
@@ -3084,7 +3255,8 @@
             "type": "integer"
           },
           "provenance": {
-            "$ref": "#/components/schemas/Provenance"
+            "$ref": "#/components/schemas/Provenance",
+            "description": "Where the numbers in this file came from."
           },
           "red_hour_share": {
             "description": "Weighted share of truth hours in Red, 0 to 1 (information only, ADR 0046).",
@@ -3359,6 +3531,7 @@
             "type": "string"
           },
           "errors": {
+            "description": "Every member that failed validation.",
             "items": {
               "$ref": "#/components/schemas/ValidationErrorItem"
             },
@@ -3416,6 +3589,7 @@
             "type": "boolean"
           },
           "violations": {
+            "description": "Violated rules; empty when `passed`.",
             "items": {
               "$ref": "#/components/schemas/Violation"
             },
@@ -3440,6 +3614,7 @@
             "type": "string"
           },
           "detail": {
+            "description": "What the plan does wrong, in one sentence.",
             "title": "Detail",
             "type": "string"
           },
@@ -3474,6 +3649,7 @@
       },
       "WbgtQuantiles": {
         "additionalProperties": false,
+        "description": "A WBGT range in degrees Celsius: the 5th, 50th and 95th percentile of the corrected forecast.",
         "properties": {
           "p05": {
             "anyOf": [
@@ -3524,6 +3700,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
+            "description": "Workload class code.",
             "enum": [
               "light",
               "moderate",
@@ -3602,7 +3779,7 @@
   "paths": {
     "/api/v1/crews/{crew_id}/day-plan": {
       "get": {
-        "description": "The rule plan for the crew's site-local day, checked by the independent validator. Employer token, own crew only.\n\nEvery plan carries the floor banner code, and is `unsigned` until `sign_off_day_plan`. A plan the validator\nrejects is never served: the answer is the `plan-invalid` problem (500).\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`.",
+        "description": "The rule plan for the crew's site-local day, checked by the independent validator. Employer token, own crew only.\n\nEvery plan carries the floor banner code, and is `unsigned` until `sign_off_day_plan`. A plan the validator\nrejects is never served: the answer is the `plan-invalid` problem (500).\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "get_crew_day_plan",
         "parameters": [
           {
@@ -3883,7 +4060,7 @@
     },
     "/api/v1/crews/{crew_id}/day-plan/sign-off": {
       "post": {
-        "description": "Record a named supervisor's acknowledgement of the day plan. Employer token, own crew only.\n\nAnswers `review-required` (409, with `missing_items`) unless every Medium, High and Red item of `ack_items` is\nacknowledged. Sign-off is independent of stops and of the warning dispatch job: it never delays either. Signing a\nplan that is already signed answers 201 with the\nrecorded sign-off again.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`.",
+        "description": "Record a named supervisor's acknowledgement of the day plan. Employer token, own crew only.\n\nAnswers `review-required` (409, with `missing_items`) unless every Medium, High and Red item of `ack_items` is\nacknowledged. Sign-off is independent of stops and of the warning dispatch job: it never delays either. Signing a\nplan that is already signed answers 201 with the\nrecorded sign-off again.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "sign_off_day_plan",
         "parameters": [
           {
@@ -4200,7 +4377,7 @@
     },
     "/api/v1/crews/{crew_id}/stops": {
       "post": {
-        "description": "Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.\n\nStop recorded. It takes effect on the crew's plan and level immediately; push alerts are sent by the alert\ndispatch job, not by this call.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`.",
+        "description": "Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.\n\nStop recorded. It takes effect on the crew's plan and level immediately; push alerts are sent by the alert\ndispatch job, not by this call.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "create_crew_stop",
         "parameters": [
           {
@@ -4425,7 +4602,7 @@
     },
     "/api/v1/crews/{crew_id}/stops/{stop_id}": {
       "delete": {
-        "description": "Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`.",
+        "description": "Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "delete_crew_stop",
         "parameters": [
           {
@@ -4830,13 +5007,13 @@
           },
           "default": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/Problem"
                 }
               }
             },
-            "description": "Problem details (RFC 9457)"
+            "description": "Any other problem (RFC 9457)."
           }
         },
         "summary": "Liveness probe",
@@ -4862,23 +5039,37 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
+                "examples": {
+                  "dependency-unavailable": {
+                    "summary": "Dependency unavailable",
+                    "value": {
+                      "dependency": "config",
+                      "detail": "The active configuration is not loaded.",
+                      "instance": "/api/v1/risk-policy",
+                      "request_id": "00000000-0000-4000-8000-000000000001",
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "urn:stellar-blaze:problem:dependency-unavailable"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/Problem"
                 }
               }
             },
-            "description": "A required dependency (the database, or the active config) is unavailable."
+            "description": "Dependency unavailable: A required dependency (the database or the active configuration) is down."
           },
           "default": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/Problem"
                 }
               }
             },
-            "description": "Problem details (RFC 9457)"
+            "description": "Any other problem (RFC 9457)."
           }
         },
         "summary": "Readiness probe",
@@ -5413,7 +5604,7 @@
     },
     "/api/v1/sites/{site_id}/crews": {
       "get": {
-        "description": "The crews of the site with the status the supervisor list shows: workload, shift, sign-off, plan status, stop.",
+        "description": "The crews of the site with the status the supervisor list shows: workload, shift, sign-off, plan status, stop.\n\nThe sign-off and plan status are those of the response date (`date`, same default rule as the other routes);\nthe stop is the one active at the time of the response.",
         "operationId": "list_site_crews",
         "parameters": [
           {
@@ -5427,6 +5618,25 @@
               "minLength": 1,
               "title": "Site Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode.",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode.",
+              "title": "Date"
             }
           }
         ],
@@ -5543,7 +5753,7 @@
     },
     "/api/v1/sites/{site_id}/data-requests": {
       "post": {
-        "description": "An employer asks for individual worker data. The answer is always the `individual-data-refused` problem (403).\n\nNo such data is held by this service. The refusal is written to an append-only audit log that every worker of the\nsite can read through `get_site_transparency_log`; the `worker_ref` is discarded and never stored, logged or echoed.\nWithout a token the answer is 401.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`.",
+        "description": "An employer asks for individual worker data. The answer is always the `individual-data-refused` problem (403).\n\nNo such data is held by this service. The refusal is written to an append-only audit log that every worker of the\nsite can read through `get_site_transparency_log`; the `worker_ref` is discarded and never stored, logged or echoed.\nWithout a token the answer is 401.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "create_data_request",
         "parameters": [
           {
@@ -5782,7 +5992,7 @@
     },
     "/api/v1/sites/{site_id}/demo-reset": {
       "post": {
-        "description": "Start a fresh demo epoch of a synthetic site. Own employer only; guarded and rate-limited.\n\nNothing is deleted. Plans, sign-offs, stop events and data requests are scoped to the current epoch, so earlier\nepochs are no longer visible. The append-only audit chain continues unbroken and records `demo_reset`. Any site\nthat is not synthetic answers `not-a-demo-site` (409).\n\nRate limit, per access token: 1 per 60 s, 10 per 3600 s. When exceeded: 429 with `Retry-After`.",
+        "description": "Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.\n\nA reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events\nand push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not\nepoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic\nanswers `not-a-demo-site` (409).\n\nRate limit, per access token: 1 per 60 s, 10 per 3600 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "reset_demo_site",
         "parameters": [
           {

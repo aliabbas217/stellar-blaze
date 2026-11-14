@@ -19,6 +19,10 @@ DEMO_RESET_LIMITS: tuple[RateLimit, ...] = (
     RateLimit(limit=10, window_seconds=3600),
 )
 EXTENSION = "x-rate-limit"
+KEYING_NOTE = (
+    "Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one "
+    "global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend)."
+)
 
 
 def extension(limits: tuple[RateLimit, ...]) -> dict[str, Any]:
@@ -29,4 +33,4 @@ def extension(limits: tuple[RateLimit, ...]) -> dict[str, Any]:
 def sentence(limits: list[dict[str, int]]) -> str:
     """The sentence appended to an operation description, built from the same numbers as the extension."""
     parts = [f"{item['limit']} per {item['window_seconds']} s" for item in limits]
-    return f"Rate limit, per access token: {', '.join(parts)}. When exceeded: 429 with `Retry-After`."
+    return f"Rate limit, per access token: {', '.join(parts)}. When exceeded: 429 with `Retry-After`. {KEYING_NOTE}"

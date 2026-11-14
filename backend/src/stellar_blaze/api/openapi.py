@@ -19,6 +19,7 @@ from pydantic.json_schema import models_json_schema
 from stellar_blaze.api.models import PROBLEM_MODELS
 from stellar_blaze.api.rate_limits import EXTENSION, sentence
 from stellar_blaze.domain.scoreboard import DemoDay, PlanScoreboard, PolicyScoreboard, ThetaDecision
+from stellar_blaze.errors import Problem
 
 ARTIFACT_MODELS: list[type[BaseModel]] = [PolicyScoreboard, PlanScoreboard, DemoDay, ThetaDecision]
 REF_TEMPLATE = "#/components/schemas/{model}"
@@ -26,7 +27,7 @@ REF_TEMPLATE = "#/components/schemas/{model}"
 
 def extra_component_schemas() -> dict[str, Any]:
     """Schemas (top-level models and everything they reference) to add to ``components.schemas``."""
-    models = [*PROBLEM_MODELS, *ARTIFACT_MODELS]
+    models: list[type[BaseModel]] = [Problem, *PROBLEM_MODELS, *ARTIFACT_MODELS]
     _, definitions = models_json_schema([(model, "serialization") for model in models], ref_template=REF_TEMPLATE)
     found: dict[str, Any] = definitions["$defs"]
     return found

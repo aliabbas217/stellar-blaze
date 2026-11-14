@@ -5,12 +5,14 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter
+from pydantic import ConfigDict
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from stellar_blaze.api.deps import ConfigPollerDep, EngineDep, RuntimeDep, SettingsDep
+from stellar_blaze.api.responses import problem_responses
 from stellar_blaze.api.schemas import ResponseModel
-from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem, Problem
+from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem
 from stellar_blaze.logging import bind_config_identity
 from stellar_blaze.redaction import describe_exception
 
@@ -19,10 +21,14 @@ logger = structlog.stdlib.get_logger(__name__)
 
 
 class LiveResponse(ResponseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Literal["ok"] = "ok"
 
 
 class ReadyChecks(ResponseModel):
+    model_config = ConfigDict(extra="forbid")
+
     database: Literal["ok"] = "ok"
     # "stale": serving the last good config, but the latest activation could not be read or was refused (logged once per
     # change). "missing" (no config at all) is never a 200: it is the 503 below.
@@ -30,11 +36,13 @@ class ReadyChecks(ResponseModel):
 
 
 class ReadyResponse(ResponseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Literal["ok"] = "ok"
     checks: ReadyChecks
 
 
-@router.get("/live", summary="Liveness probe")
+@router.get("/live", summary="Liveness probe", responses=problem_responses())
 async def health_live() -> LiveResponse:
     """The process is up and serving requests. Checks no dependency, so an orchestrator never restarts on a DB blip."""
     return LiveResponse()
@@ -43,12 +51,7 @@ async def health_live() -> LiveResponse:
 @router.get(
     "/ready",
     summary="Readiness probe",
-    responses={
-        503: {
-            "model": Problem,
-            "description": "A required dependency (the database, or the active config) is unavailable.",
-        }
-    },
+    responses=problem_responses("dependency-unavailable"),
 )
 async def health_ready(
     engine: EngineDep, settings: SettingsDep, poller: ConfigPollerDep, runtime: RuntimeDep

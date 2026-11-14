@@ -67,10 +67,11 @@ async def get_site_transparency_log(site_id: SiteIdPath) -> TransparencyLog:
     ),
 )
 async def reset_demo_site(site_id: SiteIdPath) -> DemoReset:
-    """Start a fresh demo epoch of a synthetic site. Own employer only; guarded and rate-limited.
+    """Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.
 
-    Nothing is deleted. Plans, sign-offs, stop events and data requests are scoped to the current epoch, so earlier
-    epochs are no longer visible. The append-only audit chain continues unbroken and records `demo_reset`. Any site
-    that is not synthetic answers `not-a-demo-site` (409).
+    A reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events
+    and push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not
+    epoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic
+    answers `not-a-demo-site` (409).
     """
     raise not_implemented()

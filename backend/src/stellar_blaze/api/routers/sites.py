@@ -62,6 +62,10 @@ async def get_risk_policy() -> RiskPolicy:
     summary="List the crews of a site",
     responses=problem_responses("not-found", "validation-failed", "not-implemented"),
 )
-async def list_site_crews(site_id: SiteIdPath) -> list[Crew]:
-    """The crews of the site with the status the supervisor list shows: workload, shift, sign-off, plan status, stop."""
+async def list_site_crews(site_id: SiteIdPath, date: DateQuery = None) -> list[Crew]:
+    """The crews of the site with the status the supervisor list shows: workload, shift, sign-off, plan status, stop.
+
+    The sign-off and plan status are those of the response date (`date`, same default rule as the other routes);
+    the stop is the one active at the time of the response.
+    """
     raise not_implemented()

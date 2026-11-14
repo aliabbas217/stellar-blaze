@@ -3,7 +3,9 @@
 ``artifacts/eval/2026/{policy_scoreboard,plan_scoreboard,demo_day}.json`` and ``artifacts/eval/dev/theta.json`` are
 written offline by ``ml/`` (B3 Tasks 12 and 13) from these models and read by F2 as static files; ``export_openapi``
 adds the same models to ``openapi/v1.json`` so one ``pnpm api:gen`` types them. Every number a scoreboard row or the
-demo day shows has a typed field here, and every number is a ``Metric`` that says what it was measured on.
+demo day shows has a typed field here. The counters of the two scoreboards are ``Metric`` values (value, interval,
+sample size, protocol anchor); the demo day, the theta grid and the runner-up hold plain numbers, because they describe
+one day or one selection step rather than a bootstrapped estimate.
 
 Definitions are the pre-registration's (``docs/research/2026-11-12-preregistration-2026-evaluation.md`` sections 7.2 to
 7.4 and 13, with amendment 1). The words "minutes avoided" and "illness prevented" appear nowhere in these shapes or in
@@ -72,10 +74,23 @@ class Metric(ArtifactModel):
     anchor: str = Field(description="Heading slug of the pre-registration section that defines this metric.")
 
 
+EvaluationSet = Literal["dev_2025", "scored_2026"]
 PolicyId = Literal["P0", "P1", "P2", "P3_protect", "P3_balanced"]
 PlanId = Literal["naive", "ban_only", "rule_raw", "rule_corrected"]
 Outcome = Literal["supported", "negative"]
 ZoneName = Literal["low", "medium", "high", "red"]
+
+
+class WbgtQuantiles(ArtifactModel):
+    """A WBGT range in degrees Celsius: the 5th, 50th and 95th percentile of the corrected forecast."""
+
+    p05: float | None = Field(
+        description="5th percentile of the corrected WBGT, degrees Celsius; null with no forecast."
+    )
+    p50: float | None = Field(description="Median of the corrected WBGT, degrees Celsius; null with no forecast.")
+    p95: float | None = Field(
+        description="95th percentile of the corrected WBGT, degrees Celsius; null with no forecast."
+    )
 
 
 class PairedComparison(ArtifactModel):
@@ -158,6 +173,10 @@ class SensitivityCell(ArtifactModel):
 class PolicyScoreboard(ArtifactModel):
     """The Warnings row (``artifacts/eval/2026/policy_scoreboard.json``)."""
 
+    evaluation_set: EvaluationSet = Field(
+        description="`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold "
+        'development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".'
+    )
     station: str = Field(description="ICAO id of the demo station the row is computed at (OMAA).")
     season_start: dt.date = Field(description="First local date of the scored season (15 May 2026).")
     season_end: dt.date = Field(description="Last local date of the scored season (30 Sep 2026).")
@@ -182,7 +201,7 @@ class PolicyScoreboard(ArtifactModel):
         description="The four cells of the 2 x 2 truth sensitivity, headline cell included."
     )
     verdicts: list[HypothesisVerdict] = Field(description="H4 (primary) and H5 (secondary) at the headline lead.")
-    provenance: Provenance
+    provenance: Provenance = Field(description="Where the numbers in this file came from.")
 
 
 # --- Plans row (pre-registration 7.3) ----------------------------------------------------------------------------
@@ -212,6 +231,10 @@ class PlanRow(ArtifactModel):
 class PlanScoreboard(ArtifactModel):
     """The Plans row (``artifacts/eval/2026/plan_scoreboard.json``)."""
 
+    evaluation_set: EvaluationSet = Field(
+        description="`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold "
+        'development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".'
+    )
     station: str = Field(description="ICAO id of the weather station (OMAA).")
     site_id: str = Field(description="Id of the SIMULATED demo site whose crew is scored (ADR 0057).")
     crew_id: str = Field(description="The one scored crew (crew-b).")
@@ -231,7 +254,7 @@ class PlanScoreboard(ArtifactModel):
         description="Plan ids whose rows are identical by construction; [naive, ban_only] on L1."
     )
     verdicts: list[HypothesisVerdict] = Field(description="H6 (primary) and H7 (secondary).")
-    provenance: Provenance
+    provenance: Provenance = Field(description="Where the numbers in this file came from.")
 
 
 # --- Demo day (pre-registration 7.4) -----------------------------------------------------------------------------
@@ -252,6 +275,9 @@ class DemoDayHour(ArtifactModel):
         description="Effective TWL of the raw IFS forecast in W/m2; null when missing."
     )
     raw_zone: ZoneName | None = Field(description="ADOSH zone of the raw forecast (the P2 basis); null when missing.")
+    corrected_wbgt_c: WbgtQuantiles | None = Field(
+        description="Corrected WBGT range (5th, 50th, 95th percentile) in degrees Celsius; null when no finite sample."
+    )
     p_high: float | None = Field(
         description="P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample."
     )
@@ -271,14 +297,23 @@ class RunnerUp(ArtifactModel):
 class DemoDay(ArtifactModel):
     """The demo day (``artifacts/eval/2026/demo_day.json``), chosen on truth alone before any P3 output was read."""
 
+    evaluation_set: EvaluationSet = Field(
+        description="`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold "
+        'development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".'
+    )
     station: str = Field(description="ICAO id of the demo station (OMAA).")
     date: dt.date = Field(description="Selected local date.")
-    score: float = Field(description="Observed High-zone working hours outside the ban window on that date (weighted).")
+    score: float = Field(
+        description="The pre-registration 7.4 selection score: observed High-zone working hours outside the ban "
+        "window, weighted by the non-ban fraction. It equals `high_hours_outside_ban`; it is kept under this name "
+        "because it is the quantity the selection rule maximizes."
+    )
     high_hours: float = Field(
         description="Observed High-or-Red working hours on the date, ban hours included (demo_high_h)."
     )
     high_hours_outside_ban: float = Field(
-        description="The score: High-or-Red hours outside the ban, weighted (demo_high_outside_ban_h)."
+        description="High-or-Red working hours outside the ban window, weighted (demo_high_outside_ban_h); "
+        "equals `score`."
     )
     raw_hits: float = Field(description="Danger hours the raw-forecast policy P2 warned (demo_raw_hits).")
     p3_hits: float = Field(description="Danger hours P3 at theta_protect warned (demo_p3_hits).")
@@ -287,7 +322,7 @@ class DemoDay(ArtifactModel):
     lead_days: int = Field(description="Lead of the forecasts shown (1).")
     rule: str = Field(description="The selection rule in words (pre-registration 7.4); ties go to the earliest date.")
     hours: list[DemoDayHour] = Field(description="The nine working hours 06:00-14:59 UTC in order.")
-    provenance: Provenance
+    provenance: Provenance = Field(description="Where the numbers in this file came from.")
 
 
 # --- theta (pre-registration 6.5) --------------------------------------------------------------------------------
@@ -314,4 +349,4 @@ class ThetaDecision(ArtifactModel):
     )
     n_hours: int = Field(description="Hours in the 2024-2025 selection set.")
     rule: Literal["preregistration §6.5"] = Field(description="The rule that produced the thresholds.")
-    provenance: Provenance
+    provenance: Provenance = Field(description="Where the numbers in this file came from.")

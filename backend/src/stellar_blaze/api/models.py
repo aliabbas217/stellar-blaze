@@ -23,6 +23,7 @@ from pydantic.types import JsonValue
 
 from stellar_blaze.api.schemas import ResponseModel
 from stellar_blaze.domain.risk.levels import AlertLevel
+from stellar_blaze.domain.scoreboard import WbgtQuantiles
 from stellar_blaze.errors import REVIEW_REQUIRED, ROSTER_INVALID, Problem
 
 Level = AlertLevel
@@ -31,9 +32,9 @@ Level = AlertLevel
 HHMM = Annotated[str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]
 MMDD = Annotated[str, StringConstraints(pattern=r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")]
 PhoneNumber = Annotated[str, StringConstraints(pattern=r"^\+[1-9][0-9]{6,14}$")]
-SiteId = Annotated[str, StringConstraints(min_length=1, max_length=100)]
+EntityId = Annotated[str, StringConstraints(min_length=1, max_length=100)]
 Workload = Literal["light", "moderate", "heavy"]
-SignoffState = Literal["unsigned", "signed"]
+SignoffState = Literal["unsigned", "signed", "changed_since_signed"]
 PlanStatus = Literal["rule", "fallback"]
 ForecastStatus = Literal["fresh", "stale", "fallback"]
 ForecastMode = Literal["replay", "live"]
@@ -53,13 +54,29 @@ BAN: JsonDict = {
     "season_end": "09-15",
     "timezone": "Asia/Dubai",
     "active_on_date": True,
+    "starts_at": "2026-07-01T08:30:00Z",
+    "ends_at": "2026-07-01T11:00:00Z",
 }
 
 
 BAN_WINDOW_DESCRIPTION = (
     "The midday ban in force at the site, as data. The values come from the ruleset in force "
     "(`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this "
-    "response's own date."
+    "response's own date. The object is always present: check `active_on_date` (and the null instants), never a null "
+    "object."
+)
+
+
+BANNER_DESCRIPTION = (
+    'Always present on every plan payload: the client shows the floor banner ("Green is not permission to extend '
+    'work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.").'
+)
+
+
+EPOCH_SEMANTICS = (
+    "A reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert "
+    "events and push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not "
+    "epoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted."
 )
 
 
@@ -107,7 +124,7 @@ class Site(ApiResponse):
                     "name": "Mussafah M-14 yard (synthetic)",
                     "timezone": "Asia/Dubai",
                     "synthetic": True,
-                    "demo_epoch": 1,
+                    "epoch_id": 1,
                     "supervisor_phone": "+12025550143",
                     "first_aider_phone": "+12025550144",
                 }
@@ -119,9 +136,10 @@ class Site(ApiResponse):
     name: str
     timezone: str = Field(description="IANA time zone of the site. Every local date and time of the API is in it.")
     synthetic: bool = Field(description="True for demo data. Only a synthetic site can be reset (`reset_demo_site`).")
-    demo_epoch: int | None = Field(
+    epoch_id: int | None = Field(
         description="Current demo epoch of a synthetic site (1 or more); null for a site that is not synthetic. "
-        "Plans, sign-offs, stop events and data requests belong to one epoch; `reset_demo_site` starts the next."
+        "Plans, sign-offs, stop events, data requests, alert events and push subscriptions are scoped to one epoch "
+        "and resolved server-side; `reset_demo_site` starts the next."
     )
     supervisor_phone: PhoneNumber | None = Field(
         description="Site supervisor's number in E.164, for the worker's one-tap `tel:` call; null when the site has "
@@ -147,15 +165,12 @@ class BanWindow(ApiResponse):
     season_end: MMDD = Field(description="Last local date of the ban season, `MM-DD`, inclusive (09-15).")
     timezone: str = Field(description="IANA time zone `start`, `end` and the season dates are in.")
     active_on_date: bool = Field(description="True when the ban applies on the date of the response that carries it.")
-
-
-class WbgtQuantiles(ApiResponse):
-    p05: float | None = Field(
-        description="5th percentile of the corrected WBGT, degrees Celsius; null with no forecast."
+    starts_at: AwareDatetime | None = Field(
+        description="UTC instant the ban starts on the response's own date; null when `active_on_date` is false."
     )
-    p50: float | None = Field(description="Median of the corrected WBGT, degrees Celsius; null with no forecast.")
-    p95: float | None = Field(
-        description="95th percentile of the corrected WBGT, degrees Celsius; null with no forecast."
+    ends_at: AwareDatetime | None = Field(
+        description="UTC instant the ban ends (exclusive) on the response's own date; null when "
+        "`active_on_date` is false."
     )
 
 
@@ -236,12 +251,12 @@ class RiskBand(ApiResponse):
 
 
 class WorkloadClass(ApiResponse):
-    code: Workload
+    code: Workload = Field(description="Workload class code.")
     metabolic_rate_w: float = Field(description="Metabolic rate of the class in watts, used on the device.")
 
 
 class ClothingOption(ApiResponse):
-    code: str
+    code: str = Field(description="Clothing option code; the client holds the words.")
     adjustment_c: float = Field(description="WBGT adjustment in degrees Celsius added for this clothing.")
     source: str = Field(description="Where the adjustment comes from.")
 
@@ -310,13 +325,15 @@ class Crew(ApiResponse):
                     "id": CREW_ID,
                     "site_id": SITE_ID,
                     "name": "Crew B",
-                    "task": "Concrete pour",
+                    "task_label": "Concrete pour",
                     "workload": "heavy",
                     "member_count": 20,
                     "shift": [{"start": "06:00", "end": "11:00"}, {"start": "15:00", "end": "18:00"}],
                     "signoff_state": "unsigned",
                     "plan_status": "rule",
                     "stopped": False,
+                    "active_stop_id": None,
+                    "stopped_at": None,
                 }
             ]
         }
@@ -325,20 +342,30 @@ class Crew(ApiResponse):
     id: str
     site_id: str
     name: str
-    task: str = Field(description="What the crew does, for example `Concrete pour`.")
+    task_label: str = Field(description="What the crew does, for example `Concrete pour`.")
     workload: Workload = Field(description="The crew's workload class; ADOSH Table 1 cycles follow it.")
     member_count: int = Field(description="Head count of the crew. An aggregate; the crew is suppressed below `k`.")
     shift: list[ShiftWindow] = Field(
         description="The published shift blocks, site-local; work outside them is never planned."
     )
     signoff_state: SignoffState = Field(
-        description="Sign-off of today's plan (site-local today): `unsigned` or `signed`."
+        description="Sign-off of the plan for the response date: `unsigned`; `signed`; or `changed_since_signed` (a "
+        "plan was signed earlier that day and the current rule plan differs from the signed one)."
     )
     plan_status: PlanStatus = Field(
-        description="Status of today's plan: `rule` (from the forecast) or `fallback` (no fresh forecast: "
-        "protective plan)."
+        description="Status of the plan for the response date: `rule` (from the forecast) or `fallback` (no fresh "
+        "forecast: protective plan)."
     )
-    stopped: bool = Field(description="True while a crew-lead stop is active now.")
+    stopped: bool = Field(
+        description="True while a crew-lead stop is active at the time of the response. Equivalent to "
+        "`active_stop_id` being non-null."
+    )
+    active_stop_id: str | None = Field(
+        description="Id of the active stop, to pass to `delete_crew_stop` after a reload; null when `stopped` is false."
+    )
+    stopped_at: AwareDatetime | None = Field(
+        description="UTC time the active stop was recorded; null when `stopped` is false."
+    )
 
 
 _CREW_HOUR_EXAMPLE: JsonDict = {"starts_at": "2026-07-01T06:00:00Z", "crew_level": "orange", "ban_active": False}
@@ -358,6 +385,11 @@ class CrewHour(ApiResponse):
     ban_active: bool = Field(description="True when the midday work ban is in force for any part of this hour.")
 
 
+class TimeRange(ApiResponse):
+    starts_at: AwareDatetime = Field(description="UTC start of the range.")
+    ends_at: AwareDatetime = Field(description="UTC end of the range, exclusive.")
+
+
 class CrewTimeline(ApiResponse):
     model_config = ConfigDict(
         json_schema_extra={
@@ -370,6 +402,11 @@ class CrewTimeline(ApiResponse):
                     "suppressed": False,
                     "k": 5,
                     "forecast_status": "fresh",
+                    "signoff_state": "unsigned",
+                    "shift": [
+                        {"starts_at": "2026-07-01T02:00:00Z", "ends_at": "2026-07-01T07:00:00Z"},
+                        {"starts_at": "2026-07-01T11:00:00Z", "ends_at": "2026-07-01T14:00:00Z"},
+                    ],
                     "ban_window": BAN,
                     "hours": [_CREW_HOUR_EXAMPLE],
                 }
@@ -390,19 +427,20 @@ class CrewTimeline(ApiResponse):
     forecast_status: ForecastStatus = Field(
         description="`fresh`, `stale` (shown anyway, label it) or `fallback` (no usable forecast; hours may be null)."
     )
+    signoff_state: SignoffState = Field(
+        description="Sign-off of the crew's plan for this date: `unsigned`, `signed` or `changed_since_signed`."
+    )
+    shift: list[TimeRange] = Field(
+        description="The crew's published shift blocks on this date as UTC instants, in time order."
+    )
     ban_window: BanWindow = Field(description=BAN_WINDOW_DESCRIPTION)
     hours: list[CrewHour] = Field(description="Working-day hours in time order (06:00-19:00 site-local).")
-
-
-class TimeRange(ApiResponse):
-    starts_at: AwareDatetime = Field(description="UTC start of the range.")
-    ends_at: AwareDatetime = Field(description="UTC end of the range, exclusive.")
 
 
 class PlanSegment(ApiResponse):
     starts_at: AwareDatetime = Field(description="UTC start of the segment.")
     ends_at: AwareDatetime = Field(description="UTC end of the segment, exclusive; equals the next segment's start.")
-    state: PlanState
+    state: PlanState = Field(description="What the crew does in this segment.")
     zone: PlanZone | None = Field(
         description="ADOSH zone of the segment; null for `off` and for a segment with no zone data."
     )
@@ -415,12 +453,12 @@ class Violation(ApiResponse):
     clause: str = Field(description="Text of the clause the rule comes from, from the ruleset.")
     source_id: str = Field(description="Id of the legal or policy source of the clause.")
     ranges: list[TimeRange] = Field(description="Where the plan violates the rule, in time order.")
-    detail: str
+    detail: str = Field(description="What the plan does wrong, in one sentence.")
 
 
 class ValidatorResult(ApiResponse):
     passed: bool = Field(description="True when no rule is violated.")
-    violations: list[Violation]
+    violations: list[Violation] = Field(description="Violated rules; empty when `passed`.")
     checked_rules: list[str] = Field(description="Every rule the validator evaluated, including the ones that passed.")
 
 
@@ -443,6 +481,7 @@ class AckItem(ApiResponse):
                     "zone": "high",
                     "starts_at": "2026-07-01T02:00:00Z",
                     "ends_at": "2026-07-01T03:00:00Z",
+                    "text_code": "cycle.high.heavy.20-40",
                 }
             ]
         }
@@ -456,6 +495,10 @@ class AckItem(ApiResponse):
     zone: Literal["medium", "high", "red"] = Field(description="The zone of the run; Low runs need no acknowledgement.")
     starts_at: AwareDatetime = Field(description="UTC start of the run.")
     ends_at: AwareDatetime = Field(description="UTC end of the run, exclusive.")
+    text_code: str = Field(
+        description="Ruleset action code of the run's cycle for the crew's workload and the run's zone, for example "
+        "`cycle.medium.heavy.45-15` or `cycle.high.heavy.20-40`; the client maps it to copy."
+    )
 
 
 _SEGMENTS_EXAMPLE: list[JsonValue] = [
@@ -510,13 +553,14 @@ class DayPlan(ApiResponse):
                             "zone": "high",
                             "starts_at": "2026-07-01T02:00:00Z",
                             "ends_at": "2026-07-01T03:00:00Z",
+                            "text_code": "cycle.high.heavy.20-40",
                         }
                     ],
                     "suppressed": False,
                     "restricted_headcount": 0,
                     "restrictions": [],
                     "signed_at": None,
-                    "signed_by": None,
+                    "signed_by_role": None,
                     "forecast_status": "fresh",
                     "ban_window": BAN,
                     "policy_version": POLICY_VERSION,
@@ -533,16 +577,14 @@ class DayPlan(ApiResponse):
         description="`rule` from the forecast; `fallback` when the forecast is missing or stale."
     )
     signoff_state: SignoffState = Field(
-        description="`unsigned` until a supervisor of the employer signs; never gates an alert or stop."
+        description="`unsigned` until a supervisor of the employer signs; `signed`; `changed_since_signed` when a plan "
+        "was signed earlier that day and the current rule plan differs from it. Never gates an alert or a stop."
     )
-    signoff_label_code: Literal["plan.unsigned_fallback"] | None = Field(
-        description="Non-null exactly when `signoff_state` is `unsigned`: the client shows the unsigned-fallback label."
+    signoff_label_code: Literal["plan.unsigned_fallback", "plan.changed_since_signed"] | None = Field(
+        description="Non-null exactly when `signoff_state` is not `signed`: `plan.unsigned_fallback` for `unsigned`, "
+        "`plan.changed_since_signed` for `changed_since_signed`. The client shows the matching label."
     )
-    banner_code: Literal["plan.floor_banner"] = Field(
-        description='Always present: the client shows the floor banner ("Green is not permission to extend work. '
-        "Legal and "
-        'ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.").'
-    )
+    banner_code: Literal["plan.floor_banner"] = Field(description=BANNER_DESCRIPTION)
     segments: list[PlanSegment] = Field(
         description="The plan in time order, merged runs of equal state, zone and rule."
     )
@@ -557,8 +599,13 @@ class DayPlan(ApiResponse):
         "`suppressed`."
     )
     restrictions: list[str] = Field(description="Restriction rule ids that apply to some members, without a count.")
-    signed_at: AwareDatetime | None = Field(description="UTC time of the sign-off; null while unsigned.")
-    signed_by: str | None = Field(description="Actor string of the employer's signing supervisor; null while unsigned.")
+    signed_at: AwareDatetime | None = Field(
+        description="UTC time of the sign-off; null while `unsigned`; the time of the earlier sign-off when "
+        "`changed_since_signed`."
+    )
+    signed_by_role: Literal["supervisor"] | None = Field(
+        description="Role of the signer; null while unsigned. The API never exposes a person's name."
+    )
     forecast_status: ForecastStatus = Field(
         description="`fresh`, `stale` or `fallback`; on the latter two the plan is protective."
     )
@@ -593,7 +640,7 @@ class PlanSignOff(ApiResponse):
                     "date": "2026-07-01",
                     "signoff_state": "signed",
                     "signed_at": "2026-07-01T01:10:00Z",
-                    "signed_by": "supervisor.demo",
+                    "signed_by_role": "supervisor",
                     "acknowledged_items": ["high-0600"],
                     "deviation_reason_code": None,
                 }
@@ -605,7 +652,9 @@ class PlanSignOff(ApiResponse):
     date: dt.date = Field(description="The site-local date of the signed plan.")
     signoff_state: Literal["signed"] = Field(description="Always `signed` on success.")
     signed_at: AwareDatetime = Field(description="UTC time of the sign-off.")
-    signed_by: str = Field(description="Actor string of the employer principal that signed, never a worker.")
+    signed_by_role: Literal["supervisor"] = Field(
+        description="Role of the signer. The API never exposes a person's name, and a worker never signs."
+    )
     acknowledged_items: list[str] = Field(description="The ack item ids recorded.")
     deviation_reason_code: str | None = Field(description="The deviation reason recorded; null when none.")
 
@@ -653,7 +702,7 @@ class PlanValidateRequest(ApiRequest):
         }
     )
 
-    site_id: SiteId = Field(description="Site whose forecast zones the plan is checked against.")
+    site_id: EntityId = Field(description="Site whose forecast zones the plan is checked against.")
     date: dt.date = Field(description="The site-local date to check the plan on.")
     crew: PlanCrewInput = Field(description="The hypothetical crew the roster is checked for.")
     roster_text: str | None = Field(
@@ -696,6 +745,7 @@ class PlanValidateResponse(ApiResponse):
                         "checked_rules": ["P-H1", "P-H2.daily", "P-H3", "P-H7.cap60", "P-H7.run"],
                     },
                     "zone_hours": [{"starts_at": "2026-07-01T02:00:00Z", "zone": "high", "level": "orange"}],
+                    "banner_code": "plan.floor_banner",
                     "forecast_status": "fresh",
                     "ban_window": BAN,
                     "policy_version": POLICY_VERSION,
@@ -706,6 +756,7 @@ class PlanValidateResponse(ApiResponse):
         }
     )
 
+    banner_code: Literal["plan.floor_banner"] = Field(description=BANNER_DESCRIPTION)
     validator: ValidatorResult = Field(description="The independent validator's verdict on the roster.")
     zone_hours: list[ZoneHour] = Field(description="The zones of the day the plan was checked against.")
     forecast_status: ForecastStatus = Field(
@@ -740,7 +791,6 @@ class PushSubscriptionKeys(ApiRequest):
 
 class PushSubscriptionDetails(ApiRequest):
     model_config = ConfigDict(
-        populate_by_name=True,
         json_schema_extra={
             "examples": [
                 {
@@ -791,10 +841,10 @@ class PushSubscriptionCreate(ApiRequest):
     subscription: PushSubscriptionDetails = Field(
         description="The browser's subscription, exactly as `PushSubscription.toJSON()`."
     )
-    site_id: SiteId = Field(
+    site_id: EntityId = Field(
         description="A site id from `list_sites`. Site alerts go to every subscription of the site."
     )
-    crew_id: SiteId | None = Field(
+    crew_id: EntityId | None = Field(
         description="A crew id of that site from `list_site_crews`, or null for site alerts only."
     )
 
@@ -901,20 +951,19 @@ class CrewStop(ApiResponse):
 
 
 class DemoReset(ApiResponse):
-    """A reset starts a fresh epoch of a synthetic demo site. Nothing is deleted."""
+    """A reset starts a new epoch of a synthetic demo site. Nothing is deleted."""
 
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [{"site_id": SITE_ID, "epoch": 2, "previous_epoch": 1, "reset_at": "2026-07-01T05:00:00Z"}]
+            "examples": [
+                {"site_id": SITE_ID, "epoch_id": 2, "previous_epoch_id": 1, "reset_at": "2026-07-01T05:00:00Z"}
+            ]
         }
     )
 
     site_id: str
-    epoch: int = Field(
-        description="The new current epoch. Plans, sign-offs, stop events and data requests of earlier epochs are no "
-        "longer visible; the append-only audit chain continues unbroken and records `demo_reset`."
-    )
-    previous_epoch: int = Field(description="The epoch that was current before the reset (`epoch` minus 1).")
+    epoch_id: int = Field(description=EPOCH_SEMANTICS)
+    previous_epoch_id: int = Field(description="The epoch that was current before the reset (`epoch_id` minus 1).")
     reset_at: AwareDatetime = Field(description="UTC time of the reset.")
 
 
@@ -976,7 +1025,7 @@ class ValidationProblem(Problem):
 
     model_config = ConfigDict(extra="allow", json_schema_extra={"examples": [VALIDATION_FAILED_EXAMPLE]})
 
-    errors: list[ValidationErrorItem]
+    errors: list[ValidationErrorItem] = Field(description="Every member that failed validation.")
 
 
 class RosterInvalidProblem(Problem):
@@ -984,7 +1033,7 @@ class RosterInvalidProblem(Problem):
 
     model_config = ConfigDict(extra="allow", json_schema_extra={"examples": [ROSTER_INVALID_EXAMPLE]})
 
-    errors: list[RosterError]
+    errors: list[RosterError] = Field(description="Every line of the roster that could not be read.")
 
 
 class ReviewRequiredProblem(Problem):
