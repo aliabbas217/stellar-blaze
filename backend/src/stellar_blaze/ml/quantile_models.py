@@ -19,6 +19,7 @@ byte-identical in one environment (LightGBM does not promise it across machines 
 the library quiet.
 """
 
+from collections.abc import Sequence
 from typing import Final
 
 import lightgbm as lgb
@@ -74,18 +75,30 @@ def lgbm_native_params(params: LgbmParams, *, alpha: float) -> dict[str, float |
     }
 
 
+def _outside(scored: pl.DataFrame, column: str, allowed: Sequence[int]) -> list[int]:
+    """The distinct values of ``column`` in ``scored`` that are not in ``allowed`` (sorted)."""
+    return sorted(scored.filter(~pl.col(column).is_in(list(allowed)))[column].unique().to_list())
+
+
 def fit_quantile_models(
     rows: pl.DataFrame, *, target: Target, cfg: TrainingConfig, min_rows: int = MIN_TRAIN_ROWS
 ) -> tuple[lgb.Booster, ...]:
     """Fit one quantile booster per level on the error ``y_<target>`` (truth minus forecast).
 
-    Rows whose ``y_<target>`` is null or NaN (no truth, a rejected WBGT, an hour outside 02-15 UTC) are excluded, and
-    nothing is filled. Feature nulls stay as NaN. The 19 boosters come back in ``LEVELS`` order and must be used with
-    ``predict_grid``, which returns *error* quantiles: the corrected value is ``raw + error quantile``.
+    Rows whose ``y_<target>`` is not a finite number (null, NaN or infinite: no truth, a rejected WBGT, an hour
+    outside 02-15 UTC) are excluded, and nothing is filled. Feature nulls stay as NaN. The 19 boosters come back in
+    ``LEVELS`` order and must be used with ``predict_grid``, which returns *error* quantiles: the corrected value is
+    ``raw + error quantile``.
+
+    ``cfg.leads`` and ``cfg.hours_utc`` are part of the config hash and so of the model id, therefore they are
+    enforced, not trusted: a row that would be trained on (one with a finite target) whose ``lead_days`` is not in
+    ``cfg.leads`` or whose ``hour_utc`` is not in ``cfg.hours_utc`` raises instead of being dropped, so a model never
+    differs from the config that names it. This also keeps lead 0 out of training (L2). Rows without a finite target
+    are never trained on, so their lead and hour do not matter.
 
     Args:
-        rows: A ``build_features`` frame holding the ``cfg.feature_set`` columns and ``y_<target>``. The caller has
-            already restricted it to the fold's training rows and to ``cfg.leads``.
+        rows: A ``build_features`` frame holding ``lead_days``, ``hour_utc``, the ``cfg.feature_set`` columns and
+            ``y_<target>``, already restricted by the caller to the fold's training rows.
         target: The corrected variable.
         cfg: The training config.
         min_rows: The fewest rows with a target that may remain.
@@ -94,12 +107,21 @@ def fit_quantile_models(
         19 boosters, ``LEVELS[i]`` at index ``i``.
 
     Raises:
-        ValueError: A column is missing, or fewer than ``min_rows`` rows have a target.
+        ValueError: A column is missing, a trained row lies outside ``cfg.leads`` or ``cfg.hours_utc``, or fewer than
+            ``min_rows`` rows have a target.
     """
     label_name = f"y_{target.value}"
-    if label_name not in rows.columns:
-        raise ValueError(f"the frame has no target column {label_name!r}")
-    scored = rows.filter(pl.col(label_name).fill_nan(None).is_not_null())
+    missing = [name for name in (label_name, "lead_days", "hour_utc") if name not in rows.columns]
+    if missing:
+        raise ValueError(f"the frame lacks the required columns {missing}")
+    scored = rows.filter(pl.col(label_name).cast(pl.Float64()).is_finite())
+    for column, allowed in (("lead_days", cfg.leads), ("hour_utc", cfg.hours_utc)):
+        stray = _outside(scored, column, allowed)
+        if stray:
+            raise ValueError(
+                f"{len(stray)} {column} value(s) with a target lie outside the config's {tuple(allowed)}: "
+                f"{stray[:5]}; restrict the frame before training"
+            )
     if scored.height < min_rows:
         raise ValueError(
             f"only {scored.height} rows have {label_name!r} of {rows.height}; at least {min_rows} are needed to train"

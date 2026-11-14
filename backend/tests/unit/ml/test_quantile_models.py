@@ -5,6 +5,7 @@ temperature bias, trained on one summer and scored on another. The parameters ar
 """
 
 import gzip
+import sys
 from typing import cast
 
 import lightgbm as lgb
@@ -22,6 +23,7 @@ from stellar_blaze.domain.forecast.features import (
     history_features,
 )
 from stellar_blaze.domain.forecast.grid import F64, LEVELS, MODELLED_HOURS_UTC
+from stellar_blaze.ml import quantile_models
 from stellar_blaze.ml.quantile_models import MIN_TRAIN_ROWS, feature_matrix, fit_quantile_models, lgbm_native_params
 from stellar_blaze.ml.training_config import TrainingConfig
 from tests.fixtures.forecast.synthetic import make_pairs
@@ -105,9 +107,19 @@ def _scored(frame: pl.DataFrame, target: str = "t") -> pl.DataFrame:
     return frame.filter(pl.col(f"y_{target}").is_not_null())
 
 
-def _constant_features(frame: pl.DataFrame, feature_set: FeatureSet) -> pl.DataFrame:
-    """The same rows with every feature replaced by one constant: a feature-pipeline bug that feeds nothing."""
-    return frame.with_columns(*[pl.lit(0.0, dtype=pl.Float64()).alias(name) for name in FEATURES_OF[feature_set]])
+def _feed_constants(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every feature matrix, at fit and at predict, one constant: a feature-pipeline bug that feeds nothing.
+
+    The frame keeps its real ``lead_days`` and ``hour_utc`` (``fit_quantile_models`` checks them against the config), so
+    the matrix is replaced instead, in the module under test and in this one.
+    """
+    real = feature_matrix
+
+    def zeros(rows: pl.DataFrame, feature_set: FeatureSet) -> F64:
+        return np.zeros_like(real(rows, feature_set))
+
+    monkeypatch.setattr(quantile_models, "feature_matrix", zeros)
+    monkeypatch.setattr(sys.modules[__name__], "feature_matrix", zeros)
 
 
 def _mae_ratio(
@@ -150,17 +162,14 @@ def test_quantile_models_do_not_shift_unbiased_stations(
 
 @pytest.mark.parametrize("feature_set", list(FeatureSet), ids=lambda fs: fs.value)
 def test_bias_guard_fails_for_a_model_without_features(
+    monkeypatch: pytest.MonkeyPatch,
     feature_set: FeatureSet,
     train_frames: dict[FeatureSet, pl.DataFrame],
     test_frames: dict[FeatureSet, pl.DataFrame],
 ) -> None:
     """The mutation that proves the guard above is falsifiable: constant features leave the biased stations' error."""
-    ratio, _, _ = _mae_ratio(
-        _constant_features(train_frames[feature_set], feature_set),
-        _constant_features(test_frames[feature_set], feature_set),
-        feature_set,
-        BIASED,
-    )
+    _feed_constants(monkeypatch)
+    ratio, _, _ = _mae_ratio(train_frames[feature_set], test_frames[feature_set], feature_set, BIASED)
     assert ratio > 0.5
 
 
@@ -232,6 +241,64 @@ def test_fit_refuses_too_few_scored_rows(train_frames: dict[FeatureSet, pl.DataF
         fit_quantile_models(few, target=Target.T, cfg=cfg)
     # the minimum is configurable: the same frame trains when the floor is lower
     assert len(fit_quantile_models(few, target=Target.T, cfg=cfg, min_rows=MIN_TRAIN_ROWS - 1)) == 19
+
+
+def test_fit_excludes_infinite_targets_like_null(train_frames: dict[FeatureSet, pl.DataFrame]) -> None:
+    frame = train_frames[FeatureSet.COLD]
+    cfg = _cfg(FeatureSet.COLD)
+    marked = frame.with_row_index("i").with_columns(
+        pl.when(pl.col("i") % 5 == 0)
+        .then(pl.lit(float("inf"), dtype=pl.Float64()))
+        .when(pl.col("i") % 5 == 1)
+        .then(pl.lit(float("-inf"), dtype=pl.Float64()))
+        .otherwise(pl.col("y_t"))
+        .alias("y_t")
+    )
+    kept = frame.with_row_index("i").filter(pl.col("i") % 5 > 1)
+    expected = [b.model_to_string() for b in fit_quantile_models(kept, target=Target.T, cfg=cfg)]
+    got = [b.model_to_string() for b in fit_quantile_models(marked, target=Target.T, cfg=cfg)]
+    assert got == expected  # an infinite label never reaches LightGBM
+
+
+def test_fit_refuses_a_lead_outside_the_config(train_frames: dict[FeatureSet, pl.DataFrame]) -> None:
+    """cfg.leads is hashed into the model id: a frame with another lead must not train silently."""
+    frame = train_frames[FeatureSet.COLD]
+    narrow = _cfg(FeatureSet.COLD).model_copy(update={"leads": (1, 2)})
+    with pytest.raises(ValueError, match=r"lead_days value\(s\).*\(1, 2\).*\[3\]"):
+        fit_quantile_models(frame, target=Target.T, cfg=narrow)
+    # lead 0 (never trained, L2) is caught the same way even with the full config
+    with_lead_zero = frame.with_row_index("i").with_columns(
+        pl.when(pl.col("i") == 0).then(0).otherwise(pl.col("lead_days")).cast(pl.Int8()).alias("lead_days")
+    )
+    assert with_lead_zero["y_t"][0] is not None
+    with pytest.raises(ValueError, match=r"lead_days value\(s\).*\[0\]"):
+        fit_quantile_models(with_lead_zero, target=Target.T, cfg=_cfg(FeatureSet.COLD))
+
+
+def test_fit_refuses_an_hour_outside_the_config(train_frames: dict[FeatureSet, pl.DataFrame]) -> None:
+    frame = train_frames[FeatureSet.COLD].with_row_index("i")
+    stray = frame.with_columns(
+        pl.when(pl.col("i") == 0).then(20).otherwise(pl.col("hour_utc")).cast(pl.Int8()).alias("hour_utc")
+    )
+    assert stray["y_t"][0] is not None
+    with pytest.raises(ValueError, match=r"hour_utc value\(s\).*\[20\]"):
+        fit_quantile_models(stray, target=Target.T, cfg=_cfg(FeatureSet.COLD))
+
+
+def test_fit_ignores_the_lead_and_hour_of_rows_it_does_not_train_on(
+    train_frames: dict[FeatureSet, pl.DataFrame],
+) -> None:
+    """An unmodelled hour or lead 0 is harmless when its target is null: the row is excluded anyway."""
+    frame = train_frames[FeatureSet.COLD]
+    cfg = _cfg(FeatureSet.COLD)
+    extra = frame.head(5).with_columns(
+        pl.lit(None, dtype=pl.Float64()).alias("y_t"),
+        pl.lit(0, dtype=pl.Int8()).alias("lead_days"),
+        pl.lit(20, dtype=pl.Int8()).alias("hour_utc"),
+    )
+    expected = [b.model_to_string() for b in fit_quantile_models(frame, target=Target.T, cfg=cfg)]
+    got = [b.model_to_string() for b in fit_quantile_models(pl.concat([frame, extra]), target=Target.T, cfg=cfg)]
+    assert got == expected
 
 
 def test_fit_refuses_a_frame_without_the_target_or_a_feature(train_frames: dict[FeatureSet, pl.DataFrame]) -> None:
@@ -363,7 +430,11 @@ class _Constant:
         return out
 
 
-def test_predict_grid_keeps_a_nan_row_a_nan_row() -> None:
+def test_predict_grid_keeps_a_row_whose_booster_returned_nan_an_all_nan_row() -> None:
+    """Covers ``sort_grid`` through ``predict_grid`` with a booster double that fabricates a NaN prediction.
+
+    A real booster never does this (see the next test): the double only proves that no NaN is shifted into a grid.
+    """
     # decreasing values per level (crossing in every row) and a NaN prediction of one booster in row 0
     boosters = [_Constant(float(-i), nan_first=(i == 3)) for i in range(19)]
     x = np.zeros((3, 4))
@@ -371,6 +442,26 @@ def test_predict_grid_keeps_a_nan_row_a_nan_row() -> None:
     assert np.isnan(grid[0]).all()  # the whole row, not one NaN shifted to the end of a sorted row
     assert not np.isnan(grid[1:]).any()
     np.testing.assert_array_equal(grid[1], np.arange(-18.0, 1.0))  # sorted ascending
+
+
+@pytest.mark.parametrize("shape", ["one_column", "one_row", "whole_matrix"])
+def test_real_boosters_turn_nan_features_into_finite_sorted_quantiles(
+    shape: str, site_models: tuple[lgb.Booster, ...], test_frames: dict[FeatureSet, pl.DataFrame]
+) -> None:
+    """Documents ``predict_grid``: missing features are NOT detected, so the caller must gate such rows (Task 10b).
+
+    If a future LightGBM returned NaN here, this test fails and the documented contract has to be revisited.
+    """
+    x = feature_matrix(_scored(test_frames[FeatureSet.SITE]).head(6), FeatureSet.SITE).copy()
+    if shape == "one_column":
+        x[:, feature_columns(FeatureSet.SITE).index("fc_t_c")] = np.nan
+    elif shape == "one_row":
+        x[0, :] = np.nan
+    else:
+        x[:, :] = np.nan
+    grid = predict_grid(site_models, x)
+    assert np.isfinite(grid).all()
+    assert (np.diff(grid, axis=1) >= 0.0).all()
 
 
 # === storage ========================================================================================================

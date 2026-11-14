@@ -1,7 +1,8 @@
 # Corrector training config: the cold feature set (no station history; for a station never trained on).
 #
-# Starting point: the middle of the pre-registered hyperparameter grid (pre-registration section 6.1). Task 12 rewrites
-# the three grid values, `feature_set`, `wbgt_method` and `calibration_window` from artifacts/eval/dev/selection.json.
+# Starting point: a pre-registered grid point (a corner: the grid has two values per axis; pre-registration
+# section 6.1). Task 12 rewrites the three grid values, `feature_set`, `wbgt_method` and `calibration_window`
+# from artifacts/eval/dev/selection.json.
 # There is no command-line override: a change is a new file, a new SHA-256 and so a new `cfg6` in the model id.
 # Keep this file LF-terminated; the hash normalises CRLF anyway (R20).
 

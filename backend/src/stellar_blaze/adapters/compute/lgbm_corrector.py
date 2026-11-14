@@ -28,13 +28,18 @@ def predict_grid(boosters: Sequence[lgb.Booster], x: F64) -> F64:
     """The sorted ``(n, 19)`` grid of predicted *error* quantiles (truth minus forecast), one column per level.
 
     Column ``i`` is the prediction of ``boosters[i]``, the booster of ``LEVELS[i]``. Independently trained quantile
-    models can cross, so each row is sorted with ``grid.sort_grid`` (a row holding a NaN comes back as an all-NaN row).
-    ``x`` is not modified.
+    models can cross, so each row is sorted with ``grid.sort_grid`` (if a booster ever returned NaN for a row, that row
+    would come back as an all-NaN row, never a shifted one). ``x`` is not modified.
+
+    Missing inputs are NOT detected here. A real LightGBM booster routes a NaN feature down its learned
+    missing-value branch and returns a finite, sorted prediction, even for a row or a whole matrix of NaN. The caller
+    must therefore gate rows whose required forecast values are missing *before* calling (the corrector answers
+    ``missing_input`` with null quantiles for them) and must not read a number from such a row.
 
     Args:
         boosters: The 19 boosters, in ``LEVELS`` order.
         x: The feature matrix, ``float64`` with shape ``(n, n_features)``; the columns must be the training columns in
-            the training order (NaN marks a missing value, which LightGBM handles natively).
+            the training order (NaN marks a missing value; see above).
 
     Returns:
         A new ``(n, 19)`` array, ascending along each row.
