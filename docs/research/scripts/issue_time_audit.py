@@ -1,16 +1,23 @@
-"""Audit which IFS run feeds Open-Meteo's ``temperature_2m_previous_day1`` / ``_previous_day2`` (B2 Task 2).
+r"""Audit which IFS run feeds Open-Meteo's ``temperature_2m_previous_day1`` / ``_previous_day2`` (B2 Task 2).
 
 Pre-registration section 0.1 says that ``previous_day1`` may come from a run published after 18:00 GST on day D-1.
 This script measures it for OMAA on the valid dates 2025-07-10 .. 2025-07-12 (hours 02-15 UTC): it fetches the
 Previous Runs series and the Single Runs API forecast of every 00/06/12/18 UTC init of the two preceding days, and for
 every valid hour names the init(s) whose value equals the ``previous_dayN`` value (tolerance 0.05 degrees C).
 
-Hard limits, enforced in code: at most ``MAX_DATA_CALLS`` data calls, and no request for a date in 2026 (the 2026
-hold-out). TLS is httpx2's default (verification on). A 429 is backed off once, then the run stops.
+Hard limits, enforced in code: at most ``MAX_DATA_CALLS`` HTTP requests in total (every request is counted, a 429 and
+its retry included, and a request that raised is counted too; the count lives in the manifest's ``requests`` list, saved
+after every request, and survives a resume), and no request for a date in 2026 (the 2026 hold-out). TLS is httpx2's
+default (verification on). A 429 is backed off once, then the run stops.
 
-Run (writes raw bodies and ``manifest.json`` to ``--out``; ``--offline`` re-analyzes the saved bodies, no network)::
+Run (``--out`` is required: it receives the raw bodies, ``manifest.json`` and ``analysis.json``; ``--offline``
+re-analyzes the saved bodies with no network)::
 
-    cd backend && UV_PYTHON=3.13.15 uv run --frozen python ../docs/research/scripts/issue_time_audit.py
+    cd /d/dev/stellar-blaze-b2/backend && UV_PYTHON=3.13.15 uv run --frozen python \
+        ../docs/research/scripts/issue_time_audit.py \
+        --out "C:/Users/LEGION/AppData/Local/Temp/claude/c9efb48f6f935e8c/014d9cea-9854-40c1-ad4e-9698e91ae2e0/scratchpad/issue-time-audit"
+
+Add ``--offline`` to the same command to re-analyze without network.
 """
 
 import argparse
@@ -69,18 +76,38 @@ class Call:
 
 
 @dataclass(slots=True)
+class Request:
+    """One HTTP request as sent (a 429 and its retry are two), whether or not an answer came back."""
+
+    number: int
+    url: str
+    status: int | None  # None: no response (the transport raised)
+    error: str | None = None
+
+
+@dataclass(slots=True)
 class Audit:
-    """The calls made so far, with the budget and hold-out guards."""
+    """The calls and HTTP requests made so far, with the budget and hold-out guards.
+
+    ``calls`` are the recorded answers (one body each); ``requests`` is every request sent and is what the budget
+    counts. A manifest written before ``requests`` existed has one request per call (no 429 or exception occurred).
+    """
 
     out: Path
     calls: list[Call] = field(default_factory=list)
+    requests: list[Request] = field(default_factory=list)
     stopped: str | None = None
 
     def __post_init__(self) -> None:
-        """Resume: calls recorded by an earlier invocation count against the budget and are not repeated."""
+        """Resume: requests recorded by an earlier invocation count against the budget; answered calls are not repeated."""
         manifest = self.out / "manifest.json"
         if manifest.exists():
-            self.calls = [Call(**c) for c in json.loads(manifest.read_text(encoding="utf-8"))["calls"]]
+            saved = json.loads(manifest.read_text(encoding="utf-8"))
+            self.calls = [Call(**c) for c in saved["calls"]]
+            if "requests" in saved:
+                self.requests = [Request(**r) for r in saved["requests"]]
+            else:
+                self.requests = [Request(c.index, c.url, c.status, c.error) for c in self.calls]
 
     def done(self, kind: str, model: str, run: datetime | None) -> Call | None:
         """The earlier call that already answered this request (200, or 400 'run is not available'), if any."""
@@ -96,12 +123,10 @@ class Audit:
         """Make one data call (guarded) and persist its raw body.
 
         Raises:
-            RuntimeError: The budget is spent, a 2026 date is requested, or a 429 persisted after one back-off.
+            RuntimeError: The request budget is spent, a 2026 date is requested, or a 429 persisted after one back-off.
         """
         if (earlier := self.done(kind, model, run)) is not None:
             return earlier
-        if len(self.calls) >= MAX_DATA_CALLS:
-            raise RuntimeError(f"data-call budget of {MAX_DATA_CALLS} is spent")
         params = {"latitude": LAT, "longitude": LON, "models": model, "timezone": "UTC", "hourly": hourly}
         if run is None:  # Previous Runs: a date window
             params["start_date"] = VALID_DATES[0].isoformat()
@@ -132,20 +157,46 @@ class Audit:
         self.calls.append(call)
         return call
 
+    def _send(self, client: httpx2.Client, url: str, params: dict[str, str]) -> httpx2.Response:
+        """Send one request. The budget is checked before it leaves; it is recorded (and saved) whatever happens."""
+        if len(self.requests) >= MAX_DATA_CALLS:
+            raise RuntimeError(f"request budget of {MAX_DATA_CALLS} is spent")
+        request = client.build_request("GET", url, params=params)
+        number = len(self.requests) + 1
+        try:
+            response = client.send(request)
+        except Exception as exc:
+            self.requests.append(Request(number, str(request.url), None, f"{type(exc).__name__}: {exc}"))
+            self.save_manifest()
+            raise
+        error = None if response.status_code == 200 else response.content[:300].decode("utf-8", errors="replace")
+        self.requests.append(Request(number, str(request.url), response.status_code, error))
+        self.save_manifest()
+        return response
+
     def _get(self, client: httpx2.Client, url: str, params: dict[str, str]) -> httpx2.Response:
         time.sleep(PACE_S)
-        response = client.get(url, params=params)
+        response = self._send(client, url, params)
         if response.status_code == 429:
             time.sleep(BACKOFF_429_S)  # one back-off, never a loop
-            response = client.get(url, params=params)
+            response = self._send(client, url, params)
             if response.status_code == 429:
                 self.stopped = "429 persisted after one back-off"
+                self.save_manifest()
                 raise RuntimeError(self.stopped)
         return response
 
     def save_manifest(self) -> None:
         (self.out / "manifest.json").write_text(
-            json.dumps({"calls": [asdict(c) for c in self.calls], "stopped": self.stopped}, indent=2), encoding="utf-8"
+            json.dumps(
+                {
+                    "calls": [asdict(c) for c in self.calls],
+                    "requests": [asdict(r) for r in self.requests],
+                    "stopped": self.stopped,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
         )
 
 
@@ -297,7 +348,7 @@ def main() -> int:
             _fetch_all(audit)
         finally:
             audit.save_manifest()
-        print(f"data calls made: {len(audit.calls)}")
+        print(f"data calls made: {len(audit.calls)}; HTTP requests sent: {len(audit.requests)}")
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     results: dict[str, dict[str, Any]] = {}
     for singles_model in ("ecmwf_ifs025", "ecmwf_ifs"):
