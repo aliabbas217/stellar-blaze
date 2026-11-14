@@ -56,6 +56,13 @@ accessed = 2026-11-11
 # ---- sources added for B3 -----------------------------------------------------------------------------------------
 
 [[sources]]
+id = "adr-0006-niosh-vectors"
+title = "ADR 0006: Physics: Liljegren WBGT, guarded ISO 7933 PHS, in-house NIOSH RAL/REL, TWL ported from an MIT reference"
+url = "docs/decisions/0006-physics-wbgt-phs-niosh-twl.md"
+clause = "Decision, NIOSH RAL/REL: test vectors at M = 180 W, 300 W and 415 W (the workload classes light, moderate and heavy)"
+accessed = 2026-11-11
+
+[[sources]]
 id = "mohre-mr-44-2022"
 title = "MoHRE Ministerial Resolution No. 44 of 2022, Art. 3 Noon Work Ban (Wayback copy of the u.ae PDF, not an official translation)"
 url = "https://web.archive.org/web/2024id_/https://u.ae/-/media/Information-and-services/Jobs/Ministerial-Resolution-No-44--of-2022-1.pdf"
@@ -71,7 +78,7 @@ accessed = 2026-11-11
 
 [[sources]]
 id = "cabinet-res-1-2022"
-title = "Cabinet Resolution No. 1 of 2022, Executive Regulations of Federal Decree-Law 33 of 2021 (legal-notes mirror of the uaelegislation.gov.ae English text)"
+title = "Cabinet Resolution No. 1 of 2022, Executive Regulations of Federal Decree-Law 33 of 2021 (secondary legal-notes mirror; the official copy was unreachable)"
 url = "https://uae.shushin.io/labourlaw/Cabinet-Resolution-1-of-2022"
 clause = "Art. 15"
 accessed = 2026-11-11
@@ -106,44 +113,44 @@ accessed = 2026-11-14
 
 [[sources]]
 id = "adr-0046"
-title = "ADR 0046: The warning level is the ADOSH zone of the effective TWL at the warning quantile, with a fourth stop edge"
+title = 'ADR 0046: The warning level is the ADOSH zone of the effective TWL at the warning quantile θ, with a fourth "stop" edge'
 url = "docs/decisions/0046-warning-level-policy.md"
 clause = "Decision 5: Red edge 85 W/m2, range [60, 115]"
 accessed = 2026-11-14
 
 [[sources]]
 id = "adr-0047"
-title = "ADR 0047: TWL margin 7 W/m2 (range 7-20), withdrawal limits off, MRT from the Liljegren globe"
+title = "ADR 0047: TWL margin 7 W/m² (range 7-20), withdrawal limits off, MRT from the Liljegren globe"
 url = "docs/decisions/0047-twl-margin-withdrawal-and-mrt.md"
 clause = "Decision 1: default 7.0, min 7.0, max 20.0"
 accessed = 2026-11-14
 
 [[sources]]
 id = "adr-0048"
-title = "ADR 0048: theta is a runtime tunable, set to theta_protect by a config activation after the ruleset is frozen"
+title = "ADR 0048: θ is a runtime tunable, set to θ_protect by a config activation after the ruleset is frozen"
 url = "docs/decisions/0048-warning-theta-is-a-runtime-tunable.md"
 clause = "Decision 1: default 0.10, min 0.05, max 0.50"
 accessed = 2026-11-14
 
 [[sources]]
 id = "adr-0049"
-title = "ADR 0049: Personal (on-device) level bands 0.10 / 0.50 / 0.90"
+title = "ADR 0049: Personal (on-device) level bands 0.10 / 0.50 / 0.90; the screen leads with the more severe of site and personal; ties resolve to 0.50"
 url = "docs/decisions/0049-personal-level-bands-and-displayed-level.md"
 clause = "Decision 1: bands as tunables"
 accessed = 2026-11-14
 
 [[sources]]
 id = "adr-0050"
-title = "ADR 0050: Crew timeline and k-suppression semantics (k_health 10, k_exposure 5)"
+title = "ADR 0050: Drop `share_above_amber`; a crew's level never uses member data; suppression withholds member-derived fields only; complementary suppression on every published total"
 url = "docs/decisions/0050-crew-timeline-and-k-suppression-semantics.md"
 clause = "Decisions 3 and 4"
 accessed = 2026-11-14
 
 [[sources]]
 id = "adr-0058"
-title = "ADR 0058: Alert events, the Web Push contract, and the fallback when the forecast is missing or stale"
+title = "ADR 0058: Alert events (escalate now, de-escalate after a dwell), the F1 Web Push contract adopted as is, and the fallback when the forecast is missing or stale"
 url = "docs/decisions/0058-alert-events-push-contract-and-stale-forecast-fallback.md"
-clause = "Decisions 1, 2 and 4; decision 5 amendment: the alert dispatch is its own job with a tunable cadence, separate from the 6-hourly forecast refresh; escalations reach crews within one dispatch interval (requested by the B3 architect in a task message; the ADR file on disk does not carry this amendment yet)"
+clause = "Decisions 1, 2, 4 and 5 as amended on 2026-11-14: the alert dispatch is its own job with a runtime-tunable cadence (alert_dispatch_interval_minutes, default 5 minutes, range 1 to 30), separate from the forecast refresh; an escalation reaches crews within one dispatch interval."
 accessed = 2026-11-14
 
 # ---- floors carried over from ae-heat-0.1 -------------------------------------------------------------------------
@@ -173,8 +180,12 @@ cap_w_m2 = 115.0
 
 # ---- floors new in B3 ---------------------------------------------------------------------------------------------
 
-# UAE labour law (ADR 0011 section 4, P-H1 to P-H6). Hours, not minutes. Both art18_*_counts_as_break switches are
-# PROTECTIVE READINGS (counsel Q1): ban time and ADOSH cycle rest are not credited as the Art. 18 break.
+# UAE labour law (ADR 0011 section 4, P-H1 to P-H6). Hours, not minutes. A section has one source: the primary source of
+# most values here is Federal Decree-Law 33/2021 (Art. 5(2) juveniles, 17(1) and 19(1) hours, 18 breaks). Two groups come
+# from elsewhere, and every value's own clause is in [clauses]: ban_window and ban_season are Ministerial Resolution
+# 44/2022 Art. 3 (`mohre-mr-44-2022`), ramadan_reduction_h is Executive Regulations Art. 15(2) (`cabinet-res-1-2022`).
+# Both art18_*_counts_as_break switches are PROTECTIVE READINGS (counsel Q1): ban time and ADOSH cycle rest are not
+# credited as the Art. 18 break.
 [labour]
 source = "fdl-33-2021"
 ban_window = [12:30:00, 15:00:00]
@@ -241,9 +252,9 @@ heavy_work_after_days = 7
 "gt20.3" = 80
 "gt20.4" = 100
 
-# Metabolic rate in W per workload class (ADR 0006 NIOSH test vectors).
+# Metabolic rate in W per workload class: the three M values of the ADR 0006 NIOSH test vectors.
 [workload]
-source = "adr-0006"
+source = "adr-0006-niosh-vectors"
 metabolic_w = { light = 180.0, moderate = 300.0, heavy = 415.0 }
 
 # Small-cell suppression floors (ADR 0050): the k tunables may not go below these.
@@ -261,7 +272,7 @@ source = "adr-0011"
 
 [clauses.entries."P-H1"]
 source = "mohre-mr-44-2022"
-clause = 'Art. 3 Noon Work Ban: "All work performed directly under the sun and in open places shall not be allowed between the peak hours of 12.30 pm and 3 pm from June 15 to September 15 every year. No business shall be resumed before 3pm"'
+clause = 'Art. 3 Noon Work Ban: "All work performed directly under the sun and in open places shall not be allowed between the peak hours of 12.30 pm and 3 pm from June 15 to September 15 every year. No business shall be resumed before 3pm, while adhering to what is stipulated in the procedures manual in this regard."'
 
 [clauses.entries."P-H1a"]
 source = "ad-19-2023"
@@ -328,8 +339,8 @@ source = "adr-0046"
 clause = 'Decisions 2 and 8: below the Red edge (red_twl_w_m2) every crew is stopped. POLICY, beyond the ADOSH table: stop work'
 
 [clauses.entries."STOP.no_acclimatised"]
-source = "adosh-twl"
-clause = 'Table 1: Medium Risk and High Risk "No unacclimatised person to work"; a Medium or High tick is unworkable for a crew with no acclimatized member (ADR 0011 section 2 steps 4 and 6)'
+source = "adr-0011"
+clause = 'ADR 0011 section 2 step 4: "No unacclimatised worker in Medium/High ticks"; step 6: "Any tick in High zone for a crew that has no acclimatised members is unworkable". Basis: ADOSH Table 1 Medium Risk and High Risk "No unacclimatised person to work"'
 
 [clauses.entries."FALLBACK.high"]
 source = "adr-0058"

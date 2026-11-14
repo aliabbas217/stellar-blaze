@@ -144,7 +144,11 @@ def floor_misfits(model_type: type[BaseModel], prefix: str = "") -> list[str]:
 
 
 def optional_section(annotation: Any) -> type[RulesetSection] | None:
-    """The section class of ``X`` or ``X | None`` (exactly one section and optionally ``None``), else ``None``."""
+    """The section class of ``X`` or ``X | None`` (exactly one section and optionally ``None``), else ``None``.
+
+    This deliberately re-implements ``ruleset.section_type`` instead of importing it: the structural guard checks the
+    schema with its own logic, so a bug in the production helper cannot make the guard agree with it by construction.
+    """
     if isinstance(annotation, type) and issubclass(annotation, RulesetSection):
         return annotation
     if get_origin(annotation) in (Union, UnionType):

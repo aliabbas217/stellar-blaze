@@ -295,9 +295,12 @@ def validate_runtime_config(
 
     The pin must name a loaded ruleset. In prod it must also be released, cover ``today`` (the Asia/Dubai local date)
     and have no floor, tunable range end or tunable default less protective than the ruleset in force today (ADR 0010
-    section 4.3, ADR 0044); in dev a pin may be for another date, so back-tests can pin history (each decision still
-    resolves its own date through ``RulesetCatalog.resolve``). The model must be in the registry, and the tunables
-    must resolve against the pinned ruleset, or against the one in force today when there is no pin. A floor
+    section 4.3, ADR 0044); in dev a pin may be for another date. A pin can only be used if the ruleset declares every
+    tunable of ``Tunables``: a superseded ruleset that predates a tunable (``ae-heat-0.1`` and the B3 ones) can still
+    be loaded and found by id (audit replay through ``RulesetCatalog.resolve`` never calls ``resolve_effective``), but
+    pinning it fails with one ``unknown-tunable`` ("has no default in ruleset") violation per missing tunable. The
+    model must be in the registry, and the tunables must resolve against the pinned ruleset, or against the one in
+    force today when there is no pin. A floor
     violation's path is ``ruleset_pin.<floor path>``; a tunable's is ``ruleset_pin.tunables.<name>`` plus ``.min``,
     ``.max`` or ``.default``.
 

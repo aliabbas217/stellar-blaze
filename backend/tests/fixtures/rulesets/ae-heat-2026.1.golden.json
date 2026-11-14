@@ -14,6 +14,7 @@
     "adosh-twl",
     "meteohazard-5633d57",
     "adr-0006",
+    "adr-0006-niosh-vectors",
     "mohre-mr-44-2022",
     "fdl-33-2021",
     "cabinet-res-1-2022",
@@ -216,7 +217,7 @@
       "heavy_work_after_days": 7
     },
     "workload": {
-      "source": "adr-0006",
+      "source": "adr-0006-niosh-vectors",
       "metabolic_w": {
         "light": 180.0,
         "moderate": 300.0,
@@ -233,7 +234,7 @@
       "entries": {
         "P-H1": {
           "source": "mohre-mr-44-2022",
-          "clause": "Art. 3 Noon Work Ban: \"All work performed directly under the sun and in open places shall not be allowed between the peak hours of 12.30 pm and 3 pm from June 15 to September 15 every year. No business shall be resumed before 3pm\""
+          "clause": "Art. 3 Noon Work Ban: \"All work performed directly under the sun and in open places shall not be allowed between the peak hours of 12.30 pm and 3 pm from June 15 to September 15 every year. No business shall be resumed before 3pm, while adhering to what is stipulated in the procedures manual in this regard.\""
         },
         "P-H1a": {
           "source": "ad-19-2023",
@@ -300,8 +301,8 @@
           "clause": "Decisions 2 and 8: below the Red edge (red_twl_w_m2) every crew is stopped. POLICY, beyond the ADOSH table: stop work"
         },
         "STOP.no_acclimatised": {
-          "source": "adosh-twl",
-          "clause": "Table 1: Medium Risk and High Risk \"No unacclimatised person to work\"; a Medium or High tick is unworkable for a crew with no acclimatized member (ADR 0011 section 2 steps 4 and 6)"
+          "source": "adr-0011",
+          "clause": "ADR 0011 section 2 step 4: \"No unacclimatised worker in Medium/High ticks\"; step 6: \"Any tick in High zone for a crew that has no acclimatised members is unworkable\". Basis: ADOSH Table 1 Medium Risk and High Risk \"No unacclimatised person to work\""
         },
         "FALLBACK.high": {
           "source": "adr-0058",

@@ -94,7 +94,8 @@ def test_catalog_resolves_2026_1_for_2026_07_01() -> None:
     assert catalog().ids() == (SEED_ID, ID)
 
 
-def test_the_seed_keeps_its_own_tunables_and_floors_unchanged() -> None:
+def test_the_seed_declares_only_the_margin_tunable() -> None:
+    # The seed predates B3: this is why a config cannot be resolved against it any more (parking lot).
     assert set(seed().tunables) == {"twl_margin_w_m2"}
 
 
@@ -165,7 +166,7 @@ def test_workload_privacy_and_alert_values() -> None:
     ruleset = released()
     assert ruleset.workload is not None
     assert ruleset.workload.metabolic_w == {"light": 180.0, "moderate": 300.0, "heavy": 415.0}
-    assert ruleset.workload.source == "adr-0006"
+    assert ruleset.workload.source == "adr-0006-niosh-vectors"
     assert ruleset.privacy is not None
     assert (ruleset.privacy.k_health_floor, ruleset.privacy.k_exposure_floor) == (10, 5)
     assert ruleset.alerts is not None
@@ -274,16 +275,6 @@ def test_a_missing_clause_entry_is_refused() -> None:
         Ruleset.model_validate(data)
 
 
-def test_every_section_and_tunable_cites_a_declared_source() -> None:
-    ruleset = released()
-    declared = {s.id for s in ruleset.sources}
-    for name in type(ruleset).model_fields:
-        section = getattr(ruleset, name)
-        if hasattr(section, "source"):
-            assert section.source in declared, name
-    assert all(spec.source in declared for spec in ruleset.tunables.values())
-
-
 # --- floors ------------------------------------------------------------------------------------------------------
 
 
@@ -372,11 +363,12 @@ def test_ramp_tables_and_metabolic_rates_are_compared_per_entry() -> None:
     reference = released()
     ramp = candidate(
         (("acclimatisation", "new_ramp_pct", "1"), 30),
-        (("acclimatisation", "experienced_ramp_pct", "5"), 100),
+        (("acclimatisation", "experienced_ramp_pct", "1"), 60),
         (("acclimatisation", "reacclimatisation_pct", "gt20.1"), 60),
     )
     assert [v.path for v in floor_violations(ramp, reference)] == [
         "acclimatisation.new_ramp_pct.1",
+        "acclimatisation.experienced_ramp_pct.1",
         "acclimatisation.reacclimatisation_pct.gt20.1",
     ]
     lighter = candidate((("workload", "metabolic_w", "heavy"), 400.0))

@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from stellar_blaze.config import Settings
-from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
+from stellar_blaze.domain.config.runtime import RuntimeConfig, config_body, config_sha256
 from stellar_blaze.jobs import cli
 from tests.alembic_support import BACKEND_DIR
 from tests.integration.db_admin import fetch_all
@@ -173,7 +173,8 @@ def test_the_operators_flow_seed_propose_activate_show_rollback_and_history(
     assert last_json(activated)["kind"] == "activate"
     active = shown(invoke("config", "show"))
     assert (active["config_version_id"], active["actor"], active["reason"]) == (2, "ali", "margin trial")
-    assert active["body"]["tunables"] == {"twl_margin_w_m2": 7.0}
+    assert active["body"]["tunables"] == config_body(margin(7.0))["tunables"]  # all 13 keys, derived from the model
+    assert active["body"]["tunables"]["twl_margin_w_m2"] == 7.0
 
     rolled_back = invoke("config", "rollback", "--actor", "ali", "--reason", "revert trial")
     assert rolled_back.exit_code == 0, rolled_back.output
@@ -195,7 +196,7 @@ def test_activate_with_a_stale_expected_previous_is_refused_and_writes_nothing(
     environment(monkeypatch, settings, workdir)
     assert invoke("config", "seed").exit_code == 0
     invoke("config", "propose", str(margin_file(workdir, 7.0)), *REASON_ARGS)
-    invoke("config", "propose", str(margin_file(workdir, 3.0, "other.toml")), *REASON_ARGS)
+    invoke("config", "propose", str(margin_file(workdir, 9.0, "other.toml")), *REASON_ARGS)
     assert invoke("config", "activate", "2", "--actor", "ali", "--reason", "margin trial").exit_code == 0
 
     result = invoke(
