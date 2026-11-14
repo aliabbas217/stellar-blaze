@@ -22,7 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.rulesets import load_catalog
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
+from stellar_blaze.adapters.config.site_fixture import load_site_fixture as _load_site_fixture
+from stellar_blaze.adapters.db.audit import PostgresAuditLog
 from stellar_blaze.adapters.db.config_store import PostgresConfigStore
+from stellar_blaze.adapters.db.sites import PostgresSiteStore
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import build_async_client
 from stellar_blaze.adapters.http.pacer import RequestPacer
@@ -35,7 +38,9 @@ from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig, config_sha256, validate_runtime_config
 from stellar_blaze.domain.rules.catalog import RulesetCatalog
+from stellar_blaze.ports.audit import AuditLog
 from stellar_blaze.ports.config_store import RuntimeConfigStore
+from stellar_blaze.ports.sites import SiteFixture
 from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
 
 DUBAI = "Asia/Dubai"
@@ -176,14 +181,39 @@ def build_config_store(engine: AsyncEngine, settings: Settings) -> RuntimeConfig
     return PostgresConfigStore(engine, read_timeout_s=settings.readiness_timeout_s)
 
 
+def build_audit_log(engine: AsyncEngine) -> AuditLog:
+    """The append-only, hash-chained audit log over ``engine`` (ADR 0054)."""
+    return PostgresAuditLog(engine)
+
+
+def build_site_store(engine: AsyncEngine) -> PostgresSiteStore:
+    """The site repository, epoch store and fixture store over ``engine`` (one object, three ports)."""
+    return PostgresSiteStore(engine)
+
+
+def load_site_fixture(path: Path) -> SiteFixture:
+    """Parse and validate the site fixture TOML at ``path`` (``fixtures/demo_site.toml``, ADR 0057).
+
+    Raises:
+        FileNotFoundError: ``path`` does not exist.
+        tomllib.TOMLDecodeError: The file is not TOML.
+        pydantic.ValidationError: The content is not a ``SiteFixture``.
+    """
+    return _load_site_fixture(path)
+
+
 def build_config_service(
-    runtime: Runtime, store: RuntimeConfigStore, *, clock: Callable[[], date] = dubai_today
+    runtime: Runtime,
+    store: RuntimeConfigStore,
+    *,
+    clock: Callable[[], date] = dubai_today,
+    audit: AuditLog | None = None,
 ) -> ConfigService:
     """The service that proposes, activates and loads configs for ``runtime``: its rulesets and models, and its holder
     (an activation made through the service swaps the very snapshot the API serves). ``clock`` is the date validation
     uses, the Asia/Dubai date unless a test says otherwise; the strict pin rules apply with ``SB_ENV=prod``."""
     return ConfigService(
-        store, runtime.rulesets, runtime.models, runtime.config, clock, prod=runtime.settings.env == "prod"
+        store, runtime.rulesets, runtime.models, runtime.config, clock, prod=runtime.settings.env == "prod", audit=audit
     )
 
 

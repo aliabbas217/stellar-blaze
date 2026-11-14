@@ -20,6 +20,11 @@ activation log itself records who changed what and why)::
     sb-jobs config activate VERSION_ID --actor A --reason R [--expected-previous ID]
     sb-jobs config rollback --actor A --reason R [--expected-previous ID]
 
+and the governance data (ADR 0054, 0057; not jobs either)::
+
+    sb-jobs site load PATH --actor A --reason R   # idempotent upsert; one input.changed audit row per change
+    sb-jobs audit verify                          # recompute the hash chain: exit 0, or 1 with audit.chain_broken id=N
+
 and the replay snapshots of the forecast corrector (``jobs/ml_cli.py``, also not jobs: no ``job_run`` row, no database,
 no lock; it copies silver files into ``SB_REPLAY_DIR`` and is documented there)::
 
@@ -47,6 +52,7 @@ from alembic.config import Config as AlembicConfig
 from alembic.script import ScriptDirectory
 from pydantic import JsonValue, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from stellar_blaze.adapters.db.engine import build_engine
 from stellar_blaze.adapters.storage.parquet_store import ParquetStore
@@ -58,14 +64,18 @@ from stellar_blaze.application.runtime_config import (
     SeedResult,
     audit_fields,
 )
+from stellar_blaze.application.site_load import load_site
 from stellar_blaze.composition import (
     Runtime,
+    build_audit_log,
     build_config_service,
     build_config_store,
     build_runtime,
+    build_site_store,
     build_sources,
     dubai_today,
     load_runtime_config,
+    load_site_fixture,
 )
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig
@@ -102,8 +112,22 @@ config_app = typer.Typer(
     pretty_exceptions_show_locals=False,
     help="Runtime config (ADR 0010): propose, activate and roll back the operating values, with no restart.",
 )
+site_app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_show_locals=False,
+    help="Site fixture (ADR 0057): load the demo site, its crews and members.",
+)
+audit_app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_show_locals=False,
+    help="The append-only, hash-chained audit log (ADR 0054).",
+)
 app.add_typer(db_app, name="db")
 app.add_typer(config_app, name="config")
+app.add_typer(site_app, name="site")
+app.add_typer(audit_app, name="audit")
 app.add_typer(ml_app)  # no name: its commands (and its `replay` group) sit at the top level of sb-jobs
 
 
@@ -322,7 +346,9 @@ def _run[T](settings: Settings, runtime: Runtime, work: Callable[[ConfigService]
     async def go() -> T:
         engine = build_engine(settings)
         try:
-            return await work(build_config_service(runtime, build_config_store(engine, settings)))
+            return await work(
+                build_config_service(runtime, build_config_store(engine, settings), audit=build_audit_log(engine))
+            )
         finally:
             await engine.dispose()
 
@@ -541,3 +567,71 @@ def _activation_payload(record: ActivationRecord) -> dict[str, Any]:
         "config_version_id": record.config_version_id,
         "previous_activation_id": record.previous_activation_id,
     }
+
+
+# === site and audit =================================================================================================
+
+
+def _run_db[T](settings: Settings, work: Callable[[AsyncEngine], Awaitable[T]]) -> T:
+    """Run ``work`` against an engine over the database; a database error is exit 1 with its description."""
+
+    async def go() -> T:
+        engine = build_engine(settings)
+        try:
+            return await work(engine)
+        finally:
+            await engine.dispose()
+
+    try:
+        return asyncio.run(go())
+    except (SQLAlchemyError, OSError, TimeoutError) as exc:
+        _fail(f"error: {describe_error(exc)}")
+
+
+@site_app.command("load")
+def site_load_command(
+    path: Annotated[
+        Path,
+        typer.Argument(
+            exists=True, dir_okay=False, readable=True, help="A site fixture TOML (fixtures/demo_site.toml)."
+        ),
+    ],
+    actor: ActorOption,
+    reason: ReasonOption,
+) -> None:
+    """Upsert the site, its crews and members; audit one row per changed field. Safe to run again (no rows)."""
+    _audit(actor, reason)
+    settings = _settings()
+    try:
+        fixture = load_site_fixture(path)
+    except OSError as exc:
+        _fail(f"cannot read {path}: {exc.strerror or type(exc).__name__}", 2)
+    except ValidationError as exc:
+        problems = "; ".join(
+            f"{'.'.join(str(part) for part in error['loc']) or 'fixture'}: {error['msg']}"
+            for error in exc.errors(include_input=False, include_url=False, include_context=False)
+        )
+        _fail(f"{path} is not a valid site fixture: {problems}")
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        _fail(f"{path} is not a valid site fixture: {exc}")
+
+    async def work(engine: AsyncEngine) -> dict[str, Any]:
+        store = build_site_store(engine)
+        result = await load_site(fixture, sites=store, store=store, actor=actor.strip(), reason=reason.strip())
+        return {"site_id": result.site_id, "created": result.created, "changes": result.changes}
+
+    _emit(_run_db(settings, work))
+
+
+@audit_app.command("verify")
+def audit_verify_command() -> None:
+    """Recompute the audit hash chain; exit 0 when intact, exit 1 naming the first broken row."""
+    settings = _settings()
+
+    async def work(engine: AsyncEngine) -> int | None:
+        return await build_audit_log(engine).verify()
+
+    broken = _run_db(settings, work)
+    if broken is not None:
+        _fail(f"audit.chain_broken id={broken}")
+    _emit({"chain": "intact"})

@@ -49,7 +49,8 @@ def test_0002_up_down_up_is_clean_and_leaves_no_drift(empty_settings: Settings) 
     assert all(table_exists(empty_settings, t) for t in config_objects)
     assert function_exists(empty_settings, "sb_reject_mutation")
     assert len(trigger_names(empty_settings)) == 4
-    check_no_drift(empty_settings)
+    # No `alembic check` at 0002: the models also hold the B3 tables (0003), so a database at 0002 "drifts" by design;
+    # the check runs at head below and in test_migration_0003.
 
     migrate(empty_settings, "downgrade", "0001")  # drops the triggers, the function and both tables, nothing else
     assert not any(table_exists(empty_settings, t) for t in config_objects)
@@ -59,7 +60,8 @@ def test_0002_up_down_up_is_clean_and_leaves_no_drift(empty_settings: Settings) 
 
     migrate(empty_settings, "upgrade", "head")
     assert all(table_exists(empty_settings, t) for t in config_objects)
-    assert len(trigger_names(empty_settings)) == 4
+    # Only the config triggers are counted here (0003 adds ten more; test_migration_0003 counts those).
+    assert len([name for name in trigger_names(empty_settings) if name.startswith("trg_config_")]) == 4
     check_no_drift(empty_settings)
 
 
@@ -222,7 +224,8 @@ def test_both_config_tables_reject_mutation_with_one_function_and_two_triggers_e
     rows = fetch_all(
         url,
         "SELECT c.relname AS tbl, t.tgname AS trigger, pg_get_triggerdef(t.oid) AS definition "
-        "FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid WHERE NOT t.tgisinternal ORDER BY c.relname, t.tgname",
+        "FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid WHERE NOT t.tgisinternal "
+        "AND c.relname LIKE 'config%' ORDER BY c.relname, t.tgname",  # the B3 tables' triggers: test_migration_0003
     )
 
     assert [(r["tbl"], r["trigger"]) for r in rows] == [

@@ -11,8 +11,9 @@ read that fails raises ``StoreUnavailableError`` (driver error chained).
 """
 
 import asyncio
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from datetime import datetime
 
 import asyncpg.exceptions
 from sqlalchemy import RowMapping, select
@@ -20,8 +21,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from stellar_blaze.adapters.db.audit import append_in, utc_now
 from stellar_blaze.adapters.db.tables import ConfigActivation, ConfigVersion
 from stellar_blaze.domain.config.runtime import RuntimeConfig, body_sha256, config_body
+from stellar_blaze.ports.audit import AuditEvent
 from stellar_blaze.ports.config_store import (
     ActivationKind,
     ActivationRecord,
@@ -76,9 +79,10 @@ def _activation(row: RowMapping) -> ActivationRecord:
 class PostgresConfigStore:
     """``RuntimeConfigStore`` over the ``config_version`` and ``config_activation`` tables."""
 
-    def __init__(self, engine: AsyncEngine, *, read_timeout_s: float) -> None:
+    def __init__(self, engine: AsyncEngine, *, read_timeout_s: float, clock: Callable[[], datetime] = utc_now) -> None:
         self._engine = engine
         self._read_timeout_s = read_timeout_s
+        self._clock = clock
 
     async def latest_activation(self) -> ActivationRecord | None:
         statement = select(*_ACTIVATION_COLUMNS).order_by(ConfigActivation.id.desc()).limit(1)
@@ -110,6 +114,17 @@ class PostgresConfigStore:
             if row is None:  # the hash exists already: that row is the answer, with its first author and reason
                 existing = select(*_VERSION_COLUMNS).where(ConfigVersion.sha256 == sha256)
                 row = (await connection.execute(existing)).mappings().one()
+            else:  # a new version: its audit row commits or rolls back with it (ADR 0010 section 4.5)
+                event = AuditEvent(
+                    kind="config.version_created",
+                    actor=actor,
+                    actor_role="operator",
+                    outcome="created",
+                    detail={"version_id": row["id"], "schema_version": config.schema_version, "reason": reason},
+                    config_version_id=row["id"],
+                    config_sha256=sha256,
+                )
+                await append_in(connection, event, self._clock())
         return _version(row)
 
     async def activate(
@@ -129,6 +144,25 @@ class PostgresConfigStore:
         try:
             async with self._engine.begin() as connection:
                 row = (await connection.execute(statement)).mappings().one()
+                sha256 = (
+                    await connection.execute(select(ConfigVersion.sha256).where(ConfigVersion.id == version_id))
+                ).scalar_one()
+                event = AuditEvent(
+                    kind="config.rollback" if kind == "rollback" else "config.activated",
+                    actor=actor,
+                    actor_role="operator",
+                    outcome="applied",
+                    detail={
+                        "activation_id": row["id"],
+                        "activation_kind": kind,
+                        "version_id": version_id,
+                        "previous_activation_id": expected_previous,
+                        "reason": reason,
+                    },
+                    config_version_id=version_id,
+                    config_sha256=sha256,
+                )
+                await append_in(connection, event, self._clock())
         except IntegrityError as exc:
             translated = _translate(exc, version_id=version_id, expected_previous=expected_previous)
             if translated is None:

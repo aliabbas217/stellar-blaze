@@ -81,7 +81,7 @@ def test_db_upgrade_migrates_an_empty_database_and_seeds_the_git_default(
     result = invoke("db", "upgrade")
 
     assert result.exit_code == 0, result.output
-    assert rows(empty_settings, "SELECT version_num FROM alembic_version") == [{"version_num": "0002"}]
+    assert rows(empty_settings, "SELECT version_num FROM alembic_version") == [{"version_num": "0003"}]
     (version,) = rows(empty_settings, "SELECT sha256, body, created_by, reason FROM config_version")
     assert version["sha256"] == config_sha256(RuntimeConfig())
     assert version["created_by"] == "seed:abc1234"
@@ -89,13 +89,13 @@ def test_db_upgrade_migrates_an_empty_database_and_seeds_the_git_default(
     (activation,) = rows(empty_settings, "SELECT kind, actor, previous_activation_id FROM config_activation")
     assert activation == {"kind": "seed", "actor": "seed:abc1234", "previous_activation_id": None}
     printed = last_json(result)
-    assert printed["revision"] == "0002"
+    assert printed["revision"] == "0003"
     assert printed["activation_id"] == 1
     # Alembic's own progress goes through the structured log, not to a second, unstructured stream.
     migrated = [
         json.loads(line) for line in result.stdout.splitlines() if line.startswith("{") and "Running upgrade" in line
     ]
-    assert len(migrated) == 2
+    assert len(migrated) == 3
 
 
 def test_db_upgrade_is_idempotent_and_never_replaces_an_active_config(

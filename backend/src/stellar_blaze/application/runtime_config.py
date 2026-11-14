@@ -29,6 +29,7 @@ from stellar_blaze.domain.config.runtime import (
     validate_runtime_config,
 )
 from stellar_blaze.domain.rules.catalog import LoadedRuleset, RulesetCatalog
+from stellar_blaze.ports.audit import AuditEvent, AuditLog
 from stellar_blaze.ports.config_store import (
     ActivationKind,
     ActivationRecord,
@@ -169,8 +170,12 @@ class ConfigService:
         clock: Callable[[], date],
         *,
         prod: bool,
+        audit: AuditLog | None = None,
     ) -> None:
-        """Wire the service. ``prod`` selects the strict pin rules (``validate_runtime_config``)."""
+        """Wire the service. ``prod`` selects the strict pin rules (``validate_runtime_config``). ``audit`` receives a
+        ``config.rejected`` row for every config the service refuses (ADR 0052 section 2); a successful write is
+        audited by the store in its own transaction."""
+        self._audit = audit
         self._store = store
         self._catalog = catalog
         self._models = models
@@ -222,6 +227,7 @@ class ConfigService:
         actor, reason = audit_fields(actor, reason)
         violations = self.validate(config)
         if violations:
+            await self._rejected(actor, violations)
             raise ConfigInvalidError(violations)
         return await self._store.create_version(config, actor=actor, reason=reason)
 
@@ -288,12 +294,14 @@ class ConfigService:
         actor, reason = audit_fields(actor, reason)
         violations = self.validate(config)
         if violations:
+            await self._rejected(actor, violations)
             raise ConfigInvalidError(violations)
         version = await self._store.create_version(config, actor=actor, reason=reason)
         if await self._store.latest_activation() is not None:
             return SeedResult(version, None)
         resolved = self._resolve(version)
         if isinstance(resolved, list):  # the stored row is not what was validated: only a hand-edited row gets here
+            await self._rejected(actor, resolved, version)
             raise ConfigInvalidError(resolved)
         try:
             activation = await self._store.activate(
@@ -310,12 +318,35 @@ class ConfigService:
         version = await self._store.get_version(version_id)
         resolved = self._resolve(version)
         if isinstance(resolved, list):
+            await self._rejected(actor, resolved, version)
             raise ConfigInvalidError(resolved)
         record = await self._store.activate(
             version_id, expected_previous=expected_previous, kind=kind, actor=actor, reason=reason
         )
         self._holder.swap(resolved)
         return record
+
+    async def _rejected(
+        self, actor: str, violations: Sequence[ConfigViolation], version: VersionRecord | None = None
+    ) -> None:
+        """Append ``config.rejected`` (violation codes and paths only) when an audit log is wired."""
+        if self._audit is None:
+            return
+        await self._audit.append(
+            AuditEvent(
+                kind="config.rejected",
+                actor=actor,
+                actor_role="operator",
+                outcome="rejected",
+                detail={
+                    "codes": [v.code for v in violations],
+                    "paths": [v.path for v in violations],
+                    "version_id": None if version is None else version.id,
+                },
+                config_version_id=None if version is None else version.id,
+                config_sha256=None if version is None else version.sha256,
+            )
+        )
 
     # --- loading ------------------------------------------------------------------------------------------------
 
