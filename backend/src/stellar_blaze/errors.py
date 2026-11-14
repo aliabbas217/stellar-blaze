@@ -34,6 +34,7 @@ ROSTER_INVALID = "urn:stellar-blaze:problem:roster-invalid"  # 422, try-a-plan i
 REVIEW_REQUIRED = "urn:stellar-blaze:problem:review-required"  # 409, sign-off without every item acknowledged
 NOT_A_DEMO_SITE = "urn:stellar-blaze:problem:not-a-demo-site"  # 409, reset of a site that is not synthetic
 RATE_LIMITED = "urn:stellar-blaze:problem:rate-limited"  # 429, with a Retry-After header
+SHIFT_NOT_LEGAL = "urn:stellar-blaze:problem:shift-not-legal"  # 422, the published shift breaks a shift rule itself
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -83,8 +84,18 @@ PROBLEM_RESPONSES: dict[int | str, dict[str, Any]] = {
 class DomainProblem(Exception):  # noqa: N818  (named for the RFC 9457 concept, not as an *Error)
     """Raise from any layer to answer with a specific problem; ``**ext`` become extension members."""
 
-    def __init__(self, *, type_: str, title: str, status: int, detail: str | None = None, **ext: Any) -> None:
+    def __init__(
+        self,
+        *,
+        type_: str,
+        title: str,
+        status: int,
+        detail: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        **ext: Any,
+    ) -> None:
         super().__init__(title)
+        self.headers = dict(headers or {})  # response headers such as Retry-After and WWW-Authenticate
         # A dict, not keyword arguments: mypy's pydantic plugin (init_forbid_extra) rejects extension kwargs.
         members = {**ext, "type": type_, "title": title, "status": status, "detail": detail}
         self.problem = ProblemDraft.model_validate(members)
@@ -119,7 +130,7 @@ def install_problem_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(DomainProblem)
     async def on_domain(request: Request, exc: DomainProblem) -> JSONResponse:
-        return _respond(request, exc.problem)
+        return _respond(request, exc.problem, headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def on_validation(request: Request, exc: RequestValidationError) -> JSONResponse:

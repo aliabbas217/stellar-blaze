@@ -29,6 +29,7 @@ from stellar_blaze.api.models import (
     PushSubscriptionDetails,
     ReviewRequiredProblem,
     RosterInvalidProblem,
+    ShiftNotLegalProblem,
     Site,
     ValidationProblem,
 )
@@ -44,54 +45,54 @@ API = "/api/v1"
 
 # operationId -> (method, path, declared problem statuses, employer token)
 OPERATIONS: dict[str, tuple[str, str, set[str], bool]] = {
-    "list_sites": ("get", f"{API}/sites", {"501"}, False),
+    "list_sites": ("get", f"{API}/sites", set(), False),
     "get_site_forecast_today": (
         "get",
         f"{API}/sites/{{site_id}}/forecast/today",
-        {"404", "422", "501", "503"},
+        {"404", "422", "503"},
         False,
     ),
-    "get_risk_policy": ("get", f"{API}/risk-policy", {"501", "503"}, False),
-    "list_site_crews": ("get", f"{API}/sites/{{site_id}}/crews", {"404", "422", "501"}, False),
-    "get_crew_timeline": ("get", f"{API}/crews/{{crew_id}}/timeline", {"404", "422", "501", "503"}, False),
+    "get_risk_policy": ("get", f"{API}/risk-policy", {"503"}, False),
+    "list_site_crews": ("get", f"{API}/sites/{{site_id}}/crews", {"404", "422", "503"}, False),
+    "get_crew_timeline": ("get", f"{API}/crews/{{crew_id}}/timeline", {"404", "422", "503"}, False),
     "get_crew_day_plan": (
         "get",
         f"{API}/crews/{{crew_id}}/day-plan",
-        {"401", "403", "404", "422", "429", "500", "501", "503"},
+        {"401", "403", "404", "422", "429", "500", "503"},
         True,
     ),
     "sign_off_day_plan": (
         "post",
         f"{API}/crews/{{crew_id}}/day-plan/sign-off",
-        {"401", "403", "404", "409", "422", "429", "500", "501", "503"},
+        {"401", "403", "404", "409", "422", "429", "500", "503"},
         True,
     ),
-    "validate_plan": ("post", f"{API}/plans/validate", {"404", "422", "501", "503"}, False),
+    "validate_plan": ("post", f"{API}/plans/validate", {"404", "422", "503"}, False),
     "create_push_subscription": ("post", f"{API}/push/subscriptions", {"404", "422", "501"}, False),
     "delete_push_subscription": ("delete", f"{API}/push/subscriptions/{{subscription_id}}", {"422", "501"}, False),
     "create_data_request": (
         "post",
         f"{API}/sites/{{site_id}}/data-requests",
-        {"401", "403", "404", "422", "429", "501", "503"},
+        {"401", "403", "404", "422", "429", "503"},
         True,
     ),
-    "get_site_transparency_log": ("get", f"{API}/sites/{{site_id}}/transparency-log", {"404", "422", "501"}, False),
+    "get_site_transparency_log": ("get", f"{API}/sites/{{site_id}}/transparency-log", {"404", "422"}, False),
     "create_crew_stop": (
         "post",
         f"{API}/crews/{{crew_id}}/stops",
-        {"401", "403", "404", "422", "429", "501"},
+        {"401", "403", "404", "422", "429"},
         True,
     ),
     "delete_crew_stop": (
         "delete",
         f"{API}/crews/{{crew_id}}/stops/{{stop_id}}",
-        {"401", "403", "404", "422", "429", "501"},
+        {"401", "403", "404", "422", "429"},
         True,
     ),
     "reset_demo_site": (
         "post",
         f"{API}/sites/{{site_id}}/demo-reset",
-        {"401", "403", "404", "409", "422", "429", "500", "501"},
+        {"401", "403", "404", "409", "422", "429", "500"},
         True,
     ),
 }
@@ -118,7 +119,13 @@ SUCCESS_STATUS = {
 # Problem schemas keep `additionalProperties: true` on purpose: RFC 9457 extension members (`errors`, `missing_items`,
 # `dependency`, ...) travel next to the standard members.
 RFC9457_MEMBERS = {"type", "title", "status", "detail", "instance", "request_id"}
-OPEN_PROBLEM_SCHEMAS = {"Problem", "ValidationProblem", "RosterInvalidProblem", "ReviewRequiredProblem"}
+OPEN_PROBLEM_SCHEMAS = {
+    "Problem",
+    "ValidationProblem",
+    "RosterInvalidProblem",
+    "ReviewRequiredProblem",
+    "ShiftNotLegalProblem",
+}
 
 # (schema, property) pairs that match the member-like regex and are allowed. Nothing else may.
 MEMBER_LIKE = r"(worker|member|employee|heart|symptom|acclimat|juvenile)"
@@ -697,6 +704,7 @@ def test_every_problem_type_has_a_valid_example() -> None:
         "plan-invalid",
         "roster-invalid",
         "review-required",
+        "shift-not-legal",
         "individual-data-refused",
         "forbidden-employer",
         "unauthorized",
@@ -714,6 +722,7 @@ def test_every_problem_type_has_a_valid_example() -> None:
         "validation-failed": ValidationProblem,
         "roster-invalid": RosterInvalidProblem,
         "review-required": ReviewRequiredProblem,
+        "shift-not-legal": ShiftNotLegalProblem,
     }
     for key, example in PROBLEM_EXAMPLES.items():
         own_models.get(key, Problem).model_validate(example)
@@ -751,6 +760,7 @@ def test_problem_type_constants() -> None:
         "REVIEW_REQUIRED": "review-required",
         "RATE_LIMITED": "rate-limited",
         "NOT_A_DEMO_SITE": "not-a-demo-site",
+        "SHIFT_NOT_LEGAL": "shift-not-legal",
     }
     for name, kebab in expected.items():
         assert getattr(errors, name) == f"urn:stellar-blaze:problem:{kebab}"
@@ -764,7 +774,7 @@ def test_openapi_served_by_the_app_equals_the_exported_spec(settings: Settings) 
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("op_id", sorted(OPERATIONS))
+@pytest.mark.parametrize("op_id", ["create_push_subscription", "delete_push_subscription"])
 def test_stub_routes_answer_501_until_implemented(settings: Settings, op_id: str) -> None:
     """Task 0 stubs. Task 10 and Task 11 delete the line of each route they implement; the contract stays."""
     method, path, _, _ = OPERATIONS[op_id]
@@ -847,13 +857,19 @@ def test_rate_limits_are_in_the_contract_on_every_employer_operation(spec: dict[
         if not employer:
             assert "x-rate-limit" not in operation, op_id
             continue
-        expected = [{"limit": 1, "window_seconds": 60}, {"limit": 10, "window_seconds": 3600}]
-        if op_id != "reset_demo_site":
+        expected: list[dict[str, Any]] = [{"limit": 1, "window_seconds": 60}, {"limit": 10, "window_seconds": 3600}]
+        if op_id == "create_crew_stop":  # the safety path has its own bucket (ledger R-Q)
+            expected = [{"limit": 30, "window_seconds": 60, "bucket": "stop"}]
+            assert "has its own bucket" in operation["description"]
+        elif op_id != "reset_demo_site":
             expected = [{"limit": 60, "window_seconds": 60}]
         assert operation["x-rate-limit"] == expected, op_id
         assert "Rate limit, per access token" in operation["description"], op_id
         for item in expected:
             assert f"{item['limit']} per {item['window_seconds']} s" in operation["description"], op_id
+
+
+ALERT_SENTENCE = "push alerts follow within one dispatch interval"
 
 
 @pytest.mark.unit
@@ -869,7 +885,7 @@ def test_stop_and_sign_off_copy_never_claims_delivery(spec: dict[str, Any]) -> N
         schemas(spec)["CrewStop"]["description"],
     ]
     for text in texts:
-        flat = " ".join(text.split()).replace("push alerts are sent by the alert dispatch job, not by this call", "")
+        flat = " ".join(text.split()).replace(ALERT_SENTENCE, "")
         assert not claim.search(flat), text
     assert "Stop recorded" in stop_texts[0]
-    assert " ".join(stop_texts[0].split()).count("push alerts are sent by the alert dispatch job") == 1
+    assert " ".join(stop_texts[0].split()).count(ALERT_SENTENCE) == 1

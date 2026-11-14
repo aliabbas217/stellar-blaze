@@ -24,7 +24,7 @@ from pydantic.types import JsonValue
 from stellar_blaze.api.schemas import ResponseModel
 from stellar_blaze.domain.risk.levels import AlertLevel
 from stellar_blaze.domain.scoreboard import WbgtQuantiles
-from stellar_blaze.errors import REVIEW_REQUIRED, ROSTER_INVALID, Problem
+from stellar_blaze.errors import REVIEW_REQUIRED, ROSTER_INVALID, SHIFT_NOT_LEGAL, Problem
 
 Level = AlertLevel
 """The heat level code of every wire contract: ``green``, ``amber``, ``orange``, ``red`` (never colour alone)."""
@@ -1018,6 +1018,21 @@ REVIEW_REQUIRED_EXAMPLE: dict[str, Any] = {
     "request_id": REQUEST_ID,
     "missing_items": ["high-0600"],
 }
+SHIFT_NOT_LEGAL_EXAMPLE: dict[str, Any] = {
+    "type": SHIFT_NOT_LEGAL,
+    "title": "Shift not legal",
+    "status": 422,
+    "detail": "The published shift breaks a shift rule by itself; no plan can fix it.",
+    "instance": "/api/v1/crews/crew-b/day-plan",
+    "request_id": REQUEST_ID,
+    "violations": [
+        {
+            "rule_id": "P-H2.daily",
+            "clause": "Art. 17(1): maximum normal working hours are eight hours per day.",
+            "source_id": "fdl-33-2021",
+        }
+    ],
+}
 
 
 class ValidationProblem(Problem):
@@ -1042,6 +1057,25 @@ class ReviewRequiredProblem(Problem):
     model_config = ConfigDict(extra="allow", json_schema_extra={"examples": [REVIEW_REQUIRED_EXAMPLE]})
 
     missing_items: list[str] = Field(description="Ids of the `ack_items` that were not acknowledged.")
+
+
+class ShiftViolation(BaseModel):
+    """One shift rule the published shift breaks by itself."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_id: str = Field(description="Id of the violated rule, for example `P-H2.daily`.")
+    clause: str = Field(description="Text of the clause the rule comes from, from the ruleset.")
+    source_id: str = Field(description="Id of the legal or policy source of the clause.")
+
+
+class ShiftNotLegalProblem(Problem):
+    """The 422 problem of the day plan and sign-off when the crew's published shift is itself not legal (hours or
+    juvenile rules): the planner cannot fix it, so no plan is served; fix the shift."""
+
+    model_config = ConfigDict(extra="allow", json_schema_extra={"examples": [SHIFT_NOT_LEGAL_EXAMPLE]})
+
+    violations: list[ShiftViolation] = Field(description="Every shift rule the published shift breaks.")
 
 
 REQUEST_MODELS: list[type[BaseModel]] = [
@@ -1073,4 +1107,9 @@ RESPONSE_MODELS: list[type[BaseModel]] = [
     CrewStop,
     DemoReset,
 ]
-PROBLEM_MODELS: list[type[Problem]] = [ValidationProblem, RosterInvalidProblem, ReviewRequiredProblem]
+PROBLEM_MODELS: list[type[Problem]] = [
+    ValidationProblem,
+    RosterInvalidProblem,
+    ReviewRequiredProblem,
+    ShiftNotLegalProblem,
+]

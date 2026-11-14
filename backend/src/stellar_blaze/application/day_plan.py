@@ -53,8 +53,11 @@ __all__ = [
     "PlanSegmentData",
     "PlannerBugError",
     "ShiftNotLegalError",
+    "crew_hours",
     "day_plan",
     "plan_segments",
+    "protective_timeline",
+    "stopped_mask",
 ]
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -161,7 +164,7 @@ def plan_segments(plan: CrewPlan, zones: ZoneTimeline, clauses: Mapping[str, Cla
     return tuple(segments)
 
 
-def _stopped_mask(stops: list[tuple[datetime, datetime | None]], start: datetime) -> list[bool]:
+def stopped_mask(stops: list[tuple[datetime, datetime | None]], start: datetime) -> list[bool]:
     """Which ticks a stop covers: it overlaps the tick, from ``started_at`` and up to ``cleared_at`` (exclusive)."""
     mask = [False] * _TICKS
     for started, cleared in stops:
@@ -172,7 +175,7 @@ def _stopped_mask(stops: list[tuple[datetime, datetime | None]], start: datetime
     return mask
 
 
-def _protective(timeline: ZoneTimeline) -> ZoneTimeline:
+def protective_timeline(timeline: ZoneTimeline) -> ZoneTimeline:
     """Every tick at least High; each tick that was milder is flagged ``fallback`` (a stale forecast, ADR 0058)."""
     zones = [max(z, Zone.HIGH) for z in timeline.zones]
     fallback = [f or z < Zone.HIGH for f, z in zip(timeline.fallback, timeline.zones, strict=True)]
@@ -252,10 +255,10 @@ async def day_plan(
 
     timeline = site_day.zones
     if site_day.forecast_status == "stale":
-        timeline = _protective(timeline)
+        timeline = protective_timeline(timeline)
     start = timeline.start_utc
     found = await stops.active_between(crew.crew_id, start, start + _TICK * _TICKS, epoch)
-    mask = _stopped_mask([(s.started_at, s.cleared_at) for s in found], start)
+    mask = stopped_mask([(s.started_at, s.cleared_at) for s in found], start)
     if any(mask):
         timeline = timeline.with_zones([Zone.RED if m else z for m, z in zip(mask, timeline.zones, strict=True)])
 
@@ -339,7 +342,7 @@ async def day_plan(
     status: Literal["rule", "fallback"] = (
         "fallback" if site_day.forecast_status != "fresh" or plan.status == "fallback" else "rule"
     )
-    hours = _crew_hours(site_day, mask, start)
+    hours = crew_hours(site_day, mask, start)
 
     stored: DayPlanRecord | None = None
     if snapshot.version_id is not None:
@@ -393,7 +396,7 @@ async def day_plan(
     )
 
 
-def _crew_hours(site_day: SiteDay, mask: list[bool], start: datetime) -> tuple[CrewHour, ...]:
+def crew_hours(site_day: SiteDay, mask: list[bool], start: datetime) -> tuple[CrewHour, ...]:
     out: list[CrewHour] = []
     for hour in site_day.hours:
         stopped = any(mask[i] for i in range(_TICKS) if hour.starts_at <= start + _TICK * i < hour.starts_at + _HOUR)

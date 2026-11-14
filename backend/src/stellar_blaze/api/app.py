@@ -1,6 +1,6 @@
 """Application factory: ``uvicorn stellar_blaze.api.app:create_app --factory``."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import structlog
@@ -10,11 +10,20 @@ from fastapi.routing import APIRoute
 
 from stellar_blaze import __version__
 from stellar_blaze.adapters.db.engine import build_engine
+from stellar_blaze.api.auth import parse_access_tokens
+from stellar_blaze.api.limiter import RateLimiter
 from stellar_blaze.api.middleware import RequestLogMiddleware
 from stellar_blaze.api.openapi import install_openapi
 from stellar_blaze.api.routers import crews, governance, health, plans, push, sites
 from stellar_blaze.application.runtime_config import ConfigPoller, ConfigService, SnapshotHolder
-from stellar_blaze.composition import build_config_service, build_config_store, build_runtime, dubai_today
+from stellar_blaze.application.services import Services
+from stellar_blaze.composition import (
+    build_api_services,
+    build_config_service,
+    build_config_store,
+    build_runtime,
+    dubai_today,
+)
 from stellar_blaze.config import Settings, get_settings
 from stellar_blaze.errors import PROBLEM_RESPONSES, REQUEST_ID_HEADER, install_problem_handlers
 from stellar_blaze.logging import bind_runtime_ids, configure_logging
@@ -56,11 +65,20 @@ async def load_initial_config(service: ConfigService, holder: SnapshotHolder) ->
         holder.swap(snapshot)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    """Build the API. ``settings=None`` reads the environment (the production path)."""
+def create_app(settings: Settings | None = None, *, services: Services | None = None) -> FastAPI:
+    """Build the API. ``settings=None`` reads the environment (the production path).
+
+    ``services=None`` builds the ports from Postgres and the configured forecast source in the lifespan
+    (``composition.build_api_services``); a test passes the in-memory fakes instead. Employer tokens
+    (``SB_ACCESS_TOKENS``) are parsed here, so a malformed value stops the process at startup.
+
+    Raises:
+        ValueError: ``SB_ACCESS_TOKENS`` is not JSON of the documented shape.
+    """
     if settings is None:
         settings = get_settings()
     configure_logging(settings)
+    tokens = parse_access_tokens(settings.access_tokens.get_secret_value()) if settings.access_tokens else {}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -75,7 +93,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # reports it (503) while /health/live keeps answering and the platform keeps the process.
         engine = build_engine(settings)
         app.state.engine = engine
+        close_services: Callable[[], Awaitable[None]] | None = None
         try:
+            if services is None:
+                built, close_services = await build_api_services(settings, engine)
+            else:
+                built = services
+            app.state.services = built
+            app.state.limiter = RateLimiter(built.clock)
             service = build_config_service(runtime, build_config_store(engine, settings))
             poller = ConfigPoller(service, runtime.config, settings.config_poll_interval_s)
             app.state.config_poller = poller
@@ -98,6 +123,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             finally:
                 await poller.stop()
         finally:
+            if close_services is not None:
+                await close_services()
             await engine.dispose()
 
     app = FastAPI(
@@ -109,6 +136,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.tokens = tokens
 
     # add_middleware puts the newest outermost, so the request log runs inside the correlation id middleware.
     app.add_middleware(RequestLogMiddleware)

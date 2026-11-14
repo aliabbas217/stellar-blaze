@@ -36,6 +36,7 @@ type AuditKind = Literal[
     "crew.stop_started",
     "crew.stop_cleared",
     "demo_reset",
+    "demo_reset.refused",
 ]
 
 # Same pattern as `tests/unit/api/test_openapi_v1_contract.py::MEMBER_LIKE` (Task 0): no per-member name in a log row.

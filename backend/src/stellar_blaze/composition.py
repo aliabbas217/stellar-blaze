@@ -26,6 +26,7 @@ from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
 from stellar_blaze.adapters.config.site_fixture import load_site_fixture as _load_site_fixture
 from stellar_blaze.adapters.db.audit import PostgresAuditLog
 from stellar_blaze.adapters.db.config_store import PostgresConfigStore
+from stellar_blaze.adapters.db.plans import PostgresCrewStopStore, PostgresDayPlanStore, PostgresPlanSignoffStore
 from stellar_blaze.adapters.db.sites import PostgresSiteStore
 from stellar_blaze.adapters.fakes.corrector import FakeCorrector
 from stellar_blaze.adapters.http.cache import RawResponseCache
@@ -36,6 +37,7 @@ from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
 from stellar_blaze.adapters.sources.replay import ReplayForecastSource, ReplayObservationSource
 from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, SnapshotHolder
+from stellar_blaze.application.services import Services
 from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig, config_sha256, validate_runtime_config
@@ -338,3 +340,29 @@ class CorrectorProvider:
         if corrector is None:
             corrector = self._loaded[key] = LightGbmCorrector.load(model)
         return corrector
+
+
+async def build_api_services(settings: Settings, engine: AsyncEngine) -> tuple[Services, Callable[[], Awaitable[None]]]:
+    """The ports of the API routes over ``engine`` and the sources ``settings`` names, and how to release them.
+
+    Call inside the serving event loop (the HTTP client of the live sources belongs to it) and await the returned
+    ``close`` once at shutdown. Creating the stores opens no connection. ``SB_FORECAST_SOURCE=replay`` serves the
+    snapshot the settings name (``build_sources``: forecasts and observations from the same files, no network).
+
+    Raises:
+        UnknownAdapterError, ReplaySnapshotError: As ``build_sources``.
+    """
+    sources = build_sources(settings)
+    sites = build_site_store(engine)
+    services = Services(
+        sites=sites,
+        epochs=sites,
+        stops=PostgresCrewStopStore(engine),
+        plans=PostgresDayPlanStore(engine),
+        signoffs=PostgresPlanSignoffStore(engine),
+        audit=build_audit_log(engine),
+        forecasts=sources.forecasts,
+        observations=sources.observations["iem"],
+        correctors=CorrectorProvider(),
+    )
+    return services, sources.close

@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from stellar_blaze.application.runtime_config import ConfigPoller, ConfigSnapshot, ConfigUnavailableError
+from stellar_blaze.application.services import Services
 from stellar_blaze.composition import Runtime
 from stellar_blaze.config import Settings
 from stellar_blaze.errors import DEPENDENCY_UNAVAILABLE, DomainProblem
@@ -45,6 +46,15 @@ def get_config_poller(request: Request) -> ConfigPoller:
     return poller
 
 
+def get_services(request: Request) -> Services:
+    """The ports and sources the application lifespan built (``composition.build_api_services``)."""
+    services: Services | None = getattr(request.app.state, "services", None)
+    if services is None:
+        msg = "No services: they are built by the application lifespan. Run the app through its lifespan."
+        raise RuntimeError(msg)
+    return services
+
+
 async def get_snapshot(runtime: Annotated[Runtime, Depends(get_runtime)]) -> ConfigSnapshot:
     """The active config snapshot, read once for the request, with its identity bound to the request's log context.
 
@@ -66,6 +76,7 @@ async def get_snapshot(runtime: Annotated[Runtime, Depends(get_runtime)]) -> Con
     return snapshot
 
 
+ServicesDep = Annotated[Services, Depends(get_services)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 EngineDep = Annotated[AsyncEngine, Depends(get_engine)]
 RuntimeDep = Annotated[Runtime, Depends(get_runtime)]

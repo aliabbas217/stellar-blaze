@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     replay_snapshot_id: SnapshotId | None = None
     # The site-local date the API serves when a request names none, in replay mode (the demo's "today", ADR 0057).
     replay_default_date: date | None = None
+    # Employer access tokens (ADR 0051 decision 5; a Container Apps secret): JSON {sha256(token): {actor, role,
+    # employer_id}}. None means no token exists, so every employer route answers 401. Parsed by `api.auth` at startup.
+    access_tokens: SecretStr | None = None
     # Pins for back-tests and database-less development runs only: `composition` refuses them with SB_ENV=prod, where
     # the runtime config is the one source of truth (ADR 0010 section 4.6). While one is set the snapshot is an `env`
     # one, and the config poller never replaces it with a database activation (it logs that once).

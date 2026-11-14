@@ -15,6 +15,7 @@ from stellar_blaze.api.models import (
     REQUEST_ID,
     REVIEW_REQUIRED_EXAMPLE,
     ROSTER_INVALID_EXAMPLE,
+    SHIFT_NOT_LEGAL_EXAMPLE,
     VALIDATION_FAILED_EXAMPLE,
 )
 from stellar_blaze.errors import (
@@ -27,6 +28,7 @@ from stellar_blaze.errors import (
     PLAN_INVALID,
     PROBLEM_JSON,
     RATE_LIMITED,
+    SHIFT_NOT_LEGAL,
     UNAUTHORIZED,
     DomainProblem,
 )
@@ -71,6 +73,12 @@ SPECS: dict[str, ProblemSpec] = {
         "Roster invalid",
         "The roster text or segments could not be read; `errors` names the lines.",
     ),
+    "shift-not-legal": ProblemSpec(
+        422,
+        "ShiftNotLegalProblem",
+        "Shift not legal",
+        "The crew's published shift breaks a shift rule by itself (hours, juvenile rules); `violations` lists them.",
+    ),
     "review-required": ProblemSpec(
         409,
         "ReviewRequiredProblem",
@@ -114,6 +122,7 @@ TYPES = {
     "not-found": NOT_FOUND,
     "not-a-demo-site": NOT_A_DEMO_SITE,
     "rate-limited": RATE_LIMITED,
+    "shift-not-legal": SHIFT_NOT_LEGAL,
     "plan-invalid": PLAN_INVALID,
     "not-implemented": NOT_IMPLEMENTED,
     "dependency-unavailable": DEPENDENCY_UNAVAILABLE,
@@ -153,6 +162,7 @@ PROBLEM_EXAMPLES: dict[str, dict[str, Any]] = {
     "validation-failed": VALIDATION_FAILED_EXAMPLE,
     "roster-invalid": ROSTER_INVALID_EXAMPLE,
     "review-required": REVIEW_REQUIRED_EXAMPLE,
+    "shift-not-legal": SHIFT_NOT_LEGAL_EXAMPLE,
     "not-a-demo-site": _example(
         "not-a-demo-site",
         "/api/v1/sites/site-prod-1/demo-reset",
