@@ -9,7 +9,9 @@ value is the linear interpolation between the hourly labels (pre-registration se
 range and across a NaN label.
 """
 
+import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
@@ -133,6 +135,41 @@ def hour_ban_weight(label_utc: np.datetime64 | datetime, tz: ZoneInfo, labour: L
     return float(1.0 - overlap_minutes / 60.0)
 
 
+@dataclass(frozen=True)
+class BanWindowData:
+    """The midday ban as data: field for field the API's ``BanWindow`` (``dataclasses.asdict`` validates as one).
+
+    ``start`` and ``end`` are site-local ``HH:MM`` (``end`` exclusive), ``season_start`` and ``season_end`` are
+    inclusive local ``MM-DD`` dates, ``timezone`` is the IANA name they are in. ``starts_at`` and ``ends_at`` are the
+    UTC instants of the window on the asked date, ``None`` (with ``active_on_date`` false) outside the season.
+    """
+
+    start: str
+    end: str
+    season_start: str
+    season_end: str
+    timezone: str
+    active_on_date: bool
+    starts_at: datetime | None
+    ends_at: datetime | None
+
+
+def ban_window_for(local_date: date, tz: ZoneInfo, labour: LabourRules) -> BanWindowData:
+    """The ban window of ``labour`` as data for ``local_date`` in ``tz`` (inclusive season dates)."""
+    active = _in_season(local_date, labour)
+    start, end = labour.ban_window
+    return BanWindowData(
+        start=f"{start:%H:%M}",
+        end=f"{end:%H:%M}",
+        season_start=labour.ban_season[0],
+        season_end=labour.ban_season[1],
+        timezone=tz.key,
+        active_on_date=active,
+        starts_at=datetime.combine(local_date, start, tzinfo=tz).astimezone(UTC) if active else None,
+        ends_at=datetime.combine(local_date, end, tzinfo=tz).astimezone(UTC) if active else None,
+    )
+
+
 def fallback_timeline(local_date: date, tz: ZoneInfo) -> ZoneTimeline:
     """A timeline with no forecast at all: every tick ``HIGH`` with ``fallback`` set, ``source="fallback"``."""
     ticks = day_ticks(local_date, tz)
@@ -201,6 +238,8 @@ def zone_timeline(
         _aware(ticks[0]),
         [Zone(int(z)) for z in zones],
         fallback=(~has_value).tolist(),
-        protective_twl_w_m2=twl.tolist(),
+        # Every missing value is the one ``math.nan`` object, so two timelines of the same day compare equal (tuple
+        # equality tests identity before value, and ``tolist`` makes a new NaN each time).
+        protective_twl_w_m2=[math.nan if math.isnan(v) else v for v in twl.tolist()],
         source=resolved,
     )

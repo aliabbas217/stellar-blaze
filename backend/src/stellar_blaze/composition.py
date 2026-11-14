@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 import httpx2
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from stellar_blaze.adapters.compute.lgbm_corrector import LightGbmCorrector
 from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.rulesets import load_catalog
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
@@ -26,6 +27,7 @@ from stellar_blaze.adapters.config.site_fixture import load_site_fixture as _loa
 from stellar_blaze.adapters.db.audit import PostgresAuditLog
 from stellar_blaze.adapters.db.config_store import PostgresConfigStore
 from stellar_blaze.adapters.db.sites import PostgresSiteStore
+from stellar_blaze.adapters.fakes.corrector import FakeCorrector
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import build_async_client
 from stellar_blaze.adapters.http.pacer import RequestPacer
@@ -40,6 +42,7 @@ from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig, 
 from stellar_blaze.domain.rules.catalog import RulesetCatalog
 from stellar_blaze.ports.audit import AuditLog
 from stellar_blaze.ports.config_store import RuntimeConfigStore
+from stellar_blaze.ports.corrector import ForecastCorrector
 from stellar_blaze.ports.sites import SiteFixture
 from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
 
@@ -302,3 +305,36 @@ def build_sources(
         forecasts=forecasts,
         close=client.aclose,
     )
+
+
+class CorrectorProvider:
+    """The forecast corrector of the active config snapshot, built once per model and reused.
+
+    A snapshot with no model (``model is None``: the file or env seed without a ``model_id``) is served by
+    ``FakeCorrector(0.0)``, the uncorrected raw forecast, whose ``model_id`` is ``None`` so every decision row says so
+    (ADR 0010). A snapshot that names a released model is served by B2's ``LightGbmCorrector``, loaded from the verified
+    model directory the first time it is asked for and kept: loading reads 19 boosters per target, which no request may
+    pay. The provider is cheap to keep for the life of the process; a config activation that changes ``model_id`` just
+    asks for another key.
+    """
+
+    def __init__(self) -> None:
+        self._uncorrected = FakeCorrector(0.0)
+        self._loaded: dict[str, ForecastCorrector] = {}
+
+    def for_snapshot(self, snapshot: ConfigSnapshot) -> ForecastCorrector:
+        """The corrector ``snapshot`` selects.
+
+        Raises:
+            FileNotFoundError: The model directory lacks a file of the layout.
+            pydantic.ValidationError: A model parameter file is malformed.
+            ValueError: The model's parts disagree with each other or with this code (``LightGbmCorrector.load``).
+        """
+        model = snapshot.model
+        if model is None:
+            return self._uncorrected
+        key = model.manifest.model_id
+        corrector = self._loaded.get(key)
+        if corrector is None:
+            corrector = self._loaded[key] = LightGbmCorrector.load(model)
+        return corrector

@@ -5,6 +5,7 @@ The one deliberate exception to "config only through ``SB_*``" is the standard
 ``OTEL_EXPORTER_OTLP_ENDPOINT`` variable, which ``tracing`` reads directly.
 """
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
@@ -62,6 +63,8 @@ class Settings(BaseSettings):
     # `sb-jobs replay build`. The id names a directory, so it must be a lowercase slug; it is required with `replay`.
     replay_dir: Path = Path("replay")
     replay_snapshot_id: SnapshotId | None = None
+    # The site-local date the API serves when a request names none, in replay mode (the demo's "today", ADR 0057).
+    replay_default_date: date | None = None
     # Pins for back-tests and database-less development runs only: `composition` refuses them with SB_ENV=prod, where
     # the runtime config is the one source of truth (ADR 0010 section 4.6). While one is set the snapshot is an `env`
     # one, and the config poller never replaces it with a database activation (it logs that once).

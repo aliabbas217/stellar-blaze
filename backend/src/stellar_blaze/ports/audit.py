@@ -31,6 +31,7 @@ type AuditKind = Literal[
     "data_request.refused",
     "access.denied",
     "plan.validator_rejected",
+    "plan.planner_failed",
     "plan.signed",
     "crew.stop_started",
     "crew.stop_cleared",
