@@ -4,9 +4,14 @@ import { routing } from "@/i18n/routing";
  * Views that are parked, not built (ADR 0045 as amended: the core views are ten). An empty state must never send a
  * person to one of them: a dead end dressed as a next step. Paths are written without the locale prefix.
  *
- * The list follows the deferred rows of the F2 plan (parking lot: HSE week, site setup, roster import, crew codes and
- * join, relay, config admin, climate what-if, break-things panel, Listen). Move a route out of here in the same change
- * that builds its view.
+ * These are guesses at the URLs the parked views will have, taken from the parking-lot rows of the F2 plan (HSE week,
+ * site setup, roster import, crew codes and join, relay, config admin, Listen, climate what-if, break-things panel,
+ * next steps). The judge views live under `/replay` ((judge) is a route group with no URL segment). None of them
+ * exists in src/app yet, with one exception: `/hse` is an F1 placeholder page, not the parked HSE week view.
+ * RE-CHECK each entry when its view is built: the same change must take it out of this list (the unit test fails if a
+ * guarded path becomes a real route).
+ *
+ * Not here on purpose: `/worker/alerts`, a built F1 route that Today's primary action goes to.
  */
 export const DEFERRED_ROUTES = [
   "/hse",
@@ -17,8 +22,9 @@ export const DEFERRED_ROUTES = [
   "/supervisor/relay",
   "/worker/join",
   "/worker/listen",
-  "/judge/climate",
-  "/judge/faults",
+  "/replay/climate",
+  "/replay/faults",
+  "/replay/next",
 ] as const;
 
 /** The path of an href: no query, no hash, no locale prefix. */

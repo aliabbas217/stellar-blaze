@@ -21,11 +21,17 @@ export interface EmptyStateProps {
   readonly level?: Level;
 }
 
-function assertLive(action: EmptyAction): void {
-  if (isDeferredRoute(action.href)) {
-    // A programming error, caught in development and in the unit tests: an empty state that links to a parked view is a dead end.
+/**
+ * An action that links to a parked view is a programming error. In development and under test it throws, so it is
+ * caught before it ships. In production it is dropped instead: an empty state sits on safety screens, and a thrown
+ * render there would blank the whole screen, which is worse than a missing button.
+ */
+function usable(action: EmptyAction | undefined): EmptyAction | null {
+  if (action === undefined || !isDeferredRoute(action.href)) return action ?? null;
+  if (process.env.NODE_ENV !== "production") {
     throw new Error(`EmptyState: "${action.label}" links to a deferred view (${action.href})`);
   }
+  return null;
 }
 
 /**
@@ -34,8 +40,8 @@ function assertLive(action: EmptyAction): void {
  */
 export function EmptyState({ title, reason, primary, secondary, level }: EmptyStateProps) {
   const t = useTranslations("levels");
-  assertLive(primary);
-  if (secondary !== undefined) assertLive(secondary);
+  const main = usable(primary);
+  const other = usable(secondary);
 
   return (
     <section className="flex flex-col items-start gap-3 rounded-sign border border-dashed border-edge px-6 py-8">
@@ -47,16 +53,20 @@ export function EmptyState({ title, reason, primary, secondary, level }: EmptySt
       )}
       <h2 className="font-display text-lg font-medium">{title}</h2>
       <p className="max-w-(--measure) text-base text-ink-2">{reason}</p>
-      <div className="flex flex-wrap gap-3">
-        <Link href={primary.href} className={ACTION_PRIMARY}>
-          {primary.label}
-        </Link>
-        {secondary === undefined ? null : (
-          <Link href={secondary.href} className={ACTION_SECONDARY}>
-            {secondary.label}
-          </Link>
-        )}
-      </div>
+      {main === null && other === null ? null : (
+        <div className="flex flex-wrap gap-3">
+          {main === null ? null : (
+            <Link href={main.href} className={ACTION_PRIMARY}>
+              {main.label}
+            </Link>
+          )}
+          {other === null ? null : (
+            <Link href={other.href} className={main === null ? ACTION_PRIMARY : ACTION_SECONDARY}>
+              {other.label}
+            </Link>
+          )}
+        </div>
+      )}
     </section>
   );
 }

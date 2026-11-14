@@ -5,6 +5,22 @@
   "common": {
     "appName": "Stellar Blaze",
     "appDescription": "Heat-stress safety for outdoor workers in the UAE.",
+    "spine": {
+      "slotTitle": "Midday break",
+      "slotRange": "<bdi>{from}</bdi> to <bdi>{to}</bdi>, by law",
+      "outline": "Midday break by law: not in force until <bdi>{date}</bdi>",
+      "outlineNoDate": "Midday break by law: not in force"
+    },
+    "spineKit": {
+      "kicker": "Stellar Blaze · design kit · {locale}",
+      "title": "Time spine kit",
+      "lead": "The time spine in each orientation, on each surface, with the midday break in force and out of season, in both themes (sun toggle) and both directions (language switcher).",
+      "back": "Component kit",
+      "sample": {
+        "now": "Now",
+        "shiftEnd": "Shift ends"
+      }
+    },
     "specimen": {
       "kicker": "Stellar Blaze · design specimen · {locale}",
       "title": "Qaylula",
@@ -43,14 +59,18 @@
         "stamps": {
           "title": "Stamps",
           "note": "Where a screen shows replayed, recorded, simulated, designed or development data, a stamp says so."
+        },
+        "proof": {
+          "title": "Proof chip and drawer",
+          "note": "Every scored number carries a chip that opens where it comes from. No provenance block means no number. Press a chip to open the drawer, then Recount to hash the file in this browser."
         }
       },
       "sample": {
         "kickerNow": "Site level now",
         "kickerStale": "Last known level",
         "kickerFallback": "Forecast expired",
-        "untilNow": "until 17:00",
-        "untilStale": "at 06:00",
+        "untilNow": "until <bdi>17:00</bdi>",
+        "untilStale": "at <bdi>06:00</bdi>",
         "emptyTitle": "No shift today",
         "emptyReason": "Your next shift starts tomorrow at 06:00. The forecast for tomorrow arrives at 18:00 tonight.",
         "emptyPrimary": "Open Today",
@@ -61,7 +81,10 @@
         "pendingWhat": "The 2026 scoreboard",
         "missingWhat": "Hours of work under the ban",
         "stampDetail": "3 Sep 2026",
-        "medicalLabel": "Medical help"
+        "medicalLabel": "Medical help",
+        "proofWhat": "Alerts per shift, P3 protect",
+        "proofValue": "2.6 alerts per shift",
+        "proofChangedWhat": "Alerts per shift, file changed after export"
       }
     }
   },
@@ -112,7 +135,8 @@
         "button": "Reset demo site",
         "done": "Demo site reset (new epoch {epoch}).",
         "unavailable": "Reset is not available on this deployment.",
-        "failed": "We could not reset the demo site. Try again."
+        "failed": "We could not reset the demo site. Try again.",
+        "rateLimited": "Reset is limited to once a minute. Try again shortly."
       },
       "mode": {
         "label": "Data source",
@@ -294,7 +318,7 @@
       "shareRow": "Share of crew above Amber",
       "date": "Date"
     },
-    "suppressed": "Fewer than {k} people — detail hidden to protect privacy"
+    "suppressed": "Fewer than {k} people, detail hidden to protect privacy"
   },
   "hse": {
     "title": "HSE overview",
@@ -339,6 +363,44 @@
       "designed": "Designed",
       "dev2025": "DEV 2025",
       "notClinicallyReviewed": "Not clinically reviewed"
+    },
+    "proof": {
+      "chip": "Proof",
+      "chipAria": "Proof for {what}",
+      "loadFailed": "The proof could not be opened. Try again.",
+      "title": "Where this number comes from",
+      "close": "Close",
+      "rows": {
+        "number": "Number",
+        "protocol": "Protocol line",
+        "script": "Script",
+        "file": "Result file",
+        "sha": "SHA-256",
+        "label": "Label",
+        "model": "Model",
+        "generated": "Generated"
+      },
+      "sha": {
+        "file": "Of the file this page drew",
+        "source": "Of the data the exporter read"
+      },
+      "notRecorded": "Not recorded",
+      "labels": {
+        "real": "REAL",
+        "realAssumedCrew": "REAL weather + assumed crew",
+        "simulated": "SIMULATED",
+        "dev2025": "DEV 2025, LOCO out-of-fold: not the result",
+        "recorded": "RECORDED"
+      },
+      "recount": {
+        "button": "Recount in this browser",
+        "busy": "Recounting",
+        "match": "Matches",
+        "mismatch": "Does not match: report this",
+        "unpublished": "This file is not published here, so it cannot be recounted.",
+        "failed": "The file could not be read, so nothing was recounted."
+      },
+      "syntheticShape": "synthetic shape"
     }
   },
   "levels": {

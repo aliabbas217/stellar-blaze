@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { Pictogram } from "./Pictogram";
 import { LevelScale, type LevelKind } from "./LevelScale";
 import type { Level } from "./level";
@@ -11,8 +12,11 @@ export interface LevelSignProps {
   readonly kind: LevelKind;
   /** hero: the word at 76 px under a four-label scale (worker Today). mini: the word at 22 px, scale without labels. */
   readonly size: "hero" | "mini";
-  /** How long the level holds, already worded for the locale ("until 17:00"). */
-  readonly until?: string;
+  /**
+   * How long the level holds, already worded for the locale ("until 17:00"). A node, so the caller can wrap the clock
+   * time in <bdi> (a time inside Arabic-script text must not be reordered): compose it with `t.rich`.
+   */
+  readonly until?: ReactNode;
   /** What the sign is the level of ("Site level now", "Last known level"), already worded for the locale. */
   readonly kicker: string;
 }
@@ -31,30 +35,25 @@ export function LevelMark({ level }: { readonly level: Level }) {
 }
 
 /*
- * The heights a loading skeleton must reserve, written from the same tokens the sign is built from, so the sign
- * replaces its skeleton without a layout shift (CLS budget 0.1). They are the English heights: Arabic-script text has a
- * taller line (tokens.css --leading-ar, --leading-ur), and the sign is allowed to grow for it, never to shrink.
- * tests/e2e/kit.spec.ts measures the rendered boxes.
+ * The heights a loading skeleton must reserve. They are written from the SAME two custom properties the sign sets its
+ * text with, `--sign-leading-text` and `--sign-leading-word`, which globals.css declares once per language. So the
+ * skeleton is as tall as the sign in English, Arabic, Urdu and the Indic languages alike (CLS budget 0.1): nothing here,
+ * and nothing in the sign, writes a leading of its own. A line that wraps still grows the sign past its floor; the
+ * floor is the one-line height. tests/e2e/kit.spec.ts measures the rendered boxes in en, ar and ur.
  */
-const LINE_16 = "var(--t-16) * var(--leading-body)";
-// The hero's "until" sits on its own line, reserved whether or not there is one, so the scale never moves.
-const UNTIL_ROW = "var(--t-22) * var(--leading-body)";
-const WORD_ROW = {
-  hero: "var(--t-76) * var(--leading-solid)",
-  mini: "var(--t-22) * var(--leading-body)",
-} as const;
-
-// The word row is a floor, so a taller line in another script can grow it but a short word never collapses it.
-const LEVEL_WORD_ROW = {
-  hero: `calc(${WORD_ROW.hero})`,
-  mini: `calc(${WORD_ROW.mini})`,
+const KICKER_LINE = "var(--t-16) * var(--sign-leading-text)";
+const UNTIL_LINE = "var(--t-22) * var(--sign-leading-text)";
+const WORD_LINE = {
+  hero: "var(--t-76) * var(--sign-leading-word)",
+  // The mini row also holds the 16 px "until", so its floor is the taller of the two lines.
+  mini: "max(var(--t-22) * var(--sign-leading-word), var(--t-16) * var(--sign-leading-text))",
 } as const;
 
 export const LEVEL_SIGN_HEIGHT = {
   // kicker + gap + word row + gap + until row + gap + scale bar + gap + label
-  hero: `calc(${LINE_16} * 2 + var(--s-3) * 3 + var(--s-2) * 2 + ${WORD_ROW.hero} + ${UNTIL_ROW})`,
+  hero: `calc(${KICKER_LINE} * 2 + var(--s-3) * 3 + var(--s-2) * 2 + ${WORD_LINE.hero} + ${UNTIL_LINE})`,
   // kicker + gap + word row + gap + scale bar (no labels)
-  mini: `calc(${LINE_16} + var(--s-3) * 2 + var(--s-2) + ${WORD_ROW.mini})`,
+  mini: `calc(${KICKER_LINE} + var(--s-3) * 2 + var(--s-2) + ${WORD_LINE.mini})`,
 } as const;
 
 /**
@@ -73,21 +72,26 @@ export function LevelSign({ level, kind, size, until, kicker }: LevelSignProps) 
 
   return (
     <div data-level-sign="" data-kind={kind} data-size={size} className="flex w-full flex-col gap-3">
-      <p className={`flex items-center gap-2 text-base ${live ? "text-ink-3" : "text-ink-2"}`}>
+      <p className={`flex items-center gap-2 text-base leading-(--sign-leading-text) ${live ? "text-ink-3" : "text-ink-2"}`}>
         {live ? null : <Pictogram name="clock" className="size-4" />}
         <span>{kicker}</span>
       </p>
-      <div className="flex flex-wrap items-baseline gap-3" style={{ minHeight: LEVEL_WORD_ROW[size] }}>
+      <div
+        className={`flex flex-wrap gap-3 ${size === "mini" ? "items-center" : "items-baseline"}`}
+        style={{ minHeight: `calc(${WORD_LINE[size]})` }}
+      >
         {level === null ? null : <LevelMark level={level} />}
         <h2
-          className={`font-display font-medium tracking-display [:lang(en)_&]:leading-solid ${wordSize} ${live ? "text-ink" : "text-ink-2"}`}
+          className={`font-display font-medium tracking-display leading-(--sign-leading-word) ${wordSize} ${live ? "text-ink" : "text-ink-2"}`}
         >
           {word}
         </h2>
-        {size === "mini" && until !== undefined ? <span className="text-base text-ink-2">{until}</span> : null}
+        {size === "mini" && until !== undefined ? (
+          <span className="text-base leading-(--sign-leading-text) text-ink-2">{until}</span>
+        ) : null}
       </div>
       {size === "hero" ? (
-        <p className="text-xl text-ink-2" style={{ minHeight: `calc(${UNTIL_ROW})` }}>
+        <p className="text-xl leading-(--sign-leading-text) text-ink-2" style={{ minHeight: `calc(${UNTIL_LINE})` }}>
           {until}
         </p>
       ) : null}

@@ -69,7 +69,9 @@ export function LevelScale({ level, kind, labels = true }: LevelScaleProps) {
               />
             </div>
             {labels ? (
-              <span className={`text-base ${current ? "font-medium text-ink" : "text-ink-3"}`}>{t(`name.${segment}`)}</span>
+              <span className={`text-base leading-(--sign-leading-text) ${current ? "font-medium text-ink" : "text-ink-3"}`}>
+                {t(`name.${segment}`)}
+              </span>
             ) : null}
           </div>
         );

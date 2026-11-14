@@ -37,7 +37,7 @@ export function Stamp({ kind, detail }: StampProps) {
       {detail === undefined ? null : (
         <>
           {" "}
-          <span className="font-normal">{detail}</span>
+          <bdi className="font-normal">{detail}</bdi>
         </>
       )}
     </span>

@@ -32,6 +32,16 @@ describe("LevelSign", () => {
     expect(screen.getByText("until 17:00")).toBeInTheDocument();
   });
 
+  it("takes the until text as a node, so the caller can isolate the clock time with bdi", () => {
+    for (const size of ["hero", "mini"] as const) {
+      const { container, unmount } = renderWithIntl(
+        <LevelSign level="orange" kind="live" size={size} kicker="k" until={<>until <bdi>17:00</bdi></>} />,
+      );
+      expect(container.querySelector("bdi")).toHaveTextContent("17:00");
+      unmount();
+    }
+  });
+
   it("says Site rules, with no scale marker, when there is no level", () => {
     const { container } = renderWithIntl(<LevelSign level={null} kind="fallback" size="hero" kicker="Forecast expired" />);
     expect(screen.getByRole("heading", { level: 2, name: "Site rules" })).toBeInTheDocument();

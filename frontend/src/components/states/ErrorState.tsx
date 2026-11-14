@@ -44,7 +44,7 @@ export function ErrorState({ title, detail, onRetry, requestId, children }: Erro
       {requestId === null ? null : (
         <div className="flex flex-wrap items-center gap-3 text-base text-ink-3">
           <p>
-            <span>{t("requestIdLabel")}</span> <code className="font-mono text-sm text-ink-2">{requestId}</code>
+            <span>{t("requestIdLabel")}</span> <code dir="ltr" translate="no" className="font-mono text-sm text-ink-2">{requestId}</code>
           </p>
           <button type="button" onClick={() => void copy(requestId)} className={ACTION_SECONDARY}>
             {t("error.copy")}

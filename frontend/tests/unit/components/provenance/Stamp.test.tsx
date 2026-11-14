@@ -22,6 +22,11 @@ describe("Stamp", () => {
     expect(screen.getByRole("note")).toHaveTextContent("Replay 3 Sep 2026");
   });
 
+  it("isolates the detail with bdi, so a date inside right-to-left text keeps its order", () => {
+    const { container } = renderWithIntl(<Stamp kind="REPLAY" detail="3 Sep 2026" />);
+    expect(container.querySelector("bdi")).toHaveTextContent("3 Sep 2026");
+  });
+
   it("is a note, so a screen reader reads it with the numbers it labels", () => {
     renderWithIntl(<Stamp kind="DEV_2025" />);
     expect(screen.getByRole("note")).toHaveTextContent("DEV 2025");

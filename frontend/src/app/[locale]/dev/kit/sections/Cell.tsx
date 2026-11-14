@@ -28,3 +28,8 @@ export function Cell({
 export function CellGrid({ children }: { readonly children: ReactNode }) {
   return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{children}</div>;
 }
+
+/** The rich-text tag the messages use around a clock time, so a time inside Arabic-script text is not reordered. */
+export function bdi(chunks: ReactNode): ReactNode {
+  return <bdi>{chunks}</bdi>;
+}

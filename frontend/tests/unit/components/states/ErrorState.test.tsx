@@ -12,7 +12,11 @@ describe("ErrorState", () => {
     );
     expect(screen.getByRole("heading", { name: "Something went wrong" })).toBeInTheDocument();
     expect(screen.getByText("We could not load this.")).toBeInTheDocument();
-    expect(screen.getByText("req_7f3a91c2")).toBeInTheDocument();
+    const id = screen.getByText("req_7f3a91c2");
+    expect(id).toBeInTheDocument();
+    // An identifier is read left to right and never translated, whatever language the page is in.
+    expect(id).toHaveAttribute("dir", "ltr");
+    expect(id).toHaveAttribute("translate", "no");
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledTimes(1);

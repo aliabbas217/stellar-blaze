@@ -9,7 +9,7 @@ import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { PendingBanner } from "@/components/states/PendingBanner";
 import { LevelSignSkeleton, TableRowsSkeleton } from "@/components/states/Skeletons";
 import { StaleBanner } from "@/components/states/StaleBanner";
-import { Cell, CellGrid } from "./Cell";
+import { bdi, Cell, CellGrid } from "./Cell";
 
 // An identifier shaped like the server's request ids; the code font, because it is read aloud and copied.
 const SAMPLE_REQUEST_ID = "req_7f3a91c2";
@@ -69,13 +69,13 @@ export function StatesSection() {
       {/* Each skeleton sits beside the element it stands in for, so the heights can be read against each other. */}
       <CellGrid>
         <Cell caption="hero sign" testId="sign-hero">
-          <LevelSign level="green" kind="live" size="hero" kicker={t("kickerNow")} until={t("untilNow")} />
+          <LevelSign level="green" kind="live" size="hero" kicker={t("kickerNow")} until={t.rich("untilNow", { bdi })} />
         </Cell>
         <Cell caption="hero skeleton" testId="skeleton-hero">
           <LevelSignSkeleton size="hero" />
         </Cell>
         <Cell caption="mini sign" testId="sign-mini">
-          <LevelSign level="green" kind="live" size="mini" kicker={t("kickerNow")} until={t("untilNow")} />
+          <LevelSign level="green" kind="live" size="mini" kicker={t("kickerNow")} until={t.rich("untilNow", { bdi })} />
         </Cell>
         <Cell caption="mini skeleton" testId="skeleton-mini">
           <LevelSignSkeleton size="mini" />
