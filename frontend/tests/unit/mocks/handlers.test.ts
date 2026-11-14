@@ -147,7 +147,27 @@ describe("get_site_forecast_today", () => {
     expect(hourAt(hours, "14:00")?.wbgt_c.p05).toBeCloseTo(37.4);
     expect(hourAt(hours, "14:00")?.wbgt_c.p95).toBeCloseTo(41.4);
     expect(["06:00", "08:00", "10:00", "14:00", "15:00", "18:00"].map(level)).toEqual(["green", "amber", "orange", "red", "orange", "amber"]);
-    expect(hours.every((hour) => hour.site_level !== null && hour.action_codes.length === 0)).toBe(true);
+    expect(hours.every((hour) => hour.site_level !== null)).toBe(true);
+  });
+
+  it("carries placeholder action codes by level (the shapes the ruleset's plan names), none for a green hour", async () => {
+    const { hours } = await forecast();
+    const codes = (local: string) => hourAt(hours, local)?.action_codes;
+
+    expect(codes("06:00")).toEqual([]);
+    expect(codes("08:00")).toEqual(["cycle.medium.heavy.45-15", "fluids.over-1.2l"]);
+    expect(codes("11:00")).toEqual(["cycle.high.heavy.20-40", "fluids.over-1.2l", "no-lone-work"]);
+    expect(codes("14:00")).toEqual(["stop-work", "fluids.over-1.2l", "no-lone-work"]);
+  });
+
+  it("offseason scenario: defaults to a day after the ban season, with no ban instants and no ban hour; an explicit date still wins", async () => {
+    const day = await forecast(DEMO_SITE, "offseason");
+
+    expect(day.date).toBe("2026-09-24");
+    expect(day.ban_window.active_on_date).toBe(false);
+    expect(day.ban_window.starts_at).toBeNull();
+    expect(day.hours.some((hour) => hour.ban_active)).toBe(false);
+    expect((await forecast(DEMO_SITE, "offseason", "?date=2026-09-03")).date).toBe(REPLAY_DATE);
   });
 
   it("gives the ban window as an object: 12:30 to 15:00 local, the season, and UTC instants in force", async () => {
@@ -342,6 +362,14 @@ describe("get_crew_timeline", () => {
   it("uses the replay default date when none is sent, and answers 404 for an unknown crew", async () => {
     expect((await timeline("crew-b")).date).toBe(REPLAY_DATE);
     expect((await get("/api/v1/crews/nope/timeline")).status).toBe(404);
+  });
+
+  it("noshift scenario: no published shift; offseason scenario: the timeline is for the same day after the season", async () => {
+    expect((await timeline("crew-b")).shift.length).toBeGreaterThan(0);
+    expect((await timeline("crew-b", "", "noshift")).shift).toEqual([]);
+    const late = await timeline("crew-b", "", "offseason");
+    expect(late.date).toBe("2026-09-24");
+    expect(late.ban_window.active_on_date).toBe(false);
   });
 
   it("suppressed scenario: every crew is suppressed; fallback scenario: no level in any hour, status fallback", async () => {

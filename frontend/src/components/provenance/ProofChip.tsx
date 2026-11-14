@@ -14,13 +14,16 @@ import type { Proof } from "./proof";
  * `data-proof-id` is only a stable handle for tests and for the e2e. The first click loads the drawer with a dynamic
  * import and portals it to <body> (a <dialog> is not valid inside the <p> or <button> a number often sits in); later
  * clicks reopen the same one. When it closes, focus goes back here.
+ *
+ * `label` replaces the word "Proof" on the button ("Why Orange?"); the accessible name stays "Proof for <what>". `field` is
+ * the phone size: 44 px target and 16 px text, for the worker screens (a desk chip is 28 px).
  */
-export function ProofChip({ proof }: { readonly proof: Proof | null }) {
+export function ProofChip({ proof, label, field = false }: { readonly proof: Proof | null; readonly label?: string; readonly field?: boolean }) {
   if (proof === null) return null;
-  return <Chip proof={proof} />;
+  return <Chip proof={proof} label={label} field={field} />;
 }
 
-function Chip({ proof }: { readonly proof: Proof }) {
+function Chip({ proof, label, field }: { readonly proof: Proof; readonly label: string | undefined; readonly field: boolean }) {
   const t = useTranslations("states.proof");
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
@@ -56,12 +59,15 @@ function Chip({ proof }: { readonly proof: Proof }) {
         type="button"
         data-proof-id={id}
         aria-haspopup="dialog"
-        aria-label={t("chipAria", { what: proof.what })}
+        // A custom label is the accessible name as it is written (WCAG 2.5.3: the name contains the visible text).
+        aria-label={label ?? t("chipAria", { what: proof.what })}
         onClick={openDrawer}
-        className="inline-flex min-h-7 min-w-7 items-center gap-1 rounded-sign border border-edge bg-transparent px-2 text-xs text-ink-2 hover:border-ink-2 hover:text-ink"
+        className={`inline-flex items-center gap-1 rounded-sign border border-edge bg-transparent text-ink-2 hover:border-ink-2 hover:text-ink ${
+          field ? "min-h-(--target) min-w-(--target) touch-manipulation px-3 text-base" : "min-h-7 min-w-7 px-2 text-xs"
+        }`}
       >
         <span aria-hidden className="size-1.5 rotate-45 border border-current" />
-        {t("chip")}
+        {label ?? t("chip")}
       </button>
       {failed ? (
         <span role="status" className="text-xs text-ink-2">

@@ -39,6 +39,8 @@ export type ForecastStatus = Schemas["SiteForecastToday"]["forecast_status"];
 export const SITE_DEMO = "site-demo-mussafah";
 export const SITE_EMPTY = "site-demo-empty";
 export const REPLAY_DATE = "2026-09-03";
+/** A day after the ban season (15 Sep): the `offseason` scenario serves it by default, so Today draws no midday slot. */
+export const OFFSEASON_DATE = "2026-09-24";
 export const FIXTURE_DATE = REPLAY_DATE;
 
 export const MOCK_MODEL_ID = "mock";
@@ -129,14 +131,29 @@ function banActive(date: string, hour: number): boolean {
   return inBanSeason(date) && (hour + 1) * 60 > minutesOf(BAN_START) && hour * 60 < minutesOf(BAN_END);
 }
 
+/**
+ * Placeholder action codes per level. The ruleset owns the real ones and none exists yet (ADR 0009); these are the shapes
+ * B3's plan names (`cycle.<zone>.<workload>.<work>-<rest>`, `fluids.*`, `no-lone-work`, `stop-work`) at the cycles of
+ * the canned day plans: Amber Medium 45/15, Orange High 20/40, Red stop. A fallback hour has no level and no code.
+ */
+const ACTION_CODES_BY_LEVEL: Record<Level, readonly string[]> = {
+  green: [],
+  amber: ["cycle.medium.heavy.45-15", "fluids.over-1.2l"],
+  orange: ["cycle.high.heavy.20-40", "fluids.over-1.2l", "no-lone-work"],
+  red: ["stop-work", "fluids.over-1.2l", "no-lone-work"],
+};
+
+function actionCodes(level: Level | null): string[] {
+  return level === null ? [] : [...ACTION_CODES_BY_LEVEL[level]];
+}
+
 function hourForecast(date: string, hour: number, fallback: boolean): Schemas["HourForecast"] {
   const p50 = wbgtAt(hour);
   return {
     starts_at: instantAt(date, hour * 60),
     wbgt_c: fallback ? { p05: null, p50: null, p95: null } : { p05: p50 - SPREAD_C, p50, p95: p50 + SPREAD_C },
     site_level: hourLevel(hour, fallback),
-    // The backend ruleset owns the codes and none exists yet (ADR 0009).
-    action_codes: [],
+    action_codes: actionCodes(hourLevel(hour, fallback)),
     ban_active: banActive(date, hour),
   };
 }
@@ -332,6 +349,8 @@ export interface DayOptions {
   forecastStatus?: ForecastStatus;
   /** The `suppressed` scenario: every crew is below k. */
   forceSuppressed?: boolean;
+  /** The `noshift` scenario: the crews' timelines publish no shift for the day. */
+  noShift?: boolean;
 }
 
 function isSuppressed(seed: CrewSeed, options: DayOptions): boolean {
@@ -488,7 +507,10 @@ export function crewTimeline(crewId: string, date: string, options: DayOptions =
     k: riskPolicy.k_suppression,
     forecast_status: statusOf(options),
     ban_window: banWindow(date),
-    shift: L1_SHIFT.map(({ start, end }) => ({ starts_at: instantAt(date, minutesOf(start)), ends_at: instantAt(date, minutesOf(end)) })),
+    shift:
+      options.noShift === true
+        ? []
+        : L1_SHIFT.map(({ start, end }) => ({ starts_at: instantAt(date, minutesOf(start)), ends_at: instantAt(date, minutesOf(end)) })),
     signoff_state: signoffs.get(seed.id) ?? "unsigned",
     hours: HOURS.map((hour) => {
       const from = Date.parse(instantAt(date, hour * 60));

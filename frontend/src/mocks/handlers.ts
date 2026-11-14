@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { components } from "@/api/schema";
 import { MOCK_SCENARIO_HEADER } from "../api/mock-scenario.ts";
 import {
+  OFFSEASON_DATE,
   REPLAY_DATE,
   STALE_AGE_MS,
   appendRefusal,
@@ -42,6 +43,8 @@ import {
  *               the day plan, no entries in the transparency log
  *   fallback    forecast_status "fallback": no hour has data or a level; the day plan is the protective fallback
  *   suppressed  every crew is below k: timelines say suppressed, day plans hide the restricted headcount
+ *   offseason   the forecast and the crew timeline default to 24 Sep 2026, after the ban season: no ban instants, no slot
+ *   noshift     the crew timelines publish no shift for the day
  * Any other value is ignored. The employer routes answer 401 without an `Authorization: Bearer` header (the BFF adds
  * the demo token on its allow-list); the mock accepts any non-empty token. It does not rate limit: the BFF does.
  *
@@ -50,7 +53,7 @@ import {
  */
 
 type Schemas = components["schemas"];
-type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed";
+type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift";
 type Info = Parameters<HttpResponseResolver>[0];
 
 const MOCK_REQUEST_ID = "mock-req-1";
@@ -123,7 +126,15 @@ function bodyProblem(request: Request, error: z.ZodError): Response {
 
 function scenarioOf(request: Request): Scenario | null {
   const value = request.headers.get(MOCK_SCENARIO_HEADER);
-  return value === "error" || value === "stale" || value === "empty" || value === "fallback" || value === "suppressed" ? value : null;
+  return value === "error" ||
+    value === "stale" ||
+    value === "empty" ||
+    value === "fallback" ||
+    value === "suppressed" ||
+    value === "offseason" ||
+    value === "noshift"
+    ? value
+    : null;
 }
 
 function pathParam(params: Info["params"], name: string): string {
@@ -153,13 +164,17 @@ function dayOptions(scenario: Scenario | null): DayOptions {
     ...(scenario === "fallback" ? { forecastStatus: "fallback" as const } : {}),
     ...(scenario === "stale" ? { forecastStatus: "stale" as const } : {}),
     ...(scenario === "suppressed" ? { forceSuppressed: true } : {}),
+    ...(scenario === "noshift" ? { noShift: true } : {}),
   };
 }
 
-/** The `date` query parameter: absent means the replay default date; present it must be a real YYYY-MM-DD date. */
-function dateOf(request: Request): string | null {
+/**
+ * The `date` query parameter: absent means the default date (the replay day, or a day after the ban season in the
+ * `offseason` scenario); present it must be a real YYYY-MM-DD date.
+ */
+function dateOf(request: Request, scenario: Scenario | null = null): string | null {
   const raw = new URL(request.url).searchParams.get("date");
-  if (raw === null) return REPLAY_DATE;
+  if (raw === null) return scenario === "offseason" ? OFFSEASON_DATE : REPLAY_DATE;
   return isIsoDate(raw) ? raw : null;
 }
 
@@ -237,7 +252,7 @@ export const handlers = [
   http.get(
     FORECAST_PATH,
     withScenario(({ request, params }, scenario) => {
-      const date = dateOf(request);
+      const date = dateOf(request, scenario);
       if (date === null) return badDate(request);
       return forecastResponse(request, pathParam(params, "site_id"), date, scenario);
     }),
@@ -262,7 +277,7 @@ export const handlers = [
   http.get(
     "*/api/v1/crews/:crew_id/timeline",
     withScenario(({ request, params }, scenario) => {
-      const date = dateOf(request);
+      const date = dateOf(request, scenario);
       if (date === null) return badDate(request);
       const crewId = pathParam(params, "crew_id");
       const timeline = crewTimeline(crewId, date, dayOptions(scenario));

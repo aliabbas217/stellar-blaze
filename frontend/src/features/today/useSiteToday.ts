@@ -241,6 +241,8 @@ interface SiteTodayCommon {
   readonly fetching: boolean;
   /** Requests the forecast and the policy again. */
   readonly refetch: () => void;
+  /** The phone's own clock, read every minute: how old a forecast is counts from it, even when `now` is the replay moment. */
+  readonly deviceNow: Date;
 }
 
 /**
@@ -262,13 +264,19 @@ export type SiteToday =
  * When the policy is held and its config_version differs from the forecast's, the policy is fetched again (ADR 0010), once
  * for each pair of versions: if it still differs the screen keeps showing no personal level and both versions, and nothing
  * loops. The effect below only invalidates a cached query; the request itself is made by the query library.
+ *
+ * `options.now` is the instant the screen treats as now: the demo's replay clock (`useClock`) instead of the phone's. Which
+ * hour is current, whether the forecast is fresh and whether a personal level may be shown all follow it; how long ago the
+ * forecast was written (`deviceNow`) stays the phone's. `options.enabled: false` (no site chosen yet) makes no request.
  */
-export function useSiteToday(siteId: string): SiteToday {
+export function useSiteToday(siteId: string, options: { readonly now?: Date; readonly enabled?: boolean } = {}): SiteToday {
   const queryClient = useQueryClient();
-  const forecastQuery = useQuery(siteTodayQueryOptions(siteId));
-  const policyQuery = useQuery(riskPolicyQueryOptions());
+  const enabled = options.enabled ?? true;
+  const forecastQuery = useQuery({ ...siteTodayQueryOptions(siteId), enabled });
+  const policyQuery = useQuery({ ...riskPolicyQueryOptions(), enabled });
   const profile = useProfile((state) => state.profile);
-  const now = useNow();
+  const deviceNow = useNow();
+  const now = options.now ?? deviceNow;
   const offline = useOffline();
 
   const forecast = forecastQuery.data;
@@ -294,7 +302,7 @@ export function useSiteToday(siteId: string): SiteToday {
     void refetchPolicy();
   }, [refetchForecast, refetchPolicy]);
 
-  const common: SiteTodayCommon = { offline, fetching: forecastQuery.isFetching, refetch };
+  const common: SiteTodayCommon = { offline, fetching: forecastQuery.isFetching, refetch, deviceNow };
   const problem = forecastQuery.error?.problem ?? null;
   if (view !== null) return { ...common, status: "ready", view, problem };
   if (problem !== null) return { ...common, status: "error", view: null, problem };

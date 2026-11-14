@@ -22,7 +22,7 @@ interface PageUnderTest {
 const pages: PageUnderTest[] = [
   { path: "/en", heading: en.shell.roleChooser.title },
   { path: "/ar", heading: ar.shell.roleChooser.title },
-  { path: "/en/worker", heading: en.shell.roleChooser.worker.title },
+  { path: "/en/worker", heading: en.worker.today.title },
   { path: "/en/worker/alerts", heading: en.alerts.title, enable: en.alerts.enable },
   { path: "/ur/worker/alerts", heading: ur.alerts.title, enable: ur.alerts.enable },
   { path: "/en/supervisor", heading: en.supervisor.title },

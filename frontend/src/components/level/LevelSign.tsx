@@ -82,6 +82,7 @@ export function LevelSign({ level, kind, size, until, kicker }: LevelSignProps) 
       >
         {level === null ? null : <LevelMark level={level} />}
         <h2
+          data-level-word=""
           className={`font-display font-medium tracking-display leading-(--sign-leading-word) ${wordSize} ${live ? "text-ink" : "text-ink-2"}`}
         >
           {word}
