@@ -1,27 +1,12 @@
 import { solarElevationDeg, UAE_CENTROID } from "@/lib/sun/solar";
+import { DEMO_STORAGE_KEY, THEME_STORAGE_KEY } from "@/lib/sun/theme-storage";
 import { THEME_COLORS } from "@/lib/sun/theme-colors";
 
-/** localStorage key of the sun override: JSON `{ theme: "sun" | "night", until: epoch ms }`, written by SunToggle. */
-export const THEME_STORAGE_KEY = "sb-theme";
-
-/**
- * localStorage key of the demo mode (`"replay"` or `"live"`). Task 3's DemoProvider owns it; the script only reads it.
- * Absent means replay, the default.
+/*
+ * Server-only by convention: only the server layouts and global-not-found import this module. It builds `sunScript`
+ * at module level (the solar function stringified), which a bundler cannot prove pure, so a client component importing
+ * it would ship the whole string. Client code imports the storage keys and helpers from "@/lib/sun/theme-storage".
  */
-export const DEMO_STORAGE_KEY = "sb-demo";
-
-export type ThemeName = "sun" | "night";
-
-/** What SunToggle stores: the chosen theme and the instant it stops applying (the next local midnight). */
-export interface ThemeOverride {
-  readonly theme: ThemeName;
-  readonly until: number;
-}
-
-/** The first instant of the next local day: an override lasts "until the next local midnight" (DESIGN.md section 6). */
-export function nextLocalMidnight(now: Date): number {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
-}
 
 /** The field paths, `/<locale>/worker` and `/<locale>/supervisor` with anything below them. HSE, judge and admin never match. */
 const FIELD_PATH = String.raw`^\/[a-z]{2}\/(?:worker|supervisor)(?:\/|$)`;

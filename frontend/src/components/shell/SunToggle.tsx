@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useSyncExternalStore } from "react";
 import { THEME_COLORS } from "@/lib/sun/theme-colors";
-import { nextLocalMidnight, THEME_STORAGE_KEY, type ThemeName, type ThemeOverride } from "./theme-script";
+import { nextLocalMidnight, THEME_STORAGE_KEY, type ThemeName, type ThemeOverride } from "@/lib/sun/theme-storage";
 
 /*
  * The one tap that overrides sun mode until the next local midnight (DESIGN.md section 6). It owns the

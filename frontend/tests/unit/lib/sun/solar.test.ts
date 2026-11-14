@@ -1,6 +1,7 @@
-import { DEMO_STORAGE_KEY, sunScript, THEME_STORAGE_KEY } from "@/components/shell/theme-script";
+import { sunScript } from "@/components/shell/theme-script";
 import { solarElevationDeg, UAE_CENTROID } from "@/lib/sun/solar";
 import { THEME_COLORS } from "@/lib/sun/theme-colors";
+import { DEMO_STORAGE_KEY, THEME_STORAGE_KEY } from "@/lib/sun/theme-storage";
 
 /*
  * solarElevationDeg is the "is the sun up at the site" decision of sun mode (DESIGN.md section 6). The expected

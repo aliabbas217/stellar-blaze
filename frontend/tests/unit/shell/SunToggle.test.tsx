@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SunToggle } from "@/components/shell/SunToggle";
-import { THEME_STORAGE_KEY } from "@/components/shell/theme-script";
 import { THEME_COLORS } from "@/lib/sun/theme-colors";
+import { THEME_STORAGE_KEY } from "@/lib/sun/theme-storage";
 import arMessages from "../../../messages/ar.json";
 import { renderWithIntl } from "../../utils/intl";
 
@@ -119,5 +121,13 @@ describe("SunToggle", () => {
   it("is at least 44 px tall by construction (min-h from --target, never a fixed height)", () => {
     renderWithIntl(<SunToggle />);
     expect(screen.getByRole("button")).toHaveClass("min-h-(--target)");
+  });
+});
+
+describe("SunToggle bundle hygiene", () => {
+  it("imports no module that builds the inline script (it would ship the solar function in every client chunk)", () => {
+    const source = readFileSync(path.resolve(import.meta.dirname, "../../../src/components/shell/SunToggle.tsx"), "utf8");
+    expect(source).not.toMatch(/from\s+["'][^"']*theme-script["']/);
+    expect(source).not.toMatch(/lib\/sun\/solar["']/);
   });
 });
