@@ -14,7 +14,7 @@ export interface ProofDrawerProps {
 
 /**
  * Where a number comes from: protocol line, script, result file, fingerprints, label. A native modal <dialog>: the
- * browser gives it the top layer, the inert page behind it, Escape and focus containment. It is a right-hand drawer from
+ * browser gives it the top layer, the inert page behind it, Escape and focus containment. It is a drawer at the inline end from
  * 48 rem up and a bottom sheet below. The code is a dynamic import (ProofChip loads it on the first click), so a page
  * with fifty chips ships none of it until someone asks.
  *
