@@ -49,8 +49,8 @@ ENV PATH=/app/.venv/bin:$PATH \
     NUMBA_CACHE_DIR=/app/.numba-cache \
     NUMBA_CPU_NAME=generic
 
-# WORKDIR /app makes the Settings defaults (SB_RULESETS_DIR=rulesets, SB_MODELS_DIR=models, the runtime-config seed
-# config/runtime/default.toml) and alembic.ini resolve.
+# WORKDIR /app makes the Settings defaults (SB_RULESETS_DIR=rulesets, SB_MODELS_DIR=models, SB_REPLAY_DIR=replay, the
+# runtime-config seed config/runtime/default.toml) and alembic.ini resolve.
 WORKDIR /app
 
 # The layers that never change with the code come first, so a code change does not re-run apt or the user setup.
@@ -68,13 +68,15 @@ RUN groupadd --gid 10001 app \
     && chown 10001:10001 /app/.numba-cache
 
 # Only what the app reads at run time, not all of /app: the virtualenv (which holds the installed project), the Alembic
-# migrations, ADR 0009's rulesets and model artifacts, and ADR 0010's runtime-config seed (config/runtime/default.toml).
+# migrations, ADR 0009's rulesets and model artifacts, the replay snapshots (SB_FORECAST_SOURCE=replay reads
+# replay/<SB_REPLAY_SNAPSHOT_ID>/) and ADR 0010's runtime-config seed (config/runtime/default.toml).
 # Sources, pyproject.toml and uv.lock stay in the build stage.
 COPY --from=build /app/.venv /app/.venv
 COPY alembic/ alembic/
 COPY alembic.ini ./
 COPY rulesets/ rulesets/
 COPY models/ models/
+COPY replay/ replay/
 COPY config/ config/
 # The MIT notice for the code ported from meteoHazard (domain/physics/twl.py) has to ship with that code.
 COPY THIRD_PARTY_NOTICES.md ./

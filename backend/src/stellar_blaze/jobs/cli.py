@@ -20,6 +20,11 @@ activation log itself records who changed what and why)::
     sb-jobs config activate VERSION_ID --actor A --reason R [--expected-previous ID]
     sb-jobs config rollback --actor A --reason R [--expected-previous ID]
 
+and the replay snapshots of the forecast corrector (``jobs/ml_cli.py``, also not jobs: no ``job_run`` row, no database,
+no lock; it copies silver files into ``SB_REPLAY_DIR`` and is documented there)::
+
+    sb-jobs replay build --summer YEAR --station ICAO [--station ICAO ...] --snapshot-id ID
+
 Configuration is the ``SB_*`` environment (``SB_DATABASE_URL`` is required; ``SB_DATA_DIR`` says where the files go).
 The sources come from ``composition.build_sources`` and the config store from ``composition.build_config_store``, both
 looked up as module attributes so a test can replace them with fakes; this module never names an adapter. Exit codes:
@@ -66,6 +71,7 @@ from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig
 from stellar_blaze.domain.weather.models import MODEL_SUMMERS, NwpModel
 from stellar_blaze.domain.weather.stations import STATIONS, Station, station
+from stellar_blaze.jobs.ml_cli import ml_app
 from stellar_blaze.jobs.runner import describe_error, run_job
 from stellar_blaze.jobs.work import build_dataset, ingest_forecasts, ingest_observations
 from stellar_blaze.logging import configure_logging
@@ -98,6 +104,7 @@ config_app = typer.Typer(
 )
 app.add_typer(db_app, name="db")
 app.add_typer(config_app, name="config")
+app.add_typer(ml_app)  # no name: its commands (and its `replay` group) sit at the top level of sb-jobs
 
 
 class ObservationSourceName(StrEnum):

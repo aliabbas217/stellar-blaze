@@ -71,9 +71,14 @@ from stellar_blaze.ml.training_config import TrainingConfig
 
 __all__ = [
     "TrainedCorrector",
+    "calibrated_value_grids",
+    "draw_joint_samples",
     "fit_stratum_copulas",
+    "joint_wbgt_value_grid",
     "model_id",
     "reject_thin_wbgt_rows",
+    "stratum_codes",
+    "stratum_key_of",
     "train_corrector",
     "value_grid",
     "wbgt_direct_grid",
@@ -245,15 +250,41 @@ def _floats(frame: pl.DataFrame, name: str) -> F64:
     return frame[name].cast(pl.Float64()).fill_null(float("nan")).to_numpy().astype(np.float64, copy=False)
 
 
-def _stratum_codes(lead: NDArray[np.int8], block: pl.Series) -> NDArray[np.int64]:
+def stratum_codes(lead: NDArray[np.int8], block: pl.Series) -> NDArray[np.int64]:
     """``lead * 3 + block index`` of each row (the stratum id of ``ml.conformal``)."""
     rows = len(lead)
     return lead_values(lead, rows) * _N_BLOCKS + block_indices(block, rows).astype(np.int64)
 
 
-def _key_of(code: int) -> str:
+def stratum_key_of(code: int) -> str:
+    """The ``"<lead>|<block>"`` key of a stratum id (``stratum_codes``)."""
     lead_id, block_index = divmod(code, _N_BLOCKS)
     return stratum_key(lead_id, STRATUM_BLOCKS[block_index])
+
+
+def calibrated_value_grids(
+    error_grids: Mapping[Target, F64],
+    raw: Mapping[Target, F64],
+    lead: NDArray[np.int8],
+    block: pl.Series,
+    offsets: ConformalOffsets,
+) -> dict[Target, F64]:
+    """The calibrated VALUE grids of t, td and wind: ``value_grid(apply_offsets(error grid), raw)`` per target.
+
+    The one recipe of ``train_corrector`` (the copula PIT of the calibration rows) and of ``ml.predict`` (every other
+    row), so the two cannot drift apart.
+
+    Args:
+        error_grids: Per target of ``(t, td, wind)`` the sorted ``(n, 19)`` predicted ERROR grid.
+        raw: Per target the ``(n,)`` raw forecast (NaN where missing).
+        lead: Lead in days of each row.
+        block: Hour-block of each row.
+        offsets: The conformal offsets (they must hold the three targets).
+    """
+    return {
+        target: value_grid(apply_offsets(error_grids[target], lead, block, offsets, target), raw[target], target)
+        for target in _JOINT_TARGETS
+    }
 
 
 def fit_stratum_copulas(
@@ -306,25 +337,69 @@ def fit_stratum_copulas(
     return copulas, tuple(fallback)
 
 
-def _joint_wbgt_grid(
-    cal: pl.DataFrame,
+def _stratum_samples(
+    values: Mapping[Target, F64], copulas: Mapping[str, F64], cfg: TrainingConfig, code: int, chosen: NDArray[np.bool_]
+) -> F64:
+    """The ``(m, n_joint_samples, 3)`` joint samples of the rows ``chosen`` of one stratum, from its own copula."""
+    return sample_joint(
+        [values[target][chosen] for target in _JOINT_TARGETS],
+        copulas[stratum_key_of(code)],
+        n_samples=cfg.n_joint_samples,
+        seed=cfg.sample_seed,
+    )
+
+
+def draw_joint_samples(
+    values: Mapping[Target, F64], copulas: Mapping[str, F64], cfg: TrainingConfig, codes: NDArray[np.int64]
+) -> F64:
+    """The ``(n, n_joint_samples, 3)`` joint (t, td, wind) samples of every row, drawn per stratum.
+
+    The same draws ``joint_wbgt_value_grid`` makes (same copula, count and seed per stratum), without the WBGT solver.
+    A row with a missing grid has NaN samples.
+    """
+    out = np.full((len(codes), cfg.n_joint_samples, len(_JOINT_TARGETS)), np.nan, dtype=np.float64)
+    for code in np.unique(codes).tolist():
+        chosen = codes == code
+        out[chosen] = _stratum_samples(values, copulas, cfg, code, chosen)
+    return out
+
+
+def joint_wbgt_value_grid(
+    rows: pl.DataFrame,
     values: Mapping[Target, F64],
     copulas: Mapping[str, F64],
     cfg: TrainingConfig,
     codes: NDArray[np.int64],
+    *,
+    samples_out: F64 | None = None,
 ) -> tuple[F64, int]:
-    """The pre-conformal joint WBGT value grid of the calibration rows, and how many rows were rejected (R30)."""
-    grid = np.full((cal.height, 19), np.nan, dtype=np.float64)
-    n_finite = np.zeros(cal.height, dtype=np.int64)
+    """The pre-conformal joint WBGT value grid of ``rows`` and how many rows were rejected (R30).
+
+    Per ``<lead>|<block>`` stratum: ``sample_joint`` from that stratum's copula (``cfg.n_joint_samples`` draws seeded
+    with ``cfg.sample_seed``, so a row's draws depend on its position inside its stratum), then ``wbgt_joint_grid``;
+    a row with fewer than ``n_joint_samples / 2`` finite samples is all-NaN (``reject_thin_wbgt_rows``). Shared by
+    ``train_corrector`` (the calibration rows) and ``ml.predict`` (any row).
+
+    Args:
+        rows: A ``build_features``-shaped frame (the gold columns of ``wbgt_joint_grid``), one row per grid row.
+        values: The calibrated VALUE grids of t, td and wind (``calibrated_value_grids``).
+        copulas: Stratum key to the 3x3 copula correlation.
+        cfg: The training config (``n_joint_samples``, ``sample_seed``).
+        codes: ``stratum_codes`` of each row.
+        samples_out: Optional ``(n, n_joint_samples, 3)`` array that receives each row's samples in place (rows of a
+            stratum that is drawn get their draws; the array is not cleared).
+
+    Returns:
+        The ``(n, 19)`` grid (NaN rows where rejected) and the number of rejected rows.
+    """
+    grid = np.full((rows.height, 19), np.nan, dtype=np.float64)
+    n_finite = np.zeros(rows.height, dtype=np.int64)
     for code in np.unique(codes).tolist():
         chosen = codes == code
-        samples = sample_joint(
-            [values[target][chosen] for target in _JOINT_TARGETS],
-            copulas[_key_of(code)],
-            n_samples=cfg.n_joint_samples,
-            seed=cfg.sample_seed,
-        )
-        result = wbgt_joint_grid(samples, cal.filter(pl.Series(chosen)))
+        samples = _stratum_samples(values, copulas, cfg, code, chosen)
+        if samples_out is not None:
+            samples_out[chosen] = samples
+        result = wbgt_joint_grid(samples, rows.filter(pl.Series(chosen)))
         grid[chosen], n_finite[chosen] = result.grid, result.n_finite
     return reject_thin_wbgt_rows(grid, n_finite, cfg.n_joint_samples)
 
@@ -379,9 +454,9 @@ def train_corrector(pairs: pl.DataFrame, cfg: TrainingConfig, *, cfg_sha256: str
         raise ValueError(f"no calibration rows in the {window!r} window")
     lead = cal["lead_days"].cast(pl.Int8()).to_numpy()
     block = cal["hour_block"]
-    codes = _stratum_codes(lead, block)
+    codes = stratum_codes(lead, block)
     expected = {stratum_key(lead_id, name) for lead_id in cfg.leads for name in STRATUM_BLOCKS}
-    absent_strata = sorted(expected - {_key_of(code) for code in np.unique(codes).tolist()})
+    absent_strata = sorted(expected - {stratum_key_of(code) for code in np.unique(codes).tolist()})
     if absent_strata:
         raise ValueError(f"the calibration rows have no row in the strata {absent_strata}")
     _log.info("train.split", fit_rows=fit_rows.height, cal_rows=cal.height, window=window, wbgt=cfg.wbgt_method)
@@ -399,18 +474,14 @@ def train_corrector(pairs: pl.DataFrame, cfg: TrainingConfig, *, cfg_sha256: str
         for target in boosted
     }
 
-    values = {
-        target: value_grid(
-            apply_offsets(error_grids[target], lead, block, offsets[target], target), raw[target], target
-        )
-        for target in _JOINT_TARGETS
-    }
+    merged_joint = offsets[Target.T].merge(offsets[Target.TD]).merge(offsets[Target.WIND])
+    values = calibrated_value_grids(error_grids, raw, lead, block, merged_joint)
     pit = np.stack([cdf(values[target], raw[target] + truth_error[target]) for target in _JOINT_TARGETS], axis=1)
     copulas, copula_fallback = fit_stratum_copulas(pit, lead, block, leads=cfg.leads)
 
     rejected = 0
     if not direct:
-        joint, rejected = _joint_wbgt_grid(cal, values, copulas, cfg, codes)
+        joint, rejected = joint_wbgt_value_grid(cal, values, copulas, cfg, codes)
         offsets[Target.WBGT] = fit_symmetric_offsets(
             joint - raw[Target.WBGT][:, None], truth_error[Target.WBGT], lead, block, target=Target.WBGT
         )

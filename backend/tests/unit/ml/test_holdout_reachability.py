@@ -29,6 +29,10 @@ PARQUET_READERS = frozenset({"read_parquet", "scan_parquet"})
 ML_PARQUET_READERS = frozenset({"ml/data.py"})
 PARQUET_READERS_OUTSIDE_ML = {
     "adapters/sources/ghcnh.py": "decodes the NOAA GHCNh download held in memory (io.BytesIO), never the gold file",
+    "adapters/sources/replay.py": (
+        "decodes the two data files of a replay snapshot from bytes just checked against snapshot.json (io.BytesIO); "
+        "the snapshot is built from silver by jobs/replay_build.py, never from gold/pairs.parquet"
+    ),
     "adapters/storage/parquet_store.py": (
         "B1's store reads silver observations and forecasts and counts silver rows (silver_inputs); it has no reader "
         "for gold/pairs.parquet (verified: write_gold only writes)"

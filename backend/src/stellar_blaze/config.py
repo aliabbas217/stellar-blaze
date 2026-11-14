@@ -13,9 +13,10 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from stellar_blaze import __version__
+from stellar_blaze.domain.weather.replay import SnapshotId
 
 # The kinds of forecast source `composition` knows how to ask for. Defined once here; `composition.FORECAST_SOURCES`
-# registers the factories, and `replay` is registered in B3 (ADR 0009 section 4).
+# registers the factories, `replay` included (B2, `adapters.sources.replay`; ADR 0009 section 4).
 type ForecastSourceKind = Literal["open_meteo", "replay"]
 
 
@@ -54,9 +55,13 @@ class Settings(BaseSettings):
     readiness_timeout_s: float = 2.0
     phs_timeout_s: float = 10.0
 
-    # Evolvability (ADR 0009 sections 1, 3, 4; ADR 0010). `replay` is registered in B3; selecting a source nobody
-    # registered fails in `composition` at startup, not here.
+    # Evolvability (ADR 0009 sections 1, 3, 4; ADR 0010). Selecting a source nobody registered fails in `composition`
+    # at startup, not here.
     forecast_source: ForecastSourceKind = "open_meteo"
+    # The replay forecast source reads `<replay_dir>/<replay_snapshot_id>/`, a hashed snapshot built by
+    # `sb-jobs replay build`. The id names a directory, so it must be a lowercase slug; it is required with `replay`.
+    replay_dir: Path = Path("replay")
+    replay_snapshot_id: SnapshotId | None = None
     # Pins for back-tests and database-less development runs only: `composition` refuses them with SB_ENV=prod, where
     # the runtime config is the one source of truth (ADR 0010 section 4.6). While one is set the snapshot is an `env`
     # one, and the config poller never replaces it with a database activation (it logs that once).
@@ -70,6 +75,15 @@ class Settings(BaseSettings):
     # How often each process reads the latest config activation from the database. Under 1 s would hammer the database
     # for no benefit; over 60 s is no longer "without a restart" (ADR 0010 section 6).
     config_poll_interval_s: float = Field(default=5.0, ge=1.0, le=60.0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _replay_needs_a_snapshot(self) -> Self:
+        if self.forecast_source == "replay" and self.replay_snapshot_id is None:
+            msg = (
+                "forecast_source='replay' needs a snapshot: set SB_REPLAY_SNAPSHOT_ID (a directory under SB_REPLAY_DIR)"
+            )
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def _prod_logs_are_machine_readable(self) -> Self:

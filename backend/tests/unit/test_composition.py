@@ -208,8 +208,8 @@ def test_dubai_today_is_the_asia_dubai_calendar_date() -> None:
 # --- forecast sources --------------------------------------------------------------------------------------------
 
 
-def test_only_open_meteo_is_registered_until_b3_adds_replay() -> None:
-    assert set(FORECAST_SOURCES) == {"open_meteo"}
+def test_open_meteo_and_replay_are_registered() -> None:
+    assert set(FORECAST_SOURCES) == {"open_meteo", "replay"}  # replay moved from B3 to B2 (Task 13)
 
 
 def test_the_production_registry_is_read_only() -> None:
@@ -221,7 +221,7 @@ def test_the_production_registry_is_read_only() -> None:
 def test_the_registry_keys_are_kinds_settings_accepts() -> None:
     kinds = set(get_args(ForecastSourceKind.__value__))
     assert kinds == {"open_meteo", "replay"}
-    assert set(FORECAST_SOURCES) <= kinds
+    assert set(FORECAST_SOURCES) == kinds
     # Settings uses the very same alias: there is one definition (config.py).
     annotation: object = Settings.model_fields["forecast_source"].annotation
     assert annotation is ForecastSourceKind
@@ -240,11 +240,11 @@ async def test_open_meteo_builds_the_real_source() -> None:
 
 @pytest.mark.asyncio
 async def test_an_unregistered_kind_names_the_registered_ones() -> None:
-    settings = make_settings(forecast_source="replay")
+    settings = make_settings(forecast_source="replay", replay_snapshot_id="demo-2026")
     client = build_async_client(settings)
     try:
         with pytest.raises(UnknownAdapterError, match=r"replay.*open_meteo"):
-            build_forecast_source(settings, client, None)
+            build_forecast_source(settings, client, None, {"open_meteo": FORECAST_SOURCES["open_meteo"]})
     finally:
         await client.aclose()
 

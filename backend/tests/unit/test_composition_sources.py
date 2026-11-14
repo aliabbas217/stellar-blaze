@@ -13,7 +13,7 @@ from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
-from stellar_blaze.composition import Sources, UnknownAdapterError, build_sources
+from stellar_blaze.composition import FORECAST_SOURCES, Sources, UnknownAdapterError, build_sources
 from stellar_blaze.config import Settings
 
 pytestmark = pytest.mark.unit
@@ -91,8 +91,10 @@ async def test_a_registry_passed_in_replaces_the_forecast_source() -> None:
 
 
 def test_a_forecast_source_nobody_registered_fails_the_assembly() -> None:
+    settings = make_settings(forecast_source="replay", replay_snapshot_id="demo-2026")
+
     with pytest.raises(UnknownAdapterError, match=r"replay.*open_meteo"):
-        build_sources(make_settings(forecast_source="replay"))
+        build_sources(settings, registry={"open_meteo": FORECAST_SOURCES["open_meteo"]})
 
 
 @pytest.mark.asyncio
