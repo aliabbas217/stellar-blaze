@@ -10,7 +10,7 @@ audit chain. Alert dispatch is not part of this walk (a later task adds it).
 
 import logging
 from collections.abc import Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -23,12 +23,12 @@ from tests.integration.b3_app import (
     DEMO_FIXTURE,
     REPLAY_DATE,
     SITE,
+    ManualWall,
     app_settings,
     bearer,
     cli_environment,
     last_json,
     make_workdir,
-    replay_clock,
     rows,
     running_app,
     sb_jobs,
@@ -40,7 +40,12 @@ DATE = {"date": REPLAY_DATE.isoformat()}
 WORKER_REF = "staff-no-4471-AliKhan"
 B0_ROSTER = "06:00-12:30 work\n15:00-17:00 work"
 BANNER = "plan.floor_banner"
-STOP_AT = "2025-07-10T06:00:00Z"  # replay_clock(): 10:00 in Asia/Dubai
+# The replay clock starts at 11:10 Asia/Dubai (07:10Z) on the replay day and then follows the real clock, which the test
+# moves by hand: sign-off after 5 minutes, stop after 5 more, resume after 10 more.
+SIGNED_AT = "2025-07-10T07:15:00Z"
+STOP_AT = "2025-07-10T07:20:00Z"
+CLEARED_AT = "2025-07-10T07:30:00Z"
+AFTERNOON_SHIFT = "2025-07-10T11:00:00Z"  # crew B works 06:00-11:00 and 15:00-18:00 local; 11:20 is its mid-day break
 
 
 def instant(value: str) -> datetime:
@@ -82,9 +87,11 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
     [activation] = rows(settings, "SELECT id, config_version_id FROM config_activation ORDER BY id")
     assert activation["config_version_id"] is not None
 
-    clock = replay_clock()
+    # The REAL clock is injected (it starts at the real now, after the CLI rows); the replay clock is production code.
+    wall = ManualWall(datetime.now(UTC))
+    started_wall = wall.now
     app_cfg = app_settings(settings, replay_dir=replay_dir, snapshot_id=SNAPSHOT_ID)
-    with caplog.at_level(logging.DEBUG), running_app(app_cfg, now=clock, wait_for_database_config=True) as client:
+    with caplog.at_level(logging.DEBUG), running_app(app_cfg, wall=wall, wait_for_database_config=True) as client:
         # --- the site's day -------------------------------------------------------------------------------------
         forecast = client.get(f"/api/v1/sites/{SITE}/forecast/today", params=DATE)
         assert forecast.status_code == 200, forecast.text
@@ -116,6 +123,7 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
 
         # --- sign-off with every ack id --------------------------------------------------------------------------
         ack_ids = [item["id"] for item in plan["ack_items"]]
+        wall.advance(minutes=5)
         signed = client.post(
             "/api/v1/crews/crew-b/day-plan/sign-off",
             params=DATE,
@@ -124,6 +132,7 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         )
         assert signed.status_code == 201, signed.text
         assert signed.json()["signoff_state"] == "signed"
+        assert signed.json()["signed_at"] == SIGNED_AT  # the replay day, not today
         after_sign = client.get("/api/v1/crews/crew-b/day-plan", params=DATE, headers=bearer()).json()
         assert (after_sign["signoff_state"], after_sign["signoff_label_code"]) == ("signed", None)
         assert after_sign["signed_by_role"] == "supervisor"  # a role, never a name
@@ -146,26 +155,31 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         assert all(by_rule[rule]["clause"] and by_rule[rule]["source_id"] for rule in ("P-H3", "P-H2.daily"))
 
         # --- a crew-lead stop: the crew's level turns Red from the stop, the plan stops, the sign-off is stale ----
+        wall.advance(minutes=5)
+        stop_wall = wall.now
         stop = client.post("/api/v1/crews/crew-b/stops", json={"reason_code": "heat"}, headers=bearer())
         assert stop.status_code == 201, stop.text
-        assert stop.json()["started_at"] == STOP_AT
+        assert stop.json()["started_at"] == STOP_AT  # on the replay day: "Stop work" visibly does something
         stopped_timeline = client.get("/api/v1/crews/crew-b/timeline", params=DATE).json()
         levels = {h["starts_at"]: h["crew_level"] for h in stopped_timeline["hours"]}
-        assert levels["2025-07-10T06:00:00Z"] == "red"
-        assert all(level == "red" for start, level in levels.items() if start >= STOP_AT)
-        assert levels["2025-07-10T05:00:00Z"] != "red"
+        assert levels["2025-07-10T07:00:00Z"] == "red"  # the hour the stop starts in
+        assert all(level == "red" for start, level in levels.items() if start >= "2025-07-10T07:00:00Z")
+        assert levels["2025-07-10T06:00:00Z"] != "red"
         stopped_plan = client.get("/api/v1/crews/crew-b/day-plan", params=DATE, headers=bearer()).json()
         stopped_segments = [s for s in stopped_plan["segments"] if s["state"] == "stopped"]
         assert stopped_segments
-        assert stopped_segments[0]["starts_at"] == STOP_AT
+        assert stopped_segments[0]["starts_at"] == AFTERNOON_SHIFT  # the afternoon block, the first work after the stop
         assert all(s["state"] != "work" for s in stopped_plan["segments"] if s["starts_at"] >= STOP_AT)
         assert stopped_plan["signoff_state"] == "changed_since_signed"
         assert stopped_plan["signoff_label_code"] == "plan.changed_since_signed"
         assert stopped_plan["validator"]["passed"] is True
 
         # --- resume ----------------------------------------------------------------------------------------------
+        wall.advance(minutes=10)
         resumed = client.delete(f"/api/v1/crews/crew-b/stops/{stop.json()['id']}", headers=bearer())
         assert resumed.status_code == 204
+        [stop_row] = rows(settings, "SELECT started_at, cleared_at FROM crew_stop")
+        assert (stop_row["started_at"], stop_row["cleared_at"]) == (instant(STOP_AT), instant(CLEARED_AT))
         resumed_plan = client.get("/api/v1/crews/crew-b/day-plan", params=DATE, headers=bearer()).json()
         # Back to the pre-stop plan (the forecast's own Red hours stay `stopped`), so the sign-off holds again.
         assert resumed_plan["segments"] == plan["segments"]
@@ -220,3 +234,11 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
     assert report["rows"] == report["head_id"] == len(rows(settings, "SELECT id FROM audit_event"))
     kinds = {r["kind"] for r in rows(settings, "SELECT DISTINCT kind FROM audit_event")}
     assert {"input.changed", "data_request.refused", "demo_reset", "plan.signed", "crew.stop_started"} <= kinds
+    # The domain rows are on the replay day, the audit rows keep the REAL time (the injected wall clock).
+    [signoff_row] = rows(settings, "SELECT signed_at FROM plan_signoff")
+    assert signoff_row["signed_at"] == instant(SIGNED_AT)
+    audit_at = {r["kind"]: r["at"] for r in rows(settings, "SELECT kind, at FROM audit_event WHERE kind LIKE 'crew.%'")}
+    assert audit_at["crew.stop_started"] == stop_wall
+    assert audit_at["crew.stop_started"] > started_wall
+    [signed_audit] = rows(settings, "SELECT at FROM audit_event WHERE kind = 'plan.signed'")
+    assert signed_audit["at"] == started_wall + timedelta(minutes=5)

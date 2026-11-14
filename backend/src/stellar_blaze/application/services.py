@@ -43,7 +43,12 @@ def utc_now() -> datetime:
 
 @dataclass(frozen=True)
 class Services:
-    """The ports of the core-path routes. ``clock`` is the one source of "now" (UTC) for plans, limits and audit."""
+    """The ports of the core-path routes.
+
+    ``clock`` is the DOMAIN "now" (UTC): the stamps of crew stops and sign-offs, the ``now`` of ``site_day`` and the
+    use cases. In replay mode it is a ``ReplayClock`` on the replay day (``application.replay_clock``); otherwise it is
+    the wall clock. ``wall_clock`` is always the real time, for the rate limiter and anything that records when
+    something really happened (the audit log stamps its own rows with the real clock too)."""
 
     sites: SiteRepository
     epochs: EpochStore
@@ -55,5 +60,6 @@ class Services:
     observations: ObservationSource
     correctors: CorrectorSource
     clock: Callable[[], datetime] = utc_now
+    wall_clock: Callable[[], datetime] = utc_now
     # Small TTL cache of ``site_day`` results (``api.views.load_site_day``): 60 s, at most 32 entries, one per process.
     day_cache: dict[tuple[Any, ...], tuple[datetime, Any]] = field(default_factory=dict)

@@ -1,12 +1,12 @@
 """Serving wiring in the composition root: the corrector of the active model, and the replay default date setting."""
 
 import threading
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from stellar_blaze.adapters.fakes.corrector import FakeCorrector
 from stellar_blaze.application.runtime_config import ConfigSnapshot
@@ -106,3 +106,27 @@ def test_replay_default_date_is_optional_and_parsed_from_the_environment(monkeyp
     monkeypatch.setenv("SB_REPLAY_DEFAULT_DATE", "2026-07-01")
 
     assert settings().replay_default_date == date(2026, 7, 1)
+
+
+def test_replay_now_is_optional_aware_and_parsed_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert settings().replay_now is None
+
+    monkeypatch.setenv("SB_REPLAY_NOW", "2025-07-10T11:10:00+04:00")
+
+    assert settings().replay_now == datetime(2025, 7, 10, 7, 10, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("value", ["2025-07-10T11:10:00", "2025-07-10", "noon"])
+def test_replay_now_without_an_offset_or_not_a_timestamp_is_refused(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("SB_REPLAY_NOW", value)
+
+    with pytest.raises(ValidationError, match="replay_now"):
+        settings()
+
+
+def test_an_empty_replay_now_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SB_REPLAY_NOW", "")  # a copied .env.example line
+
+    assert settings().replay_now is None

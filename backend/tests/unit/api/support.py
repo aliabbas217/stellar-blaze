@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -16,6 +16,7 @@ from stellar_blaze.adapters.fakes.corrector import FakeCorrector
 from stellar_blaze.adapters.fakes.plans import InMemoryCrewStopStore, InMemoryDayPlanStore, InMemoryPlanSignoffStore
 from stellar_blaze.adapters.fakes.sites import InMemorySiteStore
 from stellar_blaze.api.app import create_app
+from stellar_blaze.application.replay_clock import ReplayClock
 from stellar_blaze.application.runtime_config import ConfigSnapshot
 from stellar_blaze.application.services import Services
 from stellar_blaze.composition import load_site_fixture
@@ -86,14 +87,21 @@ async def build_world(
     hours: dict[int, tuple[float, float]] | None = None,
     forecasts: Any = None,
     clock: Clock | None = None,
+    replay_anchor: datetime | None = None,
 ) -> World:
+    """The fakes and the services over them. ``clock`` is the settable WALL clock (audit, plan rows, the limiter).
+
+    With ``replay_anchor`` the domain clock (stops, sign-offs, "now" of the use cases) is a ``ReplayClock`` that starts
+    at the anchor and follows ``clock``; without it the domain clock is ``clock`` itself.
+    """
     clock = clock or Clock()
+    domain: Callable[[], datetime] = clock if replay_anchor is None else ReplayClock(replay_anchor, clock)
     audit = InMemoryAuditLog(clock)
     sites = InMemorySiteStore(audit)
     await sites.upsert_fixture(load_site_fixture(BACKEND_DIR / "fixtures" / "demo_site.toml"), "test")
-    stops = InMemoryCrewStopStore(clock)
+    stops = InMemoryCrewStopStore(domain)
     plans = InMemoryDayPlanStore(clock)
-    signoffs = InMemoryPlanSignoffStore(clock)
+    signoffs = InMemoryPlanSignoffStore(domain)
     source = forecasts or serving.forecasts_of(hours or serving.day_of(serving.AMBER))
     services = Services(
         sites=sites,
@@ -105,7 +113,8 @@ async def build_world(
         forecasts=source,
         observations=serving.observations(),
         correctors=Corrector(),
-        clock=clock,
+        clock=domain,
+        wall_clock=clock,
     )
     api_settings = settings.model_copy(update={"access_tokens": SecretStr(TOKENS)})
     return World(services, clock, audit, stops, signoffs, plans, sites, api_settings)

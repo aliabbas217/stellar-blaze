@@ -160,7 +160,7 @@ async def reset_demo_site(
         site_id=site.id,
         epoch_id=new_epoch,
         previous_epoch_id=epoch,
-        reset_at=services.clock().astimezone(UTC),
+        reset_at=services.wall_clock().astimezone(UTC),  # when it really happened, like its audit row
     )
 
 

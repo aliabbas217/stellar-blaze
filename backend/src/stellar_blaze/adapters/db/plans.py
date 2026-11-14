@@ -111,11 +111,16 @@ class PostgresCrewStopStore:
 
 
 class PostgresPlanSignoffStore:
-    def __init__(self, engine: AsyncEngine) -> None:
+    """``signed_at`` is stamped by ``clock`` (the domain clock: the replay day in replay mode), not by the database."""
+
+    def __init__(self, engine: AsyncEngine, *, clock: Callable[[], datetime] = utc_now) -> None:
         self._engine = engine
+        self._clock = clock
 
     async def insert(self, record: PlanSignoffInput) -> PlanSignoffRecord:
-        statement = insert(PlanSignoff).values(**record.model_dump()).returning(*_SIGNOFF_COLUMNS)
+        statement = (
+            insert(PlanSignoff).values(**record.model_dump(), signed_at=self._clock()).returning(*_SIGNOFF_COLUMNS)
+        )
         async with self._engine.begin() as connection:
             row = (await connection.execute(statement)).mappings().one()
         return PlanSignoffRecord.model_validate(dict(row))

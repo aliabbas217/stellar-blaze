@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 import structlog
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -16,7 +17,7 @@ from stellar_blaze.api.middleware import RequestLogMiddleware
 from stellar_blaze.api.openapi import install_openapi
 from stellar_blaze.api.routers import crews, governance, health, plans, push, sites
 from stellar_blaze.application.runtime_config import ConfigPoller, ConfigService, SnapshotHolder
-from stellar_blaze.application.services import Services
+from stellar_blaze.application.services import Services, utc_now
 from stellar_blaze.composition import (
     build_api_services,
     build_config_service,
@@ -65,12 +66,18 @@ async def load_initial_config(service: ConfigService, holder: SnapshotHolder) ->
         holder.swap(snapshot)
 
 
-def create_app(settings: Settings | None = None, *, services: Services | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    services: Services | None = None,
+    wall: Callable[[], datetime] | None = None,
+) -> FastAPI:
     """Build the API. ``settings=None`` reads the environment (the production path).
 
     ``services=None`` builds the ports from Postgres and the configured forecast source in the lifespan
     (``composition.build_api_services``); a test passes the in-memory fakes instead. Employer tokens
-    (``SB_ACCESS_TOKENS``) are parsed here, so a malformed value stops the process at startup.
+    (``SB_ACCESS_TOKENS``) are parsed here, so a malformed value stops the process at startup. ``wall`` is the real
+    clock handed to ``build_api_services`` (a test injects one; ignored when ``services`` is given).
 
     Raises:
         ValueError: ``SB_ACCESS_TOKENS`` is not JSON of the documented shape.
@@ -96,11 +103,11 @@ def create_app(settings: Settings | None = None, *, services: Services | None = 
         close_services: Callable[[], Awaitable[None]] | None = None
         try:
             if services is None:
-                built, close_services = await build_api_services(settings, engine)
+                built, close_services = await build_api_services(settings, engine, wall=wall or utc_now)
             else:
                 built = services
             app.state.services = built
-            app.state.limiter = RateLimiter(built.clock)
+            app.state.limiter = RateLimiter(built.wall_clock)  # real time: replay time must not move a rate window
             service = build_config_service(runtime, build_config_store(engine, settings))
             poller = ConfigPoller(service, runtime.config, settings.config_poll_interval_s)
             app.state.config_poller = poller

@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AwareDatetime, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from stellar_blaze import __version__
@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     replay_snapshot_id: SnapshotId | None = None
     # The site-local date the API serves when a request names none, in replay mode (the demo's "today", ADR 0057).
     replay_default_date: date | None = None
+    # The replay clock's anchor (aware ISO 8601): in replay mode the API's "now" starts here and runs at real speed, so
+    # a stop or sign-off recorded in the demo lands on the replay day. Unset: `replay_default_date` at 11:10
+    # Asia/Dubai (`application.replay_clock`); with neither, or any other forecast source, "now" is the real clock.
+    replay_now: AwareDatetime | None = None
     # Employer access tokens (ADR 0051 decision 5; a Container Apps secret): JSON {sha256(token): {actor, role,
     # employer_id}}. None means no token exists, so every employer route answers 401. Parsed by `api.auth` at startup.
     access_tokens: SecretStr | None = None

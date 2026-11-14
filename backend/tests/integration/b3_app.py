@@ -5,13 +5,12 @@ The app runs in the ``TestClient`` portal thread (its lifespan builds the engine
 ``asyncio.run``. So the tests are synchronous and never share an event loop with the database.
 """
 
-import dataclasses
 import hashlib
 import json
 import shutil
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +19,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from typer.testing import CliRunner, Result
 
-from stellar_blaze.adapters.db.plans import PostgresCrewStopStore
 from stellar_blaze.api.app import create_app
-from stellar_blaze.application.services import Services
 from stellar_blaze.config import Settings
 from stellar_blaze.jobs import cli
 from tests.alembic_support import BACKEND_DIR
@@ -112,23 +109,33 @@ def app_settings(database: Settings, *, replay_dir: Path | None = None, snapshot
     )
 
 
+class ManualWall:
+    """The real clock of a test: starts at ``start`` and moves only when the test says so (no sleeping)."""
+
+    def __init__(self, start: datetime) -> None:
+        self.now = start
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, **kwargs: float) -> None:
+        self.now += timedelta(**kwargs)
+
+
 @contextmanager
 def running_app(
-    settings: Settings, *, now: Callable[[], datetime] | None = None, wait_for_database_config: bool = False
+    settings: Settings, *, wall: Callable[[], datetime] | None = None, wait_for_database_config: bool = False
 ) -> Iterator[TestClient]:
     """The app with the real Postgres services (``build_api_services``); the lifespan runs on enter and exit.
 
-    ``now`` replaces the one clock of the services and of the stop store: the replay day is in 2025, so a stop recorded
-    at the real "now" would never fall on it. ``wait_for_database_config`` waits for the config poller to replace the
-    seed snapshot with the one activated in the database (``version_id`` not None), which sign-off needs.
+    ``wall`` is the injected REAL clock (audit rows, rate limiter); in replay mode the domain clock is built by the
+    production path (``domain_clock``: a ``ReplayClock`` that starts on the replay day and follows ``wall``), so a stop
+    recorded in the demo lands on the replay day with nothing swapped by hand. ``wait_for_database_config`` waits for
+    the config poller to replace the seed snapshot with the one activated in the database (``version_id`` not None),
+    which sign-off needs.
     """
-    app = create_app(settings)
+    app = create_app(settings, wall=wall)
     with TestClient(app, raise_server_exceptions=False) as client:
-        if now is not None:
-            services: Services = app.state.services
-            app.state.services = dataclasses.replace(
-                services, clock=now, stops=PostgresCrewStopStore(app.state.engine, clock=now)
-            )
         if wait_for_database_config:
             _wait_for_database_config(app)
         yield client
@@ -144,8 +151,3 @@ def _wait_for_database_config(app: Any) -> None:
             return
         time.sleep(0.2)
     raise AssertionError("the config poller never served the activated database config (version_id is None)")
-
-
-def replay_clock(at: datetime = datetime(2025, 7, 10, 6, 0, tzinfo=UTC)) -> Callable[[], datetime]:
-    """A fixed "now" on the replay day: 06:00 UTC is 10:00 in Asia/Dubai, inside crew B's shift."""
-    return lambda: at

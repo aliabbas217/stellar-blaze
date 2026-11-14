@@ -38,8 +38,9 @@ from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
 from stellar_blaze.adapters.sources.replay import ReplayForecastSource, ReplayObservationSource
+from stellar_blaze.application.replay_clock import domain_clock
 from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, SnapshotHolder
-from stellar_blaze.application.services import Services
+from stellar_blaze.application.services import Services, utc_now
 from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig, config_sha256, validate_runtime_config
@@ -188,14 +189,15 @@ def build_config_store(engine: AsyncEngine, settings: Settings) -> RuntimeConfig
     return PostgresConfigStore(engine, read_timeout_s=settings.readiness_timeout_s)
 
 
-def build_audit_log(engine: AsyncEngine) -> AuditLog:
-    """The append-only, hash-chained audit log over ``engine`` (ADR 0054)."""
-    return PostgresAuditLog(engine)
+def build_audit_log(engine: AsyncEngine, *, clock: Callable[[], datetime] = utc_now) -> AuditLog:
+    """The append-only, hash-chained audit log over ``engine`` (ADR 0054). ``clock`` stamps ``at``: the REAL clock."""
+    return PostgresAuditLog(engine, clock=clock)
 
 
-def build_site_store(engine: AsyncEngine) -> PostgresSiteStore:
-    """The site repository, epoch store and fixture store over ``engine`` (one object, three ports)."""
-    return PostgresSiteStore(engine)
+def build_site_store(engine: AsyncEngine, *, clock: Callable[[], datetime] = utc_now) -> PostgresSiteStore:
+    """The site repository, epoch store and fixture store over ``engine`` (one object, three ports). ``clock`` stamps
+    the audit rows it appends (the real clock)."""
+    return PostgresSiteStore(engine, clock=clock)
 
 
 def load_site_fixture(path: Path) -> SiteFixture:
@@ -356,27 +358,42 @@ class CorrectorProvider:
             return corrector
 
 
-async def build_api_services(settings: Settings, engine: AsyncEngine) -> tuple[Services, Callable[[], Awaitable[None]]]:
+async def build_api_services(
+    settings: Settings, engine: AsyncEngine, *, wall: Callable[[], datetime] = utc_now
+) -> tuple[Services, Callable[[], Awaitable[None]]]:
     """The ports of the API routes over ``engine`` and the sources ``settings`` names, and how to release them.
 
     Call inside the serving event loop (the HTTP client of the live sources belongs to it) and await the returned
     ``close`` once at shutdown. Creating the stores opens no connection. ``SB_FORECAST_SOURCE=replay`` serves the
     snapshot the settings name (``build_sources``: forecasts and observations from the same files, no network).
 
+    Two clocks (``application.replay_clock``): ``wall`` is the real time (a test injects one) and stamps the audit
+    rows and feeds the rate limiter; the DOMAIN clock (``domain_clock``) is ``wall`` outside replay mode, and in replay
+    mode a ``ReplayClock`` that starts on the replay day. The domain clock stamps crew stops and sign-offs and is the
+    ``now`` of the use cases.
+
     Raises:
         UnknownAdapterError, ReplaySnapshotError: As ``build_sources``.
     """
     sources = build_sources(settings)
-    sites = build_site_store(engine)
+    clock = domain_clock(
+        source=settings.forecast_source,
+        replay_now=settings.replay_now,
+        replay_default_date=settings.replay_default_date,
+        wall=wall,
+    )
+    sites = build_site_store(engine, clock=wall)
     services = Services(
         sites=sites,
         epochs=sites,
-        stops=PostgresCrewStopStore(engine),
+        stops=PostgresCrewStopStore(engine, clock=clock),
         plans=PostgresDayPlanStore(engine),
-        signoffs=PostgresPlanSignoffStore(engine),
-        audit=build_audit_log(engine),
+        signoffs=PostgresPlanSignoffStore(engine, clock=clock),
+        audit=build_audit_log(engine, clock=wall),
         forecasts=sources.forecasts,
         observations=sources.observations["iem"],
         correctors=CorrectorProvider(),
+        clock=clock,
+        wall_clock=wall,
     )
     return services, sources.close
