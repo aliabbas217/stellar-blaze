@@ -46,14 +46,18 @@ class HoldoutViolationError(RuntimeError):
     """A read of the gold file would expose (or did expose) data the caller may not see."""
 
 
+def _file_sha256(path: Path) -> str:
+    with path.open("rb") as file:
+        return hashlib.file_digest(file, "sha256").hexdigest()
+
+
 def _verify_sha256(path: Path, expected: str) -> None:
     """Hash the whole file and compare, before any row is read.
 
     Raises:
         ValueError: The file's SHA-256 is not ``expected``; the message names both.
     """
-    with path.open("rb") as file:
-        actual = hashlib.file_digest(file, "sha256").hexdigest()
+    actual = _file_sha256(path)
     if actual != expected.lower():
         raise ValueError(f"{path} has sha256 {actual}, expected {expected.lower()}")
 
@@ -107,27 +111,35 @@ def load_test_pairs(path: Path, *, token: GateToken, part: Part = Part.FORECAST,
     """The rows of the gold pair file including the 2026 hold-out, for the gated evaluation only.
 
     The same filters as ``load_dev_pairs`` with ``summer`` in 2024, 2025 and 2026. The caller must hold a
-    ``GateToken`` that ``open_gate`` issued for ``part``; a token for another part, or no token, is refused before the
-    file is touched.
+    ``GateToken`` that ``open_gate`` issued for ``part``; the token's lock pins the one gold file that may be read
+    (``gold_sha256``). Every refusal happens before the file is read.
 
     Args:
         path: The gold ``pairs.parquet``.
         token: The token ``open_gate`` returned.
         part: The part being evaluated; it must be the token's part.
-        expected_sha256: The file's SHA-256 (lowercase hex); required, a hold-out read is always pinned to a hash.
+        expected_sha256: The file's SHA-256 (lowercase hex); required, and it must equal the lock's ``gold_sha256``.
 
     Returns:
         A ``GOLD_PAIRS_SCHEMA`` frame.
 
     Raises:
-        TypeError: ``token`` is not a ``GateToken`` (a ``GateToken`` cannot be built outside ``open_gate``).
-        HoldoutViolationError: The token is for a different part, or the collected frame holds a summer outside
-            2024-2026.
-        ValueError: The file hashes to something other than ``expected_sha256`` (nothing is read).
+        TypeError: ``token`` is not exactly a ``GateToken`` (a ``GateToken`` cannot be built outside ``open_gate``, and
+            it cannot be subclassed).
+        HoldoutViolationError: The token is for a different part, its lock has no ``gold_sha256``, ``expected_sha256``
+            is not the lock's value, the file hashes to something other than the lock's value, or the collected
+            frame holds a summer outside 2024-2026.
     """
-    if not isinstance(token, GateToken):
+    if type(token) is not GateToken:
         raise TypeError(f"token must be a GateToken from open_gate, got {type(token).__name__}")
     if token.part != part:
         raise HoldoutViolationError(f"the gate token is for part {token.part.value!r}, not {part.value!r}")
-    _verify_sha256(path, expected_sha256)
+    pinned = token.lock.gold_sha256
+    if pinned is None:
+        raise HoldoutViolationError("the token's lock has no gold_sha256: the gold file is not pinned")
+    if expected_sha256.lower() != pinned:
+        raise HoldoutViolationError(f"expected_sha256 {expected_sha256.lower()} is not the lock's gold_sha256 {pinned}")
+    actual = _file_sha256(path)
+    if actual != pinned:
+        raise HoldoutViolationError(f"{path} has sha256 {actual}, the lock's gold_sha256 is {pinned}")
     return _load(path, summers=DEV_SUMMERS | {TEST_SUMMER})
