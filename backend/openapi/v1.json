@@ -5258,7 +5258,7 @@
     },
     "/api/v1/push/subscriptions": {
       "post": {
-        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown\n`site_id` or `crew_id` is `not-found`. The body holds no worker identifier by design.",
+        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown\n`site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The body holds no worker identifier by\ndesign.",
         "operationId": "create_push_subscription",
         "requestBody": {
           "content": {
@@ -5337,29 +5337,6 @@
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -5432,29 +5409,6 @@
               }
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
-          },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
           },
           "default": {
             "content": {

@@ -11,9 +11,11 @@ from typing import Any
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from stellar_blaze.adapters.fakes.alerts import InMemoryAlertStore
 from stellar_blaze.adapters.fakes.audit import InMemoryAuditLog
 from stellar_blaze.adapters.fakes.corrector import FakeCorrector
 from stellar_blaze.adapters.fakes.plans import InMemoryCrewStopStore, InMemoryDayPlanStore, InMemoryPlanSignoffStore
+from stellar_blaze.adapters.fakes.push import InMemoryPushStore
 from stellar_blaze.adapters.fakes.sites import InMemorySiteStore
 from stellar_blaze.api.app import create_app
 from stellar_blaze.application.replay_clock import ReplayClock
@@ -110,6 +112,8 @@ async def build_world(
         plans=plans,
         signoffs=signoffs,
         audit=audit,
+        alerts=InMemoryAlertStore(clock),
+        subs=InMemoryPushStore(clock),
         forecasts=source,
         observations=serving.observations(),
         correctors=Corrector(),

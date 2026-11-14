@@ -5,7 +5,8 @@ It walks the demo story: the site's day, crew B's validated plan with its acknow
 try-a-plan roster that breaks P-H3 and P-H2.daily, a crew-lead stop (the crew's level turns Red from the stop, the plan
 ticks stopped and reads ``changed_since_signed``), the resume, a refused data request (audited with ruleset, model and
 config identity and with no trace of the worker reference anywhere), the transparency log, a demo reset and an intact
-audit chain. Alert dispatch is not part of this walk (a later task adds it).
+audit chain. It also walks the alerts: a Web Push subscription through the API, a first alerts dispatch run, and
+the next run after the stop, which creates crew B's red event (a recording channel stands in for the push service).
 """
 
 import logging
@@ -16,7 +17,10 @@ from typing import Any
 
 import pytest
 
+from stellar_blaze.adapters.fakes.notifications import RecordingPushChannel
 from stellar_blaze.config import Settings
+from stellar_blaze.jobs import cli
+from stellar_blaze.ports.push import PushChannel, PushSubscriptionStore
 from tests.fixtures.forecast.replay import SNAPSHOT_ID, build_fixture_snapshot
 from tests.integration.b3_app import (
     ACTOR_ARGS,
@@ -154,6 +158,36 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         assert {"P-H3", "P-H2.daily"} <= set(by_rule)
         assert all(by_rule[rule]["clause"] and by_rule[rule]["source_id"] for rule in ("P-H3", "P-H2.daily"))
 
+        # --- alerts: crew B subscribes through the API, the first dispatch run announces the day -----------------
+        recording = RecordingPushChannel()
+
+        def build_channel(_settings: Settings, _subs: PushSubscriptionStore) -> PushChannel | None:
+            return recording
+
+        monkeypatch.setattr(cli, "build_push_channel", build_channel)
+        monkeypatch.setenv("SB_FORECAST_SOURCE", "replay")
+        monkeypatch.setenv("SB_REPLAY_DIR", str(replay_dir))
+        monkeypatch.setenv("SB_REPLAY_SNAPSHOT_ID", SNAPSHOT_ID)
+        monkeypatch.setenv("SB_REPLAY_DEFAULT_DATE", REPLAY_DATE.isoformat())
+        subscribed = client.post(
+            "/api/v1/push/subscriptions",
+            json={
+                "subscription": {
+                    "endpoint": "https://push.example/send/crew-b-phone",
+                    "expirationTime": None,
+                    "keys": {"p256dh": "BP-key", "auth": "auth-secret"},
+                },
+                "site_id": SITE,
+                "crew_id": "crew-b",
+            },
+        )
+        assert subscribed.status_code == 201, subscribed.text
+        first_dispatch = sb_jobs("alerts", "dispatch", "--site", SITE, "--as-of", "2025-07-10T07:15:00Z")
+        assert first_dispatch.exit_code == 0, first_dispatch.output
+        crew_b_alerts = "SELECT level, kind, valid_from FROM alert_event WHERE crew_id = 'crew-b' ORDER BY id"
+        announced = rows(settings, crew_b_alerts)
+        assert announced  # the day's levels were announced before the stop
+
         # --- a crew-lead stop: the crew's level turns Red from the stop, the plan stops, the sign-off is stale ----
         wall.advance(minutes=5)
         stop_wall = wall.now
@@ -173,6 +207,23 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         assert stopped_plan["signoff_state"] == "changed_since_signed"
         assert stopped_plan["signoff_label_code"] == "plan.changed_since_signed"
         assert stopped_plan["validator"]["passed"] is True
+
+        # --- the NEXT dispatch run escalates the stop: one red crew event from the stop's hour ------------------
+        second_dispatch = sb_jobs("alerts", "dispatch", "--site", SITE, "--as-of", "2025-07-10T07:25:00Z")
+        assert second_dispatch.exit_code == 0, second_dispatch.output
+        assert last_json(second_dispatch)["events_created"] == 1
+        escalated = rows(
+            settings,
+            "SELECT level, kind, valid_from, delivered, failed, config_version_id, ruleset_id, model_id, "
+            "dispatch_interval_minutes, epoch_id FROM alert_event WHERE crew_id = 'crew-b' ORDER BY id",
+        )
+        assert len(escalated) == len(announced) + 1
+        red = escalated[-1]
+        assert (red["level"], red["kind"], red["valid_from"]) == ("red", "escalate", instant("2025-07-10T07:00:00Z"))
+        assert (red["delivered"], red["failed"], red["epoch_id"]) == (1, 0, 1)
+        assert red["config_version_id"] == activation["config_version_id"]
+        assert (red["ruleset_id"], red["model_id"], red["dispatch_interval_minutes"]) == ("ae-heat-2026.1", None, 5)
+        assert [(m.crew_id, m.level.value) for _, m in recording.sent][-1] == ("crew-b", "red")
 
         # --- resume ----------------------------------------------------------------------------------------------
         wall.advance(minutes=10)
@@ -233,7 +284,14 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
     assert report["chain"] == "intact"
     assert report["rows"] == report["head_id"] == len(rows(settings, "SELECT id FROM audit_event"))
     kinds = {r["kind"] for r in rows(settings, "SELECT DISTINCT kind FROM audit_event")}
-    assert {"input.changed", "data_request.refused", "demo_reset", "plan.signed", "crew.stop_started"} <= kinds
+    assert {
+        "input.changed",
+        "data_request.refused",
+        "demo_reset",
+        "plan.signed",
+        "crew.stop_started",
+        "alerts.dispatched",
+    } <= kinds
     # The domain rows are on the replay day, the audit rows keep the REAL time (the injected wall clock).
     [signoff_row] = rows(settings, "SELECT signed_at FROM plan_signoff")
     assert signoff_row["signed_at"] == instant(SIGNED_AT)

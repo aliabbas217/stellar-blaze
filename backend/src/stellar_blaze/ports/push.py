@@ -9,6 +9,8 @@ from typing import Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from stellar_blaze.ports.notifications import DeliveryResult, OutboundMessage
+
 
 class NewSubscription(BaseModel):
     """What the browser gave (``endpoint``, the two keys, the optional expiry) and what it subscribed to."""
@@ -50,4 +52,23 @@ class PushSubscriptionStore(Protocol):
 
     async def for_crew(self, crew_id: str, epoch_id: int) -> Sequence[SubscriptionRecord]:
         """The subscriptions that name this crew in the epoch, oldest first."""
+        ...
+
+
+class PushChannel(Protocol):
+    """A channel that delivers one alert to one subscription (``WebPushChannel``, a recording fake).
+
+    ``NotificationChannel.send`` takes only a message, with no subscription and no epoch, so it cannot address a Web
+    Push endpoint: the dispatch resolves the recipients and calls ``send_to`` once per subscription. As there, a
+    delivery failure is a ``DeliveryResult`` (``FAILED`` with ``detail``; ``gone:<status>`` for a subscription the push
+    service reports expired), never an exception, and nothing that identifies the subscription is logged except its id.
+    """
+
+    @property
+    def name(self) -> str: ...
+
+    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult: ...
+
+    async def aclose(self) -> None:
+        """Release what the channel holds (an HTTP session); safe to call twice."""
         ...

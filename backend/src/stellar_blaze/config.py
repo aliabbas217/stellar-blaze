@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import AwareDatetime, Field, SecretStr, model_validator
+from pydantic import AwareDatetime, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from stellar_blaze import __version__
@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     # Employer access tokens (ADR 0051 decision 5; a Container Apps secret): JSON {sha256(token): {actor, role,
     # employer_id}}. None means no token exists, so every employer route answers 401. Parsed by `api.auth` at startup.
     access_tokens: SecretStr | None = None
+    # Web Push (ADR 0058 decision 2; F1 web-push.md section 3). The VAPID private key (base64url, as `vapid --gen`
+    # prints it) and the contact subject, a `mailto:` URI with a real monitored address. Both or neither: without them
+    # `sb-jobs alerts dispatch` creates and audits events but sends nothing ("push not configured").
+    vapid_private_key: SecretStr | None = None
+    vapid_subject: str | None = None
     # Pins for back-tests and database-less development runs only: `composition` refuses them with SB_ENV=prod, where
     # the runtime config is the one source of truth (ADR 0010 section 4.6). While one is set the snapshot is an `env`
     # one, and the config poller never replaces it with a database activation (it logs that once).
@@ -85,6 +90,25 @@ class Settings(BaseSettings):
     # How often each process reads the latest config activation from the database. Under 1 s would hammer the database
     # for no benefit; over 60 s is no longer "without a restart" (ADR 0010 section 6).
     config_poll_interval_s: float = Field(default=5.0, ge=1.0, le=60.0, allow_inf_nan=False)
+
+    @field_validator("vapid_subject")
+    @classmethod
+    def _vapid_subject_is_a_real_mailto(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        address = value.removeprefix("mailto:")
+        if address == value or "@" not in address or address.endswith(("@localhost", "@127.0.0.1")):
+            # Apple's push service rejects a localhost-style subject with 403 BadJwtToken (F1 web-push.md section 3).
+            msg = "vapid_subject must be a mailto: URI with a real address (mailto:ops@example.org), not localhost"
+            raise ValueError(msg)
+        return value
+
+    @model_validator(mode="after")
+    def _vapid_key_and_subject_come_together(self) -> Self:
+        if (self.vapid_private_key is None) != (self.vapid_subject is None):
+            msg = "SB_VAPID_PRIVATE_KEY and SB_VAPID_SUBJECT must be set together (or both left unset)"
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def _replay_needs_a_snapshot(self) -> Self:

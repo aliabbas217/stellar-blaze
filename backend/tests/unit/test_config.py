@@ -144,3 +144,21 @@ def test_config_poll_interval_defaults_to_5_seconds_and_stays_between_1_and_60(m
         monkeypatch.setenv("SB_CONFIG_POLL_INTERVAL_S", refused)
         with pytest.raises(ValidationError, match="config_poll_interval_s"):
             Settings(_env_file=None)
+
+
+@pytest.mark.unit
+def test_vapid_settings_come_together_and_the_subject_is_a_real_mailto(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SB_DATABASE_URL", DATABASE_URL)
+    assert Settings(_env_file=None).vapid_private_key is None  # push is optional: "push not configured"
+    monkeypatch.setenv("SB_VAPID_PRIVATE_KEY", "secret-key")
+    with pytest.raises(ValueError, match="set together"):
+        Settings(_env_file=None)
+    monkeypatch.setenv("SB_VAPID_SUBJECT", "mailto:ops@example.org")
+    settings = Settings(_env_file=None)
+    assert settings.vapid_subject == "mailto:ops@example.org"
+    assert settings.vapid_private_key is not None
+    assert "secret-key" not in repr(settings)
+    for bad in ("https://example.org/contact", "ops@example.org", "mailto:ops", "mailto:ops@localhost"):
+        monkeypatch.setenv("SB_VAPID_SUBJECT", bad)
+        with pytest.raises(ValueError, match="mailto"):
+            Settings(_env_file=None)

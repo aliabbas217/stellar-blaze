@@ -26,14 +26,17 @@ from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.rulesets import load_catalog
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
 from stellar_blaze.adapters.config.site_fixture import load_site_fixture as _load_site_fixture
+from stellar_blaze.adapters.db.alerts import PostgresAlertStore
 from stellar_blaze.adapters.db.audit import PostgresAuditLog
 from stellar_blaze.adapters.db.config_store import PostgresConfigStore
 from stellar_blaze.adapters.db.plans import PostgresCrewStopStore, PostgresDayPlanStore, PostgresPlanSignoffStore
+from stellar_blaze.adapters.db.push import PostgresPushStore
 from stellar_blaze.adapters.db.sites import PostgresSiteStore
 from stellar_blaze.adapters.fakes.corrector import FakeCorrector
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.adapters.http.client import build_async_client
 from stellar_blaze.adapters.http.pacer import RequestPacer
+from stellar_blaze.adapters.notifications.webpush import WebPushChannel
 from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
@@ -48,6 +51,7 @@ from stellar_blaze.domain.rules.catalog import RulesetCatalog
 from stellar_blaze.ports.audit import AuditLog
 from stellar_blaze.ports.config_store import RuntimeConfigStore
 from stellar_blaze.ports.corrector import ForecastCorrector
+from stellar_blaze.ports.push import PushChannel, PushSubscriptionStore
 from stellar_blaze.ports.sites import SiteFixture
 from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
 
@@ -390,6 +394,8 @@ async def build_api_services(
         plans=PostgresDayPlanStore(engine),
         signoffs=PostgresPlanSignoffStore(engine, clock=clock),
         audit=build_audit_log(engine, clock=wall),
+        alerts=PostgresAlertStore(engine),
+        subs=PostgresPushStore(engine),
         forecasts=sources.forecasts,
         observations=sources.observations["iem"],
         correctors=CorrectorProvider(),
@@ -397,3 +403,12 @@ async def build_api_services(
         wall_clock=wall,
     )
     return services, sources.close
+
+
+def build_push_channel(settings: Settings, subs: PushSubscriptionStore) -> PushChannel | None:
+    """The Web Push channel, or ``None`` when no VAPID key is configured (``alerts dispatch`` then says "push not
+    configured": events are still created and audited, nothing is sent). ``Settings`` guarantees key and subject come
+    together and the subject is a ``mailto:`` URI. The channel holds an HTTP session: call ``aclose`` when done."""
+    if settings.vapid_private_key is None or settings.vapid_subject is None:
+        return None
+    return WebPushChannel(settings.vapid_private_key.get_secret_value(), settings.vapid_subject, subs)

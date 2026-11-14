@@ -11,9 +11,11 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 from stellar_blaze.application.runtime_config import ConfigSnapshot
+from stellar_blaze.ports.alerts import AlertStore
 from stellar_blaze.ports.audit import AuditLog
 from stellar_blaze.ports.corrector import ForecastCorrector
 from stellar_blaze.ports.plans import CrewStopStore, DayPlanStore, PlanSignoffStore
+from stellar_blaze.ports.push import PushSubscriptionStore
 from stellar_blaze.ports.sites import EpochStore, SiteRepository
 from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
 
@@ -56,6 +58,8 @@ class Services:
     plans: DayPlanStore
     signoffs: PlanSignoffStore
     audit: AuditLog
+    alerts: AlertStore
+    subs: PushSubscriptionStore
     forecasts: WeatherForecastSource
     observations: ObservationSource
     correctors: CorrectorSource

@@ -37,7 +37,7 @@ from stellar_blaze.api.responses import PROBLEM_EXAMPLES
 from stellar_blaze.api.security import employer_bearer
 from stellar_blaze.config import Settings
 from stellar_blaze.domain import scoreboard
-from stellar_blaze.errors import NOT_IMPLEMENTED, Problem
+from stellar_blaze.errors import Problem
 
 HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 PROBLEM_JSON = "application/problem+json"
@@ -68,8 +68,8 @@ OPERATIONS: dict[str, tuple[str, str, set[str], bool]] = {
         True,
     ),
     "validate_plan": ("post", f"{API}/plans/validate", {"404", "422", "503"}, False),
-    "create_push_subscription": ("post", f"{API}/push/subscriptions", {"404", "422", "501"}, False),
-    "delete_push_subscription": ("delete", f"{API}/push/subscriptions/{{subscription_id}}", {"422", "501"}, False),
+    "create_push_subscription": ("post", f"{API}/push/subscriptions", {"404", "422"}, False),
+    "delete_push_subscription": ("delete", f"{API}/push/subscriptions/{{subscription_id}}", {"422"}, False),
     "create_data_request": (
         "post",
         f"{API}/sites/{{site_id}}/data-requests",
@@ -774,40 +774,14 @@ def test_openapi_served_by_the_app_equals_the_exported_spec(settings: Settings) 
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("op_id", ["create_push_subscription", "delete_push_subscription"])
-def test_stub_routes_answer_501_until_implemented(settings: Settings, op_id: str) -> None:
-    """Task 0 stubs. Task 10 and Task 11 delete the line of each route they implement; the contract stays."""
-    method, path, _, _ = OPERATIONS[op_id]
-    url = path.replace("{site_id}", "site-demo-mussafah").replace("{crew_id}", "crew-b")
-    url = url.replace("{subscription_id}", "sub-1").replace("{stop_id}", "stop-1")
-    bodies: dict[str, Any] = {
-        "validate_plan": {
-            "site_id": "site-demo-mussafah",
-            "date": "2026-07-01",
-            "crew": {"workload": "heavy", "headcount": 20},
-            "roster_text": "06:00-11:00 work",
-        },
-        "create_push_subscription": {
-            "subscription": {
-                "endpoint": "https://push.example/send/abc",
-                "expirationTime": None,
-                "keys": {"p256dh": "k", "auth": "a"},
-            },
-            "site_id": "site-demo-mussafah",
-            "crew_id": None,
-        },
-        "sign_off_day_plan": {"acknowledged_items": [], "deviation_reason_code": None},
-        "create_data_request": {"subject": "worker", "data_class": "health", "worker_ref": "ref"},
-        "create_crew_stop": {"reason_code": "heat"},
-    }
+def test_no_operation_is_a_stub_any_more(spec: dict[str, Any]) -> None:
+    """Task 11 implemented the last two stubs (the push routes): no operation declares ``501`` or answers it.
 
-    response = TestClient(create_app(settings), raise_server_exceptions=False).request(
-        method, url, json=bodies.get(op_id)
-    )
-
-    assert response.status_code == 501
-    assert response.headers["content-type"].startswith(PROBLEM_JSON)
-    assert response.json()["type"] == NOT_IMPLEMENTED
+    Removing ``not-implemented`` from the two push operations is additive for a client (oasdiff WARN at most); the
+    ``not-implemented`` problem type itself stays in the contract.
+    """
+    for op_id, (_, _, operation) in operations(spec).items():
+        assert "501" not in operation["responses"], op_id
 
 
 @pytest.mark.unit

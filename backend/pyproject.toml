@@ -38,6 +38,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http==1.45.2",
     "opentelemetry-instrumentation-fastapi==0.66b2",
     "opentelemetry-instrumentation-sqlalchemy==0.66b2",  # needs skip_dep_check=True on SQLAlchemy 2.1
+    "pywebpush==2.5.0",
 ]
 
 [project.scripts]
@@ -102,7 +103,7 @@ init_typed = true
 warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
-module = ["pythermalcomfort.*", "mapie.*", "sklearn.*", "scoringrules.*", "pyarrow.*"]
+module = ["pythermalcomfort.*", "mapie.*", "sklearn.*", "scoringrules.*", "pyarrow.*", "pywebpush.*", "http_ece.*"]
 ignore_missing_imports = true
 
 # Deviation from the stack doc section 7 block above (preflight finding F7): pvlib ships no py.typed.
@@ -226,10 +227,11 @@ type = "forbidden"
 source_modules = ["stellar_blaze.domain.planner"]
 forbidden_modules = ["stellar_blaze.domain.validator"]
 
-# Transitive dependency imported directly on purpose, instead of adding a new pin: errors.py (Task 2) uses starlette
-# types, and starlette is pinned by fastapi==0.162.4.
+# Transitive dependencies imported directly on purpose, instead of adding a new pin: errors.py (Task 2) uses starlette
+# types, and starlette is pinned by fastapi==0.162.4; the Web Push channel (Task 11) shares one aiohttp.ClientSession
+# across a dispatch run, and aiohttp is pinned by pywebpush==2.5.0 (which also passes it to its own calls).
 [tool.deptry.per_rule_ignores]
-DEP003 = ["starlette"]
+DEP003 = ["starlette", "aiohttp"]
 # Training-group packages (not in the API image): offline training code under stellar_blaze/ml/ imports sklearn,
 # scoringrules and mapie (import-linter contract 6 keeps these three out of the serving layers), and
 # domain/forecast/sampling.py imports scipy, which reaches the API image through lightgbm.

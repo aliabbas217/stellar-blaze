@@ -25,6 +25,11 @@ and the governance data (ADR 0054, 0057; not jobs either)::
     sb-jobs site load PATH --actor A --reason R   # idempotent upsert; one input.changed audit row per change
     sb-jobs audit verify                          # recompute the chain: exit 0 + head JSON, else 1
 
+and the alert dispatch (ADR 0058; architect ruling R-O: its own job with a runtime-tunable cadence)::
+
+    sb-jobs alerts dispatch [--site ID] [--date YYYY-MM-DD] [--as-of ISO]   # ONE run, a job_run row; exit 1 on failure
+    sb-jobs alerts run [--site ID]    # a loop: dispatch, wait alert_dispatch_interval_minutes of the ACTIVE config
+
 and the replay snapshots of the forecast corrector (``jobs/ml_cli.py``, also not jobs: no ``job_run`` row, no database,
 no lock; it copies silver files into ``SB_REPLAY_DIR`` and is documented there)::
 
@@ -39,6 +44,8 @@ refusals on stderr.
 """
 
 import asyncio
+import contextlib
+import datetime as dt
 import json
 import tomllib
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -67,9 +74,11 @@ from stellar_blaze.application.runtime_config import (
 from stellar_blaze.application.site_load import load_site
 from stellar_blaze.composition import (
     Runtime,
+    build_api_services,
     build_audit_log,
     build_config_service,
     build_config_store,
+    build_push_channel,
     build_runtime,
     build_site_store,
     build_sources,
@@ -81,6 +90,8 @@ from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import ConfigViolation, RuntimeConfig
 from stellar_blaze.domain.weather.models import MODEL_SUMMERS, NwpModel
 from stellar_blaze.domain.weather.stations import STATIONS, Station, station
+from stellar_blaze.jobs.alerts import AlertJob, install_stop_signals, run_loop
+from stellar_blaze.jobs.alerts import wait as alerts_sleeper
 from stellar_blaze.jobs.ml_cli import ml_app
 from stellar_blaze.jobs.runner import describe_error, run_job
 from stellar_blaze.jobs.work import build_dataset, ingest_forecasts, ingest_observations
@@ -125,10 +136,17 @@ audit_app = typer.Typer(
     pretty_exceptions_show_locals=False,
     help="The append-only, hash-chained audit log (ADR 0054).",
 )
+alerts_app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_show_locals=False,
+    help="Alert dispatch (ADR 0058): create the alert events a site and its crews need, and push them.",
+)
 app.add_typer(db_app, name="db")
 app.add_typer(config_app, name="config")
 app.add_typer(site_app, name="site")
 app.add_typer(audit_app, name="audit")
+app.add_typer(alerts_app, name="alerts")
 app.add_typer(ml_app)  # no name: its commands (and its `replay` group) sit at the top level of sb-jobs
 
 
@@ -640,3 +658,123 @@ def audit_verify_command() -> None:
     if report.broken_id is not None:
         _fail(f"audit.chain_broken id={report.broken_id}")
     _emit({"chain": "intact", "rows": report.rows, "head_id": report.head_id, "head": report.head})
+
+
+# === alerts =========================================================================================================
+
+SiteOption = Annotated[str | None, typer.Option("--site", help="Only this site (default: every site).")]
+
+
+async def _alert_job(settings: Settings, runtime: Runtime, engine: AsyncEngine, site: str | None) -> AlertJob:
+    """The dispatch job over ``engine``: services and the push channel come from ``composition`` (looked up here as
+    module attributes, so a test can replace ``build_push_channel`` with a recording channel)."""
+    return await AlertJob.build(
+        settings,
+        runtime,
+        engine,
+        build_config_service(runtime, build_config_store(engine, settings), audit=build_audit_log(engine)),
+        site,
+        build_services=build_api_services,
+        build_channel=build_push_channel,
+    )
+
+
+def _lock_key(site: str | None) -> str:
+    return f"alerts-dispatch:{site or 'all'}"
+
+
+@alerts_app.command("dispatch")
+def alerts_dispatch_command(
+    site: SiteOption = None,
+    date: Annotated[
+        str | None, typer.Option("--date", help="The site-local date, YYYY-MM-DD (default: today).")
+    ] = None,
+    as_of: Annotated[
+        str | None,
+        typer.Option("--as-of", help="The instant of this run, ISO 8601 with an offset (default: the domain clock)."),
+    ] = None,
+) -> None:
+    """ONE dispatch run: create the events the site and its crews need now, push them, record them.
+
+    A stop recorded since the last run is escalated by this run. Without VAPID settings events are still created and
+    audited, nothing is sent ("push not configured"). The run is a ``job_run`` row; exit 1 when a site failed.
+    """
+    try:
+        local_date = None if date is None else dt.date.fromisoformat(date)
+    except ValueError:
+        raise typer.BadParameter("expected YYYY-MM-DD", param_hint="--date") from None
+    try:
+        instant = None if as_of is None else dt.datetime.fromisoformat(as_of)
+    except ValueError:
+        raise typer.BadParameter("expected an ISO 8601 instant", param_hint="--as-of") from None
+    if instant is not None and instant.utcoffset() is None:
+        raise typer.BadParameter("needs an offset, for example 2025-07-10T07:40:00Z", param_hint="--as-of")
+    settings = _settings()
+    runtime = _runtime(settings)
+    params: dict[str, JsonValue] = {
+        "site": site,
+        "date": None if local_date is None else local_date.isoformat(),
+        "as_of": None if instant is None else instant.isoformat(),
+    }
+
+    async def go() -> tuple[int, dict[str, JsonValue]]:
+        engine = build_engine(settings)
+        try:
+            job = await _alert_job(settings, runtime, engine, site)
+            try:
+                code = await run_job(
+                    settings,
+                    "alerts-dispatch",
+                    params,
+                    lambda: job.work(local_date, instant),
+                    lock_key=_lock_key(site),
+                )
+                return code, job.summary
+            finally:
+                await job.close()
+        finally:
+            await engine.dispose()
+
+    code, summary = asyncio.run(go())
+    if summary:
+        if summary.get("push") == "not configured":
+            typer.echo("push not configured: events are recorded, nothing is sent (set SB_VAPID_*)", err=True)
+        _emit(summary)
+    raise typer.Exit(code)
+
+
+@alerts_app.command("run")
+def alerts_run_command(site: SiteOption = None) -> None:
+    """Dispatch in a loop: a run, then a wait of ``alert_dispatch_interval_minutes`` of the ACTIVE config (read again
+    every cycle; default 5, range 1 to 30). SIGTERM or Ctrl-C ends it cleanly after the current run; a failing cycle is
+    logged and the loop goes on. Each cycle is a ``job_run`` row like ``alerts dispatch``."""
+    settings = _settings()
+    runtime = _runtime(settings)
+
+    async def go() -> None:
+        stop = asyncio.Event()
+        restore_signals = install_stop_signals(stop)
+        engine = build_engine(settings)
+        try:
+            job = await _alert_job(settings, runtime, engine, site)
+            try:
+
+                async def cycle() -> int | None:
+                    await run_job(
+                        settings,
+                        "alerts-dispatch",
+                        {"site": site, "date": None, "as_of": None},
+                        job.work,
+                        lock_key=_lock_key(site),
+                    )
+                    return job.interval_minutes
+
+                await run_loop(cycle, stop=stop, sleep=alerts_sleeper)  # looked up here: a test injects its own
+            finally:
+                await job.close()
+        finally:
+            await engine.dispose()
+            restore_signals()
+
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(go())
