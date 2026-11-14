@@ -25,7 +25,7 @@ from stellar_blaze.domain.forecast.features import Target
 from stellar_blaze.domain.forecast.grid import LEVELS, PAIRS
 from stellar_blaze.domain.forecast.schemas import QUANTILE_COLUMNS
 from stellar_blaze.ml import artefacts
-from stellar_blaze.ml.artefacts import LIMITATIONS, render_model_card, write_model
+from stellar_blaze.ml.artefacts import LIMITATIONS, ModelTooLargeError, render_model_card, write_model
 from stellar_blaze.ml.train import TrainedCorrector
 from tests.fixtures.forecast.trained import CFG_SHA256, trained_small
 
@@ -232,6 +232,47 @@ def test_size_cap_refuses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     assert not models.exists() or list(models.iterdir()) == [], "nothing, not even a partial directory, is left"
 
 
+def test_size_cap_error_is_actionable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    reference = _tree(_write(tmp_path, "reference"))
+    total = sum(len(data) for data in reference.values())
+    cap = total // 2
+    monkeypatch.setattr(artefacts, "MAX_MODEL_BYTES", cap)
+    with pytest.raises(ModelTooLargeError) as caught:
+        _write(tmp_path, "capped")
+    error = caught.value
+    assert isinstance(error, ValueError)
+    assert (error.total_bytes, error.cap_bytes) == (total, cap)
+    # every file with its true size, largest first
+    assert dict(error.files) == {path: len(data) for path, data in reference.items()}
+    sizes = [size for _, size in error.files]
+    assert sizes == sorted(sizes, reverse=True)
+    # per group (each target's boosters, the fold statistics, the small files), largest first, adding up to the total
+    assert {name for name, _ in error.by_group} == {
+        "boosters/t",
+        "boosters/td",
+        "boosters/wind",
+        "fold_stats",
+        "json_and_card",
+    }
+    assert sum(size for _, size in error.by_group) == total
+    group_sizes = [size for _, size in error.by_group]
+    assert group_sizes == sorted(group_sizes, reverse=True)
+    message = str(error)
+    for text in (
+        f"{total:,}",
+        f"{cap:,}",
+        error.files[0][0],
+        "fewer trees",
+        "num_leaves=7",
+        "joint WBGT",
+        "MAX_MODEL_BYTES",
+    ):
+        assert text in message, text
+    assert "Nothing was written" in message
+    capped = tmp_path / "capped"
+    assert not capped.exists() or list(capped.iterdir()) == []
+
+
 def test_the_size_cap_is_15_mib_and_the_small_model_is_far_below_it(tmp_path: Path) -> None:
     assert artefacts.MAX_MODEL_BYTES == 15 * 1024 * 1024
     total = sum(len(data) for data in _tree(_write(tmp_path)).values())
@@ -307,6 +348,12 @@ def test_model_card_sections_and_facts(tmp_path: Path) -> None:
     assert "2026-11-14T09:30:00+00:00" in card
     assert f"git {GIT_SHA}" in card
     assert f"Fit rows: {trained.train_rows}; calibration rows: {trained.cal_rows}" in card
+    assert f"rows without a usable joint WBGT grid: {trained.wbgt_rejected_rows}" in card
+    assert "Lead x hour-block strata (7 leads x 3 blocks = 21 per target)" in card
+    # R23, stated plainly: the climatology is in-sample for both sets and reaches the boosters
+    assert "fitted on the fit and calibration rows together" in card
+    assert "in-sample" in card
+    assert "boosters can therefore move" in card
     # the metrics table, sorted
     assert "| a_known_sites | 0.55 | 0.81 |" in card
     assert "| b_new_cluster |  | 0.97 |" in card
@@ -327,8 +374,8 @@ def test_model_card_is_deterministic_and_us_english(tmp_path: Path) -> None:
     assert '- rule_1: `{"num_leaves": 7}`' in first
     assert first.endswith("\n")
     assert "\r" not in first
-    for british in ("calibrat" + "ion" + "e", "normalis", "colour", "centre", "behaviour", "optimis"):
-        assert british not in first.lower()
+    for british in ("normalis", "behaviour", "colour", "centre", "optimis", "licence", "whilst", "modelling"):
+        assert british not in first.lower(), british
     # the only date-like text is the manifest's created_at: the card does not read a clock
     assert first.count("2026-11-14T09:30:00+00:00") == 1
 

@@ -45,9 +45,9 @@ STRATA: Final = frozenset(f"{lead}|{block.value}" for lead in range(1, 8) for bl
 TARGET_NAMES: Final = {"t", "td", "wind", "wbgt"}
 IFS: Final = "ecmwf_ifs025"
 
-# The weeks window: fit on summer days 1-14, calibrate on weeks 4, 8, 12 and 16 (days 22-28, 50-56, 78-84, 106-112),
-# and leave September days 113-118 and 125-130 (4-9 and 16-21 September) unused.
-FIT_DAYS: Final = tuple(range(1, 15))
+# The weeks window: fit on summer days 1-14 and 29-35, calibrate on weeks 4, 8, 12 and 16 (days 22-28, 50-56, 78-84,
+# 106-112), and leave September days 113-118 and 125-130 (4-9 and 16-21 September) unused.
+FIT_DAYS: Final = (*range(1, 15), *range(29, 36))  # days 29-35 are fit days that FOLLOW calibration week 4
 WEEK_DAYS: Final = (*range(22, 29), *range(50, 57), *range(78, 85), *range(106, 113))
 UNUSED_DAYS: Final = (*range(113, 119), *range(125, 131))
 WEEKS_SUMMER_DAYS: Final = (*FIT_DAYS, *WEEK_DAYS, *UNUSED_DAYS)
@@ -130,7 +130,8 @@ def test_train_corrector_end_to_end_synthetic() -> None:
         assert set(trained.offsets.offsets[target]) == STRATA, target
         assert set(trained.offsets.n[target]) == STRATA, target
         assert all(len(values) == 9 for values in trained.offsets.offsets[target].values())
-        assert all(n >= 30 for n in trained.offsets.n[target].values() if n), target
+        assert all(n >= 30 for n in trained.offsets.n[target].values()), target
+        assert trained.offsets.fallback[target] == [], target  # every stratum of this fixture has its own offsets
     # one 3x3 copula per stratum, a valid correlation matrix
     assert set(trained.copulas) == STRATA
     for matrix in trained.copulas.values():
@@ -250,6 +251,32 @@ def test_fold_isolation_rows_outside_the_masks_leave_no_trace(
     assert _fingerprint(in_cal)[1] != base[1], "the calibration rows' truth must reach the offsets"
 
 
+@pytest.mark.slow
+def test_calibration_week_truth_reaches_the_offsets_and_the_boosters_of_the_fit_days_that_follow_it(
+    weeks_run: tuple[pl.DataFrame, TrainedCorrector, list[pl.DataFrame]],
+) -> None:
+    """Pins the documented consequence of R23 (the model card says it): in-sample climatology and legal history.
+
+    The climatology is fitted on the fit and the calibration rows together, and ``bias7_*`` reads truth up to the day
+    before the issue day. So a fit day within 7 days of a calibration day, or after it, reads that day's truth, and the
+    boosters move when it moves. A calibration week that no fit day is near or after moves the offsets only. A
+    September day outside every window moves nothing (``test_fold_isolation...`` above).
+    """
+    pairs, trained, _ = weeks_run
+    base = _fingerprint(trained)
+    config = small_config(window="weeks_4_8_12_16")
+
+    # days 24-25 are in calibration week 4 (days 22-28); fit days 29-35 follow it
+    followed = train_corrector(_shift_truth(pairs, _summer_day().is_in((24, 25))), config, cfg_sha256=CFG_SHA256)
+    assert _fingerprint(followed)[1] != base[1], "the offsets move with the calibration truth"
+    assert _fingerprint(followed)[0] != base[0], "the boosters of the fit days that follow it move too"
+
+    # days 52-53 are in calibration week 8 (days 50-56): no fit day lies within 7 days of it or after it
+    last = train_corrector(_shift_truth(pairs, _summer_day().is_in((52, 53))), config, cfg_sha256=CFG_SHA256)
+    assert _fingerprint(last)[1] != base[1], "the offsets move with the calibration truth"
+    assert _fingerprint(last)[0] == base[0], "no fit day reads that week, so the boosters do not move"
+
+
 # === conformal offsets and WBGT =====================================================================================
 
 
@@ -323,6 +350,20 @@ def test_direct_method_trains_wbgt_boosters_and_needs_no_samples() -> None:
 
 
 # === inputs =========================================================================================================
+
+
+def test_a_three_lead_config_gets_nine_strata_and_nine_copulas_per_target() -> None:
+    """R25: the strata follow ``cfg.leads``, not the seven pre-registered leads."""
+    pairs = small_pairs().filter(pl.col("lead_days") <= 3)
+    config = small_config().model_copy(update={"leads": (1, 2, 3)})
+    trained = train_corrector(pairs, config, cfg_sha256=CFG_SHA256)
+    expected = {f"{lead}|{block}" for lead in (1, 2, 3) for block in ("early", "peak", "late")}
+    assert len(expected) == 9
+    for target in TARGET_NAMES:
+        assert set(trained.offsets.offsets[target]) == expected, target
+        assert set(trained.offsets.n[target]) == expected, target
+    assert set(trained.copulas) == expected
+    assert trained.copula_fallback == tuple(f"{lead}|{block}" for lead in (1, 2, 3) for block in ("early", "late"))
 
 
 def test_a_lead_outside_the_config_is_refused() -> None:

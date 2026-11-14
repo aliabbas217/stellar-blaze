@@ -18,10 +18,14 @@ the standard library and ``stellar_blaze.config`` at module level. Every command
 packages blocked.
 """
 
+import asyncio
 import json
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Annotated, NoReturn
 
 import typer
+from pydantic import JsonValue
 
 from stellar_blaze.config import Settings
 
@@ -132,3 +136,105 @@ def replay_build_command(
             }
         )
     )
+
+
+def _evaluate_dev(settings: Settings, config: Path, *, grid: bool, out_dir: Path | None) -> dict[str, JsonValue]:
+    """The body of ``sb-jobs evaluate-dev``: load the dev pairs, run the selection, write the exports (blocking).
+
+    Fails before any model is fitted if the manifest, the git commit or the pairs file cannot be had: a run of tens of
+    minutes must not end at its last step on a missing hash.
+    """
+    from stellar_blaze.domain.weather.dataset import GoldManifest
+    from stellar_blaze.jobs.replay_build import git_head, repo_root
+    from stellar_blaze.ml.data import load_dev_pairs
+    from stellar_blaze.ml.exporters import write_dev_exports
+    from stellar_blaze.ml.selection import run_dev_selection
+    from stellar_blaze.ml.training_config import load_training_config
+
+    cfg, cfg_sha256 = load_training_config(config)
+    root = repo_root()
+    target = root / "artifacts" / "eval" / "dev" if out_dir is None else out_dir
+    gold = settings.data_dir / "gold"
+    manifest = GoldManifest.model_validate_json((gold / "manifest.json").read_bytes())
+    data_sha256 = manifest.output.sha256
+    git_sha = git_head(root)
+    pairs = load_dev_pairs(gold / "pairs.parquet", expected_sha256=data_sha256)  # 2024-2025 only; 2026 never loads
+    selection = run_dev_selection(pairs, cfg, cfg_sha256, grid=grid)
+    hashes = write_dev_exports(
+        selection.oof,
+        selection.decisions,
+        target,
+        pairs=pairs,
+        cfg=selection.cfg,
+        cfg_sha256=selection.cfg_sha256,
+        git_sha=git_sha,
+        data_sha256=data_sha256,
+        mode=selection.mode,
+        grid_scores=selection.grid_scores,
+        tables=selection.tables,
+        summer_split=selection.summer_split,
+        counts=selection.counts,
+    )
+    return {
+        "mode": selection.mode,
+        "decisions": [json.loads(decision.model_dump_json()) for decision in selection.decisions],
+        "exports": dict(hashes),
+        "directory": str(target),
+        "counts": dict(selection.counts),
+    }
+
+
+@ml_app.command("evaluate-dev")
+def evaluate_dev_command(
+    config: Annotated[
+        Path, typer.Option("--config", help="Training config TOML (backend/training/configs/); the starting point.")
+    ],
+    grid: Annotated[
+        bool,
+        typer.Option(
+            "--grid",
+            help="Run the pre-registered selection rules 6.1-6.4 (several full out-of-fold runs, about 2 hours) "
+            "instead of the single config.",
+        ),
+    ] = False,
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Export directory (default: artifacts/eval/dev/ at the repo root).")
+    ] = None,
+) -> None:
+    """Evaluate the corrector on 2024-2025 leave-one-cluster-out and write the dev exports (never reads 2026).
+
+    Without ``--grid`` only the given config runs; with it the hyperparameters, feature set, WBGT method and
+    calibration window are chosen by the pre-registered rules (section 6) and the chosen configuration's out-of-fold
+    predictions are exported. Writes ``selection.json``, ``dev_skill.json`` and ``oof_samples_abu_dhabi.parquet`` and
+    prints the decisions as JSON. Runs as the ``evaluate-dev`` job (a ``job_run`` row, one advisory lock per config
+    name). Exit codes: 0 done or skipped (locked), 1 failed, 2 bad usage or configuration.
+    """
+    import tomllib
+
+    from pydantic import ValidationError
+
+    from stellar_blaze.jobs.runner import run_job
+    from stellar_blaze.ml.training_config import load_training_config
+
+    settings = _settings()
+    try:
+        cfg, cfg_sha256 = load_training_config(config)
+    except (OSError, tomllib.TOMLDecodeError, ValidationError) as exc:
+        raise typer.BadParameter(f"{config}: {exc}", param_hint="--config") from None
+    outcome: list[dict[str, JsonValue]] = []
+
+    async def work() -> Mapping[str, JsonValue]:
+        summary = await asyncio.to_thread(_evaluate_dev, settings, config, grid=grid, out_dir=out)
+        outcome.append(summary)
+        return summary
+
+    params: dict[str, JsonValue] = {
+        "config": str(config),
+        "config_name": cfg.name,
+        "config_sha256": cfg_sha256,
+        "grid": grid,
+    }
+    code = asyncio.run(run_job(settings, "evaluate-dev", params, work, lock_key=f"evaluate-dev:{cfg.name}"))
+    if outcome:
+        typer.echo(json.dumps(outcome[0], sort_keys=True))
+    raise typer.Exit(code)

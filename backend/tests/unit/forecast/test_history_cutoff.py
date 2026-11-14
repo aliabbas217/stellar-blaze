@@ -52,8 +52,53 @@ class _HistoryUser(FakeCorrector):
         )
 
 
+class _BiasUser(FakeCorrector):
+    """A fake with a ``bias7``-style feature: the mean daily forecast MINUS truth over the dates its rule allows.
+
+    A shift applied to the truth and to the past forecasts alike cancels in this difference, which is what the contract
+    helper must not be blind to.
+    """
+
+    def __init__(self, rule: _Rule) -> None:
+        super().__init__(spread_c=1.0)
+        self._rule = rule
+
+    def correct(
+        self,
+        *,
+        ifs: pl.DataFrame,
+        gfs: pl.DataFrame,
+        history: pl.DataFrame,
+        history_ifs: pl.DataFrame | None = None,
+    ) -> pl.DataFrame:
+        base = super().correct(ifs=ifs, gfs=gfs, history=history, history_ifs=history_ifs)
+        assert history_ifs is not None
+        daily_truth = history.group_by(pl.col("valid_time").dt.date().alias("d")).agg(pl.col("t_c").mean())
+        daily_forecast = history_ifs.group_by(pl.col("valid_time").dt.date().alias("d")).agg(pl.col("t_c").mean())
+        error = dict(
+            daily_forecast.join(daily_truth, on="d", suffix="_truth")
+            .select("d", pl.col("t_c") - pl.col("t_c_truth"))
+            .iter_rows()
+        )
+        shifts = []
+        for valid_time, lead in zip(ifs["valid_time"].to_list(), ifs["lead_days"].to_list(), strict=True):
+            allowed = self._rule(valid_time.date(), lead)
+            used = [v for d, v in error.items() if allowed(d)]
+            shifts.append(float(np.mean(used)) if used else 0.0)
+        per_row = pl.Series(np.repeat(shifts, len(VARIABLES)))
+        is_t = pl.col("variable") == "t"
+        return base.with_columns(
+            pl.when(is_t).then(pl.col(name) + per_row).otherwise(pl.col(name)).alias(name) for name in QUANTILE_COLUMNS
+        )
+
+
 def _before_issue_day(valid: date, lead: int) -> Callable[[date], bool]:
     return lambda d: d <= valid - timedelta(days=lead + 1)
+
+
+def _through_the_issue_day(valid: date, lead: int) -> Callable[[date], bool]:
+    # One day too many: the issue day D - L itself, whose truth is not yet known when the forecast is issued.
+    return lambda d: d <= valid - timedelta(days=lead)
 
 
 def _everything(valid: date, lead: int) -> Callable[[date], bool]:
@@ -61,7 +106,8 @@ def _everything(valid: date, lead: int) -> Callable[[date], bool]:
 
 
 def _day_before_valid(valid: date, lead: int) -> Callable[[date], bool]:
-    # The previous day's truth regardless of the lead: fine at lead 1, a leak at lead 2 and 3.
+    # The day before the valid date regardless of the lead. At lead 1 the cutoff is D - 2, so D - 1 is already a leak
+    # there too (the issue day itself); at lead 2 and 3 it is further inside the future.
     return lambda d: d == valid - timedelta(days=1)
 
 
@@ -126,6 +172,16 @@ def test_declaring_no_history_use_while_using_it_fails(inputs: _Inputs) -> None:
 def test_a_corrector_that_reads_history_after_the_cutoff_fails(inputs: _Inputs, rule: _Rule) -> None:
     with pytest.raises(AssertionError, match="later than the cutoff date"):
         _check(_HistoryUser(rule), inputs, uses_history=True)
+
+
+def test_a_bias7_style_window_that_stops_at_the_cutoff_passes(inputs: _Inputs) -> None:
+    _check(_BiasUser(_before_issue_day), inputs, uses_history=True)
+
+
+def test_a_forecast_minus_truth_window_that_includes_the_issue_day_fails(inputs: _Inputs) -> None:
+    """The leak the helper once missed: truth and past forecasts shifted alike cancel in forecast minus truth."""
+    with pytest.raises(AssertionError, match="later than the cutoff date"):
+        _check(_BiasUser(_through_the_issue_day), inputs, uses_history=True)
 
 
 def test_a_history_with_nothing_after_any_cutoff_is_rejected_as_vacuous(inputs: _Inputs) -> None:

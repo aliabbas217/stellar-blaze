@@ -79,7 +79,9 @@ def test_an_empty_snapshot_id_variable_means_unset(monkeypatch: pytest.MonkeyPat
         Settings(_env_file=None)
 
 
-@pytest.mark.parametrize("snapshot_id", ["../secrets", "a/b", "Upper", "with space", "x" * 65])
+@pytest.mark.parametrize(
+    "snapshot_id", ["../secrets", "a/b", "Upper", "with space", "x" * 65, "con", "aux", "nul", "com1", "lpt9"]
+)
 def test_settings_refuse_a_snapshot_id_that_is_not_a_slug(snapshot_id: str) -> None:
     """The id becomes a directory name under ``replay_dir``: it must not be able to climb out of it."""
     with pytest.raises(ValidationError, match="snapshot id"):

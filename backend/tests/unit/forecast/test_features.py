@@ -7,7 +7,9 @@ from typing import Any
 
 import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
+from stellar_blaze.application.dataset import build_pairs
 from stellar_blaze.domain.forecast.features import (
     BANNED_COLUMNS,
     FORECAST_COLUMN,
@@ -20,11 +22,12 @@ from stellar_blaze.domain.forecast.features import (
     fit_fold_stats,
     history_features,
     hour_block_expr,
+    pairs_from_forecasts,
 )
 from stellar_blaze.domain.forecast.grid import HOUR_BLOCKS, MODELLED_HOURS_UTC, hour_block
 from stellar_blaze.domain.physics.psychrometrics import relative_humidity_pct
-from stellar_blaze.domain.weather.schemas import GOLD_PAIRS_SCHEMA
-from tests.fixtures.forecast.synthetic import make_pairs
+from stellar_blaze.domain.weather.schemas import GOLD_PAIRS_SCHEMA, OBS_HOURLY_SCHEMA, SchemaMismatchError
+from tests.fixtures.forecast.synthetic import forecasts_of, make_pairs
 
 pytestmark = pytest.mark.unit
 
@@ -651,3 +654,127 @@ def test_valid_time_must_be_utc_aware(
     }
     with pytest.raises(ValueError, match=r"valid_time must be a UTC-aware Datetime.*got Datetime"):
         calls[entry]()
+
+
+# === pairs_from_forecasts: the serving twin of the gold frame ========================================================
+
+_TRUTH_AND_REFERENCE = (
+    *("obs_t_c", "obs_td_c", "obs_wind_ms", "has_joint_obs", "audit_t_c", "audit_td_c", "audit_wind_ms"),
+    *("ref_sw_wm2", "ref_direct_wm2", "ref_pressure_hpa"),
+    *("wbgt_obs_c", "wbgt_obs_reject", "wbgt_fc_refrad_c", "wbgt_fc_refrad_reject"),
+)
+_SERVING_COLUMNS = (
+    *("station", "cluster", "model", "summer", "valid_time", "lead_days", "hour_utc", "doy"),
+    *("station_elev_m", "grid_lat", "grid_lon", "grid_elev_m"),
+    *("fc_t_c", "fc_td_c", "fc_wind_ms", "fc_sw_wm2", "fc_direct_wm2", "fc_pressure_hpa"),
+    *("wbgt_fc_c", "wbgt_fc_reject"),
+)
+_ORDER = ["model", "station", "valid_time", "lead_days"]
+
+
+@pytest.fixture(scope="module")
+def serving(pairs: pl.DataFrame) -> pl.DataFrame:
+    return pairs_from_forecasts(forecasts_of(pairs, IFS), forecasts_of(pairs, GFS))
+
+
+def test_pairs_from_forecasts_equals_the_gold_forecast_columns(pairs: pl.DataFrame, serving: pl.DataFrame) -> None:
+    """Same rows and values as the gold frame's forecast side, ``wbgt_fc_c`` and its reject code included (1e-12)."""
+    assert tuple(serving.columns) == _SERVING_COLUMNS
+    assert not set(serving.columns) & set(_TRUTH_AND_REFERENCE), "a serving frame has no truth or reference column"
+    gold = pairs.select(_SERVING_COLUMNS).sort(_ORDER)
+    assert gold["wbgt_fc_c"].is_finite().sum() > 0.99 * gold.height, (
+        "the fixture must hold real WBGT values, or this is vacuous"
+    )
+    assert_frame_equal(serving.sort(_ORDER), gold, abs_tol=1e-12, rel_tol=0.0)
+
+
+def test_pairs_from_forecasts_keeps_the_ifs_rows_first_in_their_order(pairs: pl.DataFrame) -> None:
+    ifs, gfs = forecasts_of(pairs, IFS), forecasts_of(pairs, GFS)
+    serving = pairs_from_forecasts(ifs, gfs)
+    assert serving.height == ifs.height + gfs.height
+    head = serving.head(ifs.height)
+    assert head["model"].unique().to_list() == [IFS]
+    assert head.select("station", "valid_time", "lead_days").equals(ifs.select("station", "valid_time", "lead_days"))
+
+
+@pytest.mark.parametrize("feature_set", list(FeatureSet))
+def test_build_features_on_a_serving_frame_equals_the_gold_frame_without_truth(
+    pairs: pl.DataFrame, serving: pl.DataFrame, stats: FoldStats, history: pl.DataFrame, feature_set: FeatureSet
+) -> None:
+    """Truth never enters a feature, so the serving frame builds exactly the features of the gold frame."""
+    gold = pairs.drop(_TRUTH_AND_REFERENCE).sort(_ORDER)
+    from_serving = build_features(
+        model_rows(serving.sort(_ORDER)), feature_set=feature_set, stats=stats, history=history
+    )
+    from_gold = build_features(model_rows(gold), feature_set=feature_set, stats=stats, history=history)
+    assert not [name for name in from_serving.columns if name.startswith("y_")]
+    assert from_serving.height > 1000
+    assert_frame_equal(from_serving, from_gold, abs_tol=1e-12, rel_tol=0.0)
+
+
+def test_pairs_from_forecasts_keeps_a_row_with_a_missing_value(pairs: pl.DataFrame) -> None:
+    """Nothing is dropped: a null, a NaN or an infinity is a null value, and its WBGT is rejected, never a number."""
+    ifs = forecasts_of(pairs, IFS).filter(pl.col("lead_days") == 1).head(6)
+    broken = ifs.with_columns(
+        pl.when(pl.int_range(pl.len()) == 0).then(None).otherwise(pl.col("td_c")).alias("td_c"),
+        pl.when(pl.int_range(pl.len()) == 1).then(float("nan")).otherwise(pl.col("t_c")).alias("t_c"),
+        pl.when(pl.int_range(pl.len()) == 2).then(float("inf")).otherwise(pl.col("sw_wm2")).alias("sw_wm2"),
+    )
+    out = pairs_from_forecasts(broken, forecasts_of(pairs, GFS).head(0))
+    assert out.height == broken.height
+    assert (out["fc_td_c"][0], out["fc_t_c"][1], out["fc_sw_wm2"][2]) == (None, None, None)
+    assert out["wbgt_fc_reject"][:3].ne(0).all()
+    assert out["wbgt_fc_c"][:3].is_nan().all(), "NaN, never a number"
+    assert out["wbgt_fc_reject"][3:].eq(0).all()
+
+
+def test_pairs_from_forecasts_screens_the_solver_inputs_like_build_pairs(pairs: pl.DataFrame) -> None:
+    """A temperature of 75 C or a negative wind keeps its ``fc_*`` value and only the WBGT is rejected (B1 rule)."""
+    ifs = forecasts_of(pairs, IFS).filter(pl.col("lead_days") == 1).head(8)
+    odd = ifs.with_columns(
+        pl.when(pl.int_range(pl.len()) == 0).then(75.0).otherwise(pl.col("t_c")).alias("t_c"),
+        pl.when(pl.int_range(pl.len()) == 1).then(-75.0).otherwise(pl.col("td_c")).alias("td_c"),
+        pl.when(pl.int_range(pl.len()) == 2).then(-1.0).otherwise(pl.col("wind_ms")).alias("wind_ms"),
+        pl.when(pl.int_range(pl.len()) == 3).then(0.0).otherwise(pl.col("pressure_hpa")).alias("pressure_hpa"),
+    )
+    mine = pairs_from_forecasts(odd, odd.head(0)).sort(_ORDER)
+    b1 = build_pairs(
+        forecasts=odd, obs_iem=pl.DataFrame(schema=OBS_HOURLY_SCHEMA), obs_ghcnh=pl.DataFrame(schema=OBS_HOURLY_SCHEMA)
+    ).sort(_ORDER)
+    assert 75.0 in mine["fc_t_c"].to_list()
+    assert (mine["wbgt_fc_reject"] != 0).sum() >= 4
+    assert_frame_equal(
+        mine.select("wbgt_fc_c", "wbgt_fc_reject"), b1.select("wbgt_fc_c", "wbgt_fc_reject"), abs_tol=1e-12, rel_tol=0.0
+    )
+
+
+def test_pairs_from_forecasts_is_utc_in_every_calendar_column() -> None:
+    """``summer``, ``hour_utc`` and ``doy`` come from the UTC instant: 23:00 UTC on 31 Dec is hour 23, day 365."""
+    when = datetime(2025, 12, 31, 23, tzinfo=UTC)
+    values = {
+        **{"t_c": 20.0, "td_c": 10.0, "wind_ms": 3.0, "sw_wm2": 0.0, "direct_wm2": 0.0, "pressure_hpa": 1010.0},
+        **{"grid_lat": 24.5, "grid_lon": 54.75, "grid_elev_m": 30.0},
+    }
+    frame = pl.DataFrame(
+        {
+            "station": ["OMAA"],
+            "model": [IFS],
+            "valid_time": [when],
+            "lead_days": pl.Series([2], dtype=pl.Int8),
+            **{name: [value] for name, value in values.items()},
+        },
+        schema_overrides={"valid_time": pl.Datetime("us", "UTC")},
+    )
+    out = pairs_from_forecasts(frame, frame.head(0))
+    assert out.select("summer", "hour_utc", "doy").row(0) == (2025, 23, 365)
+    dubai = frame.with_columns(pl.col("valid_time").dt.convert_time_zone("Asia/Dubai"))
+    with pytest.raises(SchemaMismatchError, match="valid_time"):
+        pairs_from_forecasts(dubai, frame.head(0))
+
+
+def test_pairs_from_forecasts_refuses_an_unknown_station_and_a_repeated_key(pairs: pl.DataFrame) -> None:
+    ifs = forecasts_of(pairs, IFS).head(4)
+    with pytest.raises(ValueError, match="not in STATIONS"):
+        pairs_from_forecasts(ifs.with_columns(pl.lit("KJFK").alias("station")), ifs.head(0))
+    with pytest.raises(ValueError, match="duplicate"):
+        pairs_from_forecasts(pl.concat([ifs, ifs.head(1)]), ifs.head(0))

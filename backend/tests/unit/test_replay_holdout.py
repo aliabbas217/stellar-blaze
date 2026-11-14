@@ -31,6 +31,7 @@ from stellar_blaze.domain.weather.replay import (
 from stellar_blaze.jobs import replay_build
 from stellar_blaze.jobs.cli import app
 from stellar_blaze.jobs.replay_build import ReplayHoldoutError, build_replay_snapshot
+from stellar_blaze.ml.data import TEST_SUMMER
 from tests.fixtures.forecast.replay import (
     FIXTURE_STATIONS,
     GIT_SHA,
@@ -119,6 +120,12 @@ def test_the_held_out_years_are_exactly_2026() -> None:
     assert frozenset({2026}) == HELD_OUT_SUMMERS  # a change here is the deliberate unlock, and shows in review
 
 
+def test_the_replay_hold_out_is_the_ml_test_summer() -> None:
+    """The ML split's test summer and the replay hold-out are one fact: they must move together."""
+    assert TEST_SUMMER in HELD_OUT_SUMMERS
+    assert frozenset({TEST_SUMMER}) == HELD_OUT_SUMMERS
+
+
 # --- the sources and the manifest -----------------------------------------------------------------------------------
 
 
@@ -156,6 +163,9 @@ def make_manifest(snapshot_dir: Path, **changes: Any) -> dict[str, Any]:
             "held-out",
             id="2026-in-utc-though-2025-on-the-wall",
         ),
+        pytest.param(
+            {"start": "2025-05-15T00:00:00Z", "end": "2027-01-01T00:00:00Z"}, "held-out", id="2026-strictly-inside"
+        ),
     ],
 )
 def test_a_manifest_window_in_a_held_out_year_is_refused_by_the_model(
@@ -165,6 +175,13 @@ def test_a_manifest_window_in_a_held_out_year_is_refused_by_the_model(
 
     with pytest.raises(ValidationError, match=fragment):
         ReplaySnapshot.model_validate(manifest)
+
+
+def test_a_manifest_window_inside_an_allowed_year_is_accepted_by_the_model(snapshot_dir: Path) -> None:
+    """The counterpart of the refusals: the same start, an end still in 2025."""
+    manifest = make_manifest(snapshot_dir, start="2025-05-15T00:00:00Z", end="2025-12-31T23:00:00Z")
+
+    ReplaySnapshot.model_validate(manifest)
 
 
 def test_a_manifest_end_in_2026_stops_both_sources(snapshot_dir: Path) -> None:

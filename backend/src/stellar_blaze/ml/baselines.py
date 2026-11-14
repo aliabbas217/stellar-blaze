@@ -32,7 +32,7 @@ Wind is not clipped at 0 here: the pre-registration clips the corrector's wind (
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
@@ -52,6 +52,7 @@ __all__ = [
     "Baseline",
     "BaselineModel",
     "UnsupportedBaselineError",
+    "fallback_count",
     "fit_baselines",
     "predict_baseline",
 ]
@@ -109,10 +110,9 @@ class BaselineModel:
         n_fit_rows: Training rows with a target (those that fit anything).
         n_null_target: Training rows excluded because ``y_<target>`` was null.
         n_ridge_rows: Training rows the ridge was fitted on (a target and every cold feature).
-        fallback_counts: Per baseline name (``"b3"``, ``"b3d"``, ``"b4"``) the number of rows of the LAST
-            ``predict_baseline`` call for that baseline that took the fallback (B2 or B2d); replaced by every call,
-            never accumulated, so predicting the same rows twice gives the same count. Rows that predict NaN are not
-            counted.
+
+    How many rows took a fallback is not stored here (a fitted model is read-only): ``fallback_count`` computes it from
+    the rows.
     """
 
     target: Target
@@ -124,7 +124,6 @@ class BaselineModel:
     n_fit_rows: int
     n_null_target: int
     n_ridge_rows: int
-    fallback_counts: dict[str, int] = field(default_factory=dict[str, int])
 
 
 def _clean(name: str) -> pl.Expr:
@@ -162,7 +161,7 @@ def _quantile_table(
         pl.col("res").quantile(level, interpolation="linear").alias(name)
         for level, name in zip(LEVELS, _QUANTILE_COLUMNS, strict=True)
     ]
-    per_lead = residuals.group_by("lead").agg(pl.len().alias("n_lead"), *aggregates)
+    per_lead = residuals.group_by("lead", maintain_order=True).agg(pl.len().alias("n_lead"), *aggregates)
     counts = dict(zip(per_lead["lead"].to_list(), per_lead["n_lead"].to_list(), strict=True))
     thin_leads = {lead: counts.get(lead, 0) for lead in leads if counts.get(lead, 0) < MIN_STRATUM_ROWS}
     if thin_leads:
@@ -170,7 +169,7 @@ def _quantile_table(
         raise ValueError(
             f"{label.value}: too few training residuals for {shown}; need at least {MIN_STRATUM_ROWS} per lead"
         )
-    per_stratum = residuals.group_by("lead", "hour_block").agg(pl.len().alias("n"), *aggregates)
+    per_stratum = residuals.group_by("lead", "hour_block", maintain_order=True).agg(pl.len().alias("n"), *aggregates)
     strata = pl.DataFrame({"lead": sorted(leads)}, schema={"lead": pl.Int16()}).join(
         pl.DataFrame({"hour_block": list(_BLOCKS)}), how="cross"
     )
@@ -235,7 +234,13 @@ def fit_baselines(train: pl.DataFrame, *, target: Target, pooled: bool) -> Basel
     leads = sorted(rows["lead"].unique().to_list())
 
     bias_keys = ["lead", "hour_block"] if pooled else ["station", "lead", "hour_block"]
-    static_bias = rows.group_by(bias_keys).agg(pl.col("y").mean().alias("bias"), pl.len().alias("n")).sort(bias_keys)
+    # maintain_order: a parallel group_by sums a group's rows in a run-dependent order, so its float mean differs in the
+    # last bit between identical runs (pooled bias, and through it B2d's residuals); in order it is reproducible
+    static_bias = (
+        rows.group_by(bias_keys, maintain_order=True)
+        .agg(pl.col("y").mean().alias("bias"), pl.len().alias("n"))
+        .sort(bias_keys)
+    )
     corrected = rows.join(static_bias.select(*bias_keys, "bias"), on=bias_keys, how="left", validate="m:1")
 
     residuals: dict[Baseline, pl.DataFrame] = {
@@ -360,9 +365,19 @@ def _b2_point(model: BaselineModel, frame: pl.DataFrame, raw: F64, rows: _Mask |
     return out
 
 
+def _bias7_values(frame: pl.DataFrame) -> F64:
+    return np.asarray(frame["bias7"].fill_null(float("nan")).to_numpy(), dtype=np.float64)
+
+
+def _ridge_inputs(frame: pl.DataFrame) -> tuple[F64, _Mask]:
+    """The cold feature matrix of the rows and the mask of the rows whose features are all present."""
+    x = np.ascontiguousarray(frame.select(_COLD).to_numpy(), dtype=np.float64)
+    return x, np.isfinite(x).all(axis=1)
+
+
 def _running_point(model: BaselineModel, frame: pl.DataFrame, raw: F64) -> tuple[F64, _Mask]:
     """B3's point forecast and the mask of the rows that fell back to B2."""
-    bias7 = np.asarray(frame["bias7"].fill_null(float("nan")).to_numpy(), dtype=np.float64)
+    bias7 = _bias7_values(frame)
     fallback = np.isnan(bias7) & ~np.isnan(raw)
     point = raw - bias7
     point[fallback] = _b2_point(model, frame, raw, fallback)[fallback]
@@ -371,8 +386,7 @@ def _running_point(model: BaselineModel, frame: pl.DataFrame, raw: F64) -> tuple
 
 def _ridge_point(model: BaselineModel, frame: pl.DataFrame, raw: F64) -> tuple[F64, _Mask]:
     """B4's point forecast and the mask of the rows that fell back to B2 (a null cold feature)."""
-    x = np.ascontiguousarray(frame.select(_COLD).to_numpy(), dtype=np.float64)
-    complete = np.isfinite(x).all(axis=1)
+    x, complete = _ridge_inputs(frame)
     fallback = ~complete & ~np.isnan(raw)
     point = np.full(raw.shape, np.nan)
     if complete.any():
@@ -396,8 +410,8 @@ def _dressed(model: BaselineModel, frame: pl.DataFrame, point: F64, baseline: Ba
 def predict_baseline(model: BaselineModel, rows: pl.DataFrame, baseline: Baseline) -> F64:
     """The corrected forecast of ``rows`` under one baseline.
 
-    A row with a null ``raw_<target>`` gives NaN (a ``(n, 19)`` row of NaN for a dressed baseline): never a value. The
-    count of rows that took B3's, B3d's or B4's fallback replaces ``model.fallback_counts[baseline.value]``.
+    A row with a null ``raw_<target>`` gives NaN (a ``(n, 19)`` row of NaN for a dressed baseline): never a value. How
+    many rows took B3's, B3d's or B4's fallback is ``fallback_count`` (a function of the rows alone).
 
     Args:
         model: From ``fit_baselines``.
@@ -417,7 +431,7 @@ def predict_baseline(model: BaselineModel, rows: pl.DataFrame, baseline: Baselin
     _require_supported(model.target, baseline)
     frame = _prediction_frame(model, rows, baseline)
     raw = _raw(frame)
-    fallback: _Mask | None = None
+    fallback: _Mask
     match baseline:
         case Baseline.B0:
             return raw
@@ -431,7 +445,36 @@ def predict_baseline(model: BaselineModel, rows: pl.DataFrame, baseline: Baselin
             point, fallback = _running_point(model, frame, raw)
         case Baseline.B4:
             point, fallback = _ridge_point(model, frame, raw)
-    model.fallback_counts[baseline.value] = int(fallback.sum())
     if baseline is Baseline.B3:
         return point
     return _dressed(model, frame, point, baseline, fallback)
+
+
+def fallback_count(model: BaselineModel, rows: pl.DataFrame, baseline: Baseline) -> int:
+    """How many of ``rows`` take ``baseline``'s fallback to B2 (B3, B4) or B2d (B3d, B4 dressed).
+
+    A pure function of ``rows``, so it adds up over chunks: the count of a whole frame is the sum of its chunks'.
+
+    * B3 and B3d: rows with a null ``bias7_<target>`` and a raw forecast.
+    * B4: rows with a raw forecast and any null (or non-finite) cold feature.
+    * Any other baseline has no fallback: 0 (``rows`` is not read).
+
+    A row without a raw forecast predicts NaN and is not counted.
+
+    Args:
+        model: From ``fit_baselines`` (its target and, for B3, whether it was fitted with ``bias7``).
+        rows: The rows given to ``predict_baseline``.
+        baseline: Which baseline.
+
+    Raises:
+        UnsupportedBaselineError: B3 or B3d for the WBGT target, or for a model fitted without ``bias7``.
+        ValueError: A column the baseline reads is missing from ``rows``.
+    """
+    _require_supported(model.target, baseline)
+    if baseline not in (Baseline.B3, Baseline.B3D, Baseline.B4):
+        return 0
+    frame = _prediction_frame(model, rows, baseline)
+    raw = _raw(frame)
+    if baseline is Baseline.B4:
+        return int((~_ridge_inputs(frame)[1] & ~np.isnan(raw)).sum())
+    return int((np.isnan(_bias7_values(frame)) & ~np.isnan(raw)).sum())

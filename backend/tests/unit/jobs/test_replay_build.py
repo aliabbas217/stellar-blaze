@@ -18,7 +18,7 @@ from typer.testing import CliRunner
 from stellar_blaze.adapters.storage.parquet_store import ParquetStore
 from stellar_blaze.domain.provenance import ProvenanceLabel
 from stellar_blaze.domain.weather.models import NwpModel
-from stellar_blaze.domain.weather.replay import ReplaySnapshot
+from stellar_blaze.domain.weather.replay import ReplaySnapshot, check_snapshot_id
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, OBS_HOURLY_SCHEMA
 from stellar_blaze.domain.weather.stations import station
 from stellar_blaze.jobs import replay_build
@@ -39,6 +39,7 @@ from tests.fixtures.forecast.synthetic import forecasts_of, observations_of
 pytestmark = pytest.mark.unit
 
 DATABASE_URL = "postgresql+asyncpg://sb:hunter2@localhost:5432/stellar_blaze"
+RESERVED_IDS = ["con", "prn", "aux", "nul", "com1", "com9", "lpt1", "lpt9", "CON"]  # Windows device names, any case
 
 
 def sha256(path: Path) -> str:
@@ -219,7 +220,21 @@ def test_snapshot_size_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
 @pytest.mark.parametrize(
     "snapshot_id",
-    ["", "../escape", "a/b", "a\\b", "Has Upper", "with space", ".hidden", "a--b", "-lead", "trail-", "x" * 65, "ü"],
+    [
+        "",
+        "../escape",
+        "a/b",
+        "a\\b",
+        "Has Upper",
+        "with space",
+        ".hidden",
+        "a--b",
+        "-lead",
+        "trail-",
+        "x" * 65,
+        "ü",
+        *RESERVED_IDS,
+    ],
 )
 def test_an_unsafe_snapshot_id_is_refused_before_anything_is_written(tmp_path: Path, snapshot_id: str) -> None:
     store = seed_silver(tmp_path)
@@ -236,6 +251,12 @@ def test_an_unsafe_snapshot_id_is_refused_before_anything_is_written(tmp_path: P
 
     assert not (tmp_path / "replay").exists()
     assert not (tmp_path / "escape").exists()
+
+
+@pytest.mark.parametrize("snapshot_id", RESERVED_IDS)
+def test_a_windows_device_name_is_refused_with_a_message_that_says_so(tmp_path: Path, snapshot_id: str) -> None:
+    with pytest.raises(ValueError, match="reserved device name"):
+        check_snapshot_id(snapshot_id)
 
 
 @pytest.mark.parametrize("snapshot_id", ["2025-dev", "dev_2025_v2", "a", "s2025", "x" * 64])

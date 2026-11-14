@@ -17,11 +17,14 @@ from stellar_blaze.domain.forecast.features import (
     history_features,
 )
 from stellar_blaze.domain.forecast.grid import F64, LEVELS, MODELLED_HOURS_UTC
+from stellar_blaze.ml import baselines as baselines_module
 from stellar_blaze.ml._sklearn import Ridge
 from stellar_blaze.ml.baselines import (
+    RIDGE_ALPHA,
     Baseline,
     BaselineModel,
     UnsupportedBaselineError,
+    fallback_count,
     fit_baselines,
     predict_baseline,
 )
@@ -151,6 +154,17 @@ def test_held_out_station_needs_the_pooled_bias(train: pl.DataFrame, test: pl.Da
     assert np.isfinite(out).all()
     grid = predict_baseline(pooled, held_out, Baseline.B2D)
     assert np.isfinite(grid).all()
+    # the correction of a held-out station's rows is the mean over the SEEN stations (OMAA +1.5, OMDB 0), not the mean
+    # that includes the held-out station (OMFJ runs +3.0, which would pull the all-station mean about a degree lower)
+    for lead in LEADS:
+        block = (pl.col("lead_days") == lead) & (pl.col("hour_block") == "peak")
+        rows = held_out.filter(block)
+        correction = predict_baseline(pooled, rows, Baseline.B2) - rows["raw_t"].to_numpy()
+        seen_mean = mean_target(seen.filter(block))
+        all_station_mean = mean_target(train.filter(block))
+        assert np.allclose(correction, seen_mean), lead
+        assert not np.isclose(correction, all_station_mean, atol=0.5).any(), lead
+        assert abs(seen_mean - all_station_mean) > 0.5  # the two candidates really differ, so the test can tell
     per_station = fit_baselines(seen, target=Target.T, pooled=False)
     for baseline in (Baseline.B2, Baseline.B2D):
         with pytest.raises(KeyError, match="OMFJ"):
@@ -198,14 +212,21 @@ def test_wbgt_dressed_grid_is_nan_only_where_the_forecast_is_missing(frame: pl.D
     assert np.isnan(predict_baseline(fitted, rows, Baseline.B0)[missing]).all()
 
 
+@pytest.mark.parametrize(
+    ("lead", "block"),
+    [(1, "early"), (1, "peak"), (2, "peak"), (2, "late"), (3, "early"), (3, "late")],
+    ids=lambda value: str(value),
+)
 def test_dressing_quantiles_are_the_numpy_quantiles_of_each_baselines_own_residual(
-    train: pl.DataFrame, model: BaselineModel
+    train: pl.DataFrame, model: BaselineModel, lead: int, block: str
 ) -> None:
-    stratum = (pl.col("lead_days") == 2) & (pl.col("hour_block") == "peak")
+    """Six strata (three leads, all three hour-blocks), each against ``numpy.quantile`` of that stratum's residuals."""
+    stratum = (pl.col("lead_days") == lead) & (pl.col("hour_block") == block)
     rows = train.filter(stratum)
     probe = rows.filter(pl.col("bias7_t").is_not_null()).head(3)
     keys = ["station", "lead_days", "hour_block"]
     valid = rows.filter(pl.col("y_t").is_not_null())
+    assert valid.height >= 30  # a stratum of its own, not the lead-pooled fallback
     static = valid.with_columns(pl.col("y_t") - pl.col("y_t").mean().over(keys))
     running = valid.filter(pl.col("bias7_t").is_not_null()).with_columns(pl.col("y_t") + pl.col("bias7_t"))
     expected = {
@@ -268,10 +289,12 @@ def test_b3_is_raw_minus_bias7_and_falls_back_to_b2_when_it_is_null(frame: pl.Da
     assert (~known).any()  # the first days of the summer have no history
     assert np.array_equal(out[known], raw[known] - bias7[known])  # exactly, not approximately
     assert np.array_equal(out[~known], b2[~known])
-    assert model.fallback_counts["b3"] == int((~known).sum())
+    assert fallback_count(model, frame, Baseline.B3) == int((~known).sum())
 
 
-def test_b3_removes_a_persistent_bias_with_history_only(frame: pl.DataFrame, model: BaselineModel) -> None:
+def test_b3_removes_a_constant_injected_bias_on_the_rows_that_have_history(
+    frame: pl.DataFrame, model: BaselineModel
+) -> None:
     omaa = station_rows(frame, "OMAA").filter(pl.col("bias7_t").is_not_null())
     raw_error = mean_error(omaa["raw_t"].to_numpy(), omaa)
     b3_error = mean_error(predict_baseline(model, omaa, Baseline.B3), omaa)
@@ -286,7 +309,7 @@ def test_b3d_falls_back_to_b2d_where_bias7_is_null(frame: pl.DataFrame, model: B
     b2d = predict_baseline(model, frame, Baseline.B2D)
     assert np.array_equal(out[unknown], b2d[unknown])
     assert not np.array_equal(out[~unknown], b2d[~unknown])
-    assert model.fallback_counts["b3d"] == int(unknown.sum())
+    assert fallback_count(model, frame, Baseline.B3D) == int(unknown.sum())
 
 
 @pytest.mark.parametrize("baseline", [Baseline.B3, Baseline.B3D])
@@ -348,17 +371,95 @@ def test_b4_falls_back_to_b2d_for_rows_with_a_null_cold_feature(frame: pl.DataFr
     b2d = predict_baseline(model, frame, Baseline.B2D)
     assert np.array_equal(out[incomplete], b2d[incomplete])
     assert not np.array_equal(out[~incomplete], b2d[~incomplete])
-    assert model.fallback_counts["b4"] == int(incomplete.sum())
+    assert fallback_count(model, frame, Baseline.B4) == int(incomplete.sum())
     assert not np.isnan(out).any()
 
 
-def test_fallback_counts_are_the_last_prediction_not_a_running_total(frame: pl.DataFrame, model: BaselineModel) -> None:
-    predict_baseline(model, frame, Baseline.B3)
-    first = model.fallback_counts["b3"]
-    predict_baseline(model, frame, Baseline.B3)
-    assert model.fallback_counts["b3"] == first
-    predict_baseline(model, frame.filter(pl.col("bias7_t").is_not_null()), Baseline.B3)
-    assert model.fallback_counts["b3"] == 0
+@pytest.mark.parametrize("baseline", [Baseline.B3, Baseline.B3D, Baseline.B4])
+@pytest.mark.parametrize("chunk", [1, 7, 500])
+def test_the_fallback_count_of_chunks_adds_up_to_the_count_of_the_whole(
+    frame: pl.DataFrame, model: BaselineModel, baseline: Baseline, chunk: int
+) -> None:
+    """A pure function of the rows: scoring in chunks and in one call report the same total, and a repeat the same."""
+    whole = fallback_count(model, frame, baseline)
+    chunks = [frame.slice(offset, chunk) for offset in range(0, frame.height, chunk)]
+    assert whole > 0  # the fixture has rows without history and rows without a GFS feature
+    assert sum(fallback_count(model, part, baseline) for part in chunks) == whole
+    assert fallback_count(model, frame, baseline) == whole
+    assert fallback_count(model, frame.filter(pl.col("bias7_t").is_not_null()), Baseline.B3) == 0
+
+
+def test_the_fallback_count_does_not_depend_on_what_was_predicted_before(
+    frame: pl.DataFrame, model: BaselineModel
+) -> None:
+    """The model is read-only: predicting leaves no state that a later count could pick up."""
+    before = fallback_count(model, frame, Baseline.B3D)
+    predict_baseline(model, frame.head(10), Baseline.B3D)
+    predict_baseline(model, frame.filter(pl.col("bias7_t").is_not_null()), Baseline.B3D)
+    assert fallback_count(model, frame, Baseline.B3D) == before
+    assert not hasattr(model, "fallback_counts")
+    with pytest.raises(AttributeError):  # frozen: nothing can be stashed on it either
+        model.pooled = True  # type: ignore[misc]
+
+
+def test_a_baseline_without_a_fallback_counts_zero_and_wbgt_has_no_b3(train: pl.DataFrame, frame: pl.DataFrame) -> None:
+    fitted = fit_baselines(train, target=Target.T, pooled=False)
+    for baseline in (Baseline.B0, Baseline.B0D, Baseline.B2, Baseline.B2D):
+        assert fallback_count(fitted, frame, baseline) == 0
+    wbgt = fit_baselines(train, target=Target.WBGT, pooled=False)
+    with pytest.raises(UnsupportedBaselineError, match="wbgt"):
+        fallback_count(wbgt, frame, Baseline.B3D)
+    assert fallback_count(wbgt, frame, Baseline.B4) > 0
+
+
+def test_the_fallback_count_leaves_out_rows_without_a_raw_forecast(frame: pl.DataFrame, model: BaselineModel) -> None:
+    """A row that predicts NaN is missing, not fallen back."""
+    no_raw = frame.with_columns(pl.lit(None, dtype=pl.Float64).alias("raw_t"))
+    for baseline in (Baseline.B3, Baseline.B3D, Baseline.B4):
+        assert fallback_count(model, no_raw, baseline) == 0
+
+
+# === determinism ====================================================================================================
+
+
+@pytest.mark.parametrize("pooled", [True, False])
+def test_two_identical_fits_are_bit_identical(frame: pl.DataFrame, pooled: bool) -> None:
+    """A parallel ``group_by`` mean sums in a run-dependent order: the pooled bias differed in the last bit between
+    identical runs (and B2d's residuals with it) until the aggregations were made ordered."""
+    fits = [fit_baselines(frame, target=Target.T, pooled=pooled) for _ in range(8)]
+    first = fits[0]
+    for other in fits[1:]:
+        assert other.static_bias.equals(first.static_bias)
+        assert other.dressing.keys() == first.dressing.keys()
+        for baseline, table in first.dressing.items():
+            assert other.dressing[baseline].equals(table), baseline
+    rows = frame.head(300)
+    for baseline in (Baseline.B2, Baseline.B2D, Baseline.B3D, Baseline.B4):
+        first_out = predict_baseline(first, rows, baseline)
+        for other in fits[1:]:
+            assert np.array_equal(predict_baseline(other, rows, baseline), first_out, equal_nan=True), baseline
+
+
+# === the ridge ======================================================================================================
+
+
+def test_the_pre_registered_ridge_penalty_is_what_reaches_the_ridge(
+    train: pl.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pre-registration section 5: ridge, alpha 1.0 (on standardized features): pinned at the constructor call."""
+    penalties: list[float] = []
+
+    class SpyRidge(Ridge):
+        def __init__(self, alpha: float) -> None:
+            penalties.append(alpha)
+            super().__init__(alpha)
+
+    monkeypatch.setattr(baselines_module, "Ridge", SpyRidge)
+
+    fit_baselines(train, target=Target.T, pooled=False)
+
+    assert RIDGE_ALPHA == 1.0
+    assert penalties == [1.0]
 
 
 # === inputs =========================================================================================================

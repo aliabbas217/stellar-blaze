@@ -31,6 +31,10 @@ SNAPSHOT_ID_PATTERN: Final = r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$"
 """A snapshot id is a path component: lowercase letters and digits in groups joined by single ``-`` or ``_``."""
 _SNAPSHOT_ID = re.compile(SNAPSHOT_ID_PATTERN)
 MAX_SNAPSHOT_ID_LENGTH: Final = 64
+WINDOWS_RESERVED_NAMES: Final = frozenset(
+    {"con", "prn", "aux", "nul", *(f"com{n}" for n in range(1, 10)), *(f"lpt{n}" for n in range(1, 10))}
+)
+"""Windows device names: a directory of that name cannot be made portably (``replay/con/`` is the console there)."""
 
 
 def check_snapshot_id(value: str) -> str:
@@ -38,8 +42,13 @@ def check_snapshot_id(value: str) -> str:
 
     Raises:
         ValueError: ``value`` is empty, longer than 64 characters or not a lowercase slug (so it could be a path such
-            as ``../x`` or hold a separator).
+            as ``../x`` or hold a separator), or it is a Windows reserved device name (``con``, ``nul``, ``com1``...).
     """
+    if value.casefold() in WINDOWS_RESERVED_NAMES:
+        raise ValueError(
+            f"a snapshot id must not be a Windows reserved device name ({', '.join(sorted(WINDOWS_RESERVED_NAMES))}), "
+            f"got {value!r}"
+        )
     if len(value) > MAX_SNAPSHOT_ID_LENGTH or not _SNAPSHOT_ID.fullmatch(value):
         raise ValueError(
             f"a snapshot id must be a lowercase slug of at most {MAX_SNAPSHOT_ID_LENGTH} characters "
@@ -93,7 +102,8 @@ class ReplaySnapshot(BaseModel):
 
     @model_validator(mode="after")
     def _window_and_files(self) -> Self:
-        held_out = sorted({self.start.astimezone(UTC).year, self.end.astimezone(UTC).year} & HELD_OUT_SUMMERS)
+        years = set(range(self.start.astimezone(UTC).year, self.end.astimezone(UTC).year + 1))
+        held_out = sorted(years & HELD_OUT_SUMMERS)  # every year in between, not only the endpoints
         if held_out:
             raise ValueError(
                 f"the window {self.start.isoformat()} to {self.end.isoformat()} touches held-out year(s) {held_out}"

@@ -44,7 +44,7 @@ from stellar_blaze.domain.forecast.grid import PAIRS
 from stellar_blaze.domain.forecast.schemas import QUANTILE_COLUMNS
 from stellar_blaze.ml.train import TrainedCorrector, model_id
 
-__all__ = ["LIMITATIONS", "MAX_MODEL_BYTES", "render_model_card", "write_model"]
+__all__ = ["LIMITATIONS", "MAX_MODEL_BYTES", "ModelTooLargeError", "render_model_card", "write_model"]
 
 MAX_MODEL_BYTES: Final = 15 * 1024 * 1024
 """A model directory stays at or below this many bytes (global constraints; the image carries the released model)."""
@@ -71,6 +71,71 @@ _PARQUET_LEVEL: Final = 3
 _BOOSTER_SUFFIX: Final = ".txt.gz"
 _MANIFEST: Final = "manifest.json"
 _CARD: Final = "model_card.md"
+
+
+_LARGEST_SHOWN: Final = 5
+
+
+class ModelTooLargeError(ValueError):
+    """A model directory would exceed ``MAX_MODEL_BYTES``; nothing was written.
+
+    Attributes:
+        total_bytes: What the directory would take, manifest included.
+        cap_bytes: The cap in force (``MAX_MODEL_BYTES`` at the time of the call).
+        by_group: Bytes per group, largest first: ``boosters/<target>`` for each target's boosters and ``fold_stats``,
+            ``json_and_card`` (conformal, copula, params, card, manifest) for the rest.
+        files: Every file and its size, largest first.
+    """
+
+    def __init__(
+        self,
+        model_id: str,
+        *,
+        total_bytes: int,
+        cap_bytes: int,
+        by_group: tuple[tuple[str, int], ...],
+        files: tuple[tuple[str, int], ...],
+        remedies: str,
+    ) -> None:
+        self.model_id = model_id
+        self.total_bytes = total_bytes
+        self.cap_bytes = cap_bytes
+        self.by_group = by_group
+        self.files = files
+        groups = ", ".join(f"{name} {size:,}" for name, size in by_group)
+        largest = ", ".join(f"{name} {size:,}" for name, size in files[:_LARGEST_SHOWN])
+        super().__init__(
+            f"model {model_id} would take {total_bytes:,} bytes, over the cap of {cap_bytes:,} "
+            f"({total_bytes - cap_bytes:,} too many). By group: {groups}. Largest files: {largest}. "
+            f"Remedies: {remedies}. Nothing was written."
+        )
+
+
+def _group_of(path: str) -> str:
+    parts = path.split("/")
+    if parts[0] == "boosters":
+        return f"boosters/{parts[1]}"
+    return "fold_stats" if parts[0] == "fold_stats" else "json_and_card"
+
+
+def _too_large(identifier: str, sizes: Mapping[str, int], cap: int, trained: TrainedCorrector) -> ModelTooLargeError:
+    groups: dict[str, int] = {}
+    for path, size in sizes.items():
+        groups[_group_of(path)] = groups.get(_group_of(path), 0) + size
+    lgbm = trained.cfg.lgbm
+    remedies = (
+        f"fewer trees (n_estimators is {lgbm.n_estimators}), num_leaves=7 (it is {lgbm.num_leaves}), "
+        f"the joint WBGT method (wbgt_method is {trained.cfg.wbgt_method!r}; the direct method adds 19 boosters), "
+        "or raising MAX_MODEL_BYTES by a recorded decision"
+    )
+    return ModelTooLargeError(
+        identifier,
+        total_bytes=sum(sizes.values()),
+        cap_bytes=cap,
+        by_group=tuple(sorted(groups.items(), key=lambda item: (-item[1], item[0]))),
+        files=tuple(sorted(sizes.items(), key=lambda item: (-item[1], item[0]))),
+        remedies=remedies,
+    )
 
 
 def _canonical_json(value: object) -> bytes:
@@ -142,7 +207,7 @@ def render_model_card(
             f"- Summers: {', '.join(str(year) for year in trained.summers) or 'none'}",
             f"- Stations: {', '.join(trained.stations) or 'none'}",
             f"- Fit rows: {trained.train_rows}; calibration rows: {trained.cal_rows}; "
-            f"joint WBGT rows rejected: {trained.wbgt_rejected_rows}",
+            f"rows without a usable joint WBGT grid: {trained.wbgt_rejected_rows}",
         ]
     lines += [""]
 
@@ -151,6 +216,11 @@ def render_model_card(
     lines += [
         "- Fit: 15 May to 31 August of each training summer (pre-registration 2.3).",
         f"- Calibration (conformal offsets and copulas): window `{window}`, disjoint in time from the fit.",
+        "- The climatology features are fitted on the fit and calibration rows together, so they are in-sample for "
+        "both sets. A fit row within 7 days of a calibration day reads that day's truth through the climatology, and "
+        "a fit row after a calibration day reads it through the station history (`bias7_*`, which is legal: it uses "
+        "only truth before the issue day). The boosters can therefore move when a calibration-day truth moves; the "
+        "conformal offsets are fitted on the calibration rows' own errors regardless.",
         "- Regime (a): known sites, new summer (final model, all clusters). Regime (c): a new cluster and a new summer "
         "(cold feature set). Regime (b): new cluster, known summers (leave-one-cluster-out on 2024-2025).",
         "- Folds are whole clusters (Abu Dhabi, Dubai/Sharjah, Al Maktoum, Al Ain, Fujairah, Ras Al Khaimah); "
@@ -190,8 +260,12 @@ def render_model_card(
         lines += ["Not recorded in this card (see `conformal.json`).", ""]
     else:
         offsets = trained.offsets
+        first = next(iter(sorted(offsets.n)), None)
+        strata = sorted(offsets.n[first]) if first else []
+        n_leads, n_blocks = len({key.split("|")[0] for key in strata}), len({key.split("|")[1] for key in strata})
         lines += [
-            "Lead x hour-block strata (7 x 3 = 21 per target); n counts rows, not independent days.",
+            f"Lead x hour-block strata ({n_leads} leads x {n_blocks} blocks = {len(strata)} per target); "
+            "n counts rows, not independent days.",
             "",
             "| target | strata | n min | n median | n max | lead-pooled fallbacks | negative offsets |",
             "|---|---|---|---|---|---|---|",
@@ -266,8 +340,9 @@ def write_model(
         ``models_dir / model_id``.
 
     Raises:
-        ValueError: ``created_at`` is naive, a hash or the metrics are malformed, or the directory would exceed
-            ``MAX_MODEL_BYTES``.
+        ModelTooLargeError: The directory would exceed ``MAX_MODEL_BYTES`` (a ``ValueError``; it carries the total,
+            the cap and the sizes per group and per file, and names the remedies).
+        ValueError: ``created_at`` is naive, or a hash or the metrics are malformed.
         FileExistsError: The model directory already exists (a model is never overwritten).
     """
     if created_at.tzinfo is None or created_at.utcoffset() is None:
@@ -324,9 +399,9 @@ def write_model(
     # The card cannot list its own hash: it is rendered from the manifest of the other files, then hashed itself.
     files[_CARD] = render_model_card(manifest_of(files), selection, trained=trained).encode(_TEXT_ENCODING)
     manifest_bytes = _canonical_json(manifest_of(files).model_dump(mode="json"))
-    total = sum(len(data) for data in files.values()) + len(manifest_bytes)
-    if total > MAX_MODEL_BYTES:
-        raise ValueError(f"model {identifier} would take {total} bytes, over the cap of {MAX_MODEL_BYTES}")
+    sizes = {path: len(data) for path, data in files.items()} | {_MANIFEST: len(manifest_bytes)}
+    if sum(sizes.values()) > MAX_MODEL_BYTES:
+        raise _too_large(identifier, sizes, MAX_MODEL_BYTES, trained)
 
     models_dir.mkdir(parents=True, exist_ok=True)
     partial = models_dir / f".{identifier}.partial"
