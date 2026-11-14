@@ -44,8 +44,9 @@ def test_bind_runtime_ids_binds_the_loaded_ruleset_and_model_ids(settings: Setti
     assert bound == {"ruleset_ids": "ae-heat-0.1", "model_ids": f"{FIRST},{SECOND}"}
 
 
-def test_bind_runtime_ids_with_no_models_binds_an_empty_string(settings: Settings) -> None:
-    bind_runtime_ids(build_runtime(settings, today=date(2026, 11, 11)))
+def test_bind_runtime_ids_with_no_models_binds_an_empty_string(settings: Settings, tmp_path: Path) -> None:
+    # An empty models directory: the committed backend/models/ now holds the released corrector (B2 Task 14).
+    bind_runtime_ids(build_runtime(settings.model_copy(update={"models_dir": tmp_path}), today=date(2026, 11, 11)))
     assert structlog.contextvars.get_contextvars() == {"ruleset_ids": "ae-heat-0.1", "model_ids": ""}
 
 

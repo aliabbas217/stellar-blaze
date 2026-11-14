@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -101,10 +102,12 @@ def test_an_empty_directory_is_an_empty_registry(tmp_path: Path) -> None:
         registry.get(FIRST)
 
 
-def test_the_committed_models_directory_is_loadable() -> None:
-    # backend/models/ ships with only .gitkeep until B2 trains a model: still a valid registry, and files are skipped.
+def test_the_committed_models_directory_holds_exactly_the_frozen_model() -> None:
+    # B2 released one model (Task 14): backend/models/ holds exactly the model the protocol lock freezes for the 2026
+    # evaluation, every file hash verified. Releasing another model is a deliberate change of the lock and this test.
+    lock = tomllib.loads((BACKEND_ROOT / "training" / "protocol.lock.toml").read_text(encoding="utf-8"))
     registry = scan_models(BACKEND_ROOT / "models")
-    assert registry.ids() == ()
+    assert registry.ids() == (lock["model_id"],)
 
 
 def test_hidden_directories_and_loose_files_are_ignored(tmp_path: Path) -> None:
