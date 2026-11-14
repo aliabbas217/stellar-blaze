@@ -80,14 +80,17 @@ NO_ZONE: Final = -1
 
 
 def zone_of(twl_eff: F64, edges: ZoneEdges) -> NDArray[np.int8]:
-    """The zone of each effective TWL (W/m2) as an ``int8`` array of the same shape: 0 Low to 3 Red, -1 for NaN."""
+    """The zone of each effective TWL (W/m2) as an ``int8`` array of the same shape: 0 Low to 3 Red, -1 for no value.
+
+    NaN and +/-inf are no value (``NO_ZONE``), as in ``protective_twl``.
+    """
     twl = np.asarray(twl_eff, dtype=np.float64)
     zone = np.select(
         [twl >= edges.low_min, twl >= edges.medium_min, twl >= edges.red_min],
         [int(Zone.LOW), int(Zone.MEDIUM), int(Zone.HIGH)],
         default=int(Zone.RED),
     ).astype(np.int8)
-    zone[np.isnan(twl)] = NO_ZONE
+    zone[~np.isfinite(twl)] = NO_ZONE  # NaN and +/-inf are no value, as in ``protective_twl``
     return zone
 
 
@@ -98,7 +101,7 @@ def hour_levels(twl_eff_samples: F64, edges: ZoneEdges, theta: float) -> NDArray
     tie at ``theta`` escalates. The share is the exact integer ratio, correctly rounded (``3 / 30 == 0.1``): it is the
     ADR's definition, written so that it does not depend on how ``np.quantile`` rounds its rank. With numpy 2.5.4 the
     two agree for every n up to 200 (``tests/unit/risk/test_levels.py``), which is what ADR 0046 section 4 states.
-    NaN samples are not counted at all; an hour with no finite sample has no level (-1).
+    NaN and infinite samples are not counted at all; an hour with no finite sample has no level (-1).
 
     Args:
         twl_eff_samples: Effective TWL in W/m2, shape ``(..., n_samples)``.

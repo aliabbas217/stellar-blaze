@@ -165,23 +165,42 @@ def test_level_equals_q10_zone_at_theta_010(samples: F64) -> None:
     assert levels.tolist() == q10_zones.tolist()
 
 
-def test_level_equals_q10_zone_for_every_sample_count_up_to_200() -> None:
-    """The exact count rule and numpy's ``inverted_cdf`` q10 agree for every n and every number of High samples.
-
-    The controller's supplement expected a float-rounding difference (``30 * 0.1 == 3.0000000000000004``); with numpy
-    2.5.4 there is none, checked here exhaustively for n = 1..200 and k = 0..n samples below the High edge. If a numpy
-    upgrade ever introduces one, this test names the n and k, and ADR 0046 section 4's clamp still keeps the plan at
-    least as protective as the level.
-    """
+def _level_vs_q10_differences(first_n: int, last_n: int) -> list[tuple[int, int, int, int]]:
+    """``(n, k, level, q10 zone)`` for every n in the range and k = 0..n samples below the High edge that disagree."""
     differences = []
-    for n in range(1, 201):
+    for n in range(first_n, last_n + 1):
         for k in range(n + 1):
             row = np.array([100.0] * k + [150.0] * (n - k))[None, :]
             level = int(hour_levels(row, EDGES, 0.10)[0])
             q10_zone = int(zone_of(protective_twl(row), EDGES)[0])
             if level != q10_zone:
                 differences.append((n, k, level, q10_zone))
-    assert differences == []
+    return differences
+
+
+def test_level_equals_q10_zone_for_every_sample_count_up_to_120() -> None:
+    """The exact count rule and numpy's ``inverted_cdf`` q10 agree for every n and every number of High samples.
+
+    The controller's supplement expected a float-rounding difference (``30 * 0.1 == 3.0000000000000004``); with numpy
+    2.5.4 there is none, checked here exhaustively for n = 1..120 and k = 0..n samples below the High edge (the
+    ``slow`` test below goes to 200). If a numpy upgrade ever introduces one, this test names the n and k, and ADR 0046
+    section 4's clamp still keeps the plan at least as protective as the level.
+    """
+    assert _level_vs_q10_differences(1, 120) == []
+
+
+@pytest.mark.slow
+def test_level_equals_q10_zone_for_every_sample_count_up_to_200() -> None:
+    assert _level_vs_q10_differences(121, 200) == []
+
+
+@pytest.mark.parametrize("bad", [float("inf"), float("-inf"), float("nan")])
+def test_non_finite_samples_have_no_zone_and_are_not_counted(bad: float) -> None:
+    assert zone_of(np.array([bad, 150.0, 100.0]), EDGES).tolist() == [-1, 0, 2]
+    row = np.array([[bad, 100.0, 150.0, 150.0]])
+    assert hour_levels(row, EDGES, 0.10).tolist() == [2]  # 1 of 3 finite samples is High: 0.33 >= 0.10
+    assert hour_levels(np.array([[bad, bad]]), EDGES, 0.10).tolist() == [-1]  # no finite sample: no level
+    assert math.isnan(protective_twl(np.array([[bad, bad]]))[0])
 
 
 def test_protective_twl_is_the_inverted_cdf_q10_of_the_finite_samples() -> None:

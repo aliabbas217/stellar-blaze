@@ -312,3 +312,112 @@ def test_protective_twl_series_survives_with_zones() -> None:
     assert changed.start_utc == timeline.start_utc
     with pytest.raises(ValueError, match="one zone per tick"):
         timeline.with_zones(stops[:10])
+
+
+def _labels_without(*hours: int, first: int = 2, last: int = 15) -> np.ndarray:
+    return np.array(
+        [f"2026-07-01T{h:02d}:00" for h in range(first, last + 1) if h not in hours], dtype="datetime64[us]"
+    )
+
+
+def _timeline_with_labels(labels: np.ndarray, twl: float = 150.0) -> ZoneTimeline:
+    return zone_timeline(
+        local_date=DAY,
+        tz=DUBAI,
+        labels_utc=labels,
+        protective_twl_eff=np.full(labels.size, twl),
+        hour_level_zones=None,
+        edges=EDGES,
+    )
+
+
+def _assert_high_fallback(timeline: ZoneTimeline, first: str, last: str) -> None:
+    span = range(_tick_index(first), _tick_index(last) + 1)
+    assert all(timeline.zones[i] == Zone.HIGH and timeline.fallback[i] for i in span), (first, last)
+    assert all(math.isnan(timeline.protective_twl_w_m2[i]) for i in span)
+
+
+def test_a_removed_hourly_label_is_a_gap_not_a_bridge() -> None:
+    # Review I1: labels 06Z, 07Z, 09Z (08Z removed, not NaN). The ticks strictly between 07Z and 09Z used to be
+    # interpolated (Low, no fallback); a missing hour must be High + fallback. The labelled ticks stay as they were.
+    timeline = _timeline_with_labels(_labels_without(8))
+    _assert_high_fallback(timeline, "2026-07-01T07:05", "2026-07-01T08:55")
+    for stamp in ("2026-07-01T07:00", "2026-07-01T09:00", "2026-07-01T09:30"):
+        assert timeline.zones[_tick_index(stamp)] == Zone.LOW
+        assert not timeline.fallback[_tick_index(stamp)]
+
+
+def test_two_removed_labels_are_one_gap() -> None:
+    timeline = _timeline_with_labels(_labels_without(8, 9))
+    _assert_high_fallback(timeline, "2026-07-01T07:05", "2026-07-01T09:55")
+    assert not timeline.fallback[_tick_index("2026-07-01T07:00")]
+    assert not timeline.fallback[_tick_index("2026-07-01T10:00")]
+
+
+def test_two_separate_removed_labels_are_two_gaps() -> None:
+    timeline = _timeline_with_labels(_labels_without(6, 10))
+    _assert_high_fallback(timeline, "2026-07-01T05:05", "2026-07-01T06:55")
+    _assert_high_fallback(timeline, "2026-07-01T09:05", "2026-07-01T10:55")
+    assert not any(timeline.fallback[_tick_index("2026-07-01T07:00") : _tick_index("2026-07-01T09:00") + 1])
+
+
+def test_a_removed_first_or_last_label_shortens_the_labelled_range() -> None:
+    first_gone = _timeline_with_labels(_labels_without(2))
+    _assert_high_fallback(first_gone, "2026-07-01T00:00", "2026-07-01T02:55")
+    assert not first_gone.fallback[_tick_index("2026-07-01T03:00")]
+    last_gone = _timeline_with_labels(_labels_without(15))
+    assert not last_gone.fallback[_tick_index("2026-07-01T14:00")]
+    _assert_high_fallback(last_gone, "2026-07-01T14:05", "2026-07-01T17:55")
+
+
+def test_a_nan_label_is_still_a_gap_and_contiguous_labels_still_interpolate() -> None:
+    twl = np.full(14, 150.0)
+    twl[5] = NAN  # 07Z
+    timeline = zone_timeline(
+        local_date=DAY,
+        tz=DUBAI,
+        labels_utc=_hourly_labels(),
+        protective_twl_eff=twl,
+        hour_level_zones=None,
+        edges=EDGES,
+    )
+    _assert_high_fallback(timeline, "2026-07-01T06:05", "2026-07-01T07:55")
+    ticks = np.array(["2026-07-01T09:30"], dtype="datetime64[us]")
+    assert interpolate_hourly(_hourly_labels(), np.arange(100.0, 114.0), ticks).tolist() == [pytest.approx(107.5)]
+
+
+def test_interpolate_hourly_gap_gives_nan_between_but_not_on_the_labels() -> None:
+    labels = _labels_without(8, first=6, last=10)  # 06Z 07Z 09Z 10Z
+    values = np.array([100.0, 110.0, 130.0, 140.0])
+    stamps = ["2026-07-01T06:30", "2026-07-01T07:00", "2026-07-01T07:30", "2026-07-01T08:00", "2026-07-01T09:00"]
+    out = interpolate_hourly(labels, values, np.array(stamps, dtype="datetime64[us]"))
+    assert out[0] == pytest.approx(105.0)
+    assert out[1] == 110.0  # exactly on a label that exists
+    assert math.isnan(out[2])
+    assert math.isnan(out[3])
+    assert out[4] == 130.0
+
+
+def test_interpolate_hourly_treats_infinity_as_no_value_without_a_warning() -> None:
+    # filterwarnings = error: an inf - inf or inf * 0 in the blend would raise a RuntimeWarning here.
+    labels = _hourly_labels(2, 5)
+    values = np.array([100.0, np.inf, 120.0, -np.inf])
+    stamps = ["2026-07-01T02:30", "2026-07-01T03:00", "2026-07-01T03:30", "2026-07-01T04:30", "2026-07-01T05:00"]
+    out = interpolate_hourly(labels, values, np.array(stamps, dtype="datetime64[us]"))
+    assert np.isnan(out).all()
+
+
+@pytest.mark.parametrize(
+    ("day", "start_utc"),
+    [
+        (date(2026, 3, 28), "2026-03-28T03:00"),  # CET, UTC+1
+        (date(2026, 3, 29), "2026-03-29T02:00"),  # the clocks went forward at 02:00 local: CEST, UTC+2
+        (date(2026, 10, 24), "2026-10-24T02:00"),  # CEST
+        (date(2026, 10, 25), "2026-10-25T03:00"),  # the clocks went back at 03:00 local: CET, UTC+1
+    ],
+)
+def test_tick_grid_on_daylight_saving_days_starts_at_local_four(day: date, start_utc: str) -> None:
+    ticks = day_ticks(day, ZoneInfo("Europe/Madrid"))
+    assert ticks[0] == _t(start_utc)  # 04:00 local, converted with zoneinfo and not a fixed offset
+    assert ticks.shape == (216,)
+    assert (np.diff(ticks) == np.timedelta64(5, "m")).all()  # equally spaced in UTC (documented in the module)

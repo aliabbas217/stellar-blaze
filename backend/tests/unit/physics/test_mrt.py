@@ -75,7 +75,7 @@ def _thermofeel_globe_mrt(vector: tuple[str, float, float, float, float, float, 
     speed_2m = calculate_wind_speed_2m_liljegren(va, cz, _arr(sw))
     rh_fraction = relative_humidity_pct(_arr(t), _arr(td)) / 100.0
     globe_c = solve_globe(_arr(t + KELVIN), rh_fraction, _arr(pressure), speed_2m, _arr(sw), fdir, cz)
-    mrt_k = calculate_mrt_from_bgt(_arr(t + KELVIN), globe_c + KELVIN, _arr(wind))
+    mrt_k = calculate_mrt_from_bgt(_arr(t + KELVIN), globe_c + KELVIN, va)  # the same 0.62 floor as the globe
     return float(globe_c[0]), float(mrt_k[0] - KELVIN)
 
 
@@ -207,3 +207,22 @@ def test_mrt_is_above_the_globe_when_the_globe_is_above_the_air() -> None:
     # an MRT above the globe.
     mrt = mrt_from_globe_c(t_c=_arr(40.0), globe_c=_arr(55.0), wind10m_ms=_arr(2.0))
     assert mrt[0] > 55.0
+
+
+@pytest.mark.parametrize("wind", [0.0, 0.1, 0.3, 0.5, 0.61])
+def test_mrt_floors_the_wind_like_the_globe_solve(wind: float) -> None:
+    # thermofeel's MRT term grows with wind ** 0.6; unfloored, calm air collapsed the MRT onto the globe temperature.
+    floor = 0.62
+    globe = _arr(57.0)
+    calm = mrt_from_globe_c(t_c=_arr(44.0), globe_c=globe, wind10m_ms=_arr(wind))
+    floored = mrt_from_globe_c(t_c=_arr(44.0), globe_c=globe, wind10m_ms=_arr(floor))
+    assert calm[0] == floored[0]
+    assert calm[0] > 57.0  # the globe is above the air, so the MRT is above the globe, also in calm air
+
+
+def test_mrt_is_flat_below_the_floor_and_nan_wind_stays_nan() -> None:
+    winds = np.round(np.arange(0.0, 3.0001, 0.05), 2)
+    mrt = mrt_from_globe_c(t_c=np.full(winds.shape, 44.0), globe_c=np.full(winds.shape, 57.0), wind10m_ms=winds)
+    assert (mrt[winds <= 0.62] == mrt[winds <= 0.62][0]).all()  # no collapse onto the globe temperature in calm air
+    assert (np.diff(mrt) >= 0.0).all()  # above the floor the conversion term grows with wind ** 0.6
+    assert np.isnan(mrt_from_globe_c(t_c=_arr(44.0), globe_c=_arr(57.0), wind10m_ms=_arr(np.nan))[0])

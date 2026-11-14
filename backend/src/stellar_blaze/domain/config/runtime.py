@@ -300,9 +300,8 @@ def validate_runtime_config(
     be loaded and found by id (audit replay through ``RulesetCatalog.resolve`` never calls ``resolve_effective``), but
     pinning it fails with one ``unknown-tunable`` ("has no default in ruleset") violation per missing tunable. The
     model must be in the registry, and the tunables must resolve against the pinned ruleset, or against the one in
-    force today when there is no pin. A floor
-    violation's path is ``ruleset_pin.<floor path>``; a tunable's is ``ruleset_pin.tunables.<name>`` plus ``.min``,
-    ``.max`` or ``.default``.
+    force today when there is no pin. A floor violation's path is ``ruleset_pin.<floor path>``; a tunable's is
+    ``ruleset_pin.tunables.<name>`` plus ``.min``, ``.max`` or ``.default``.
 
     Raises:
         NoRulesetError: There is no pin and no ruleset is in force today. That is a gap in the catalog, not a config

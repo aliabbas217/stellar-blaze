@@ -36,3 +36,17 @@ Intl), 2025-07-01 00:00:00 to 2025-07-02 23:00:00 UTC (58 rows, all 329 columns,
 - Content worth knowing: the dew point at 2025-07-01T12:00:00 and 14:00:00 carries quality code `2` (suspect) and the
   rows are kept; blank quality codes are real nulls in this parquet (not empty strings); no numeric sentinel for a
   missing value occurs in the five station-years inspected (OMAA 2025 and 2026, OMDB 2025, OMFJ 2024, OMRK 2025).
+
+## `risk/personal_level_vectors.json`
+
+Reference vectors for the personal level (ADR 0049): 46 exceedance cases (`exceedance_3q`) and 14 band cases
+(`band_level`), `format_version` 1. They are generated, not recorded: the Python implementation in
+`stellar_blaze.domain.risk.personal` is the source and the frontend's `personal.ts` (F2) must reproduce every vector,
+so the file is the parity contract between the two. F2 consumes it as a test fixture.
+
+- Generate: `uv run python -m stellar_blaze.domain.risk.personal --write-vectors <path>` (from `backend/`; the committed
+  file is `tests/fixtures/risk/personal_level_vectors.json`). `test_vectors_file_matches_functions` in `tests/unit/risk/test_personal_parity.py` fails if the
+  committed file differs from what the generator writes.
+- Format: documented in the `stellar_blaze.domain.risk.personal` module docstring (`format_version` is bumped when the
+  shape changes).
+- Re-generate only with the code change that moves a vector, and say so in the commit.

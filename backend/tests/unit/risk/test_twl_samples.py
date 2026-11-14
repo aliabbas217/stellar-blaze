@@ -183,3 +183,43 @@ def test_a_hotter_sample_is_never_more_sustainable() -> None:
     samples = np.array([[[t, 20.0, 2.0] for t in (34.0, 38.0, 42.0, 46.0)]], dtype=np.float64)
     got = twl_sample_matrix(samples, lat=OMAA_LAT, lon=OMAA_LON, **_frame(samples))
     assert (np.diff(got[0]) <= 0.0).all()
+
+
+@pytest.mark.parametrize(
+    ("t", "td", "sw", "direct"),
+    [(36.0, 12.0, 500.0, 350.0), (40.0, 20.0, 800.0, 600.0), (44.0, 18.0, 900.0, 700.0), (33.0, 25.0, 300.0, 120.0)],
+)
+def test_twl_never_rises_as_the_wind_falls(t: float, td: float, sw: float, direct: float) -> None:
+    """Calm air is never milder than a light breeze (review C1): the MRT wind is floored like the globe wind.
+
+    Before the floor was shared, TWL at 10 m wind 0.0 / 0.1 / 0.3 / 0.5 / 0.62 / 1.0 m/s read 139 / 119 / 101 / 122 /
+    129 / 158 W/m2 for T 36, Td 12, sw 500: non-monotone, with calm air milder than breezy air.
+    """
+    winds = np.round(np.arange(0.0, 3.0001, 0.05), 2)
+    samples = np.array([[[t, td, w] for w in winds]], dtype=np.float64)
+    frame = _Frame(
+        sw_wm2=np.array([sw]),
+        direct_wm2=np.array([direct]),
+        pressure_hpa=np.array([1000.0]),
+        valid_time_utc=np.array(["2026-07-01T05:00"], dtype="datetime64[us]"),
+    )
+    got = twl_sample_matrix(samples, lat=OMAA_LAT, lon=OMAA_LON, **frame)[0]
+    assert np.isfinite(got).all()
+    steps = np.diff(got)  # winds ascend: a negative step is TWL rising as the wind falls
+    calm = winds[1:] <= 1.95
+    assert (steps[calm] >= 0.0).all(), "TWL rose as the wind fell below 2 m/s"
+    # thermofeel's Liljegren solve switches stability class at 2.0 m/s: a known upstream step of the globe (about 0.3 C,
+    # 1 to 2 W/m2 of TWL, inside the 7 W/m2 margin). It is the only allowed exception across the whole 0-3 m/s sweep.
+    assert (steps >= -2.0).all(), "TWL rose by more than the 2.0 m/s class step as the wind fell"
+
+
+def test_calm_air_twl_is_at_most_the_floor_wind_twl_with_the_sun_up() -> None:
+    samples = np.array([[[36.0, 12.0, 0.0], [36.0, 12.0, 0.62]]], dtype=np.float64)
+    frame = _Frame(
+        sw_wm2=np.array([500.0]),
+        direct_wm2=np.array([350.0]),
+        pressure_hpa=np.array([1000.0]),
+        valid_time_utc=np.array(["2026-07-01T05:00"], dtype="datetime64[us]"),
+    )
+    got = twl_sample_matrix(samples, lat=OMAA_LAT, lon=OMAA_LON, **frame)[0]
+    assert got[0] <= got[1]

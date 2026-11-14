@@ -372,10 +372,15 @@ def mrt_from_globe_c(*, t_c: F64, globe_c: F64, wind10m_ms: F64) -> F64:
     and returns kelvin. NaN in any argument gives NaN, as does an element whose fourth-root argument would be negative.
     The arguments broadcast against each other.
 
+    The wind is floored at ``MIN_WIND_10M`` (0.62 m/s) exactly as ``globe_temperature_c`` floors it for the globe solve.
+    thermofeel's conversion term grows with ``wind ** 0.6``, so an unfloored calm wind would collapse the MRT onto the
+    globe temperature (the least conservative MRT, and inconsistent with the globe it was solved for): TWL would read
+    milder in calm air than in a light breeze. With the floor the MRT, and so the TWL, never rises as the wind falls.
+
     Args:
         t_c: Air temperature in degrees Celsius.
         globe_c: Globe temperature in degrees Celsius (``globe_temperature_c``).
-        wind10m_ms: Wind speed at 10 m in m/s.
+        wind10m_ms: Wind speed at 10 m in m/s (floored at 0.62 m/s here).
 
     Raises:
         ValueError: A wind speed is negative.
@@ -387,6 +392,8 @@ def mrt_from_globe_c(*, t_c: F64, globe_c: F64, wind10m_ms: F64) -> F64:
     valid = np.isfinite(t) & np.isfinite(globe) & np.isfinite(wind)
     if valid.any():
         with np.errstate(invalid="ignore"):
-            mrt_k = calculate_mrt_from_bgt(t[valid] + _KELVIN_OFFSET, globe[valid] + _KELVIN_OFFSET, wind[valid])
+            mrt_k = calculate_mrt_from_bgt(
+                t[valid] + _KELVIN_OFFSET, globe[valid] + _KELVIN_OFFSET, np.maximum(wind[valid], MIN_WIND_10M)
+            )
         mrt_c[valid] = np.asarray(mrt_k, dtype=np.float64) - _KELVIN_OFFSET
     return mrt_c

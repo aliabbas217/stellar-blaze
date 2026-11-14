@@ -61,13 +61,16 @@ def interpolate_hourly(labels_utc: TickTimes, values: F64, ticks_utc: TickTimes)
     """Linear interpolation of per-label ``values`` to ``ticks_utc``; NaN outside ``[labels[0], labels[-1]]``.
 
     A tick exactly on a label gets that label's value (NaN if the label is NaN), even when the next label is NaN. A tick
-    strictly between two labels is NaN unless both are finite ("across a NaN label").
+    strictly between two labels is NaN unless both are finite ("across a NaN label") AND the two labels are exactly one
+    hour apart: a larger span means an hourly label is missing, and a missing hour is never bridged with a milder value
+    (a gap gives NaN, which ``zone_timeline`` turns into ``HIGH`` with ``fallback``). Infinite values count as NaN.
 
     Raises:
         ValueError: ``labels_utc`` is not strictly increasing or does not match ``values`` in length.
     """
     labels = np.asarray(labels_utc).astype("datetime64[us]").astype(np.int64)
     vals = np.asarray(values, dtype=np.float64)
+    vals = np.where(np.isfinite(vals), vals, np.nan)  # +/-inf is no value, like NaN
     ticks = np.asarray(ticks_utc).astype("datetime64[us]").astype(np.int64)
     if vals.shape != labels.shape or labels.ndim != 1:
         raise ValueError(f"values must have one value per label, got {vals.shape} for {labels.shape} labels")
@@ -84,6 +87,7 @@ def interpolate_hourly(labels_utc: TickTimes, values: F64, ticks_utc: TickTimes)
     on_label = offset == 0.0
     weight = np.divide(offset, span, out=np.zeros_like(offset), where=span > 0.0)
     blended = vals[lower] + weight * (vals[upper] - vals[lower])  # NaN if either label is NaN
+    blended = np.where(span == _HOUR_US, blended, np.nan)  # a span of more than one hour is a missing label
     out[inside] = np.where(on_label, vals[lower], blended)[inside]
     return out
 
