@@ -696,8 +696,8 @@ def evaluate_2026_command(
         str | None,
         typer.Option(
             "--amendment",
-            help="The id of the pre-registration section 13 amendment-log row that allows a re-run of a part that "
-            "has a result; the first output is kept as *.run1.json.",
+            help="One of the lock's amendments (amendment-1, amendment-2, ... by the order of its [[amendments]]) that "
+            "allows a re-run of a part that has a result; the first output is kept as *.run1.json.",
         ),
     ] = None,
 ) -> None:
@@ -709,7 +709,9 @@ def evaluate_2026_command(
     and ``artifacts/eval/2026/`` is written with exclusive create, after a last check that HEAD has not moved and the
     tree is clean. Runs as the job ``evaluate-2026:<part>`` (a ``job_run`` row, one advisory lock per part). Parts
     ``warnings`` and ``plans`` are implemented in B3 (exit 2); ``all`` runs the parts that exist. Exit codes: 0 done or
-    skipped (locked), 1 failed, 2 refused by the gate or bad usage.
+    skipped (locked, with a message: nothing ran, so it is not a success) is exit 1, 1 failed, 2 refused by the gate or
+    bad usage. A relative ``SB_MODELS_DIR``/``SB_DATA_DIR`` is read against ``<repository>/backend``, and a missing
+    models directory is refused before the gate reads anything.
     """
     from stellar_blaze.jobs import evaluate_2026
     from stellar_blaze.jobs.replay_build import repo_root
@@ -728,8 +730,12 @@ def evaluate_2026_command(
         later = [item.value for item in Part if item not in evaluate_2026.PART_RUNNERS]
         typer.echo(f"evaluate-2026 --part all: {', '.join(later)} implemented in B3, not run", err=True)
     note = amendment.strip() if amendment else None
-    settings = _settings()
     root = repo_root()
+    try:
+        settings = evaluate_2026.resolve_settings(_settings(), root)
+    except ValueError as exc:
+        typer.echo(f"evaluate-2026: {exc}", err=True)
+        raise typer.Exit(2) from None
     for item in wanted:
         _evaluate_2026_part(settings, root, item, note)
 
@@ -767,5 +773,8 @@ def _evaluate_2026_part(settings: Settings, root: Path, part: "Part", amendment:
         raise typer.Exit(2)
     if outcome:
         typer.echo(json.dumps(outcome[0], sort_keys=True))
+    elif code == 0:  # run_job skipped the run (another process holds the lock): nothing was scored or written
+        typer.echo(f"{job}: skipped, another run holds the lock (nothing was scored or written)", err=True)
+        raise typer.Exit(1)
     if code != 0:
         raise typer.Exit(code)

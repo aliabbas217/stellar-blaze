@@ -6,6 +6,7 @@ written with ``write_model``, and the gate token is minted by ``open_gate`` agai
 lock, go marker and models directory (``tests/fixtures/forecast/gated.py``).
 """
 
+import inspect
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -21,7 +22,8 @@ from pydantic import JsonValue
 from stellar_blaze.domain.forecast.features import FeatureSet, Target, build_features, history_features
 from stellar_blaze.domain.forecast.grid import LEVELS
 from stellar_blaze.domain.weather.models import NwpModel
-from stellar_blaze.ml.evaluate import BRIER_THRESHOLDS_C
+from stellar_blaze.ml.bootstrap import DEFAULT_SEED, block_bootstrap, paired_block_bootstrap
+from stellar_blaze.ml.forecast_tables import SERIES_REFERENCE_COLUMNS
 from stellar_blaze.ml.forecast_test import B_ALL_NOT_RUN, ForecastTestResult, evaluate_forecast_test
 from stellar_blaze.ml.metrics import PREREGISTERED_RELIABILITY_EDGES
 from stellar_blaze.ml.predict import corrected_grids
@@ -29,6 +31,7 @@ from stellar_blaze.ml.protocol_gate import GateToken, Part
 from stellar_blaze.ml.serving_path import cold_config, correct_with_released_model, released_training_config
 from tests.fixtures.forecast.dev_run import CLUSTERS
 from tests.fixtures.forecast.gated import DEV_EDGES, GatedWorld, released, synthetic_test_pairs, with_aifs
+from tests.fixtures.forecast.skill_keys import BASELINES, REQUIRED_SKILL_COLUMNS
 
 pytestmark = pytest.mark.unit
 
@@ -98,24 +101,8 @@ def evaluated(tmp_path_factory: pytest.TempPathFactory) -> Evaluated:
 
 # === the 7.1 content ================================================================================================
 
-_MODELS = ("corrector", "b0", "b0d", "b2d", "b3d", "b4")
-_BASELINES = ("b0", "b0d", "b2d", "b3d", "b4")
-_REQUIRED_COLUMNS = {
-    "target",
-    "lead_days",
-    "hour_block",
-    "n_rows",
-    "n_days",
-    "n_no_truth",
-    "n_no_forecast",
-    *(f"{metric}_{model}" for model in _MODELS for metric in ("crps", "mae", "rmse", "bias")),
-    *("pinball_05", "pinball_50", "pinball_95", "is_90", "is_80", "cov_90", "cov_80", "cov_50"),
-    *(f"pit_{i:02d}" for i in range(10)),
-    *(f"events_{t:.0f}" for t in BRIER_THRESHOLDS_C),
-    *(f"brier_{name}_{t:.0f}" for t in BRIER_THRESHOLDS_C for name in ("c", "b2d", "clim")),
-    *(f"bss_{pair}_{t:.0f}" for t in BRIER_THRESHOLDS_C for pair in ("c_clim", "c_b2d", "b2d_clim")),
-    *(f"crps_diff_{b}{suffix}" for b in _BASELINES for suffix in ("", "_lo", "_hi")),
-}
+_BASELINES = BASELINES
+_REQUIRED_COLUMNS = REQUIRED_SKILL_COLUMNS
 
 
 @pytest.mark.slow
@@ -274,6 +261,9 @@ def test_the_omaa_series_has_the_corrected_grids_the_raw_forecast_and_the_truth(
     for target in Target:
         assert series[f"grid_{target.value}"].dtype == pl.Array(pl.Float64, len(LEVELS))
     assert series.select(f"raw_{t.value}" for t in Target).width == 4
+    gold = omaa.sort("valid_time", "lead_days")  # the gold truths, flags and lead-0 reference ride along unchanged
+    for name in SERIES_REFERENCE_COLUMNS:
+        np.testing.assert_array_equal(series[name].to_numpy(), gold[name].to_numpy(), err_msg=name)  # NaN equals NaN
     t_grid = series.filter(pl.col("grid_t").is_not_null())
     assert t_grid.height > 0
     grids = np.asarray(t_grid["grid_t"].to_list())
@@ -322,6 +312,30 @@ def test_the_serving_path_reproduces_the_offline_predictor_for_t_td_and_wind() -
         assert np.isnan(served.grids[target][~present]).all()  # missing input is never a number
     assert served.statuses["t:ok"] == int(present.sum())
     assert served.statuses["t:missing_input"] == int((~present).sum())
+
+
+@pytest.mark.slow
+def test_the_serving_path_wbgt_agrees_statistically_with_the_offline_predictor() -> None:
+    """WBGT, the headline variable, comes from joint draws (radiation, pressure and coordinates all enter the solver).
+
+    The draws differ between the two paths, so the check is statistical: the quantile medians agree within 0.4 degrees
+    C on average and the finite rows are the same. A swapped radiation or coordinate column of the serving frame
+    (``serving_path._FORECAST_COLUMNS``) moves the WBGT median by far more.
+    """
+    model = released()
+    test = synthetic_test_pairs().filter(pl.col("summer") == 2026)
+    served = correct_with_released_model(model.model, test)
+    features = build_features(
+        test, feature_set=FeatureSet.SITE, stats=model.trained.stats, history=history_features(test)
+    )
+    offline = corrected_grids(model.trained, features)
+    median = LEVELS.index(0.5)
+    serving_wbgt, offline_wbgt = served.grids[Target.WBGT], offline[Target.WBGT]
+    serving_finite, offline_finite = np.isfinite(serving_wbgt).all(axis=1), np.isfinite(offline_wbgt).all(axis=1)
+    np.testing.assert_array_equal(serving_finite, offline_finite)
+    assert serving_finite.sum() > 100
+    difference = np.abs(serving_wbgt[serving_finite, median] - offline_wbgt[offline_finite, median])
+    assert difference.mean() < 0.4, f"mean |median difference| {difference.mean():.3f} degrees C"
 
 
 @pytest.mark.slow
@@ -425,3 +439,178 @@ def make_four_leads(pairs: pl.DataFrame) -> pl.DataFrame:
     """The frame plus IFS rows of lead 4 (the fixture's model leads are 1-3): copies of the lead-3 rows."""
     extra = pairs.filter(pl.col("lead_days") == 3).with_columns(pl.lit(4, dtype=pl.Int8).alias("lead_days"))
     return pl.concat([pairs, extra])
+
+
+# === the pre-registered bootstrap (section 8) =======================================================================
+
+PREREGISTERED_BOOTSTRAP = {"block_days": 7, "n_boot": 2000, "seed": 20261112, "interval": "95% percentile"}
+"""Pre-registration section 8, written out here on purpose: the code derives these from its own defaults."""
+
+
+def test_the_default_replicate_count_and_the_bootstrap_defaults_are_the_preregistered_ones() -> None:
+    forecast = inspect.signature(evaluate_forecast_test).parameters["n_boot"].default
+    assert forecast == PREREGISTERED_BOOTSTRAP["n_boot"]
+    for function in (block_bootstrap, paired_block_bootstrap):
+        defaults = {name: p.default for name, p in inspect.signature(function).parameters.items()}
+        assert defaults["n_boot"] == forecast
+        assert defaults["block_days"] == PREREGISTERED_BOOTSTRAP["block_days"]
+        assert defaults["seed"] == PREREGISTERED_BOOTSTRAP["seed"] == DEFAULT_SEED
+        assert defaults["confidence_level"] == 0.95
+
+
+@pytest.mark.slow
+def test_the_output_reports_the_bootstrap_that_the_skill_tables_actually_ran(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ``bootstrap`` block is the pre-registered one, and every interval was drawn with exactly those settings."""
+    calls: list[dict[str, Any]] = []
+    real = paired_block_bootstrap
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr("stellar_blaze.ml.evaluate.paired_block_bootstrap", spy)
+    _, token = mint(tmp_path)
+    model = released().model
+    result = evaluate_forecast_test(  # n_boot left at its default: the pre-registered 2,000
+        synthetic_test_pairs(),
+        model=model,
+        cold_cfg=cold_config(released_training_config(model)[0]),
+        token=token,
+        dev_tercile_edges=DEV_EDGES,
+        clusters=CLUSTERS[:1],
+    )
+
+    assert result.skill["bootstrap"] == PREREGISTERED_BOOTSTRAP
+    assert calls
+    assert {call["n_boot"] for call in calls} == {2000}
+    assert {call["seed"] for call in calls} == {20261112}
+    assert all("block_days" not in call and "confidence_level" not in call for call in calls)  # the defaults rule
+
+
+# === missing inputs with the real (cold) released model =============================================================
+
+_HOLE_INPUTS = ("fc_pressure_hpa", "fc_sw_wm2", "fc_direct_wm2")  # each nulled on its own rows of the 2026 IFS rows
+_HOLE_STRIDES = (53, 47, 59)
+
+
+@dataclass(frozen=True)
+class ColdEvaluated:
+    pairs: pl.DataFrame
+    result: ForecastTestResult
+    ifs_rows: int
+    hole_rows: int
+
+
+def _with_missing_inputs(pairs: pl.DataFrame) -> pl.DataFrame:
+    """The 2026 IFS rows with pressure, shortwave and direct radiation null on different rows (a real feed has gaps)."""
+    test_ifs = (pl.col("model") == _IFS) & (pl.col("summer") == 2026)
+    return pairs.with_columns(
+        [
+            pl.when(test_ifs & (pl.int_range(pl.len()) % stride == 0)).then(None).otherwise(pl.col(name)).alias(name)
+            for name, stride in zip(_HOLE_INPUTS, _HOLE_STRIDES, strict=True)
+        ]
+    )
+
+
+@pytest.fixture(scope="module")
+def cold_evaluated(tmp_path_factory: pytest.TempPathFactory) -> ColdEvaluated:
+    """The released model is ``cold`` (as the real one), scored on 2026 rows some of which lack IFS inputs."""
+    cold = released(FeatureSet.COLD)
+    assert released_training_config(cold.model)[0].feature_set is FeatureSet.COLD
+    world = GatedWorld(tmp_path_factory.mktemp("cold"), cold.model.manifest.model_id, cold.models_dir)
+    pairs = _with_missing_inputs(synthetic_test_pairs())
+    result = evaluate_forecast_test(
+        pairs,
+        model=cold.model,
+        cold_cfg=cold_config(released_training_config(cold.model)[0]),
+        token=world.token(),
+        dev_tercile_edges=DEV_EDGES,
+        clusters=CLUSTERS,
+        n_boot=N_BOOT,
+    )
+    test_ifs = _ifs(pairs)
+    holes = test_ifs.select(pl.any_horizontal(pl.col(*_HOLE_INPUTS).is_null())).to_series().sum()
+    return ColdEvaluated(pairs, result, test_ifs.height, int(holes))
+
+
+def _cell_sum(result: ForecastTestResult, name: str, target: str, column: str) -> int:
+    """``column`` summed over the leads and the three hour blocks (they partition the rows; ``working`` overlaps)."""
+    rows = table_rows(regime(result, name)["skill"])
+    return int(sum(r[column] for r in rows if r["target"] == target and r["hour_block"] != "working"))
+
+
+@pytest.mark.slow
+def test_rows_with_a_missing_input_are_counted_not_scored_and_the_serving_statuses_say_so(
+    cold_evaluated: ColdEvaluated,
+) -> None:
+    statuses = cold_evaluated.result.skill["serving_statuses"]
+    assert isinstance(statuses, dict)
+    assert cold_evaluated.hole_rows > 0
+    for variable in ("t", "td", "wind", "wbgt"):
+        assert statuses[f"{variable}:missing_input"] == cold_evaluated.hole_rows  # every variable, the same rows
+        assert statuses[f"{variable}:ok"] == cold_evaluated.ifs_rows - cold_evaluated.hole_rows
+    for target in Target:
+        assert _cell_sum(cold_evaluated.result, "a", target.value, "n_no_forecast") > 0
+
+
+@pytest.mark.slow
+def test_in_regime_a_every_model_drops_exactly_the_same_rows(cold_evaluated: ColdEvaluated) -> None:
+    result = cold_evaluated.result
+    # One missing-input row is out of the corrector AND of every baseline, for t, td and wind alike.
+    counts = {t: _cell_sum(result, "a", t, "n_no_forecast") for t in ("t", "td", "wind")}
+    assert len(set(counts.values())) == 1
+    assert 0 < counts["t"] <= cold_evaluated.hole_rows
+    scored = {t: _cell_sum(result, "a", t, "n_rows") for t in ("t", "td", "wind")}
+    assert len(set(scored.values())) == 1
+    # B0 (the raw forecast, finite on those rows) is scored on the corrector's rows only: recompute it from the series.
+    series = cold_evaluated.result.series
+    omaa_lead1 = series.filter(
+        (pl.col("lead_days") == 1)
+        & pl.col("hour_utc").is_between(6, 14)  # the by-station table is the working daytime (UTC 06-14)
+        & pl.col("grid_t").is_not_null()
+        & pl.col("truth_t").is_not_null()
+        & pl.col("raw_t").is_not_null()
+    )
+    row = next(
+        r
+        for r in table_rows(regime(result, "a")["by_station"])
+        if r["target"] == "t" and r["station"] == "OMAA" and r["lead_days"] == 1
+    )
+    assert row["n_rows"] == omaa_lead1.height
+    expected = float(np.abs(omaa_lead1["raw_t"].to_numpy() - omaa_lead1["truth_t"].to_numpy()).mean())
+    assert row["mae_b0"] == pytest.approx(expected, abs=1e-4)
+    assert series.filter(pl.col("raw_t").is_not_null() & pl.col("grid_t").is_null()).height > 0  # raw exists, no grid
+    # ... and without that rule B0 would differ: over the rows the corrector dropped it is another number.
+    raw_only = series.filter(
+        (pl.col("lead_days") == 1)
+        & pl.col("hour_utc").is_between(6, 14)
+        & pl.col("grid_t").is_null()
+        & pl.col("truth_t").is_not_null()
+        & pl.col("raw_t").is_not_null()
+    )
+    assert raw_only.height > 0
+
+
+@pytest.mark.slow
+def test_regime_c_scores_the_rows_regime_a_drops_and_the_output_says_so(cold_evaluated: ColdEvaluated) -> None:
+    """Cold features need no pressure or radiation, so (c) scores more T/Td/wind rows than (a); WBGT needs them all."""
+    result = cold_evaluated.result
+    for target in ("t", "td", "wind"):
+        assert _cell_sum(result, "c", target, "n_no_forecast") == 0
+        assert _cell_sum(result, "c", target, "n_rows") > _cell_sum(result, "a", target, "n_rows")
+    assert _cell_sum(result, "c", "wbgt", "n_rows") == _cell_sum(result, "a", "wbgt", "n_rows")
+    notes = result.skill["notes"]
+    assert isinstance(notes, list)
+    text = " ".join(str(note) for note in notes)
+    for phrase in ("Regime (a)", "all nine inputs", "Regime (c)", "pressure or radiation", "different row sets"):
+        assert phrase in text
+    for name in ("a", "c"):  # the counts sit next to the numbers of each regime
+        payload = regime(result, name)
+        counts = payload["counts"]
+        assert counts["test_rows"] > 0
+        assert sum(counts["rows_by_summer"].values()) == cold_evaluated.ifs_rows
+        columns = payload["skill"]["columns"]
+        assert "n_rows" in columns
+        assert "n_no_forecast" in columns

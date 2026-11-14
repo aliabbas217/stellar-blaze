@@ -16,6 +16,7 @@ from stellar_blaze.domain.forecast.grid import F64, LEVELS
 from stellar_blaze.domain.provenance import Provenance, ProvenanceLabel
 from stellar_blaze.ml.forecast_tables import (
     RELIABILITY_MIN_COUNT,
+    SERIES_REFERENCE_COLUMNS,
     raw_comparison,
     reliability_payload,
     series_frame,
@@ -246,9 +247,25 @@ def _series_inputs() -> tuple[pl.DataFrame, dict[Target, F64], dict[Target, F64]
     return keys, grids, truths
 
 
+def _reference(keys: pl.DataFrame) -> pl.DataFrame:
+    """The gold rows of ``keys`` (same identity columns, row for row) with distinct values in every exported column."""
+    count = keys.height
+    return keys.select("station", "valid_time", "lead_days").with_columns(
+        pl.Series("obs_t_c", [30.5 + i for i in range(count)], dtype=pl.Float64),
+        pl.Series("obs_td_c", [20.5 + i for i in range(count)], dtype=pl.Float64),
+        pl.Series("obs_wind_ms", [3.5 + i for i in range(count)], dtype=pl.Float64),
+        pl.Series("wbgt_obs_c", [29.5 + i for i in range(count)], dtype=pl.Float64),
+        pl.Series("has_joint_obs", [True, False, True][:count], dtype=pl.Boolean),
+        pl.Series("wbgt_obs_reject", [0, 3, 0][:count], dtype=pl.Int8),
+        pl.Series("ref_sw_wm2", [800.0 + i for i in range(count)], dtype=pl.Float64),
+        pl.Series("ref_direct_wm2", [600.0 + i for i in range(count)], dtype=pl.Float64),
+        pl.Series("ref_pressure_hpa", [1000.0 + i for i in range(count)], dtype=pl.Float64),
+    )
+
+
 def test_the_series_is_one_station_one_summer_with_null_for_missing_never_a_number() -> None:
     keys, grids, truths = _series_inputs()
-    frame = series_frame(keys, grids, truths, station="OMAA", summer=2026)
+    frame = series_frame(keys, grids, truths, station="OMAA", summer=2026, reference=_reference(keys))
     assert frame.height == 2
     assert frame["hour_utc"].to_list() == [7, 9]  # sorted by time
     assert frame["grid_t"][0] is None  # no forecast: a null array, not a row of NaN
@@ -258,14 +275,81 @@ def test_the_series_is_one_station_one_summer_with_null_for_missing_never_a_numb
     assert frame["grid_wbgt"].dtype == pl.Array(pl.Float64, 19)
     assert frame.columns[:6] == ["station", "cluster", "valid_time", "summer", "lead_days", "hour_utc"]
     with pytest.raises(ValueError, match="no row of station OMFJ"):
-        series_frame(keys, grids, truths, station="OMFJ", summer=2026)
+        series_frame(keys, grids, truths, station="OMFJ", summer=2026, reference=_reference(keys))
     with pytest.raises(ValueError, match="summer 2025"):
-        series_frame(keys, grids, truths, station="OMAA", summer=2025)
+        series_frame(keys, grids, truths, station="OMAA", summer=2025, reference=_reference(keys))
+
+
+def test_the_series_carries_the_gold_truths_flags_and_lead_zero_reference_even_without_a_forecast() -> None:
+    """B3's truth WBGT needs ``wbgt_obs_c``, ``has_joint_obs``, ``wbgt_obs_reject`` and ``ref_*`` on every row."""
+    keys, grids, truths = _series_inputs()
+    reference = _reference(keys)
+    frame = series_frame(keys, grids, truths, station="OMAA", summer=2026, reference=reference)
+
+    assert set(SERIES_REFERENCE_COLUMNS) == {
+        "obs_t_c",
+        "obs_td_c",
+        "obs_wind_ms",
+        "wbgt_obs_c",
+        "has_joint_obs",
+        "wbgt_obs_reject",
+        "ref_sw_wm2",
+        "ref_direct_wm2",
+        "ref_pressure_hpa",
+    }
+    assert set(SERIES_REFERENCE_COLUMNS) <= set(frame.columns)
+    # keys' rows are OMAA@09 (index 0), OMAA@07 (index 1), OMDB@08; the series is sorted by time: 07 first
+    assert frame["grid_t"][0] is None  # the 07 UTC row has no forecast ...
+    assert frame["truth_wbgt"][0] == 28.0
+    assert frame["wbgt_obs_c"].to_list() == [30.5, 29.5]  # ... and keeps its gold observation, flags and reference
+    assert frame["has_joint_obs"].to_list() == [False, True]
+    assert frame["wbgt_obs_reject"].to_list() == [3, 0]
+    assert frame["ref_sw_wm2"].to_list() == [801.0, 800.0]
+    assert frame["ref_direct_wm2"].to_list() == [601.0, 600.0]
+    assert frame["ref_pressure_hpa"].to_list() == [1001.0, 1000.0]
+    assert frame["obs_t_c"].to_list() == [31.5, 30.5]
+    assert frame["has_joint_obs"].dtype == pl.Boolean
+    assert frame["wbgt_obs_reject"].dtype == pl.Int8
+
+
+def test_the_series_refuses_a_reference_that_is_not_the_rows_of_the_keys() -> None:
+    keys, grids, truths = _series_inputs()
+    shuffled = _reference(keys).reverse()
+    with pytest.raises(ValueError, match="misaligned"):
+        series_frame(keys, grids, truths, station="OMAA", summer=2026, reference=shuffled)
+    with pytest.raises(ValueError, match="misaligned"):
+        series_frame(keys, grids, truths, station="OMAA", summer=2026, reference=_reference(keys).head(2))
+    with pytest.raises(ValueError, match=r"lacks the column\(s\) \['ref_sw_wm2'\]"):
+        series_frame(keys, grids, truths, station="OMAA", summer=2026, reference=_reference(keys).drop("ref_sw_wm2"))
+
+
+def test_a_model_missing_one_lead_does_not_empty_the_other_leads_common_rows() -> None:
+    """AIFS has rows at lead 1 only: at lead 3 IFS and GFS are still compared on their common rows (not scored 0)."""
+    rows = []
+    for lead in (1, 3):
+        for model in ("ecmwf_ifs025", "gfs_seamless", "ecmwf_aifs025_single"):
+            if model == "ecmwf_aifs025_single" and lead == 3:
+                continue
+            rows.append({"model": model, "valid_time": hour(lead), "lead_days": lead, "fc_t_c": 31.0, "obs_t_c": 30.0})
+    result = raw_comparison(_raw_frame(rows)).filter(pl.col("target") == "t")
+
+    cells = {(r["lead_days"], r["model"]): r for r in result.to_dicts()}
+    assert set(cells) == {
+        (1, "ecmwf_ifs025"),
+        (1, "gfs_seamless"),
+        (1, "ecmwf_aifs025_single"),
+        (3, "ecmwf_ifs025"),
+        (3, "gfs_seamless"),
+    }
+    assert cells[(1, "ecmwf_ifs025")]["n_rows"] == 1
+    assert cells[(3, "ecmwf_ifs025")]["n_rows"] == 1  # was 0 with a global model count of 3
+    assert cells[(3, "gfs_seamless")]["n_rows"] == 1
+    assert cells[(3, "ecmwf_ifs025")]["mae"] == pytest.approx(1.0)
 
 
 def test_the_series_parquet_carries_its_provenance_and_the_manifest_hashes_its_bytes() -> None:
     keys, grids, truths = _series_inputs()
-    frame = series_frame(keys, grids, truths, station="OMAA", summer=2026)
+    frame = series_frame(keys, grids, truths, station="OMAA", summer=2026, reference=_reference(keys))
     provenance = Provenance(
         protocol_path="docs/x.md",
         protocol_anchor="#a",

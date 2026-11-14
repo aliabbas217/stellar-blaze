@@ -11,6 +11,7 @@ import pickle
 import re
 import shutil
 import subprocess
+import tomllib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -45,6 +46,7 @@ FREEZE_PATH = "docs/research/freeze.md"
 PROTOCOL_BYTES = b"# Pre-registration\nline two\n"
 FREEZE_BYTES = b"# Freeze addendum\n"
 PROTOCOL_COMMIT = "a" * 40
+GO_PATH = "backend/training/2026-go.toml"
 GOLD_SHA = "7" * 64  # the lock's default pin; loader tests pin the real digest of their synthetic file
 HEAD = "b" * 40
 
@@ -93,8 +95,14 @@ class FakeGit:
             raise GitError(f"{commit}:{path} not found") from None
 
 
+def sha_lf(data: bytes) -> str:
+    """The SHA-256 of ``data`` with CRLF read as LF (how the go marker binds the lock)."""
+    return sha(data.replace(b"\r\n", b"\n"))
+
+
 def go_text(
     *,
+    lock_sha256: str,
     protocol_sha256: str = sha(PROTOCOL_BYTES),
     model_id: str = MODEL_ID,
     approved_by: str = "the architect",
@@ -102,7 +110,7 @@ def go_text(
 ) -> str:
     """The text of a ``2026-go.toml`` marker (the values are written as given, so a test can break one)."""
     return (
-        f'protocol_sha256 = "{protocol_sha256}"\nmodel_id = "{model_id}"\n'
+        f'protocol_sha256 = "{protocol_sha256}"\nmodel_id = "{model_id}"\nlock_sha256 = "{lock_sha256}"\n'
         f'approved_by = "{approved_by}"\napproved_at = {approved_at}\n'
     )
 
@@ -116,16 +124,26 @@ class World:
     models_dir: Path
     git: FakeGit
 
-    def write_go(self, text: str | None = None) -> None:
-        """Write the 2026-go marker (the default text is bound to the default lock)."""
-        self.go_path.write_text(go_text() if text is None else text, encoding="utf-8")
+    def go_text(self, **changes: str) -> str:
+        """A go marker bound to the lock file as it is now; ``changes`` break one value (``go_text``'s keywords)."""
+        return go_text(lock_sha256=sha_lf(self.lock_path.read_bytes()), **changes)
+
+    def write_go(self, text: str | None = None, *, committed: bool = True) -> None:
+        """Write the 2026-go marker (the default text is bound to the current lock) and commit it in the fake git.
+
+        ``committed=False`` leaves HEAD without the marker (or with other bytes: the caller sets those).
+        """
+        data = (self.go_text() if text is None else text).encode("utf-8")
+        self.go_path.write_bytes(data)
+        if committed:
+            self.git.files[(HEAD, GO_PATH)] = data
 
     def write_lock(self, *, amendments: Sequence[tuple[str, str, str]] = (), **changes: str | None) -> None:
         """Rewrite the lock; ``None`` drops a key (TOML has no null); ``amendments`` are (path, sha, commit) triples.
 
-        The go marker is rewritten bound to the new lock (its protocol hash and model id; a lock without a model id
-        keeps the default one), so a test that changes the lock breaks one thing only. A go test rewrites the marker
-        afterwards.
+        The go marker is rewritten (and committed in the fake git) bound to the new lock (its protocol hash, model id
+        and lock hash; a lock without a model id keeps the default one), so a test that changes the lock breaks one
+        thing only. A go test rewrites the marker afterwards.
         """
         values: dict[str, str | None] = {
             "protocol_path": PROTOCOL_PATH,
@@ -141,7 +159,9 @@ class World:
         for path, digest, commit in amendments:
             lines += ["", "[[amendments]]", f'path = "{path}"', f'sha256 = "{digest}"', f'commit = "{commit}"']
         self.lock_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        self.write_go(go_text(protocol_sha256=values["protocol_sha256"] or "", model_id=values["model_id"] or MODEL_ID))
+        self.write_go(
+            self.go_text(protocol_sha256=values["protocol_sha256"] or "", model_id=values["model_id"] or MODEL_ID)
+        )
 
     def add_amendment(
         self,
@@ -273,19 +293,38 @@ def _unparsable_go_marker(w: World) -> None:
 
 
 def _go_marker_with_a_naive_time(w: World) -> None:
-    w.write_go(go_text(approved_at="2026-11-15T09:30:00"))  # a TOML local date-time: no offset, so not AwareDatetime
+    w.write_go(w.go_text(approved_at="2026-11-15T09:30:00"))  # a TOML local date-time: no offset, so not AwareDatetime
 
 
 def _go_marker_with_an_extra_key(w: World) -> None:
-    w.write_go(go_text() + 'note = "extra keys are refused"\n')
+    w.write_go(w.go_text() + 'note = "extra keys are refused"\n')
 
 
 def _go_marker_for_another_protocol(w: World) -> None:
-    w.write_go(go_text(protocol_sha256="1" * 64))
+    w.write_go(w.go_text(protocol_sha256="1" * 64))
 
 
 def _go_marker_for_another_model(w: World) -> None:
-    w.write_go(go_text(model_id="corrector-20261113-0000000-000009"))
+    w.write_go(w.go_text(model_id="corrector-20261113-0000000-000009"))
+
+
+def _go_marker_for_another_lock(w: World) -> None:
+    w.write_go(w.go_text().replace(sha_lf(w.lock_path.read_bytes()), "2" * 64))
+
+
+def _lock_edited_after_the_go(w: World) -> None:
+    """A later committed lock edit (another gold hash) with the old go-ahead left as it was."""
+    w.lock_path.write_text(
+        w.lock_path.read_text(encoding="utf-8").replace(f'"{GOLD_SHA}"', '"' + "8" * 64 + '"'), encoding="utf-8"
+    )
+
+
+def _go_marker_not_committed(w: World) -> None:
+    del w.git.files[(HEAD, GO_PATH)]
+
+
+def _go_marker_edited_after_the_commit(w: World) -> None:
+    w.git.files[(HEAD, GO_PATH)] = w.go_path.read_bytes() + b"# edited since\n"
 
 
 def _prior_result(part: Part) -> Callable[[World], None]:
@@ -320,6 +359,10 @@ _REFUSALS: list[tuple[str, Part, Callable[[World], None]]] = [
     ("go-invalid", Part.FORECAST, _go_marker_with_an_extra_key),
     ("go-mismatch", Part.FORECAST, _go_marker_for_another_protocol),
     ("go-mismatch", Part.FORECAST, _go_marker_for_another_model),
+    ("go-mismatch", Part.FORECAST, _go_marker_for_another_lock),
+    ("go-mismatch", Part.FORECAST, _lock_edited_after_the_go),
+    ("go-uncommitted", Part.FORECAST, _go_marker_not_committed),
+    ("go-uncommitted", Part.FORECAST, _go_marker_edited_after_the_commit),
     ("freeze-missing", Part.WARNINGS, _no_freeze),
     ("freeze-missing", Part.PLANS, _no_freeze),
     ("freeze-hash-mismatch", Part.WARNINGS, _freeze_edited),
@@ -397,6 +440,7 @@ def test_gate_lists_every_failure_not_the_first(world: World) -> None:
         "model-not-found",
         "freeze-hash-mismatch",
         "freeze-hash-mismatch",  # the working tree and HEAD both differ from the (replaced) locked hash
+        "go-mismatch",  # the lock edit above also falls outside what the go-ahead signed (its lock_sha256)
         "result-exists",
     ]
     for reason in refused.value.reasons:
@@ -414,7 +458,7 @@ def test_gate_without_a_lock_skips_what_needs_it_and_still_reports_the_rest(worl
 
 
 def test_gate_lists_both_go_bindings_when_both_differ_and_the_marker_is_read_without_a_lock(world: World) -> None:
-    world.write_go(go_text(protocol_sha256="1" * 64, model_id="corrector-20261113-0000000-000009"))
+    world.write_go(world.go_text(protocol_sha256="1" * 64, model_id="corrector-20261113-0000000-000009"))
     with pytest.raises(GateRefusedError) as refused:
         world.gate(Part.FORECAST)
     assert codes(refused) == ["go-mismatch", "go-mismatch"]
@@ -441,6 +485,7 @@ def test_the_go_marker_is_parsed_into_a_frozen_marker_with_an_aware_time() -> No
         {
             "protocol_sha256": sha(PROTOCOL_BYTES),
             "model_id": MODEL_ID,
+            "lock_sha256": sha(b"the lock"),
             "approved_by": "the architect",
             "approved_at": datetime(2026, 11, 15, 9, 30, tzinfo=UTC),
         }
@@ -450,6 +495,55 @@ def test_the_go_marker_is_parsed_into_a_frozen_marker_with_an_aware_time() -> No
         marker.model_id = "other"  # type: ignore[misc]  # frozen
     with pytest.raises(ValidationError):
         GoMarker.model_validate({**marker.model_dump(), "approved_by": ""})  # who approved it must be named
+    without_lock_hash = {key: value for key, value in marker.model_dump().items() if key != "lock_sha256"}
+    with pytest.raises(ValidationError, match="lock_sha256"):
+        GoMarker.model_validate(without_lock_hash)  # the lock binding is required, not optional
+    with pytest.raises(ValidationError, match="lock_sha256"):
+        GoMarker.model_validate({**marker.model_dump(), "lock_sha256": "not-a-digest"})
+
+
+def test_the_go_marker_docstring_example_is_a_valid_marker() -> None:
+    """The example in the ``GoMarker`` docstring (the architect copies it) parses as a marker with its five keys."""
+    docstring = GoMarker.__doc__ or ""
+    block = docstring.split("::", 1)[1]
+    text = "\n".join(line.strip() for line in block.strip().splitlines())
+    marker = GoMarker.model_validate(tomllib.loads(text))
+    assert marker.approved_at.utcoffset() is not None
+    assert set(tomllib.loads(text)) == set(GoMarker.model_fields)
+
+
+def test_a_lock_with_crlf_line_endings_keeps_the_go_valid(world: World) -> None:
+    """The marker binds the lock with CRLF read as LF: a Windows checkout with autocrlf is the same lock."""
+    as_lf = world.lock_path.read_bytes().replace(b"\r\n", b"\n")
+    world.lock_path.write_bytes(as_lf.replace(b"\n", b"\r\n"))
+    assert b"\r\n" in world.lock_path.read_bytes()
+    assert world.gate(Part.FORECAST).part is Part.FORECAST
+
+
+def test_a_go_marker_with_crlf_line_endings_in_the_tree_is_the_committed_one(world: World) -> None:
+    committed = world.go_path.read_bytes().replace(b"\r\n", b"\n")
+    world.git.files[(HEAD, GO_PATH)] = committed
+    world.go_path.write_bytes(committed.replace(b"\n", b"\r\n"))  # git stores LF, autocrlf writes CRLF
+    assert world.gate(Part.FORECAST).part is Part.FORECAST
+
+
+def test_the_go_marker_is_still_judged_for_its_commit_without_a_lock(world: World) -> None:
+    _drop_the_lock(world)
+    _go_marker_not_committed(world)
+    with pytest.raises(GateRefusedError) as refused:
+        world.gate(Part.FORECAST)
+    assert codes(refused) == ["lock-missing", "go-uncommitted"]
+
+
+def test_a_go_marker_outside_the_repository_is_not_committed(world: World, tmp_path: Path) -> None:
+    outside = tmp_path / "elsewhere" / "2026-go.toml"
+    outside.parent.mkdir()
+    outside.write_bytes(world.go_path.read_bytes())
+    world.go_path = outside
+    with pytest.raises(GateRefusedError) as refused:
+        world.gate(Part.FORECAST)
+    assert codes(refused) == ["go-uncommitted"]
+    assert "not inside the repository" in refused.value.reasons[0]
 
 
 def test_gate_without_a_lock_reports_a_prior_result_too(world: World) -> None:
@@ -483,19 +577,21 @@ def test_forecast_part_does_not_need_the_freeze(world: World) -> None:
 
 
 @pytest.mark.parametrize(
-    ("method", "code"),
+    ("method", "expected"),
     [
-        ("head", "git-error"),
-        ("is_ancestor", "commit-not-ancestor"),
-        ("show", "commit-content-mismatch"),
-        ("is_clean", "tree-dirty"),
+        ("head", ["git-error"]),
+        ("is_ancestor", ["commit-not-ancestor"]),
+        ("show", ["commit-content-mismatch", "go-uncommitted"]),  # the marker's committed bytes are read the same way
+        ("is_clean", ["tree-dirty"]),
     ],
 )
-def test_a_git_failure_closes_the_gate_with_the_codes_of_the_check(method: str, code: str, world: World) -> None:
+def test_a_git_failure_closes_the_gate_with_the_codes_of_the_check(
+    method: str, expected: list[str], world: World
+) -> None:
     world.git.errors = {method}
     with pytest.raises(GateRefusedError) as refused:
         world.gate(Part.FORECAST)
-    assert codes(refused) == [code]
+    assert codes(refused) == expected
     assert f"{method} failed" in refused.value.reasons[0]
 
 
@@ -909,3 +1005,53 @@ def test_subprocess_git_needs_the_executable(monkeypatch: pytest.MonkeyPatch, tm
     monkeypatch.setattr(shutil, "which", lambda _name: None)
     with pytest.raises(GitError, match="not found on PATH"):
         SubprocessGit(tmp_path)
+
+
+@pytest.mark.skipif(_GIT is None, reason="the git executable is not installed")
+def test_the_gate_wants_the_go_marker_committed_in_a_real_repository(isolated_git: Path, tmp_path: Path) -> None:
+    """An untracked marker is refused even when the tree reads as clean; a committed one opens the gate."""
+    repo = isolated_git
+    _run_git(repo, "init", "--quiet", "--initial-branch=main")
+    (repo / PROTOCOL_PATH).parent.mkdir(parents=True)
+    (repo / PROTOCOL_PATH).write_bytes(PROTOCOL_BYTES)
+    protocol_commit = _commit(repo, "the pre-registration")
+    lock_file = repo / "backend" / "training" / "protocol.lock.toml"
+    lock_file.parent.mkdir(parents=True)
+    lock_file.write_bytes(
+        (
+            f'protocol_path = "{PROTOCOL_PATH}"\nprotocol_sha256 = "{sha(PROTOCOL_BYTES)}"\n'
+            f'protocol_commit = "{protocol_commit}"\ngold_sha256 = "{GOLD_SHA}"\nmodel_id = "{MODEL_ID}"\n'
+        ).encode()
+    )
+    _commit(repo, "the lock")
+    go_file = repo / GO_PATH
+    go_file.write_bytes(
+        go_text(lock_sha256=sha_lf(lock_file.read_bytes())).encode()
+    )  # written, not committed; git is told to ignore it so that only the committed-bytes check can refuse
+    (repo / ".git" / "info" / "exclude").write_text("backend/training/2026-go.toml\n", encoding="utf-8")
+    reader = SubprocessGit(repo)
+    assert reader.is_clean() is True
+
+    def gate() -> GateToken:
+        return open_gate(
+            repo_root=repo,
+            lock_path=lock_file,
+            part=Part.FORECAST,
+            results_dir=repo / "artifacts" / "eval" / "2026",
+            models_dir=FIXTURE_MODELS,
+            go_path=go_file,
+            git=reader,
+        )
+
+    with pytest.raises(GateRefusedError) as untracked:
+        gate()
+    assert codes(untracked) == ["go-uncommitted"]
+
+    (repo / ".git" / "info" / "exclude").write_text("", encoding="utf-8")
+    go_commit = _commit(repo, "the architect's go")
+    assert gate().head == go_commit
+
+    go_file.write_bytes(go_file.read_bytes() + b"# edited after the commit\n")  # a tree edit: dirty, and not the commit
+    with pytest.raises(GateRefusedError) as edited:
+        gate()
+    assert codes(edited) == ["tree-dirty", "go-uncommitted"]

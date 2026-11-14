@@ -8,9 +8,13 @@ lead-1 IFS forecasts) and puts the answers back as ``(n, 19)`` grids aligned wit
 
 Chunks. Rows are corrected in chunks of one station and one UTC month: the joint WBGT draws are made per batch (see
 ``adapters.compute.lgbm_corrector``), so chunking bounds memory and the cost of the WBGT solver, and the same chunks
-in the same order always give the same numbers. The history of a chunk is the station's whole season of lead-1
-forecasts and observations: the feature builder reads, for a row of valid date D and lead L, only the UTC dates
-D - L - 7 to D - L - 1 (L3), so handing it later days cannot leak them (a test perturbs the future and checks).
+in the same order always give the same numbers. Every station x month chunk reuses the same ``sample_seed`` for each
+(lead, hour-block) stratum: the generator is made afresh per batch and stratum, so a row's joint draws depend on its
+position inside its stratum and batch and not on the chunks before it, and the rows of different chunks share the same
+underlying normals. That is known and accepted (the result does not depend on the order of the chunks) and is why the
+chunking must stay as it is. The history of a chunk is the station's whole season of lead-1 forecasts and
+observations: the feature builder reads, for a row of valid date D and lead L, only the UTC dates D - L - 7 to
+D - L - 1 (L3), so handing it later days cannot leak them (a test perturbs the future and checks).
 
 A row that the serving path cannot correct (a null IFS value, ``missing_input``) comes back as NaN, never filled; the
 counts per variable and status are returned so the report can state them.

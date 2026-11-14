@@ -35,6 +35,7 @@ __all__ = [
     "RAW_COMPARISON_SUMMERS",
     "RELIABILITY_EVENTS_C",
     "RELIABILITY_MIN_COUNT",
+    "SERIES_REFERENCE_COLUMNS",
     "raw_comparison",
     "reliability_payload",
     "series_frame",
@@ -50,6 +51,25 @@ RELIABILITY_MIN_COUNT: Final = 50
 
 RAW_COMPARISON_SUMMERS: Final[tuple[int, ...]] = (2025, 2026)
 RAW_COMPARISON_LEADS: Final[tuple[int, ...]] = (1, 2, 3)
+
+SERIES_REFERENCE_COLUMNS: Final[tuple[str, ...]] = (
+    "obs_t_c",
+    "obs_td_c",
+    "obs_wind_ms",
+    "wbgt_obs_c",
+    "has_joint_obs",
+    "wbgt_obs_reject",
+    "ref_sw_wm2",
+    "ref_direct_wm2",
+    "ref_pressure_hpa",
+)
+"""The gold columns the series carries as they are: the truths, the scored-row flags and the lead-0 reference.
+
+``truth_<target>`` is ``raw + error``: it is null wherever the raw forecast (or the observation) is missing, and it
+has no flags, so it cannot serve a truth WBGT of the demo day (7.4, B3). ``obs_*`` and ``wbgt_obs_c`` are the
+observations whatever the forecast, ``has_joint_obs`` and ``wbgt_obs_reject`` say which of them are scored, and
+``ref_*`` (lead-0 radiation and pressure) are the inputs of the truth WBGT. They are exported, never computed on.
+"""
 
 _WORKING_HOURS: Final = range(6, 15)  # UTC 06-14
 _RELIABILITY_MODELS: Final = ("corrector", "b2d")
@@ -171,7 +191,8 @@ def raw_comparison(pairs: pl.DataFrame) -> pl.DataFrame:
     ``n_rows`` and ``n_days`` count the rows (and distinct UTC dates) where every model that appears in ``pairs`` has a
     finite forecast and the truth is scored, so the models are compared on the same station-hours; ``n_rows_own``
     counts each model's own scored rows (AIFS has fewer). ``bias`` is forecast minus truth. A model absent from
-    ``pairs`` is absent from the table (nothing is filled).
+    ``pairs`` is absent from the table (nothing is filled). "Every model that appears" is judged per target, summer and
+    lead: a model that has no row at one lead (AIFS at lead 3, say) does not remove the other models' common rows there.
 
     Args:
         pairs: Gold-shaped rows of the three models (``load_test_pairs(..., models=...)`` with AIFS).
@@ -186,7 +207,8 @@ def raw_comparison(pairs: pl.DataFrame) -> pl.DataFrame:
         rows = _raw_rows(pairs, target)
         if rows.is_empty():
             continue
-        present = rows["model"].n_unique()
+        # The models present are counted per (summer, lead): a model missing one lead must not empty the others.
+        present = pl.col("model").n_unique().over("summer", "lead_days")
         common = rows.filter(pl.len().over(key) == present)
         own = rows.group_by("summer", "lead_days", "model").agg(pl.len().cast(pl.Int64).alias("n_rows_own"))
         scored = (
@@ -242,16 +264,34 @@ def series_frame(
     *,
     station: str,
     summer: int,
+    reference: pl.DataFrame,
 ) -> pl.DataFrame:
     """One station's rows of one summer with the corrected grids, the raw forecasts and the truths of the four targets.
 
     Columns: ``station``, ``cluster``, ``valid_time``, ``summer``, ``lead_days``, ``hour_utc``; ``raw_<target>`` and
     ``truth_<target>`` (null where missing or unscored); ``grid_<target>`` (the corrector's 19-level value grid as a
-    fixed array, null for a row without a forecast). Rows are sorted by valid time and lead.
+    fixed array, null for a row without a forecast); and the gold columns of ``SERIES_REFERENCE_COLUMNS`` (the
+    observations whatever the forecast, the scored-row flags and the lead-0 reference radiation and pressure). Rows are
+    sorted by valid time and lead.
+
+    Args:
+        keys: The out-of-fold keys (``OofPredictions.keys``).
+        grids: Target to the ``(n, 19)`` corrected value grid aligned with ``keys``.
+        truths: Target to the truth per row (``raw + error``), aligned with ``keys``.
+        station: The station to export.
+        summer: The summer to export.
+        reference: The gold rows of ``keys``, row for row (the IFS rows of the test frame): ``station``, ``valid_time``,
+            ``lead_days`` must equal ``keys``' and the ``SERIES_REFERENCE_COLUMNS`` must be present.
 
     Raises:
-        ValueError: The station has no row in that summer.
+        ValueError: The station has no row in that summer, ``reference`` is not ``keys``' rows or lacks a column.
     """
+    missing = [name for name in SERIES_REFERENCE_COLUMNS if name not in reference.columns]
+    if missing:
+        raise ValueError(f"reference lacks the column(s) {missing}")
+    identity = ["station", "valid_time", "lead_days"]
+    if reference.height != keys.height or not reference.select(identity).equals(keys.select(identity)):
+        raise ValueError("reference is not the rows of keys, in order: the gold columns would be misaligned")
     selected = np.flatnonzero(
         keys.select(((pl.col("station") == station) & (pl.col("summer") == summer)).alias("m")).to_series().to_numpy()
     )
@@ -267,6 +307,7 @@ def series_frame(
         extra.append(_nullable(np.asarray(truths[target][selected], dtype=np.float64)).alias(f"truth_{target.value}"))
     for target in Target:
         extra.append(_array_column(grids[target][selected]).alias(f"grid_{target.value}"))
+    extra.extend(reference[selected.tolist()].get_column(name) for name in SERIES_REFERENCE_COLUMNS)
     return frame.with_columns(extra).sort("valid_time", "lead_days")
 
 

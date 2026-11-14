@@ -6,6 +6,9 @@ that list explicit and fails when it grows without someone deciding it should:
 
 * ``open_gate`` and ``load_test_pairs`` are referenced only by ``ml/protocol_gate.py``, ``ml/data.py`` and
   ``jobs/evaluate_2026.py`` (the gated evaluation job, Task 15);
+* ``evaluate_folds`` and ``evaluate_with_predictor`` (public fold engines of ``ml/evaluate.py`` that, unlike
+  ``evaluate_dev``, do not refuse a frame with 2026 rows) are referenced only by ``ml/evaluate.py`` itself and
+  ``ml/forecast_test.py`` (which holds a gate token); tests are not scanned here, they are not shipped;
 * the job hands ``open_gate`` a ``SubprocessGit(...)`` written inline as the ``git`` argument, never a fake or a
   variable;
 * ``GateToken.recheck`` (the last check before a write) is called only by the job, on a token that is a parameter typed
@@ -26,6 +29,10 @@ SRC = Path(__file__).resolve().parents[3] / "src" / "stellar_blaze"
 GATED = frozenset({"open_gate", "load_test_pairs"})
 GATE_USERS = frozenset({"ml/protocol_gate.py", "ml/data.py", "jobs/evaluate_2026.py"})
 EVALUATE_2026 = SRC / "jobs" / "evaluate_2026.py"
+
+UNGUARDED_ENGINES = frozenset({"evaluate_folds", "evaluate_with_predictor"})
+"""Public fold engines that skip the 2026 refusal of ``evaluate_dev``: their callers hold a gate token."""
+ENGINE_USERS = frozenset({"ml/evaluate.py", "ml/forecast_test.py"})
 
 PARQUET_READERS = frozenset({"read_parquet", "scan_parquet"})
 ML_PARQUET_READERS = frozenset({"ml/data.py"})
@@ -100,6 +107,30 @@ def test_the_scan_sees_the_source_tree() -> None:
 def test_only_the_gate_the_loader_and_the_job_reference_the_2026_entry_points() -> None:
     users = {name for name, tree in _python_files().items() if references(tree, GATED)}
     assert users <= GATE_USERS, f"unreviewed references to {sorted(GATED)} in {sorted(users - GATE_USERS)}"
+
+
+def test_only_evaluate_and_the_gated_forecast_row_reference_the_unguarded_fold_engines() -> None:
+    users = {name for name, tree in _python_files().items() if references(tree, UNGUARDED_ENGINES)}
+    assert users >= ENGINE_USERS, "the scan must find the engines in their own module and in their one caller"
+    assert users <= ENGINE_USERS, (
+        f"unreviewed references to {sorted(UNGUARDED_ENGINES)} in {sorted(users - ENGINE_USERS)}: they do not refuse "
+        "summer 2026"
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "evaluate_folds(pairs, folds, cfg, cfg_sha256=s, tercile_edges=e)",
+        "evaluate_with_predictor(train, test, fold_name='x')",
+        "from stellar_blaze.ml.evaluate import evaluate_folds",
+        "from stellar_blaze.ml.evaluate import evaluate_with_predictor as run",
+        "engine = evaluate.evaluate_folds",
+        "fn = getattr(evaluate, 'evaluate_with_predictor')",
+    ],
+)
+def test_the_engine_scan_can_fail(source: str) -> None:
+    assert references(ast.parse(source), UNGUARDED_ENGINES)
 
 
 def test_the_job_gives_open_gate_a_subprocess_git_inline() -> None:
