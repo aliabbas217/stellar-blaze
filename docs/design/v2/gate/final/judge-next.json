@@ -1,0 +1,389 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/judge-next.html",
+  "when": "2026-11-12T01:03:20.912Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-next\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-next\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 16
+          },
+          {
+            "px": 13,
+            "n": 56
+          },
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 11
+          },
+          {
+            "px": 18,
+            "n": 3
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 46,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "1px",
+            "n": 29
+          },
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 9
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 385,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 12,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "What's next · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-next\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 64.9
+        },
+        "squint": {
+          "masses": 32,
+          "competitors": 1,
+          "dominance": 0.284,
+          "top": [
+            {
+              "cells": 105,
+              "weight": 29.46,
+              "cx": 0.414,
+              "cy": 0.081,
+              "bbox": [
+                0.042,
+                0.075,
+                0.792,
+                0.09
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 16.42,
+              "cx": 0.903,
+              "cy": 0.965,
+              "bbox": [
+                0.847,
+                0.955,
+                0.958,
+                0.985
+              ]
+            },
+            {
+              "cells": 40,
+              "weight": 6.28,
+              "cx": 0.692,
+              "cy": 0.827,
+              "bbox": [
+                0.611,
+                0.806,
+                0.847,
+                0.851
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 4.53,
+              "cx": 0.209,
+              "cy": 0.819,
+              "bbox": [
+                0.139,
+                0.806,
+                0.292,
+                0.836
+              ]
+            },
+            {
+              "cells": 18,
+              "weight": 3.99,
+              "cx": 0.13,
+              "cy": 0.751,
+              "bbox": [
+                0.042,
+                0.746,
+                0.208,
+                0.776
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.055,
+        "centroid": {
+          "x": 0.457,
+          "y": 0.534
+        },
+        "colourfulness": 4.3,
+        "luminanceSpread": 0.187,
+        "chromaProxy": 0.005,
+        "hierarchyByHueOnly": false,
+        "inkPct": 19.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-next\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-next\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 16
+          },
+          {
+            "px": 13,
+            "n": 52
+          },
+          {
+            "px": 14,
+            "n": 67
+          },
+          {
+            "px": 16,
+            "n": 11
+          },
+          {
+            "px": 18,
+            "n": 3
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 36,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "1px",
+            "n": 29
+          },
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 9
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 114,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 12,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "What's next · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-next\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 68.9
+        },
+        "squint": {
+          "masses": 44,
+          "competitors": 1,
+          "dominance": 0.554,
+          "top": [
+            {
+              "cells": 297,
+              "weight": 229.21,
+              "cx": 0.722,
+              "cy": 0.945,
+              "bbox": [
+                0.5,
+                0.907,
+                0.944,
+                0.981
+              ]
+            },
+            {
+              "cells": 24,
+              "weight": 12.91,
+              "cx": 0.295,
+              "cy": 0.321,
+              "bbox": [
+                0.236,
+                0.299,
+                0.347,
+                0.346
+              ]
+            },
+            {
+              "cells": 22,
+              "weight": 11.98,
+              "cx": 0.855,
+              "cy": 0.256,
+              "bbox": [
+                0.806,
+                0.234,
+                0.903,
+                0.271
+              ]
+            },
+            {
+              "cells": 21,
+              "weight": 11.06,
+              "cx": 0.733,
+              "cy": 0.251,
+              "bbox": [
+                0.681,
+                0.234,
+                0.792,
+                0.262
+              ]
+            },
+            {
+              "cells": 21,
+              "weight": 10.39,
+              "cx": 0.128,
+              "cy": 0.258,
+              "bbox": [
+                0.083,
+                0.234,
+                0.181,
+                0.271
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.071,
+        "centroid": {
+          "x": 0.498,
+          "y": 0.571
+        },
+        "colourfulness": 9.8,
+        "luminanceSpread": 0.564,
+        "chromaProxy": 0.027,
+        "hierarchyByHueOnly": false,
+        "inkPct": 28.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

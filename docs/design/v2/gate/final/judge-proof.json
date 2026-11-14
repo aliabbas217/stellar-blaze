@@ -1,0 +1,390 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/judge-proof.html",
+  "when": "2026-11-12T01:03:35.918Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-proof\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-proof\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 1
+          },
+          {
+            "px": 13,
+            "n": 28
+          },
+          {
+            "px": 14,
+            "n": 34
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 18,
+            "n": 3
+          },
+          {
+            "px": 32,
+            "n": 1
+          },
+          {
+            "px": 35,
+            "n": 1
+          },
+          {
+            "px": 96,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 20
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 442,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 4,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Proof sheet · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-proof\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 74.2
+        },
+        "squint": {
+          "masses": 31,
+          "competitors": 2,
+          "dominance": 0.188,
+          "top": [
+            {
+              "cells": 31,
+              "weight": 17.91,
+              "cx": 0.099,
+              "cy": 0.741,
+              "bbox": [
+                0.028,
+                0.731,
+                0.167,
+                0.761
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 14.35,
+              "cx": 0.916,
+              "cy": 0.961,
+              "bbox": [
+                0.861,
+                0.94,
+                0.958,
+                0.985
+              ]
+            },
+            {
+              "cells": 50,
+              "weight": 9.96,
+              "cx": 0.312,
+              "cy": 0.275,
+              "bbox": [
+                0.139,
+                0.269,
+                0.528,
+                0.284
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 8.39,
+              "cx": 0.131,
+              "cy": 0.154,
+              "bbox": [
+                0.083,
+                0.134,
+                0.194,
+                0.179
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 5.93,
+              "cx": 0.339,
+              "cy": 0.687,
+              "bbox": [
+                0.139,
+                0.687,
+                0.542,
+                0.687
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.116,
+        "centroid": {
+          "x": 0.386,
+          "y": 0.479
+        },
+        "colourfulness": 4.2,
+        "luminanceSpread": 0.165,
+        "chromaProxy": 0.005,
+        "hierarchyByHueOnly": false,
+        "inkPct": 15.2,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 19% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-proof\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-proof\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 1
+          },
+          {
+            "px": 13,
+            "n": 24
+          },
+          {
+            "px": 14,
+            "n": 31
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 18,
+            "n": 3
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 32,
+            "n": 1
+          },
+          {
+            "px": 56,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 20
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 114,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 3,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Proof sheet · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-proof\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 73.1
+        },
+        "squint": {
+          "masses": 63,
+          "competitors": 1,
+          "dominance": 0.477,
+          "top": [
+            {
+              "cells": 241,
+              "weight": 183.58,
+              "cx": 0.769,
+              "cy": 0.945,
+              "bbox": [
+                0.583,
+                0.907,
+                0.944,
+                0.981
+              ]
+            },
+            {
+              "cells": 40,
+              "weight": 20.91,
+              "cx": 0.202,
+              "cy": 0.418,
+              "bbox": [
+                0.139,
+                0.393,
+                0.278,
+                0.458
+              ]
+            },
+            {
+              "cells": 18,
+              "weight": 10.15,
+              "cx": 0.327,
+              "cy": 0.423,
+              "bbox": [
+                0.292,
+                0.393,
+                0.347,
+                0.449
+              ]
+            },
+            {
+              "cells": 19,
+              "weight": 9.26,
+              "cx": 0.071,
+              "cy": 0.427,
+              "bbox": [
+                0.042,
+                0.393,
+                0.097,
+                0.458
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 8.87,
+              "cx": 0.16,
+              "cy": 0.847,
+              "bbox": [
+                0.083,
+                0.841,
+                0.236,
+                0.85
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.16,
+        "centroid": {
+          "x": 0.506,
+          "y": 0.66
+        },
+        "colourfulness": 9,
+        "luminanceSpread": 0.477,
+        "chromaProxy": 0.024,
+        "hierarchyByHueOnly": false,
+        "inkPct": 24.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [
+    {
+      "at": "dark@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 19% of visual weight (corpus p05 19%) — nothing leads the eye"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

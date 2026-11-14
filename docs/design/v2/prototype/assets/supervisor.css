@@ -1,0 +1,28 @@
+/* Supervisor shell (S0-S3): phone 390 first, tablet 768, setup also desk. Reads only tokens.css + base.css. */
+.sup { max-width: 760px; margin-inline: auto; min-height: 100svh; background: var(--ground); padding-bottom: var(--s-24); }
+@media (min-width: 800px) { body.sup-page { background: var(--ground-deep); } .sup { margin-block: var(--s-6); min-height: 0; border: 1px solid var(--hair); } }
+.sbar { display: flex; align-items: center; gap: var(--s-3); min-height: 60px; padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--hair); }
+.sbar .wordmark { view-transition-name: wordmark; font-size: var(--t-13); }
+@media (max-width: 599px) { .sbar .wordmark { display: none; } }
+.sbar .back { display: grid; place-items: center; width: var(--target); height: var(--target); margin-inline-start: calc(-1 * var(--s-3)); color: var(--ink); border-radius: var(--r); }
+.sbar .back:hover { background: var(--raised); }
+.sbar .ttl { min-width: 0; }
+.sbar .ttl .t { font-weight: 600; font-size: var(--t-16); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sbar .ttl .s { font-size: var(--t-13); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sbar .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.sbar .sun-toggle span { display: none; }
+@media (min-width: 600px) { .sbar .sun-toggle span { display: inline; } }
+.sec { padding: var(--s-4); }
+.sec + .sec { border-top: 1px solid var(--hair); }
+.k { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.provline { font-size: var(--t-13); color: var(--ink-3); }
+.focal { font-size: var(--t-28); font-weight: 400; line-height: 1.15; letter-spacing: -0.015em; text-wrap: balance; }
+@media (min-width: 700px) { .focal { font-size: var(--t-36); } }
+.act-row { display: grid; gap: var(--s-2); padding: var(--s-4); }
+.act-row .btn { width: 100%; }
+.toast { position: fixed; inset-inline: var(--s-4); bottom: calc(var(--s-4) + env(safe-area-inset-bottom)); max-width: 728px; margin-inline: auto; z-index: 30; display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); background: var(--ink); color: var(--ground); border-radius: var(--r); font-size: var(--t-14); }
+.toast .btn { margin-inline-start: auto; color: var(--ground); border-color: var(--ground); min-height: 40px; }
+.reqid { font-family: var(--mono); font-size: var(--t-13); color: var(--ink-3); }
+.chipset { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.chipset button, .chipset a { min-height: var(--target); min-width: var(--target); padding: 0 var(--s-3); border: 1px solid var(--edge); border-radius: var(--r); background: transparent; font-size: var(--t-16); text-decoration: none; display: inline-flex; align-items: center; gap: var(--s-2); }
+.chipset [aria-pressed="true"], .chipset [aria-current="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); font-weight: 600; }

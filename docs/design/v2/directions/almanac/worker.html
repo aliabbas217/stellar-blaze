@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stellar Blaze · Today</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&family=Schibsted+Grotesk:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@500&text=%D8%A7%D8%B1%D8%AF%D9%88&family=Noto+Sans+Devanagari:wght@500&text=%E0%A4%B9%E0%A4%BF%E0%A4%A8%E0%A5%8D%E0%A4%A6%E0%A5%80%E0%A4%A8%E0%A5%87%E0%A4%AA%E0%A4%BE%E0%A4%B2%E0%A5%80&family=Noto+Sans+Bengali:wght@500&text=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE&family=Noto+Sans+Arabic:wght@500&text=%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="almanac.css">
+<style>
+body { font-size: var(--t-lg); }
+.col { max-width: 30rem; margin: 0 auto; padding: 0 var(--s-4) var(--s-7); }
+.top { display: flex; align-items: baseline; justify-content: space-between; padding: var(--s-4) 0 var(--s-3); border-bottom: 1px solid var(--ink); }
+.top .wordmark { font-size: 1.25rem; }
+.top .site { font-size: var(--t-sm); color: var(--ink-soft); text-align: end; }
+.langs { display: flex; justify-content: space-between; border-bottom: 1px solid var(--hair); }
+.langs button { min-height: 44px; min-width: 44px; padding: 0 var(--s-1); font-size: var(--t-md); color: var(--ink-soft); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.langs button[aria-pressed="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+.langs .ur { font-family: "Noto Nastaliq Urdu", serif; font-size: 0.95rem; line-height: 1; }
+.langs .hi, .langs .ne { font-family: "Noto Sans Devanagari", sans-serif; }
+.langs .bn { font-family: "Noto Sans Bengali", sans-serif; }
+.langs .ar { font-family: "Noto Sans Arabic", sans-serif; }
+
+.when { margin-top: var(--s-5); font-size: var(--t-md); color: var(--ink-soft); font-weight: 500; }
+.level { margin-top: var(--s-2); }
+.level .sub { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); margin-top: var(--s-3); }
+.level h1 { font: 600 clamp(3rem, 2.6rem + 1.6vw, 3.4rem)/1.02 var(--serif); letter-spacing: -0.025em; }
+.level h1 .mk { display: inline-block; width: 0.32em; height: 0.32em; background: var(--lv-red); vertical-align: 0.42em; margin-inline-end: 0.16em; }
+.then { font: 500 var(--t-xl)/1.3 var(--serif); color: var(--ink-soft); }
+.listen { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 48px; padding: 0 var(--s-4); flex: none; border: 1px solid var(--ink); font: 600 var(--t-sm)/1 var(--sans); }
+
+.scale { margin-top: var(--s-5); display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+.scale span { display: block; padding-top: var(--s-2); border-top: 3px solid var(--hair); font-size: var(--t-sm); color: var(--ink-muted); }
+.scale span.on { border-top: 6px solid var(--ink); padding-top: 5px; color: var(--ink); font-weight: 700; }
+
+.rows { margin-top: var(--s-6); border-top: 2px solid var(--ink); }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); padding: var(--s-4) 0; border-bottom: 1px solid var(--hair); }
+.row .k { font-weight: 500; }
+.row .v { font: 600 var(--t-xl)/1 var(--serif); white-space: nowrap; }
+
+h2.sec { margin-top: var(--s-7); font: 700 var(--t-xs)/1.3 var(--sans); letter-spacing: 0.09em; text-transform: uppercase; padding-bottom: var(--s-2); border-bottom: 2px solid var(--ink); display: flex; justify-content: space-between; }
+h2.sec small { font-weight: 500; letter-spacing: 0.02em; text-transform: none; color: var(--ink-muted); font-size: var(--t-xs); }
+ol.acts { list-style: none; }
+ol.acts li { display: grid; grid-template-columns: 28px 1fr; gap: var(--s-4); align-items: start; padding: var(--s-4) 0; border-bottom: 1px solid var(--hair); font: 500 var(--t-lg)/1.4 var(--sans); }
+ol.acts svg { width: 28px; height: 28px; margin-top: 1px; }
+ol.acts b { font-weight: 700; }
+
+.chart { margin-top: var(--s-3); }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .cap { font-size: var(--t-sm); color: var(--ink-soft); margin-top: var(--s-2); }
+.foot { margin-top: var(--s-6); padding-top: var(--s-3); border-top: 1px solid var(--hair); font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.55; }
+
+.dock { position: sticky; bottom: 0; z-index: 4; background: var(--ground); border-top: 1px solid var(--ink); padding-bottom: env(safe-area-inset-bottom); }
+.dock-in { max-width: 30rem; margin: 0 auto; padding: var(--s-3) var(--s-4) 0; }
+.unwell { width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: center; gap: var(--s-3); background: var(--ink); color: var(--ground); font: 700 var(--t-lg)/1 var(--sans); }
+.unwell svg { width: 22px; height: 22px; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: var(--s-2); }
+.tabs a { min-height: 52px; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: var(--t-md); color: var(--ink-soft); border-top: 2px solid transparent; }
+.tabs a[aria-current] { color: var(--ink); font-weight: 700; border-top-color: var(--ink); }
+
+/* desktop: the phone column, captioned like a figure in a report */
+.aside { display: none; }
+@media (min-width: 1000px) {
+  body { background: var(--ground-2); }
+  .dock { position: fixed; bottom: 0; inset-inline: 0; }
+  .col { padding-bottom: 170px; }
+  .page { display: grid; grid-template-columns: 1fr 30rem 1fr; gap: var(--s-8); min-height: 100vh; }
+  .col { background: var(--ground); border-inline: 1px solid var(--hair-strong); width: 30rem; padding-inline: var(--s-5); }
+  .aside { display: block; padding-top: var(--s-9); justify-self: end; max-width: 18rem; }
+  .aside .kicker { margin-bottom: var(--s-3); }
+  .aside p:not(.kicker) { font: 400 var(--t-lg)/1.5 var(--serif); color: var(--ink-soft); }
+  .aside a { display: inline-block; margin-top: var(--s-5); font-size: var(--t-sm); }
+  .dock-in { padding-inline: var(--s-5); background: var(--ground); }
+  .dock { background: transparent; border-top: 0; } .dock-in { border: 1px solid var(--hair-strong); border-bottom: 0; border-top: 1px solid var(--ink); width: 30rem; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <aside class="aside" aria-label="About this view"><p class="kicker">Worker view · phone</p><p>One reading, one instruction, one action. Large type for bright sun, every word read aloud on request, six languages one tap away.</p><a href="index.html">Back to the story</a></aside>
+  <main class="col">
+    <header class="top"><a class="wordmark" href="index.html">Stellar <i>Blaze</i></a><span class="site">Mussafah M-14 yard<br>Crew B · concrete pour</span></header>
+    <nav class="langs" aria-label="Language">
+      <button aria-pressed="true" lang="en">EN</button><button class="ur" lang="ur" aria-pressed="false">اردو</button><button class="hi" lang="hi" aria-pressed="false">हिन्दी</button><button class="bn" lang="bn" aria-pressed="false">বাংলা</button><button class="ne" lang="ne" aria-pressed="false">नेपाली</button><button class="ar" lang="ar" aria-pressed="false">العربية</button>
+    </nav>
+
+    <p class="when">Thursday 3 September · now 11:10</p>
+    <div class="level">
+      <h1><span class="mk" aria-hidden="true"></span>Red until <span class="num">17:00.</span></h1>
+      <div class="sub"><p class="then">Then Orange until <span class="num">19:00.</span></p>
+      <button class="listen" type="button" aria-label="Listen to today's heat warning">
+        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l6-5v16l-6-5H3z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2"/></svg>Listen</button></div>
+    </div>
+    <div class="scale" role="img" aria-label="Heat level 4 of 4: Red">
+      <span>Green</span><span>Amber</span><span>Orange</span><span class="on">Red</span>
+    </div>
+
+    <div class="rows">
+      <div class="row"><span class="k">Midday break, by law</span><span class="v num">12:30 – 15:00</span></div>
+    </div>
+
+    <h2 class="sec">What to do now <small>Draft wording, awaiting clinical review</small></h2>
+    <ol class="acts">
+      <li><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M1 7 14 1l13 6v2H1z" fill="currentColor"/><rect x="3" y="9" width="2" height="18" fill="currentColor"/><rect x="23" y="9" width="2" height="18" fill="currentColor"/><circle cx="12" cy="13" r="2.4" fill="currentColor"/><path d="M10 16.5h4l1 5h4.5v5.5H17v-3.5h-5.5L10 22z" fill="currentColor"/></svg><span>Work <b>20 minutes</b>, rest <b>40 minutes</b> in shade</span></li>
+      <li><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M6 6h16l-2 21H8z" fill="currentColor"/><path d="M8.6 10h10.8" stroke="var(--ground)" stroke-width="1.6"/><path d="M14 13.5c1.6 2.2 2.4 3.4 2.4 4.4a2.4 2.4 0 0 1-4.8 0c0-1 .8-2.2 2.4-4.4z" fill="var(--ground)"/></svg><span>Drink <b>1.2 litres</b> of water or more every hour</span></li>
+      <li><svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="8" cy="4" r="3" fill="currentColor"/><path d="M4 9h8l1 9h-2l-.5 9h-5L5 18H3z" fill="currentColor"/><circle cx="20" cy="4" r="3" fill="currentColor"/><path d="M16 9h8l1 9h-2l-.5 9h-5L17 18h-2z" fill="currentColor"/></svg><span><b>Never</b> work alone</span></li>
+    </ol>
+
+    <h2 class="sec">Heat today, 06:00 to 19:00 <small>WBGT °C</small></h2>
+    <figure class="chart">
+      <svg id="curve" role="img" aria-labelledby="curve-t"><title id="curve-t">Forecast heat at work today, by hour</title></svg>
+      <figcaption class="cap" id="curve-cap">Peak 39.4 °C at 14:00. Colour shows heat above the heavy-work limit.</figcaption>
+    </figure>
+
+    <p class="foot">Design still: the level is a design state; at build it comes from the site policy (ADOSH zones). Curve: ECMWF IFS day-1 forecast WBGT at OMAA, 3 Sep 2026.</p>
+  </main>
+</div>
+
+<div class="dock">
+  <div class="dock-in">
+    <button class="unwell" type="button"><svg viewBox="0 0 22 22" aria-hidden="true"><path d="M8 1h6v7h7v6h-7v7H8v-7H1V8h7z" fill="currentColor"/></svg>I feel unwell</button>
+    <nav class="tabs" aria-label="Sections"><a href="#" aria-current="page">Today</a><a href="#">Alerts</a><a href="#">My data</a></nav>
+  </div>
+</div>
+
+<script type="module">
+import { loadJSON, RAMP_LIGHT, css } from '../_shared/heat.js';
+const LIMIT = 26.6, NOW = 11 + 10 / 60;
+const season = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const day = season.wbgt_c_by_local_hour[season.days.indexOf('2026-09-03')];
+const H0 = 6, H1 = 19, pts = day.slice(H0, H1 + 1).map((v, i) => [H0 + i, v]);
+const peak = pts.reduce((a, b) => (b[1] > a[1] ? b : a));
+document.getElementById('curve-cap').textContent = `Peak ${peak[1].toFixed(1)} °C at ${String(peak[0]).padStart(2, '0')}:00. Colour shows heat above the heavy-work limit (26.6 °C).`;
+
+const svg = document.getElementById('curve'), W = 440, Hh = 200, L = 30, R = 8, T = 22, B = 26;
+const V0 = 24, V1 = 40;
+const x = (h) => L + (h - H0) / (H1 - H0) * (W - L - R), y = (v) => T + (V1 - v) / (V1 - V0) * (Hh - T - B);
+svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+const ink = 'oklch(0.21 0.016 252)', soft = 'oklch(0.50 0.012 252)', hair = 'oklch(0.86 0.006 245)';
+let s = `<defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${y(LIMIT)}" y2="${y(40)}">${[0, .25, .5, .75, 1].map((t) => `<stop offset="${t}" stop-color="${css(RAMP_LIGHT(LIMIT + (40 - LIMIT) * t))}"/>`).join('')}</linearGradient>
+  <clipPath id="above"><rect x="0" y="0" width="${W}" height="${y(LIMIT)}"/></clipPath></defs>`;
+// midday break band
+s += `<rect x="${x(12.5)}" y="${T}" width="${x(15) - x(12.5)}" height="${Hh - T - B}" fill="oklch(0.935 0.005 240)"/><text x="${x(12.5) + 4}" y="${T + 12}" font-size="11" fill="${soft}" font-family="Schibsted Grotesk">break</text>`;
+// gridlines + y labels
+for (const v of [30, 35, 40]) s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${hair}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="${soft}" font-family="Schibsted Grotesk">${v}</text>`;
+// heat above the limit: area between the curve and the limit line, coloured by height on RAMP_LIGHT
+const line = pts.map(([h, v], i) => `${i ? 'L' : 'M'}${x(h).toFixed(1)},${y(v).toFixed(1)}`).join('');
+s += `<path d="${line}L${x(H1)},${y(LIMIT)}L${x(H0)},${y(LIMIT)}Z" fill="url(#g)" clip-path="url(#above)"/>`;
+s += `<line x1="${L}" x2="${W - R}" y1="${y(LIMIT)}" y2="${y(LIMIT)}" stroke="${ink}" stroke-dasharray="4 3"/><text x="${W - R}" y="${y(LIMIT) + 14}" text-anchor="end" font-size="11" fill="${ink}" font-family="Schibsted Grotesk">heavy-work limit 26.6</text>`;
+s += `<path d="${line}" fill="none" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`;
+// x axis
+s += `<line x1="${L}" x2="${W - R}" y1="${Hh - B}" y2="${Hh - B}" stroke="${ink}"/>`;
+for (const h of [6, 9, 12, 15, 18]) s += `<line x1="${x(h)}" x2="${x(h)}" y1="${Hh - B}" y2="${Hh - B + 4}" stroke="${ink}"/><text x="${x(h)}" y="${Hh - B + 17}" text-anchor="middle" font-size="12" fill="${soft}" font-family="Schibsted Grotesk">${String(h).padStart(2, '0')}:00</text>`;
+// now + peak
+const nv = day[11] + (day[12] - day[11]) * (NOW - 11);
+s += `<line x1="${x(NOW)}" x2="${x(NOW)}" y1="${T - 6}" y2="${Hh - B}" stroke="${ink}" stroke-width="1.5"/><circle cx="${x(NOW)}" cy="${y(nv)}" r="4" fill="${ink}"/><text x="${x(NOW) - 6}" y="${T - 8}" text-anchor="end" font-size="12" font-weight="700" fill="${ink}" font-family="Schibsted Grotesk">now 11:10</text>`;
+s += `<text x="${x(peak[0]) + 7}" y="${y(peak[1]) + 4}" font-size="13" font-weight="600" fill="${ink}" font-family="Newsreader">${peak[1].toFixed(1)}</text>`;
+svg.insertAdjacentHTML('beforeend', s);
+document.querySelectorAll('.langs button').forEach((b) => b.addEventListener('click', () => document.querySelectorAll('.langs button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)))));
+</script>
+</body>
+</html>

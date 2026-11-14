@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Try a plan · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+/* judge desk chrome (shared grammar across judge-*.html) */
+.desk { max-width: var(--content-max); margin-inline: auto; padding: var(--s-4) clamp(16px, 3vw, 40px) var(--s-12); }
+.ev-tabs { display: flex; flex-wrap: wrap; gap: 0 var(--s-1); margin-bottom: var(--s-4); font-size: var(--t-13); }
+.ev-tabs span { color: var(--ink-3); display: inline-flex; align-items: center; min-height: 32px; margin-inline-end: var(--s-2); }
+.ev-tabs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--s-2); color: var(--ink-3); text-decoration: none; border-bottom: 2px solid transparent; }
+.ev-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.head { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.eyebrow { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.head h1 { max-width: 36ch; }
+.lead { color: var(--ink-2); max-width: var(--measure); }
+.stepnav { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-12); padding-top: var(--s-4); border-top: 1px solid var(--hair); }
+.stepnav a { color: var(--ink-2); font-size: var(--t-14); }
+.notes { margin-top: var(--s-6); padding-left: var(--s-4); color: var(--ink-3); font-size: var(--t-13); display: grid; gap: var(--s-1); max-width: 90ch; }
+.tag.rec { border-color: var(--ink-2); color: var(--ink); font-weight: 600; letter-spacing: 0.06em; }
+
+/* hero: the plan strip on the day axis */
+.strip { view-transition-name: spine; padding: var(--s-4) var(--s-4) var(--s-2); }
+.strip-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-4); margin-bottom: var(--s-2); }
+.strip-h h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.strip-h .faint { font-size: var(--t-13); }
+.strip-h .status { margin-inline-start: auto; font-size: var(--t-14); color: var(--ink-2); }
+.strip svg .blk-work { fill: var(--ink-2); }
+.strip svg .blk-brk { fill: var(--raised); stroke: var(--edge); stroke-width: 1; }
+.strip svg .blk-rest { fill: none; stroke: var(--hair); stroke-width: 1; stroke-dasharray: 3 3; }
+.strip svg .t-in { font: 600 14px var(--sans); fill: var(--ground); }
+.strip svg .t-in2 { font: 400 13px var(--sans); fill: var(--ground); }
+.strip svg .t-out { font: 500 13px var(--sans); fill: var(--ink-2); }
+.strip svg .row-l { font: 500 13px var(--sans); fill: var(--ink-3); }
+.strip svg .vb { stroke: var(--signal); stroke-width: 2; fill: none; }
+.strip svg .vb-n { fill: var(--signal); }
+.strip svg .vb-t { font: 700 13px var(--sans); fill: var(--on-signal); }
+.strip svg .slot-l { font: 500 13px var(--sans); fill: var(--ink-3); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); padding: var(--s-2) 0 0; font-size: var(--t-13); color: var(--ink-3); }
+.legend i { display: inline-block; width: 14px; height: 10px; margin-inline-end: 6px; vertical-align: -1px; border-radius: 1px; }
+.legend .k-work { background: var(--ink-2); } .legend .k-brk { background: var(--raised); border: 1px solid var(--edge); }
+.legend .k-slot { background: var(--slot); border-inline: 1px solid var(--edge); } .legend .k-v { background: var(--signal); }
+
+/* editor + result */
+.work { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--s-6); margin-top: var(--s-4); align-items: start; }
+@media (max-width: 960px) { .work { grid-template-columns: minmax(0, 1fr); } }
+.edit { display: grid; gap: var(--s-4); }
+.tpls { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.tpls button { min-height: var(--target); padding: 0 var(--s-3); border: 1px solid var(--hair); border-radius: var(--r); background: transparent; color: var(--ink-2); font-size: var(--t-14); }
+.tpls button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.runs { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--s-2) var(--s-3); align-items: center; }
+.runs label { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.runs .to { color: var(--ink-3); font-size: var(--t-13); }
+.runs input { min-height: var(--target); font-size: var(--t-16); width: 100%; min-width: 0; padding: 0 var(--s-2); background: var(--ground-deep); border: 1px solid var(--edge); border-radius: var(--r); font-variant-numeric: tabular-nums; }
+.runs input[aria-invalid="true"] { border-color: var(--signal); }
+.err { color: var(--signal); font-size: var(--t-14); }
+.check { width: 100%; }
+.check[aria-busy="true"] { opacity: 0.7; }
+.result { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+.result > *, .viol li > * { min-width: 0; }
+.sum { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-3); }
+.sum h2 { font: 500 var(--t-28)/1.15 var(--sans); letter-spacing: -0.01em; }
+.sum .faint { font-size: var(--t-14); }
+.viol { list-style: none; padding: 0; display: grid; }
+.viol li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: var(--s-3); padding: var(--s-3) 0; border-top: 1px solid var(--hair); }
+.viol .n { width: 24px; height: 24px; display: grid; place-items: center; background: var(--signal); color: var(--on-signal); font-weight: 700; font-size: var(--t-13); border-radius: var(--r); }
+.viol .clause { font-weight: 600; }
+.viol .clause .mono { color: var(--ink-3); font-weight: 400; margin-inline-end: var(--s-2); }
+.viol p + p { color: var(--ink-2); font-size: var(--t-14); }
+.viol .when { color: var(--ink); font-size: var(--t-14); }
+.checked h3 { font: 600 var(--t-14)/1.3 var(--sans); margin-bottom: var(--s-2); }
+.checked ul { list-style: none; padding: 0; }
+.checked { min-width: 0; overflow-wrap: anywhere; }
+.checked li { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--s-3); padding: var(--s-2) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.checked li > span:last-child { color: var(--ink-2); text-align: end; }
+.checked li.p-row > span:last-child { color: var(--ink-3); }
+.checked .faint { font-size: var(--t-13); margin-top: var(--s-2); max-width: 70ch; }
+.indep { font-size: var(--t-13); color: var(--ink-3); }
+.sk { height: 56px; } .sk.t { height: 120px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Evidence you can try</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="desk" id="main">
+  <nav class="ev-tabs" aria-label="Evidence"><span>Try it yourself</span><a href="judge-validator.html" aria-current="page">Try a plan</a><a href="judge-frontier.html">Roster frontier</a><a href="judge-climate.html">Warmer summer</a><a href="judge-governance.html">Governance</a><a href="judge-faults.html">Break things</a></nav>
+  <header class="head">
+    <p class="eyebrow">Try a plan · Thu 3 Sep 2026, Abu Dhabi (OMAA)</p>
+    <h1 class="j-h2">Change the times. An independent validator cites every rule the plan breaks.</h1>
+  </header>
+
+  <section class="panel strip" aria-labelledby="strip-h">
+    <div class="strip-h">
+      <h2 id="strip-h">The plan on the day</h2>
+      <span class="faint" id="peak"></span>
+      <span class="status" id="status" role="status" aria-live="polite"></span>
+    </div>
+    <div class="ribbon" id="plan-strip"></div>
+    <div class="legend" aria-hidden="true"><span><i class="k-work"></i>Work</span><span><i class="k-brk"></i>Break of 1 h or more, outside the midday break</span><span><i class="k-slot"></i>Midday break, by law</span><span><i class="k-v"></i>Rule broken (numbered below)</span></div>
+  </section>
+
+  <div class="work">
+    <form class="edit" id="plan" novalidate aria-label="Edit the plan">
+      <div class="tpls" role="group" aria-label="Start from a roster">
+        <button type="button" data-tpl="B0">Common roster</button>
+        <button type="button" data-tpl="B1">Legal default</button>
+        <button type="button" data-tpl="naive">Straight through</button>
+      </div>
+      <div class="runs" id="runs"></div>
+      <p class="err" id="err" role="alert" hidden></p>
+      <button class="btn primary lg check" type="submit" id="check">Check this plan</button>
+      <p class="indep">The validator shares no code with the planners (ADR 0011 §3). This page runs four of its rules in the browser so the times stay editable.</p>
+    </form>
+
+    <div aria-live="polite">
+      <section class="result" id="result" data-when="ideal empty recorded" aria-label="Validator result"></section>
+      <section class="result" data-when="loading" aria-busy="true" aria-label="Checking the plan">
+        <p class="skel sk" style="width:60%">.</p><p class="skel sk t">.</p><p class="skel sk t">.</p>
+      </section>
+      <section class="empty" data-when="error" role="alert">
+        <h3>The validator did not answer</h3>
+        <p class="muted">Your times are kept. Try again, or open the recorded result for the common roster.</p>
+        <p><button class="btn" type="button" id="retry">Try again</button> <a class="btn" href="?state=recorded">Show the recorded result</a></p>
+        <p class="faint" style="font-size:var(--t-13)">Request id <span class="mono">req_7f3a9c2e</span> (prototype)</p>
+      </section>
+    </div>
+  </div>
+
+  <ul class="notes">
+    <li>Heat row: ECMWF IFS 0.25° forecast issued the evening before, WBGT by the backend's Liljegren module. A forecast, not station truth.</li>
+    <li>Rules read protectively from the Labour Law and the midday ban (ADR 0011 §4). Counsel review is pending; our reading of Art. 18 is an open question.</li>
+    <li>The two rosters come from the roster study (roster_frontier.json baselines). Weekly hours assume 6 working days.</li>
+  </ul>
+
+  <nav class="stepnav" aria-label="Story"><a href="index.html">All views</a><a class="btn" href="judge-frontier.html">Next: roster frontier</a></nav>
+</main>
+
+<script type="module">
+import { boot, spine, STATE, fmt } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+{ const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn'); menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); }; }
+boot({ surface: 'desk', states: ['ideal', 'empty', 'loading', 'error', 'recorded'] });
+
+const $ = (id) => document.getElementById(id);
+const setView = (s) => { for (const el of document.querySelectorAll('[data-when]')) el.hidden = !el.dataset.when.split(/\s+/).includes(s); };
+
+// rosters: B0 / B1 exactly as roster_frontier.json "baselines"; naive = straight through, as ADR 0011 §9 (a)
+const TPL = {
+  B0: { name: 'Common roster', runs: [['06:00', '12:30'], ['15:00', '17:00']] },
+  B1: { name: 'Legal default', runs: [['06:00', '11:00'], ['15:00', '18:00']] },
+  naive: { name: 'Straight through', runs: [['06:00', '17:00']] },
+};
+// validator rules run here (ADR 0011 §3, §4); ADOSH zone caps need the truth-zone timeline, not run here
+const RULES = {
+  ban: { id: 'P-H1', cite: 'Midday ban, MR 44/2022 Art. 3', rule: 'No outdoor work 12:30 to 15:00, 15 Jun to 15 Sep.', what: 'Work inside the midday break' },
+  art18: { id: 'P-H3', cite: 'UAE Labour Law Art. 18', rule: 'No more than 5 hours of work without a break of 1 hour. Midday-break time does not count as that break (our protective reading).', what: 'Work past 5 h without a 1 h break' },
+  hours: { id: 'P-H2', cite: 'UAE Labour Law Art. 17 and 19', rule: 'Normal hours 8 h a day and 48 h a week.', what: 'Work past 8 h in the day' },
+  added: { id: 'P-H10', cite: 'Product rule: no added minutes', rule: 'A plan never schedules more work than the published shift, 06:00 to 12:30 and 15:00 to 17:00.', what: 'Work past the published 8 h 30 min' },
+};
+const ORDER = ['ban', 'art18', 'hours', 'added'];
+const toMin = (v) => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
+const hm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const dur = (m) => `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
+
+// ---- the check: 5-minute ticks (ADR 0011 §2) ----
+function check(runs) {
+  const work = new Array(288).fill(false);
+  for (const [s, e] of runs) for (let t = s / 5; t < e / 5; t++) work[t] = true;
+  const f = { ban: [], art18: [], hours: [], added: [] };
+  let acc = 0, gap = 0, cum = 0;
+  for (let t = 0; t < 288; t++) {
+    const m = t * 5, banned = m >= 750 && m < 900;
+    if (work[t]) {
+      if (banned) f.ban.push(t);
+      if (gap >= 12) acc = 0; // a 1 h non-ban gap is the Art. 18 break; ban time never is
+      gap = 0; acc++; cum++;
+      if (acc > 60) f.art18.push(t);
+      if (cum > 96) f.hours.push(t);
+      if (cum > 102) f.added.push(t);
+    } else if (!banned) gap++;
+  }
+  const groups = (a) => a.reduce((o, t) => { const l = o[o.length - 1]; if (l && t === l[1] + 1) l[1] = t; else o.push([t, t]); return o; }, []).map(([a, b]) => [a * 5, (b + 1) * 5]);
+  const v = [];
+  for (const k of ORDER) for (const r of groups(f[k])) v.push({ k, a: r[0], b: r[1] });
+  v.sort((x, y) => x.a - y.a || ORDER.indexOf(x.k) - ORDER.indexOf(y.k));
+  return { v, total: cum * 5, counts: Object.fromEntries(ORDER.map((k) => [k, groups(f[k]).length])) };
+}
+
+// ---- editor ----
+let current = { tpl: 'B0', name: TPL.B0.name, runs: TPL.B0.runs.map((r) => [...r]) };
+let lastResult = null;
+const runsEl = $('runs');
+function drawRuns() {
+  const rows = [...current.runs]; while (rows.length < 3) rows.push(['', '']);
+  runsEl.innerHTML = rows.map(([a, b], i) => `<label for="s${i}">Run ${i + 1}</label><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="hh:mm" id="s${i}" value="${a}" aria-label="Run ${i + 1} start"><span class="to">to</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="hh:mm" id="e${i}" value="${b}" aria-label="Run ${i + 1} end">`).join('');
+  for (const b of document.querySelectorAll('[data-tpl]')) b.setAttribute('aria-pressed', String(b.dataset.tpl === current.tpl));
+}
+function readRuns() {
+  const err = $('err'); err.hidden = true; runsEl.querySelectorAll('input').forEach((i) => i.removeAttribute('aria-invalid'));
+  const fail = (msg, el) => { err.hidden = false; err.textContent = msg; el.setAttribute('aria-invalid', 'true'); el.focus(); return null; };
+  const out = [];
+  for (let i = 0; i < 3; i++) {
+    const a = $(`s${i}`), b = $(`e${i}`);
+    if (!a.value && !b.value) continue;
+    if (!a.value || !b.value) return fail(`Run ${i + 1} needs a start and an end.`, a.value ? b : a);
+    const T = /^([01]?\d|2[0-3]):[0-5]\d$/;
+    for (const x of [a, b]) if (!T.test(x.value.trim())) return fail(`Run ${i + 1}: write the time as hh:mm, for example 06:00.`, x);
+    const s = toMin(a.value.trim()), e = toMin(b.value.trim());
+    if (s % 5 || e % 5) return fail(`Run ${i + 1}: use steps of 5 minutes, for example 06:05.`, s % 5 ? a : b);
+    if (e <= s) return fail(`Run ${i + 1} ends before it starts.`, b);
+    out.push([s, e, i]);
+  }
+  if (!out.length) return fail('Enter at least one run.', $('s0'));
+  out.sort((x, y) => x[0] - y[0]);
+  for (let i = 1; i < out.length; i++) if (out[i][0] < out[i - 1][1]) return fail(`Run ${out[i][2] + 1} starts before run ${out[i - 1][2] + 1} ends.`, $(`s${out[i][2]}`));
+  return out.map(([s, e]) => [s, e]);
+}
+
+// ---- hero: the strip ----
+let DAY = null;
+function drawStrip(runs, v) {
+  const el = $('plan-strip');
+  const W = Math.max(320, Math.round(el.clientWidth));
+  const narrow = W < 640, from = 5, to = 20, pad = 22;
+  const pos = (h) => pad + (h - from) / (to - from) * (W - 2 * pad);
+  const lanes = [];
+  for (const x of v) { let l = 0; while ((lanes[l] || []).some((y) => !(x.b <= y.a || x.a >= y.b))) l++; (lanes[l] ||= []).push(x); x.lane = l; }
+  const nL = Math.max(1, lanes.length), vTop = 168, L = vTop + nL * 34 + 34;
+  spine(el, { values: DAY, from, to, now: null, ban: [12.5, 15], orientation: 'h', width: W, length: L, bandY: 28, band: 22, compact: true,
+    aria: `Plan on Thu 3 Sep: ${runs.map(([s, e]) => `${hm(s)} to ${hm(e)}`).join(', ')}. Midday break 12:30 to 15:00. ${v.length ? `${v.length} rule ranges broken.` : ''}` });
+  const svg = el.querySelector('svg');
+  svg.querySelectorAll('.r-tick').forEach((n) => n.remove());
+  // the qaylula slot runs through every row
+  const y0 = 58, y1 = L - 30;
+  svg.querySelectorAll('.r-slot').forEach((r) => { r.setAttribute('y', y0); r.setAttribute('height', y1 - y0); });
+  svg.querySelectorAll('.r-slot-rule').forEach((r) => { r.setAttribute('y1', y0); r.setAttribute('y2', y1); });
+  let s = `<text class="row-l" x="${pos(from)}" y="16">Heat, WBGT forecast by hour</text><text class="row-l" x="${pos(from)}" y="78">Plan</text>`;
+  s += `<text class="slot-l" x="${(pos(12.5) + pos(15)) / 2}" y="${y1 - 8}" text-anchor="middle">${narrow ? 'Break' : 'Midday break'}</text>`;
+  const Y = 86, H = 56;
+  // gaps between runs (non-ban part >= 60 min = the Art. 18 break)
+  for (let i = 1; i < runs.length; i++) {
+    const g0 = runs[i - 1][1], g1 = runs[i][0];
+    const nonBan = Math.max(0, Math.min(g1, 750) - g0) + Math.max(0, g1 - Math.max(g0, 900));
+    const a = Math.min(g1, 750) > g0 ? g0 : Math.max(g0, 900), b = g0 < 750 ? Math.min(g1, 750) : g1;
+    if (b > a) {
+      const cls = nonBan >= 60 ? 'blk-brk' : 'blk-rest';
+      s += `<rect class="${cls}" x="${pos(a / 60)}" y="${Y + 8}" width="${pos(b / 60) - pos(a / 60)}" height="${H - 16}" rx="2"/>`;
+      if (pos(b / 60) - pos(a / 60) > 70) s += `<text class="t-out" x="${(pos(a / 60) + pos(b / 60)) / 2}" y="${Y + H / 2 + 5}" text-anchor="middle">${nonBan >= 60 ? 'Art. 18 break' : `Rest ${nonBan} min`}</text>`;
+    }
+  }
+  for (const [a, b] of runs) {
+    const x0 = pos(a / 60), x1 = pos(b / 60), w = x1 - x0;
+    s += `<rect class="blk-work" x="${x0}" y="${Y}" width="${w}" height="${H}" rx="2"/>`;
+    if (w > 96) s += `<text class="t-in" x="${x0 + 8}" y="${Y + 24}">${hm(a)} to ${hm(b)}</text><text class="t-in2" x="${x0 + 8}" y="${Y + 43}">${dur(b - a)} work</text>`;
+    else if (w > 40) s += `<text class="t-in2" x="${x0 + 6}" y="${Y + 34}">${dur(b - a).replace(' min', 'm')}</text>`;
+  }
+  // violations, attached to the block they break
+  v.forEach((x, i) => {
+    const a = pos(x.a / 60), b = pos(x.b / 60), y = vTop + x.lane * 34;
+    s += `<path class="vb" d="M${a} ${Y + H + 2} V${y} H${b} V${Y + H + 2}"/>`;
+    const cx = Math.min(Math.max((a + b) / 2, 12), W - 12);
+    s += `<rect class="vb-n" x="${cx - 11}" y="${y + 4}" width="22" height="22" rx="2"/><text class="vb-t" x="${cx}" y="${y + 20}" text-anchor="middle">${i + 1}</text>`;
+  });
+  const step = narrow ? 3 : 1;
+  for (let h = from; h <= to; h += step) s += `<text class="r-tick" x="${pos(h)}" y="${L - 8}" text-anchor="middle">${narrow ? String(h).padStart(2, '0') : fmt(h)}</text>`;
+  svg.insertAdjacentHTML('beforeend', s);
+}
+
+// ---- result ----
+const proofV = (what) => JSON.stringify({ what, protocol: 'Validator rules P-H1, P-H2, P-H3, P-H10 (ADR 0011 §3, §4), checked on 5-minute ticks', script: 'judge-validator.html (browser re-implementation of four validator rules)', file: 'roster_frontier.json baselines; the times you typed', sha: 'cc14dabe4b5c44db47988befcdff6ecaf034c675e412c7441823fcd04bd1501f (roster_frontier.json)', label: 'Real law, assumed shift' }).replace(/'/g, '&#39;');
+function renderResult({ v, total, counts }, runs, recorded) {
+  const nRules = new Set(v.map((x) => x.k)).size;
+  const head = v.length
+    ? `<div class="sum"><h2 tabindex="-1" id="res-h">${v.length} ${v.length === 1 ? 'break' : 'breaks'} of ${nRules} ${nRules === 1 ? 'rule' : 'rules'}</h2><button class="proof" type="button" data-proof='${proofV(`${v.length} rule ranges broken by "${current.name}"`)}'>proof</button>${recorded ? '<span class="tag rec">RECORDED</span>' : ''}</div>`
+    : `<div class="sum"><h2 tabindex="-1" id="res-h">0 rules broken</h2><button class="proof" type="button" data-proof='${proofV(`0 rule ranges broken by "${current.name}"`)}'>proof</button></div><p class="muted">Against the rules listed below, not a certificate. <button class="btn" type="button" data-pick="B0">Check the common roster</button></p>`;
+  const sub = `<p class="faint" style="font-size:var(--t-14)">${current.name}: ${dur(total)} of work in ${runs.length} ${runs.length === 1 ? 'run' : 'runs'}${recorded ? '. Recorded from this checker on the common roster; the product records the validator service\'s answer' : ''}.</p>`;
+  const list = v.length ? `<ol class="viol" aria-label="Rules broken">${v.map((x, i) => `<li><span class="n" aria-hidden="true">${i + 1}</span><div><p class="clause"><span class="mono">${RULES[x.k].id}</span>${RULES[x.k].cite}</p><p class="when">${RULES[x.k].what}: ${hm(x.a)} to ${hm(x.b)}</p><p>${RULES[x.k].rule}</p></div></li>`).join('')}</ol>` : '';
+  const row = (k, n) => `<li><span>${RULES[k].cite.split(',')[0]} <span class="mono faint">${RULES[k].id}</span></span><span>${counts[k] ? `${counts[k]} ${counts[k] === 1 ? 'range' : 'ranges'}` : 'No break'}</span></li>`;
+  const checked = `<section class="checked" aria-labelledby="chk-h"><h3 id="chk-h">What was checked</h3><ul>${ORDER.map((k) => row(k)).join('')}<li class="p-row"><span>ADOSH Table 1 work and rest caps <span class="mono faint">P-H7</span></span><span>Truth zones scored 12 Nov</span></li></ul><p class="faint">Lone work, acclimatisation, juveniles and task family are checked on crew data in the product; the demo crew is assumed, so they are not run here.</p></section>`;
+  $('result').innerHTML = head + sub + list + checked;
+  drawStrip(runs, v);
+  $('status').textContent = v.length ? `${v.length} ${v.length === 1 ? 'break' : 'breaks'}, numbered` : 'Checked: 0 rules broken';
+}
+
+function run(focus) {
+  const runs = readRuns(); if (!runs) return;
+  const btn = $('check'); btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Checking…';
+  setView('loading'); $('status').textContent = 'Checking';
+  setTimeout(() => {
+    lastResult = check(runs);
+    setView(lastResult.v.length ? 'ideal' : 'empty');
+    renderResult(lastResult, runs, false);
+    btn.removeAttribute('aria-busy'); btn.textContent = 'Check this plan';
+    if (focus) $('res-h')?.focus();
+  }, 450);
+}
+function pick(k) { current = { tpl: k, name: TPL[k].name, runs: TPL[k].runs.map((r) => [...r]) }; drawRuns(); lastResult = null; preview(); }
+function preview() { const runs = readRuns(); if (runs) { drawStrip(runs, []); $('status').textContent = 'Not checked yet'; } }
+
+document.querySelector('.tpls').addEventListener('click', (e) => { const b = e.target.closest('[data-tpl]'); if (b) pick(b.dataset.tpl); });
+runsEl.addEventListener('input', () => { current.tpl = null; current.name = 'Your plan'; document.querySelectorAll('[data-tpl]').forEach((b) => b.setAttribute('aria-pressed', 'false')); lastResult = null; preview(); });
+$('plan').addEventListener('submit', (e) => { e.preventDefault(); run(true); });
+$('retry').addEventListener('click', () => run(true));
+$('result').addEventListener('click', (e) => { const b = e.target.closest('[data-pick]'); if (b) { pick(b.dataset.pick); run(true); } });
+
+try {
+  const s = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+  DAY = s.wbgt_c_by_local_hour[s.days.indexOf('2026-09-03')];
+  let pk = 6; for (let h = 6; h < 19; h++) if (DAY[h] > DAY[pk]) pk = h;
+  $('peak').innerHTML = `Peak ${DAY[pk].toFixed(1)} °C WBGT at ${fmt(pk)}, inside the midday break <button class="proof" type="button" data-proof='${JSON.stringify({ what: `Forecast WBGT ${DAY[pk].toFixed(1)} °C at ${fmt(pk)}, Thu 3 Sep 2026, OMAA`, protocol: 'Day-1 forecast as issued the evening before (Open-Meteo Previous Runs, ecmwf_ifs025)', script: 'stellar_blaze wbgt_liljegren', file: 'data/omaa_2026_ifs_d1_wbgt_hourly.json', sha: '31a780c9fbf5750709174fe0206a4421a8ec705de22412bcaf189a79cb24e566', label: 'Real forecast, not station truth' })}'>proof</button>`;
+} catch { DAY = null; }
+
+pick(STATE === 'empty' ? 'B1' : 'B0');
+if (STATE === 'ideal' || STATE === 'empty' || STATE === 'recorded') { const runs = readRuns(); lastResult = check(runs); setView(STATE); renderResult(lastResult, runs, STATE === 'recorded'); }
+if (STATE === 'error') $('status').textContent = 'No answer from the validator';
+if (STATE === 'loading') { $('check').setAttribute('aria-busy', 'true'); $('check').textContent = 'Checking…'; $('status').textContent = 'Checking'; }
+let raf = 0; new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const r = readRuns(); if (r) drawStrip(r, lastResult ? lastResult.v : []); }); }).observe($('plan-strip'));
+</script>
+</body>
+</html>

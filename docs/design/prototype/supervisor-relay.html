@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="supervisor">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crew relay · Supervisor · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Noto+Sans+Arabic:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Sans+Bengali:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  .crumbs ol { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .crumbs li + li::before { content: "\203A" / ""; margin-inline-end: var(--space-2); }
+  .crumbs [aria-current="page"] { color: var(--ink); font-weight: 600; }
+  .banner .btn svg, .banner .reqid svg { inline-size: 1.25rem; block-size: 1.25rem; }
+
+  /* relay sign: readable at 3 m. Level colour, hatch, pictogram, mega numeral, name and window. */
+  .relay { display: grid; justify-items: center; align-content: center; min-block-size: calc(var(--space-24) * 2); padding: var(--space-3); }
+  .relay .sign__plate { column-gap: var(--space-4); padding: var(--space-4); }
+  .relay .sign__name { font-size: var(--size-headline); }
+  .relay__when { font-size: var(--size-title); }
+  @media (min-width: 48rem) {
+    .relay { min-block-size: calc(var(--space-24) * 3); padding: var(--space-8); }
+    .relay .sign__plate { column-gap: var(--space-8); padding: var(--space-6) var(--space-8); }
+    .relay .sign__picto { inline-size: var(--space-24); block-size: var(--space-24); }
+    .relay .sign__name { font-size: var(--size-display); }
+    .relay__when { font-size: var(--size-headline); }
+  }
+  :lang(ur) .relay .sign__name { font-size: var(--size-headline); }
+  .relay-actions li { display: grid; grid-template-columns: var(--space-12) minmax(0, 1fr); column-gap: var(--space-4); align-items: center; }
+  .relay-actions svg { inline-size: var(--space-12); block-size: var(--space-12); }
+  .relay-actions span { font-size: var(--size-lead); }
+  @media (min-width: 48rem) { .relay-actions span { font-size: var(--size-headline); } }
+
+  /* language chips: links that set the language of the card, audio and bulletin */
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .chip { position: relative; }
+  .chip > input { position: absolute; opacity: 0; inset: 0; margin: 0; }
+  .chip > a, .chip > span {
+    display: inline-flex; align-items: center; min-block-size: var(--space-12); padding-inline: var(--space-4);
+    border: var(--rule) solid var(--control); border-radius: var(--radius-sign); background: var(--surface);
+    font-weight: 600; text-decoration: none; color: var(--ink);
+  }
+  .chip > a[aria-current="true"], .chip > input:checked + span { border-color: var(--ink); border-width: var(--space-1); background: var(--surface-raised); }
+  .chip > input:focus-visible + span { outline: var(--focus-width) solid var(--focus); outline-offset: var(--focus-offset); }
+  .chip[lang="ur"] > * { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif; }
+  .chip[lang="ar"] > * { font-family: "Noto Sans Arabic", var(--font-body-fallback); }
+  .chip[lang="hi"] > *, .chip[lang="ne"] > * { font-family: "Noto Sans Devanagari", var(--font-body-fallback); }
+  .chip[lang="bn"] > * { font-family: "Noto Sans Bengali", var(--font-body-fallback); }
+
+  .controls .btn { min-block-size: var(--space-16); padding-inline: var(--space-6); }
+  .controls .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+  .bulletin { font-size: var(--size-lead); max-inline-size: var(--measure); }
+  .sk-sign { block-size: calc(var(--space-24) * 2); }
+  .sk-line { block-size: var(--space-8); }
+  .sk-line--short { inline-size: 50%; }
+  .sk-chip { block-size: var(--space-12); inline-size: calc(var(--space-24) * 3); }
+  .sk-btn { block-size: var(--space-16); }
+
+  /* Urdu view: text with no Urdu string yet stays English and gets the Latin face (see script below) */
+  :where(html:lang(ur) [lang="en"]) { font-family: "Noto Sans", var(--font-body-fallback); line-height: var(--leading-body); unicode-bidi: plaintext; }
+  html:lang(ur) [lang="en"]:is(.t-headline, .t-title, .panel-title), html:lang(ur) [lang="en"] :is(.t-headline, .t-title, .panel-title) { font-family: var(--font-display); font-weight: 600; }
+  html:lang(ur) .btn--primary:has([lang="en"]), html:lang(ur) [lang="en"] .btn--primary { font-family: var(--font-display); font-size: var(--size-title); }
+  .proto-note { display: none; font-family: var(--font-mono); font-size: var(--size-label); background: var(--surface-raised); border: var(--rule-hairline) dashed var(--control); padding: var(--space-2) var(--space-3); }
+  html:lang(ur) .proto-note { display: block; }
+
+  /* print crew card: A5, black and white safe (hatch and numerals carry the level) */
+  @page { size: A5; margin: 10mm; }
+  @media print {
+    .proto-bar, .desk-top, .crumbs, .no-print { display: none !important; }
+    .desk { padding: 0; }
+  }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error" data-langs="en,ur">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top" dir="ltr" lang="en">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Supervisor</span>
+  </div>
+</header>
+
+<main id="main" class="desk stack stack-6">
+  <nav class="crumbs" aria-label="Breadcrumb" dir="ltr" lang="en">
+    <ol>
+      <li><a href="index.html">Supervisor</a></li>
+      <li><a href="supervisor-crews.html">Crews today</a></li>
+      <li><a href="supervisor-crew.html" data-crew data-plan>Crew A</a></li>
+      <li><a href="supervisor-relay.html" aria-current="page">Relay</a></li>
+    </ol>
+  </nav>
+  <p class="proto-note no-print" lang="en" dir="ltr">Prototype note, not product: the supervisor controls stay in English. Only the crew-facing card (level name, actions, bulletin) switches language, and only where ur.json has a string. No Urdu has been invented.</p>
+
+  <header class="vs-2 no-print" dir="ltr" lang="en">
+    <h1 class="t-headline">Crew relay: <span data-crew>Crew A</span></h1>
+    <p class="t-label t-muted measure">Show this to the crew, play it, or send it. No health data and no names.</p>
+  </header>
+
+  <!-- IDEAL, ERROR (audio missing) and EMPTY all keep the sign in view -->
+  <section data-state="ideal error empty" class="stack stack-6" aria-label="Crew card">
+    <article class="sign relay lv-red" aria-labelledby="sign-name">
+      <div class="sign__plate sign__plate--wide">
+        <div class="sign__num"><svg class="ico sign__picto"><use href="#i-red"/></svg><span class="t-mega">4</span></div>
+        <p class="sign__name" id="sign-name" data-t-ur="سرخ">Red</p>
+        <p class="sign__when relay__when t-num">From 13:00 to 17:00</p>
+      </div>
+    </article>
+
+    <div data-state="ideal error" class="vs-3">
+      <ol class="relay-actions vs-3">
+        <li><svg class="ico"><use href="#i-orange"/></svg><span data-t-ur="اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Work 20 minutes, rest 40 minutes in shade</span></li>
+        <li><svg class="ico"><use href="#i-water"/></svg><span data-t-ur="اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Drink 1.2 litres of water or more every hour</span></li>
+        <li><svg class="ico"><use href="#i-crew"/></svg><span data-t-ur="اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Never work alone</span></li>
+      </ol>
+      <p class="cluster"><span class="stamp stamp--quiet" data-t-ur="مسودہ">Draft template</span><span class="t-label t-muted" data-t-ur="حتمی عبارت جائزہ شدہ ٹیمپلیٹ سے آئے گی۔">ADOSH Table 1, High zone, heavy work. Final wording comes from the reviewed templates.</span></p>
+    </div>
+  </section>
+
+  <!-- ERROR: the audio clip for this language is missing; the card is still usable -->
+  <div data-state="error" class="banner no-print" role="status" dir="ltr" lang="en">
+    <svg class="ico"><use href="#i-speaker"/></svg>
+    <div class="vs-2">
+      <p><strong>Audio not available in Nepali yet.</strong> Read the card aloud.</p>
+      <p class="cluster">
+        <button class="btn btn--sm" type="button"><svg class="ico"><use href="#i-retry"/></svg><span>Check again</span></button>
+        <span class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></span>
+      </p>
+    </div>
+  </div>
+
+  <!-- IDEAL + ERROR: language chips, audio, bulletin, print -->
+  <section data-state="ideal error" class="stack stack-6 no-print" aria-label="Relay tools" dir="ltr" lang="en">
+    <nav class="vs-2" aria-label="Crew languages">
+      <p class="t-label t-muted" id="chips-h">Language of the card, audio and bulletin</p>
+      <ul class="chips" aria-labelledby="chips-h">
+        <li class="chip" lang="en"><a href="?lang=en" data-lang="en">English</a></li>
+        <li class="chip" lang="ur"><a href="?lang=ur" data-lang="ur">اردو</a></li>
+        <li class="chip" lang="ne"><a href="?state=error" data-lang="ne">नेपाली</a></li>
+      </ul>
+    </nav>
+
+    <div class="controls cluster cluster-4">
+      <button class="btn btn--primary" type="button" id="play" aria-pressed="false" data-state="ideal"><svg class="ico"><use href="#i-speaker"/></svg><span>Play audio</span></button>
+      <button class="btn btn--primary" type="button" aria-disabled="true" data-state="error"><svg class="ico"><use href="#i-speaker"/></svg><span>Play audio<span class="sr-only"> (not available in Nepali)</span></span></button>
+      <a class="btn" href="?state=ideal&amp;lang=en" data-state="error"><svg class="ico"><use href="#i-speaker"/></svg><span>Play audio in English</span></a>
+      <button class="btn" type="button" id="copy" data-copy=""><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy bulletin</span></button>
+      <button class="btn" type="button" id="print"><svg class="ico"><use href="#i-print"/></svg><span>Print crew card</span></button>
+    </div>
+
+    <section class="card vs-3" aria-labelledby="bul-h">
+      <h2 id="bul-h" class="panel-title">Bulletin text</h2>
+      <p class="t-label t-muted">Copy it into your own message to the crew. It has no health data and no names.</p>
+      <p class="bulletin" id="bulletin" dir="auto" data-t-ur="سائٹ کا گرمی الرٹ: سرخ۔ اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Site heat alert: Red. From 13:00 to 17:00. Work 20 minutes, rest 40 minutes in shade. Drink 1.2 litres of water or more every hour. Never work alone.</p>
+    </section>
+  </section>
+
+  <!-- LOADING: the sign skeleton at the final dimensions -->
+  <section data-state="loading" class="stack stack-6" aria-busy="true" aria-label="Loading the relay card">
+    <div class="skel sk-sign"></div>
+    <div class="vs-3"><div class="skel sk-line"></div><div class="skel sk-line"></div><div class="skel sk-line sk-line--short"></div></div>
+    <div class="skel sk-chip"></div>
+    <div class="skel sk-btn"></div>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY: crew has no language set -->
+  <section data-state="empty" class="empty no-print" aria-labelledby="empty-h" dir="ltr" lang="en">
+    <svg class="ico empty__picto"><use href="#i-speaker"/></svg>
+    <h2 id="empty-h" class="t-headline">Choose the crew's languages</h2>
+    <p class="measure">Audio and the bulletin are prepared in the languages you choose. Pick at least one. You can change them later.</p>
+    <form class="vs-4" action="?state=ideal" method="get" aria-label="Crew languages">
+      <fieldset class="vs-2">
+        <legend class="t-label"><strong>Crew languages</strong></legend>
+        <div class="chips">
+          <label class="chip" lang="en"><input type="checkbox" name="langs" value="en" checked><span>English</span></label>
+          <label class="chip" lang="ar"><input type="checkbox" name="langs" value="ar"><span>العربية</span></label>
+          <label class="chip" lang="ur"><input type="checkbox" name="langs" value="ur"><span>اردو</span></label>
+          <label class="chip" lang="hi"><input type="checkbox" name="langs" value="hi"><span>हिन्दी</span></label>
+          <label class="chip" lang="bn"><input type="checkbox" name="langs" value="bn"><span>বাংলা</span></label>
+          <label class="chip" lang="ne"><input type="checkbox" name="langs" value="ne"><span>नेपाली</span></label>
+        </div>
+      </fieldset>
+      <div><a class="btn btn--primary" href="supervisor-relay.html">Save languages</a></div>
+    </form>
+  </section>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Prototype behaviour: crew name from ?crew=, current language chip, copy text, play and print. */
+  (() => {
+    const params = new URLSearchParams(location.search);
+    const crew = params.get("crew") || "Crew A";
+    document.querySelectorAll("[data-crew]").forEach((el) => (el.textContent = crew));
+    document.querySelectorAll("[data-plan]").forEach((a) => (a.href = "supervisor-crew.html?crew=" + encodeURIComponent(crew)));
+    document.title = crew + " · Crew relay · Supervisor · Stellar Blaze prototype";
+
+    const current = document.body.dataset.current === "error" ? "ne" : document.documentElement.lang === "ur" ? "ur" : "en";
+    document.querySelectorAll(".chips a[data-lang]").forEach((a) => {
+      const p = new URLSearchParams();
+      if (crew !== "Crew A") p.set("crew", crew);
+      if (a.dataset.lang === "ne") p.set("state", "error"); else p.set("lang", a.dataset.lang);
+      a.href = "?" + p.toString();
+      if (a.dataset.lang === current) a.setAttribute("aria-current", "true");
+    });
+
+    const bulletin = document.getElementById("bulletin");
+    const copy = document.getElementById("copy");
+    if (bulletin && copy) copy.dataset.copy = bulletin.textContent.trim();
+    document.getElementById("print")?.addEventListener("click", () => window.print());
+
+    const play = document.getElementById("play");
+    let t = null;
+    const stopClip = () => { clearTimeout(t); play.setAttribute("aria-pressed", "false"); play.querySelector("span").textContent = "Play audio"; play.querySelector("use").setAttribute("href", "#i-speaker"); };
+    play?.addEventListener("click", () => {
+      if (play.getAttribute("aria-pressed") === "true") return stopClip();
+      play.setAttribute("aria-pressed", "true"); play.querySelector("span").textContent = "Stop audio"; play.querySelector("use").setAttribute("href", "#i-pause");
+      t = setTimeout(stopClip, 4000);
+    });
+  })();
+</script>
+<script>
+  /* Urdu view: any text without an Urdu string yet stays English and is marked lang="en" (never invented Urdu). */
+  (() => {
+    if (document.documentElement.lang !== "ur") return;
+    document.querySelectorAll("main *").forEach((el) => {
+      if (el.closest("[lang]:not(html)")) return;
+      if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) el.lang = "en";
+    });
+  })();
+</script>
+</body>
+</html>

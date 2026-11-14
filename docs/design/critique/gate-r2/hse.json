@@ -1,0 +1,1064 @@
+{
+  "url": "http://127.0.0.1:8765/hse.html",
+  "when": "2026-11-11T12:15:26.464Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 59
+          },
+          {
+            "px": 16,
+            "n": 45
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 13
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 3
+          },
+          {
+            "px": 76,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 55.8
+        },
+        "squint": {
+          "masses": 54,
+          "competitors": 3,
+          "dominance": 0.165,
+          "top": [
+            {
+              "cells": 81,
+              "weight": 48.22,
+              "cx": 0.352,
+              "cy": 0.401,
+              "bbox": [
+                0.236,
+                0.364,
+                0.458,
+                0.421
+              ]
+            },
+            {
+              "cells": 66,
+              "weight": 39.17,
+              "cx": 0.115,
+              "cy": 0.395,
+              "bbox": [
+                0.042,
+                0.364,
+                0.194,
+                0.421
+              ]
+            },
+            {
+              "cells": 57,
+              "weight": 34.6,
+              "cx": 0.246,
+              "cy": 0.087,
+              "bbox": [
+                0.181,
+                0.065,
+                0.306,
+                0.112
+              ]
+            },
+            {
+              "cells": 72,
+              "weight": 20.26,
+              "cx": 0.493,
+              "cy": 0.29,
+              "bbox": [
+                0,
+                0.29,
+                0.986,
+                0.29
+              ]
+            },
+            {
+              "cells": 53,
+              "weight": 16.69,
+              "cx": 0.206,
+              "cy": 0.645,
+              "bbox": [
+                0.042,
+                0.636,
+                0.431,
+                0.673
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.188,
+        "centroid": {
+          "x": 0.329,
+          "y": 0.421
+        },
+        "colourfulness": 11.1,
+        "luminanceSpread": 0.316,
+        "chromaProxy": 0.028,
+        "hierarchyByHueOnly": false,
+        "inkPct": 25.5,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.165)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 17% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 59
+          },
+          {
+            "px": 16,
+            "n": 45
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 13
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 3
+          },
+          {
+            "px": 76,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 42.4
+        },
+        "squint": {
+          "masses": 35,
+          "competitors": 2,
+          "dominance": 0.185,
+          "top": [
+            {
+              "cells": 87,
+              "weight": 36.17,
+              "cx": 0.157,
+              "cy": 0.645,
+              "bbox": [
+                0.056,
+                0.613,
+                0.25,
+                0.675
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 31.47,
+              "cx": 0.148,
+              "cy": 0.885,
+              "bbox": [
+                0.069,
+                0.863,
+                0.236,
+                0.912
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 18.45,
+              "cx": 0.184,
+              "cy": 0.788,
+              "bbox": [
+                0.056,
+                0.762,
+                0.361,
+                0.813
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 13.43,
+              "cx": 0.585,
+              "cy": 0.832,
+              "bbox": [
+                0.528,
+                0.813,
+                0.639,
+                0.85
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 13,
+              "cx": 0.742,
+              "cy": 0.831,
+              "bbox": [
+                0.694,
+                0.813,
+                0.792,
+                0.85
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.166,
+        "centroid": {
+          "x": 0.34,
+          "y": 0.546
+        },
+        "colourfulness": 16.6,
+        "luminanceSpread": 0.287,
+        "chromaProxy": 0.049,
+        "hierarchyByHueOnly": false,
+        "inkPct": 27.2,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 19% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 59
+          },
+          {
+            "px": 16,
+            "n": 45
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 13
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 3
+          },
+          {
+            "px": 95,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 51.1
+        },
+        "squint": {
+          "masses": 41,
+          "competitors": 3,
+          "dominance": 0.163,
+          "top": [
+            {
+              "cells": 33,
+              "weight": 14.86,
+              "cx": 0.144,
+              "cy": 0.443,
+              "bbox": [
+                0.083,
+                0.418,
+                0.194,
+                0.463
+              ]
+            },
+            {
+              "cells": 52,
+              "weight": 12.11,
+              "cx": 0.372,
+              "cy": 0.392,
+              "bbox": [
+                0.306,
+                0.358,
+                0.458,
+                0.433
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 11.14,
+              "cx": 0.816,
+              "cy": 0.283,
+              "bbox": [
+                0.764,
+                0.269,
+                0.903,
+                0.299
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 6.43,
+              "cx": 0.151,
+              "cy": 0.374,
+              "bbox": [
+                0.083,
+                0.358,
+                0.236,
+                0.388
+              ]
+            },
+            {
+              "cells": 17,
+              "weight": 6.2,
+              "cx": 0.129,
+              "cy": 0.114,
+              "bbox": [
+                0.069,
+                0.104,
+                0.181,
+                0.119
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.147,
+        "centroid": {
+          "x": 0.382,
+          "y": 0.413
+        },
+        "colourfulness": 11.9,
+        "luminanceSpread": 0.152,
+        "chromaProxy": 0.031,
+        "hierarchyByHueOnly": false,
+        "inkPct": 22.8,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.163)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 16% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 59
+          },
+          {
+            "px": 16,
+            "n": 45
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 13
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 3
+          },
+          {
+            "px": 76,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 55.7
+        },
+        "squint": {
+          "masses": 61,
+          "competitors": 3,
+          "dominance": 0.156,
+          "top": [
+            {
+              "cells": 79,
+              "weight": 53.81,
+              "cx": 0.35,
+              "cy": 0.401,
+              "bbox": [
+                0.236,
+                0.364,
+                0.458,
+                0.421
+              ]
+            },
+            {
+              "cells": 62,
+              "weight": 42.53,
+              "cx": 0.117,
+              "cy": 0.395,
+              "bbox": [
+                0.042,
+                0.364,
+                0.194,
+                0.421
+              ]
+            },
+            {
+              "cells": 57,
+              "weight": 37.9,
+              "cx": 0.246,
+              "cy": 0.087,
+              "bbox": [
+                0.181,
+                0.065,
+                0.306,
+                0.112
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 15.43,
+              "cx": 0.53,
+              "cy": 0.535,
+              "bbox": [
+                0.403,
+                0.523,
+                0.667,
+                0.551
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 12.43,
+              "cx": 0.127,
+              "cy": 0.032,
+              "bbox": [
+                0.042,
+                0.019,
+                0.222,
+                0.037
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.166,
+        "centroid": {
+          "x": 0.359,
+          "y": 0.412
+        },
+        "colourfulness": 10.3,
+        "luminanceSpread": 0.463,
+        "chromaProxy": 0.027,
+        "hierarchyByHueOnly": false,
+        "inkPct": 44,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.156)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 16% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 59
+          },
+          {
+            "px": 16,
+            "n": 45
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 13
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 3
+          },
+          {
+            "px": 76,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 42.4
+        },
+        "squint": {
+          "masses": 38,
+          "competitors": 2,
+          "dominance": 0.2,
+          "top": [
+            {
+              "cells": 88,
+              "weight": 50.78,
+              "cx": 0.156,
+              "cy": 0.645,
+              "bbox": [
+                0.056,
+                0.613,
+                0.25,
+                0.675
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 35.76,
+              "cx": 0.148,
+              "cy": 0.885,
+              "bbox": [
+                0.069,
+                0.863,
+                0.236,
+                0.912
+              ]
+            },
+            {
+              "cells": 54,
+              "weight": 24.98,
+              "cx": 0.183,
+              "cy": 0.788,
+              "bbox": [
+                0.056,
+                0.762,
+                0.361,
+                0.813
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 15.83,
+              "cx": 0.586,
+              "cy": 0.832,
+              "bbox": [
+                0.528,
+                0.813,
+                0.639,
+                0.85
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 15.37,
+              "cx": 0.741,
+              "cy": 0.831,
+              "bbox": [
+                0.694,
+                0.813,
+                0.792,
+                0.85
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.141,
+        "centroid": {
+          "x": 0.382,
+          "y": 0.577
+        },
+        "colourfulness": 14.5,
+        "luminanceSpread": 0.423,
+        "chromaProxy": 0.044,
+        "hierarchyByHueOnly": false,
+        "inkPct": 53.7,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 59
+          },
+          {
+            "px": 16,
+            "n": 45
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 13
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 3
+          },
+          {
+            "px": 95,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\hse\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 51.5
+        },
+        "squint": {
+          "masses": 38,
+          "competitors": 3,
+          "dominance": 0.135,
+          "top": [
+            {
+              "cells": 57,
+              "weight": 17.41,
+              "cx": 0.373,
+              "cy": 0.393,
+              "bbox": [
+                0.306,
+                0.358,
+                0.458,
+                0.448
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 17.22,
+              "cx": 0.143,
+              "cy": 0.443,
+              "bbox": [
+                0.083,
+                0.418,
+                0.194,
+                0.463
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 15.49,
+              "cx": 0.816,
+              "cy": 0.284,
+              "bbox": [
+                0.764,
+                0.269,
+                0.903,
+                0.299
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 9.54,
+              "cx": 0.151,
+              "cy": 0.374,
+              "bbox": [
+                0.083,
+                0.358,
+                0.236,
+                0.388
+              ]
+            },
+            {
+              "cells": 17,
+              "weight": 7.68,
+              "cx": 0.128,
+              "cy": 0.114,
+              "bbox": [
+                0.069,
+                0.104,
+                0.181,
+                0.119
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.117,
+        "centroid": {
+          "x": 0.418,
+          "y": 0.417
+        },
+        "colourfulness": 10,
+        "luminanceSpread": 0.243,
+        "chromaProxy": 0.026,
+        "hierarchyByHueOnly": false,
+        "inkPct": 38.9,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.135)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 14% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [
+    {
+      "at": "light@1440",
+      "id": "everything-shouts",
+      "severity": "major",
+      "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.163)."
+    },
+    {
+      "at": "light@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 16% of visual weight (corpus p05 19%) — nothing leads the eye"
+    },
+    {
+      "at": "dark@1440",
+      "id": "everything-shouts",
+      "severity": "major",
+      "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.135)."
+    },
+    {
+      "at": "dark@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 14% of visual weight (corpus p05 19%) — nothing leads the eye"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

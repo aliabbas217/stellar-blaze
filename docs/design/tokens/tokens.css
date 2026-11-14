@@ -1,0 +1,330 @@
+/*
+ * REVISION 2 (design phase, 2026-11-11): docs/design/DESIGN.md R1-R6. Changes vs
+ * frontend/src/styles/tokens.css are marked `rev2`. Adopt by copying this file over it in F2.
+ *
+ * Arish Signal design tokens, the single source of every colour, space, radius,
+ * font, size and duration in the app (see /DESIGN.md for the rationale).
+ *
+ * Three tiers:
+ *   1. Primitives   --ref-*          raw values, referenced ONLY by tier 2.
+ *   2. Semantic     --surface, --ink, --level-amber, ...
+ *                                    role names; light values on :root, dark
+ *                                    values swapped under [data-theme="dark"] and,
+ *                                    when no override is set, under the system
+ *                                    preference. Components use these (through the
+ *                                    Tailwind names mapped in globals.css) and never
+ *                                    a --ref-* value.
+ *   3. Component    --pattern-*, --shade-*
+ *                                    hatch and shade-band sizes; reference tier 2.
+ *
+ * Rules that keep the theme swap correct:
+ *   - A semantic token must reference a primitive, never another semantic token.
+ *     A var() is resolved where it is declared, so a semantic-to-semantic alias
+ *     would go stale inside a nested [data-theme] subtree.
+ *   - The light values sit on `:root, [data-theme="light"]` so a nested
+ *     data-theme="light" subtree still works on a page that follows a dark system.
+ *   - The dark declarations appear twice (override, and system default). Change
+ *     both together; tests/unit/styles/tokens.test.ts fails if they differ, if
+ *     DESIGN.md disagrees with this file, or if a contrast pair drops below its floor.
+ *   - Names here must not equal a Tailwind theme key (--color-*, --text-*,
+ *     --radius-*, --font-*) or a next/font variable. A self-referencing
+ *     `--x: var(--x)` is emitted by `@theme inline` and silently breaks the value.
+ *
+ * Contrast (WCAG 2.2 relative luminance, computed from these OKLCH values):
+ * see the Colors section of /DESIGN.md.
+ */
+
+/* ---------- Tier 1: primitives ---------- */
+:root {
+  /* sand: warm desert neutral, the surface and ink ramp */
+  --ref-white: oklch(1 0 0);
+  --ref-black: oklch(0 0 0);
+  --ref-sand-50: oklch(0.975 0.012 80);
+  --ref-sand-100: oklch(0.95 0.02 80);
+  --ref-sand-200: oklch(0.9 0.03 78);
+  --ref-sand-300: oklch(0.83 0.04 76);
+  --ref-sand-500: oklch(0.6 0.045 70);
+  --ref-sand-600: oklch(0.52 0.04 68);
+  --ref-sand-700: oklch(0.42 0.035 65);
+  --ref-sand-900: oklch(0.24 0.02 60);
+  --ref-sand-950: oklch(0.17 0.015 60);
+
+  /* falaj: the teal of the aflaj irrigation channels, the one action hue */
+  --ref-falaj-300: oklch(0.8 0.08 198);
+  --ref-falaj-600: oklch(0.5 0.08 205);
+  --ref-falaj-700: oklch(0.42 0.07 208);
+  /* rev2 R6: low-chroma falaj for the 'ours' highlight */
+  --ref-falaj-soft: oklch(0.93 0.03 205);
+  --ref-falaj-dark: oklch(0.3 0.04 205);
+
+  /* level fills, the only saturated colours in the product */
+  --ref-level-green: oklch(0.52 0.13 150);
+  --ref-level-amber: oklch(0.82 0.16 85);
+  --ref-level-orange: oklch(0.7 0.17 50);
+  --ref-level-red: oklch(0.5 0.19 27);
+
+  /* soft tints and their ink (light theme) */
+  --ref-green-soft: oklch(0.93 0.05 150);
+  --ref-green-ink: oklch(0.38 0.1 150);
+  --ref-amber-soft: oklch(0.95 0.06 90);
+  --ref-amber-ink: oklch(0.45 0.09 75);
+  --ref-orange-soft: oklch(0.93 0.04 55);
+  --ref-orange-ink: oklch(0.45 0.12 45);
+  --ref-red-soft: oklch(0.93 0.035 27);
+  --ref-red-ink: oklch(0.42 0.16 27);
+
+  /* soft tints (dark theme): same hue, L 0.30, C 0.05 */
+  --ref-green-dark: oklch(0.3 0.05 150);
+  --ref-amber-dark: oklch(0.3 0.05 85);
+  --ref-orange-dark: oklch(0.3 0.05 50);
+  --ref-red-dark: oklch(0.3 0.05 27);
+}
+
+/* ---------- Tier 2: semantic, light (default) ---------- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --surface: var(--ref-sand-50);
+  --surface-raised: var(--ref-sand-100);
+  --ink: var(--ref-sand-950);
+  --ink-muted: var(--ref-sand-700);
+  --hairline: var(--ref-sand-300);
+  --control: var(--ref-sand-500);
+  --action: var(--ref-falaj-600);
+  --on-action: var(--ref-white);
+  --focus: var(--ref-falaj-700);
+  --scrim: var(--ref-sand-950);
+
+  /* rev2 R1: sign rim, the black band of a warning sign */
+  --sign-rim: var(--ref-sand-950);
+  /* rev2 R6 */
+  --action-soft: var(--ref-falaj-soft);
+  --on-action-soft: var(--ref-falaj-700);
+  /* rev2 R3: data viz */
+  --viz-truth: var(--ref-sand-950);
+  --viz-raw: var(--ref-sand-700);
+  --viz-ours: var(--ref-falaj-600);
+  --viz-grid: var(--ref-sand-300);
+  --viz-danger: var(--ref-level-red);
+
+  --level-green: var(--ref-level-green);
+  --on-level-green: var(--ref-white);
+  --level-green-soft: var(--ref-green-soft);
+  --on-level-green-soft: var(--ref-green-ink);
+
+  --level-amber: var(--ref-level-amber);
+  --on-level-amber: var(--ref-sand-950);
+  --level-amber-soft: var(--ref-amber-soft);
+  --on-level-amber-soft: var(--ref-amber-ink);
+
+  --level-orange: var(--ref-level-orange);
+  --on-level-orange: var(--ref-sand-950);
+  --level-orange-soft: var(--ref-orange-soft);
+  --on-level-orange-soft: var(--ref-orange-ink);
+
+  --level-red: var(--ref-level-red);
+  --on-level-red: var(--ref-white);
+  --level-red-soft: var(--ref-red-soft);
+  --on-level-red-soft: var(--ref-red-ink);
+}
+
+/* ---------- Tier 2: semantic, dark (explicit override) ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface: var(--ref-sand-950);
+  --surface-raised: var(--ref-sand-900);
+  --ink: var(--ref-sand-50);
+  --ink-muted: var(--ref-sand-300);
+  --hairline: var(--ref-sand-700);
+  --control: var(--ref-sand-500);
+  --action: var(--ref-falaj-300);
+  --on-action: var(--ref-sand-950);
+  --focus: var(--ref-falaj-300);
+  --scrim: var(--ref-black);
+
+  /* rev2 R1: sign rim, the white band of a sign on a dark page */
+  --sign-rim: var(--ref-sand-50);
+  /* rev2 R6 */
+  --action-soft: var(--ref-falaj-dark);
+  --on-action-soft: var(--ref-sand-50);
+  /* rev2 R3: data viz */
+  --viz-truth: var(--ref-sand-50);
+  --viz-raw: var(--ref-sand-300);
+  --viz-ours: var(--ref-falaj-300);
+  --viz-grid: var(--ref-sand-700);
+  --viz-danger: var(--ref-level-red);
+
+  /* level fills and their on-colours are unchanged in dark; only the soft tints swap */
+  --level-green-soft: var(--ref-green-dark);
+  --on-level-green-soft: var(--ref-sand-50);
+  --level-amber-soft: var(--ref-amber-dark);
+  --on-level-amber-soft: var(--ref-sand-50);
+  --level-orange-soft: var(--ref-orange-dark);
+  --on-level-orange-soft: var(--ref-sand-50);
+  --level-red-soft: var(--ref-red-dark);
+  --on-level-red-soft: var(--ref-sand-50);
+}
+
+/* ---------- Tier 2: semantic, dark (system default when no override) ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --surface: var(--ref-sand-950);
+    --surface-raised: var(--ref-sand-900);
+    --ink: var(--ref-sand-50);
+    --ink-muted: var(--ref-sand-300);
+    --hairline: var(--ref-sand-700);
+    --control: var(--ref-sand-500);
+    --action: var(--ref-falaj-300);
+    --on-action: var(--ref-sand-950);
+    --focus: var(--ref-falaj-300);
+    --scrim: var(--ref-black);
+
+    /* rev2 */
+    --sign-rim: var(--ref-sand-50);
+    --action-soft: var(--ref-falaj-dark);
+    --on-action-soft: var(--ref-sand-50);
+    --viz-truth: var(--ref-sand-50);
+    --viz-raw: var(--ref-sand-300);
+    --viz-ours: var(--ref-falaj-300);
+    --viz-grid: var(--ref-sand-700);
+    --viz-danger: var(--ref-level-red);
+
+    --level-green-soft: var(--ref-green-dark);
+    --on-level-green-soft: var(--ref-sand-50);
+    --level-amber-soft: var(--ref-amber-dark);
+    --on-level-amber-soft: var(--ref-sand-50);
+    --level-orange-soft: var(--ref-orange-dark);
+    --on-level-orange-soft: var(--ref-sand-50);
+    --level-red-soft: var(--ref-red-dark);
+    --on-level-red-soft: var(--ref-sand-50);
+  }
+}
+
+/* ---------- Tier 2: semantic, non-colour (theme independent) ---------- */
+:root {
+  /* space: the 4 px grid; N is the Tailwind step (p-4 is 16 px) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* shape: cut-sign corners, 2 px rules, no drop shadows */
+  --radius-sign: 2px;
+  --rule: 2px;
+  --rule-hairline: 1px;
+  --focus-width: 3px;
+  --focus-offset: 2px;
+  --rim-width: 2px; /* rev2 R1 */
+
+  /* rev2 R5: layout */
+  --content-max: 80rem;
+  --worker-max: 30rem;
+  --measure: 66ch;
+  --grid-columns: 12;
+  --grid-gutter: var(--space-6);
+  --target-worker: 2.75rem; /* 44 px, gloved hands */
+
+  /* type sizes: major-third steps (x1.25) with a display jump; rem so text zoom works */
+  --size-label: 0.875rem;
+  --size-body: 1rem;
+  --size-lead: 1.25rem;
+  --size-title: 1.5625rem;
+  --size-headline: 1.953rem;
+  --size-display: 3.052rem;
+  --size-numeral: 4.768rem;
+  --size-mega: 5.96rem; /* rev2 R5: desktop scoreboard counters only */
+
+  /* line height: Arabic-script text needs more room than Latin; Nastaliq the most */
+  --leading-solid: 1; /* Western digits and Latin display words only, never text that can be Arabic-script or Indic */
+  --leading-body: 1.5;
+  --leading-ar: 1.8;
+  --leading-ur: 2.1;
+
+  /* font fallbacks; the loaded family arrives through next/font as --font-display / --font-body */
+  --font-display-fallback: "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body-fallback: system-ui, sans-serif;
+  /* rev2: system monospace, for SHA-256 hashes and reproduce commands in the proof drawer only */
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* motion: opacity on state change only, switched off for reduced motion */
+  --duration-state: 150ms;
+}
+
+/*
+ * Letter-spacing (tracking) for uppercase signage headings: Latin only. Arabic-script text is
+ * cursive and browsers drop or break joins when it is spaced, and Devanagari and Bengali lose
+ * their joined top bar. Any non-English language therefore gets zero. The rules are mutually
+ * exclusive, so a nested lang="ar" span inside an English page still resets to zero.
+ */
+:lang(en) {
+  --tracking-signage: 0.025em;
+}
+
+:not(:lang(en)) {
+  --tracking-signage: 0em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-state: 0ms;
+  }
+}
+
+/* ---------- Tier 3: component (patterns and the shade band) ---------- */
+:root {
+  /*
+   * The hatch colour is the element's own text colour (on-level-*) at 35 percent, so
+   * it follows the level and the theme. `currentColor` stays a keyword until it is
+   * used, which is why the pattern is built here and not from a --pattern-ink that
+   * would have to be set per element.
+   * Text never sits directly on a hatch: it sits on a solid plate (see DESIGN.md).
+   */
+  --pattern-ink: color-mix(in oklch, currentColor 35%, transparent);
+  --pattern-stripe: 2px;
+  --pattern-pitch-amber: 12px;
+  --pattern-pitch-orange: 7px;
+  --pattern-pitch-red: 6px;
+
+  --pattern-level-green: none;
+  --pattern-level-amber: repeating-linear-gradient(
+    135deg,
+    var(--pattern-ink) 0 var(--pattern-stripe),
+    transparent var(--pattern-stripe) var(--pattern-pitch-amber)
+  );
+  --pattern-level-orange: repeating-linear-gradient(
+    135deg,
+    var(--pattern-ink) 0 var(--pattern-stripe),
+    transparent var(--pattern-stripe) var(--pattern-pitch-orange)
+  );
+  --pattern-level-red:
+    repeating-linear-gradient(
+      135deg,
+      var(--pattern-ink) 0 var(--pattern-stripe),
+      transparent var(--pattern-stripe) var(--pattern-pitch-red)
+    ),
+    repeating-linear-gradient(
+      45deg,
+      var(--pattern-ink) 0 var(--pattern-stripe),
+      transparent var(--pattern-stripe) var(--pattern-pitch-red)
+    );
+
+  /* shade band: one cell per forecast hour */
+  --shade-cell-height: 4.5rem;
+  --shade-cell-gap: var(--rule);
+  --shade-plate-padding: var(--space-1);
+
+  /* rev2 R3/R1: viz band, ban hatch, season ribbon */
+  --viz-ours-band: color-mix(in oklch, var(--viz-ours) 22%, transparent);
+  --viz-ban: repeating-linear-gradient(135deg, var(--viz-grid) 0 1px, transparent 1px 6px);
+  --ribbon-cell-width: 0.375rem;
+  --ribbon-cell-height: 3rem;
+}

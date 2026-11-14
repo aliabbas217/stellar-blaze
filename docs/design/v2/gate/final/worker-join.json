@@ -1,0 +1,214 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/worker-join.html",
+  "when": "2026-11-12T01:05:46.696Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\worker-join\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\worker-join\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 1
+          },
+          {
+            "px": 13,
+            "n": 31
+          },
+          {
+            "px": 14,
+            "n": 5
+          },
+          {
+            "px": 15,
+            "n": 5
+          },
+          {
+            "px": 16,
+            "n": 22
+          },
+          {
+            "px": 18,
+            "n": 16
+          },
+          {
+            "px": 22,
+            "n": 6
+          },
+          {
+            "px": 28,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 1
+          },
+          {
+            "px": 76,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 10,
+        "fontFamilies": [
+          "Archivo",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Bengali",
+          "Noto Sans Arabic"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 42
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 8
+          },
+          {
+            "px": 6,
+            "n": 3
+          },
+          {
+            "px": 5,
+            "n": 2
+          },
+          {
+            "px": 55,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 15,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Join your crew · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\worker-join\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 65.8
+        },
+        "squint": {
+          "masses": 10,
+          "competitors": 1,
+          "dominance": 0.836,
+          "top": [
+            {
+              "cells": 601,
+              "weight": 531.06,
+              "cx": 0.498,
+              "cy": 0.844,
+              "bbox": [
+                0.042,
+                0.804,
+                0.944,
+                0.888
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 29.77,
+              "cx": 0.113,
+              "cy": 0.408,
+              "bbox": [
+                0.056,
+                0.364,
+                0.167,
+                0.449
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 20.08,
+              "cx": 0.298,
+              "cy": 0.417,
+              "bbox": [
+                0.264,
+                0.383,
+                0.333,
+                0.449
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 18.51,
+              "cx": 0.508,
+              "cy": 0.413,
+              "bbox": [
+                0.472,
+                0.383,
+                0.542,
+                0.449
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 17.78,
+              "cx": 0.396,
+              "cy": 0.411,
+              "bbox": [
+                0.361,
+                0.383,
+                0.444,
+                0.439
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.191,
+        "centroid": {
+          "x": 0.439,
+          "y": 0.681
+        },
+        "colourfulness": 19.1,
+        "luminanceSpread": 0.93,
+        "chromaProxy": 0.074,
+        "hierarchyByHueOnly": false,
+        "inkPct": 31.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

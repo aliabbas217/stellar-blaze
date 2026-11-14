@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="index">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar Blaze prototype · index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  .roles { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 48rem) { .roles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .role { display: grid; gap: var(--space-3); align-content: start; text-decoration: none; }
+  .role:hover { border-color: var(--ink); }
+  .views { display: grid; gap: var(--space-8); grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 64rem) { .views { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .views li { padding-block: var(--space-2); }
+  .views a { font-weight: 600; }
+  .hero-signs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+</style>
+</head>
+<body data-states="ideal">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <span class="brand">Stellar Blaze</span>
+    <span class="t-label t-muted">Design prototype for review, 12 Nov 2026</span>
+  </div>
+</header>
+
+<main id="main" class="desk stack stack-12" data-state="ideal">
+  <section class="stack stack-4" aria-labelledby="h">
+    <div class="hero-signs" aria-hidden="true">
+      <span class="sign lv-green sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-green"/></svg><b class="t-title">1</b></span></span>
+      <span class="sign lv-amber sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-amber"/></svg><b class="t-title">2</b></span></span>
+      <span class="sign lv-orange sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-orange"/></svg><b class="t-title">3</b></span></span>
+      <span class="sign lv-red sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title">4</b></span></span>
+    </div>
+    <h1 class="t-display" id="h">Choose your role</h1>
+    <p class="t-lead measure">This demo has no login. Every number is a labelled placeholder until the evaluation exporters produce real results.</p>
+  </section>
+
+  <nav class="roles" aria-label="Roles">
+    <a class="card role" href="worker-today.html">
+      <svg class="ico" width="40" height="40"><use href="#i-today"/></svg>
+      <span class="t-title">Worker</span>
+      <span class="t-muted">Today's heat level on your phone, in your language.</span>
+    </a>
+    <a class="card role" href="supervisor-crews.html">
+      <svg class="ico" width="40" height="40"><use href="#i-crew"/></svg>
+      <span class="t-title">Supervisor</span>
+      <span class="t-muted">Crew plans, sign-off, stop work and crew relay.</span>
+    </a>
+    <a class="card role" href="hse.html">
+      <svg class="ico" width="40" height="40"><use href="#i-eye"/></svg>
+      <span class="t-title">HSE</span>
+      <span class="t-muted">Site aggregates only. Small groups are hidden.</span>
+    </a>
+  </nav>
+
+  <section class="stack stack-6" aria-labelledby="all">
+    <div class="spread">
+      <h2 class="t-headline" id="all">Every view</h2>
+      <a class="btn btn--primary" href="replay-season.html">Start the judges' replay</a>
+    </div>
+    <p class="t-muted measure">Each view has a control bar at the top (not part of the product) to switch its states (loading, empty, error, partial), the theme, and on worker views the language (English or Urdu, right to left).</p>
+    <div class="views">
+      <div class="stack stack-2">
+        <h3 class="panel-title">Worker (phone, 390 px)</h3>
+        <ul>
+          <li><a class="link" href="worker-today.html">Today</a>: level sign, actions, shade band</li>
+          <li><a class="link" href="worker-setup.html">Set up once</a>: consent and profile</li>
+          <li><a class="link" href="worker-alert.html">Alert card</a></li>
+          <li><a class="link" href="worker-unwell.html">I feel unwell</a></li>
+          <li><a class="link" href="worker-alerts.html">Alerts</a>: on, blocked, install help</li>
+          <li><a class="link" href="worker-data.html">My data</a>: stored fields and who asked</li>
+        </ul>
+      </div>
+      <div class="stack stack-2">
+        <h3 class="panel-title">Supervisor, HSE, admin</h3>
+        <ul>
+          <li><a class="link" href="supervisor-crews.html">Crews today</a></li>
+          <li><a class="link" href="supervisor-crew.html">Crew plan</a>: timeline, break plan, sign-off</li>
+          <li><a class="link" href="supervisor-relay.html">Crew relay</a></li>
+          <li><a class="link" href="hse.html">HSE week</a></li>
+          <li><a class="link" href="admin-config.html">Runtime config</a> (F2 stretch)</li>
+        </ul>
+      </div>
+      <div class="stack stack-2">
+        <h3 class="panel-title">Judges' replay (desktop)</h3>
+        <ul>
+          <li><a class="link" href="replay-season.html">Summer 2026 scoreboard</a></li>
+          <li><a class="link" href="replay-day.html">The pre-registered day</a></li>
+          <li><a class="link" href="replay-validator.html">Try a plan</a></li>
+          <li><a class="link" href="replay-frontier.html">Roster frontier</a></li>
+          <li><a class="link" href="replay-climate.html">Same summer, warmer</a> (cut first)</li>
+          <li><a class="link" href="replay-governance.html">Governance refusal</a></li>
+          <li><a class="link" href="replay-faults.html">Break things</a></li>
+          <li><a class="link" href="replay-next.html">What's next</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="assets/proto.js"></script>
+</body>
+</html>

@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar Blaze · Heat-stress forecasts for UAE outdoor crews</title>
+<meta name="description" content="Hour-by-hour heat levels, legal shift plans and warnings for outdoor crews in the UAE. Summer 2026 replayed against airport thermometers.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<link rel="modulepreload" href="assets/kit.js"><link rel="modulepreload" href="assets/heat.js"><link rel="modulepreload" href="assets/judge.js">
+<style>
+/* ---------- hero: the IFS WBGT terrain owns the fold ---------- */
+.hero { position: relative; height: calc(100svh - 61px); min-height: 660px; max-height: 960px; overflow: hidden; border-bottom: 1px solid var(--hair); }
+.stage { position: absolute; inset: 0; }
+#field, #flat { position: absolute; inset: 0; width: 100%; height: 100%; }
+#field { opacity: 0; transition: opacity var(--dur-2) var(--ease); }
+#field.on { opacity: 1; }
+.shade { position: absolute; inset: 0; pointer-events: none; background:
+  linear-gradient(90deg, var(--ground) 0%, color-mix(in oklch, var(--ground) 80%, transparent) 34%, color-mix(in oklch, var(--ground) 0%, transparent) 56%),
+  linear-gradient(0deg, var(--ground) 0%, color-mix(in oklch, var(--ground) 0%, transparent) 24%); }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.stn { position: absolute; transform: translate(-50%, -100%); padding-bottom: 7px; white-space: nowrap; font-size: var(--t-13); color: var(--ink); }
+.stn b { font-weight: 500; background: var(--ground); padding: 2px 6px; border-radius: 1px; }
+.stn::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 1px; height: 7px; background: var(--ground); }
+.copy { position: absolute; z-index: 3; inset-inline-start: clamp(16px, 3vw, 40px); top: clamp(48px, 12vh, 128px); max-width: 540px; display: grid; gap: var(--s-6); }
+.copy .k { color: var(--ink-3); font-size: var(--t-14); }
+.copy .j-lede { font-size: var(--t-18); max-width: 44ch; }
+.cta { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.readout { position: absolute; z-index: 3; inset-inline-end: clamp(16px, 3vw, 40px); bottom: 136px; width: 316px; background: color-mix(in oklch, var(--ground) 88%, transparent); border: 1px solid var(--hair); border-radius: var(--r); padding: var(--s-4); display: grid; gap: var(--s-2); }
+.readout .lbl { color: var(--ink-3); font-size: var(--t-13); }
+.readout .big { font: 300 var(--t-48)/1 var(--sans); letter-spacing: -0.03em; }
+.readout .big small { font-size: var(--t-18); color: var(--ink-2); margin-inline-start: 4px; letter-spacing: 0; }
+.readout dl { display: grid; grid-template-columns: 1fr auto; border-top: 1px solid var(--hair); margin-top: var(--s-1); }
+.readout dt, .readout dd { padding: 7px 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.readout dt { color: var(--ink-2); } .readout dd { text-align: end; }
+.readout .src { color: var(--ink-3); font-size: var(--t-12); line-height: 1.45; }
+.readout .src-row { display: flex; gap: var(--s-2); align-items: flex-start; justify-content: space-between; }
+.scrub { position: absolute; z-index: 3; inset-inline: clamp(16px, 3vw, 40px); bottom: 18px; display: grid; grid-template-columns: 44px minmax(0, 1fr) 200px; gap: var(--s-4); align-items: center; }
+.play { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--edge); border-radius: var(--r); background: var(--ground); }
+.track { position: relative; view-transition-name: spine; }
+.track .ribbon .r-label { font-size: 12px; }
+.track .hit { position: absolute; inset: 0; cursor: pointer; touch-action: none; border-radius: var(--r); }
+.when { font-size: var(--t-14); color: var(--ink-2); text-align: end; }
+.when b { display: block; color: var(--ink); font-weight: 500; font-size: var(--t-16); }
+
+/* ---------- console (from Watch): stations, needs attention, event log ---------- */
+.console { max-width: var(--content-max); margin-inline: auto; padding: var(--s-12) clamp(16px, 3vw, 40px) 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr) minmax(0, 1fr); gap: var(--s-4); }
+.console > header { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); flex-wrap: wrap; }
+.console > header h2 { font: 500 var(--t-22)/1.25 var(--sans); }
+.st-list { list-style: none; padding: 0; }
+.st { display: grid; grid-template-columns: 48px minmax(0, 1fr) 96px 64px; gap: var(--s-3); align-items: center; min-height: 48px; padding: 0 var(--s-4); border-bottom: 1px solid var(--hair); }
+.st:last-child { border-bottom: 0; }
+.st .code { font-family: var(--mono); font-size: var(--t-13); color: var(--ink-2); }
+.st .nm { font-size: var(--t-14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st .v { text-align: end; font-size: var(--t-16); font-weight: 500; white-space: nowrap; }
+.st.hot { box-shadow: inset 2px 0 0 var(--signal); }
+.st.hot .code { color: var(--signal); }
+.att { display: grid; gap: var(--s-2); }
+.att .who { font-size: var(--t-16); font-weight: 500; }
+.att .who .mono { color: var(--ink-3); margin-inline-start: var(--s-2); }
+.att .big { font: 300 var(--t-64)/1 var(--sans); letter-spacing: -0.03em; }
+.att .big small { font-size: var(--t-22); color: var(--ink-2); margin-inline-start: 4px; letter-spacing: 0; }
+.att .delta { color: var(--ink-2); }
+.att dl { display: grid; grid-template-columns: 1fr auto; margin-top: var(--s-3); border-top: 1px solid var(--hair); }
+.att dt, .att dd { padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.att dt { color: var(--ink-3); } .att dd { text-align: end; }
+.ev-list { list-style: none; padding: 0; }
+.ev { display: grid; grid-template-columns: 52px 1fr; gap: var(--s-3); padding: 9px var(--s-4); border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.ev:last-child { border-bottom: 0; }
+.ev time { color: var(--ink-3); }
+.ev.future { color: var(--ink-3); }
+.ev.now { box-shadow: inset 2px 0 0 var(--signal); color: var(--ink); }
+.ev.now time { color: var(--signal); }
+
+/* offscreen sections skip style, layout and paint until they near the viewport */
+.console, .chapter, footer.colophon { content-visibility: auto; contain-intrinsic-size: auto 900px; }
+/* ---------- chapters (B's narrative) ---------- */
+.chapter { max-width: var(--content-max); margin-inline: auto; padding: var(--s-24) clamp(16px, 3vw, 40px) 0; display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: var(--s-12); scroll-margin-top: 16px; }
+.chapter .side { display: grid; gap: var(--s-4); align-content: start; position: sticky; top: var(--s-6); }
+.chapter .n { color: var(--ink-3); font-size: var(--t-14); }
+.chapter .side p.body { color: var(--ink-2); max-width: 46ch; }
+.chapter .main { display: grid; gap: var(--s-6); align-content: start; min-width: 0; }
+.chapter .go { justify-self: start; }
+.mini-tbl td:first-child { font-weight: 500; }
+.mini-tbl td small { display: block; color: var(--ink-3); font-size: var(--t-13); font-weight: 400; }
+.artefacts { list-style: none; padding: 0; border-top: 1px solid var(--edge); }
+.artefacts li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-2) var(--s-6); padding: var(--s-4) 0; border-bottom: 1px solid var(--hair); }
+.artefacts b { font-weight: 600; }
+.artefacts p { color: var(--ink-2); font-size: var(--t-14); grid-column: 1; }
+.artefacts .mono { color: var(--ink-3); grid-column: 1; overflow-wrap: anywhere; font-size: var(--t-12); }
+.artefacts .proof { grid-column: 2; grid-row: 1; align-self: start; }
+.surfaces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
+.surfaces .surface:first-child { grid-row: span 2; grid-template-rows: 1fr auto; }
+.surfaces .surface:first-child .mini svg { max-height: 360px; }
+.surface { display: grid; grid-template-rows: 200px auto; gap: var(--s-3); padding: var(--s-4); background: var(--panel); border: 1px solid var(--hair); border-radius: var(--r); text-decoration: none; transition: border-color var(--dur-1) var(--ease); }
+.surface:hover { border-color: var(--edge); }
+.surface .mini { display: grid; place-items: center; overflow: hidden; }
+.surface .mini svg { max-width: 100%; max-height: 200px; }
+.surface h3 { font: 600 var(--t-16)/1.3 var(--sans); }
+.surface p { color: var(--ink-2); font-size: var(--t-14); }
+.surface .role { color: var(--ink-3); font-size: var(--t-13); }
+.surface .ribbon .r-label { font-size: 12px; }
+.sentence { font-size: var(--t-16); line-height: 2; color: var(--ink-2); max-width: 30ch; }
+.sentence u { text-decoration: none; color: var(--ink); border-bottom: 2px solid var(--signal); padding-bottom: 1px; }
+.road { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--edge); }
+.road div { padding: var(--s-4) var(--s-4) var(--s-4) 0; display: grid; gap: var(--s-1); align-content: start; }
+.road strong { font: 400 var(--t-36)/1 var(--sans); }
+.road span { color: var(--ink-2); font-size: var(--t-14); }
+.road em { font-style: normal; color: var(--ink-3); font-size: var(--t-13); }
+footer.colophon { max-width: var(--content-max); margin: var(--s-24) auto 0; padding: var(--s-6) clamp(16px, 3vw, 40px) var(--s-16); border-top: 1px solid var(--hair); display: grid; gap: var(--s-2); color: var(--ink-3); font-size: var(--t-13); }
+
+/* ---------- the story stepper (index.html?step=...) ---------- */
+.stepper { position: fixed; inset-inline: 0; bottom: 0; z-index: 30; background: var(--ground); border-top: 1px solid var(--edge); transform: translateY(100%); transition: transform var(--dur-2) var(--ease); }
+.stepper.on { transform: none; }
+.stepper .in { max-width: var(--content-max); margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4); align-items: center; padding: var(--s-2) clamp(16px, 3vw, 40px); }
+.stepper .j-dots { justify-content: flex-start; }
+.stepper .ctl { display: flex; gap: var(--s-2); align-items: center; }
+.stepper .copied { font-size: var(--t-13); color: var(--ink-3); min-width: 6ch; }
+.stepper .cur { display: none; font-size: var(--t-13); color: var(--ink-2); }
+body { padding-bottom: 64px; }
+
+@media (max-width: 1100px) { .console { grid-template-columns: 1fr 1fr; } .console .log { grid-column: 1 / -1; } .surfaces { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px) {
+  .hero { height: auto; max-height: none; min-height: 0; display: flex; flex-direction: column; overflow: visible; }
+  .copy, .readout, .scrub { position: relative; inset: auto; }
+  .copy { order: 1; padding: var(--s-6) var(--s-4) 0; max-width: none; gap: var(--s-4); }
+  .copy .cta .btn { flex: 1 1 100%; }
+  .stage { position: relative; order: 2; height: 360px; margin-top: var(--s-2); }
+  .shade { background: linear-gradient(180deg, var(--ground) 0%, color-mix(in oklch, var(--ground) 0%, transparent) 14%, color-mix(in oklch, var(--ground) 0%, transparent) 86%, var(--ground) 100%); }
+  .scrub { order: 3; margin: 0 var(--s-4); grid-template-columns: 44px minmax(0, 1fr); }
+  .scrub .when { grid-column: 1 / -1; text-align: start; }
+  .readout { order: 4; margin: var(--s-4); width: auto; }
+  .chapter { grid-template-columns: 1fr; gap: var(--s-6); padding-top: var(--s-16); }
+  .chapter .side { position: static; }
+}
+@media (max-width: 760px) {
+  .console { grid-template-columns: 1fr; padding-top: var(--s-8); }
+  .st { grid-template-columns: 40px minmax(0, 1fr) 56px 68px; gap: var(--s-2); padding: 0 var(--s-3); } .st svg { width: 56px; height: auto; }
+  .surfaces { grid-template-columns: 1fr; } .surfaces .surface:first-child { grid-row: auto; }
+  .road { grid-template-columns: 1fr 1fr; }
+  .stepper .j-dots { display: none; }
+  .stepper .cur { display: block; }
+  .stepper .copy-link, .stepper .copied { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { #field, .stepper { transition: none; } }
+</style>
+</head>
+<body>
+<a class="skip" href="judge-season.html">Skip to the scoreboard</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Heat-stress forecasts for outdoor crews in the UAE</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main>
+<section class="hero" aria-labelledby="h1">
+  <div class="stage" aria-hidden="true">
+    <canvas id="flat"></canvas>
+    <canvas id="field"></canvas>
+    <div class="shade"></div>
+    <div class="labels" id="labels"></div>
+  </div>
+
+  <div class="copy">
+    <p class="k">Summer 2026, replayed against airport thermometers</p>
+    <h1 class="j-h1" id="h1">Heat that stops work, forecast the evening before.</h1>
+    <p class="j-lede">Hour-by-hour heat levels, legal shift plans and warnings in six languages for every outdoor crew. Every number on this site can be traced to its file.</p>
+    <div class="cta"><a class="btn primary lg" href="judge-season.html">See the scoreboard</a><a class="btn lg" href="index.html?step=problem" data-step="problem">Walk me through it</a></div>
+  </div>
+
+  <aside class="readout" aria-label="Field reading at the selected hour">
+    <p class="lbl" id="r-lbl">Hottest point in the UAE at 14:00</p>
+    <p class="big" id="r-peak">39.4<small>°C</small></p>
+    <p class="mono" id="r-where" style="color:var(--ink-3)">24.50 N 54.75 E</p>
+    <dl>
+      <dt>Abu Dhabi airport <span class="mono">OMAA</span></dt><dd id="r-omaa">39.4 °C</dd>
+      <dt>Heavy-work limit (NIOSH)</dt><dd>26.6 °C</dd>
+    </dl>
+    <div class="src-row"><p class="src">WBGT in sun from the ECMWF forecast issued the day before. Thu 3 Sep 2026, the hottest forecast of the summer, shown for illustration.</p>
+      <button class="proof" type="button" id="field-proof" data-proof='{"what":"WBGT field, 3 Sep 2026, every hour","protocol":"Illustration only: the hottest OMAA day-1 forecast of 15 May to 30 Sep 2026. The scored day is fixed separately in the protocol.","script":"stellar_blaze.domain.physics.wbgt.wbgt_liljegren","file":"data/uae_ifs025_d1_wbgt_2026-09-03.json","sha":"computing…","label":"Real forecast (ECMWF IFS 0.25°, issued the day before, Open-Meteo archive, fetched 11 Nov 2026). Not station truth."}'>Source</button></div>
+  </aside>
+
+  <div class="scrub">
+    <button class="play" id="play" type="button" aria-label="Pause the day"></button>
+    <div class="track"><div class="ribbon" id="spine"></div><div class="hit" id="hit" role="slider" tabindex="0" aria-label="Hour of the day, 3 Sep 2026" aria-valuemin="0" aria-valuemax="23" aria-valuenow="14"></div></div>
+    <p class="when"><b id="when-h">14:00</b>Thu 3 Sep 2026, Gulf time</p>
+  </div>
+</section>
+
+<section class="console" aria-labelledby="h-con" data-when="ideal loading">
+  <header><h2 id="h-con">The same hour, station by station</h2><p class="j-src">Abu Dhabi airport is its own forecast series; the other stations read the forecast grid at their location.</p></header>
+  <section class="panel" aria-labelledby="h-st"><div class="panel-h"><h3 id="h-st">Stations</h3><span class="faint">24 hours, dashed line at 26.6 °C</span></div><ol class="st-list" id="stations"></ol></section>
+  <section class="panel" aria-labelledby="h-att"><div class="panel-h"><h3 id="h-att">Needs attention</h3><span class="faint" id="att-h">at 14:00</span></div>
+    <div class="panel-b att" aria-live="polite">
+      <p class="who"><span id="att-name">Abu Dhabi airport</span><span class="mono" id="att-code">OMAA</span></p>
+      <p class="big" id="att-v">39.4<small>°C</small></p>
+      <p class="delta" id="att-d">12.8 °C over the heavy-work limit</p>
+      <dl><dt>Grid cells over 26.6 °C</dt><dd id="att-cells">374 of 374</dd><dt>Midday break</dt><dd id="att-ban">In force to 15:00</dd></dl>
+    </div></section>
+  <section class="panel log" aria-labelledby="h-ev"><div class="panel-h"><h3 id="h-ev">The day so far</h3><span class="faint">computed from the forecast</span></div><ol class="ev-list" id="events"></ol></section>
+</section>
+
+<section class="console" data-when="error"><div class="empty" style="grid-column:1/-1"><h3>The forecast files did not load</h3><p class="muted">The scoreboard and the proof pages still work. Reload to try the field again.</p><a class="btn primary" href="judge-season.html">See the scoreboard</a></div></section>
+
+<!-- ---------------- the story ---------------- -->
+<section class="chapter" id="problem" aria-labelledby="h-p" data-chapter>
+  <div class="side">
+    <p class="n">Chapter 1 of 6 · The problem</p>
+    <h2 class="j-h2" id="h-p">The midday break stops <span id="p-ban">279</span> of the <span id="p-over">1,624</span> working hours too hot for heavy work</h2>
+    <p class="body">From 15 June to 15 September the law stops outdoor work from 12:30 to 15:00. The heat does not keep to that window: mornings pass the limit by nine, and evenings are still above it at six.</p>
+    <p class="body">A crew needs to know which hours, not which months. That is the forecast we give them the evening before.</p>
+  </div>
+  <div class="main">
+    <div class="j-nums" id="nums">
+      <div><strong id="n-over">1,624<small>of 1,807</small></strong><span>working-hour forecasts above 26.6 °C, 06:00 to 19:00, 15 May to 30 Sep</span></div>
+      <div><strong id="n-ban">279</strong><span>of them inside the midday break, counting the 12:00 hour in full, which flatters the break</span></div>
+      <div><strong id="n-days">139<small>of 139</small></strong><span>days whose forecast peak crossed the limit</span></div>
+    </div>
+    <figure>
+      <div class="j-chart" id="cal" style="min-height:330px"></div>
+      <figcaption class="j-legend" style="margin-top:var(--s-2)"><span><i class="sw slot"></i>Midday break, by law</span><span>Coloured: above 26.6 °C, brighter is hotter</span><span>Grey: under the limit</span><button class="proof" type="button" id="cal-proof" data-proof='{"what":"1,624 of 1,807 working-hour forecasts above 26.6 °C; 279 inside the midday break","protocol":"Count of hours 06:00 to 18:59 (13 per day), 15 May to 30 Sep 2026, where the day-1 forecast WBGT is above 26.6 °C. The break window counts hours 12, 13 and 14 from 15 Jun to 15 Sep.","script":"assets/judge.js seasonFacts()","file":"data/omaa_2026_ifs_d1_wbgt_hourly.json","sha":"computing…","label":"Real forecast at Abu Dhabi airport (OMAA). Forecast, not station truth."}'>How this is counted</button></figcaption>
+    </figure>
+    <details class="j-alt"><summary>Show the counts as a table</summary><table class="tbl" id="cal-tbl"></table></details>
+  </div>
+</section>
+
+<section class="chapter" id="scoreboard" aria-labelledby="h-s" data-chapter>
+  <div class="side">
+    <p class="n">Chapter 2 of 6 · Scoreboard</p>
+    <h2 class="j-h2" id="h-s">Four ways to warn a crew, judged on one summer</h2>
+    <p class="body">Each policy gets only the forecast it would have had the evening before. Airport thermometers then say what happened. The measures were fixed before the summer was scored.</p>
+    <a class="btn primary go" href="judge-season.html">Open the scoreboard</a>
+  </div>
+  <div class="main">
+    <div class="j-chart" id="ribbon" style="min-height:240px"></div>
+    <div class="notice j-pending"><p><strong>Not yet scored.</strong> Scores fill from the single scoring run; protocol fixed before 2026 was scored.</p><button class="proof" type="button" data-proof='{"what":"Danger hours nobody was warned about, four policies, summer 2026","script":"backend/eval/policy_scoreboard.py","file":"policy_scoreboard.json","label":"Not yet written: the single scoring run writes this file once"}'>Proof</button></div>
+    <table class="tbl mini-tbl">
+      <thead><tr><th>Policy</th><th class="n">Danger hours nobody was warned about</th></tr></thead>
+      <tbody>
+        <tr><td>Midday break only<small>12:30 to 15:00, 15 Jun to 15 Sep</small></td><td class="n" data-pend></td></tr>
+        <tr><td>Fixed 32 °C rule<small>stop when the forecast passes 32 °C</small></td><td class="n" data-pend></td></tr>
+        <tr><td>ADOSH zones on the raw forecast<small>the regulator's zones, no correction</small></td><td class="n" data-pend></td></tr>
+        <tr class="ours"><td>Stellar Blaze<small>corrected forecast, hourly levels</small></td><td class="n" data-pend></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="chapter" id="day" aria-labelledby="h-d" data-chapter>
+  <div class="side">
+    <p class="n">Chapter 3 of 6 · One day</p>
+    <h2 class="j-h2" id="h-d">One day, chosen by a rule before we looked</h2>
+    <p class="body">The protocol fixes the day: the 2026 day with the most observed High-zone working hours outside the break, ties to the earliest. We show it whatever our forecast did.</p>
+    <a class="btn go" href="judge-day.html">Open the day</a>
+  </div>
+  <div class="main">
+    <div class="j-chart" id="daychart" style="min-height:300px"></div>
+    <p class="j-legend"><span><i class="sw"></i>Raw forecast, 3 Sep, the hottest of the summer</span><span><i class="sw slot"></i>Midday break</span><span class="later">Ours and station truth: added by the scoring run</span></p>
+  </div>
+</section>
+
+<section class="chapter" id="proof" aria-labelledby="h-r" data-chapter>
+  <div class="side">
+    <p class="n">Chapter 4 of 6 · Proof</p>
+    <h2 class="j-h2" id="h-r">Every number opens to the file it came from</h2>
+    <p class="body">Three things pin the result down: the protocol written first, the forecast files as fetched, and the single scoring run. Each one has a fingerprint you can check.</p>
+    <a class="btn go" href="judge-proof.html">Inspect one number</a>
+  </div>
+  <div class="main">
+    <ol class="artefacts">
+      <li><b>The protocol, committed before scoring</b><p>Measures, the demo day rule, the Plans measures and the threshold, fixed on 12 Nov 2026 before 2026 was scored.</p><span class="mono">docs/eval/preregistration.md</span>
+        <button class="proof" type="button" data-proof='{"what":"Pre-registration of measures, demo day rule and threshold","protocol":"Committed 12 Nov 2026, before the single scoring run","script":"none: a written protocol","file":"docs/eval/preregistration.md","sha":"commit hash written at registration","label":"Protocol"}'>Open</button></li>
+      <li><b>The forecast at Abu Dhabi airport, as fetched</b><p id="a-file">139 days × 24 hours of day-1 forecast WBGT, fetched 11 Nov 2026.</p><span class="mono" id="a-sha">sha-256 computing…</span>
+        <button class="proof" type="button" id="a-proof" data-proof='{"what":"OMAA day-1 forecast WBGT, 15 May to 30 Sep 2026","protocol":"Inputs as fetched; never edited after the fetch","script":"stellar_blaze.domain.physics.wbgt.wbgt_liljegren","file":"data/omaa_2026_ifs_d1_wbgt_hourly.json","sha":"computing…","label":"Real forecast, not station truth"}'>Open</button></li>
+      <li><b>The scoring run</b><p>One run of the policy scoreboard against the station thermometers. It writes the result file and its fingerprint.</p><span class="mono">backend/eval/policy_scoreboard.py → policy_scoreboard.json</span>
+        <button class="proof" type="button" data-proof='{"what":"Warnings and Plans scoreboard, summer 2026","script":"backend/eval/policy_scoreboard.py","file":"policy_scoreboard.json","label":"Pending: scored once, 12 Nov 2026"}'>Open</button></li>
+    </ol>
+  </div>
+</section>
+
+<section class="chapter" id="product" aria-labelledby="h-u" data-chapter>
+  <div class="side">
+    <p class="n">Chapter 5 of 6 · The product</p>
+    <h2 class="j-h2" id="h-u">One forecast, five screens, each drawn on the clock</h2>
+    <p class="body">The same hour-by-hour heat reaches the worker's phone, the crew lead, the site setup, the HSE office and the people who run it. Each mini below is the hero of that screen, from the same data.</p>
+  </div>
+  <div class="main">
+    <div class="surfaces">
+      <a class="surface" href="worker-today.html"><div class="mini ribbon" id="m-worker"></div><div><p class="role">Worker, on the phone</p><h3>Today: rest in shade 40 min every hour</h3><p>The shift as a spine: now, the next break, the end.</p></div></a>
+      <a class="surface" href="supervisor-crews.html"><div class="mini ribbon" id="m-crews"></div><div><p class="role">Crew lead</p><h3>Crews today, worst first</h3><p>One strip per crew across the day, the break cut through all of them.</p></div></a>
+      <a class="surface" href="supervisor-setup.html"><div class="mini"><p class="sentence"><u>Mussafah yard</u>, <u>two crews</u> on a <u>concrete pour</u>, <u>06:00 to 18:00</u>, <u>Urdu and Hindi</u>.</p></div><div><p class="role">Site setup</p><h3>One sentence, no form</h3><p>Each phrase fills a field you can see and change.</p></div></a>
+      <a class="surface" href="hse.html"><div class="mini" id="m-hse"></div><div><p class="role">HSE office</p><h3>The week at a glance</h3><p>Sites by hours, small groups hidden.</p></div></a>
+      <a class="surface" href="admin.html"><div class="mini" id="m-admin"></div><div><p class="role">Admin</p><h3>Settings with floors that cannot move</h3><p>Every change versioned; the legal break is fixed.</p></div></a>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="next" aria-labelledby="h-n" data-chapter>
+  <div class="side">
+    <p class="n">Chapter 6 of 6 · What's next</p>
+    <h2 class="j-h2" id="h-n">What is built, what is designed, what needs a pilot</h2>
+    <p class="body">Seven next steps, each with what exists today and what would start it. Nothing on the roadmap is claimed as done.</p>
+    <a class="btn go" href="judge-next.html">See the roadmap</a>
+  </div>
+  <div class="main">
+    <div class="road">
+      <div><strong>1</strong><span>Exists</span><em>production forecast data path</em></div>
+      <div><strong>2</strong><span>Designed</span><em>regulator view, self-hosted language model</em></div>
+      <div><strong>3</strong><span>Needs a pilot</span><em>shadow-mode pilot, wearables, on-site sensors</em></div>
+      <div><strong>1</strong><span>Rejected for now</span><em>weeks 2 to 4 outlook</em></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="colophon">
+  <p>Forecast: ECMWF IFS 0.25°, day-1 runs from the Open-Meteo Previous Runs archive, fetched 11 Nov 2026. WBGT in sun by the Liljegren method in the Stellar Blaze physics module. Heavy-work limit: NIOSH recommended limit, 415 W, acclimatised. Coast: Natural Earth.</p>
+  <p>Design prototype, 12 Nov 2026. Scored results appear only after the single scoring run. <a href="views.html">Every view</a></p>
+</footer>
+
+<nav class="stepper" id="stepper" aria-label="Story">
+  <div class="in">
+    <ol class="j-dots" id="dots"></ol><p class="cur" id="cur"></p>
+    <div class="ctl"><span class="copied" id="copied" aria-live="polite"></span><button class="btn copy-link" type="button" id="copy">Copy link to this step</button><button class="btn" type="button" id="prev">Back</button><button class="btn primary" type="button" id="next-btn">Next</button></div>
+  </div>
+</nav>
+
+<script type="module">
+import { boot, spine, q, fmt } from './assets/kit.js';
+import { sampler, fieldMax, clipCoast, RAMP_DARK, css, STATIONS, reducedMotion, hasWebGL, hh } from './assets/heat.js';
+import { loadData, sha256, seasonFacts, heatCalendar, seasonRibbon, dayChart, STEPS, PENDING, LIMIT, nf, dayLabel } from './assets/judge.js';
+
+boot({ surface: 'desk', states: ['ideal', 'loading', 'error'] });
+const STATE = q.get('state') || 'ideal';
+const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+for (const td of document.querySelectorAll('[data-pend]')) td.innerHTML = PENDING;
+
+// ---------------- story stepper: one URL per chapter (index.html?step=id) ----------------
+const CH = ['problem', 'scoreboard', 'day', 'proof', 'product', 'next'];
+const LBL = Object.fromEntries(STEPS.map((s) => [s.id, s.label]));
+const dots = document.getElementById('dots'), stepper = document.getElementById('stepper');
+dots.innerHTML = CH.map((id, k) => `<li><a href="index.html?step=${id}" data-step="${id}" aria-label="Chapter ${k + 1}: ${LBL[id]}"><span>${LBL[id]}</span></a></li>`).join('');
+let cur = q.get('step') && CH.includes(q.get('step')) ? q.get('step') : null;
+const smooth = () => reducedMotion() ? 'auto' : 'smooth';
+function mark(id, push) {
+  cur = id; for (const a of dots.querySelectorAll('a')) a.toggleAttribute('aria-current', a.dataset.step === id), a.dataset.step === id && a.setAttribute('aria-current', 'step');
+  const i = CH.indexOf(id);
+  document.getElementById('cur').textContent = id ? `${i + 1} of 6 · ${LBL[id]}` : '';
+  document.getElementById('prev').disabled = i <= 0;
+  const nx = document.getElementById('next-btn'); nx.textContent = i < 0 ? 'Start the story' : i === CH.length - 1 ? 'See the roadmap' : `Next: ${LBL[CH[i + 1]].toLowerCase()}`;
+  const u = new URL(location.href); if ((u.searchParams.get('step') || null) === id) return; if (id) u.searchParams.set('step', id); else u.searchParams.delete('step');
+  history[push ? 'pushState' : 'replaceState'](null, '', u.pathname.split('/').pop() + u.search.replace(/=(?=&|$)/g, ''));
+}
+function go(id) { document.getElementById(id).scrollIntoView({ behavior: smooth(), block: 'start' }); mark(id, true); document.getElementById(id).querySelector('h2').focus({ preventScroll: true }); }
+for (const h of document.querySelectorAll('[data-chapter] h2')) h.tabIndex = -1;
+document.addEventListener('click', (e) => { const a = e.target.closest('a[data-step]'); if (!a) return; e.preventDefault(); go(a.dataset.step); });
+document.getElementById('prev').onclick = () => { const i = CH.indexOf(cur); if (i > 0) go(CH[i - 1]); };
+document.getElementById('next-btn').onclick = () => { const i = CH.indexOf(cur); if (i === CH.length - 1) location.href = 'judge-next.html'; else go(CH[i + 1]); };
+document.getElementById('copy').onclick = async () => { const el = document.getElementById('copied'); try { await navigator.clipboard.writeText(location.href); el.textContent = 'Copied'; } catch { el.textContent = 'Copy the address bar'; } setTimeout(() => (el.textContent = ''), 2400); };
+const seen = new Map();
+const io = new IntersectionObserver((es) => { for (const e of es) seen.set(e.target.id, e.isIntersecting ? e.intersectionRatio : 0);
+  const best = [...seen].filter(([, r]) => r > 0).sort((a, b) => b[1] - a[1])[0]; if (best && best[0] !== cur) mark(best[0], false); }, { threshold: [0, 0.25, 0.5] });
+for (const s of document.querySelectorAll('[data-chapter]')) io.observe(s);
+let userScrolled = false; addEventListener('wheel', () => (userScrolled = true), { once: true, passive: true }); addEventListener('touchmove', () => (userScrolled = true), { once: true, passive: true }); addEventListener('keydown', () => (userScrolled = true), { once: true });
+new IntersectionObserver(([e]) => { stepper.classList.toggle('on', !e.isIntersecting); if (e.isIntersecting && cur && scrollY < 200 && userScrolled) mark(null, false); }).observe(document.querySelector('.hero'));
+addEventListener('popstate', () => { const s = new URLSearchParams(location.search).get('step'); if (s && CH.includes(s)) document.getElementById(s).scrollIntoView(); });
+mark(cur, false);
+
+// ---------------- data ----------------
+let season, field, coast;
+try {
+  [season, field, coast] = await Promise.all([loadData('omaa_2026_ifs_d1_wbgt_hourly.json'), loadData('uae_ifs025_d1_wbgt_2026-09-03.json'), loadData('coast.json')]);
+} catch (err) {
+  const u = new URL(location.href); if (STATE !== 'error') { u.searchParams.set('state', 'error'); location.replace(u); } throw err;
+}
+const S = season.json, F = sampler(field.json), FJ = field.json;
+const f = seasonFacts(S);
+const DAY = S.wbgt_c_by_local_hour[S.days.indexOf(FJ.day_local)];
+
+// ---------------- hero: hour state, readout, scrubber (the qaylula slot on the spine) ----------------
+const BOX = [FJ.lon[0], FJ.lat[0], FJ.lon.at(-1), FJ.lat.at(-1)];
+const LON0 = (BOX[0] + BOX[2]) / 2, LAT0 = (BOX[1] + BOX[3]) / 2, KX = Math.cos(LAT0 * Math.PI / 180);
+const X = (lo) => (lo - LON0) * KX, Z = (la) => -(la - LAT0);
+const NCELL = FJ.lat.length * FJ.lon.length;
+const OV = Array.from({ length: 24 }, (_, h) => { let n = 0; for (const r of FJ.wbgt_c) for (const c of r) if (c[h] > LIMIT) n++; return n; });
+const FM = Array.from({ length: 24 }, (_, h) => fieldMax(FJ, h));
+const PEAK_H = DAY.indexOf(Math.max(...DAY));
+const still = q.has('still') || STATE === 'loading';
+let hour = q.has('h') ? Math.max(0, Math.min(23, +q.get('h'))) : (reducedMotion() ? PEAK_H : PEAK_H);
+let playing = !still && !reducedMotion();
+const spineEl = document.getElementById('spine'), hit = document.getElementById('hit'), playBtn = document.getElementById('play');
+const IC = { pause: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3" height="12" fill="currentColor"/><rect x="9" y="1" width="3" height="12" fill="currentColor"/></svg>', play: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1l9 6-9 6z" fill="currentColor"/></svg>' };
+const setPlay = () => { playBtn.innerHTML = playing ? IC.pause : IC.play; playBtn.setAttribute('aria-label', playing ? 'Pause the day' : 'Play the day'); };
+if (reducedMotion() || still) playBtn.hidden = !!q.has('still') && false;
+setPlay();
+let lastSpineH = -1;
+function drawSpine() {
+  const w = spineEl.clientWidth || 800;
+  spine(spineEl, { values: DAY, from: 0, to: 24, now: hour, ban: [12.5, 15], orientation: 'h', width: w, length: 74, band: 20, bandY: 24, tickStep: w < 500 ? 6 : 3,
+    aria: `Hours of 3 Sep 2026 at Abu Dhabi airport, coloured by forecast WBGT. Midday break 12:30 to 15:00. Selected ${hh(Math.floor(hour))}.` });
+  lastSpineH = hour;
+}
+const evEls = [];
+let lastReadH = -1;
+function moveNow() { // move the now line only; the spine itself is redrawn on resize
+  const ln = spineEl.querySelector('.r-now'); if (!ln) return drawSpine();
+  const w = spineEl.clientWidth || 800, x = 22 + hour / 24 * (w - 44); ln.setAttribute('x1', x); ln.setAttribute('x2', x);
+}
+function readout() {
+  moveNow();
+  const h = Math.floor(hour); if (h === lastReadH) return; lastReadH = h;
+  const m = FM[h];
+  document.getElementById('r-lbl').textContent = `Hottest point in the UAE at ${hh(h)}`;
+  document.getElementById('r-peak').innerHTML = `${m.v.toFixed(1)}<small>°C</small>`;
+  document.getElementById('r-where').textContent = `${m.la.toFixed(2)} N ${m.lo.toFixed(2)} E`;
+  document.getElementById('r-omaa').textContent = `${DAY[h].toFixed(1)} °C`;
+  document.getElementById('when-h').textContent = hh(h);
+  hit.setAttribute('aria-valuenow', h); hit.setAttribute('aria-valuetext', `${hh(h)}: hottest point ${m.v.toFixed(1)} degrees, Abu Dhabi airport ${DAY[h].toFixed(1)}`);
+  consoleAt(h);
+}
+const setHour = (v) => { hour = v; playing = false; setPlay(); readout(); dirty = true; kick(); };
+hit.addEventListener('pointerdown', (e) => { hit.setPointerCapture(e.pointerId); const r = hit.getBoundingClientRect(), pad = 22 / (spineEl.clientWidth || 800) * r.width;
+  const mv = (ev) => setHour(Math.max(0, Math.min(23.99, (ev.clientX - r.left - pad) / (r.width - 2 * pad) * 24))); mv(e); hit.onpointermove = mv; hit.onpointerup = () => (hit.onpointermove = null); });
+hit.addEventListener('keydown', (e) => { const k = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+  if (k) { e.preventDefault(); setHour((Math.floor(hour) + k + 24) % 24); } else if (e.key === 'Home') { e.preventDefault(); setHour(0); } else if (e.key === 'End') { e.preventDefault(); setHour(23); } });
+playBtn.onclick = () => { playing = !playing; setPlay(); kick(); };
+
+const yieldTask = () => new Promise((r) => setTimeout(r, 0));
+await yieldTask();
+// ---------------- console panels (C): stations + sparklines, needs attention, event log ----------------
+const ST = Object.entries(STATIONS).map(([k, [la, lo, name]]) => ({ k, la, lo, name, day: k === 'OMAA' ? DAY : Array.from({ length: 24 }, (_, h) => F(la, lo, h)) }));
+const NAMES = { OMAA: 'Abu Dhabi airport', OMAD: 'Al Bateen, Abu Dhabi', OMAL: 'Al Ain', OMDB: 'Dubai airport', OMDW: 'Al Maktoum, Dubai', OMFJ: 'Fujairah', OMSJ: 'Sharjah', OMRK: 'Ras Al Khaimah' };
+const SL = { w: 96, h: 28, lo: 18, hi: 41 };
+const sy = (v) => SL.h - (v - SL.lo) / (SL.hi - SL.lo) * SL.h;
+document.getElementById('stations').innerHTML = ST.map((s) => { const mx = Math.max(...s.day);
+  return `<li class="st" data-k="${s.k}"><span class="code">${s.k}</span><span class="nm">${NAMES[s.k]}</span>
+  <svg width="${SL.w}" height="${SL.h}" viewBox="0 0 ${SL.w} ${SL.h}" role="img" aria-label="${NAMES[s.k]}: 24-hour forecast, peak ${mx.toFixed(1)} °C at ${hh(s.day.indexOf(mx))}"><line x1="0" x2="${SL.w}" y1="${sy(LIMIT)}" y2="${sy(LIMIT)}" stroke="var(--edge)" stroke-dasharray="2 2"/><polyline points="${s.day.map((v, h) => `${(h / 23 * SL.w).toFixed(1)},${sy(v).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--ink-2)" stroke-width="1.25"/><circle class="d" r="3" fill="var(--signal)"/></svg>
+  <span class="v">.</span></li>`; }).join('');
+const rows = [...document.querySelectorAll('.st')];
+// events: computed from the data, never typed
+const EV = []; const f1 = (v) => v.toFixed(1);
+const dmin = Math.min(...DAY), dminH = DAY.indexOf(dmin);
+EV.push([dminH, `Abu Dhabi airport low of the day, ${f1(dmin)} °C${dmin > LIMIT ? ', still over the limit' : ''}`]);
+const allH = OV.findIndex((n) => n === NCELL); if (allH >= 0) EV.push([allH, `All ${NCELL} grid cells over 26.6 °C`]);
+const f32 = DAY.findIndex((v, h) => h >= dminH && v >= 32); if (f32 >= 0) EV.push([f32, `Abu Dhabi airport passes the fixed 32 °C rule, ${f1(DAY[f32])} °C`]);
+EV.push([12.5, 'Midday break starts, by law']);
+EV.push([PEAK_H, `Abu Dhabi airport peak, ${f1(DAY[PEAK_H])} °C`]);
+const fpH = FM.reduce((b, m, h) => (m.v > FM[b].v ? h : b), 0); EV.push([fpH + 0.001, `Hottest point of the day, ${f1(FM[fpH].v)} °C`]);
+EV.push([15, 'Midday break ends: the heat does not']);
+const l32 = DAY.reduce((a, v, h) => (v >= 32 ? h : a), -1); if (l32 >= 0 && l32 < 23) EV.push([l32 + 1, `Abu Dhabi airport back under 32 °C, still ${f1(DAY[l32 + 1])} °C`]);
+EV.sort((a, b) => a[0] - b[0]);
+document.getElementById('events').innerHTML = EV.map(([t, txt]) => `<li class="ev" data-t="${t}"><time>${fmt(Math.floor(t * 2) / 2)}</time><span>${txt}</span></li>`).join('');
+evEls.push(...document.querySelectorAll('.ev'));
+let lastConsoleH = -1;
+function consoleAt(h) {
+  if (h === lastConsoleH) return; lastConsoleH = h;
+  let best = ST[0]; for (const s of ST) if (s.day[h] > best.day[h]) best = s;
+  rows.forEach((r, i) => { const s = ST[i]; r.classList.toggle('hot', s === best); r.querySelector('.v').textContent = `${f1(s.day[h])} °C`;
+    const d = r.querySelector('.d'); d.setAttribute('cx', (h / 23 * SL.w).toFixed(1)); d.setAttribute('cy', sy(s.day[h]).toFixed(1)); });
+  document.getElementById('att-h').textContent = `at ${hh(h)}`;
+  document.getElementById('att-name').textContent = NAMES[best.k]; document.getElementById('att-code').textContent = best.k;
+  document.getElementById('att-v').innerHTML = `${f1(best.day[h])}<small>°C</small>`;
+  const d = best.day[h] - LIMIT; document.getElementById('att-d').textContent = `${f1(Math.abs(d))} °C ${d >= 0 ? 'over' : 'under'} the heavy-work limit`;
+  document.getElementById('att-cells').textContent = `${OV[h]} of ${NCELL}`;
+  document.getElementById('att-ban').textContent = h + 0.5 >= 12.5 && h < 15 ? 'In force to 15:00' : h < 12 ? 'From 12:30' : 'Ended at 15:00';
+  let ni = -1; evEls.forEach((e, i) => { const past = +e.dataset.t <= h + 0.999; e.classList.toggle('future', !past); if (past) ni = i; });
+  evEls.forEach((e, i) => e.classList.toggle('now', i === ni));
+}
+
+// ---------------- 2D field: poster frame while 3D loads, and the fallback ----------------
+const flat = document.getElementById('flat'), labels = document.getElementById('labels');
+const LBL_ST = innerWidth < 900 ? ['OMAA', 'OMFJ'] : ['OMAA', 'OMDB', 'OMAL', 'OMFJ'];
+const stnEls = LBL_ST.map((k) => { const e = document.createElement('div'); e.className = 'stn'; e.innerHTML = `<b>${NAMES[k].replace(' airport', '')}</b>`; labels.appendChild(e); return { k, la: STATIONS[k][0], lo: STATIONS[k][1], e }; });
+function flatGeom() { const w = flat.clientWidth, ht = flat.clientHeight, m = w < 900;
+  const s = Math.min(w * (m ? 0.92 : 0.5) / ((BOX[2] - BOX[0]) * KX), ht * (m ? 0.86 : 0.62) / (BOX[3] - BOX[1]));
+  return { w, ht, s, ox: w * (m ? 0.5 : 0.66), oy: ht * (m ? 0.5 : 0.44) }; }
+// colour LUT: RAMP_DARK sampled every 0.05 °C once, so redraws never redo the OKLCH maths
+const LUT0 = 16, LUTS = 0.05, LUT = Array.from({ length: 561 }, (_, k) => RAMP_DARK(LUT0 + k * LUTS));
+const ramp = (v) => LUT[Math.max(0, Math.min(560, Math.round((v - LUT0) / LUTS)))];
+const COAST = clipCoast(coast.json, BOX);
+const st = 0.05, nx = Math.round((BOX[2] - BOX[0]) / st) + 1, nz = Math.round((BOX[3] - BOX[1]) / st) + 1, V = new Float32Array(nx * nz);
+const off = document.createElement('canvas'); off.width = nx; off.height = nz; const og = off.getContext('2d'), img = og.createImageData(nx, nz);
+function drawFlat() {
+  const { w, ht, s, ox, oy } = flatGeom(), dpr = Math.min(devicePixelRatio, 2);
+  flat.width = w * dpr; flat.height = ht * dpr; const g = flat.getContext('2d'); g.scale(dpr, dpr);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const v = F(BOX[3] - j * st, BOX[0] + i * st, hour), k = j * nx + i, c = ramp(v); V[k] = v;
+    img.data[k * 4] = c[0] * 255; img.data[k * 4 + 1] = c[1] * 255; img.data[k * 4 + 2] = c[2] * 255; img.data[k * 4 + 3] = 255; }
+  og.putImageData(img, 0, 0);
+  const x0 = ox + X(BOX[0]) * s, y0 = oy + Z(BOX[3]) * s, ww = (BOX[2] - BOX[0]) * KX * s, hh2 = (BOX[3] - BOX[1]) * s;
+  g.imageSmoothingEnabled = true; g.drawImage(off, x0, y0, ww, hh2);
+  // isotherms (1 °C) by marching squares on every second grid point
+  g.strokeStyle = 'rgba(14,18,26,.42)'; g.lineWidth = 1; g.beginPath();
+  const px = (i) => x0 + i / (nx - 1) * ww, pz = (j) => y0 + j / (nz - 1) * hh2;
+  for (let j = 0; j < nz - 2; j += 2) for (let i = 0; i < nx - 2; i += 2) {
+    const a = V[j * nx + i], b = V[j * nx + i + 2], c = V[(j + 2) * nx + i + 2], d = V[(j + 2) * nx + i];
+    const lo = Math.ceil(Math.min(a, b, c, d)), hi = Math.floor(Math.max(a, b, c, d));
+    for (let L = lo; L <= hi; L++) { let n = 0, X1 = 0, Y1 = 0;
+      const e = (xa, ya, xb, yb, va, vb) => { if ((va - L) * (vb - L) < 0) { const t = (L - va) / (vb - va), xx = xa + (xb - xa) * t, yy = ya + (yb - ya) * t; if (n === 0) { X1 = xx; Y1 = yy; } else if (n === 1) { g.moveTo(X1, Y1); g.lineTo(xx, yy); } n++; } };
+      e(px(i), pz(j), px(i + 2), pz(j), a, b); e(px(i + 2), pz(j), px(i + 2), pz(j + 2), b, c); e(px(i + 2), pz(j + 2), px(i), pz(j + 2), c, d); e(px(i), pz(j + 2), px(i), pz(j), d, a); } }
+  g.stroke();
+  g.strokeStyle = 'rgba(240,242,245,.75)'; g.lineWidth = 1;
+  for (const l of COAST) { g.beginPath(); l.forEach(([lo, la], i) => g[i ? 'lineTo' : 'moveTo'](ox + X(lo) * s, oy + Z(la) * s)); g.stroke(); }
+  for (const t of stnEls) { t.e.style.left = `${ox + X(t.lo) * s}px`; t.e.style.top = `${oy + Z(t.la) * s}px`; }
+}
+let flatHour = -1;
+// no WebGL probe here: creating a context costs a GPU init on the main thread; start3D() fails over to this 2D field instead
+const flatMode = q.has('fallback') || q.has('static');
+drawSpine(); readout(); await yieldTask(); drawFlat(); flatHour = hour; await yieldTask();
+addEventListener('resize', () => { drawSpine(); if (flatMode || !three) drawFlat(); if (chartsDone) drawCharts(); });
+
+// ---------------- 3D terrain (A), lazy after first paint; budget per ADR 0037 ----------------
+let dirty = true, three = null, kick = () => {};
+function flatLoop() { let last = performance.now(); const step = (now) => { const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (playing) { hour = (hour + dt * 1.2) % 24; readout(); }
+    if (Math.floor(hour) !== Math.floor(flatHour)) { drawFlat(); flatHour = hour; }
+    if (playing && !three) requestAnimationFrame(step); else running = false; };
+  return () => { if (!running && !three) { running = true; last = performance.now(); requestAnimationFrame(step); } }; }
+let running = false;
+kick = flatLoop(); if (flatMode) { const k0 = () => setTimeout(() => kick(), 1200); if (document.readyState === 'complete') k0(); else addEventListener('load', k0, { once: true }); } else kick = () => { if (Math.floor(hour) !== Math.floor(flatHour)) { drawFlat(); flatHour = hour; } };
+
+// The terrain is drawn with plain WebGL (one tiny shader program, five buffers): no 3D library to download,
+// parse or compile, which keeps the scene inside ADR 0037's budget on a throttled phone. ≤ 6,000 vertices
+// desktop, ≤ 1,500 phone (ADR 0037 §3); DPR capped at 2 (1.5 on phones); unlit on purpose (light would change
+// the encoded colour, i.e. the value); relief comes from height + 1 °C isotherms.
+// 3D terrain: drawn in a worker on an OffscreenCanvas when the browser supports it (context creation and meshing
+// then never block this thread); otherwise the same plain-WebGL renderer on the main thread (start3DMain below).
+async function start3D() {
+  const canvas = document.getElementById('field');
+  if (!('transferControlToOffscreen' in canvas) || typeof Worker === 'undefined') return start3DMain();
+  const mobile = innerWidth < 900, dpr = Math.min(devicePixelRatio, mobile ? 1.5 : 2);
+  const off = canvas.transferControlToOffscreen();
+  const wk = new Worker(new URL('assets/terrain-worker.js', location.href), { type: 'module' });
+  await new Promise((res, rej) => { wk.onmessage = ({ data }) => (data.type === 'ready' ? res() : data.type === 'fail' && rej(new Error(data.why))); wk.onerror = (e) => rej(new Error(e.message || 'worker failed'));
+    wk.postMessage({ type: 'init', canvas: off, field: { lat: FJ.lat, lon: FJ.lon, wbgt_c: FJ.wbgt_c }, coast: COAST, mobile, stations: stnEls.map((t) => [t.la, t.lo]) }, [off]); });
+  let az = 0, visible = true, last = performance.now(), slow = 0, loopOn = false, busy = false, first = true;
+  function fallBack() { loopOn = false; three = null; wk.terminate(); canvas.classList.remove('on'); flat.style.visibility = ''; drawFlat(); kick = flatLoop(); kick(); }
+  wk.onmessage = ({ data }) => {
+    if (data.type === 'fail') return fallBack();
+    if (data.type !== 'drawn') return;
+    busy = false;
+    if (data.labels) data.labels.forEach(([x, y], i) => { stnEls[i].e.style.left = `${x}px`; stnEls[i].e.style.top = `${y}px`; });
+    if (first && data.labels) { first = false; canvas.classList.add('on'); setTimeout(() => (flat.style.visibility = 'hidden'), 260); }
+  };
+  const send = (force) => { if (busy && !force) return; busy = true; wk.postMessage({ type: 'draw', hour, az, W: canvas.clientWidth, H: canvas.clientHeight, dpr, force: !!force }); };
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (playing && visible) { hour = (hour + dt * 1.2) % 24; if (!mobile) az += dt * 0.025;
+      // performance monitor (ADR 0037 §4): under 30 fps for 2 s, switch to the 2D field
+      slow = dt > 1 / 30 ? slow + dt : 0; if (slow > 2) { fallBack(); return; } }
+    if (visible) send(dirty); dirty = false;
+    if (playing) readout();
+    if (playing && visible) requestAnimationFrame(frame); else loopOn = false;
+  }
+  three = { wk };
+  kick = () => { if (!loopOn && three) { loopOn = true; last = performance.now(); requestAnimationFrame(frame); } };
+  addEventListener('resize', () => { dirty = true; kick(); });
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) { dirty = true; kick(); } }).observe(canvas);
+  send(true); kick();
+}
+async function start3DMain() {
+  const canvas = document.getElementById('field'), mobile = innerWidth < 900;
+  const gl = canvas.getContext('webgl', { antialias: !mobile, alpha: true, premultipliedAlpha: false, powerPreference: 'high-performance' });
+  if (!gl) throw new Error('no WebGL');
+  await yieldTask();
+  const sh = (type, src) => { const s2 = gl.createShader(type); gl.shaderSource(s2, src); gl.compileShader(s2); return s2; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, 'attribute vec3 p;attribute vec3 c;uniform mat4 m;varying vec3 v;void main(){gl_Position=m*vec4(p,1.0);v=c;}'));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec3 v;uniform vec4 u;void main(){gl_FragColor=u.a>0.0?u:vec4(v,1.0);}'));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('WebGL program failed');
+  gl.useProgram(prog);
+  const aP = gl.getAttribLocation(prog, 'p'), aC = gl.getAttribLocation(prog, 'c'), uM = gl.getUniformLocation(prog, 'm'), uU = gl.getUniformLocation(prog, 'u');
+  gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.clearColor(0, 0, 0, 0);
+  const HZ = 0.075, HH = (wv) => (wv - 20) * HZ;
+  const NX = mobile ? 43 : 85, NZ = mobile ? 33 : 65, NV = NX * NZ;
+  const pos = new Float32Array(NV * 3), col = new Float32Array(NV * 3), vals = new Float32Array(NV), LL = [];
+  for (let i = 0; i < NV; i++) { const ix = i % NX, iz = Math.floor(i / NX); const lo = BOX[0] + (BOX[2] - BOX[0]) * ix / (NX - 1), la = BOX[3] - (BOX[3] - BOX[1]) * iz / (NZ - 1); LL.push([la, lo]); pos[i * 3] = X(lo); pos[i * 3 + 2] = Z(la); }
+  const idx = new Uint16Array((NX - 1) * (NZ - 1) * 6); let k = 0;
+  for (let z = 0; z < NZ - 1; z++) for (let x = 0; x < NX - 1; x++) { const a = z * NX + x; idx.set([a, a + NX, a + 1, a + 1, a + NX, a + NX + 1], k); k += 6; }
+  const buf = () => gl.createBuffer();
+  const bPos = buf(), bCol = buf(), bIdx = buf(), bIso = buf(), bCoast = buf();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+  const MAXSEG = 24000, iso = new Float32Array(MAXSEG * 6); let nIso = 0;
+  const COASTL = COAST.map((l0) => (mobile ? l0.filter((_, i) => i % 3 === 0 || i === l0.length - 1) : l0));
+  const nCoast = COASTL.reduce((a, l) => a + (l.length - 1) * 2, 0), coastPos = new Float32Array(nCoast * 3);
+  await yieldTask();
+  function update() {
+    for (let i = 0; i < NV; i++) { const v = F(LL[i][0], LL[i][1], hour), c = ramp(v); vals[i] = v; pos[i * 3 + 1] = HH(v); col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2]; }
+    nIso = 0;
+    for (let z = 0; z < NZ - 1; z++) for (let x = 0; x < NX - 1; x++) {
+      const a = z * NX + x, b = a + 1, c = a + NX + 1, d = a + NX, va = vals[a], vb = vals[b], vc = vals[c], vd = vals[d];
+      for (let L = Math.ceil(Math.min(va, vb, vc, vd)); L <= Math.floor(Math.max(va, vb, vc, vd)); L++) { let n = 0; const o = nIso * 6;
+        const e = (i, j, vi, vj) => { if (n < 2 && (vi - L) * (vj - L) < 0) { const t = (L - vi) / (vj - vi), q = o + n * 3; iso[q] = pos[i * 3] + (pos[j * 3] - pos[i * 3]) * t; iso[q + 1] = HH(L) + 0.004; iso[q + 2] = pos[i * 3 + 2] + (pos[j * 3 + 2] - pos[i * 3 + 2]) * t; n++; } };
+        e(a, b, va, vb); e(b, c, vb, vc); e(c, d, vc, vd); e(d, a, vd, va);
+        if (n === 2 && nIso < MAXSEG - 1) nIso++; } }
+    let q = 0; for (const l of COASTL) for (let i = 0; i < l.length - 1; i++) for (const [lo, la] of [l[i], l[i + 1]]) { coastPos[q++] = X(lo); coastPos[q++] = HH(F(la, lo, hour)) + 0.01; coastPos[q++] = Z(la); }
+    gl.bindBuffer(gl.ARRAY_BUFFER, bPos); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bCol); gl.bufferData(gl.ARRAY_BUFFER, col, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bIso); gl.bufferData(gl.ARRAY_BUFFER, iso.subarray(0, Math.max(6, nIso * 6)), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bCoast); gl.bufferData(gl.ARRAY_BUFFER, coastPos, gl.DYNAMIC_DRAW);
+  }
+  // camera: column-major 4x4 maths, the same framing as the three.js version (fov 32 desktop / 44 phone, view offset on desktop)
+  let MVP = new Float32Array(16);
+  const mul = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s2 = 0; for (let i = 0; i < 4; i++) s2 += a[i * 4 + r] * b[c * 4 + i]; o[c * 4 + r] = s2; } return o; };
+  const persp = (fov, asp, n, f) => { const t = 1 / Math.tan(fov * Math.PI / 360); return new Float32Array([t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0]); };
+  const look = (e, t) => { let zx = e[0] - t[0], zy = e[1] - t[1], zz = e[2] - t[2]; let l = Math.hypot(zx, zy, zz); zx /= l; zy /= l; zz /= l;
+    let xx = zz, xz = -zx; const xy = 0; l = Math.hypot(xx, xz); xx /= l; xz /= l; // x = up(+y) cross z
+    const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    return new Float32Array([xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0, -(xx * e[0] + xy * e[1] + xz * e[2]), -(yx * e[0] + yy * e[1] + yz * e[2]), -(zx * e[0] + zy * e[1] + zz * e[2]), 1]); };
+  let az = 0, W = 1, Hh = 1;
+  const target = [0, 0.55, 0.1];
+  function camera() { const r = mobile ? 8.4 : 11.2, tilt = mobile ? 0.98 : 0.74;
+    const eye = [Math.sin(az - 0.35) * r * Math.cos(tilt), target[1] + r * Math.sin(tilt), target[2] + Math.cos(az - 0.35) * r * Math.cos(tilt)];
+    const shift = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, mobile ? 0 : 0.4, mobile ? 0 : 0.08, 0, 1]);
+    MVP = mul(shift, mul(persp(mobile ? 44 : 32, W / Hh, 0.1, 100), look(eye, target))); }
+  const project = (x, y, z) => { const m = MVP, cx = m[0] * x + m[4] * y + m[8] * z + m[12], cy = m[1] * x + m[5] * y + m[9] * z + m[13], cw = m[3] * x + m[7] * y + m[11] * z + m[15]; return [(cx / cw * 0.5 + 0.5) * W, (-cy / cw * 0.5 + 0.5) * Hh]; };
+  const attr = (b, loc) => { gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); };
+  function render() {
+    gl.viewport(0, 0, canvas.width, canvas.height); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.uniformMatrix4fv(uM, false, MVP);
+    gl.uniform4f(uU, 0, 0, 0, -1); attr(bPos, aP); attr(bCol, aC); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx); gl.drawElements(gl.TRIANGLES, idx.length, gl.UNSIGNED_SHORT, 0);
+    gl.disableVertexAttribArray(aC); gl.vertexAttrib3f(aC, 0, 0, 0);
+    gl.uniform4f(uU, 0, 0, 0, 0.32); attr(bIso, aP); gl.drawArrays(gl.LINES, 0, nIso * 2);
+    gl.uniform4f(uU, 0.043, 0.055, 0.078, 1); attr(bCoast, aP); gl.drawArrays(gl.LINES, 0, nCoast);
+  }
+  function place() { for (const t of stnEls) { const [x, y] = project(X(t.lo), HH(F(t.la, t.lo, hour)) + 0.02, Z(t.la)); t.e.style.left = `${x}px`; t.e.style.top = `${y}px`; } }
+  function resize() { const dpr = Math.min(devicePixelRatio, mobile ? 1.5 : 2); W = canvas.clientWidth; Hh = canvas.clientHeight; canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hh * dpr); dirty = true; kick(); }
+  addEventListener('resize', resize);
+  let lastH = -1, visible = true, last = performance.now(), slow = 0, loopOn = false;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (playing && visible) { hour = (hour + dt * 1.2) % 24; if (!mobile) az += dt * 0.025;
+      // performance monitor (ADR 0037 §4): under 30 fps for 2 s, switch to the 2D field
+      slow = dt > 1 / 30 ? slow + dt : 0; if (slow > 2) { fallBack(); return; } }
+    // phones: re-mesh every quarter hour and draw only then (no orbit); desktop: every 3 minutes of replay time, orbiting
+    let drew = false;
+    if (Math.abs(hour - lastH) > (mobile ? 0.25 : 0.05) || dirty) { update(); lastH = hour; drew = true; }
+    if (playing) readout();
+    if (visible && (drew || !mobile)) { camera(); render(); place(); }
+    dirty = false;
+    if (playing && visible) requestAnimationFrame(frame); else loopOn = false;
+  }
+  function fallBack() { loopOn = false; three = null; canvas.classList.remove('on'); flat.style.visibility = ''; drawFlat(); kick = flatLoop(); kick(); }
+  three = { gl };
+  kick = () => { if (!loopOn && three) { loopOn = true; last = performance.now(); requestAnimationFrame(frame); } };
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) { dirty = true; kick(); } }).observe(canvas);
+  resize(); update(); await yieldTask(); camera(); render(); place();
+  canvas.classList.add('on'); setTimeout(() => (flat.style.visibility = 'hidden'), 260);
+  kick();
+}
+if (!flatMode && STATE !== 'loading') {
+  const later = () => start3D().catch((err) => { console.warn('3D unavailable, keeping the 2D field', err); three = null; kick = flatLoop(); kick(); });
+  const idle = () => ('requestIdleCallback' in window ? requestIdleCallback(later, { timeout: 1500 }) : setTimeout(later, 300));
+  if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true });
+}
+
+// ---------------- chapters ----------------
+document.getElementById('p-ban').textContent = nf(f.inBan); document.getElementById('p-over').textContent = nf(f.over);
+document.getElementById('n-over').innerHTML = `${nf(f.over)}<small>of ${nf(f.n)}</small>`;
+document.getElementById('n-ban').textContent = nf(f.inBan);
+document.getElementById('n-days').innerHTML = `${f.daysOver}<small>of ${f.N}</small>`;
+// table alternative: per month
+const months = {}; S.days.forEach((d, i) => { const m = d.slice(0, 7); months[m] ??= { n: 0, o: 0, b: 0 }; for (let h = 6; h < 19; h++) { months[m].n++; const v = S.wbgt_c_by_local_hour[i][h]; if (v > LIMIT) { months[m].o++; if (i >= f.i0 && i <= f.i1 && h >= 12 && h <= 14) months[m].b++; } } });
+const MN = { '05': 'May (from 15th)', '06': 'June', '07': 'July', '08': 'August', '09': 'September' };
+document.getElementById('cal-tbl').innerHTML = `<thead><tr><th>Month</th><th class="n">Working hours</th><th class="n">Above 26.6 °C</th><th class="n">Inside the midday break</th></tr></thead><tbody>${Object.entries(months).map(([m, v]) => `<tr><td>${MN[m.slice(5)]}</td><td class="n">${v.n}</td><td class="n">${v.o}</td><td class="n">${v.b}</td></tr>`).join('')}<tr><td><b>Summer</b></td><td class="n"><b>${nf(f.n)}</b></td><td class="n"><b>${nf(f.over)}</b></td><td class="n"><b>${nf(f.inBan)}</b></td></tr></tbody>`;
+const DRAW = [() => heatCalendar(document.getElementById('cal'), S, f),
+  () => seasonRibbon(document.getElementById('ribbon'), S, f, { compact: true, height: innerWidth < 640 ? 200 : 240 }),
+  () => dayChart(document.getElementById('daychart'), DAY, { ban: [12.5, 15], height: innerWidth < 640 ? 260 : 320, aria: `Raw forecast WBGT at Abu Dhabi airport, 3 Sep 2026, 05:00 to 20:00, peak ${Math.max(...DAY).toFixed(1)} °C at ${hh(PEAK_H)}. Our forecast and station truth are added by the scoring run.` })];
+const drawCharts = () => DRAW.forEach((d) => d());
+let chartsDone = false; const below = (sync) => { if (chartsDone) return; chartsDone = true; if (sync === true) { drawCharts(); minis(); return; }
+  const jobs = [...DRAW, minis];
+  const run = () => { jobs.shift()(); if (jobs.length) setTimeout(run, 16); }; run(); };
+if (cur) { below(true); const t = document.getElementById(cur); requestAnimationFrame(() => t.scrollIntoView()); }
+
+// product minis: the hero of each screen, from the same data
+function minis() {
+spine(document.getElementById('m-worker'), { values: DAY, from: 6, to: 18, now: 11 + 10 / 60, ban: [12.5, 15], orientation: 'v', width: 250, length: 340, bandX: 64, band: 40, tickStep: 3, aria: 'Worker shift spine, 3 Sep 2026, 06:00 to 18:00, now 11:10, midday break 12:30 to 15:00' });
+spine(document.getElementById('m-crews'), { values: DAY, from: 6, to: 18, now: 11 + 10 / 60, ban: [12.5, 15], orientation: 'h', width: 300, length: 74, band: 22, bandY: 26, tickStep: 3, aria: 'Crew day strip, 06:00 to 18:00, midday break cut through' });
+(() => { // HSE week: 7 days × working hours, 31 Aug to 6 Sep
+  const i0 = S.days.indexOf('2026-08-31'), cw = 36, ch = 11, pl = 44; let g = '';
+  for (let d = 0; d < 7; d++) { for (let h = 6; h < 19; h++) { const v = S.wbgt_c_by_local_hour[i0 + d][h]; g += `<rect x="${pl + d * cw}" y="${8 + (h - 6) * ch}" width="${cw - 2}" height="${ch - 1}" fill="${v > LIMIT ? css(RAMP_DARK(v)) : 'var(--raised)'}"/>`; }
+    g += `<text class="j-tick" x="${pl + d * cw + cw / 2 - 1}" y="${8 + 13 * ch + 16}" text-anchor="middle">${dayLabel(S.days[i0 + d]).split(' ')[0]}</text>`; }
+  g += `<rect class="j-slot" x="${pl - 4}" y="${8 + 6.5 * ch}" width="${7 * cw + 6}" height="${2.5 * ch}" fill-opacity=".86"/><line class="j-slot-rule" x1="${pl - 4}" x2="${pl + 7 * cw + 2}" y1="${8 + 6.5 * ch}" y2="${8 + 6.5 * ch}"/><line class="j-slot-rule" x1="${pl - 4}" x2="${pl + 7 * cw + 2}" y1="${8 + 9 * ch}" y2="${8 + 9 * ch}"/>`;
+  for (const h of [6, 12, 18]) g += `<text class="j-tick" x="${pl - 8}" y="${8 + (h - 6) * ch + 9}" text-anchor="end">${String(h).padStart(2, '0')}:00</text>`;
+  document.getElementById('m-hse').innerHTML = `<svg width="${pl + 7 * cw + 4}" height="${8 + 13 * ch + 22}" role="img" aria-label="Week of 31 Aug to 6 Sep 2026, working hours coloured by forecast WBGT, midday break cut in">${g}</svg>`;
+})();
+(() => { // admin: the floors drawn as fixed lines on a version timeline
+  const w = 300, g = `<line x1="16" x2="${w - 10}" y1="40" y2="40" stroke="var(--edge)"/>${[0, 1, 2, 3].map((i) => `<circle cx="${40 + i * 70}" cy="40" r="${i === 3 ? 6 : 4}" fill="${i === 3 ? 'var(--signal)' : 'var(--ink-3)'}"/><text class="j-tick" x="${40 + i * 70}" y="22" text-anchor="middle">v${i + 1}</text>`).join('')}
+    <rect class="j-slot" x="16" y="80" width="${w - 26}" height="26"/><line class="j-slot-rule" x1="16" x2="${w - 10}" y1="80" y2="80"/><line class="j-slot-rule" x1="16" x2="${w - 10}" y1="106" y2="106"/><text class="j-slot-lab" x="24" y="97">Floor: midday break 12:30 to 15:00</text>
+    <line x1="16" x2="${w - 10}" y1="140" y2="140" stroke="var(--ink-2)" stroke-dasharray="4 3"/><text class="j-lab" x="16" y="160">Floor: heavy-work limit 26.6 °C</text>`;
+  document.getElementById('m-admin').innerHTML = `<svg width="${w}" height="172" role="img" aria-label="Configuration versions v1 to v4 with two floors no version can change">${g}</svg>`;
+})();
+}
+if (!chartsDone) { const go2 = () => ('requestIdleCallback' in window ? requestIdleCallback(below, { timeout: 2500 }) : setTimeout(below, 200)); new IntersectionObserver(([e], o) => { if (e.isIntersecting) { below(); o.disconnect(); } }, { rootMargin: '400px' }).observe(document.getElementById('problem')); if (document.readyState === 'complete') go2(); else addEventListener('load', go2, { once: true }); }
+
+// ---------------- proof chips: real SHA-256 of the files actually drawn ----------------
+(async () => {
+  const [hs, fs] = await Promise.all([sha256(season.buf), sha256(field.buf)]);
+  if (!hs) return;
+  const setSha = (el, sha) => { const p = JSON.parse(el.dataset.proof); p.sha = sha; el.dataset.proof = JSON.stringify(p); };
+  setSha(document.getElementById('cal-proof'), hs); setSha(document.getElementById('a-proof'), hs); setSha(document.getElementById('field-proof'), fs);
+  document.getElementById('a-sha').textContent = `sha-256 ${hs}`;
+  document.getElementById('a-file').textContent = `${S.days.length} days × 24 hours of day-1 forecast WBGT, ${nf(season.bytes)} bytes, fetched 11 Nov 2026.`;
+})();
+</script>
+</body>
+</html>

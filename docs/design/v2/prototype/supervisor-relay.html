@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relay to crew · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&family=Noto+Nastaliq+Urdu:wght@500&family=Noto+Sans+Devanagari:wght@500&family=Noto+Sans+Bengali:wght@500&family=Noto+Sans+Arabic:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/supervisor.css">
+<style>
+.board { padding: var(--s-4) var(--s-4) 0; }
+.board .crew { font-size: var(--t-18); font-weight: 600; }
+.big { view-transition-name: level; margin-top: var(--s-1); }
+.big .level-word strong { font-size: clamp(6rem, 26vw, 11rem); letter-spacing: -0.045em; line-height: 0.85; }
+.big .until { font-size: clamp(var(--t-28), 7vw, var(--t-48)); font-weight: 500; line-height: 1.1; margin-top: var(--s-2); letter-spacing: -0.015em; }
+.big .scale { margin-top: var(--s-4); }
+.next2 { padding: var(--s-4) var(--s-2) 0 var(--s-4); view-transition-name: spine; }
+.next2 svg { width: 100%; height: auto; overflow: visible; }
+.paper svg { width: 100%; height: auto; overflow: visible; }
+.next2 .bl, .paper .bl { font: 600 17px var(--sans); }
+.next2 .tick, .paper .tick { font: 500 14px var(--sans); fill: var(--ink-2); }
+.next2 .cap { font: 500 13px var(--sans); fill: var(--ink-3); }
+.todo { list-style: none; padding: var(--s-2) var(--s-4) 0; }
+.todo li { display: grid; grid-template-columns: 44px 1fr; gap: var(--s-3); align-items: center; padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); font-size: clamp(var(--t-22), 5vw, var(--t-28)); font-weight: 500; line-height: 1.2; }
+.todo .pict { width: 44px; height: 44px; }
+.ctl { padding: var(--s-4); display: grid; gap: var(--s-3); }
+.ctl .play { width: 100%; min-height: 60px; font-size: var(--t-18); }
+.ctl .row2 { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ctl .note { font-size: var(--t-14); color: var(--ink-2); }
+.bulletin { font-size: var(--t-14); color: var(--ink-2); max-width: 66ch; }
+.banner { margin: var(--s-3) var(--s-4) 0; }
+/* A5 print preview: paper, black on white, same structure */
+.paper-wrap { padding: var(--s-4); background: var(--ground-deep); }
+.paper { background: var(--ground); color: var(--ink); aspect-ratio: 148 / 210; max-width: 420px; margin-inline: auto; padding: 7% 8%; border: 1px solid var(--edge); display: grid; align-content: start; gap: 10px; }
+.paper .pw { font-size: clamp(64px, 20vw, 104px); font-weight: 500; letter-spacing: -0.045em; line-height: 0.85; }
+.paper .pu { font-size: 22px; font-weight: 500; }
+.paper ul { list-style: none; padding: 0; font-size: 16px; }
+.paper li { padding: 6px 0; border-bottom: 1px solid var(--hair); }
+.paper .pf { font-size: 12px; color: var(--ink-3); margin-top: auto; }
+@media print { .sbar, .ctl, .proto, .board-ui { display: none !important; } .paper-wrap { padding: 0; background: none; } .paper { border: 0; max-width: none; } }
+</style>
+</head>
+<body class="sup-page">
+<div class="sup">
+  <div id="top"></div>
+  <main>
+    <div data-when="loading"><div class="board"><p class="skel" style="height:24px;width:30%">.</p><p class="skel" style="height:150px;width:70%;margin-top:8px">.</p></div><div class="skel" style="height:110px;margin:16px">.</div><div class="skel" style="height:60px;margin:16px">.</div></div>
+
+    <section class="sec" data-when="empty" aria-labelledby="eh">
+      <div class="empty"><h3 id="eh">Choose the crew's languages</h3><p class="muted">Audio and the bulletin are prepared in the languages you pick. Pick at least one; you can change them later.</p>
+        <div class="chipset" id="pick" role="group" aria-label="Crew languages"></div>
+        <button class="btn primary lg" type="button">Save languages</button></div>
+    </section>
+
+    <div data-when="ideal partial print">
+      <section class="board" data-when="ideal partial" aria-labelledby="bigw">
+        <p class="crew" id="crewline"></p>
+        <div class="big"><p class="level-word" id="bigw"><strong></strong></p><p class="until" id="until"></p>
+          <div class="scale" role="img" id="scale"><span>Green</span><span>Amber</span><span>Orange</span><span>Red</span></div></div>
+      </section>
+      <section class="next2" id="next2" data-when="ideal partial" aria-label="The next 2 hours"></section>
+      <ul class="todo" id="todo" data-when="ideal partial"></ul>
+
+      <div class="notice banner" data-when="partial" role="status"><strong>Audio not available in Nepali yet.</strong> Read the card aloud, or play it in Hindi.</div>
+      <section class="ctl board-ui" data-when="ideal partial">
+        <div class="chipset" id="langs" role="group" aria-label="Language of the audio and bulletin"></div>
+        <button class="btn primary lg play" id="play" type="button" aria-pressed="false"></button>
+        <div class="row2"><a class="btn" id="printlink" href="?state=print">Print A5 card</a><button class="btn" type="button" id="copy" style="border-color:transparent">Copy bulletin</button></div>
+        <p class="bulletin" id="bulletin"></p>
+        <p class="provline">Card and audio come from fixed templates (draft wording, not clinically reviewed). No names, no health data. Replay: Thu 3 Sep 2026, real IFS forecast at OMAA; crew assumed.</p>
+      </section>
+
+      <section data-when="print" class="paper-wrap" aria-label="A5 crew card, print preview">
+        <div class="paper" id="paper" data-theme="sun"></div>
+        <div class="ctl board-ui" style="max-width:420px;margin-inline:auto;padding-inline:0"><button class="btn primary lg play" type="button" onclick="print()">Print</button><a class="btn" href="?">Back to relay</a></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script type="module">
+import { boot, q, STATE, ICON } from './assets/kit.js';
+import { REPLAY, SITE, LEVELS, LANG, LANG_EN, crewById, replayDay, topbar, fmt, plan, status } from './assets/crews.js';
+const crew = crewById(q.get('crew') || 'B');
+document.getElementById('top').innerHTML = topbar({ back: { href: `supervisor-plan.html?crew=${crew.id}`, label: `Crew ${crew.id} plan` }, title: `Relay to Crew ${crew.id}`, sub: 'Show it, play it or print it' });
+document.title = `Relay to Crew ${crew.id} · Stellar Blaze`;
+boot({ surface: 'field', at: REPLAY.at, states: ['ideal', 'loading', 'empty', 'partial', 'print'] });
+
+const day = await replayDay();
+const st = status(crew, day);
+const blocks = plan(crew, day).filter((b) => b.k !== 'off');
+const t0 = REPLAY.now, t1 = t0 + 2;
+const win = blocks.filter((b) => b.to > t0 && b.from < t1).map((b) => ({ ...b, from: Math.max(b.from, t0), to: Math.min(b.to, t1) }));
+const cur = win[0];
+const NAME = { work: 'Work', rest: 'Rest in shade', art18: 'Break', ban: 'Midday break', stop: 'Stop work' };
+const lv = LEVELS[st.lv];
+document.getElementById('crewline').textContent = `Crew ${crew.id} · heat level`;
+document.querySelector('#bigw strong').textContent = lv;
+document.getElementById('until').textContent = st.working ? `until ${fmt(st.until)}` : `from ${fmt(st.start)}`;
+const sc = document.getElementById('scale'); sc.children[st.lv].setAttribute('aria-current', 'true'); sc.setAttribute('aria-label', `Level ${st.lv + 1} of 4, ${lv}`);
+
+const nowLine = cur ? (cur.k === 'work' ? `Work until ${fmt(cur.to)}, then rest in shade` : `Rest in shade now until ${fmt(cur.to)}`) : 'Rest in shade';
+const CYC = ['work at your own pace', 'work 45 min, rest 15 min in shade', 'work 20 min, rest 40 min in shade', 'all work stops'];
+const lines = [['shade', cur && cur.k !== 'work' ? `${nowLine}. Then ${CYC[st.lv]}` : nowLine], ['water', 'Drink 1.2 litres of water every hour'], ['buddy', 'Never work alone']];
+document.getElementById('todo').innerHTML = lines.map(([i, t]) => `<li>${ICON[i].replace('<svg', '<svg class="pict"')}<span>${t}</span></li>`).join('');
+const bulletin = `Crew ${crew.id} heat alert: ${lv} until ${fmt(st.until)}. ${nowLine}. Midday break ${fmt(SITE.ban[0])} to ${fmt(SITE.ban[1])}. Drink 1.2 litres of water every hour. Never work alone.`;
+document.getElementById('bulletin').textContent = bulletin;
+document.getElementById('copy').onclick = async (e) => { try { await navigator.clipboard.writeText(bulletin); e.target.textContent = 'Copied'; } catch { e.target.textContent = 'Copy failed: select the text'; } };
+
+// next two hours, big enough to read at 3 m
+function draw(el, big = true) {
+  const W = Math.round(el.clientWidth) || 360, R = 6, top = 8, h = big ? 76 : 56;
+  const x = (t) => (t - t0) / (t1 - t0) * (W - R);
+  let s = '';
+  for (const b of win) {
+    const bx = x(b.from) + 1, bw = x(b.to) - x(b.from) - 2;
+    let fill = 'var(--ink)', tc = 'var(--ground)', stroke = 'none';
+    if (b.k === 'rest' || b.k === 'art18') { fill = 'var(--ground)'; tc = 'var(--ink)'; stroke = 'var(--ink)'; }
+    if (b.k === 'ban') { fill = 'var(--slot)'; tc = 'var(--ink)'; stroke = 'var(--edge)'; }
+    s += `<rect x="${bx + 0.5}" y="${top + 0.5}" width="${bw - 1}" height="${h - 1}" fill="${fill}" stroke="${stroke}" ${b.k === 'art18' ? 'stroke-width="3"' : ''}/>`;
+    if (b.k === 'ban') s += `<line x1="${bx}" x2="${bx}" y1="${top - 6}" y2="${top + h + 6}" stroke="var(--edge)"/>`;
+    const label = [NAME[b.k], { ban: 'Midday', rest: 'Rest' }[b.k]].find((l) => l && bw > l.length * 10 + 16);
+    if (label) s += `<text class="bl" x="${bx + 10}" y="${top + h / 2 + 6}" fill="${tc}">${label}</text>`;
+  }
+  const marks = [t0, ...new Set(win.slice(1).map((b) => b.from))].filter((t, i, a) => i === 0 || t - a[i - 1] > 0.33 || true);
+  let lastX = -99;
+  for (const t of [...marks, t1]) { const px = x(t); if (px - lastX < 46 && t !== t1) continue; if (t === t1 && px - lastX < 46) continue; lastX = px; s += `<text class="tick" x="${Math.min(px, W - R)}" y="${top + h + 22}" text-anchor="${t === t0 ? 'start' : t === t1 ? 'end' : 'middle'}">${t === t0 ? 'Now' : fmt(t)}</text>`; }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${top + h + 30}" width="${W}" height="${top + h + 30}" role="img" aria-label="Next 2 hours: ${win.map((b) => `${NAME[b.k]} ${fmt(b.from)} to ${fmt(b.to)}`).join(', ')}">${s}</svg>`;
+}
+const n2 = document.getElementById('next2');
+if (!n2.closest('[hidden]') && !n2.hidden) { draw(n2); new ResizeObserver(() => draw(n2)).observe(n2); }
+
+// language chips: crew languages first; audio clips are pre-rendered per template (ADR 0002); Nepali not yet
+const order = [...crew.langs, ...Object.keys(LANG).filter((l) => !crew.langs.includes(l))];
+const sel = STATE === 'partial' ? 'ne' : (q.get('lang') || crew.langs[0]);
+const chip = (l) => `<button type="button" lang="${l}" aria-pressed="${l === sel}" data-l="${l}">${LANG[l]}</button>`;
+document.getElementById('langs').innerHTML = order.map(chip).join('');
+document.getElementById('pick').innerHTML = Object.keys(LANG).map((l) => `<button type="button" lang="${l}" aria-pressed="false">${LANG[l]}</button>`).join('');
+document.getElementById('pick').onclick = (e) => { const b = e.target.closest('button'); if (b) b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); };
+const play = document.getElementById('play');
+const label = (l) => (l === 'ne' ? `Play in ${LANG_EN.hi} instead` : `Play to crew in ${LANG_EN[l]}`);
+play.innerHTML = `${ICON.speaker}<span>${label(sel)}</span>`;
+let tm = null;
+play.onclick = () => {
+  if (play.getAttribute('aria-pressed') === 'true') { clearTimeout(tm); play.setAttribute('aria-pressed', 'false'); play.querySelector('span').textContent = label(sel); return; }
+  play.setAttribute('aria-pressed', 'true'); play.querySelector('span').textContent = 'Playing. Tap to stop';
+  tm = setTimeout(() => { play.setAttribute('aria-pressed', 'false'); play.querySelector('span').textContent = label(sel); }, 6000);
+};
+document.getElementById('langs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const u = new URL(location.href); if (b.dataset.l === 'ne') u.searchParams.set('state', 'partial'); else { u.searchParams.delete('state'); u.searchParams.set('lang', b.dataset.l); } location.replace(u); };
+
+// A5 preview
+document.getElementById('paper').innerHTML = `<p style="font-size:14px;font-weight:600">Crew ${crew.id} · ${SITE.name} · Thu 3 Sep</p><p class="pw">${lv}</p><p class="pu">${st.working ? 'until' : 'from'} ${fmt(st.working ? st.until : st.start)}</p><div id="pnext"></div><ul>${lines.map(([, t]) => `<li>${t}</li>`).join('')}<li>Midday break ${fmt(SITE.ban[0])} to ${fmt(SITE.ban[1])}, by law</li></ul><p class="pf">Printed 11:10. Check the app for changes. Draft wording, not clinically reviewed.</p>`;
+const pn = document.getElementById('pnext'); if (STATE === 'print') draw(pn, false);
+</script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roster frontier · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.desk { max-width: var(--content-max); margin-inline: auto; padding: var(--s-4) clamp(16px, 3vw, 40px) var(--s-12); }
+.ev-tabs { display: flex; flex-wrap: wrap; gap: 0 var(--s-1); margin-bottom: var(--s-4); font-size: var(--t-13); }
+.ev-tabs span { color: var(--ink-3); display: inline-flex; align-items: center; min-height: 32px; margin-inline-end: var(--s-2); }
+.ev-tabs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--s-2); color: var(--ink-3); text-decoration: none; border-bottom: 2px solid transparent; }
+.ev-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.head { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.eyebrow { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.head h1 { max-width: 36ch; }
+.stepnav { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-12); padding-top: var(--s-4); border-top: 1px solid var(--hair); }
+.stepnav a:not(.btn) { color: var(--ink-2); font-size: var(--t-14); }
+.notes { margin-top: var(--s-6); padding-left: var(--s-4); color: var(--ink-3); font-size: var(--t-13); display: grid; gap: var(--s-1); max-width: 90ch; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: var(--s-6); align-items: start; }
+@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+.chart { position: relative; padding: var(--s-4); }
+.chart-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-3); margin-bottom: var(--s-2); }
+.chart-h h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.chart-h .faint { font-size: var(--t-13); }
+#fr svg { width: 100%; height: auto; display: block; overflow: visible; }
+#fr .ax { stroke: var(--hair); stroke-width: 1; }
+#fr .tk { font: 400 12px var(--sans); fill: var(--ink-3); }
+#fr .ttl { font: 500 13px var(--sans); fill: var(--ink-3); }
+#fr .front { fill: none; stroke: var(--ink-3); stroke-width: 2; }
+#fr .fpt { fill: var(--ink-3); stroke: var(--panel); stroke-width: 2; }
+#fr .fpt.hit { cursor: crosshair; }
+#fr .best { fill: var(--signal); stroke: var(--panel); stroke-width: 2; }
+#fr .b0 { fill: var(--panel); stroke: var(--ink); stroke-width: 2; }
+#fr .b1 { fill: var(--ink); stroke: var(--panel); stroke-width: 2; }
+#fr .arrow { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+#fr .arrowhead { fill: var(--ink); }
+#fr .gate { stroke: var(--edge); stroke-width: 1.5; stroke-dasharray: 5 4; }
+#fr .short { fill: var(--ground-deep); }
+#fr .lbl { font: 600 13px var(--sans); fill: var(--ink); }
+#fr .lbl2 { font: 400 13px var(--sans); fill: var(--ink-2); }
+#fr .lblq { font: 500 13px var(--sans); fill: var(--ink-3); }
+#fr .halo { stroke: var(--panel); stroke-width: 5; stroke-linejoin: round; paint-order: stroke; }
+.tip { position: absolute; pointer-events: none; z-index: 5; padding: var(--s-2) var(--s-3); background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); font-size: var(--t-13); line-height: 1.4; white-space: nowrap; }
+.tip b { font-weight: 600; display: block; }
+.key { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: var(--t-13); color: var(--ink-3); margin-top: var(--s-2); }
+.key svg { display: inline-block; vertical-align: -2px; margin-inline-end: 6px; }
+
+.rail { display: grid; gap: var(--s-6); }
+.ctl label { display: flex; justify-content: space-between; font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.ctl output { color: var(--ink); font-size: var(--t-22); font-weight: 500; }
+.ctl input[type="range"] { width: 100%; accent-color: var(--signal); min-height: var(--target); }
+.ctl .hint { font-size: var(--t-13); color: var(--ink-3); }
+.verdict { font-size: var(--t-18); line-height: 1.4; }
+.verdict small { display: block; font-size: var(--t-13); color: var(--ink-3); margin-top: var(--s-2); }
+.law { border-top: 1px solid var(--hair); padding-top: var(--s-4); display: grid; gap: var(--s-3); }
+.law h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.nums { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.num strong { display: block; font: 400 var(--t-48)/1 var(--sans); letter-spacing: -0.02em; }
+.num span { font-size: var(--t-13); color: var(--ink-2); }
+.credit { font-size: var(--t-14); color: var(--ink-2); }
+.days { margin-top: var(--s-4); padding: var(--s-4); view-transition-name: spine; }
+.days h2 { font: 600 var(--t-14)/1.3 var(--sans); margin-bottom: var(--s-2); }
+.days .ribbon .rl { font: 500 13px var(--sans); fill: var(--ink-2); }
+.days .ribbon .rk { fill: var(--ink-2); }
+.days .ribbon .rk.best { fill: var(--signal); }
+.days .ribbon .rk.b0 { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+details.tbl-alt { margin-top: var(--s-3); }
+details.tbl-alt summary { cursor: pointer; font-size: var(--t-14); color: var(--ink-2); min-height: var(--target); display: flex; align-items: center; }
+.tbl-wrap { overflow-x: auto; }
+.sk-c { height: 520px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Evidence you can try</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="desk" id="main">
+  <nav class="ev-tabs" aria-label="Evidence"><span>Try it yourself</span><a href="judge-validator.html">Try a plan</a><a href="judge-frontier.html" aria-current="page">Roster frontier</a><a href="judge-climate.html">Warmer summer</a><a href="judge-governance.html">Governance</a><a href="judge-faults.html">Break things</a></nav>
+  <header class="head">
+    <p class="eyebrow">Roster frontier · 14,596 legal day rosters, station climatology 2024 to 2026</p>
+    <h1 class="j-h2">No roster shape outruns the heat under law, sleep and commute. Making the common roster legal does more.</h1>
+  </header>
+
+  <!-- loading -->
+  <div class="grid" data-when="loading" aria-busy="true" aria-label="Loading the frontier"><p class="skel sk-c">.</p><div class="rail"><p class="skel" style="height:120px">.</p><p class="skel" style="height:160px">.</p></div></div>
+  <!-- empty -->
+  <section class="empty" data-when="empty">
+    <h3>The frontier has not been exported yet</h3>
+    <p class="muted">It is computed once from the legal rosters and station climatology, then stored as roster_frontier.json. Until that file exists there is nothing to draw, and no sketch is shown in its place.</p>
+    <p><a class="btn primary" href="judge-validator.html">Meanwhile, try a plan</a></p>
+  </section>
+  <!-- error -->
+  <section class="empty" data-when="error" role="alert">
+    <h3>The frontier did not load</h3>
+    <p class="muted">roster_frontier.json could not be read. The written verdict stands: no change recommended at commutes of 30 min or more.</p>
+    <p><a class="btn primary" href="judge-frontier.html">Try again</a></p>
+    <p class="faint" style="font-size:var(--t-13)">Request id <span class="mono">req_c41e08b2</span> (prototype)</p>
+  </section>
+
+  <div class="grid" data-when="ideal">
+    <div>
+      <figure class="panel chart">
+        <div class="chart-h"><h2 id="fr-h">Exposure against sleep, legal rosters on the frontier</h2><span class="faint" id="fr-sub"></span><button class="proof" type="button" id="chart-proof">proof</button></div>
+        <div id="fr"></div>
+        <div class="tip" id="tip" hidden></div>
+        <div class="key" aria-hidden="true">
+          <span><svg width="22" height="12"><line x1="0" x2="22" y1="6" y2="6" stroke="var(--ink-3)" stroke-width="2"/><circle cx="11" cy="6" r="4" fill="var(--ink-3)"/></svg>Frontier: least exposure for each amount of sleep</span>
+          <span><svg width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="var(--ink)" stroke-width="2"/></svg>Common roster, outside the law</span>
+          <span><svg width="14" height="14"><path d="M7 1 13 7 7 13 1 7Z" fill="var(--ink)"/></svg>Legal default</span>
+          <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="var(--signal)"/></svg>Best roster that keeps 7.5 h of sleep</span>
+        </div>
+        <figcaption class="sr-only" id="fr-desc"></figcaption>
+      </figure>
+      <section class="panel days" aria-labelledby="days-h">
+        <h2 id="days-h">The rosters on the day</h2>
+        <div class="ribbon" id="days"></div>
+      </section>
+      <details class="tbl-alt"><summary>Chart as a table</summary><div class="tbl-wrap"><table class="tbl" id="tbl"></table></div></details>
+    </div>
+
+    <aside class="rail" aria-label="Commute and verdict">
+      <div class="ctl">
+        <label for="commute"><span>Commute, one way</span><output id="c-out" for="commute">45 min</output></label>
+        <input type="range" id="commute" min="15" max="90" step="15" value="45">
+        <p class="hint">Every 15 min of one-way commute costs 30 min of sleep.</p>
+      </div>
+      <p class="verdict" id="verdict" aria-live="polite"></p>
+      <section class="law" aria-labelledby="law-h">
+        <h2 id="law-h">What making the common roster legal is worth</h2>
+        <div class="nums">
+          <p class="num"><strong id="l30"></strong><span>less exposure per worked hour at WBGT ≥ 30 °C</span> <button class="proof" type="button" id="p30">proof</button></p>
+          <p class="num"><strong id="l32"></strong><span>at WBGT ≥ 32 °C</span> <button class="proof" type="button" id="p32">proof</button></p>
+        </div>
+        <p class="credit">This gain belongs to the law, not to us. It is never added to our scoreboard.</p>
+      </section>
+      <a class="btn primary lg" href="judge-climate.html">Next: the same summer, warmer</a>
+    </aside>
+  </div>
+
+  <ul class="notes">
+    <li>Exposure is summer worker-hours at WBGT ≥ 30 °C per scheduled daily hour, station observations 2024 to 2026, leave-one-summer-out. Airport stations, not a worksite.</li>
+    <li>Sleep opportunity uses a bedtime floor of 21:30, a 2 h evening buffer and 45 min of preparation: assumptions until a pilot sleep diary exists.</li>
+    <li>Only the frontier is exported; the 14,596 rosters behind it are in legal_sleep_templates_output.txt.</li>
+  </ul>
+  <nav class="stepnav" aria-label="Story"><a href="judge-validator.html">Back: try a plan</a><a href="index.html">All views</a></nav>
+</main>
+
+<script type="module">
+import { boot, STATE, q } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+{ const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn'); menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); }; }
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error'] });
+const $ = (id) => document.getElementById(id);
+const setView = (s) => { for (const el of document.querySelectorAll('[data-when]')) el.hidden = !el.dataset.when.split(/\s+/).includes(s); };
+const rn = (r) => r.replace(/-/g, ' to ');
+const SHA = 'cc14dabe4b5c44db47988befcdff6ecaf034c675e412c7441823fcd04bd1501f';
+const proof = (what, extra = {}) => JSON.stringify({ what, protocol: 'Static analysis, run once (ADR 0024); headline numbers per ADR 0033', script: 'docs/research/scripts/roster/legal_sleep_templates.py v2', file: 'data/roster_frontier.json', sha: SHA, label: 'Real climatology; commute, buffer and bedtime are assumptions', ...extra });
+
+let D;
+if (STATE === 'ideal') {
+  try { D = await loadJSON('roster_frontier.json'); } catch { setView('error'); D = null; }
+}
+if (D) init();
+
+function init() {
+  const G = D.assumptions.sleep_gate_h;
+  const pct = (x) => `${(Math.round(x * 1000 + 1e-6) / 10).toFixed(1)}%`;
+  $('l30').textContent = pct(D.legalisation_B0_to_B1_mean.ge30);
+  $('l32').textContent = pct(D.legalisation_B0_to_B1_mean.ge32);
+  $('p30').dataset.proof = proof(`Legalising the common roster (B0 to B1) removes ${pct(D.legalisation_B0_to_B1_mean.ge30)} of exposure per worked hour at WBGT ≥ 30, mean of 6 station clusters × 3 summers (range 1.8% to 16.9%)`);
+  $('p32').dataset.proof = proof(`${pct(D.legalisation_B0_to_B1_mean.ge32)} at WBGT ≥ 32, same folds (range 8.1% to 33.7%)`);
+  $('chart-proof').dataset.proof = proof('Frontier points per commute: pareto_e30_vs_sleep');
+  const slider = $('commute');
+  const start = Number(q.get('commute'));
+  if ([15, 30, 45, 60, 75, 90].includes(start)) slider.value = start;
+  const draw = () => {
+    const c = Number(slider.value);
+    $('c-out').textContent = `${c} min`; slider.setAttribute('aria-valuetext', `${c} minutes one way`);
+    const P = D.pareto_e30_vs_sleep.find((p) => p.commute_min === c);
+    const F = D.frontier_absolute_gate.find((p) => p.commute_min === c);
+    const best = F.folds_no_change === 0 ? P.pareto.filter((p) => p.sleep_h >= G).sort((a, b) => a.e30_per_h - b.e30_per_h)[0] : null;
+    $('fr-sub').textContent = `${P.pareto.length} rosters on the frontier at ${c} min`;
+    $('verdict').innerHTML = F.folds_no_change === 0
+      ? `At ${c} min, a legal roster keeps ${G} h of sleep and cuts exposure ${pct(F.avoided_vs_legal_default_ge30)} against the legal default. <small>Not recommended by the product: no roster service ships (ADR 0024). A pilot site with on-site housing reopens it. <button class="proof" type="button" data-proof='${proof(`${pct(F.avoided_vs_legal_default_ge30)} avoided vs the legal default at WBGT ≥ 30, commute ${c} min, ${F.folds} folds`)}'>proof</button></small>`
+      : `At ${c} min the legal default leaves ${F.b1_sleep_h} h of sleep, under the ${G} h gate. <strong>No change recommended in ${F.folds_no_change} of ${F.folds} folds.</strong> <small>The commute binds, not the roster shape. <button class="proof" type="button" data-proof='${proof(`No change recommended in ${F.folds_no_change} of ${F.folds} folds at commute ${c} min (frontier_absolute_gate)`)}'>proof</button></small>`;
+    chart(P, best, G);
+    days(P, best);
+    table(P, best);
+  };
+  slider.addEventListener('input', draw);
+  let raf = 0; new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }).observe($('fr'));
+  draw();
+}
+
+function chart(P, best, G) {
+  const el = $('fr'), w = Math.max(300, Math.round(el.clientWidth)), compact = w < 600;
+  const h = compact ? 380 : Math.min(470, Math.max(400, Math.round(w * 0.52)));
+  const L = compact ? 40 : 56, R = 16, T = 40, B = 50, pw = w - L - R, ph = h - T - B;
+  const X = (s) => L + (s / 10) * pw, Y = (e) => T + ph * (1 - (e - 30) / 75);
+  let s = `<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arrowhead" d="M0 0 10 5 0 10Z"/></marker></defs>`;
+  s += `<rect class="short" x="${L}" y="${T}" width="${X(G) - L}" height="${ph}"/>`;
+  for (let e = 30; e <= 105; e += 15) s += `<line class="ax" x1="${L}" x2="${L + pw}" y1="${Y(e)}" y2="${Y(e)}"/><text class="tk" x="${L - 8}" y="${Y(e) + 4}" text-anchor="end">${e}</text>`;
+  for (let x = 0; x <= 10; x += compact ? 2 : 1) s += `<text class="tk" x="${X(x)}" y="${T + ph + 18}" text-anchor="middle">${x} h</text>`;
+  s += `<text class="ttl" x="${L}" y="${T + ph + 42}">Sleep opportunity before the shift</text>`;
+  s += `<text class="ttl" x="${L - (compact ? 32 : 48)}" y="${T - 22}">${compact ? 'Hours at WBGT ≥ 30 per scheduled hour' : 'Exposure: summer hours at WBGT ≥ 30 °C per scheduled hour, lower is better'}</text>`;
+  s += `<line class="gate" x1="${X(G)}" x2="${X(G)}" y1="${T}" y2="${T + ph}"/><text class="lblq halo" x="${X(G) - 8}" y="${T + 16}" text-anchor="end">Under the ${G} h sleep gate</text>`;
+  const pts = P.pareto.slice().sort((a, b) => a.sleep_h - b.sleep_h);
+  s += `<path class="front" d="M${pts.map((p) => `${X(p.sleep_h).toFixed(1)},${Y(p.e30_per_h).toFixed(1)}`).join(' L')}"/>`;
+  s += pts.map((p, i) => `<circle class="fpt" cx="${X(p.sleep_h)}" cy="${Y(p.e30_per_h)}" r="4.5" data-i="${i}"/>`).join('');
+  const b0 = [X(P.B0.sleep_h), Y(P.B0.e30_per_h)], b1 = [X(P.B1.sleep_h), Y(P.B1.e30_per_h)];
+  s += `<path class="arrow" d="M${b0[0] + 14} ${b0[1] + 2} C ${b0[0] + 34} ${b0[1] + 8}, ${b1[0] + 34} ${b1[1] - 8}, ${b1[0] + 12} ${b1[1] - 3}" marker-end="url(#ah)"/>`;
+  s += `<rect class="b0" x="${b0[0] - 6}" y="${b0[1] - 6}" width="12" height="12"/><path class="b1" d="M${b1[0]} ${b1[1] - 9} L${b1[0] + 9} ${b1[1]} L${b1[0]} ${b1[1] + 9} L${b1[0] - 9} ${b1[1]}Z"/>`;
+  // the legalisation label sits in the empty lower-right quadrant, with a leader to the arrow
+  const am = [b0[0] + 26, (b0[1] + b1[1]) / 2];
+  if (compact) {
+    const lx = w - R, ly = Y(44);
+    s += `<path class="ax" style="stroke:var(--ink-3)" d="M${am[0]} ${am[1] + 4} L${lx - 40} ${ly - 18}"/>`;
+    s += `<text class="lbl halo" x="${lx}" y="${ly}" text-anchor="end">Making it legal:</text><text class="lbl2 halo" x="${lx}" y="${ly + 18}" text-anchor="end">credited to</text><text class="lbl2 halo" x="${lx}" y="${ly + 36}" text-anchor="end">the law</text>`;
+  } else {
+    const lx = X(G) + 40, ly = Y(52);
+    s += `<path class="ax" style="stroke:var(--ink-3)" d="M${am[0]} ${am[1] + 4} L${lx + 2} ${ly - 18}"/>`;
+    s += `<text class="lbl halo" x="${lx}" y="${ly}">Making it legal</text><text class="lbl2 halo" x="${lx}" y="${ly + 18}">Credited to the law,</text><text class="lbl2 halo" x="${lx}" y="${ly + 36}">never to our scoreboard</text>`;
+  }
+  s += `<text class="lbl2 halo" x="${b0[0] - 12}" y="${b0[1] - 2}" text-anchor="end">Common roster</text><text class="lbl2 halo" x="${b1[0] - 14}" y="${b1[1] + 16}" text-anchor="end">Legal default</text>`;
+  if (best) { const bx = X(best.sleep_h), by = Y(best.e30_per_h); s += `<circle class="best" cx="${bx}" cy="${by}" r="7"/>${compact ? '' : `<text class="lbl halo" x="${bx + 12}" y="${by + 22}">${rn(best.roster)}</text>`}`; }
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-labelledby="fr-h" aria-describedby="fr-desc">${s}</svg>`;
+  $('fr-desc').textContent = `At this commute the frontier runs from ${pts[0].sleep_h} h of sleep at ${pts[0].e30_per_h} to ${pts[pts.length - 1].sleep_h} h at ${pts[pts.length - 1].e30_per_h}. Common roster ${P.B0.e30_per_h}, legal default ${P.B1.e30_per_h}, both at ${P.B1.sleep_h} h of sleep.`;
+  // hover: nearest mark
+  const tip = $('tip'), svg = el.querySelector('svg');
+  const marks = pts.map((p) => ({ x: X(p.sleep_h), y: Y(p.e30_per_h), t: rn(p.roster), p }))
+    .concat([{ x: b0[0], y: b0[1], t: 'Common roster, 06:00 to 12:30 + 15:00 to 17:00', p: P.B0 }, { x: b1[0], y: b1[1], t: 'Legal default, 06:00 to 11:00 + 15:00 to 18:00', p: P.B1 }]);
+  svg.onpointermove = (e) => {
+    const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left) * (w / r.width), my = (e.clientY - r.top) * (h / r.height);
+    let m = null, d = 24; for (const k of marks) { const dd = Math.hypot(k.x - mx, k.y - my); if (dd < d) { d = dd; m = k; } }
+    if (!m) { tip.hidden = true; return; }
+    tip.hidden = false; tip.innerHTML = `<b>${m.t}</b>Sleep ${m.p.sleep_h} h · ${m.p.e30_per_h.toFixed(1)} h at ≥ 30 °C · ${m.p.e32_per_h.toFixed(1)} at ≥ 32 °C`;
+    const fx = m.x * (r.width / w) + svg.getBoundingClientRect().left - el.parentElement.getBoundingClientRect().left;
+    const fy = m.y * (r.height / h) + svg.getBoundingClientRect().top - el.parentElement.getBoundingClientRect().top;
+    tip.style.left = `${Math.min(fx + 12, el.parentElement.clientWidth - tip.offsetWidth - 8)}px`; tip.style.top = `${fy - 52}px`;
+  };
+  svg.onpointerleave = () => { tip.hidden = true; };
+}
+
+function days(P, best) {
+  const el = $('days'), w = Math.max(300, Math.round(el.clientWidth)), compact = w < 600, from = 4, to = 22, pad = 8;
+  const pos = (t) => pad + (t - from) / (to - from) * (w - 2 * pad);
+  const parse = (r) => r.split(' + ').map((x) => x.split('-').map((t) => { const [a, b] = t.split(':').map(Number); return a + b / 60; }));
+  const rows = [['Common roster, 8 h 30 min, outside the law', D.baselines.B0_common_practice_non_compliant, 'b0'], ['Legal default, 8 h', D.baselines.B1_legal_default, '']];
+  if (best) rows.push([`Best roster at this commute that keeps ${D.assumptions.sleep_gate_h} h of sleep`, best.roster.replace(/-/g, '-'), 'best']);
+  const RH = 46, H = rows.length * RH + 28;
+  let s = `<rect class="r-slot" x="${pos(12.5)}" y="0" width="${pos(15) - pos(12.5)}" height="${rows.length * RH}"/><line class="r-slot-rule" x1="${pos(12.5)}" x2="${pos(12.5)}" y1="0" y2="${rows.length * RH}"/><line class="r-slot-rule" x1="${pos(15)}" x2="${pos(15)}" y1="0" y2="${rows.length * RH}"/>`;
+  rows.forEach(([lab, r, cls], i) => {
+    const y = i * RH;
+    s += `<text class="rl" x="${pad}" y="${y + 15}">${lab}</text>`;
+    for (const [a, b] of parse(r.replace(/(\d\d:\d\d)-(\d\d:\d\d)/g, '$1-$2'))) s += `<rect class="rk ${cls}" x="${pos(a)}" y="${y + 22}" width="${pos(b) - pos(a)}" height="14" rx="1"/>`;
+  });
+  for (let t = from; t <= to; t += compact ? 6 : 2) s += `<text class="r-tick" x="${pos(t)}" y="${H - 6}" text-anchor="middle">${String(t).padStart(2, '0')}:00</text>`;
+  if (!compact) s += `<text class="r-label" x="${(pos(12.5) + pos(15)) / 2}" y="${rows.length * RH - 4}" text-anchor="middle">Midday break</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${H}" role="img" aria-label="Rosters on a summer day from 04:00 to 22:00, with the midday break 12:30 to 15:00">${s}</svg>`;
+}
+
+function table(P, best) {
+  $('tbl').innerHTML = `<caption class="sr-only">Frontier at ${$('commute').value} min commute</caption><thead><tr><th>Roster</th><th class="n">Sleep, h</th><th class="n">Hours ≥ 30 °C per scheduled hour</th><th class="n">≥ 32 °C</th></tr></thead><tbody>
+    <tr><td>Common roster (outside the law)</td><td class="n">${P.B0.sleep_h}</td><td class="n">${P.B0.e30_per_h.toFixed(1)}</td><td class="n">${P.B0.e32_per_h.toFixed(1)}</td></tr>
+    <tr><td>Legal default</td><td class="n">${P.B1.sleep_h}</td><td class="n">${P.B1.e30_per_h.toFixed(1)}</td><td class="n">${P.B1.e32_per_h.toFixed(1)}</td></tr>
+    ${P.pareto.map((p) => `<tr${best && p.roster === best.roster ? ' class="ours"' : ''}><td>${rn(p.roster)}</td><td class="n">${p.sleep_h}</td><td class="n">${p.e30_per_h.toFixed(1)}</td><td class="n">${p.e32_per_h.toFixed(1)}</td></tr>`).join('')}</tbody>`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar Blaze · Isotherm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js" } }</script>
+<style>
+:root {
+  --ground: oklch(0.155 0.012 255);
+  --ground-2: oklch(0.19 0.012 255);
+  --ink: oklch(0.94 0.005 255);
+  --ink-2: oklch(0.74 0.01 255);
+  --ink-3: oklch(0.58 0.012 255);
+  --hair: oklch(0.32 0.012 255);
+  --hair-strong: oklch(0.45 0.012 255);
+  --focus: oklch(0.86 0.12 85);
+  --sans: "Archivo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --gutter: clamp(16px, 3vw, 40px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; }
+html { background: var(--ground); }
+body { background: var(--ground); color: var(--ink); font: 400 15px/1.5 var(--sans); font-variation-settings: "wdth" 100; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.mono { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- top bar ---------- */
+.bar { position: absolute; inset: 0 0 auto 0; z-index: 5; background: var(--ground); display: flex; align-items: center; gap: 32px; padding: 20px var(--gutter); border-bottom: 1px solid color-mix(in oklch, var(--hair) 70%, transparent); }
+.mark { display: flex; align-items: baseline; gap: 10px; text-decoration: none; }
+.mark b { font: 600 15px/1 var(--sans); font-variation-settings: "wdth" 118; letter-spacing: 0.14em; text-transform: uppercase; }
+.mark span { color: var(--ink-3); }
+.bar nav { display: flex; gap: 28px; margin-inline-start: auto; }
+.bar nav a { text-decoration: none; color: var(--ink-2); font-size: 14px; padding: 6px 0; }
+.bar nav a:hover { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px; border-radius: 2px; font: 500 14px/1 var(--sans); text-decoration: none; cursor: pointer; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); }
+.btn .short { display: none; }
+@media (max-width: 900px) { .btn .long { display: none; } .btn .short { display: inline; } }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--hair-strong); }
+
+/* ---------- hero ---------- */
+.hero { position: relative; height: 100svh; min-height: 640px; overflow: hidden; }
+.stage { position: absolute; inset: 0; }
+#field, #fallback { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fallback { display: none; }
+.vignette { position: absolute; inset: 0; pointer-events: none; background:
+  linear-gradient(90deg, var(--ground) 0%, color-mix(in oklch, var(--ground) 70%, transparent) 30%, transparent 55%),
+  linear-gradient(0deg, var(--ground) 0%, transparent 22%); }
+.copy { position: absolute; z-index: 3; inset-inline-start: var(--gutter); top: 21vh; max-width: 560px; }
+.eyebrow { color: var(--ink-3); text-transform: uppercase; }
+h1 { margin-top: 20px; font: 400 clamp(34px, 4.4vw, 60px)/1.04 var(--sans); font-variation-settings: "wdth" 104; letter-spacing: -0.02em; }
+h1 em { font-style: normal; color: var(--ink-2); }
+.lede { margin-top: 22px; max-width: 46ch; color: var(--ink-2); font-size: 17px; line-height: 1.55; }
+.cta { margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+.readout { position: absolute; z-index: 3; inset-inline-end: var(--gutter); bottom: 112px; width: 300px; border-top: 1px solid var(--hair-strong); }
+.readout dl { display: grid; grid-template-columns: 1fr auto; }
+.readout dt, .readout dd { padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.readout dt { color: var(--ink-3); }
+.readout dd { text-align: end; color: var(--ink); }
+.readout .big { font: 300 48px/1 var(--sans); font-variation-settings: "wdth" 100; letter-spacing: -0.03em; padding: 14px 0 6px; }
+.readout .big small { font-size: 18px; color: var(--ink-2); margin-inline-start: 4px; }
+.readout .cap { color: var(--ink-3); padding-bottom: 12px; }
+
+.labels { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.stn { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; color: var(--ink); font: 500 10.5px/1 var(--mono); letter-spacing: 0.04em; padding-bottom: 8px; }
+.stn b { font-weight: 500; background: var(--ground); padding: 3px 5px; border-radius: 1px; }
+.stn::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 1px; height: 8px; background: var(--ground); }
+.stn i { font-style: normal; color: var(--ink-2); margin-inline-start: 5px; }
+
+.timeline { position: absolute; z-index: 3; inset-inline: var(--gutter); bottom: 26px; display: grid; grid-template-columns: auto 1fr 300px; gap: 28px; align-items: end; }
+.play { width: 40px; height: 40px; border-radius: 2px; border: 1px solid var(--hair-strong); background: transparent; color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.hours { position: relative; display: grid; grid-template-columns: repeat(24, 1fr); border-bottom: 1px solid var(--hair-strong); height: 40px; align-items: end; }
+.hours span { border-inline-start: 1px solid var(--hair); height: 8px; position: relative; }
+.hours span:nth-child(3n+1)::after { content: attr(data-h); position: absolute; top: -18px; left: 3px; font: 400 10.5px/1 var(--mono); color: var(--ink-3); }
+.hours .ban { position: absolute; bottom: 0; height: 22px; border: 1px solid var(--hair-strong); border-bottom: 0; color: var(--ink-3); font: 400 10px/1 var(--mono); padding: 4px 5px; letter-spacing: .04em; }
+.hours .cursor { position: absolute; bottom: -1px; width: 2px; height: 30px; background: var(--ink); transition: left .12s linear; }
+.legend .ramp { height: 8px; border-radius: 1px; }
+.legend .ticks { display: flex; justify-content: space-between; color: var(--ink-3); margin-top: 6px; }
+.legend .t { color: var(--ink-2); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.src { color: var(--ink-3); font-size: 11px; line-height: 1.5; padding-top: 10px; }
+
+/* ---------- below the fold ---------- */
+section.season { padding: 96px var(--gutter) 120px; border-top: 1px solid var(--hair); display: grid; grid-template-columns: 320px 1fr; gap: 64px; }
+section h2 { font: 400 32px/1.1 var(--sans); letter-spacing: -0.015em; }
+section .sub { color: var(--ink-2); margin-top: 14px; max-width: 36ch; }
+.strip { display: grid; grid-template-columns: repeat(139, 1fr); height: 64px; gap: 1px; }
+.strip i { display: block; }
+.months { display: flex; justify-content: space-between; color: var(--ink-3); margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; margin-top: 48px; }
+th, td { text-align: start; padding: 14px 0; border-bottom: 1px solid var(--hair); font-weight: 400; }
+th { color: var(--ink-3); font: 400 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+td.p { color: var(--ink-3); font-family: var(--mono); font-size: 12px; }
+tr.ours td:first-child { color: var(--ink); }
+tr.ours td:first-child::before { content: ""; display: inline-block; width: 6px; height: 6px; background: var(--ink); margin-inline-end: 10px; vertical-align: middle; }
+
+@media (max-width: 900px) {
+  .hero { height: auto; min-height: 0; display: flex; flex-direction: column; }
+  .bar { position: relative; order: 0; }
+  .copy { order: 1; } .stage { order: 2; } .readout { order: 3; } .timeline { order: 4; }
+  .bar .mark span { display: none; }
+  .copy, .readout, .timeline { position: relative; inset: auto; top: auto; bottom: auto; }
+  .copy { padding: 32px var(--gutter) 0; max-width: none; }
+  .stage { position: relative; height: 380px; margin-top: 8px; }
+  .readout { margin: 0 var(--gutter); width: auto; }
+  .timeline { margin: 20px var(--gutter) 32px; }
+  .bar nav { display: none; }
+  .bar .btn { margin-inline-start: auto; }
+  h1 { font-size: 32px; }
+  .lede { font-size: 15px; }
+  .readout dl { grid-template-columns: 1fr auto; }
+  .readout .row-x { display: none; }
+  .readout .big { font-size: 40px; }
+  .vignette { background: linear-gradient(180deg, var(--ground) 0%, transparent 14%, transparent 86%, var(--ground) 100%); }
+  .timeline { grid-template-columns: auto 1fr; }
+  .legend { display: none; }
+  .hours span:nth-child(3n+1)::after { display: none; }
+  .hours span:nth-child(6n+1)::after { display: block; }
+  section.season { grid-template-columns: 1fr; gap: 32px; padding-top: 64px; }
+  .stn i { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hours .cursor { transition: none; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="mark" href="#"><b>Stellar Blaze</b><span class="mono">UAE</span></a>
+  <nav aria-label="Main"><a href="#season">Story</a><a href="#season">Scoreboard</a><a href="#season">Proof</a><a href="worker.html">For crews</a><a href="setup.html">Set up a site</a></nav>
+  <a class="btn" href="#season"><span class="long">Start the 3 minute story</span><span class="short">Story</span></a>
+</header>
+
+<main>
+<section class="hero" aria-labelledby="h1">
+  <div class="stage">
+    <canvas id="field" aria-hidden="true"></canvas>
+    <canvas id="fallback" aria-hidden="true"></canvas>
+    <div class="vignette"></div>
+    <div class="labels" id="labels" aria-hidden="true"></div>
+  </div>
+
+  <div class="copy">
+    <p class="eyebrow mono">Heat stress forecast · United Arab Emirates</p>
+    <h1 id="h1">Heat that stops work, forecast the evening before. <em>Checked against a summer we never trained on.</em></h1>
+    <p class="lede">Hour by hour heat levels, legal shift plans and warnings in six languages for every outdoor crew. Summer 2026 is replayed against airport thermometers, so every number can be checked.</p>
+    <div class="cta"><a class="btn" href="#season">See the season scoreboard</a><a class="btn ghost" href="#season">How it is proved</a></div>
+  </div>
+
+  <aside class="readout" aria-label="Field readout">
+    <dl>
+      <dt class="mono">WBGT in sun, peak</dt><dd class="mono num" id="r-time">14:00</dd>
+    </dl>
+    <p class="big num" id="r-peak">39.4<small>°C</small></p>
+    <p class="cap mono" id="r-where">at 24.50 N 54.75 E</p>
+    <dl>
+      <dt class="mono">Abu Dhabi Intl, OMAA</dt><dd class="mono num" id="r-omaa">39.4 °C</dd>
+      <dt class="mono row-x">NIOSH limit, heavy work</dt><dd class="mono num row-x">26.6 °C</dd>
+    </dl>
+    <p class="src">ECMWF IFS 0.25°, issued the day before (Open-Meteo archive); WBGT by the Liljegren method in our physics module. 3 Sep 2026 is the hottest OMAA forecast of the summer, shown for illustration; the scored day is pre-registered separately.</p>
+  </aside>
+
+  <div class="timeline">
+    <button class="play" id="play" aria-label="Pause the day"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3" height="12" fill="currentColor"/><rect x="9" y="1" width="3" height="12" fill="currentColor"/></svg></button>
+    <div class="hours" id="hours" role="slider" tabindex="0" aria-label="Hour of day" aria-valuemin="0" aria-valuemax="23" aria-valuenow="14"></div>
+    <div class="legend" aria-hidden="true">
+      <p class="t mono"><span>WBGT °C</span><span>heavy work limit 26.6</span></p>
+      <div class="ramp" id="ramp"></div>
+      <p class="ticks mono num"><span>26</span><span>30</span><span>34</span><span>38</span></p>
+    </div>
+  </div>
+</section>
+
+<section class="season" id="season" aria-labelledby="h2s">
+  <div>
+    <h2 id="h2s">Summer 2026, replayed honestly</h2>
+    <p class="sub">Four warning policies judged on the forecast they had the evening before, against what the thermometer then recorded. Metrics were fixed before the summer was scored.</p>
+  </div>
+  <div>
+    <p class="mono" style="color:var(--ink-3);margin-bottom:12px">Daily peak WBGT forecast, OMAA, 15 May to 30 Sep 2026 · one column per day</p>
+    <div class="strip" id="strip" role="img" aria-label="Daily peak WBGT forecast at OMAA for 139 days"></div>
+    <p class="months mono"><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></p>
+    <table>
+      <thead><tr><th>Policy</th><th>High-zone hours warned</th><th>False alarms</th><th>95% interval</th></tr></thead>
+      <tbody>
+        <tr><td>Midday ban only</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+        <tr><td>Fixed WBGT 32 °C rule</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+        <tr><td>ADOSH zones on the raw forecast</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+        <tr class="ours"><td>Stellar Blaze</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+</main>
+
+<script type="module">
+import * as THREE from 'three';
+import { loadJSON, sampler, fieldMax, clipCoast, RAMP_DARK, css, STATIONS, reducedMotion, hasWebGL, hh } from '../_shared/heat.js';
+
+const q = new URLSearchParams(location.search);
+const [field, coast, season] = await Promise.all([
+  loadJSON('uae_ifs025_d1_wbgt_2026-09-03.json'), loadJSON('coast.json'), loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json'),
+]);
+const S = sampler(field);
+const OMAA_DAY = season.wbgt_c_by_local_hour[season.days.indexOf(field.day_local)];
+const BOX = [field.lon[0], field.lat[0], field.lon.at(-1), field.lat.at(-1)];
+const LON0 = (BOX[0] + BOX[2]) / 2, LAT0 = (BOX[1] + BOX[3]) / 2, KX = Math.cos(LAT0 * Math.PI / 180);
+const X = (lo) => (lo - LON0) * KX, Z = (la) => -(la - LAT0);
+const HZ = 0.075, H = (w) => (w - 20) * HZ;
+
+// ---- legend ramp + hour ticks + season strip (all from data) ----
+document.getElementById('ramp').style.background = `linear-gradient(90deg, ${[26,28,30,32,34,36,38,40].map(v => css(RAMP_DARK(v))).join(',')})`;
+const hours = document.getElementById('hours');
+hours.innerHTML = Array.from({ length: 24 }, (_, i) => `<span data-h="${String(i).padStart(2,'0')}"></span>`).join('')
+  + `<div class="ban" style="left:${12.5/24*100}%;width:${2.5/24*100}%">BAN</div><div class="cursor" id="cursor"></div>`;
+document.getElementById('strip').innerHTML = season.wbgt_c_by_local_hour.map((d, i) => {
+  const m = Math.max(...d.filter(v => v != null)); return `<i style="background:${css(RAMP_DARK(m))}" title="${season.days[i]} ${m.toFixed(1)} °C"></i>`; }).join('');
+
+let hour = q.has('h') ? +q.get('h') : 14, playing = !q.has('still') && !reducedMotion();
+const playBtn = document.getElementById('play');
+const setPlayIcon = () => { playBtn.innerHTML = playing ? '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3" height="12" fill="currentColor"/><rect x="9" y="1" width="3" height="12" fill="currentColor"/></svg>' : '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1l9 6-9 6z" fill="currentColor"/></svg>'; playBtn.setAttribute('aria-label', playing ? 'Pause the day' : 'Play the day'); };
+setPlayIcon();
+playBtn.onclick = () => { playing = !playing; setPlayIcon(); };
+const setHourFromX = (e) => { const r = hours.getBoundingClientRect(); hour = Math.max(0, Math.min(23, Math.floor((e.clientX - r.left) / r.width * 24))); playing = false; setPlayIcon(); };
+hours.addEventListener('pointerdown', setHourFromX);
+hours.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') hour = (Math.floor(hour) + 1) % 24; if (e.key === 'ArrowLeft') hour = (Math.floor(hour) + 23) % 24; playing = false; setPlayIcon(); });
+
+function readout() {
+  const h = Math.floor(hour), m = fieldMax(field, h);
+  document.getElementById('r-time').textContent = hh(h) + ' GST';
+  document.getElementById('r-peak').innerHTML = `${m.v.toFixed(1)}<small>°C</small>`;
+  document.getElementById('r-where').textContent = `at ${m.la.toFixed(2)} N ${m.lo.toFixed(2)} E`;
+  document.getElementById('r-omaa').textContent = OMAA_DAY[h].toFixed(1) + ' °C';
+  document.getElementById('cursor').style.left = `calc(${(hour / 24) * 100}% - 1px)`;
+  hours.setAttribute('aria-valuenow', h); hours.setAttribute('aria-valuetext', `${hh(h)}, peak ${m.v.toFixed(1)} degrees`);
+}
+
+// ---- 2D fallback (no WebGL): a flat map of the same field ----
+function drawFallback() {
+  const c = document.getElementById('fallback'); c.style.display = 'block';
+  const w = c.width = c.clientWidth, hgt = c.height = c.clientHeight, g = c.getContext('2d');
+  const m = w < 900, s = Math.min(w * (m ? 0.9 : 0.42) / ((BOX[2] - BOX[0]) * KX), hgt * (m ? 0.8 : 0.6) / (BOX[3] - BOX[1])), ox = w * (m ? 0.5 : 0.6), oy = hgt * (m ? 0.5 : 0.45);
+  for (let la = BOX[1]; la < BOX[3]; la += 0.05) for (let lo = BOX[0]; lo < BOX[2]; lo += 0.05) {
+    g.fillStyle = css(RAMP_DARK(S(la, lo, hour))); g.fillRect(ox + X(lo) * s, oy + Z(la) * s, s * 0.05 * KX + 1, s * 0.05 + 1);
+  }
+  g.strokeStyle = 'rgba(240,242,245,.8)'; g.lineWidth = 1;
+  for (const l of clipCoast(coast, BOX)) { g.beginPath(); l.forEach(([lo, la], i) => g[i ? 'lineTo' : 'moveTo'](ox + X(lo) * s, oy + Z(la) * s)); g.stroke(); }
+}
+
+if (!hasWebGL() || q.has('fallback')) { drawFallback(); readout(); }
+else {
+  const canvas = document.getElementById('field');
+  const mobile = innerWidth < 900;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(mobile ? 46 : 32, 1, 0.1, 100);
+
+  // terrain: one vertex per 0.0625° (4x the IFS grid), height and colour from WBGT
+  const NX = mobile ? 43 : 85, NZ = mobile ? 33 : 65;
+  const geo = new THREE.PlaneGeometry(1, 1, NX - 1, NZ - 1); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, col = new Float32Array(pos.count * 3); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const LL = []; for (let i = 0; i < pos.count; i++) { const ix = i % NX, iz = Math.floor(i / NX);
+    const lo = BOX[0] + (BOX[2] - BOX[0]) * ix / (NX - 1), la = BOX[3] - (BOX[3] - BOX[1]) * iz / (NZ - 1); LL.push([la, lo]); pos.setX(i, X(lo)); pos.setZ(i, Z(la)); }
+  // unlit on purpose: lighting would change the encoded colour, i.e. the value. Relief comes from height + isotherms.
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const lin = (c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; // vertex colours are linear in three
+  const mesh = new THREE.Mesh(geo, mat); scene.add(mesh);
+  scene.add(new THREE.AmbientLight(0xffffff, 1.25)); const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-2, 3, 1.5); scene.add(sun);
+
+  // isotherms: marching squares on the vertex grid at every 1 °C, every 5th brighter
+  const MAXSEG = 24000, isoPos = new Float32Array(MAXSEG * 6), isoCol = new Float32Array(MAXSEG * 6);
+  const isoGeo = new THREE.BufferGeometry(); isoGeo.setAttribute('position', new THREE.BufferAttribute(isoPos, 3)); isoGeo.setAttribute('color', new THREE.BufferAttribute(isoCol, 3));
+  const iso = new THREE.LineSegments(isoGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.3 })); scene.add(iso);
+
+  // coast, draped
+  const coastLines = clipCoast(coast, BOX).map(l => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(l.length * 3), 3)); const ln = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x0b0e14 })); ln.userData.ll = l; scene.add(ln); return ln; });
+
+  const vals = new Float32Array(pos.count);
+  function update() {
+    for (let i = 0; i < pos.count; i++) { const v = S(LL[i][0], LL[i][1], hour); vals[i] = v; pos.setY(i, H(v)); const c = RAMP_DARK(v); col[i*3] = lin(c[0]); col[i*3+1] = lin(c[1]); col[i*3+2] = lin(c[2]); }
+    pos.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.computeVertexNormals();
+    let n = 0; const P = (i) => [pos.getX(i), pos.getY(i), pos.getZ(i)];
+    for (let z = 0; z < NZ - 1; z++) for (let x = 0; x < NX - 1; x++) {
+      const a = z*NX+x, b = a+1, c = a+NX+1, d = a+NX; const va = vals[a], vb = vals[b], vc = vals[c], vd = vals[d];
+      const lo = Math.ceil(Math.min(va, vb, vc, vd)), hi = Math.floor(Math.max(va, vb, vc, vd));
+      for (let L = lo; L <= hi; L++) {
+        const pts = []; const edge = (i, j, vi, vj) => { if ((vi - L) * (vj - L) < 0) { const t = (L - vi) / (vj - vi), p = P(i), q2 = P(j); pts.push([p[0]+(q2[0]-p[0])*t, H(L)+0.004, p[2]+(q2[2]-p[2])*t]); } };
+        edge(a, b, va, vb); edge(b, c, vb, vc); edge(c, d, vc, vd); edge(d, a, vd, va);
+        if (pts.length >= 2 && n < MAXSEG) { const k = 0.0; isoPos.set([...pts[0], ...pts[1]], n*6); isoCol.fill(k, n*6, n*6+6); n++; }
+      }
+    }
+    isoGeo.setDrawRange(0, n * 2); isoGeo.attributes.position.needsUpdate = true; isoGeo.attributes.color.needsUpdate = true;
+    for (const ln of coastLines) { const a = ln.geometry.attributes.position; ln.userData.ll.forEach(([lo, la], i) => a.setXYZ(i, X(lo), H(S(la, lo, hour)) + 0.01, Z(la))); a.needsUpdate = true; }
+  }
+
+  const labels = document.getElementById('labels');
+  const stnEls = Object.entries(STATIONS).filter(([k]) => !['OMAD', 'OMSJ', 'OMDW'].includes(k)).map(([k, [la, lo]]) => { const e = document.createElement('div'); e.className = 'stn'; labels.appendChild(e); return { k, la, lo, e }; });
+  const v3 = new THREE.Vector3();
+  function placeLabels() { const w = canvas.clientWidth, h = canvas.clientHeight;
+    for (const s of stnEls) { const v = S(s.la, s.lo, hour); v3.set(X(s.lo), H(v) + 0.02, Z(s.la)).project(camera);
+      s.e.style.left = `${(v3.x * 0.5 + 0.5) * w}px`; s.e.style.top = `${(-v3.y * 0.5 + 0.5) * h}px`; s.e.innerHTML = `<b>${s.k}</b>`; } }
+
+  function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; if (!mobile) camera.setViewOffset(w, h, -w * 0.12, h * 0.1, w, h); else camera.clearViewOffset(); camera.updateProjectionMatrix(); }
+  addEventListener('resize', resize); resize();
+
+  let t0 = performance.now(), az = 0, lastHour = -1;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - t0) / 1000); t0 = now;
+    if (playing) { hour = (hour + dt * 1.4) % 24; az += dt * 0.025; }
+    const r = mobile ? 8.2 : 11.2, tilt = mobile ? 0.98 : 0.74;
+    const target = new THREE.Vector3(0, 0.55, 0.1);
+    camera.position.set(target.x + Math.sin(az - 0.35) * r * Math.cos(tilt), target.y + r * Math.sin(tilt), target.z + Math.cos(az - 0.35) * r * Math.cos(tilt));
+    camera.lookAt(target);
+    if (Math.abs(hour - lastHour) > 0.02) { update(); readout(); lastHour = hour; }
+    renderer.render(scene, camera); placeLabels();
+    if (playing || document.body.dataset.ready !== '1') { document.body.dataset.ready = '1'; }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  // pause the render loop's work when the hero is off screen
+  new IntersectionObserver(([e]) => { if (!e.isIntersecting && playing) { playing = false; setPlayIcon(); } }).observe(canvas);
+}
+</script>
+</body>
+</html>

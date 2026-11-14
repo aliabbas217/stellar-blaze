@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar Blaze · Almanac</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Schibsted+Grotesk:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="almanac.css">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
+<style>
+/* ---------- hero: headline column + the season ridge ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 31rem) minmax(0, 1fr); gap: var(--s-7); padding: var(--s-6) var(--gutter) 0; min-height: calc(100svh - 64px); }
+.copy { padding-top: var(--s-5); display: flex; flex-direction: column; }
+h1 { margin-top: var(--s-4); font: 500 clamp(2.375rem, 1.7rem + 2.6vw, 4rem)/1.03 var(--serif); letter-spacing: -0.022em; text-wrap: balance; font-optical-sizing: auto; }
+h1 em { font-style: italic; font-weight: 400; }
+.standfirst { margin-top: var(--s-5); font: 400 var(--t-xl)/1.42 var(--serif); color: var(--ink-soft); max-width: 34ch; text-wrap: pretty; }
+.cta { margin-top: var(--s-6); display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.byline { margin-top: auto; padding: var(--s-5) 0 var(--s-5); border-top: 1px solid var(--hair); font-size: var(--t-sm); color: var(--ink-muted); max-width: 40ch; line-height: 1.5; }
+.byline b { color: var(--ink); font-weight: 600; }
+
+.figure { display: flex; flex-direction: column; min-width: 0; padding-top: var(--s-5); }
+.fig-head { display: flex; gap: var(--s-6); align-items: flex-end; justify-content: space-between; padding-bottom: var(--s-3); border-bottom: 1px solid var(--hair); }
+.fig-title { font: 600 var(--t-md)/1.35 var(--sans); max-width: 46ch; }
+.fig-title span { display: block; font-weight: 400; color: var(--ink-muted); font-size: var(--t-sm); }
+.key { flex: none; width: 260px; }
+.key .ramp { height: 10px; display: flex; }
+.key .ramp i { flex: 1; }
+.key .ticks { display: flex; justify-content: space-between; margin-top: 4px; }
+.lim-key { margin-top: 6px; color: var(--ink-soft); }
+.key .cap { margin-bottom: 6px; color: var(--ink); font-weight: 600; }
+.stage { position: relative; flex: 1; min-height: 520px; overflow: hidden; }
+#ridge, #flat { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#flat { display: none; }
+.anno { position: absolute; inset: 0; pointer-events: none; }
+.anno svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.note { position: absolute; font: 400 var(--t-sm)/1.35 var(--sans); color: var(--ink-soft); width: max-content; max-width: 250px; background: color-mix(in oklch, var(--ground) 82%, transparent); }
+.note b { display: block; color: var(--ink); font-weight: 600; }
+.note.big b { font: 500 1.75rem/1 var(--serif); letter-spacing: -0.01em; margin-bottom: 4px; }
+.note.end { text-align: end; }
+.tick { position: absolute; font: 500 var(--t-xs)/1 var(--sans); color: var(--ink-muted); transform: translate(-50%, 0); white-space: nowrap; }
+.tick.m { transform: translate(-100%, -50%); }
+.fig-foot { border-top: 1px solid var(--hair); padding: var(--s-3) 0 var(--s-5); font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5; display: flex; justify-content: space-between; gap: var(--s-6); }
+.fig-foot button { text-decoration: underline; text-underline-offset: 3px; color: var(--ink-soft); min-height: 24px; flex: none; }
+
+/* ---------- story ---------- */
+.chapter { padding: var(--s-9) var(--gutter); border-top: 1px solid var(--ink); display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--s-5); }
+.chapter > .side { grid-column: 1 / span 4; }
+.chapter > .main { grid-column: 6 / span 7; }
+.chapter h2 { margin-top: var(--s-4); font: 500 var(--t-3xl)/1.1 var(--serif); letter-spacing: -0.015em; text-wrap: balance; }
+.chapter p.body { margin-top: var(--s-5); font: 400 var(--t-lg)/1.6 var(--serif); color: var(--ink-soft); max-width: 60ch; text-wrap: pretty; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; border-top: 2px solid var(--ink); margin-bottom: var(--s-6); }
+.stats div { padding: var(--s-4) 0 var(--s-4); border-bottom: 1px solid var(--hair); }
+.stats div + div { padding-inline-start: var(--s-5); border-inline-start: 1px solid var(--hair); }
+.stats strong { display: block; font: 500 clamp(2.5rem, 1.8rem + 2.4vw, 3.75rem)/1 var(--serif); letter-spacing: -0.02em; }
+.stats span { display: block; margin-top: var(--s-2); color: var(--ink-soft); font-size: var(--t-sm); max-width: 28ch; }
+#grid { width: 100%; height: auto; display: block; }
+.grid-key { display: flex; justify-content: space-between; margin-top: var(--s-2); }
+.ban-draw { stroke-dasharray: 2000; stroke-dashoffset: 0; }
+
+table { width: 100%; border-collapse: collapse; border-top: 2px solid var(--ink); }
+caption { text-align: start; caption-side: bottom; padding-top: var(--s-3); font-size: var(--t-xs); color: var(--ink-muted); }
+th, td { text-align: start; padding: var(--s-4) var(--s-3) var(--s-4) 0; border-bottom: 1px solid var(--hair); vertical-align: baseline; }
+thead th { font: 600 var(--t-xs)/1.3 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); padding-top: var(--s-3); }
+thead th.r, td.r { text-align: end; padding-inline-end: 0; }
+td.pol { font: 400 var(--t-xl)/1.25 var(--serif); }
+td.pol small { display: block; font: 400 var(--t-sm)/1.4 var(--sans); color: var(--ink-muted); margin-top: 2px; }
+td.p { color: var(--ink-muted); font-size: var(--t-sm); font-style: italic; font-family: var(--serif); white-space: nowrap; }
+tr.ours td { border-bottom: 2px solid var(--ink); }
+tr.ours td.pol { font-weight: 600; }
+.proof { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--ink); }
+.proof li { list-style: none; padding: var(--s-4) var(--s-5) var(--s-4) 0; }
+.proof li + li { padding-inline-start: var(--s-5); border-inline-start: 1px solid var(--hair); }
+.proof b { display: block; font: 600 var(--t-md)/1.3 var(--sans); margin: var(--s-2) 0; }
+.proof .n { font: 500 var(--t-2xl)/1 var(--serif); }
+.proof p { color: var(--ink-soft); font-size: var(--t-sm); line-height: 1.55; }
+footer.colophon { padding: var(--s-6) var(--gutter) var(--s-8); border-top: 1px solid var(--ink); font-size: var(--t-xs); color: var(--ink-muted); display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-6); }
+
+/* scroll-driven reveal: native timelines where supported; everything is visible without them */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html:not(.still) .reveal { animation: rise linear both; animation-timeline: view(); animation-range: entry 0% entry 45%; }
+    html:not(.still) .ban-draw { animation: draw linear both; animation-timeline: view(); animation-range: entry 30% cover 45%; }
+  }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes draw { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+
+@media (max-width: 1100px) {
+  .hero { grid-template-columns: 1fr; gap: 0; min-height: 0; padding-top: var(--s-4); }
+  .copy { padding-top: 0; }
+  .byline { margin-top: var(--s-5); }
+  .stage { min-height: 0; height: 460px; flex: none; }
+  .chapter > .side, .chapter > .main { grid-column: 1 / -1; }
+  .chapter > .main { margin-top: var(--s-6); }
+}
+@media (max-width: 760px) {
+  .hero { display: flex; flex-direction: column; }
+  .copy { display: contents; }
+  .copy .kicker { order: 0; } h1 { order: 1; } .figure { order: 2; margin-top: var(--s-5); } .standfirst { order: 3; } .cta { order: 4; } .byline { order: 5; }
+  .fig-title span { display: none; }
+  .standfirst { font-size: var(--t-lg); }
+  .fig-head { flex-direction: column; align-items: stretch; gap: var(--s-3); }
+  .key { width: 100%; }
+  .stage { height: 400px; }
+  .note.lg-only, .tick.lg-only { display: none; }
+  .note { max-width: 150px; font-size: var(--t-xs); }
+  .note.big b { font-size: 1.375rem; }
+  .fig-foot { flex-direction: column; gap: var(--s-2); }
+  .chapter { padding-block: var(--s-8); }
+  .stats div + div { padding-inline-start: var(--s-4); }
+  thead th.c2, td.c2, thead th.c3, td.c3 { display: none; }
+  td.pol { font-size: var(--t-lg); }
+  .proof { grid-template-columns: 1fr; }
+  .proof li + li { padding-inline-start: 0; border-inline-start: 0; border-top: 1px solid var(--hair); }
+  footer.colophon { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="mast-in">
+    <a class="wordmark" href="#">Stellar <i>Blaze</i></a>
+    <span class="dateline">Heat at work in the United Arab Emirates · Summer 2026 replayed</span>
+    <nav aria-label="Main"><a href="#problem">The problem</a><a href="#scoreboard">Scoreboard</a><a href="#proof">Proof</a><a href="worker.html">For crews</a><a href="setup.html">Set up a site</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="hero" aria-labelledby="h1">
+  <div class="copy">
+    <p class="kicker">Heat-stress forecasting for outdoor work</p>
+    <h1 id="h1">Every day of summer, the forecast crossed the <em><span style="white-space:nowrap">heavy-work</span> heat limit</em></h1>
+    <p class="standfirst">Stellar Blaze turns that forecast into heat levels hour by hour, legal shift plans and warnings in six languages. Summer 2026 is replayed against airport thermometers, on a summer the model never trained on.</p>
+    <div class="cta"><a class="btn" href="#scoreboard">Read the scoreboard</a><a class="btn ghost" href="#problem">Start with the problem</a></div>
+    <p class="byline"><b>Data:</b> ECMWF IFS 0.25° forecast issued the day before, via the Open-Meteo archive; wet-bulb globe temperature (WBGT, in sun) by the Liljegren method. Forecast values, not station truth.</p>
+  </div>
+
+  <figure class="figure" aria-labelledby="fig1">
+    <div class="fig-head">
+      <p class="fig-title" id="fig1">Heat at Abu Dhabi airport, every hour of 139 days<span>Forecast WBGT, 15 May to 30 Sep 2026. One ridge per day, midnight to midnight; later days in front.</span></p>
+      <div class="key" aria-hidden="true">
+        <p class="label cap">Crest colour: forecast WBGT above the heavy-work limit, °C</p>
+        <div class="ramp" id="ramp"></div>
+        <p class="ticks label num"><span>26.6</span><span>30</span><span>33</span><span>36</span><span>39.4</span></p>
+        <p class="label lim-key">Dashed plane: NIOSH heavy-work limit, 26.6 °C</p>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="ridge" aria-hidden="true"></canvas>
+      <canvas id="flat" aria-hidden="true"></canvas>
+      <div class="anno" id="anno" aria-hidden="true"><svg id="leaders"></svg></div>
+      <p class="sr-only">Ridgeline chart of 139 days of hourly forecast WBGT at Abu Dhabi airport. All 139 days exceed the NIOSH heavy-work limit of 26.6 °C; 2,609 of 3,336 hours are above it. The hottest forecast is 39.4 °C at 14:00 on 3 September. The legal midday ban runs from 15 June to 15 September, 12:30 to 15:00.</p>
+    </div>
+    <figcaption class="fig-foot"><span>NIOSH recommended limit for heavy work (415 W), acclimatised: 26.6 °C WBGT. 3 Sep is shown for illustration; the scored day is pre-registered separately.</span><button id="motion" type="button">Pause the camera</button></figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="problem" aria-labelledby="h2a">
+  <div class="side reveal">
+    <p class="kicker">1 · The problem</p>
+    <h2 id="h2a">The midday ban covers about one in ten of the hours too hot for heavy work</h2>
+    <p class="body">From 15 June to 15 September the law stops outdoor work from 12:30 to 15:00. The heat does not keep to that window. Mornings pass the limit by nine, and on many evenings it is still above the line at eight.</p>
+    <p class="body">A crew needs to know which hours, not which months. That is the forecast we give them the evening before.</p>
+  </div>
+  <div class="main reveal">
+    <div class="stats">
+      <div><strong class="num" id="s-over">2,609</strong><span>forecast hours above 26.6 °C, 15 May to 30 Sep</span></div>
+      <div><strong class="num" id="s-ban">279</strong><span>of them inside the ban window, counting the 12:00 hour in full (which flatters the ban)</span></div>
+    </div>
+    <svg id="grid" role="img" aria-labelledby="gridt"><title id="gridt">Grid of every hour of every day, coloured where forecast WBGT is above 26.6 °C, with the midday ban window outlined.</title></svg>
+    <p class="grid-key label num"><span>Rows: hours 00 to 23 · columns: days 15 May to 30 Sep</span><span>Outline: midday ban</span></p>
+  </div>
+</section>
+
+<section class="chapter" id="scoreboard" aria-labelledby="h2b">
+  <div class="side reveal">
+    <p class="kicker">2 · Scoreboard</p>
+    <h2 id="h2b">Four ways to warn a crew, judged on one summer</h2>
+    <p class="body">Each policy gets only the forecast it would have had the evening before. Airport thermometers then say what happened. The metrics were fixed before the summer was scored.</p>
+  </div>
+  <div class="main reveal">
+    <table>
+      <thead><tr><th>Policy</th><th class="r">High-zone hours warned</th><th class="r c2">False alarms</th><th class="r c3">95 % interval</th></tr></thead>
+      <tbody>
+        <tr><td class="pol">Midday ban only<small>12:30 to 15:00, 15 Jun to 15 Sep</small></td><td class="r p">scored 12 Nov</td><td class="r p c2">scored 12 Nov</td><td class="r p c3">scored 12 Nov</td></tr>
+        <tr><td class="pol">Fixed WBGT 32 °C rule<small>stop when the forecast passes 32 °C</small></td><td class="r p">scored 12 Nov</td><td class="r p c2">scored 12 Nov</td><td class="r p c3">scored 12 Nov</td></tr>
+        <tr><td class="pol">ADOSH zones on the raw forecast<small>the regulator's zones, no correction</small></td><td class="r p">scored 12 Nov</td><td class="r p c2">scored 12 Nov</td><td class="r p c3">scored 12 Nov</td></tr>
+        <tr class="ours"><td class="pol">Stellar Blaze<small>corrected forecast, hourly levels</small></td><td class="r p">scored 12 Nov</td><td class="r p c2">scored 12 Nov</td><td class="r p c3">scored 12 Nov</td></tr>
+      </tbody>
+      <caption>Scores are written by the exporter on 12 November 2026. No number appears here before it exists.</caption>
+    </table>
+  </div>
+</section>
+
+<section class="chapter" id="proof" aria-labelledby="h2c">
+  <div class="side reveal">
+    <p class="kicker">3 · Proof</p>
+    <h2 id="h2c">How the numbers keep us honest</h2>
+  </div>
+  <div class="main reveal">
+    <ol class="proof">
+      <li><span class="n num">1</span><b>Forecast from the evening before</b><p>Every policy sees the day-1 forecast only, never the day it is judged on.</p></li>
+      <li><span class="n num">2</span><b>Airport thermometers as truth</b><p>Eight UAE airport stations record what the heat really was, hour by hour.</p></li>
+      <li><span class="n num">3</span><b>Rules written down first</b><p>The scored day and the metrics were registered before the summer was replayed.</p></li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer class="colophon">
+  <p>Forecast: ECMWF IFS 0.25°, day-1 runs from the Open-Meteo Previous Runs archive, fetched 11 Nov 2026. WBGT in sun by the Liljegren method in the Stellar Blaze physics module. NIOSH limit computed with the backend's <code>niosh.rel_wbgt_c</code> for 415 W.</p>
+  <p>Design still, Almanac direction. Levels and scores on these pages are design states until the exporter runs on 12 November.</p>
+</footer>
+
+<script type="module">
+import { loadJSON, RAMP_LIGHT, css, reducedMotion, hasWebGL } from '../_shared/heat.js';
+
+const q = new URLSearchParams(location.search);
+if (q.has('still')) document.documentElement.classList.add('still');
+const season = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const DAYS = season.days, W = season.wbgt_c_by_local_hour, N = DAYS.length;
+const LIMIT = 26.6, VMAX = 39.4, BASE = 18;
+const di = (s) => DAYS.indexOf(s);
+const I_PEAK = di('2026-09-03'), I_BAN0 = di('2026-06-15'), I_BAN1 = di('2026-09-15');
+const PAPER = [0.9631, 0.9665, 0.9705]; // oklch(0.975 0.004 240) in sRGB, for the canvas paths
+
+// colour rule: paper below the heavy-work limit, RAMP_LIGHT above it (the colour is the excess heat)
+const heat = (v) => v < LIMIT ? null : RAMP_LIGHT(v);
+document.getElementById('ramp').innerHTML = Array.from({ length: 28 }, (_, i) => `<i style="background:${css(RAMP_LIGHT(LIMIT + (VMAX - LIMIT) * i / 27))}"></i>`).join('');
+
+// ---- facts derived from the data, never typed in ----
+let over = 0, inBan = 0;
+W.forEach((row, i) => row.forEach((v, h) => { if (v > LIMIT) { over++; if (i >= I_BAN0 && i <= I_BAN1 && h >= 12 && h <= 14) inBan++; } }));
+document.getElementById('s-over').textContent = over.toLocaleString('en-GB');
+document.getElementById('s-ban').textContent = inBan.toLocaleString('en-GB');
+
+// ---- monotone cubic (Fritsch-Carlson): smooth ridges that never overshoot a real value ----
+const SUB = 4;
+function smooth(y) {
+  const n = y.length, d = [], m = new Array(n);
+  for (let i = 0; i < n - 1; i++) d.push(y[i + 1] - y[i]);
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) { if (d[i] === 0) { m[i] = m[i + 1] = 0; continue; } const a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b; if (s > 9) { const t = 3 / Math.sqrt(s); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; } }
+  const out = [];
+  for (let i = 0; i < n - 1; i++) for (let k = 0; k < SUB; k++) { const t = k / SUB, t2 = t * t, t3 = t2 * t;
+    out.push((2 * t3 - 3 * t2 + 1) * y[i] + (t3 - 2 * t2 + t) * m[i] + (-2 * t3 + 3 * t2) * y[i + 1] + (t3 - t2) * m[i + 1]); }
+  out.push(y[n - 1]); return out;
+}
+const RIDGES = W.map(smooth); const M = RIDGES[0].length; // 93 points per day
+const hourAt = (k) => k / SUB;
+
+// ---- the problem chapter: every hour of every day as a grid, ban outlined ----
+(function grid() {
+  const svg = document.getElementById('grid'), cw = 5, ch = svg.clientWidth < 500 ? 22 : 9, w = N * cw, h = 24 * ch, padL = 26, padT = 4;
+  svg.setAttribute('viewBox', `0 0 ${w + padL} ${h + padT + 22}`);
+  let s = '';
+  W.forEach((row, i) => row.forEach((v, hr) => { const c = heat(v); s += `<rect x="${padL + i * cw}" y="${padT + hr * ch}" width="${cw - 0.6}" height="${ch - 0.6}" fill="${c ? css(c) : 'oklch(0.935 0.005 240)'}"/>`; }));
+  for (const hr of [0, 6, 12, 18]) s += `<text x="${padL - 6}" y="${padT + hr * ch + 7}" text-anchor="end" font-size="8" fill="oklch(0.5 0.012 252)" font-family="Schibsted Grotesk">${String(hr).padStart(2, '0')}</text>`;
+  for (const [lab, d] of [['May', '2026-05-15'], ['Jun', '2026-06-01'], ['Jul', '2026-07-01'], ['Aug', '2026-08-01'], ['Sep', '2026-09-01']]) { const x = padL + di(d) * cw; s += `<line x1="${x}" x2="${x}" y1="${padT + h}" y2="${padT + h + 5}" stroke="oklch(0.21 0.016 252)" stroke-width="0.6"/><text x="${x + 2}" y="${padT + h + 15}" font-size="8" fill="oklch(0.38 0.014 252)" font-family="Schibsted Grotesk">${lab}</text>`; }
+  const bx = padL + I_BAN0 * cw, by = padT + 12.5 * ch, bw = (I_BAN1 - I_BAN0 + 1) * cw, bh = 2.5 * ch;
+  s += `<rect class="ban-draw" x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="none" stroke="oklch(0.21 0.016 252)" stroke-width="1.6"/>`;
+  svg.insertAdjacentHTML('beforeend', s);
+})();
+
+// ---- annotations (shared by 3D and 2D) ----
+const stage = document.getElementById('stage'), anno = document.getElementById('anno'), leaders = document.getElementById('leaders');
+const small = () => stage.clientWidth < 700;
+const NOTES = [
+  { id: 'peak', big: true, d: I_PEAK, h: 14, v: W[I_PEAK][14], dx: -120, dy: -150, html: `<b class="num">${W[I_PEAK][14].toFixed(1)} °C</b>3 Sep, 14:00: the hottest forecast of the summer` },
+  { id: 'ban0', lg: true, d: I_BAN0, h: 23, v: W[I_BAN0][23], dx: 40, dy: -60, html: '<b>15 Jun · midday ban starts</b>no outdoor work 12:30 to 15:00' },
+  { id: 'ban1', lg: true, d: I_BAN1, h: 23, v: W[I_BAN1][23], dx: 34, dy: -30, html: '<b>15 Sep · ban ends</b>a fortnight of summer left' },
+  { id: 'lim', lg: true, d: N - 1, h: 23, v: LIMIT, dx: 34, dy: 16, html: '<b>NIOSH heavy-work limit, 26.6 °C</b>colour starts at this line' },
+];
+for (const n of NOTES) { const e = document.createElement('div'); e.className = `note${n.big ? ' big' : ''}${n.lg ? ' lg-only' : ''}${n.end ? ' end' : ''}`; e.innerHTML = n.html; anno.appendChild(e); n.el = e; }
+const TICKS = [[0, '00:00'], [6, '06'], [12, '12'], [18, '18'], [23, innerWidth < 760 ? '23' : '23:00']].map(([h, t]) => ({ h, t, el: Object.assign(document.createElement('span'), { className: 'tick num', textContent: t }) }));
+const MONTHS = [['2026-05-15', '15 May'], ['2026-06-01', '1 Jun'], ['2026-07-01', '1 Jul'], ['2026-08-01', '1 Aug'], ['2026-09-01', '1 Sep'], ['2026-09-30', '30 Sep']].map(([d, t]) => ({ i: di(d), el: Object.assign(document.createElement('span'), { className: 'tick m num lg-only', textContent: t }) }));
+[...TICKS, ...MONTHS].forEach((t) => anno.appendChild(t.el));
+
+function layoutNotes(project) {
+  const sm = small(); let path = '';
+  for (const n of NOTES) {
+    if (sm && n.lg) continue;
+    const [x, y] = project(n.h, n.v, n.d);
+    const dx = sm ? (n.id === 'lim' ? -20 : -60) : n.dx, dy = sm ? (n.id === 'lim' ? 46 : -90) : n.dy;
+    n.el.style.left = '0px'; const lx = x + dx, ly = y + dy, r = n.el.getBoundingClientRect();
+    const left = n.end && !sm ? lx - r.width : (sm && n.id === 'peak' ? lx - r.width / 2 : lx), top = ly - (dy < 0 ? r.height : 0);
+    n.el.style.left = `${Math.max(0, Math.min(stage.clientWidth - r.width - 2, left))}px`; n.el.style.top = `${top}px`;
+    const ex = n.end && !sm ? lx : (dx > 0 ? lx - 6 : lx + 6);
+    path += `<path d="M${x},${y} L${x + dx * 0.15},${ly} L${ex},${ly}" fill="none" stroke="oklch(0.21 0.016 252)" stroke-width="1"/><circle cx="${x}" cy="${y}" r="3" fill="oklch(0.21 0.016 252)"/>`;
+  }
+  leaders.innerHTML = path;
+  for (const t of TICKS) { const [x, y] = project(t.h, BASE, N - 1, 0.25); t.el.style.left = `${x}px`; t.el.style.top = `${y + 8}px`; }
+  for (const t of MONTHS) { const [x, y] = project(0, BASE, t.i, 0); t.el.style.left = `${x - 10}px`; t.el.style.top = `${y}px`; }
+}
+
+// ---- 2D fallback: an oblique ridgeline on canvas, same colour rule ----
+function drawFlat() {
+  const c = document.getElementById('flat'); c.style.display = 'block'; document.getElementById('ridge').style.display = 'none';
+  const dpr = Math.min(devicePixelRatio, 2), w = stage.clientWidth, hgt = stage.clientHeight;
+  c.width = w * dpr; c.height = hgt * dpr; const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const left = w * 0.08, right = w * (small() ? 0.97 : 0.74), top = hgt * 0.2, bottom = hgt * 0.9;
+  const step = (bottom - top) / N, ky = (hgt * 0.32) / (VMAX - BASE), shift = (right - left) * 0.06;
+  const project = (h, v, d, dz = 0) => [left + (h / 23) * (right - left - shift) + (d / N) * shift, top + (d + dz) * step - (v - BASE) * ky];
+  for (let d = 0; d < N; d++) {
+    const pts = RIDGES[d].map((v, k) => project(hourAt(k), v, d)), y0 = project(0, BASE, d)[1];
+    g.beginPath(); g.moveTo(pts[0][0], y0); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(pts.at(-1)[0], y0); g.closePath();
+    g.fillStyle = `rgb(${PAPER.map((x) => x * 255).join(' ')})`; g.fill();
+    // same crest rule as the 3D view: a band under the line, coloured by that hour's WBGT, thicker with the excess
+    g.lineCap = 'butt';
+    for (let k = 0; k < M - 1; k++) { const v = (RIDGES[d][k] + RIDGES[d][k + 1]) / 2, ex = v - LIMIT; if (ex <= 0) continue;
+      const lw = 0.8 + ex * 0.42; g.lineWidth = lw; g.strokeStyle = css(RAMP_LIGHT(v));
+      g.beginPath(); g.moveTo(pts[k][0], pts[k][1] + lw / 2); g.lineTo(pts[k + 1][0], pts[k + 1][1] + lw / 2); g.stroke(); }
+    g.beginPath(); pts.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y));
+    const em = d === I_PEAK || d === I_BAN0 || d === I_BAN1; g.lineWidth = em ? 1.6 : 0.6; g.strokeStyle = em ? 'rgb(30 34 44)' : 'rgba(40 46 58 / .55)'; g.stroke();
+  }
+  layoutNotes(project); layoutNotes(project); // second pass: notes measured at their final position
+}
+
+// ---- 3D: the season ridge ----
+async function draw3D() {
+  const THREE = await import('three');
+  const { Line2 } = await import('three/addons/lines/Line2.js');
+  const { LineMaterial } = await import('three/addons/lines/LineMaterial.js');
+  const { LineGeometry } = await import('three/addons/lines/LineGeometry.js');
+  THREE.ColorManagement.enabled = false; // colours below are display sRGB already; pass them through untouched
+
+  const canvas = document.getElementById('ridge');
+  const phone = innerWidth < 760;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, phone ? 1.5 : 2)); renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(phone ? 30 : 21, 1, 0.1, 100);
+
+  const XW = 6.4, DZ = 0.058, KY = 0.095;
+  const X = (h) => (h / 23 - 0.5) * XW, Z = (d) => (d - (N - 1) / 2) * DZ, Y = (v) => (v - BASE) * KY;
+  const paper = new THREE.Color(...PAPER);
+
+  // ramp baked into a 1D texture straight from RAMP_LIGHT (the same function the CSS key uses)
+  const RN = 256, rampData = new Uint8Array(RN * 4);
+  for (let i = 0; i < RN; i++) { const c = RAMP_LIGHT(LIMIT + (40.5 - LIMIT) * i / (RN - 1)); rampData.set([c[0] * 255, c[1] * 255, c[2] * 255, 255], i * 4); }
+  const rampTex = new THREE.DataTexture(rampData, RN, 1); rampTex.magFilter = rampTex.minFilter = THREE.LinearFilter; rampTex.needsUpdate = true;
+
+  // fills: one strip per day from the floor to the curve; colour comes from the HEIGHT (= WBGT) in the shader
+  const fillPos = new Float32Array(N * M * 2 * 3), fillTop = new Float32Array(N * M * 2 * 2), idx = [];
+  for (let d = 0; d < N; d++) for (let k = 0; k < M; k++) {
+    const o = (d * M + k) * 2, x = X(hourAt(k)), z = Z(d);
+    const v = RIDGES[d][k]; fillPos.set([x, 0, z, x, Y(v), z], o * 3); fillTop.set([Y(v), v, Y(v), v], o * 2);
+    if (k < M - 1) idx.push(o, o + 2, o + 1, o + 1, o + 2, o + 3);
+  }
+  const fillGeo = new THREE.BufferGeometry(); fillGeo.setAttribute('position', new THREE.BufferAttribute(fillPos, 3)); fillGeo.setIndex(idx); fillGeo.setAttribute('aTop', new THREE.BufferAttribute(fillTop, 2));
+  const fillMat = new THREE.ShaderMaterial({
+    side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+    uniforms: { uRamp: { value: rampTex }, uPaper: { value: paper }, uKY: { value: KY }, uBase: { value: BASE }, uLim: { value: LIMIT }, uFog: { value: new THREE.Vector2(13, 26) } },
+    // a crest band under each ridge line, coloured by that hour's WBGT and thickening with the excess over the limit;
+    // everything else is paper, so colour marks exactly the hours above the heavy-work limit
+    vertexShader: `attribute vec2 aTop; varying float vY; varying vec2 vTop; varying float vD; void main(){ vY = position.y; vTop = aTop; vec4 mv = modelViewMatrix * vec4(position,1.0); vD = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform sampler2D uRamp; uniform vec3 uPaper; uniform float uKY, uBase, uLim; uniform vec2 uFog; varying float vY; varying vec2 vTop; varying float vD;
+      void main(){ float ex = vTop.y - uLim; float band = ex > 0.0 ? 0.006 + ex * 0.0055 : 0.0;
+        vec3 c = (vTop.x - vY) < band ? texture2D(uRamp, vec2(clamp(ex / (40.5 - uLim), 0.0, 1.0), 0.5)).rgb : uPaper;
+        c = mix(c, uPaper, smoothstep(uFog.x, uFog.y, vD) * 0.45); gl_FragColor = vec4(c, 1.0); }`,
+  });
+  scene.add(new THREE.Mesh(fillGeo, fillMat));
+
+  // ink ridge lines, merged into one draw call; distance fades them toward paper like printed depth
+  const segPos = new Float32Array(N * (M - 1) * 6);
+  for (let d = 0, o = 0; d < N; d++) for (let k = 0; k < M - 1; k++, o += 6) segPos.set([X(hourAt(k)), Y(RIDGES[d][k]), Z(d), X(hourAt(k + 1)), Y(RIDGES[d][k + 1]), Z(d)], o);
+  const segGeo = new THREE.BufferGeometry(); segGeo.setAttribute('position', new THREE.BufferAttribute(segPos, 3));
+  scene.fog = new THREE.Fog(paper, 13, 28);
+  scene.add(new THREE.LineSegments(segGeo, new THREE.LineBasicMaterial({ color: new THREE.Color(0.22, 0.25, 0.31), transparent: true, opacity: 0.62 })));
+
+  // the three annotated days drawn heavier (real width lines)
+  const emph = [];
+  for (const d of [I_BAN0, I_BAN1, I_PEAK]) {
+    const g = new LineGeometry(); g.setPositions(RIDGES[d].flatMap((v, k) => [X(hourAt(k)), Y(v) + 0.002, Z(d)]));
+    const m = new LineMaterial({ color: 0x1b1f28, linewidth: d === I_PEAK ? 2.2 : 1.6, worldUnits: false }); emph.push(m);
+    scene.add(new Line2(g, m));
+  }
+
+  // the NIOSH limit as a faint plane and a dashed waterline round its edge
+  const limY = Y(LIMIT), z0 = Z(0) - DZ, z1 = Z(N - 1) + DZ;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(XW, z1 - z0), new THREE.MeshBasicMaterial({ color: 0x1b1f28, transparent: true, opacity: 0.045, depthWrite: false, side: THREE.DoubleSide }));
+  plane.rotation.x = -Math.PI / 2; plane.position.set(0, limY, (z0 + z1) / 2); plane.renderOrder = 2; scene.add(plane);
+  const rim = new THREE.BufferGeometry().setFromPoints([[-XW / 2, z1], [XW / 2, z1], [XW / 2, z0], [-XW / 2, z0], [-XW / 2, z1]].map(([x, z]) => new THREE.Vector3(x, limY, z)));
+  const rimLine = new THREE.Line(rim, new THREE.LineDashedMaterial({ color: 0x1b1f28, dashSize: 0.08, gapSize: 0.06, fog: false })); rimLine.computeLineDistances(); rimLine.renderOrder = 3; scene.add(rimLine);
+  // floor rule along the front
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-XW / 2, 0, z1 + 0.25), new THREE.Vector3(XW / 2, 0, z1 + 0.25)]), new THREE.LineBasicMaterial({ color: 0x1b1f28, fog: false })));
+
+  const v3 = new THREE.Vector3();
+  const project = (h, v, d, dz = 0) => { v3.set(X(h), Y(v), Z(d) + dz).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; };
+
+  function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
+    if (!phone) camera.setViewOffset(w, h, w * 0.07, h * 0.0, w, h); else camera.clearViewOffset(); camera.updateProjectionMatrix();
+    emph.forEach((m) => m.resolution.set(w, h)); }
+  addEventListener('resize', resize); resize();
+
+  // camera: a slow dolly along the season (back toward May, forward to September); frozen for ?still / reduced motion
+  let playing = !q.has('still') && !reducedMotion(), t = 0, last = performance.now();
+  const btn = document.getElementById('motion');
+  const setBtn = () => { btn.textContent = playing ? 'Pause the camera' : 'Move the camera'; };
+  setBtn(); btn.onclick = () => { playing = !playing; setBtn(); };
+  if (q.has('still') || reducedMotion()) btn.hidden = true;
+  const target = new THREE.Vector3(0, 0.55, 0.3);
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; if (playing) t += dt;
+    const s = Math.sin(t * 0.11), r = phone ? 18.5 : 21.5, el = phone ? 0.62 : 0.5, az = (phone ? -0.08 : -0.2) + s * 0.08;
+    camera.position.set(Math.sin(az) * r * Math.cos(el), r * Math.sin(el) + 0.6, Math.cos(az) * r * Math.cos(el) - s * 1.2);
+    camera.lookAt(target.x, target.y, target.z - s * 1.2);
+    renderer.render(scene, camera); layoutNotes(project);
+    if (playing) requestAnimationFrame(frame);
+  }
+  btn.addEventListener('click', () => { if (playing) { last = performance.now(); requestAnimationFrame(frame); } });
+  requestAnimationFrame(frame);
+  addEventListener('resize', () => { if (!playing) requestAnimationFrame(frame); });
+  new IntersectionObserver(([e]) => { if (!e.isIntersecting && playing) { playing = false; setBtn(); } }).observe(canvas);
+}
+
+if (!hasWebGL() || q.has('fallback')) { drawFlat(); addEventListener('resize', drawFlat); document.getElementById('motion').hidden = true; }
+else { try { await draw3D(); } catch (err) { console.warn('3D unavailable, drawing the flat ridgeline', err); drawFlat(); } }
+</script>
+</body>
+</html>

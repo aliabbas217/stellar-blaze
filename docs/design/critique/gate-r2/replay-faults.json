@@ -1,0 +1,977 @@
+{
+  "url": "http://127.0.0.1:8765/replay-faults.html",
+  "when": "2026-11-11T12:19:03.221Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 15
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Break things · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 63.6
+        },
+        "squint": {
+          "masses": 59,
+          "competitors": 2,
+          "dominance": 0.212,
+          "top": [
+            {
+              "cells": 107,
+              "weight": 63.85,
+              "cx": 0.461,
+              "cy": 0.441,
+              "bbox": [
+                0.333,
+                0.402,
+                0.597,
+                0.477
+              ]
+            },
+            {
+              "cells": 96,
+              "weight": 55.66,
+              "cx": 0.158,
+              "cy": 0.439,
+              "bbox": [
+                0.042,
+                0.402,
+                0.292,
+                0.467
+              ]
+            },
+            {
+              "cells": 54,
+              "weight": 35.54,
+              "cx": 0.602,
+              "cy": 0.026,
+              "bbox": [
+                0.542,
+                0,
+                0.667,
+                0.047
+              ]
+            },
+            {
+              "cells": 36,
+              "weight": 15.53,
+              "cx": 0.335,
+              "cy": 0.154,
+              "bbox": [
+                0.264,
+                0.14,
+                0.403,
+                0.168
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 13.24,
+              "cx": 0.143,
+              "cy": 0.916,
+              "bbox": [
+                0.069,
+                0.897,
+                0.208,
+                0.925
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.133,
+        "centroid": {
+          "x": 0.379,
+          "y": 0.445
+        },
+        "colourfulness": 11,
+        "luminanceSpread": 0.334,
+        "chromaProxy": 0.028,
+        "hierarchyByHueOnly": false,
+        "inkPct": 25.6,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 15
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Break things · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 63.4
+        },
+        "squint": {
+          "masses": 61,
+          "competitors": 1,
+          "dominance": 0.222,
+          "top": [
+            {
+              "cells": 65,
+              "weight": 28.69,
+              "cx": 0.175,
+              "cy": 0.244,
+              "bbox": [
+                0.042,
+                0.225,
+                0.319,
+                0.263
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 10.72,
+              "cx": 0.296,
+              "cy": 0.015,
+              "bbox": [
+                0.208,
+                0,
+                0.333,
+                0.037
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 8.24,
+              "cx": 0.137,
+              "cy": 0.075,
+              "bbox": [
+                0.042,
+                0.063,
+                0.222,
+                0.087
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 5.37,
+              "cx": 0.256,
+              "cy": 0.787,
+              "bbox": [
+                0.125,
+                0.787,
+                0.389,
+                0.787
+              ]
+            },
+            {
+              "cells": 16,
+              "weight": 4.22,
+              "cx": 0.042,
+              "cy": 0.644,
+              "bbox": [
+                0.042,
+                0.55,
+                0.042,
+                0.738
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.157,
+        "centroid": {
+          "x": 0.351,
+          "y": 0.45
+        },
+        "colourfulness": 7.5,
+        "luminanceSpread": 0.202,
+        "chromaProxy": 0.015,
+        "hierarchyByHueOnly": false,
+        "inkPct": 30.8,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 15
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Break things · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 57.7
+        },
+        "squint": {
+          "masses": 30,
+          "competitors": 1,
+          "dominance": 0.439,
+          "top": [
+            {
+              "cells": 127,
+              "weight": 56.16,
+              "cx": 0.772,
+              "cy": 0.491,
+              "bbox": [
+                0.653,
+                0.448,
+                0.889,
+                0.552
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 12.82,
+              "cx": 0.136,
+              "cy": 0.852,
+              "bbox": [
+                0.069,
+                0.836,
+                0.194,
+                0.866
+              ]
+            },
+            {
+              "cells": 41,
+              "weight": 12.26,
+              "cx": 0.774,
+              "cy": 0.621,
+              "bbox": [
+                0.653,
+                0.612,
+                0.889,
+                0.642
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 7.9,
+              "cx": 0.149,
+              "cy": 0.153,
+              "bbox": [
+                0.069,
+                0.134,
+                0.222,
+                0.164
+              ]
+            },
+            {
+              "cells": 50,
+              "weight": 7.9,
+              "cx": 0.253,
+              "cy": 0.697,
+              "bbox": [
+                0.125,
+                0.672,
+                0.417,
+                0.716
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.021,
+        "centroid": {
+          "x": 0.479,
+          "y": 0.496
+        },
+        "colourfulness": 27.1,
+        "luminanceSpread": 0.196,
+        "chromaProxy": 0.089,
+        "hierarchyByHueOnly": false,
+        "inkPct": 26.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 15
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Break things · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 63.2
+        },
+        "squint": {
+          "masses": 54,
+          "competitors": 2,
+          "dominance": 0.189,
+          "top": [
+            {
+              "cells": 101,
+              "weight": 69.99,
+              "cx": 0.462,
+              "cy": 0.441,
+              "bbox": [
+                0.333,
+                0.411,
+                0.597,
+                0.477
+              ]
+            },
+            {
+              "cells": 92,
+              "weight": 62.34,
+              "cx": 0.16,
+              "cy": 0.439,
+              "bbox": [
+                0.042,
+                0.411,
+                0.292,
+                0.458
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 38.5,
+              "cx": 0.603,
+              "cy": 0.026,
+              "bbox": [
+                0.542,
+                0,
+                0.667,
+                0.047
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 16.75,
+              "cx": 0.144,
+              "cy": 0.916,
+              "bbox": [
+                0.069,
+                0.897,
+                0.208,
+                0.925
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 12.43,
+              "cx": 0.127,
+              "cy": 0.032,
+              "bbox": [
+                0.042,
+                0.019,
+                0.222,
+                0.037
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.132,
+        "centroid": {
+          "x": 0.391,
+          "y": 0.426
+        },
+        "colourfulness": 11,
+        "luminanceSpread": 0.482,
+        "chromaProxy": 0.03,
+        "hierarchyByHueOnly": false,
+        "inkPct": 35.9,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 19% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 15
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Break things · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 63.5
+        },
+        "squint": {
+          "masses": 62,
+          "competitors": 1,
+          "dominance": 0.179,
+          "top": [
+            {
+              "cells": 62,
+              "weight": 33.45,
+              "cx": 0.175,
+              "cy": 0.244,
+              "bbox": [
+                0.042,
+                0.225,
+                0.319,
+                0.263
+              ]
+            },
+            {
+              "cells": 22,
+              "weight": 12,
+              "cx": 0.292,
+              "cy": 0.014,
+              "bbox": [
+                0.194,
+                0,
+                0.333,
+                0.025
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 10.37,
+              "cx": 0.136,
+              "cy": 0.074,
+              "bbox": [
+                0.042,
+                0.063,
+                0.222,
+                0.087
+              ]
+            },
+            {
+              "cells": 19,
+              "weight": 7.53,
+              "cx": 0.261,
+              "cy": 0.788,
+              "bbox": [
+                0.139,
+                0.787,
+                0.389,
+                0.787
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 7.26,
+              "cx": 0.378,
+              "cy": 0.3,
+              "bbox": [
+                0.25,
+                0.287,
+                0.5,
+                0.3
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.151,
+        "centroid": {
+          "x": 0.363,
+          "y": 0.436
+        },
+        "colourfulness": 7.7,
+        "luminanceSpread": 0.315,
+        "chromaProxy": 0.017,
+        "hierarchyByHueOnly": false,
+        "inkPct": 34.3,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 18% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 15
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Break things · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-faults\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 57.9
+        },
+        "squint": {
+          "masses": 30,
+          "competitors": 1,
+          "dominance": 0.311,
+          "top": [
+            {
+              "cells": 124,
+              "weight": 45.82,
+              "cx": 0.769,
+              "cy": 0.491,
+              "bbox": [
+                0.653,
+                0.448,
+                0.889,
+                0.537
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 17.74,
+              "cx": 0.136,
+              "cy": 0.852,
+              "bbox": [
+                0.069,
+                0.836,
+                0.194,
+                0.866
+              ]
+            },
+            {
+              "cells": 59,
+              "weight": 14.76,
+              "cx": 0.266,
+              "cy": 0.698,
+              "bbox": [
+                0.125,
+                0.672,
+                0.472,
+                0.716
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 14.04,
+              "cx": 0.772,
+              "cy": 0.62,
+              "bbox": [
+                0.667,
+                0.612,
+                0.875,
+                0.642
+              ]
+            },
+            {
+              "cells": 23,
+              "weight": 9.62,
+              "cx": 0.149,
+              "cy": 0.153,
+              "bbox": [
+                0.069,
+                0.134,
+                0.222,
+                0.164
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.065,
+        "centroid": {
+          "x": 0.435,
+          "y": 0.503
+        },
+        "colourfulness": 26.4,
+        "luminanceSpread": 0.286,
+        "chromaProxy": 0.088,
+        "hierarchyByHueOnly": false,
+        "inkPct": 34,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="worker">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>I feel unwell · Worker · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* focus must not end up behind the sticky dock (WCAG 2.2 2.4.11) */
+  html[data-surface="worker"] { scroll-padding-block-end: calc(var(--space-24) + var(--space-12)); }
+  .worker a.link { display: inline-flex; align-items: center; min-block-size: var(--target-worker); }
+  .steps > li { display: grid; gap: var(--space-3); }
+  .step__head { display: grid; grid-template-columns: auto auto 1fr; align-items: center; column-gap: var(--space-3); }
+  .step__picto { inline-size: var(--space-8); block-size: var(--space-8); }
+  .stepnum {
+    display: grid; place-items: center; inline-size: var(--space-12); block-size: var(--space-12);
+    background: var(--ink); color: var(--surface); border-radius: var(--radius-sign);
+    font-family: var(--font-display); font-weight: 700; font-size: var(--size-title); line-height: var(--leading-solid);
+  }
+  .step--focal { background: var(--surface); border: var(--rule) solid var(--ink); }
+  .call { min-block-size: var(--space-16); font-family: var(--font-display); font-size: var(--size-title); letter-spacing: var(--tracking-signage); }
+  .call svg { inline-size: var(--space-6); block-size: var(--space-6); }
+  .banner .btn svg, .banner .reqid svg { inline-size: 1.25rem; block-size: 1.25rem; }
+  /* a block that is itself a child of .stack gets its own inner rhythm from a grid gap, not a second --stack */
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  /* Urdu view: text with no Urdu string yet stays English and gets the Latin face (see script below) */
+  :where(html:lang(ur) [lang="en"]) { font-family: "Noto Sans", var(--font-body-fallback); line-height: var(--leading-body); unicode-bidi: plaintext; }
+  html:lang(ur) [lang="en"]:is(.t-headline, .t-title, .panel-title), html:lang(ur) [lang="en"] :is(.t-headline, .t-title, .panel-title) { font-family: var(--font-display); font-weight: 600; }
+  html:lang(ur) .btn--primary:has([lang="en"]), html:lang(ur) [lang="en"] .btn--primary { font-family: var(--font-display); font-size: var(--size-title); }
+  .proto-note { display: none; font-family: var(--font-mono); font-size: var(--size-label); background: var(--surface-raised); border: var(--rule-hairline) dashed var(--control); padding: var(--space-2) var(--space-3); }
+  html:lang(ur) .proto-note { display: block; }
+</style>
+</head>
+<body data-states="ideal,empty,error,attested" data-langs="en,ur">
+<a class="skip-link" href="#main" data-t-ur="مواد پر جائیں">Skip to content</a>
+
+<main id="main" class="worker stack stack-6">
+  <header class="worker-top">
+    <p class="t-title">Stellar Blaze</p>
+    <span class="stamp stamp--quiet" data-t-ur="مسودہ ترجمہ">Placeholder</span>
+  </header>
+  <p class="proto-note" lang="en" dir="ltr">Prototype note, not product: text with no key in ur.json stays in English here. No Urdu has been invented. This card is static and works offline from cache, so it has no loading state.</p>
+
+  <h1 class="t-headline">If you feel unwell</h1>
+
+  <ol class="steps vs-4">
+    <!-- Step 1: the focal point -->
+    <li class="card step--focal" aria-labelledby="s1-h">
+      <div class="step__head">
+        <span class="stepnum" aria-hidden="true">1</span>
+        <svg class="ico step__picto" aria-hidden="true"><use href="#i-phone"/></svg>
+        <h2 class="panel-title" id="s1-h">Call</h2>
+      </div>
+      <div class="stack stack-2">
+        <a class="btn btn--primary btn--block call" href="tel:998"><svg class="ico"><use href="#i-phone"/></svg><span>Call 998, ambulance</span></a>
+        <div data-state="ideal error attested" class="vs-1">
+          <a class="btn btn--block call" href="tel:⟨first-aider-number⟩"><svg class="ico"><use href="#i-phone"/></svg><span>Call site first aider</span></a>
+          <span class="slot-key">site.first_aider_phone</span>
+        </div>
+        <div data-state="empty" class="banner" role="status">
+          <svg class="ico"><use href="#i-info"/></svg>
+          <div class="stack stack-1">
+            <p><strong>Ask the nearest person to call your first aider.</strong></p>
+            <p class="t-label">No first aider number is set for this site.</p>
+          </div>
+        </div>
+      </div>
+      <p class="t-label t-muted">Calling does not need a data connection.</p>
+      <div>
+        <p class="t-lead">⟨Call step from ADOSH CoP 11.0 §4.5(c), reviewed text⟩</p>
+        <span class="slot-key">unwell.step.call</span>
+      </div>
+    </li>
+
+    <li class="card" aria-labelledby="s2-h">
+      <div class="step__head">
+        <span class="stepnum" aria-hidden="true">2</span>
+        <svg class="ico step__picto" aria-hidden="true"><use href="#i-orange"/></svg>
+        <h2 class="panel-title" id="s2-h">Move to shade</h2>
+      </div>
+      <div>
+        <p class="t-lead">⟨Move step from ADOSH CoP 11.0 §4.5(c), reviewed text⟩</p>
+        <span class="slot-key">unwell.step.move</span>
+      </div>
+    </li>
+
+    <li class="card" aria-labelledby="s3-h">
+      <div class="step__head">
+        <span class="stepnum" aria-hidden="true">3</span>
+        <svg class="ico step__picto" aria-hidden="true"><use href="#i-cool"/></svg>
+        <h2 class="panel-title" id="s3-h">Cool down</h2>
+      </div>
+      <div>
+        <p class="t-lead">⟨Cool-down step from ADOSH CoP 11.0 §4.5(c), reviewed text⟩</p>
+        <span class="slot-key">unwell.step.cool</span>
+      </div>
+    </li>
+  </ol>
+
+  <!-- Only when the employer has attested it (else this block is omitted) -->
+  <aside data-state="attested" class="banner" aria-label="Pay">
+    <svg class="ico"><use href="#i-stop"/></svg>
+    <div class="stack stack-1">
+      <p class="t-lead"><strong>Stop work now. You will not lose pay for this.</strong></p>
+      <p class="t-label t-muted">Shown only because your employer attested it: ⟨attestation reference⟩.</p>
+    </div>
+  </aside>
+
+  <!-- ERROR: the optional message to the first aider was not sent. Calls above stay primary. -->
+  <div data-state="error" class="banner" role="alert">
+    <svg class="ico"><use href="#i-offline"/></svg>
+    <div class="stack stack-2">
+      <p><strong>Not sent yet.</strong> We will try again while the app is open.</p>
+      <p class="cluster">
+        <button class="btn btn--sm" type="button"><svg class="ico"><use href="#i-retry"/></svg><span>Try again now</span></button>
+        <span class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></span>
+      </p>
+    </div>
+  </div>
+
+  <div data-state="ideal error attested" class="vs-2">
+    <button class="btn btn--block" type="button"><svg class="ico"><use href="#i-unwell"/></svg><span>Tell my first aider</span></button>
+    <p class="t-label t-muted measure">Optional. If you are offline the message waits and is sent when you are back online.</p>
+  </div>
+
+  <section class="vs-3" aria-label="About this card">
+    <p class="cluster"><span class="stamp stamp--quiet">Not clinically reviewed</span><span class="t-label t-muted">The steps cite ADOSH CoP 11.0 §4.5(c).</span></p>
+    <p class="cluster"><svg class="ico" width="24" height="24" aria-hidden="true"><use href="#i-lock"/></svg><strong>Your supervisor does not see this.</strong></p>
+  </section>
+</main>
+
+<!-- No unwell button here: this page is the unwell card. The bar has no current item, because this is none of the three. -->
+<div class="worker-dock">
+<nav class="bottom-bar" aria-label="Worker" data-aria-ur="کارکن">
+  <a href="worker-today.html"><svg class="ico"><use href="#i-today"/></svg><span data-t-ur="آج">Today</span></a>
+  <a href="worker-alerts.html"><svg class="ico"><use href="#i-bell"/></svg><span data-t-ur="الرٹس">Alerts</span></a>
+  <a href="worker-data.html"><svg class="ico"><use href="#i-eye"/></svg><span data-t-ur="میرا ڈیٹا">My data</span></a>
+</nav>
+</div>
+<script src="assets/proto.js"></script>
+<script>
+  /* Urdu view: any text without an Urdu string yet stays English and is marked lang="en" (never invented Urdu). */
+  (() => {
+    if (document.documentElement.lang !== "ur") return;
+    document.querySelectorAll("main *, .worker-dock *").forEach((el) => {
+      if (el.closest("[lang]:not(html)")) return;
+      if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) el.lang = "en";
+    });
+  })();
+</script>
+</body>
+</html>

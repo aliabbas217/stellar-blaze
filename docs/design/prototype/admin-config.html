@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="admin">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runtime config · Admin · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  .banner .btn svg, .banner .reqid svg { inline-size: 1.25rem; block-size: 1.25rem; }
+  .active { border: var(--rule) solid var(--ink); background: var(--surface); }
+  .active .t-headline { overflow-wrap: anywhere; }
+  .cfg th[scope="col"] { vertical-align: bottom; }
+  .cfg .slot-key { font-weight: 400; }
+  .cfg td, .cfg th[scope="row"] { vertical-align: middle; }
+  .cfg .t-mono { overflow-wrap: anywhere; }
+  .lockname { display: inline-flex; align-items: start; gap: var(--space-2); font-weight: 600; }
+  .lockname svg { inline-size: 1rem; block-size: 1rem; margin-block-start: 0.3em; flex: none; }
+  .err svg { inline-size: 1.25rem; block-size: 1.25rem; flex: none; }
+  .err { align-items: start; }
+  .hint { font-size: var(--size-label); color: var(--ink-muted); }
+  .textarea { resize: vertical; }
+  .modal__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  dialog.modal { inline-size: min(34rem, calc(100vw - var(--space-8))); max-inline-size: none; }
+  .diff { border: var(--rule-hairline) solid var(--hairline); border-radius: var(--radius-sign); padding: var(--space-3) var(--space-4); }
+  .btn[hidden], [hidden] { display: none; }
+  .diff[hidden] { display: none; }
+  .sk-line { block-size: var(--space-8); inline-size: 40%; }
+  .sk-active { block-size: calc(var(--space-16) + var(--space-8)); }
+  .sk-table { block-size: calc(var(--space-24) * 2 + var(--space-8)); }
+
+  @media (max-width: 47.99rem) {
+    .cfg thead { position: absolute; inline-size: var(--rule-hairline); block-size: var(--rule-hairline); overflow: hidden; clip-path: inset(50%); }
+    .cfg, .cfg tbody { display: block; }
+    .cfg tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); padding-block: var(--space-3); border-block-end: var(--rule-hairline) solid var(--hairline); }
+    .cfg th[scope="row"], .cfg td { display: block; padding: 0; border: 0; }
+    .cfg td[data-label] { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); }
+    .cfg td[data-label]::before { content: attr(data-label); color: var(--ink-muted); font-size: var(--size-label); font-weight: 600; }
+    .cfg td[data-label] .v { text-align: end; }
+    .cfg td:not([data-label]) { padding-block-start: var(--space-2); }
+  }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error,unauthorized,violation,conflict">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Admin</span>
+    <span class="stamp stamp--quiet">Admin token required</span>
+  </div>
+</header>
+
+<main id="main" class="desk stack stack-8">
+  <header class="vs-3">
+    <h1 class="t-display">Runtime config</h1>
+    <p class="t-lead measure">Tunables change without a deploy, inside a reviewed range, with a reason on the record. Legal floors are read-only.</p>
+  </header>
+
+  <!-- ACTIVATED / ROLLED BACK confirmation (set by the dialogs) -->
+  <div id="toast" hidden>
+    <div class="banner" role="status">
+      <svg class="ico"><use href="#i-proof"/></svg>
+      <p id="toast-text"><strong>Activated.</strong></p>
+    </div>
+  </div>
+
+  <!-- CONFLICT: someone activated first -->
+  <div data-state="conflict" class="banner" role="alert">
+    <svg class="ico"><use href="#i-warn"/></svg>
+    <div class="vs-2">
+      <p><strong>Config changed since you opened it.</strong> Reload to see the new active version and the new diff before you edit.</p>
+      <p><a class="btn btn--sm" href="admin-config.html"><svg class="ico"><use href="#i-retry"/></svg>Reload</a></p>
+    </div>
+  </div>
+
+  <!-- IDEAL (also: violation, conflict) -->
+  <div data-state="ideal violation conflict" class="stack stack-8">
+    <section class="card active vs-2" aria-labelledby="active-h">
+      <h2 id="active-h" class="sr-only">Active version</h2>
+      <p class="t-headline">Active: config v⟨n⟩, activated ⟨time⟩ by ⟨actor⟩</p>
+      <p class="t-label t-muted"><span class="t-mono">sha256 ⟨64 hex characters⟩</span></p>
+      <span class="slot-key">config.active</span>
+    </section>
+
+    <section class="vs-3" aria-labelledby="tun-h">
+      <div class="spread"><h2 id="tun-h" class="t-headline">Tunables</h2><span class="stamp stamp--quiet">Class b, live</span></div>
+      <p class="t-label t-muted measure">Editable inside the reviewed range. A value outside it is refused.</p>
+      <div class="table-scroll">
+        <table class="table cfg" role="table">
+          <caption class="sr-only">Runtime tunables with their current value and allowed range</caption>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th scope="col" role="columnheader">Name</th>
+              <th scope="col" role="columnheader">Value<span class="slot-key">tunables[].value</span></th>
+              <th scope="col" role="columnheader">Allowed range</th>
+              <th scope="col" role="columnheader">Class</th>
+              <th scope="col" role="columnheader"><span class="sr-only">Edit</span></th>
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">twl_margin_w_m2</span></th>
+              <td data-label="Value" role="cell"><span class="v"><span class="slot">###</span></span></td>
+              <td data-label="Allowed range" role="cell"><span class="v">0 to 20, higher is safer</span></td>
+              <td data-label="Class" role="cell"><span class="v"><span class="t-mono">b</span></span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="edit-dialog" data-name="twl_margin_w_m2" data-min="0" data-max="20" data-bracket="[0, 20]" data-hint="0 to 20, higher is safer" data-flag="0">Edit<span class="sr-only"> twl_margin_w_m2</span></button></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">deescalation_dwell_minutes</span></th>
+              <td data-label="Value" role="cell"><span class="v"><span class="slot">###</span></span></td>
+              <td data-label="Allowed range" role="cell"><span class="v">⟨min⟩ to ⟨max⟩</span></td>
+              <td data-label="Class" role="cell"><span class="v"><span class="t-mono">b</span></span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="edit-dialog" data-name="deescalation_dwell_minutes" data-min="0" data-max="1000" data-bracket="[⟨min⟩, ⟨max⟩]" data-hint="⟨min⟩ to ⟨max⟩" data-flag="0">Edit<span class="sr-only"> deescalation_dwell_minutes</span></button></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">planner_det_time_s</span></th>
+              <td data-label="Value" role="cell"><span class="v"><span class="slot">###</span></span></td>
+              <td data-label="Allowed range" role="cell"><span class="v">0.5 to 10</span></td>
+              <td data-label="Class" role="cell"><span class="v"><span class="t-mono">b</span></span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="edit-dialog" data-name="planner_det_time_s" data-min="0.5" data-max="10" data-bracket="[0.5, 10]" data-hint="0.5 to 10" data-flag="0">Edit<span class="sr-only"> planner_det_time_s</span></button></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">k_health</span></th>
+              <td data-label="Value" role="cell"><span class="v"><span class="slot">###</span></span></td>
+              <td data-label="Allowed range" role="cell"><span class="v">10 or more</span></td>
+              <td data-label="Class" role="cell"><span class="v"><span class="t-mono">b</span></span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="edit-dialog" data-name="k_health" data-min="10" data-max="" data-bracket="[10, no upper limit]" data-hint="10 or more" data-flag="0">Edit<span class="sr-only"> k_health</span></button></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">k_exposure</span></th>
+              <td data-label="Value" role="cell"><span class="v"><span class="slot">###</span></span></td>
+              <td data-label="Allowed range" role="cell"><span class="v">5 or more</span></td>
+              <td data-label="Class" role="cell"><span class="v"><span class="t-mono">b</span></span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="edit-dialog" data-name="k_exposure" data-min="5" data-max="" data-bracket="[5, no upper limit]" data-hint="5 or more" data-flag="0">Edit<span class="sr-only"> k_exposure</span></button></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">planner_cpsat_enabled</span></th>
+              <td data-label="Value" role="cell"><span class="v"><span class="slot">###</span></span></td>
+              <td data-label="Allowed range" role="cell"><span class="v">on or off</span></td>
+              <td data-label="Class" role="cell"><span class="v"><span class="t-mono">b</span></span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="edit-dialog" data-name="planner_cpsat_enabled" data-min="" data-max="" data-bracket="" data-hint="on or off" data-flag="1">Edit<span class="sr-only"> planner_cpsat_enabled</span></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="vs-3" aria-labelledby="floor-h">
+      <div class="spread"><h2 id="floor-h" class="t-headline">Legal floors</h2><span class="stamp">Read only</span></div>
+      <p class="t-label t-muted measure">Legal floor: changes only by a reviewed ruleset release, never here.</p>
+      <div class="table-scroll">
+        <table class="table cfg" role="table">
+          <caption class="sr-only">Legal and regulatory floors with their source clause</caption>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th scope="col" role="columnheader">Floor</th>
+              <th scope="col" role="columnheader">Value</th>
+              <th scope="col" role="columnheader">Source</th>
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="lockname"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg><span>ADOSH TWL zone edges</span></span></th>
+              <td data-label="Value" role="cell"><span class="v">Low 140 or more, Medium 115 to 140, High below 115 (W/m2)</span></td>
+              <td data-label="Source" role="cell"><span class="v">ADOSH Technical Guideline Table 1, ADR 0006</span></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="lockname"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg><span>Midday ban window</span></span></th>
+              <td data-label="Value" role="cell"><span class="v">12:30 to 15:00, 15 Jun to 15 Sep</span></td>
+              <td data-label="Source" role="cell"><span class="v">MR 44/2022 Art. 3 (P-H1)</span></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="lockname"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg><span>Normal working hours</span></span></th>
+              <td data-label="Value" role="cell"><span class="v">8 per day, 48 per week</span></td>
+              <td data-label="Source" role="cell"><span class="v">Art. 17(1), Art. 19(1) to (3) (P-H2)</span></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="lockname"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg><span>Art. 18 break</span></span></th>
+              <td data-label="Value" role="cell"><span class="v">No more than 5 hours of work in a row without 1 hour of break. Ban time and ADOSH rest not credited</span></td>
+              <td data-label="Source" role="cell"><span class="v">Art. 18 (P-H3), protective reading</span></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="lockname"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg><span>Privacy floors</span></span></th>
+              <td data-label="Value" role="cell"><span class="v">k_health 10, k_exposure 5</span></td>
+              <td data-label="Source" role="cell"><span class="v">ADR 0011 section 7</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="vs-3" aria-labelledby="hist-h">
+      <div class="spread"><h2 id="hist-h" class="t-headline">History</h2><span class="stamp stamp--quiet">Append only</span></div>
+      <p class="t-label t-muted measure">A rollback adds a new row. Nothing is edited or deleted.</p>
+      <div class="table-scroll">
+        <table class="table cfg" role="table">
+          <caption class="sr-only">Config versions, newest first</caption>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th scope="col" role="columnheader">Version</th>
+              <th scope="col" role="columnheader">Kind</th>
+              <th scope="col" role="columnheader">Actor</th>
+              <th scope="col" role="columnheader">Reason</th>
+              <th scope="col" role="columnheader">Activated</th>
+              <th scope="col" role="columnheader"><span class="sr-only">Roll back</span></th>
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">v⟨n⟩</span></th>
+              <td data-label="Kind" role="cell"><span class="v"><span class="t-mono">activate</span></span></td>
+              <td data-label="Actor" role="cell"><span class="v">⟨actor⟩</span></td>
+              <td data-label="Reason" role="cell"><span class="v">⟨reason, 10 to 500 characters⟩</span></td>
+              <td data-label="Activated" role="cell"><span class="v t-num">⟨time⟩</span></td>
+              <td role="cell"><span class="stamp">Active</span></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">v⟨prev⟩</span></th>
+              <td data-label="Kind" role="cell"><span class="v"><span class="t-mono">activate</span></span></td>
+              <td data-label="Actor" role="cell"><span class="v">⟨actor⟩</span></td>
+              <td data-label="Reason" role="cell"><span class="v">⟨reason, 10 to 500 characters⟩</span></td>
+              <td data-label="Activated" role="cell"><span class="v t-num">⟨time⟩</span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="rollback-dialog" data-version="v⟨prev⟩">Roll back<span class="sr-only"> to v⟨prev⟩</span></button></td>
+            </tr>
+            <tr role="row">
+              <th scope="row" role="rowheader"><span class="t-mono">v⟨seed⟩</span></th>
+              <td data-label="Kind" role="cell"><span class="v"><span class="t-mono">seed</span></span></td>
+              <td data-label="Actor" role="cell"><span class="v">⟨actor⟩</span></td>
+              <td data-label="Reason" role="cell"><span class="v">⟨reason, 10 to 500 characters⟩</span></td>
+              <td data-label="Activated" role="cell"><span class="v t-num">⟨time⟩</span></td>
+              <td role="cell"><button class="btn btn--sm" type="button" data-open="rollback-dialog" data-version="v⟨seed⟩">Roll back<span class="sr-only"> to v⟨seed⟩</span></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- LOADING -->
+  <section data-state="loading" class="vs-4" aria-busy="true" aria-label="Loading the config">
+    <div class="skel sk-active"></div>
+    <div class="skel sk-line"></div>
+    <div class="skel sk-table"></div>
+    <div class="skel sk-line"></div>
+    <div class="skel sk-table"></div>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY: no versions yet -->
+  <section data-state="empty" class="empty" aria-labelledby="empty-h">
+    <svg class="ico empty__picto"><use href="#i-lock"/></svg>
+    <h2 id="empty-h" class="t-headline">No config versions yet</h2>
+    <p class="t-lead measure">The service needs one active version before it can answer decision requests. Seed it from the default file in the image.</p>
+    <div class="cluster cluster-4">
+      <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-proof"/></svg>Seed from the default file</button>
+    </div>
+    <p class="cluster"><span class="t-label t-muted">Or from a terminal:</span><code class="t-mono">sb-jobs config seed</code><button class="btn btn--sm" type="button" data-copy="sb-jobs config seed"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+
+  <!-- ERROR -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="err-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h2 id="err-h" class="t-headline">The config did not load</h2>
+    <p class="measure">Check your connection and try again. The service keeps running on its last good version.</p>
+    <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+
+  <!-- UNAUTHORIZED (401) -->
+  <section data-state="unauthorized" class="error" role="alert" aria-labelledby="auth-h">
+    <svg class="ico empty__picto"><use href="#i-lock"/></svg>
+    <h2 id="auth-h" class="t-headline">Admin token needed</h2>
+    <p class="measure">Changing the config needs an admin token. Reading it does not.</p>
+    <form class="vs-3" action="admin-config.html" method="get">
+      <div class="field">
+        <label for="token">Admin token</label>
+        <input class="input" id="token" name="token" type="password" autocomplete="off" spellcheck="false">
+      </div>
+      <div><button class="btn btn--primary" type="submit">Use this token</button></div>
+    </form>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+</main>
+
+<!-- EDIT: value, reason, Validate, diff, Activate -->
+<dialog class="modal" id="edit-dialog" aria-labelledby="ed-h">
+  <form id="edit-form" class="vs-4" novalidate>
+    <h2 id="ed-h" class="t-headline">Edit <span class="t-mono" id="ed-name">⟨name⟩</span></h2>
+    <dl class="kv">
+      <dt>Current value</dt><dd><span class="slot">###</span></dd>
+      <dt>Allowed range</dt><dd id="ed-range">⟨range⟩</dd>
+    </dl>
+    <div class="field">
+      <label for="ed-val">New value</label>
+      <input class="input" id="ed-val" name="value" inputmode="decimal" autocomplete="off" aria-describedby="ed-range ed-val-err">
+      <p class="err" id="ed-val-err" data-state="on-submit" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span><strong id="ed-val-msg">Outside the reviewed range.</strong> <span class="t-mono" id="ed-val-code">policy-bound-violation</span></span></p>
+    </div>
+    <div class="field">
+      <label for="ed-reason">Reason</label>
+      <textarea class="textarea" id="ed-reason" name="reason" rows="4" maxlength="500" aria-describedby="ed-count ed-reason-err"></textarea>
+      <p class="hint" id="ed-count"><span id="ed-n">0</span> of 500 characters. At least 10.</p>
+      <p class="err" id="ed-reason-err" data-state="on-submit" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span>Give a reason of 10 to 500 characters.</span></p>
+    </div>
+    <div class="diff vs-1" id="ed-diff" hidden aria-live="polite">
+      <p class="t-label t-muted">Diff, nothing is active yet</p>
+      <p>Current value <span class="slot">###</span>, new value <strong id="ed-diff-new">⟨new⟩</strong></p>
+    </div>
+    <div class="modal__actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn btn--primary" type="submit" id="ed-validate">Validate</button>
+      <button class="btn btn--primary" type="button" id="ed-activate" hidden>Activate</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ROLL BACK: one action, with a reason -->
+<dialog class="modal" id="rollback-dialog" aria-labelledby="rb-h">
+  <form id="rb-form" class="vs-4" novalidate>
+    <h2 id="rb-h" class="t-headline">Roll back to <span class="t-mono" id="rb-ver">v⟨prev⟩</span></h2>
+    <p>This activates that version again as a new row of kind <span class="t-mono">rollback</span>. It goes through the same checks as any activation.</p>
+    <div class="field">
+      <label for="rb-reason">Reason</label>
+      <textarea class="textarea" id="rb-reason" rows="4" maxlength="500" aria-describedby="rb-count rb-reason-err"></textarea>
+      <p class="hint" id="rb-count"><span id="rb-n">0</span> of 500 characters. At least 10.</p>
+      <p class="err" id="rb-reason-err" data-state="on-submit" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span>Give a reason of 10 to 500 characters.</span></p>
+    </div>
+    <div class="modal__actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn btn--primary" type="submit">Roll back</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Prototype behaviour: edit dialog (range check, live counter, diff), rollback dialog, violation state. */
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const show = (id, on) => $(id).classList.toggle("is-shown", on);
+    const toast = $("toast");
+    const announce = (html) => { $("toast-text").innerHTML = html; toast.hidden = false; toast.scrollIntoView({ block: "nearest" }); };
+
+    /* edit dialog */
+    const ed = { dlg: $("edit-dialog"), form: $("edit-form"), val: $("ed-val"), reason: $("ed-reason"), cur: null };
+    const reset = () => {
+      ed.val.value = ""; ed.reason.value = ""; $("ed-n").textContent = "0";
+      ["ed-val-err", "ed-reason-err"].forEach((id) => show(id, false));
+      ed.val.setAttribute("aria-invalid", "false");
+      $("ed-diff").hidden = true; $("ed-activate").hidden = true; $("ed-validate").hidden = false;
+    };
+    const prepare = (b) => {
+      ed.cur = { name: b.dataset.name, min: b.dataset.min === "" ? -Infinity : +b.dataset.min, max: b.dataset.max === "" ? Infinity : +b.dataset.max, bracket: b.dataset.bracket, flag: b.dataset.flag === "1" };
+      $("ed-name").textContent = b.dataset.name; $("ed-range").textContent = b.dataset.hint;
+      reset();
+    };
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest('[data-open="edit-dialog"]'); if (b) prepare(b);
+      const r = e.target.closest('[data-open="rollback-dialog"]');
+      if (r) { $("rb-ver").textContent = r.dataset.version; $("rb-reason").value = ""; $("rb-n").textContent = "0"; show("rb-reason-err", false); }
+    });
+    ed.reason.addEventListener("input", () => ($("ed-n").textContent = ed.reason.value.length));
+    $("rb-reason").addEventListener("input", () => ($("rb-n").textContent = $("rb-reason").value.length));
+    const unvalidate = () => { $("ed-diff").hidden = true; $("ed-activate").hidden = true; $("ed-validate").hidden = false; };
+    ed.val.addEventListener("input", unvalidate);
+    ed.reason.addEventListener("input", unvalidate);
+    ed.form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const raw = ed.val.value.trim(); const c = ed.cur; let bad = null;
+      if (c.flag) { if (!/^(on|off)$/i.test(raw)) bad = "Enter on or off."; }
+      else if (raw === "" || Number.isNaN(Number(raw))) bad = "Enter a number.";
+      else if (Number(raw) < c.min || Number(raw) > c.max) bad = "Outside the reviewed range " + c.bracket + ".";
+      const n = ed.reason.value.trim().length; const reasonBad = n < 10 || n > 500;
+      $("ed-val-msg").textContent = bad || ""; $("ed-val-code").hidden = !(bad && bad.startsWith("Outside"));
+      show("ed-val-err", !!bad); show("ed-reason-err", reasonBad);
+      ed.val.setAttribute("aria-invalid", bad ? "true" : "false");
+      if (bad) return ed.val.focus();
+      if (reasonBad) return ed.reason.focus();
+      $("ed-diff-new").textContent = raw; $("ed-diff").hidden = false;
+      $("ed-validate").hidden = true; $("ed-activate").hidden = false; $("ed-activate").focus();
+    });
+    $("ed-activate").addEventListener("click", () => { ed.dlg.close(); announce("<strong>Activated as config v⟨n+1⟩.</strong> The audit row is written and the change is live without a restart."); });
+
+    /* rollback dialog */
+    $("rb-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const n = $("rb-reason").value.trim().length; const bad = n < 10 || n > 500;
+      show("rb-reason-err", bad);
+      if (bad) return $("rb-reason").focus();
+      $("rollback-dialog").close();
+      announce("<strong>Rolled back to " + $("rb-ver").textContent + ".</strong> A new row of kind rollback is on the record.");
+    });
+
+    /* state: an out-of-range value, with the dialog open */
+    if (document.body.dataset.current === "violation") {
+      prepare(document.querySelector('[data-name="twl_margin_w_m2"]'));
+      ed.val.value = "35"; ed.reason.value = "Back-test says the margin should move."; $("ed-n").textContent = ed.reason.value.length;
+      ed.dlg.showModal();
+      ed.form.dispatchEvent(new Event("submit", { cancelable: true }));
+    }
+  })();
+</script>
+</body>
+</html>

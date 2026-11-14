@@ -1,0 +1,1363 @@
+{
+  "url": "http://127.0.0.1:8765/replay-climate.html",
+  "when": "2026-11-11T11:59:41.931Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Same summer, warmer · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 56
+        },
+        "squint": {
+          "masses": 54,
+          "competitors": 2,
+          "dominance": 0.118,
+          "top": [
+            {
+              "cells": 62,
+              "weight": 44.66,
+              "cx": 0.245,
+              "cy": 0.543,
+              "bbox": [
+                0.125,
+                0.523,
+                0.375,
+                0.561
+              ]
+            },
+            {
+              "cells": 51,
+              "weight": 37.35,
+              "cx": 0.722,
+              "cy": 0.46,
+              "bbox": [
+                0.625,
+                0.439,
+                0.819,
+                0.477
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 21.68,
+              "cx": 0.406,
+              "cy": 0.459,
+              "bbox": [
+                0.347,
+                0.439,
+                0.458,
+                0.477
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 17.88,
+              "cx": 0.095,
+              "cy": 0.452,
+              "bbox": [
+                0.042,
+                0.43,
+                0.139,
+                0.477
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 16.14,
+              "cx": 0.555,
+              "cy": 0.461,
+              "bbox": [
+                0.514,
+                0.439,
+                0.597,
+                0.477
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.108,
+        "centroid": {
+          "x": 0.41,
+          "y": 0.559
+        },
+        "colourfulness": 11.8,
+        "luminanceSpread": 0.567,
+        "chromaProxy": 0.031,
+        "hierarchyByHueOnly": false,
+        "inkPct": 32,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 12% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Same summer, warmer · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 54.5
+        },
+        "squint": {
+          "masses": 36,
+          "competitors": 1,
+          "dominance": 0.139,
+          "top": [
+            {
+              "cells": 82,
+              "weight": 23.36,
+              "cx": 0.493,
+              "cy": 0.287,
+              "bbox": [
+                0.042,
+                0.275,
+                0.944,
+                0.375
+              ]
+            },
+            {
+              "cells": 39,
+              "weight": 16.1,
+              "cx": 0.365,
+              "cy": 0.235,
+              "bbox": [
+                0.278,
+                0.225,
+                0.458,
+                0.25
+              ]
+            },
+            {
+              "cells": 34,
+              "weight": 15.4,
+              "cx": 0.572,
+              "cy": 0.234,
+              "bbox": [
+                0.486,
+                0.225,
+                0.653,
+                0.25
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 10.78,
+              "cx": 0.198,
+              "cy": 0.235,
+              "bbox": [
+                0.139,
+                0.225,
+                0.25,
+                0.25
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 9.84,
+              "cx": 0.146,
+              "cy": 0.307,
+              "bbox": [
+                0.069,
+                0.3,
+                0.236,
+                0.325
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.101,
+        "centroid": {
+          "x": 0.412,
+          "y": 0.451
+        },
+        "colourfulness": 12.7,
+        "luminanceSpread": 0.277,
+        "chromaProxy": 0.036,
+        "hierarchyByHueOnly": false,
+        "inkPct": 37.6,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 14% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Same summer, warmer · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 49.9
+        },
+        "squint": {
+          "masses": 29,
+          "competitors": 1,
+          "dominance": 0.256,
+          "top": [
+            {
+              "cells": 116,
+              "weight": 29.74,
+              "cx": 0.332,
+              "cy": 0.194,
+              "bbox": [
+                0.069,
+                0.179,
+                0.597,
+                0.209
+              ]
+            },
+            {
+              "cells": 50,
+              "weight": 19.19,
+              "cx": 0.168,
+              "cy": 0.607,
+              "bbox": [
+                0.083,
+                0.582,
+                0.25,
+                0.642
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 10.51,
+              "cx": 0.187,
+              "cy": 0.144,
+              "bbox": [
+                0.083,
+                0.134,
+                0.292,
+                0.149
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 8.61,
+              "cx": 0.444,
+              "cy": 0.603,
+              "bbox": [
+                0.375,
+                0.582,
+                0.514,
+                0.612
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 8.36,
+              "cx": 0.73,
+              "cy": 0.604,
+              "bbox": [
+                0.653,
+                0.582,
+                0.806,
+                0.612
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.137,
+        "centroid": {
+          "x": 0.367,
+          "y": 0.466
+        },
+        "colourfulness": 15.3,
+        "luminanceSpread": 0.202,
+        "chromaProxy": 0.044,
+        "hierarchyByHueOnly": false,
+        "inkPct": 31.2,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Same summer, warmer · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 55.6
+        },
+        "squint": {
+          "masses": 46,
+          "competitors": 2,
+          "dominance": 0.141,
+          "top": [
+            {
+              "cells": 87,
+              "weight": 64.85,
+              "cx": 0.208,
+              "cy": 0.543,
+              "bbox": [
+                0.042,
+                0.523,
+                0.375,
+                0.561
+              ]
+            },
+            {
+              "cells": 64,
+              "weight": 48.71,
+              "cx": 0.739,
+              "cy": 0.459,
+              "bbox": [
+                0.625,
+                0.439,
+                0.861,
+                0.477
+              ]
+            },
+            {
+              "cells": 66,
+              "weight": 45.33,
+              "cx": 0.356,
+              "cy": 0.46,
+              "bbox": [
+                0.236,
+                0.439,
+                0.472,
+                0.477
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 20.26,
+              "cx": 0.094,
+              "cy": 0.452,
+              "bbox": [
+                0.042,
+                0.43,
+                0.139,
+                0.477
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 18.4,
+              "cx": 0.555,
+              "cy": 0.461,
+              "bbox": [
+                0.514,
+                0.439,
+                0.597,
+                0.477
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.089,
+        "centroid": {
+          "x": 0.417,
+          "y": 0.533
+        },
+        "colourfulness": 11.9,
+        "luminanceSpread": 0.65,
+        "chromaProxy": 0.034,
+        "hierarchyByHueOnly": false,
+        "inkPct": 43.7,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 14% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Same summer, warmer · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 54.5
+        },
+        "squint": {
+          "masses": 37,
+          "competitors": 1,
+          "dominance": 0.13,
+          "top": [
+            {
+              "cells": 82,
+              "weight": 28.3,
+              "cx": 0.493,
+              "cy": 0.287,
+              "bbox": [
+                0.042,
+                0.275,
+                0.944,
+                0.375
+              ]
+            },
+            {
+              "cells": 36,
+              "weight": 18.87,
+              "cx": 0.365,
+              "cy": 0.234,
+              "bbox": [
+                0.278,
+                0.225,
+                0.458,
+                0.25
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 17.08,
+              "cx": 0.572,
+              "cy": 0.234,
+              "bbox": [
+                0.5,
+                0.225,
+                0.653,
+                0.25
+              ]
+            },
+            {
+              "cells": 23,
+              "weight": 12.54,
+              "cx": 0.196,
+              "cy": 0.234,
+              "bbox": [
+                0.139,
+                0.225,
+                0.25,
+                0.25
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 12.07,
+              "cx": 0.147,
+              "cy": 0.307,
+              "bbox": [
+                0.069,
+                0.3,
+                0.236,
+                0.313
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.085,
+        "centroid": {
+          "x": 0.424,
+          "y": 0.463
+        },
+        "colourfulness": 11.9,
+        "luminanceSpread": 0.392,
+        "chromaProxy": 0.035,
+        "hierarchyByHueOnly": false,
+        "inkPct": 42.7,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 13% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 70
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 28
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Same summer, warmer · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-climate\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 50.4
+        },
+        "squint": {
+          "masses": 25,
+          "competitors": 2,
+          "dominance": 0.151,
+          "top": [
+            {
+              "cells": 53,
+              "weight": 22.92,
+              "cx": 0.169,
+              "cy": 0.606,
+              "bbox": [
+                0.083,
+                0.582,
+                0.25,
+                0.642
+              ]
+            },
+            {
+              "cells": 63,
+              "weight": 22.55,
+              "cx": 0.266,
+              "cy": 0.194,
+              "bbox": [
+                0.097,
+                0.179,
+                0.431,
+                0.209
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 13.1,
+              "cx": 0.187,
+              "cy": 0.144,
+              "bbox": [
+                0.083,
+                0.134,
+                0.292,
+                0.149
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 12.88,
+              "cx": 0.449,
+              "cy": 0.6,
+              "bbox": [
+                0.375,
+                0.582,
+                0.542,
+                0.612
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 12.44,
+              "cx": 0.731,
+              "cy": 0.601,
+              "bbox": [
+                0.653,
+                0.582,
+                0.806,
+                0.612
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.105,
+        "centroid": {
+          "x": 0.395,
+          "y": 0.498
+        },
+        "colourfulness": 14.3,
+        "luminanceSpread": 0.301,
+        "chromaProxy": 0.043,
+        "hierarchyByHueOnly": false,
+        "inkPct": 44.4,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 15% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": false,
+    "blockers": [
+      {
+        "rule": "touch-target",
+        "detail": "light@390: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@768: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@1440: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@390: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@768: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@1440: 7 interactive target(s) under 24px"
+      }
+    ]
+  },
+  "composition": [
+    {
+      "at": "dark@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 15% of visual weight (corpus p05 19%) — nothing leads the eye"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Break things · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* proposed shared: proto.css defines .stack-2/3/6/8 only, so an undefined .stack-1/.stack-4 inherits the parent's --stack */
+  .stack-1 { --stack: var(--space-1); }
+  .stack-4 { --stack: var(--space-4); }
+  .bench { display: grid; gap: var(--space-8); grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 64rem) { .bench { grid-template-columns: minmax(0, 1fr) minmax(0, 24rem); } }
+
+  /* proposed shared: a toggle button that carries its state in words (On / Off), not colour alone */
+  .fault {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; text-align: start;
+    inline-size: 100%; min-block-size: var(--space-16); padding: var(--space-3) var(--space-4); cursor: pointer;
+    background: var(--surface); color: var(--ink); border: var(--rule) solid var(--control); border-inline-start: var(--space-2) solid var(--control);
+    border-radius: var(--radius-sign);
+  }
+  .fault svg { inline-size: 1.75rem; block-size: 1.75rem; }
+  .fault b { display: block; font-weight: 600; }
+  .fault[aria-pressed="true"] { background: var(--surface-raised); border-color: var(--ink); }
+  .fault__state { font-size: var(--size-label); font-weight: 700; min-inline-size: 3ch; text-align: end; }
+  .faults { display: grid; gap: var(--space-3); }
+
+  /* the preview phone */
+  .phone .worker-top { flex-wrap: wrap; }
+  .phone .band { gap: 1px; }
+  .phone .band--compact .cell b { font-size: var(--size-label); padding-inline: 0; }
+  .phone .band .hr { font-size: var(--size-label); }
+  .fade-in { animation: fade-in var(--duration-state) ease-out; }
+  @keyframes fade-in { from { opacity: 0; } }
+  [hidden] { display: none !important; }
+  .actions li { flex-wrap: nowrap; align-items: start; }
+  .actions svg { flex: none; }
+  .testname { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+</style>
+</head>
+<body data-states="ideal">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html">Try a plan</a></li>
+    <li><a href="replay-frontier.html">Frontier</a></li>
+    <li><a href="replay-climate.html">Warmer summer</a></li>
+    <li><a href="replay-governance.html">Governance</a></li>
+    <li><a href="replay-faults.html" aria-current="step">Break things</a></li>
+    <li><a href="replay-next.html">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-3">
+    <h1 class="t-display">Break things</h1>
+    <p class="t-lead measure">Switch a fault on and watch the worker's Today screen answer. When something fails, the screen says so and falls back to something at least as protective as the midday ban.</p>
+    <p class="cluster"><span class="stamp stamp--quiet">Placeholder levels</span></p>
+  </header>
+
+  <div class="bench">
+    <section class="stack stack-6" aria-labelledby="f-h">
+      <h2 id="f-h" class="t-headline">Faults</h2>
+      <div class="faults" role="group" aria-labelledby="f-h">
+        <button type="button" class="fault" aria-pressed="false" data-fault="offline">
+          <svg class="ico"><use href="#i-offline"/></svg>
+          <span><b>Go offline</b><span class="t-label t-muted">The app opens from the copy saved on the phone.</span></span>
+          <span class="fault__state" aria-hidden="true">Off</span>
+        </button>
+        <button type="button" class="fault" aria-pressed="false" data-fault="stale">
+          <svg class="ico"><use href="#i-today"/></svg>
+          <span><b>Make forecast stale</b><span class="t-label t-muted">Older than 3 h: a banner says when it was last updated.</span></span>
+          <span class="fault__state" aria-hidden="true">Off</span>
+        </button>
+        <button type="button" class="fault" aria-pressed="false" data-fault="feed">
+          <svg class="ico"><use href="#i-warn"/></svg>
+          <span><b>Lose weather feed for 48 h</b><span class="t-label t-muted">After 48 h without data the app stops showing levels and shows the site rules.</span></span>
+          <span class="fault__state" aria-hidden="true">Off</span>
+        </button>
+        <button type="button" class="fault" aria-pressed="false" data-fault="push">
+          <svg class="ico"><use href="#i-bell"/></svg>
+          <span><b>Push not delivered</b><span class="t-label t-muted">A warning never reaches the phone.</span></span>
+          <span class="fault__state" aria-hidden="true">Off</span>
+        </button>
+      </div>
+      <div class="cluster cluster-4">
+        <button type="button" class="btn btn--sm" id="reset"><svg class="ico"><use href="#i-retry"/></svg>Back to normal</button>
+        <p class="t-label" id="summary" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="banner banner--floor">
+        <svg class="ico"><use href="#i-lock"/></svg>
+        <div class="stack stack-2">
+          <p><strong>The fallback is never less protective than the midday ban.</strong></p>
+          <p class="t-label">The site rules keep the 12:30 to 15:00 break and add a rest in shade every hour. The invariant has a test of its own:</p>
+          <p class="testname"><code class="t-mono">test_fallback_is_never_less_protective_than_the_midday_ban</code>
+            <button class="btn btn--sm" type="button" data-copy="test_fallback_is_never_less_protective_than_the_midday_ban"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+          <p class="t-label t-muted">Test name as designed (planner decision record, class d invariant); the test lands with the planner build.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- the preview: the worker's Today screen -->
+    <section class="stack stack-4" aria-labelledby="p-h">
+      <h2 id="p-h" class="t-headline">The worker's Today screen</h2>
+      <div class="phone stack stack-4" id="preview" role="group" aria-label="Worker Today screen, preview">
+        <div class="worker-top">
+          <div><p class="t-label t-muted">Site</p><p class="t-title">Musaffah demo yard</p></div>
+          <span class="stamp stamp--quiet">Placeholder data</span>
+        </div>
+
+        <div class="banner" id="b-offline" hidden role="status">
+          <svg class="ico"><use href="#i-offline"/></svg>
+          <div class="stack stack-1"><p><strong>You are offline</strong></p><p class="t-label">The levels below were saved on this phone.</p></div>
+        </div>
+        <div class="banner" id="b-stale" hidden role="status">
+          <svg class="ico"><use href="#i-info"/></svg>
+          <div class="stack stack-1"><p><strong>Last updated 09:40</strong></p><p class="t-label">This may be out of date. Levels refresh when you are back online.</p></div>
+        </div>
+        <div class="banner" id="b-feed" hidden role="status">
+          <svg class="ico"><use href="#i-warn"/></svg>
+          <p><strong>No fresh forecast.</strong> Follow the site rules until it is back.</p>
+        </div>
+        <div class="banner" id="b-push" hidden role="status">
+          <svg class="ico"><use href="#i-bell"/></svg>
+          <p>The app still shows today's levels when opened. Your supervisor relays warnings.</p>
+        </div>
+
+        <!-- normal: the same sign and band as the worker Today screen -->
+        <div id="v-normal" class="stack stack-4">
+          <article class="sign lv-red" aria-labelledby="pv-name">
+            <div class="sign__plate sign__plate--wide">
+              <div class="sign__num"><svg class="ico sign__picto"><use href="#i-red"/></svg><span class="t-numeral">4</span></div>
+              <p class="sign__name" id="pv-name">Red</p>
+              <p class="sign__when t-num">Until 17:00</p>
+            </div>
+          </article>
+          <p class="t-label">Your own level, worked out on this phone.</p>
+          <div class="stack stack-2">
+            <p class="panel-title">Heat level by hour</p>
+            <ol class="band band--compact" aria-label="Levels from 06:00 to 19:00, placeholder">
+              <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+              <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+              <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+              <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+              <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+              <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+              <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+              <li aria-label="13:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">13</span></li>
+              <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+              <li aria-label="15:00, Red, level 4, now" aria-current="time"><div class="cell lv-red"><b>4</b></div><span class="hr">15</span></li>
+              <li aria-label="16:00, Red, level 4"><div class="cell lv-red"><b>4</b></div><span class="hr">16</span></li>
+              <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+              <li aria-label="18:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+              <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+            </ol>
+            <p class="t-label t-muted">Dashed outline: midday break 12:30 to 15:00. Dark hour: now.</p>
+          </div>
+        </div>
+
+        <!-- fallback: no fresh forecast, site rules -->
+        <div id="v-fallback" class="stack stack-4" hidden>
+          <article class="sign lv-orange" aria-label="Site rules, level 3 Orange, until a fresh forecast arrives">
+            <div class="sign__plate sign__plate--wide">
+              <div class="sign__num"><svg class="ico sign__picto"><use href="#i-orange"/></svg><span class="t-numeral">3</span></div>
+              <p class="sign__name">Site rules</p>
+              <p class="sign__when">Until a fresh forecast arrives</p>
+            </div>
+          </article>
+          <ol class="stack stack-3 actions">
+            <li class="cluster cluster-4"><svg class="ico" width="32" height="32"><use href="#i-cool"/></svg><span class="t-lead">Rest in shade every hour</span></li>
+            <li class="cluster cluster-4"><svg class="ico" width="32" height="32"><use href="#i-water"/></svg><span class="t-lead">Drink water</span></li>
+            <li class="cluster cluster-4"><svg class="ico" width="32" height="32"><use href="#i-today"/></svg><span class="t-lead">No outdoor work 12:30 to 15:00</span></li>
+          </ol>
+          <p class="cluster"><span class="stamp stamp--quiet">Draft wording</span></p>
+          <p class="t-label t-muted">Your supervisor has a printed crew card for today.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="cluster cluster-4">
+    <a class="btn btn--primary" href="replay-next.html">See what is next</a>
+    <a class="link" href="replay-governance.html">Back to governance</a>
+  </div>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>The preview uses placeholder levels, not live data.</li>
+    <li>3 hours and 48 hours are the app's cache limits for a forecast.</li>
+    <li>Draft wording on the site rules is not yet from the reviewed templates.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  (() => {
+    const on = { offline: false, stale: false, feed: false, push: false };
+    const buttons = document.querySelectorAll("[data-fault]");
+    const show = (id, visible) => {
+      const el = document.getElementById(id);
+      if (el.hidden !== !visible) {
+        el.hidden = !visible;
+        if (visible) { el.classList.remove("fade-in"); void el.offsetWidth; el.classList.add("fade-in"); }
+      }
+    };
+    const parts = { offline: "an offline banner", stale: "a stale-forecast banner", feed: "the site rules sign instead of levels", push: "a note that the supervisor relays warnings" };
+    const render = () => {
+      buttons.forEach((b) => {
+        const v = on[b.dataset.fault];
+        b.setAttribute("aria-pressed", String(v));
+        b.querySelector(".fault__state").textContent = v ? "On" : "Off";
+      });
+      show("b-offline", on.offline);
+      show("b-stale", on.stale && !on.feed);
+      show("b-feed", on.feed);
+      show("b-push", on.push);
+      show("v-normal", !on.feed);
+      show("v-fallback", on.feed);
+      const active = Object.keys(on).filter((k) => on[k]);
+      document.getElementById("summary").textContent = active.length
+        ? "Preview shows " + active.map((k) => parts[k]).join(", ") + "."
+        : "Preview: normal. Today's levels, no banners.";
+    };
+    buttons.forEach((b) => b.addEventListener("click", () => { on[b.dataset.fault] = !on[b.dataset.fault]; render(); }));
+    document.getElementById("reset").addEventListener("click", () => { Object.keys(on).forEach((k) => (on[k] = false)); render(); });
+    (new URLSearchParams(location.search).get("fault") || "").split(",").forEach((k) => { if (k in on) on[k] = true; });
+    render();
+  })();
+</script>
+</body>
+</html>

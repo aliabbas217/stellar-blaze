@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roster frontier · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* proposed shared: proto.css defines .stack-2/3/6/8 only, so an undefined .stack-1/.stack-4 inherits the parent's --stack */
+  .stack-1 { --stack: var(--space-1); }
+  .stack-4 { --stack: var(--space-4); }
+  .row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); }
+  .pair { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
+  @media (min-width: 48rem) { .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .pair .card { display: grid; gap: var(--space-4); align-content: start; }
+
+  /* proposed shared: framed figure + SVG text defaults for charts */
+  .frame { border: var(--rule-hairline) solid var(--hairline); border-radius: var(--radius-sign); padding: var(--space-3); background: var(--surface); }
+  .chart text { fill: var(--ink); }
+  .chart .lbl { font-size: var(--size-label); font-weight: 600; }
+  .chart .lbl-quiet { font-size: var(--size-label); font-weight: 500; fill: var(--ink-muted); }
+  .chart .halo { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+  .chart .tpl { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; }
+  .chart .tpl-night { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 3 2; }
+  .chart .front { fill: none; stroke: var(--viz-truth); stroke-width: 2.5; }
+  .chart .front-pt { fill: var(--viz-truth); }
+  .chart .b0 { fill: var(--viz-truth); }
+  .chart .b1 { fill: var(--surface); stroke: var(--viz-truth); stroke-width: 2.5; }
+  .chart .gate { stroke: var(--ink-muted); stroke-width: 2; stroke-dasharray: 2 4; }
+  .chart .arrow { stroke: var(--viz-truth); stroke-width: 2; fill: none; }
+  .chart .arrowhead { fill: var(--viz-truth); }
+
+  /* proposed shared: details used as the chart's data-table alternative */
+  details.alt > summary { cursor: pointer; font-weight: 600; min-block-size: var(--space-8); display: flex; align-items: center; }
+  details.alt[open] > summary { margin-block-end: var(--space-3); }
+
+  /* commute control */
+  .commute { max-inline-size: 34rem; }
+  .commute .cluster { flex-wrap: nowrap; }
+  .commute input[type="range"] { flex: 1 1 auto; min-inline-size: 0; accent-color: var(--action); min-block-size: var(--space-8); }
+  .commute output { flex: none; white-space: nowrap; min-inline-size: 7ch; text-align: end; font-weight: 700; font-size: var(--size-lead); }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html">Try a plan</a></li>
+    <li><a href="replay-frontier.html" aria-current="step">Frontier</a></li>
+    <li><a href="replay-climate.html">Warmer summer</a></li>
+    <li><a href="replay-governance.html">Governance</a></li>
+    <li><a href="replay-faults.html">Break things</a></li>
+    <li><a href="replay-next.html">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-3">
+    <h1 class="t-display measure">No roster shape outruns the heat under law, sleep and commute.</h1>
+    <p class="t-lead measure">We tried the obvious optimiser idea on every legal 8 hour day template, ⟨n_templates⟩ of them, against real climatology and a night's sleep. It does not survive. Making the common roster legal is worth more than any reshuffle, and that gain belongs to the law.</p>
+    <p class="cluster">
+      <span class="stamp">Real climatology</span>
+      <span class="stamp">Static analysis, not live</span>
+      <span class="stamp stamp--quiet">Placeholder points</span>
+    </p>
+  </header>
+
+  <!-- IDEAL -->
+  <section data-state="ideal" class="stack stack-6" aria-labelledby="chart-h">
+    <div class="spread">
+      <h2 id="chart-h" class="t-headline">Exposure against sleep</h2>
+      <span class="stamp stamp--quiet">Placeholder</span>
+    </div>
+
+    <div class="field commute">
+      <label for="commute">Commute, one way</label>
+      <div class="cluster cluster-4">
+        <input type="range" id="commute" min="15" max="90" step="5" value="30" aria-describedby="commute-hint">
+        <output for="commute" id="commute-out" class="t-num">30 min</output>
+      </div>
+      <p id="commute-hint" class="hint">Every 15 minutes of one-way commute costs 30 minutes of sleep. Slide it and watch every template move left.</p>
+    </div>
+
+    <figure class="frame stack stack-3" aria-labelledby="chart-h">
+      <svg id="fr-chart" class="chart" role="img" aria-labelledby="fc-t" aria-describedby="fc-d">
+        <title id="fc-t">Exposure per worked hour against sleep opportunity for legal day templates, with the Pareto front, the common practice roster B0 and the legal default B1</title>
+        <desc id="fc-d">Illustrative chart, not data. Each legal day template is a hollow circle; the Pareto front is a line of filled circles rising to the right, because more sleep means a later start and more heat. B1, the legal default, sits on the front. B0, common practice outside the legal limits, sits above B1, and an arrow from B0 to B1 is labelled as a gain credited to the law, not to us. Night templates sit low and to the left and are greyed as not eligible. A dashed vertical line marks the sleep gate. Sliding the commute moves every template to the left. A table below gives the same reading in words.</desc>
+        <defs>
+          <marker id="fr-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="arrowhead" d="M0 0 10 5 0 10Z"/></marker>
+        </defs>
+        <g id="fr-plot"></g>
+      </svg>
+      <ul class="legend" aria-label="Legend">
+        <li><svg class="chart" viewBox="0 0 28 14" aria-hidden="true"><circle class="tpl" cx="14" cy="7" r="4"/></svg>Legal day template</li>
+        <li><svg class="chart" viewBox="0 0 28 14" aria-hidden="true"><line class="front" x1="1" y1="7" x2="27" y2="7"/><circle class="front-pt" cx="14" cy="7" r="4.5"/></svg>Pareto front</li>
+        <li><svg class="chart" viewBox="0 0 28 14" aria-hidden="true"><rect class="b0" x="9" y="2" width="10" height="10"/></svg>B0 common practice</li>
+        <li><svg class="chart" viewBox="0 0 28 14" aria-hidden="true"><path class="b1" d="M14 1 20 7 14 13 8 7Z"/></svg>B1 legal default</li>
+        <li><svg class="chart" viewBox="0 0 28 14" aria-hidden="true"><circle class="tpl-night" cx="14" cy="7" r="4.5"/></svg>Night template, not eligible</li>
+        <li><svg class="chart" viewBox="0 0 28 14" aria-hidden="true"><line class="gate" x1="14" y1="0" x2="14" y2="14"/></svg>Sleep gate</li>
+      </ul>
+      <figcaption class="t-label t-muted measure">Static analysis, run once on the legal templates; the slider re-draws a stored result and runs nothing. Sleep opportunity is counted with a bedtime floor of 21:30 and a 2 hour evening buffer after the shift and commute; wake is start minus commute minus 45 minutes. Those are assumptions until a pilot sleep diary exists. Placeholder points: the real chart reads <span class="t-mono">roster_frontier.json</span>.</figcaption>
+    </figure>
+
+    <div class="banner" role="status" id="verdict" aria-live="polite">
+      <svg class="ico"><use href="#i-info"/></svg>
+      <p id="verdict-text"></p>
+    </div>
+
+    <details class="alt card">
+      <summary>Chart as a table</summary>
+      <div class="table-scroll">
+        <table class="table">
+          <caption class="sr-only">What each mark on the frontier chart stands for</caption>
+          <thead><tr><th scope="col">Mark</th><th scope="col">Eligible</th><th scope="col">Where it sits</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">B0, common practice</th><td>No, outside the legal limits</td><td>Above B1: more exposure per worked hour, about the same sleep</td></tr>
+            <tr><th scope="row">B1, legal default</th><td>Yes</td><td>On the Pareto front</td></tr>
+            <tr><th scope="row">Pareto front</th><td>Yes</td><td>Rises to the right: more sleep means a later start and more exposure</td></tr>
+            <tr><th scope="row">Other legal day templates</th><td>Yes</td><td>Above the front: another template has the same or more sleep and less exposure</td></tr>
+            <tr><th scope="row">Night templates</th><td>No: permit, day-sleep accommodation, premium position, juvenile exclusion</td><td>Lowest exposure, least sleep</td></tr>
+            <tr><th scope="row">Sleep gate</th><td>Not a template</td><td>Vertical line; templates to its left do not leave enough sleep</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <section data-state="ideal" class="stack stack-6" aria-labelledby="law-h">
+    <div class="row-head">
+      <h2 id="law-h" class="t-headline">What making B0 legal is worth</h2>
+      <span class="stamp">Real climatology</span>
+    </div>
+    <p class="t-lead measure">Moving the same crew from B0 to the legal default B1 removes this share of exposure per worked hour. This gain belongs to the law, not to our system, and is never added to our scoreboard.</p>
+    <div class="pair">
+      <article class="card" aria-labelledby="l1">
+        <div class="counter">
+          <p class="counter__label" id="l1">Exposure removed at WBGT 30 °C or more</p>
+          <p class="counter__value"><span class="t-display slot">###</span><span class="slot-key">frontier_legalisation_e30_pct</span></p>
+          <p class="counter__ci">per worked hour · ⟨n_clusters⟩ airport clusters, ⟨n_summers⟩ summers <button class="proof" type="button" data-metric="Exposure removed by legalising the roster, 30 °C" data-label="REAL"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+      </article>
+      <article class="card" aria-labelledby="l2">
+        <div class="counter">
+          <p class="counter__label" id="l2">Exposure removed at WBGT 32 °C or more</p>
+          <p class="counter__value"><span class="t-display slot">###</span><span class="slot-key">frontier_legalisation_e32_pct</span></p>
+          <p class="counter__ci">per worked hour · ⟨n_clusters⟩ airport clusters, ⟨n_summers⟩ summers <button class="proof" type="button" data-metric="Exposure removed by legalising the roster, 32 °C" data-label="REAL"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+      </article>
+    </div>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="replay-climate.html">See the same summer, warmer</a>
+      <a class="link" href="replay-validator.html">Back to try a plan</a>
+    </div>
+  </section>
+
+  <!-- LOADING -->
+  <section data-state="loading" class="stack stack-6" aria-busy="true" aria-label="Loading the frontier">
+    <div class="skel" style="block-size: var(--space-12); max-inline-size: 34rem"></div>
+    <div class="skel" style="block-size: 26rem"></div>
+    <div class="pair"><div class="skel" style="block-size: 9rem"></div><div class="skel" style="block-size: 9rem"></div></div>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY -->
+  <section data-state="empty" class="empty" aria-labelledby="e-h">
+    <svg class="ico empty__picto"><use href="#i-proof"/></svg>
+    <h2 id="e-h" class="t-headline">The static analysis has not been exported yet</h2>
+    <p class="measure">The frontier is computed once from the legal templates and real climatology, then stored. Until that file exists there is nothing to draw, and no sketch is shown in its place.</p>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="#">Read how it is computed</a>
+      <a class="link" href="replay-validator.html">Meanwhile, try a plan against the rules</a>
+    </div>
+  </section>
+
+  <!-- ERROR -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="x-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h2 id="x-h" class="t-headline">The frontier did not load</h2>
+    <p class="measure">The result file could not be read. The written verdict above still stands.</p>
+    <div class="cluster cluster-4">
+      <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+      <a class="link" href="#">Show the recorded chart</a>
+    </div>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>Airport station climatology, not a worksite.</li>
+    <li>Bedtime floor, evening buffer and the sleep gate are assumed policy values, not measurements.</li>
+    <li>Night templates are shown only to say why they are excluded.</li>
+    <li>TWL aligned with ADOSH zones, not certified.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Frontier chart: ILLUSTRATIVE points (deterministic), not data. The real chart reads roster_frontier.json.
+     Drawn at the container's pixel width so labels keep their real size at 390 px. */
+  (() => {
+    const svg = document.getElementById("fr-chart");
+    const plot = document.getElementById("fr-plot");
+    const slider = document.getElementById("commute");
+    if (!svg || !plot || !slider) return;
+    const GATE = 0.62;
+    const fy = (x) => 0.14 + 0.6 * Math.pow(x, 1.5);       /* front: more sleep, more heat */
+    const FRONT_X = [0.12, 0.28, 0.42, 0.55, 0.66, 0.70, 0.85];
+    const B1 = { x: 0.70, y: fy(0.70) };
+    const B0 = { x: 0.74, y: fy(0.70) + 0.32 };
+    const NIGHT = [[0.05, 0.06], [0.10, 0.04], [0.14, 0.09], [0.17, 0.05], [0.08, 0.11], [0.2, 0.08]];
+    let seed = 11;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const CLOUD = Array.from({ length: 44 }, () => { const x = 0.1 + 0.85 * rnd(); return { x, y: Math.min(1.05, fy(x) + 0.04 + 0.26 * Math.pow(rnd(), 1.4)) }; });
+    const squeeze = (c) => 1 - 0.7 * ((c - 15) / 75);       /* every 15 min of commute costs sleep: x moves left */
+
+    const out = document.getElementById("commute-out");
+    const verdict = document.getElementById("verdict-text");
+    const words = (c) => {
+      const f = squeeze(c);
+      const open = CLOUD.concat(FRONT_X.map((x) => ({ x, y: fy(x) }))).some((p) => p.x * f >= GATE && p.y < B1.y - 0.005);
+      return open
+        ? `At a commute of ${c} min some templates keep the sleep gate and score lower exposure than the legal default. The size of that gain moves with the assumed bedtime floor, so we make no claim about it.`
+        : `At a commute of ${c} min no template keeps the sleep gate and beats the legal default on heat. Output: no change recommended. Binding constraint: commute ${c} min, sleep gate ⟨sleep_gate_h⟩ h.`;
+    };
+
+    const draw = () => {
+      const w = Math.round(svg.clientWidth);
+      if (!w) return;
+      const c = +slider.value, f = squeeze(c);
+      out.textContent = c + " min";
+      slider.setAttribute("aria-valuetext", c + " minutes one way");
+      verdict.textContent = words(c);
+      const compact = w < 560;
+      const h = compact ? 450 : 440;
+      const L = compact ? 40 : 52, R = 14, T = 44, B = 58;
+      const pw = w - L - R, ph = h - T - B;
+      const X = (x) => L + x * f * pw, Xs = (x) => L + x * pw;
+      const Y = (y) => T + ph * (1 - y / 1.1);
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      const fp = FRONT_X.map((x) => [X(x), Y(fy(x))]);
+      const frontLine = "M" + fp.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" L");
+      const b0 = [X(B0.x), Y(B0.y)], b1 = [X(B1.x), Y(B1.y)];
+      const gx = Xs(GATE);
+
+      /* labels first, so template marks that would sit under one are left out of the drawing */
+      const boxes = [];
+      const label = (arr, bx, y, pref, cls, gap) => {
+        const width = Math.max(...arr.map((t) => t.length)) * 7.6;
+        let anchor = pref;                                   /* flip a label that would leave the chart */
+        if (pref === "end" && bx - gap - width < 4) anchor = "start";
+        if (pref === "start" && bx + gap + width > w - 4) anchor = "end";
+        const x = anchor === "end" ? bx - gap : bx + gap;
+        boxes.push({ x0: anchor === "end" ? x - width : x, x1: anchor === "end" ? x : x + width, y0: y - 14, y1: y + 16 * (arr.length - 1) + 6 });
+        const spans = arr.map((t, i) => `<tspan x="${x.toFixed(1)}" dy="${i ? 16 : 0}">${t}</tspan>`).join("");
+        return `<text class="${cls} halo" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}">${spans}</text><text class="${cls}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}">${spans}</text>`;
+      };
+      const mid = [(b0[0] + b1[0]) / 2, (b0[1] + b1[1]) / 2];
+      const labels = [
+        label(["B0 common practice,", "outside the legal limits"], b0[0], b0[1] - (compact ? 4 : 2), compact ? "end" : "start", "lbl", compact ? 12 : 14),
+        label(["B1 legal default"], b1[0], b1[1] + 24, "start", "lbl", 16),
+        label(["gain credited to the law,", "not to us"], mid[0], mid[1] + (compact ? 2 : 4), compact ? "end" : "start", "lbl-quiet", compact ? 10 : 14),
+        label(["Night templates:", "not eligible"], X(0.25), Y(0.115), "start", "lbl-quiet", 0),
+      ].join("");
+      const free = (x, y) => !boxes.some((q) => x > q.x0 - 6 && x < q.x1 + 6 && y > q.y0 - 6 && y < q.y1 + 6);
+      const tpl = CLOUD.filter((p) => free(X(p.x), Y(p.y))).map((p) => `<circle class="tpl" cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3.5"/>`).join("");
+      const night = NIGHT.map((p) => `<circle class="tpl-night" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="4.5"/>`).join("");
+      const fpts = fp.map((p) => `<circle class="front-pt" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.5"/>`).join("");
+      const gateText = compact ? "Sleep gate" : "Sleep gate ⟨sleep_gate_h⟩ h";
+      plot.innerHTML = `
+        <g class="grid">
+          <line x1="${L}" y1="${T}" x2="${L}" y2="${T + ph}"/><line x1="${L}" y1="${T + ph}" x2="${L + pw}" y2="${T + ph}"/>
+          ${[0.25, 0.5, 0.75].map((g) => `<line x1="${L + g * pw}" y1="${T}" x2="${L + g * pw}" y2="${T + ph}"/><line x1="${L}" y1="${T + ph * g}" x2="${L + pw}" y2="${T + ph * g}"/>`).join("")}
+        </g>
+        <line class="gate" x1="${gx}" y1="${T}" x2="${gx}" y2="${T + ph}"/>
+        ${tpl}${night}
+        <path class="front" d="${frontLine}"/>${fpts}
+        <path class="arrow" d="M${b0[0].toFixed(1)},${(b0[1] + 9).toFixed(1)} L${b1[0].toFixed(1)},${(b1[1] - 11).toFixed(1)}" marker-end="url(#fr-head)"/>
+        <rect class="b0" x="${(b0[0] - 6).toFixed(1)}" y="${(b0[1] - 6).toFixed(1)}" width="12" height="12"/>
+        <path class="b1" d="M${b1[0].toFixed(1)},${(b1[1] - 9).toFixed(1)} L${(b1[0] + 9).toFixed(1)},${b1[1].toFixed(1)} L${b1[0].toFixed(1)},${(b1[1] + 9).toFixed(1)} L${(b1[0] - 9).toFixed(1)},${b1[1].toFixed(1)}Z"/>
+        ${labels}
+        <text class="lbl-quiet halo" x="${gx + 6}" y="${T + 14}">${gateText}</text><text class="lbl-quiet" x="${gx + 6}" y="${T + 14}">${gateText}</text>
+        <g class="axis">
+          <text x="${L}" y="${T - 28}" style="font-size: var(--size-label)">Exposure E30 per worked hour${compact ? "" : ", lower is better"}</text>
+          ${compact ? `<text x="${L}" y="${T - 12}" style="font-size: var(--size-label)">Lower is better</text>` : ""}
+          <text x="${L - 8}" y="${T + 4}" text-anchor="end">More</text>
+          <text x="${L - 8}" y="${T + ph}" text-anchor="end">Less</text>
+          <text x="${L}" y="${T + ph + 20}">Less sleep</text>
+          <text x="${L + pw}" y="${T + ph + 20}" text-anchor="end">More sleep</text>
+          <text x="${L + pw / 2}" y="${T + ph + 44}" text-anchor="middle" style="font-size: var(--size-label)">Sleep opportunity, hours</text>
+        </g>`;
+    };
+    draw();
+    let raf = 0;
+    const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); };
+    slider.addEventListener("input", again);
+    if ("ResizeObserver" in window) new ResizeObserver(again).observe(svg.parentElement);
+    else addEventListener("resize", again);
+  })();
+</script>
+</body>
+</html>

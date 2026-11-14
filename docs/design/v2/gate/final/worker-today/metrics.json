@@ -1,0 +1,207 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/worker-today.html",
+  "when": "2026-11-12T01:05:53.843Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\worker-today\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\worker-today\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 1
+          },
+          {
+            "px": 13,
+            "n": 28
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 17,
+            "n": 13
+          },
+          {
+            "px": 18,
+            "n": 10
+          },
+          {
+            "px": 22,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Bengali",
+          "Noto Sans Arabic",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 8
+          },
+          {
+            "px": 6,
+            "n": 3
+          },
+          {
+            "px": 5,
+            "n": 2
+          },
+          {
+            "px": 55,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 15,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\worker-today\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 66.9
+        },
+        "squint": {
+          "masses": 11,
+          "competitors": 1,
+          "dominance": 0.819,
+          "top": [
+            {
+              "cells": 600,
+              "weight": 530.62,
+              "cx": 0.498,
+              "cy": 0.844,
+              "bbox": [
+                0.042,
+                0.804,
+                0.944,
+                0.888
+              ]
+            },
+            {
+              "cells": 39,
+              "weight": 26.22,
+              "cx": 0.329,
+              "cy": 0.332,
+              "bbox": [
+                0.264,
+                0.299,
+                0.389,
+                0.355
+              ]
+            },
+            {
+              "cells": 38,
+              "weight": 26.21,
+              "cx": 0.503,
+              "cy": 0.338,
+              "bbox": [
+                0.458,
+                0.29,
+                0.542,
+                0.374
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 23.38,
+              "cx": 0.111,
+              "cy": 0.32,
+              "bbox": [
+                0.056,
+                0.28,
+                0.167,
+                0.355
+              ]
+            },
+            {
+              "cells": 24,
+              "weight": 17.43,
+              "cx": 0.602,
+              "cy": 0.325,
+              "bbox": [
+                0.569,
+                0.299,
+                0.653,
+                0.355
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.18,
+        "centroid": {
+          "x": 0.45,
+          "y": 0.673
+        },
+        "colourfulness": 21.9,
+        "luminanceSpread": 0.93,
+        "chromaProxy": 0.085,
+        "hierarchyByHueOnly": false,
+        "inkPct": 30.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runtime config · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+.wordmark { view-transition-name: wordmark; }
+main.wrap { padding-block: var(--s-6) var(--s-16); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+.head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4) var(--s-8); align-items: end; }
+.head .k { color: var(--ink-3); font-size: var(--t-14); }
+.head h1 { font: 400 var(--t-36)/1.1 var(--sans); letter-spacing: -0.02em; margin-top: var(--s-2); }
+.head .lead { font-size: var(--t-18); color: var(--ink-2); margin-top: var(--s-2); max-width: 76ch; }
+.head .lead strong { color: var(--ink); font-weight: 500; }
+.act { display: grid; justify-items: end; gap: var(--s-2); }
+.act .faint { font-size: var(--t-13); max-width: 40ch; text-align: end; }
+@media (max-width: 760px) { .head { grid-template-columns: 1fr; } .act { justify-items: start; } .act .faint { text-align: start; } .head h1 { font-size: var(--t-22); } .head .lead { font-size: var(--t-16); } main.wrap { gap: var(--s-4); padding-top: var(--s-4); } }
+
+/* the hero: version spine with floors as fixed lines */
+.spine-wrap { overflow-x: auto; border: 1px solid var(--hair); border-radius: var(--r); background: var(--ground); view-transition-name: spine; }
+#spine { min-width: 1320px; } /* drawn 1:1 (viewBox 1320): labels never shrink below 12 px; narrower screens scroll sideways */
+#spine svg { width: 100%; height: auto; display: block; }
+#spine .lane-name { font: 600 14px var(--sans); fill: var(--ink); } /* sans: Plex Mono is kept for codes, hashes and route ids only */
+#spine .lane-sub { font: 400 12px var(--sans); fill: var(--ink-3); }
+#spine .tick { font: 400 12px var(--sans); fill: var(--ink-3); }
+#spine .day { font: 500 13px var(--sans); fill: var(--ink-2); }
+#spine .ver { font: 600 14px var(--sans); fill: var(--ink); }
+#spine .ver-sub { font: 400 12px var(--sans); fill: var(--ink-3); }
+#spine .val { font: 500 14px var(--sans); fill: var(--ink); }
+#spine .val.draft { fill: var(--signal); }
+#spine .floor { stroke: var(--ink-2); stroke-width: 2; }
+#spine .floor-l { font: 500 12px var(--sans); fill: var(--ink-2); }
+#spine .forbid { fill: var(--ground-deep); }
+#spine .forbid-l { font: 400 12px var(--sans); fill: var(--ink-3); }
+#spine .range { stroke: var(--edge); stroke-width: 1; stroke-dasharray: 4 4; }
+#spine .range-l { font: 400 12px var(--sans); fill: var(--ink-3); }
+#spine .step { stroke: var(--ink); stroke-width: 2; fill: none; }
+#spine .step.draft { stroke: var(--signal); stroke-dasharray: 6 4; }
+#spine .vline { stroke: var(--hair); stroke-width: 1; }
+#spine .vline.now { stroke: var(--signal); stroke-width: 1; stroke-dasharray: 3 3; }
+#spine .lane-sep { stroke: var(--hair); stroke-width: 1; }
+#spine .absent { font: 400 12px var(--sans); fill: var(--ink-3); font-style: italic; }
+#spine .cat { font: 500 13px var(--sans); fill: var(--ink); }
+#spine .cat.mono { font: 400 13px var(--mono); }
+#spine .pt { fill: var(--ink); }
+#spine .pt.draft { fill: var(--signal); }
+.spine-foot { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-8); font-size: var(--t-13); color: var(--ink-3); align-items: center; }
+.spine-foot .it { display: inline-flex; align-items: center; gap: var(--s-2); }
+.spine-foot .ln { width: 24px; height: 0; border-top: 2px solid var(--ink-2); }
+.spine-foot .ln.r { border-top: 1px dashed var(--edge); }
+.spine-foot .ln.d { border-top: 2px dashed var(--signal); }
+.spine-foot .sw { width: 22px; height: 12px; background: var(--ground-deep); border: 1px solid var(--hair); }
+.spine-foot .src { margin-inline-start: auto; }
+
+/* tables below */
+.grid2 { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--s-6); align-items: start; }
+@media (max-width: 1100px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.panel-h { flex-wrap: wrap; }
+.tbl-wrap { overflow-x: auto; position: relative; }
+.tbl .mono { font-size: var(--t-13); }
+.tbl td .sub { display: block; font-size: var(--t-13); color: var(--ink-3); }
+.tbl .btn { min-height: 32px; padding: 0 var(--s-3); font-size: var(--t-13); }
+.tbl tr.draft td { background: color-mix(in oklch, var(--signal) 7%, transparent); }
+.hist .kind { font-size: var(--t-13); color: var(--ink-2); }
+.panel .note { padding: var(--s-3) var(--s-4); font-size: var(--t-13); color: var(--ink-3); border-top: 1px solid var(--hair); }
+
+/* drawer form */
+.ed { padding: var(--s-4); display: grid; gap: var(--s-4); }
+.ed dl { display: grid; grid-template-columns: auto 1fr; gap: var(--s-1) var(--s-4); padding: 0; font-size: var(--t-14); }
+.ed dt { margin: 0; color: var(--ink-3); font-size: var(--t-13); }
+.ed dd { margin: 0; }
+.field { display: grid; gap: var(--s-1); }
+.field label { font-size: var(--t-13); color: var(--ink-2); font-weight: 500; }
+.field input, .field textarea, .field select { min-height: var(--target); padding: var(--s-2) var(--s-3); background: var(--ground); border: 1px solid var(--edge); border-radius: var(--r); font-size: var(--t-16); }
+.field textarea { min-height: 88px; resize: vertical; }
+.field [aria-invalid="true"] { border-color: var(--lv-red); }
+.hint { font-size: var(--t-13); color: var(--ink-3); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.chips button { min-height: 32px; padding: 0 var(--s-3); border: 1px solid var(--hair); border-radius: var(--r); background: transparent; font-size: var(--t-13); color: var(--ink-2); }
+.chips button:hover { border-color: var(--edge); color: var(--ink); }
+.err { display: grid; gap: 2px; padding: var(--s-3); border: 1px solid var(--edge); border-inline-start: 3px solid var(--lv-red); border-radius: var(--r); background: var(--ground); font-size: var(--t-14); }
+.err .mono { color: var(--ink-3); font-size: var(--t-12); }
+.diff { padding: var(--s-3); border: 1px solid var(--hair); border-inline-start: 3px solid var(--signal); border-radius: var(--r); font-size: var(--t-14); display: grid; gap: var(--s-1); }
+.diff .faint { font-size: var(--t-13); }
+.ed .btns { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.toast { position: fixed; inset-inline-start: 50%; bottom: var(--s-6); transform: translateX(-50%); z-index: 40; max-width: min(640px, calc(100vw - 32px)); }
+.auth { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4); align-items: end; }
+.auth form { display: flex; gap: var(--s-3); align-items: end; flex-wrap: wrap; }
+@media (max-width: 760px) { .auth { grid-template-columns: 1fr; } }
+.sk-spine { height: 520px; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Admin · demo token</span>
+  <nav aria-label="Sections"><a href="hse.html">HSE week</a><a href="admin.html" aria-current="page">Runtime config</a><a href="judge-governance.html">Governance story</a></nav>
+</header>
+
+<main class="wrap" id="main">
+  <section class="head" aria-labelledby="h1">
+    <div>
+      <p class="k" id="active-line">Active version</p>
+      <h1 id="h1">Runtime config</h1>
+      <p class="lead" id="lead" data-when="ideal stale bound floor conflict validating unauthorized rollback activated"></p>
+    </div>
+    <div class="act" data-when="ideal stale bound floor validating">
+      <button class="btn primary lg" type="button" id="activate">Activate v3</button>
+      <p class="faint">Draft v3 is validated. Activating writes the audit row; replicas pick it up within 5 s, with no restart.</p>
+    </div>
+    <div class="act" data-when="conflict unauthorized">
+      <button class="btn primary lg" type="button" aria-disabled="true" aria-describedby="act-off">Activate v3</button>
+      <p class="faint" id="act-off" data-when="conflict">Off until you reload: the active version changed.</p>
+      <p class="faint" data-when="unauthorized">Off until an admin token is given.</p>
+    </div>
+    <div class="act" data-when="rollback activated">
+      <button class="btn primary lg" type="button" id="rb-open">Roll back to v2</button>
+      <p class="faint">Adds a row of kind rollback. Nothing is edited or deleted.</p>
+    </div>
+  </section>
+
+  <!-- unhappy-path banners -->
+  <div class="notice" role="status" data-when="stale"><div><strong>A replica refused v2 and keeps serving v1.</strong> Readiness reports <span class="mono">checks.config = stale</span>. Its log line is <span class="mono">config_rejected</span>; the audit row is written. Decisions from that replica carry v1, so nothing mixes inside one decision.</div></div>
+  <div class="notice" role="alert" data-when="conflict"><div><strong>409 · Config changed since you opened it.</strong> Someone activated a version after v2, which your draft was built on. Reload to see the new active version and a fresh diff before you activate. <span class="mono">stale-activation</span> · request id <span class="mono">req_3a90c61e</span></div><button class="btn" type="button" onclick="location.href='admin.html'">Reload</button></div>
+  <section class="panel auth" data-when="unauthorized" aria-labelledby="auth-h" style="padding:var(--s-4)">
+    <div><h2 id="auth-h" style="font:600 var(--t-18)/1.3 var(--sans)">401 · Admin token needed</h2><p class="muted">Reading the config is public. Changing it needs a token; the actor on the audit row comes from the token, never from the form. The failed attempt is on the record as <span class="mono">config.auth_failed</span>.</p></div>
+    <form action="admin.html" method="get"><div class="field"><label for="tok">Admin token</label><input id="tok" name="token" type="password" autocomplete="off" spellcheck="false"></div><button class="btn" type="submit">Use this token</button></form>
+  </section>
+
+  <div data-when="loading" aria-busy="true"><p class="sr-only" role="status">Loading the config</p><div class="skel sk-spine">.</div></div>
+
+  <section class="empty" data-when="error" role="alert">
+    <h3>The config did not load</h3>
+    <p class="muted">The API did not answer. The service keeps running on its last good version; nothing changes until a version is activated.</p>
+    <div style="display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap"><button class="btn" type="button" onclick="location.reload()">Try again</button><span class="faint" style="font-size:var(--t-13)">Request id <span class="mono">req_e27b4d18</span></span></div>
+  </section>
+
+  <section class="empty" data-when="empty">
+    <h3>No config versions yet</h3>
+    <p class="muted" style="max-width:66ch">The service answers no decision request until one version is active (readiness 503, <span class="mono">dependency = "config"</span>). Seed it from the default file in the image; it becomes v1 with kind seed.</p>
+    <div style="display:flex;gap:var(--s-4);align-items:center;flex-wrap:wrap"><button class="btn primary" type="button">Seed v1 from the default file</button><span class="faint" style="font-size:var(--t-13)">Or in a terminal: <span class="mono">sb-jobs config seed</span></span></div>
+    <p class="faint" style="font-size:var(--t-13)">Source: <span class="mono">backend/config/runtime/default.toml</span>, every value at its ruleset default.</p>
+  </section>
+
+  <!-- HERO -->
+  <section data-when="ideal stale bound floor conflict validating unauthorized rollback activated" aria-labelledby="sp-h" style="display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s-3)">
+    <h2 id="sp-h" class="sr-only">Version history, with legal floors as fixed lines</h2>
+    <div class="spine-wrap" tabindex="0" aria-label="Version history, scrolls sideways on small screens"><div id="spine"></div></div>
+    <div class="spine-foot">
+      <span class="it"><span class="ln"></span>Legal floor: changes only by a reviewed ruleset release</span>
+      <span class="it"><span class="ln r"></span>Reviewed range (policy)</span>
+      <span class="it"><span class="sw"></span>Refused side of a floor</span>
+      <span class="it"><span class="ln d"></span>Draft, not active</span>
+      <span class="src">History is the roadmap plan for 12 to 17 Nov, not records yet <button type="button" class="proof" data-proof='{"what":"Config versions v1 to v3 and their tunable values","protocol":"ADR 0010 §3 (config_version, config_activation), ADR 0011 §7.6 and §8 (k_health, k_exposure, planner_det_time_s ranges), ADR 0006 (TWL margin about 7 W/m2, set by the back-test)","script":"backend/config/runtime/default.toml (v1); ae-heat-2026.1 (B3, not released)","file":"docs/superpowers/plans/2026-11-11-roadmap.md (Thu 12, Mon 16, Tue 17 rows)","sha":"computed in this page from each canonical body","label":"Planned versions; dates from the roadmap; actor is the demo admin"}'>Where from?</button></span>
+    </div>
+  </section>
+
+  <div class="grid2" data-when="ideal stale bound floor conflict validating unauthorized rollback activated">
+    <section class="panel" aria-labelledby="tun-h">
+      <div class="panel-h"><h2 id="tun-h">Tunables</h2><span class="faint">Class b · live, inside the reviewed range</span></div>
+      <div class="tbl-wrap"><table class="tbl" id="tun"><caption class="sr-only">Runtime tunables, value and allowed range</caption>
+        <thead><tr><th>Name</th><th class="n">Active</th><th>Allowed</th><th>Source</th><th><span class="sr-only">Edit</span></th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel" aria-labelledby="fl-h">
+      <div class="panel-h"><h2 id="fl-h">Legal floors</h2><span class="faint">Class c · read only</span></div>
+      <div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Legal and regulatory floors with their source</caption>
+        <thead><tr><th>Floor</th><th>Value</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>ADOSH TWL zone edges</td><td>Low 140 or more, Medium 115 to 140, High below 115 W/m²</td><td>ADOSH TG Table 1</td></tr>
+          <tr><td>Midday break</td><td>12:30 to 15:00, 15 Jun to 15 Sep</td><td>MR 44/2022 Art. 3</td></tr>
+          <tr><td>Working hours</td><td>8 a day, 48 a week</td><td>Art. 17, 19</td></tr>
+          <tr><td>Art. 18 break</td><td>At most 5 h in a row without 1 h of break</td><td>Art. 18, protective reading</td></tr>
+          <tr><td>Privacy</td><td><span class="mono">k_health</span> 10, <span class="mono">k_exposure</span> 5</td><td>ADR 0011 §7.6</td></tr>
+          <tr><td>PERSONAL data</td><td>A <span class="mono">personal</span> LLM or speech route must be <span class="mono">self_hosted</span></td><td>ADR 0010 §8, ADR 0038</td></tr>
+        </tbody></table></div>
+      <p class="note">Floors are not in the runtime schema, so a payload that tries to set one fails validation as <span class="mono">floor-violation</span>.</p>
+    </section>
+  </div>
+
+  <section class="panel hist" data-when="ideal stale bound floor conflict validating unauthorized rollback activated" aria-labelledby="hi-h">
+    <div class="panel-h"><h2 id="hi-h">Activation log</h2><span class="faint">Append only · newest first</span></div>
+    <div class="tbl-wrap"><table class="tbl" id="hist"><caption class="sr-only">Config activations, newest first</caption>
+      <thead><tr><th>Version</th><th>Kind</th><th>When</th><th>Actor</th><th>Reason</th><th>sha256</th><th><span class="sr-only">Action</span></th></tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+
+<!-- A2 edit drawer -->
+<dialog class="drawer" id="ed" aria-labelledby="ed-h">
+  <div class="panel-h"><h2 id="ed-h">Edit <span class="mono" id="ed-name"></span></h2><button class="btn" type="button" data-close>Close</button></div>
+  <form class="ed" id="ed-form" novalidate>
+    <dl><dt>Active</dt><dd id="ed-cur"></dd><dt>Allowed</dt><dd id="ed-range"></dd><dt>Source</dt><dd id="ed-src"></dd></dl>
+    <div class="field" id="f-num"><label for="ed-val">New value</label><input id="ed-val" inputmode="decimal" autocomplete="off" aria-describedby="ed-range"></div>
+    <div class="field" id="f-route" hidden><label for="ed-route">Route for PERSONAL calls</label>
+      <select id="ed-route"><option value="">None (calls fail closed)</option><option value="selfhosted-dev">selfhosted-dev · hosting: self_hosted</option><option value="managed-api">managed-api · hosting: managed</option></select></div>
+    <div class="err" id="ed-err" role="alert" hidden><strong id="ed-err-t"></strong><span id="ed-err-d"></span><span class="mono" id="ed-err-c"></span></div>
+    <div class="field"><label for="ed-reason">Reason</label>
+      <div class="chips" aria-label="Reason starters"><button type="button">Back-test result</button><button type="button">Pilot feedback</button><button type="button">Rollback after incident</button></div>
+      <textarea id="ed-reason" maxlength="500" aria-describedby="ed-n"></textarea><p class="hint" id="ed-n">0 of 500 characters, at least 10. The reason is the audit record.</p></div>
+    <div class="diff" id="ed-diff" hidden aria-live="polite"><span class="faint">Diff against v2. Nothing is active yet.</span><span id="ed-diff-t"></span></div>
+    <div class="btns"><button class="btn primary" type="submit" id="ed-validate">Validate</button><button class="btn primary" type="button" id="ed-activate" hidden>Activate v3</button><button class="btn" type="button" data-close>Cancel</button></div>
+  </form>
+</dialog>
+
+<!-- A3 rollback confirm -->
+<dialog class="drawer" id="rb" aria-labelledby="rb-h">
+  <div class="panel-h"><h2 id="rb-h">Roll back to v2</h2><button class="btn" type="button" data-close>Close</button></div>
+  <form class="ed" id="rb-form" novalidate>
+    <p>Activates v2 again as a new row of kind <span class="mono">rollback</span>. It runs the same checks as any activation, and later decisions carry v2.</p>
+    <div class="diff"><span class="faint">What changes</span><span><span class="mono">twl_margin_w_m2</span> 7 back to 0 W/m²</span></div>
+    <div class="field"><label for="rb-reason">Reason</label><textarea id="rb-reason" maxlength="500">Rollback drill, roadmap 17 Nov: prove a live change and rollback with no new revision.</textarea><p class="hint">10 to 500 characters.</p></div>
+    <div class="btns"><button class="btn primary" type="submit">Roll back to v2</button><button class="btn" type="button" data-close>Cancel</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden><div class="notice signal" role="status"><div id="toast-t"></div></div></div>
+
+<script type="module">
+import { boot, STATE } from './assets/kit.js';
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error', 'unauthorized', 'stale', 'bound', 'floor', 'conflict', 'validating', 'rollback', 'activated'] });
+
+// ---- versions: bodies follow ADR 0010 §3 RuntimeConfig; v1 is default.toml as committed; v2, v3 follow the roadmap ----
+const V = [
+  { v: 1, kind: 'seed', day: 12, actor: 'job-migrate', reason: 'Seed from backend/config/runtime/default.toml: every value at its ruleset default',
+    body: { flags: {}, schema_version: 1, tunables: {} }, ruleset: 'ae-heat-0.1' },
+  { v: 2, kind: 'activate', day: 16, actor: 'ali (demo token)', reason: 'Pin ae-heat-2026.1 (B3): k split into k_health and k_exposure, planner budget',
+    body: { flags: { planner_cpsat_enabled: false }, ruleset_pin: 'ae-heat-2026.1', schema_version: 1, tunables: { k_exposure: 5, k_health: 10, planner_det_time_s: 2, twl_margin_w_m2: 0 } }, ruleset: 'ae-heat-2026.1' },
+  { v: 3, kind: 'activate', day: 17, actor: 'ali (demo token)', reason: 'Back-test result: TWL margin 7 W/m², the value ADR 0006 recommends; the back-test sets the final number',
+    body: { flags: { planner_cpsat_enabled: false }, ruleset_pin: 'ae-heat-2026.1', schema_version: 1, tunables: { k_exposure: 5, k_health: 10, planner_det_time_s: 2, twl_margin_w_m2: 7 } }, ruleset: 'ae-heat-2026.1' },
+];
+const canon = (o) => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((x) => [x, v[x]])) : v));
+for (const x of V) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canon(x.body))); x.sha = [...new Uint8Array(b)].map((n) => n.toString(16).padStart(2, '0')).join(''); }
+const v3active = ['rollback', 'activated'].includes(STATE);
+const active = v3active ? V[2] : V[1];
+
+document.getElementById('active-line').innerHTML = `Active: config v${active.v} · ruleset <span class="mono">${active.ruleset}</span> · activated ${active.day} Nov by ${active.actor}${STATE === 'stale' ? ' · one replica still on v1' : ''}`;
+if (STATE === 'empty') document.getElementById('active-line').textContent = 'Active: none. Decision routes answer 503 until a version is seeded.';
+if (STATE === 'loading' || STATE === 'error') document.getElementById('active-line').textContent = 'Active version';
+const lead = document.getElementById('lead');
+if (lead) lead.innerHTML = v3active
+  ? `<strong>v3 is live: TWL margin 7 W/m².</strong> Every decision since carries <span class="mono">config_version</span> 3. Roll back if the drill calls for it.`
+  : `<strong>One change waits: TWL margin 0 to 7 W/m².</strong> Higher is safer; it moves readings toward High before zoning. No floor is touched.`;
+
+// ---- tunables (class b): ranges from ruleset ae-heat-0.1 (released) and ADR 0011 §8 (ae-heat-2026.1 draft) ----
+const T = [
+  { n: 'twl_margin_w_m2', unit: 'W/m²', min: 0, max: 20, floor: 0, floorL: 'Floor 0: the ADOSH Table 1 edges', allowed: '0 to 20, higher is safer', src: 'ruleset ae-heat-0.1, ADR 0006', from: 1 },
+  { n: 'k_health', unit: 'workers', min: 10, max: null, floor: 10, floorL: 'Floor 10: ADR 0011 §7.6', allowed: '10 or more', src: 'ADR 0011 §7.6', from: 2, axis: [0, 20] },
+  { n: 'k_exposure', unit: 'workers', min: 5, max: null, floor: 5, floorL: 'Floor 5: ADR 0011 §7.6', allowed: '5 or more', src: 'ADR 0011 §7.6', from: 2, axis: [0, 20] },
+  { n: 'planner_det_time_s', unit: 's', min: 0.5, max: 10, floor: null, allowed: '0.5 to 10', src: 'ADR 0011 §8', from: 2 },
+];
+
+// ---- hero: the version spine ----
+function drawSpine() {
+  const el = document.getElementById('spine'); if (!el) return;
+  const Wd = 1320, LX = 236, RX = Wd - 196, top = 74, laneH = 80;
+  const d0 = 12, d1 = 18, X = (d) => LX + (d - d0) / (d1 - d0) * (RX - LX);
+  const draftShown = !v3active;
+  const lanes = [{ cat: 'ruleset' }, ...T, { cat: 'route' }];
+  const H = top + lanes.length * laneH + 16;
+  let s = '';
+  // day axis
+  for (let d = d0; d <= d1; d++) s += `<text class="tick" x="${X(d)}" y="${H - 2}" text-anchor="middle">${d} Nov</text><line class="vline" x1="${X(d)}" x2="${X(d)}" y1="${top - 6}" y2="${H - 18}" stroke-dasharray="1 5"/>`;
+  s += `<text class="tick" x="${X(18)}" y="${top - 46}" text-anchor="end">Feature freeze 18 Nov</text>`;
+  // version markers
+  for (const x of V) {
+    const isDraft = x.v === 3 && draftShown, px = X(x.day);
+    s += `<line class="vline${isDraft ? ' now' : ''}" x1="${px}" x2="${px}" y1="${top - 30}" y2="${H - 18}"/>`;
+    s += `<text class="ver" x="${px + 6}" y="${top - 30}" ${isDraft ? 'style="fill:var(--signal)"' : ''}>v${x.v}${x.v === active.v ? ' · active' : isDraft ? ' · draft' : ''}</text><text class="ver-sub" x="${px + 6}" y="${top - 14}">${x.kind} · ${x.day} Nov</text>`;
+  }
+  lanes.forEach((ln, i) => {
+    const y0 = top + i * laneH, y1 = y0 + laneH - 14, ym = (y0 + y1) / 2;
+    s += `<line class="lane-sep" x1="16" x2="${Wd - 16}" y1="${y0 - 7}" y2="${y0 - 7}"/>`;
+    if (ln.cat === 'ruleset') {
+      s += `<text class="lane-name" x="20" y="${ym - 2}">ruleset_pin</text><text class="lane-sub" x="20" y="${ym + 15}">Which released ruleset</text>`;
+      s += `<text class="cat mono" x="${X(12) + 8}" y="${ym + 5}">ae-heat-0.1</text><text class="cat mono" x="${X(16) + 8}" y="${ym + 5}">ae-heat-2026.1</text>`;
+      s += `<line class="step" x1="${X(12)}" x2="${RX}" y1="${y1}" y2="${y1}" style="stroke-width:1;stroke:var(--edge)"/>`;
+      return;
+    }
+    if (ln.cat === 'route') {
+      s += `<text class="lane-name" x="20" y="${ym - 2}">llm_routes.personal</text><text class="lane-sub" x="20" y="${ym + 15}">PERSONAL calls: voice, free text</text>`;
+      s += `<text class="cat" x="${X(12) + 8}" y="${ym + 5}">None: calls fail closed, the form is used</text>`;
+      s += `<line class="floor" x1="${LX}" x2="${RX}" y1="${y1}" y2="${y1}"/><text class="floor-l" x="${RX + 10}" y="${y1 + 4}">Floor: self_hosted only</text>`;
+      s += `<text class="forbid-l" x="${RX + 10}" y="${y1 - 14}">managed: refused</text>`;
+      return;
+    }
+    const lo = ln.axis ? ln.axis[0] : ln.min === 0 ? -4 : 0, hi = ln.axis ? ln.axis[1] : ln.max * 1.15;
+    const Y = (v) => y1 - (v - lo) / (hi - lo) * (y1 - y0);
+    const RS = ln.from > 1 ? X(16) : LX;
+    s += `<text class="lane-name" x="20" y="${ym - 2}">${ln.n}</text><text class="lane-sub" x="20" y="${ym + 15}">${ln.allowed}${ln.unit === 's' ? ' s' : ln.unit === 'W/m²' ? ' W/m²' : ''}</text>`;
+    if (ln.floor != null) {
+      s += `<rect class="forbid" x="${LX}" y="${Y(ln.floor)}" width="${RX - LX}" height="${y1 - Y(ln.floor) + 6}"/>`;
+      s += `<line class="floor" x1="${LX}" x2="${RX}" y1="${Y(ln.floor)}" y2="${Y(ln.floor)}"/><text class="floor-l" x="${RX + 10}" y="${Y(ln.floor) + 4}">${ln.floorL}</text>`;
+      s += `<text class="forbid-l" x="${LX + 6}" y="${Math.min(y1 + 4, Y(ln.floor) + 15)}">${ln.n === 'twl_margin_w_m2' ? 'Below 0 would zone above the legal edges: refused' : 'Below the floor: refused'}</text>`;
+    } else {
+      s += `<line class="range" x1="${RS}" x2="${RX}" y1="${Y(ln.min)}" y2="${Y(ln.min)}"/><text class="range-l" x="${RX + 10}" y="${Y(ln.min) + 4}">Reviewed min ${ln.min}, no legal floor</text>`;
+    }
+    if (ln.max != null) s += `<line class="range" x1="${RS}" x2="${RX}" y1="${Y(ln.max)}" y2="${Y(ln.max)}"/><text class="range-l" x="${RX + 10}" y="${Y(ln.max) + 4}">Reviewed max ${ln.max}</text>`;
+    // value steps per version
+    const pts = V.filter((x) => x.v >= ln.from).map((x) => ({ x, val: x.v === 1 ? 0 : x.body.tunables[ln.n] }));
+    if (ln.from > 1) s += `<text class="absent" x="${X(12) + 8}" y="${y0 + 12}">Not in ae-heat-0.1</text>`;
+    pts.forEach((p, k) => {
+      const prev0 = pts[k - 1];
+      const isDraft = p.x.v === 3 && draftShown && prev0 && prev0.val !== p.val;
+      const xa = X(p.x.day), xb = k < pts.length - 1 ? X(pts[k + 1].x.day) : RX;
+      const prev = pts[k - 1];
+      if (prev && prev.val !== p.val) s += `<line class="step${isDraft ? ' draft' : ''}" x1="${xa}" x2="${xa}" y1="${Y(prev.val)}" y2="${Y(p.val)}"/>`;
+      s += `<line class="step${isDraft ? ' draft' : ''}" x1="${xa}" x2="${xb}" y1="${Y(p.val)}" y2="${Y(p.val)}"/><circle class="pt${isDraft ? ' draft' : ''}" cx="${xa}" cy="${Y(p.val)}" r="4"/>`;
+      if (!prev || prev.val !== p.val) s += `<text class="val${isDraft ? ' draft' : ''}" x="${xa + 8}" y="${Y(p.val) - 7}">${p.val}${isDraft ? ' (draft)' : ''}</text>`;
+    });
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${Wd} ${H}" role="img" aria-label="Config versions v1 on 12 Nov, v2 on 16 Nov, v3 ${draftShown ? 'draft' : 'active'} on 17 Nov. TWL margin 0, then 7 in v3, floor 0, max 20. k_health 10 on its floor of 10. k_exposure 5 on its floor of 5. planner_det_time_s 2 within 0.5 to 10. PERSONAL route none; floor self_hosted only.">${s}</svg>`;
+}
+drawSpine();
+
+// ---- tunables table + history table ----
+const tb = document.querySelector('#tun tbody');
+if (tb) tb.innerHTML = T.map((t) => `<tr${t.n === 'twl_margin_w_m2' && !v3active ? ' class="draft"' : ''}><td class="mono">${t.n}</td><td class="n">${active.body.tunables[t.n]}${t.n === 'twl_margin_w_m2' && !v3active ? '<span class="sub">draft 7</span>' : ''}</td><td>${t.allowed}</td><td>${t.src}</td><td><button class="btn" type="button" data-edit="${t.n}">Edit<span class="sr-only"> ${t.n}</span></button></td></tr>`).join('')
+  + `<tr><td class="mono">llm_routes.personal</td><td class="n">none</td><td>a <span class="mono">self_hosted</span> route, or none</td><td>ADR 0010 §8, 0038</td><td><button class="btn" type="button" data-edit="route">Edit<span class="sr-only"> PERSONAL route</span></button></td></tr>`;
+const hb = document.querySelector('#hist tbody');
+if (hb) {
+  const rows = [];
+  if (STATE === 'activated' || STATE === 'rollback') rows.push({ x: V[2], kind: 'activate', active: true });
+  else rows.push({ x: V[2], kind: 'draft', draft: true });
+  rows.push({ x: V[1], kind: 'activate', active: !v3active }, { x: V[0], kind: 'seed' });
+  hb.innerHTML = rows.map((r) => `<tr${r.draft ? ' class="draft"' : ''}><td><strong>v${r.x.v}</strong>${r.active ? '<span class="sub">active</span>' : ''}</td><td class="kind">${r.draft ? 'draft, validated' : r.kind}</td><td>${r.draft ? 'not active' : `${r.x.day} Nov 2026`}</td><td>${r.x.actor}</td><td>${r.x.reason}</td><td class="mono" title="${r.x.sha}">${r.x.sha.slice(0, 12)}</td><td>${r.draft ? '' : r.active ? '' : r.x.v === 2 && v3active ? '<button class="btn" type="button" data-rb>Roll back<span class="sr-only"> to v2</span></button>' : ''}</td></tr>`).join('');
+}
+
+// ---- A2 edit drawer ----
+const $ = (id) => document.getElementById(id);
+const ed = $('ed'); let cur = null;
+function openEdit(name) {
+  cur = name === 'route' ? { n: 'llm_routes.personal', route: true } : T.find((t) => t.n === name);
+  $('ed-name').textContent = cur.n; $('ed-err').hidden = true; $('ed-diff').hidden = true; $('ed-activate').hidden = true; $('ed-validate').hidden = false;
+  $('f-num').hidden = !!cur.route; $('f-route').hidden = !cur.route;
+  $('ed-cur').textContent = cur.route ? 'none (fails closed)' : `${active.body.tunables[cur.n]} ${cur.unit}`;
+  $('ed-range').textContent = cur.route ? 'a self_hosted route, or none' : cur.allowed;
+  $('ed-src').textContent = cur.route ? 'ADR 0010 §8, ADR 0038' : cur.src;
+  $('ed-val').value = cur.n === 'twl_margin_w_m2' ? '7' : ''; $('ed-val').setAttribute('aria-invalid', 'false');
+  $('ed-reason').value = cur.n === 'twl_margin_w_m2' ? V[2].reason : ''; count();
+  ed.showModal();
+}
+const count = () => ($('ed-n').textContent = `${$('ed-reason').value.length} of 500 characters, at least 10. The reason is the audit record.`);
+$('ed-reason').addEventListener('input', count);
+document.querySelectorAll('.chips button').forEach((b) => (b.onclick = () => { $('ed-reason').value = b.textContent + ': '; count(); $('ed-reason').focus(); }));
+function fail(title, detail, code) { $('ed-err-t').textContent = title; $('ed-err-d').textContent = detail; $('ed-err-c').textContent = code; $('ed-err').hidden = false; }
+function validate() {
+  $('ed-err').hidden = true;
+  const reason = $('ed-reason').value.trim();
+  if (cur.route) {
+    const r = $('ed-route').value;
+    if (r === 'managed-api') { fail('PERSONAL route must be self-hosted.', 'managed-api has hosting: managed. Voice and free text are PERSONAL and never leave our infrastructure. The route stays none.', 'floor-violation · ADR 0010 §8 · ADR 0038'); return; }
+  } else {
+    const raw = $('ed-val').value.trim(), v = Number(raw);
+    if (raw === '' || Number.isNaN(v)) { fail('Enter a number.', '', ''); $('ed-val').setAttribute('aria-invalid', 'true'); return; }
+    if (cur.floor != null && v < cur.floor) { fail(`Below the legal floor of ${cur.floor}.`, 'Legal floor: changes only by a reviewed ruleset release.', 'floor-violation'); $('ed-val').setAttribute('aria-invalid', 'true'); return; }
+    if (v < cur.min || (cur.max != null && v > cur.max)) { fail(`Outside the reviewed range [${cur.min}, ${cur.max ?? 'no upper limit'}].`, 'Policy benchmark from the ruleset. A wider range needs a ruleset release.', 'policy-bound-violation'); $('ed-val').setAttribute('aria-invalid', 'true'); return; }
+  }
+  if (reason.length < 10) { fail('Give a reason of 10 to 500 characters.', '', ''); $('ed-reason').focus(); return; }
+  $('ed-diff-t').innerHTML = cur.route ? `<span class="mono">llm_routes.personal</span> none to ${$('ed-route').value || 'none'}` : `<span class="mono">${cur.n}</span> ${active.body.tunables[cur.n]} to <strong>${$('ed-val').value}</strong> ${cur.unit}. Checks passed: schema, range, floors, model and calibration.`;
+  $('ed-diff').hidden = false; $('ed-validate').hidden = true; $('ed-activate').hidden = false; $('ed-activate').focus();
+}
+$('ed-form').addEventListener('submit', (e) => { e.preventDefault(); validate(); });
+['ed-val', 'ed-route', 'ed-reason'].forEach((id) => $(id).addEventListener('input', () => { $('ed-diff').hidden = true; $('ed-activate').hidden = true; $('ed-validate').hidden = false; }));
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-edit]'); if (b && STATE !== 'unauthorized') openEdit(b.dataset.edit); const r = e.target.closest('[data-rb]'); if (r) $('rb').showModal(); });
+document.querySelectorAll('dialog [data-close]').forEach((b) => (b.onclick = () => b.closest('dialog').close()));
+document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
+const toast = (html) => { $('toast-t').innerHTML = html; $('toast').hidden = false; };
+const doActivate = () => { ed.close(); toast(`<strong>Activated v3.</strong> Audit row <span class="mono">config.activated</span> written in the same transaction. Replicas pick it up within 5 s; the revision is unchanged.`); };
+$('ed-activate').onclick = doActivate;
+$('activate')?.addEventListener('click', doActivate);
+$('rb-open')?.addEventListener('click', () => $('rb').showModal());
+$('rb-form').addEventListener('submit', (e) => { e.preventDefault(); if ($('rb-reason').value.trim().length < 10) return; $('rb').close(); toast('<strong>Rolled back to v2.</strong> A row of kind rollback is on the record; later decisions carry v2.'); });
+
+// ---- states that open a drawer ----
+if (STATE === 'bound') { openEdit('twl_margin_w_m2'); $('ed-val').value = '25'; validate(); }
+if (STATE === 'floor') { openEdit('route'); $('ed-route').value = 'managed-api'; $('ed-reason').value = 'Pilot feedback: use the managed API for voice setup'; count(); validate(); }
+if (STATE === 'validating') { openEdit('twl_margin_w_m2'); const b = $('ed-validate'); b.textContent = 'Validating'; b.setAttribute('aria-busy', 'true'); b.setAttribute('aria-disabled', 'true'); }
+if (STATE === 'rollback') $('rb').showModal();
+if (STATE === 'activated') toast(`<strong>Activated v3.</strong> Audit row <span class="mono">config.activated</span> written in the same transaction. Replicas pick it up within 5 s; the revision is unchanged.`);
+</script>
+</body>
+</html>
