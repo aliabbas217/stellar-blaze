@@ -226,7 +226,6 @@ DEP002 = [
     # runtime-loaded or used from B2/B3; remove each when first imported
     "uvicorn",
     "pyarrow",
-    "lightgbm",
     "ortools",
     "duckdb",
 ]
