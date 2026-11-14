@@ -1,0 +1,25 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { FieldShell } from "@/components/shell/FieldShell";
+import { DemoClock } from "@/features/demo/DemoClock";
+import { useDemo } from "@/features/demo/DemoProvider";
+import { DemoSwitch } from "@/features/demo/DemoSwitch";
+
+/*
+ * Glue between the supervisor routes and the presentational field shell: the demo site, the demo clock and the mode
+ * switch. No dock (the supervisor's Stop work bar belongs to the crew screens). Imports no worker code: a supervisor
+ * gets the site from the demo context, never from the worker's on-device pin.
+ */
+export function SupervisorFrame({ children }: { children: ReactNode }) {
+  const { site } = useDemo();
+
+  return (
+    <FieldShell siteName={site?.name ?? null} clock={<DemoClock />}>
+      <div className="border-b border-hair px-4 py-2">
+        <DemoSwitch />
+      </div>
+      {children}
+    </FieldShell>
+  );
+}

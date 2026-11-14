@@ -1,16 +1,16 @@
 import { SerwistProvider } from "@serwist/turbopack/react";
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { fontClassFor } from "@/app/fonts";
 import { titleTemplate } from "@/app/titles";
+import { RouteTheme } from "@/components/shell/RouteTheme";
 import { sunScript } from "@/components/shell/theme-script";
 import { LocalePrefs } from "@/features/pwa/LocalePrefs";
 import { APPLE_TOUCH_ICON, MANIFEST_COLORS } from "@/features/pwa/manifest";
 import { dirFor } from "@/i18n/direction";
 import { routing } from "@/i18n/routing";
-import { QueryProvider } from "@/providers/QueryProvider";
 import "@/styles/globals.css";
 
 /*
@@ -23,12 +23,6 @@ import "@/styles/globals.css";
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
-
-// Night is the default theme whatever the system prefers; on a field route in sun mode the inline script and the
-// SunToggle move this meta to the sun colour (a static <meta> cannot follow data-theme).
-export const viewport: Viewport = {
-  themeColor: MANIFEST_COLORS.night,
-};
 
 export async function generateMetadata(props: LayoutProps<"/[locale]">): Promise<Metadata> {
   const { locale } = await props.params;
@@ -51,6 +45,12 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
     // suppressHydrationWarning: the inline sun script sets data-theme on <html> before React hydrates.
     <html lang={locale} dir={dirFor(locale)} className={fontClassFor(locale)} suppressHydrationWarning>
       <head>
+        {/* Night is the default browser-chrome colour whatever the system prefers; the inline script, SunToggle and
+            useRouteTheme move it to the sun colour on a field route in sun mode. It is a plain <meta> here and not
+            `viewport.themeColor`: Next re-renders that one on every client navigation and puts the night colour back
+            after the theme was applied (the sun colour was lost on a navigation from the landing page to /worker). Next
+            still writes the default viewport meta. */}
+        <meta name="theme-color" content={MANIFEST_COLORS.night} />
         <script dangerouslySetInnerHTML={{ __html: sunScript }} />
       </head>
       <body className="flex min-h-dvh flex-col">
@@ -60,7 +60,10 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
           <NextIntlClientProvider>
             {/* Leaves the language for the service worker, which shows push notifications with no page open. */}
             <LocalePrefs />
-            <QueryProvider>{children}</QueryProvider>
+            <RouteTheme />
+            {/* No QueryProvider here on purpose (F2 Task 3): TanStack Query is mounted only in the worker and supervisor
+                layouts and the judge (live) sub-layout, so the landing and the static judge pages do not ship it. */}
+            {children}
           </NextIntlClientProvider>
         </SerwistProvider>
       </body>

@@ -20,6 +20,10 @@ Object.assign(process.env, {
   HOSTNAME: "127.0.0.1",
   API_ORIGIN: "http://127.0.0.1:4010", // the port scripts/mock-api.ts listens on
   VAPID_PUBLIC_KEY: vapid.getPublicKey("base64url"),
+  // Same as playwright.config.ts: the demo employer token (a test value for the mock API) and generous write limits.
+  DEMO_EMPLOYER_TOKEN: "e2e-demo-employer-token",
+  DEMO_WRITE_RATE_PER_MIN: "10000",
+  DEMO_WRITE_GLOBAL_RATE_PER_MIN: "10000",
 });
 
 // Each module starts its server when it is imported. Node strips the types of mock-api.ts.

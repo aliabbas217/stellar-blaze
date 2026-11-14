@@ -22,7 +22,8 @@ import {
  * server. Persisted to localStorage under `sb-profile-v1`:
  *  - `profile`: the worker's profile (workload class, heat-work start date, clothing option, site and crew, and the
  *    consent it was given under);
- *  - `push`: the API's registration of this browser's alert subscription (Task 7).
+ *  - `push`: the API's registration of this browser's alert subscription (Task 7);
+ *  - `site`: the site (and optionally the crew) this phone is pinned to (F2 Task 3, `useDeviceSite`).
  *
  * `revoke()` takes all of it back. Rendering from this store is hydration-safe: zustand 5 gives React the
  * pre-hydration state as the server snapshot.
@@ -44,6 +45,12 @@ export interface PushRegistration {
   readonly siteId: string;
 }
 
+/** Which site, and optionally which crew, this phone is pinned to. Chosen on the phone; the API never hears of it. */
+export interface DeviceSite {
+  readonly siteId: string;
+  readonly crewId: string | null;
+}
+
 export interface RevokeOutcome {
   /** The steps that did not finish; empty when each one did. The profile is cleared in memory either way. */
   readonly failed: readonly RevokeStep[];
@@ -62,6 +69,8 @@ export function isRevokeComplete(outcome: RevokeOutcome): boolean {
 export interface ProfileState {
   readonly profile: Profile | null;
   readonly push: PushRegistration | null;
+  /** The site pin (C7): taken back by `revoke()` with everything else, so a worker who removes their data is not left pinned to a crew. */
+  readonly site: DeviceSite | null;
   /**
    * Counts the times the worker's data was taken back on this phone, by `revoke()` here or by another tab (see below).
    * Not persisted. A flow that began before a revoke and finishes after it compares the count it read at the start:
@@ -69,6 +78,10 @@ export interface ProfileState {
    */
   readonly revokeEpoch: number;
   readonly setPush: (push: PushRegistration | null) => void;
+  /** Pins the phone to a site and an optional crew. */
+  readonly chooseSite: (site: DeviceSite) => void;
+  /** Drops the pin only; nothing else is touched. */
+  readonly clearSite: () => void;
   /**
    * Keeps the worker's profile (already validated by the form). When the site differs from the stored profile's, the
    * cached API responses of the old site are cleared too.
@@ -115,6 +128,15 @@ function within<T>(run: () => Promise<T>, ms: number): Promise<T> {
         clearTimeout(timer);
       });
   });
+}
+
+/** A stored value is a pin only when it has a site id and a crew id that is a string or null. */
+function toDeviceSite(value: unknown): DeviceSite | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { siteId, crewId } = value as Record<string, unknown>;
+  if (!isNonEmptyString(siteId)) return null;
+  if (crewId !== null && !isNonEmptyString(crewId)) return null;
+  return { siteId, crewId };
 }
 
 /** Clears the caches and Serwist's expiration record: both are attempted, and a failure of either is thrown. */
@@ -206,9 +228,16 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
       (set, get, api) => ({
         profile: null,
         push: null,
+        site: null,
         revokeEpoch: 0,
         setPush: (push) => {
           set({ push });
+        },
+        chooseSite: (site) => {
+          set({ site });
+        },
+        clearSite: () => {
+          set({ site: null });
         },
         save: (profile) => {
           const previous = get().profile;
@@ -239,7 +268,7 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
 
           // Local data next, before anything that waits on a browser API or the network: the worker's data is gone
           // from this phone whatever happens after.
-          set({ profile: null, push: null, revokeEpoch: get().revokeEpoch + 1 });
+          set({ profile: null, push: null, site: null, revokeEpoch: get().revokeEpoch + 1 });
           api.persist.clearStorage();
           // The guarded storage swallows a failed removal; reading the key back is how it is noticed.
           const stored = guardedLocalStorage.getItem(PROFILE_STORAGE_KEY) !== null;
@@ -328,18 +357,23 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
         // Not bumped for the profile: a state saved by Task 7 has no `profile` key, which reads as no profile.
         version: 1,
         storage: createJSONStorage(() => guardedLocalStorage),
-        partialize: (state) => ({ profile: state.profile, push: state.push }),
+        partialize: (state) => ({ profile: state.profile, push: state.push, site: state.site }),
         // Corrupt JSON never reaches here (zustand drops it and keeps the initial state); a parseable value of the wrong
         // shape is validated field by field instead of being trusted.
         merge: (persisted, current) => {
-          const stored = persisted as { profile?: unknown; push?: unknown } | null | undefined;
+          const stored = persisted as { profile?: unknown; push?: unknown; site?: unknown } | null | undefined;
           const profile = toProfile(stored?.profile);
           const push = toPushRegistration(stored?.push);
+          const site = toDeviceSite(stored?.site);
           // What was read removed everything this tab held: another tab revoked (see the listener below). That counts as
           // a revoke here, so the epoch moves; it moves here, in the merge, because setting it afterwards would go
           // through persist and write the key back (ruling R37).
-          const removed = (current.profile !== null || current.push !== null) && profile === null && push === null;
-          return { ...current, profile, push, revokeEpoch: current.revokeEpoch + (removed ? 1 : 0) };
+          const removed =
+            (current.profile !== null || current.push !== null || current.site !== null) &&
+            profile === null &&
+            push === null &&
+            site === null;
+          return { ...current, profile, push, site, revokeEpoch: current.revokeEpoch + (removed ? 1 : 0) };
         },
       },
     ),

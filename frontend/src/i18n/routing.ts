@@ -16,6 +16,11 @@ export const routing = defineRouting({
   locales: ["en", "ar", "ur", "hi", "bn", "ne"],
   defaultLocale: "en",
   localeCookie: { name: LOCALE_COOKIE_NAME, sameSite: "lax" },
+  // The URL prefix is the only thing that picks the language, so `/` is a plain 307 to `/en` for every visitor. With
+  // detection on, next-intl also reads Accept-Language and the cookie, and the root would answer differently per
+  // browser: unreproducible for a judge who opens a shared link, and uncacheable. A reader picks a language with the
+  // chips (LanguageChips); a stored choice (LocalePrefs) still applies on the URLs that carry a prefix.
+  localeDetection: false,
 });
 
 export type Locale = (typeof routing.locales)[number];

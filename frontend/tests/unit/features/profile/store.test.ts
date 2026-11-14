@@ -86,11 +86,11 @@ describe("useProfile (push slice)", () => {
     expect(reloaded.getState().profile).toBeNull();
   });
 
-  it("persists the two slices and no action", async () => {
+  it("persists the three slices and no action", async () => {
     const store = await freshStore();
     store.getState().setPush(registration);
     const stored = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) ?? "{}") as { state: object };
-    expect(Object.keys(stored.state).sort()).toEqual(["profile", "push"]);
+    expect(Object.keys(stored.state).sort()).toEqual(["profile", "push", "site"]);
   });
 
   it("clears the registration when set to null, and a reload stays cleared", async () => {
@@ -564,7 +564,7 @@ describe("revoke epoch and other tabs (ruling R34)", () => {
     expect(store.getState().revokeEpoch).toBe(2);
 
     store.getState().save(profile);
-    expect(Object.keys((JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) ?? "{}") as { state: object }).state).sort()).toEqual(["profile", "push"]);
+    expect(Object.keys((JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) ?? "{}") as { state: object }).state).sort()).toEqual(["profile", "push", "site"]);
   });
 
   /** What the browser does in the other tab when it changes localStorage. */

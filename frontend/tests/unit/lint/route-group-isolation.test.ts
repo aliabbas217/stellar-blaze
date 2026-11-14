@@ -29,8 +29,17 @@ const SYNTAX = "no-restricted-syntax";
 const WORKER_ROUTE = "src/app/[locale]/(worker)/worker/page.tsx";
 const SUPERVISOR_ROUTE = "src/app/[locale]/(supervisor)/supervisor/page.tsx";
 const HSE_ROUTE = "src/app/[locale]/(hse)/hse/page.tsx";
-const WORKER_FEATURES = ["today", "profile", "risk", "push"].map((name) => `src/features/${name}/x.ts`);
+const WORKER_FEATURE_NAMES = ["today", "profile", "risk", "push", "alert", "unwell"];
+const WORKER_FEATURES = WORKER_FEATURE_NAMES.map((name) => `src/features/${name}/x.ts`);
 const SUPERVISOR_FEATURE = "src/features/supervisor/x.ts";
+// The judge route group, the locale landing page and the judge feature (F2 Task 3): public, static, no personal data. They
+// may not import worker, supervisor or HSE code. The demo feature is neutral ground every group uses, so it may not import any.
+const JUDGE_ROUTE = "src/app/[locale]/(judge)/replay/layout.tsx";
+const JUDGE_LIVE_ROUTE = "src/app/[locale]/(judge)/replay/(live)/layout.tsx";
+const LANDING = "src/app/[locale]/page.tsx";
+const JUDGE_FEATURE = "src/features/judge/x.ts";
+const DEMO_FEATURE = "src/features/demo/x.ts";
+const NO_ROLE_CODE_FILES = [JUDGE_ROUTE, JUDGE_LIVE_ROUTE, LANDING, JUDGE_FEATURE, DEMO_FEATURE];
 const SHARED = [
   "src/components/ui/button.tsx",
   "src/api/client.ts",
@@ -41,7 +50,6 @@ const SHARED = [
 // (src/features/pwa: the manifest, the offline fallback and the SW cache rules hold no personal data, so it is
 // neutral ground that worker, supervisor and app-level code may all use) nor the files that wire it in.
 const UNRESTRICTED = [
-  "src/app/[locale]/page.tsx",
   "src/app/[locale]/dev/specimen/page.tsx",
   "src/app/[locale]/offline/page.tsx",
   "src/app/[locale]/manifest.webmanifest/route.ts",
@@ -105,6 +113,21 @@ describe("route-group isolation: the options ESLint resolves per path", () => {
     expect(rules[SYNTAX]).toBeDefined();
   });
 
+  it.each(NO_ROLE_CODE_FILES)("%s: error, no worker, supervisor or hse imports", async (rel) => {
+    const rules = await rulesFor(rel);
+    expect(importPatterns(rules)?.severity).toBe(2);
+    expect(groupsOf(rules)).toEqual(
+      expect.arrayContaining([
+        ...WORKER_FEATURE_NAMES.map((name) => `**/features/${name}`),
+        "**/features/supervisor",
+        "**/(worker)",
+        "**/(supervisor)",
+        "**/(hse)",
+      ]),
+    );
+    expect(rules[SYNTAX]).toBeDefined();
+  });
+
   it.each([SUPERVISOR_ROUTE, HSE_ROUTE, SUPERVISOR_FEATURE])("%s: error, no worker imports", async (rel) => {
     const rules = await rulesFor(rel);
     expect(importPatterns(rules)?.severity).toBe(2);
@@ -114,13 +137,15 @@ describe("route-group isolation: the options ESLint resolves per path", () => {
         "**/features/profile",
         "**/features/risk",
         "**/features/push",
+        "**/features/alert",
+        "**/features/unwell",
         "**/(worker)",
       ]),
     );
     expect(rules[SYNTAX]).toBeDefined();
   });
 
-  it.each([...WORKER_FEATURES, SUPERVISOR_FEATURE])("%s: parent-relative imports are banned", async (rel) => {
+  it.each([...WORKER_FEATURES, SUPERVISOR_FEATURE, JUDGE_FEATURE, DEMO_FEATURE])("%s: parent-relative imports are banned", async (rel) => {
     expect(groupsOf(await rulesFor(rel))).toEqual(expect.arrayContaining([".."]));
   });
 
@@ -128,7 +153,7 @@ describe("route-group isolation: the options ESLint resolves per path", () => {
     const rules = await rulesFor(rel);
     expect(importPatterns(rules)?.severity).toBe(2);
     expect(groupsOf(rules)).toEqual(
-      expect.arrayContaining(["**/features/*", "**/(worker)", "**/(supervisor)", "**/(hse)"]),
+      expect.arrayContaining(["**/features/*", "**/(worker)", "**/(supervisor)", "**/(hse)", "**/(judge)"]),
     );
     expect(rules[SYNTAX]).toBeDefined();
   });
@@ -180,7 +205,29 @@ describe("route-group isolation: what the resolved rules report", () => {
     // fallback mapping lives in src/features/pwa and is imported only by files in src/app (the SW, the layout).
     ["shared lib, pwa feature", "src/lib/utils.ts", 'export { fallbackUrlFor } from "@/features/pwa/fallback";', [IMPORTS]],
     ["shared component, pwa feature import()", "src/components/ui/button.tsx", 'export const load = () => import("@/features/pwa/fallback");', [SYNTAX]],
+    // Task 3: the judge group, the landing page and the judge feature are public and static; the demo feature is neutral.
+    ["test_judge_group_cannot_import_worker_code: judge route, worker feature", JUDGE_ROUTE, 'import { s } from "@/features/profile/store"; export { s };', [IMPORTS]],
+    ["judge route, worker group path", JUDGE_ROUTE, 'export { default } from "@/app/[locale]/(worker)/worker/page";', [IMPORTS]],
+    ["judge route, supervisor feature", JUDGE_ROUTE, 'import { s } from "@/features/supervisor/x"; export { s };', [IMPORTS]],
+    ["judge route, hse group path", JUDGE_ROUTE, 'export { default } from "@/app/[locale]/(hse)/hse/page";', [IMPORTS]],
+    ["judge route, the new worker features", JUDGE_ROUTE, 'import { a } from "@/features/alert/x"; import { u } from "@/features/unwell/x"; export { a, u };', [IMPORTS, IMPORTS]],
+    ["judge route, import()", JUDGE_ROUTE, 'export const load = () => import("@/features/today/useSiteToday");', [SYNTAX]],
+    ["judge live route, worker feature", JUDGE_LIVE_ROUTE, 'import { s } from "@/features/risk/personal"; export { s };', [IMPORTS]],
+    ["test_landing_page_cannot_import_worker_code: landing page, worker feature", LANDING, 'import { s } from "@/features/profile/store"; export { s };', [IMPORTS]],
+    ["landing page, supervisor group path", LANDING, 'export { default } from "@/app/[locale]/(supervisor)/supervisor/page";', [IMPORTS]],
+    ["landing page, require()", LANDING, 'export const r: unknown = require("@/features/push/usePush");', [SYNTAX]],
+    ["judge feature, worker feature", JUDGE_FEATURE, 'import { s } from "@/features/profile/store"; export { s };', [IMPORTS]],
+    ["judge feature, bare sibling", JUDGE_FEATURE, 'export { x } from "../today/x";', [IMPORTS]],
+    ["demo feature, worker feature", DEMO_FEATURE, 'import { s } from "@/features/profile/store"; export { s };', [IMPORTS]],
+    ["demo feature, supervisor feature", DEMO_FEATURE, 'import { s } from "@/features/supervisor/x"; export { s };', [IMPORTS]],
+    ["shared component, judge group path", "src/components/ui/button.tsx", 'export { default } from "@/app/[locale]/(judge)/replay/layout";', [IMPORTS]],
+    ["worker feature, the new alert feature is a worker feature (a supervisor feature may not import it)", SUPERVISOR_FEATURE, 'import { a } from "@/features/alert/x"; export { a };', [IMPORTS]],
+    ["supervisor route, the new unwell feature", SUPERVISOR_ROUTE, 'import { u } from "@/features/unwell/x"; export { u };', [IMPORTS]],
     // What must stay allowed.
+    ["landing page, shared code and the neutral features", LANDING, 'import { Link } from "@/i18n/navigation"; import { d } from "@/features/demo/constants"; import { p } from "@/features/pwa/manifest"; import { j } from "@/features/judge/x"; export { Link, d, p, j };', []],
+    ["judge route, shared code, the demo feature and its own feature", JUDGE_ROUTE, 'import { s } from "@/components/shell/DeskShell"; import { d } from "@/features/demo/DemoProvider"; import { j } from "@/features/judge/x"; export { s, d, j };', []],
+    ["worker route, the demo feature (neutral)", WORKER_ROUTE, 'import { d } from "@/features/demo/DemoProvider"; export { d };', []],
+    ["supervisor route, the demo feature (neutral)", SUPERVISOR_ROUTE, 'import { d } from "@/features/demo/DemoProvider"; export { d };', []],
     ["supervisor feature, own code and shared code", SUPERVISOR_FEATURE, 'import { a } from "./local"; import { b } from "@/api/client"; import { c } from "@/components/ui/button"; import { d } from "@/features/supervisor/model"; export { a, b, c, d };', []],
     ["supervisor feature, import() of own and shared code", SUPERVISOR_FEATURE, 'export const load = () => [import("./local"), import("@/features/supervisor/model"), import("@/lib/utils")]; export type T = import("@/features/supervisor/model").M;', []],
     ["route files may use parent-relative imports (only feature code may not)", WORKER_ROUTE, 'export { a } from "../local"; export const load = () => import("../lazy");', []],

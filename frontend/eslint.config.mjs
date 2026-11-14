@@ -27,7 +27,7 @@ import tseslint from "typescript-eslint";
 // Options of these two rules replace, never merge, across config objects that match the same file, so the blocks
 // below cover disjoint files and a later block must not set either rule for them.
 // tests/unit/lint/route-group-isolation.test.ts resolves the real config per path and fails if one did.
-const WORKER_FEATURES = ["today", "profile", "risk", "push"];
+const WORKER_FEATURES = ["today", "profile", "risk", "push", "alert", "unwell"];
 const SHARED_DIRS = ["components", "api", "lib", "i18n"];
 
 // One forbidden target, written for both mechanisms: `globs` (gitignore syntax) for no-restricted-imports and
@@ -44,6 +44,7 @@ const PARENT_RELATIVE = { globs: [".."], re: String.raw`(^|[^.\w-])[.][.]([^.\w-
 const SHARED_HOME = "Shared code lives in src/components, src/api, src/lib, src/i18n and src/styles.";
 const NO_SUPERVISOR_CODE = `Worker code must not import supervisor or HSE code (ADR 0009 section 7). ${SHARED_HOME}`;
 const NO_WORKER_CODE = `Supervisor and HSE code must not import worker code: on-device personal data stays unreachable from it (ADR 0009 section 7). ${SHARED_HOME}`;
+const NO_ROLE_CODE = `The judge pages, the landing page and the shared demo feature must not import worker, supervisor or HSE code (ADR 0009 section 7, F2 Task 3): they are public and static, and must not be able to reach on-device personal data. ${SHARED_HOME}`;
 const NO_FEATURE_CODE = `Shared code must not import a feature or a route group (ADR 0009 section 7): features use shared code, never the reverse.`;
 const NO_PARENT_RELATIVE = `Feature code reaches other directories through the "@/" alias, not "../": the isolation rule matches import paths by name (ADR 0009 section 7).`;
 
@@ -73,6 +74,20 @@ function isolation(files, forbid) {
 
 const forbidSupervisorCode = { targets: [featureDir("supervisor"), routeGroup("supervisor"), routeGroup("hse")], message: NO_SUPERVISOR_CODE };
 const forbidWorkerCode = { targets: [...WORKER_FEATURES.map(featureDir), routeGroup("worker")], message: NO_WORKER_CODE };
+// The judge route group (src/app/[locale]/(judge)), its feature (src/features/judge), the locale landing page and the
+// demo feature (src/features/demo, neutral ground that worker, supervisor and judge code all use) may not import any
+// role's code. Judge code is not forbidden from `features/demo`, and `features/demo` is not forbidden from
+// importing the judge feature: only the three role groups are walled off.
+const forbidRoleCode = {
+  targets: [
+    ...WORKER_FEATURES.map(featureDir),
+    featureDir("supervisor"),
+    routeGroup("worker"),
+    routeGroup("supervisor"),
+    routeGroup("hse"),
+  ],
+  message: NO_ROLE_CODE,
+};
 const forbidParentRelative = { targets: [PARENT_RELATIVE], message: NO_PARENT_RELATIVE };
 
 const routeGroupIsolation = [
@@ -83,11 +98,13 @@ const routeGroupIsolation = [
   ),
   isolation(["src/app/[[]locale]/(supervisor)/**", "src/app/[[]locale]/(hse)/**"], [forbidWorkerCode]),
   isolation(["src/features/supervisor/**"], [forbidWorkerCode, forbidParentRelative]),
+  isolation(["src/app/[[]locale]/(judge)/**", "src/app/[[]locale]/page.tsx"], [forbidRoleCode]),
+  isolation(["src/features/judge/**", "src/features/demo/**"], [forbidRoleCode, forbidParentRelative]),
   isolation(
     SHARED_DIRS.map((name) => `src/${name}/**`),
     [
       {
-        targets: [ANY_FEATURE, routeGroup("worker"), routeGroup("supervisor"), routeGroup("hse")],
+        targets: [ANY_FEATURE, routeGroup("worker"), routeGroup("supervisor"), routeGroup("hse"), routeGroup("judge")],
         message: NO_FEATURE_CODE,
       },
     ],

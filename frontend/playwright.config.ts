@@ -71,6 +71,14 @@ export default defineConfig({
         VAPID_PUBLIC_KEY: testVapidPublicKey(),
         // Without it a production build ignores the `x-sb-mock-scenario` header that the specs use to make the API fail on purpose.
         SB_MOCK_SCENARIOS: "1",
+        // The dev pages (the specimen, the component kit) answer 404 in a production build without it; kit.spec.ts needs the kit.
+        SB_SPECIMEN: "1",
+        // The BFF's demo employer token (F2 decision D4) and the write rate limits that guard it. The token is a test value
+        // that opens only the mock API; the limits are far above anything a spec does, so a rate limit never fails an
+        // unrelated test (the limiter itself is covered by tests/unit/api/rate-limit.test.ts).
+        DEMO_EMPLOYER_TOKEN: "e2e-demo-employer-token",
+        DEMO_WRITE_RATE_PER_MIN: "10000",
+        DEMO_WRITE_GLOBAL_RATE_PER_MIN: "10000",
       },
     },
   ],
