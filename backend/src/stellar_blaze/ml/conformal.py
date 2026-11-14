@@ -28,7 +28,8 @@ how often that clamp can matter.
 
 The data model ``ConformalOffsets`` and ``apply_offsets`` live in ``domain.forecast.conformal`` (the serving adapter
 applies stored offsets and may not import ``stellar_blaze.ml``); they are re-exported here. This module keeps the
-training half: ``fit_symmetric_offsets``, ``calibration_mask`` and, for the oracle test, ``ml._mapie``.
+training half: ``fit_symmetric_offsets``, ``calibration_mask``, ``fit_mask`` (the fit rows are the training period minus
+the calibration rows) and, for the oracle test, ``ml._mapie``.
 """
 
 from collections.abc import Sequence
@@ -57,6 +58,7 @@ __all__ = [
     "ConformalOffsets",
     "apply_offsets",
     "calibration_mask",
+    "fit_mask",
     "fit_symmetric_offsets",
     "stratum_key",
 ]
@@ -78,6 +80,7 @@ _COVERAGE_TWENTIETHS: Final = (_UPPER - _LOWER).astype(np.int64)  # coverage hi 
 
 # Summer day 1 is 15 May; the 4th, 8th, 12th and 16th week of the summer (pre-registration 6.4; 28 days per summer).
 _SUMMER_START: Final = (5, 15)
+_FIT_END: Final = (8, 31)  # the pre-registered training period is 15 May-31 August (section 2.3)
 _WEEK_DAYS: Final[tuple[range, ...]] = tuple(range(7 * (week - 1) + 1, 7 * week + 1) for week in (4, 8, 12, 16))
 
 
@@ -229,3 +232,30 @@ def calibration_mask(rows: pl.DataFrame, window: CalibrationWindow) -> pl.Series
         summer_day = (pl.col("valid_date") - pl.date(pl.col("summer"), month, day)).dt.total_days() + 1
         mask = pl.any_horizontal(summer_day.is_between(days[0], days[-1]) for days in _WEEK_DAYS)
     return rows.select(mask.fill_null(value=False).alias("in_calibration_window")).to_series()
+
+
+def fit_mask(rows: pl.DataFrame, window: CalibrationWindow) -> pl.Series:
+    """Which rows the quantile models are fitted on (pre-registration 2.3, rule L7), aligned with ``rows``.
+
+    Training is always 15 May to 31 August of the row's own ``summer`` (UTC ``valid_date``), and a fit row is never a
+    calibration row. Under ``"september"`` the two conditions agree. Under ``"weeks_4_8_12_16"`` the calibration weeks
+    inside the period are removed from the fit set, and the rows from 1 September on that are not calibration rows
+    (September outside the weeks) are used by neither, because the training period ends on 31 August. This function
+    owns the rule so that the fit set and ``calibration_mask`` cannot drift apart.
+
+    Args:
+        rows: A frame with a ``valid_date`` (``pl.Date``) and an integer ``summer`` column.
+        window: The calibration window rule.
+
+    Returns:
+        A boolean Series named ``in_fit_set``, one entry per row; a null date is ``False``.
+
+    Raises:
+        ValueError: ``window`` is unknown, ``valid_date`` or ``summer`` is missing, or ``valid_date`` is not a Date.
+    """
+    calibration = calibration_mask(rows, window)
+    if "summer" not in rows.columns:
+        raise ValueError("fit_mask needs the summer column")
+    first, last = (pl.date(pl.col("summer"), *_SUMMER_START), pl.date(pl.col("summer"), *_FIT_END))
+    in_period = rows.select(pl.col("valid_date").is_between(first, last).fill_null(value=False)).to_series()
+    return (in_period & ~calibration).alias("in_fit_set")
