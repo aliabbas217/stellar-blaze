@@ -106,8 +106,9 @@ jobs:
           uv export --locked --quiet --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/req.txt"
           uv run pip-audit --disable-pip --no-deps -r "$RUNNER_TEMP/req.txt"
 
-      # ADR 0009 section 5. Report-only until B3 Task 0 freezes v1 and adds `--fail-on ERR`.
-      - name: OpenAPI breaking-change report (oasdiff)
+      # ADR 0009 section 5. Enforcing since B3 Task 0 froze v1 (ADR 0051 decision 6): a breaking change (ERR) fails the
+      # build, additive changes pass.
+      - name: OpenAPI breaking-change check (oasdiff)
         working-directory: .
         env:
           # Pull requests compare with the base branch tip, pushes with the previous head. All zeros (the first push of
@@ -130,7 +131,7 @@ jobs:
           mkdir -p "$tool_dir"
           curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
           (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" oasdiff)
-          "$tool_dir/oasdiff" breaking "${BASE_SHA}:${spec}" "${spec}"
+          "$tool_dir/oasdiff" breaking "${BASE_SHA}:${spec}" "${spec}" --fail-on ERR
 
       - name: Build the image
         run: docker build -t stellar-blaze-api:ci .
