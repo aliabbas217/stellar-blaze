@@ -12,6 +12,10 @@ The 2026 summer is locked (``HELD_OUT_SUMMERS``) until the architect's go-ahead.
 failed, 2 bad usage or configuration, or a held-out summer. Like every ``sb-jobs`` command it reads
 the ``SB_*`` environment, which includes ``SB_DATABASE_URL``, though this command never connects to it.
 
+The gated 2026 evaluation, behind the pre-registration gate (``jobs/evaluate_2026.py``)::
+
+    sb-jobs evaluate-2026 --part forecast|warnings|plans|all [--amendment ID]
+
 Training, a job with a ``job_run`` row and an advisory lock per config name::
 
     sb-jobs train --config PATH [--release] [--dev-skill PATH]
@@ -30,6 +34,7 @@ import asyncio
 import json
 import shlex
 from collections.abc import Mapping
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn
 
@@ -40,6 +45,7 @@ from stellar_blaze.config import Settings
 
 if TYPE_CHECKING:
     from stellar_blaze.ml.git import GitReader
+    from stellar_blaze.ml.protocol_gate import Part
 
 ml_app = typer.Typer(
     no_args_is_help=True,
@@ -444,3 +450,97 @@ def train_command(
     if outcome:
         typer.echo(json.dumps(outcome[0], sort_keys=True))
     raise typer.Exit(code)
+
+
+class EvaluationPart(StrEnum):
+    """``--part`` of ``evaluate-2026``: the three parts of the gated run, or every part that exists."""
+
+    FORECAST = "forecast"
+    WARNINGS = "warnings"
+    PLANS = "plans"
+    ALL = "all"
+
+
+@ml_app.command("evaluate-2026")
+def evaluate_2026_command(
+    part: Annotated[
+        EvaluationPart,
+        typer.Option("--part", help="forecast, warnings or plans (the last two are implemented in B3), or all."),
+    ],
+    amendment: Annotated[
+        str | None,
+        typer.Option(
+            "--amendment",
+            help="The id of the pre-registration section 13 amendment-log row that allows a re-run of a part that "
+            "has a result; the first output is kept as *.run1.json.",
+        ),
+    ] = None,
+) -> None:
+    """Score the held-out 2026 summer, once, behind the pre-registration gate (never run without the architect's go).
+
+    The gate opens first: the lock, the protocol's hash and commit, a clean tree, the released model, the architect's
+    ``backend/training/2026-go.toml`` bound to that protocol and model, and no earlier result. A refusal prints every
+    reason on stderr and exits 2 with no data touched. Then the gold file is loaded (pinned to the lock's hash), scored,
+    and ``artifacts/eval/2026/`` is written with exclusive create, after a last check that HEAD has not moved and the
+    tree is clean. Runs as the job ``evaluate-2026:<part>`` (a ``job_run`` row, one advisory lock per part). Parts
+    ``warnings`` and ``plans`` are implemented in B3 (exit 2); ``all`` runs the parts that exist. Exit codes: 0 done or
+    skipped (locked), 1 failed, 2 refused by the gate or bad usage.
+    """
+    from stellar_blaze.jobs import evaluate_2026
+    from stellar_blaze.jobs.replay_build import repo_root
+    from stellar_blaze.ml.protocol_gate import Part
+
+    existing = list(evaluate_2026.PART_RUNNERS)
+    wanted = existing if part is EvaluationPart.ALL else [Part(part.value)]
+    missing = [item for item in wanted if item not in evaluate_2026.PART_RUNNERS]
+    if missing:
+        typer.echo(
+            f"evaluate-2026 --part {', '.join(item.value for item in missing)}: implemented in B3 (nothing was run)",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if part is EvaluationPart.ALL:
+        later = [item.value for item in Part if item not in evaluate_2026.PART_RUNNERS]
+        typer.echo(f"evaluate-2026 --part all: {', '.join(later)} implemented in B3, not run", err=True)
+    note = amendment.strip() if amendment else None
+    settings = _settings()
+    root = repo_root()
+    for item in wanted:
+        _evaluate_2026_part(settings, root, item, note)
+
+
+def _evaluate_2026_part(settings: Settings, root: Path, part: "Part", amendment: str | None) -> None:
+    """One part of ``evaluate-2026``: the gate first (exit 2 on refusal), then the job (exit 1 on failure)."""
+    from stellar_blaze.jobs import evaluate_2026
+    from stellar_blaze.jobs.runner import run_job
+    from stellar_blaze.ml.protocol_gate import GateRefusedError
+
+    try:
+        token = evaluate_2026.open_the_gate(settings, root, part, amendment)
+    except GateRefusedError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from None
+    refusals: list[GateRefusedError] = []
+    outcome: list[dict[str, JsonValue]] = []
+
+    async def work() -> Mapping[str, JsonValue]:
+        try:
+            summary = await asyncio.to_thread(
+                evaluate_2026.PART_RUNNERS[part], settings, token, root, amendment=amendment
+            )
+        except GateRefusedError as exc:  # HEAD moved or the tree went dirty before the write: nothing was written
+            refusals.append(exc)
+            raise
+        outcome.append(summary)
+        return summary
+
+    job = f"evaluate-2026:{part.value}"
+    params: dict[str, JsonValue] = {"part": part.value, "amendment": amendment, "head": token.head}
+    code = asyncio.run(run_job(settings, job, params, work, lock_key=job))
+    if refusals:
+        typer.echo(str(refusals[0]), err=True)
+        raise typer.Exit(2)
+    if outcome:
+        typer.echo(json.dumps(outcome[0], sort_keys=True))
+    if code != 0:
+        raise typer.Exit(code)

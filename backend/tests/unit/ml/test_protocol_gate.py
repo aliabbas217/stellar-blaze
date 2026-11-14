@@ -13,10 +13,12 @@ import shutil
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from stellar_blaze.ml.data import TEST_SUMMER, HoldoutViolationError, load_test_pairs
 from stellar_blaze.ml.git import GitError, GitReader, SubprocessGit
@@ -24,6 +26,7 @@ from stellar_blaze.ml.protocol_gate import (
     RESULT_FILES,
     GateRefusedError,
     GateToken,
+    GoMarker,
     Part,
     ProtocolAmendment,
     ProtocolLock,
@@ -89,16 +92,40 @@ class FakeGit:
             raise GitError(f"{commit}:{path} not found") from None
 
 
+def go_text(
+    *,
+    protocol_sha256: str = sha(PROTOCOL_BYTES),
+    model_id: str = MODEL_ID,
+    approved_by: str = "the architect",
+    approved_at: str = "2026-11-15T09:30:00+04:00",
+) -> str:
+    """The text of a ``2026-go.toml`` marker (the values are written as given, so a test can break one)."""
+    return (
+        f'protocol_sha256 = "{protocol_sha256}"\nmodel_id = "{model_id}"\n'
+        f'approved_by = "{approved_by}"\napproved_at = {approved_at}\n'
+    )
+
+
 @dataclass
 class World:
     repo_root: Path
     lock_path: Path
+    go_path: Path
     results_dir: Path
     models_dir: Path
     git: FakeGit
 
+    def write_go(self, text: str | None = None) -> None:
+        """Write the 2026-go marker (the default text is bound to the default lock)."""
+        self.go_path.write_text(go_text() if text is None else text, encoding="utf-8")
+
     def write_lock(self, *, amendments: Sequence[tuple[str, str, str]] = (), **changes: str | None) -> None:
-        """Rewrite the lock; ``None`` drops a key (TOML has no null); ``amendments`` are (path, sha, commit) triples."""
+        """Rewrite the lock; ``None`` drops a key (TOML has no null); ``amendments`` are (path, sha, commit) triples.
+
+        The go marker is rewritten bound to the new lock (its protocol hash and model id; a lock without a model id
+        keeps the default one), so a test that changes the lock breaks one thing only. A go test rewrites the marker
+        afterwards.
+        """
         values: dict[str, str | None] = {
             "protocol_path": PROTOCOL_PATH,
             "protocol_sha256": sha(PROTOCOL_BYTES),
@@ -113,6 +140,7 @@ class World:
         for path, digest, commit in amendments:
             lines += ["", "[[amendments]]", f'path = "{path}"', f'sha256 = "{digest}"', f'commit = "{commit}"']
         self.lock_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        self.write_go(go_text(protocol_sha256=values["protocol_sha256"] or "", model_id=values["model_id"] or MODEL_ID))
 
     def add_amendment(
         self,
@@ -141,6 +169,7 @@ class World:
             part=part,
             results_dir=self.results_dir,
             models_dir=self.models_dir,
+            go_path=self.go_path,
             git=self.git if git is None else git,
             amendment=amendment,
         )
@@ -156,6 +185,7 @@ def world(tmp_path: Path) -> World:
     built = World(
         repo_root=repo,
         lock_path=repo / "backend" / "training" / "protocol.lock.toml",
+        go_path=repo / "backend" / "training" / "2026-go.toml",
         results_dir=repo / "artifacts" / "eval" / "2026",
         models_dir=FIXTURE_MODELS,
         git=FakeGit(),
@@ -233,6 +263,30 @@ def _amendment_committed_differently(w: World) -> None:
     w.write_lock(amendments=[w.add_amendment("amend-1", b"one\n", "c" * 40, committed_bytes=b"other\n")])
 
 
+def _no_go_marker(w: World) -> None:
+    w.go_path.unlink()
+
+
+def _unparsable_go_marker(w: World) -> None:
+    w.write_go("this is = = not toml\n")
+
+
+def _go_marker_with_a_naive_time(w: World) -> None:
+    w.write_go(go_text(approved_at="2026-11-15T09:30:00"))  # a TOML local date-time: no offset, so not AwareDatetime
+
+
+def _go_marker_with_an_extra_key(w: World) -> None:
+    w.write_go(go_text() + 'note = "extra keys are refused"\n')
+
+
+def _go_marker_for_another_protocol(w: World) -> None:
+    w.write_go(go_text(protocol_sha256="1" * 64))
+
+
+def _go_marker_for_another_model(w: World) -> None:
+    w.write_go(go_text(model_id="corrector-20261113-0000000-000009"))
+
+
 def _prior_result(part: Part) -> Callable[[World], None]:
     def mutate(w: World) -> None:
         w.results_dir.mkdir(parents=True)
@@ -257,6 +311,14 @@ _REFUSALS: list[tuple[str, Part, Callable[[World], None]]] = [
     ("amendment-hash-mismatch", Part.FORECAST, _amendment_edited),
     ("amendment-not-ancestor", Part.FORECAST, _amendment_not_an_ancestor),
     ("amendment-content-mismatch", Part.FORECAST, _amendment_committed_differently),
+    ("go-missing", Part.FORECAST, _no_go_marker),
+    ("go-missing", Part.WARNINGS, _no_go_marker),
+    ("go-missing", Part.PLANS, _no_go_marker),
+    ("go-invalid", Part.FORECAST, _unparsable_go_marker),
+    ("go-invalid", Part.FORECAST, _go_marker_with_a_naive_time),
+    ("go-invalid", Part.FORECAST, _go_marker_with_an_extra_key),
+    ("go-mismatch", Part.FORECAST, _go_marker_for_another_protocol),
+    ("go-mismatch", Part.FORECAST, _go_marker_for_another_model),
     ("freeze-missing", Part.WARNINGS, _no_freeze),
     ("freeze-missing", Part.PLANS, _no_freeze),
     ("freeze-hash-mismatch", Part.WARNINGS, _freeze_edited),
@@ -267,7 +329,9 @@ _REFUSALS: list[tuple[str, Part, Callable[[World], None]]] = [
 ]
 
 
-@pytest.mark.parametrize(("code", "part", "mutate"), _REFUSALS, ids=[f"{c}-{p.value}" for c, p, _ in _REFUSALS])
+@pytest.mark.parametrize(
+    ("code", "part", "mutate"), _REFUSALS, ids=[f"{c}-{p.value}-{m.__name__.strip('_')}" for c, p, m in _REFUSALS]
+)
 def test_gate_refuses_each_failure(code: str, part: Part, mutate: Callable[[World], None], world: World) -> None:
     mutate(world)
     with pytest.raises(GateRefusedError) as refused:
@@ -348,6 +412,45 @@ def test_gate_without_a_lock_skips_what_needs_it_and_still_reports_the_rest(worl
     assert codes(refused) == ["lock-missing", "tree-dirty"]
 
 
+def test_gate_lists_both_go_bindings_when_both_differ_and_the_marker_is_read_without_a_lock(world: World) -> None:
+    world.write_go(go_text(protocol_sha256="1" * 64, model_id="corrector-20261113-0000000-000009"))
+    with pytest.raises(GateRefusedError) as refused:
+        world.gate(Part.FORECAST)
+    assert codes(refused) == ["go-mismatch", "go-mismatch"]
+    assert "protocol_sha256" in refused.value.reasons[0]
+    assert "model_id" in refused.value.reasons[1]
+    # Without a lock there is nothing to bind to: a missing marker is still reported, a present one is not judged.
+    _drop_the_lock(world)
+    _no_go_marker(world)
+    with pytest.raises(GateRefusedError) as unlocked:
+        world.gate(Part.FORECAST)
+    assert codes(unlocked) == ["lock-missing", "go-missing"]
+
+
+def test_a_go_marker_for_a_lock_without_a_model_id_is_judged_by_model_id_missing_alone(world: World) -> None:
+    """The lock names no model (reported once); a marker bound to a model cannot also be called a mismatch."""
+    _no_model_id(world)
+    with pytest.raises(GateRefusedError) as refused:
+        world.gate(Part.FORECAST)
+    assert codes(refused) == ["model-id-missing"]
+
+
+def test_the_go_marker_is_parsed_into_a_frozen_marker_with_an_aware_time() -> None:
+    marker = GoMarker.model_validate(
+        {
+            "protocol_sha256": sha(PROTOCOL_BYTES),
+            "model_id": MODEL_ID,
+            "approved_by": "the architect",
+            "approved_at": datetime(2026, 11, 15, 9, 30, tzinfo=UTC),
+        }
+    )
+    assert marker.approved_at.utcoffset() is not None
+    with pytest.raises(ValidationError):
+        marker.model_id = "other"  # type: ignore[misc]  # frozen
+    with pytest.raises(ValidationError):
+        GoMarker.model_validate({**marker.model_dump(), "approved_by": ""})  # who approved it must be named
+
+
 def test_gate_without_a_lock_reports_a_prior_result_too(world: World) -> None:
     _drop_the_lock(world)
     _prior_result(Part.PLANS)(world)
@@ -409,6 +512,31 @@ def test_the_real_lock_file_is_consistent_with_the_committed_documents() -> None
         assert sha((REPO_ROOT / amendment.path).read_bytes()) == amendment.sha256, amendment.path
     if lock.freeze_path is not None:
         assert sha((REPO_ROOT / lock.freeze_path).read_bytes()) == lock.freeze_sha256
+
+
+REAL_GO = REAL_LOCK.parent / "2026-go.toml"
+
+
+@pytest.mark.skipif(REAL_GO.exists(), reason="the architect has written the 2026 go marker: the pin below is spent")
+def test_the_real_gate_refuses_today_with_go_missing(tmp_path: Path) -> None:
+    """The 2026 run is locked until the architect commits ``backend/training/2026-go.toml``: no code writes it.
+
+    The real lock path and the real marker path go to ``open_gate`` (with a fake git, so nothing runs against the
+    worktree); ``go-missing`` is among the refusal reasons whatever else the lock still lacks (a model id until the
+    model is frozen).
+    """
+    with pytest.raises(GateRefusedError) as refused:
+        open_gate(
+            repo_root=REPO_ROOT,
+            lock_path=REAL_LOCK,
+            part=Part.FORECAST,
+            results_dir=tmp_path / "no-results",
+            models_dir=tmp_path / "no-models",
+            go_path=REAL_GO,
+            git=FakeGit(),
+        )
+    assert "go-missing" in codes(refused)
+    assert not REAL_GO.exists()  # the test (like the gate) never creates it
 
 
 @pytest.mark.parametrize("bad", ["../outside.md", "/etc/passwd", "C:/x.md", "a\\b.md", ""])

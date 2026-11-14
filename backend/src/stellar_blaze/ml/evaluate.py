@@ -27,7 +27,7 @@ Sign conventions. ``y_*`` in ``OofPredictions.keys`` is the ERROR truth minus fo
 truth is ``raw_* + y_*`` (``truth``); ``bias`` in the skill table is the median forecast minus the truth.
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -38,6 +38,7 @@ from numpy.typing import NDArray
 
 from stellar_blaze.domain.forecast.features import (
     FeatureSet,
+    FoldStats,
     Target,
     build_features,
     feature_columns,
@@ -48,7 +49,7 @@ from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.ml import metrics
 from stellar_blaze.ml.baselines import Baseline, fit_baselines, predict_baseline
 from stellar_blaze.ml.bootstrap import DEFAULT_SEED, paired_block_bootstrap
-from stellar_blaze.ml.conformal import calibration_mask, fit_mask
+from stellar_blaze.ml.conformal import CalibrationWindow, calibration_mask, fit_mask
 from stellar_blaze.ml.data import DEV_SUMMERS, TEST_SUMMER, HoldoutViolationError
 from stellar_blaze.ml.predict import corrected_grids
 from stellar_blaze.ml.regimes import CLUSTERS, Fold, loco_folds, split
@@ -61,7 +62,9 @@ __all__ = [
     "OofPredictions",
     "coverage_by_forecast_tercile",
     "evaluate_dev",
+    "evaluate_folds",
     "evaluate_summer_split",
+    "evaluate_with_predictor",
     "skill_table",
     "truth",
 ]
@@ -183,23 +186,28 @@ class _FoldOutput:
     fallbacks: pl.DataFrame
 
 
+def _feature_frames(
+    train: pl.DataFrame, test: pl.DataFrame, *, window: CalibrationWindow, stats: FoldStats
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """The baselines' training rows and the test rows as ``site`` feature frames under the fold statistics ``stats``.
+
+    Training rows are the fit and calibration rows (``window``) of the training side (the rows the corrector sees
+    too); the test rows are every modelled test row.
+    """
+    train_features = build_features(train, feature_set=FeatureSet.SITE, stats=stats, history=history_features(train))
+    train_features = train_features.filter(pl.col("hour_block").is_not_null())
+    train_features = train_features.filter(fit_mask(train_features, window) | calibration_mask(train_features, window))
+    test_features = build_features(
+        test, feature_set=FeatureSet.SITE, stats=stats, history=history_features(test)
+    ).filter(pl.col("hour_block").is_not_null())
+    return train_features, test_features
+
+
 def _fit_and_test_frames(
     train: pl.DataFrame, test: pl.DataFrame, trained: TrainedCorrector
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """The baselines' training rows and the test rows as ``site`` feature frames under the fold's statistics.
-
-    Training rows are the fit and calibration rows of the training clusters (the rows the corrector sees too); the
-    test rows are every modelled test row.
-    """
-    window = trained.cfg.calibration_window
-    train_features = build_features(
-        train, feature_set=FeatureSet.SITE, stats=trained.stats, history=history_features(train)
-    ).filter(pl.col("hour_block").is_not_null())
-    train_features = train_features.filter(fit_mask(train_features, window) | calibration_mask(train_features, window))
-    test_features = build_features(
-        test, feature_set=FeatureSet.SITE, stats=trained.stats, history=history_features(test)
-    ).filter(pl.col("hour_block").is_not_null())
-    return train_features, test_features
+    """``_feature_frames`` under a trained corrector's own window and statistics."""
+    return _feature_frames(train, test, window=trained.cfg.calibration_window, stats=trained.stats)
 
 
 def _base_rates(fold: str, train_features: pl.DataFrame) -> pl.DataFrame:
@@ -245,6 +253,18 @@ def _fallback_rows(fold: str, test_features: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _baseline_grids(
+    train_features: pl.DataFrame, test_features: pl.DataFrame, *, pooled: bool
+) -> dict[tuple[Target, str], F64]:
+    """The predictions of B0, B0d, B2d, B3d (t, td, wind) and B4 on the test rows, fitted on the training rows only."""
+    grids: dict[tuple[Target, str], F64] = {}
+    for target in Target:
+        model = fit_baselines(train_features, target=target, pooled=pooled)
+        for baseline in _BASELINES_WBGT if target is Target.WBGT else _BASELINES_JOINT:
+            grids[(target, baseline.value)] = predict_baseline(model, test_features, baseline)
+    return grids
+
+
 def _run_fold(
     pairs: pl.DataFrame, fold: Fold, cfg: TrainingConfig, cfg_sha256: str, sample_clusters: Collection[str]
 ) -> _FoldOutput:
@@ -271,17 +291,22 @@ def _run_fold(
     # Pooled bias is for HELD-OUT clusters only (pre-registration section 5): when every test cluster is also a
     # training cluster (the summer split) each station has its own training rows, so its own bias is the baseline.
     pooled = fold.test_clusters.isdisjoint(fold.train_clusters)
-    for target in Target:
-        model = fit_baselines(train_features, target=target, pooled=pooled)
-        for baseline in _BASELINES_WBGT if target is Target.WBGT else _BASELINES_JOINT:
-            grids[(target, baseline.value)] = predict_baseline(model, test_features, baseline)
+    grids.update(_baseline_grids(train_features, test_features, pooled=pooled))
     base_rates = _base_rates(fold.name, train_features)
     fallbacks = _fallback_rows(fold.name, test_features)
     return _FoldOutput(keys, grids, samples, sample_rows, base_rates, fallbacks)
 
 
-def _assemble(outputs: list[_FoldOutput], sample_clusters: Collection[str]) -> OofPredictions:
-    """Join the per-fold outputs, one grid key at a time (each fold's array is released as it is copied in)."""
+def _assemble(
+    outputs: list[_FoldOutput],
+    sample_clusters: Collection[str],
+    tercile_edges: tuple[float, float] | None = None,
+) -> OofPredictions:
+    """Join the per-fold outputs, one grid key at a time (each fold's array is released as it is copied in).
+
+    ``tercile_edges`` are the forecast-WBGT edges to carry; ``None`` derives them from the rows (the development run).
+    The gated test run passes the stored development edges and never derives any from 2026 forecasts.
+    """
     sizes = [output.keys.height for output in outputs]
     offsets = np.concatenate([[0], np.cumsum(sizes)]).astype(np.int64)
     keys = pl.concat([output.keys for output in outputs])
@@ -304,11 +329,14 @@ def _assemble(outputs: list[_FoldOutput], sample_clusters: Collection[str]) -> O
         sample_index = np.concatenate(
             [begin + output.sample_rows for output, begin in kept if output.sample_rows is not None]
         ).astype(np.int64)
-    forecast = keys["wbgt_fc_c"].cast(pl.Float64()).to_numpy()
-    forecast = forecast[np.isfinite(forecast)]
-    if forecast.size == 0:
-        raise ValueError("no row has a finite forecast WBGT: the terciles cannot be computed")
-    edge_low, edge_high = (float(edge) for edge in np.quantile(forecast, [1.0 / 3.0, 2.0 / 3.0]))
+    if tercile_edges is None:
+        forecast = keys["wbgt_fc_c"].cast(pl.Float64()).to_numpy()
+        forecast = forecast[np.isfinite(forecast)]
+        if forecast.size == 0:
+            raise ValueError("no row has a finite forecast WBGT: the terciles cannot be computed")
+        edge_low, edge_high = (float(edge) for edge in np.quantile(forecast, [1.0 / 3.0, 2.0 / 3.0]))
+    else:
+        edge_low, edge_high = tercile_edges
     _log.info("evaluate.done", rows=keys.height, folds=len(outputs), sample_clusters=sorted(sample_clusters))
     return OofPredictions(
         keys=keys,
@@ -400,6 +428,66 @@ def evaluate_summer_split(
         for a, b in ((first, second), (second, first))
     ]
     return _run(pairs, folds, cfg, cfg_sha256, sample_clusters)
+
+
+def evaluate_folds(
+    pairs: pl.DataFrame,
+    folds: Sequence[Fold],
+    cfg: TrainingConfig,
+    *,
+    cfg_sha256: str,
+    tercile_edges: tuple[float, float],
+) -> OofPredictions:
+    """The fold engine of the gated test run: train per fold, predict the fold's test rows, with FIXED tercile edges.
+
+    Unlike ``evaluate_dev`` this does not refuse summer 2026: its caller (``ml.forecast_test``) holds a gate token and
+    hands it the frames the gate released. The fold statistics, offsets, copulas and baselines are fitted on each
+    fold's training rows only (``_run_fold``); ``tercile_edges`` are carried as given and never derived from the rows.
+
+    Raises:
+        ValueError: ``folds`` is empty, or a fold has no training or test rows.
+    """
+    if not folds:
+        raise ValueError("folds must name at least one fold")
+    outputs = [_run_fold(pairs, fold, cfg, cfg_sha256, ()) for fold in folds]
+    return _assemble(outputs, (), tercile_edges)
+
+
+def evaluate_with_predictor(
+    train: pl.DataFrame,
+    test: pl.DataFrame,
+    *,
+    fold_name: str,
+    window: CalibrationWindow,
+    stats: FoldStats,
+    predict: Callable[[pl.DataFrame], Mapping[Target, F64]],
+    tercile_edges: tuple[float, float],
+) -> OofPredictions:
+    """One fold whose corrector grids come from ``predict`` (the serving path of the released model) and not a refit.
+
+    The baselines are fitted on ``train`` exactly as in ``evaluate_folds`` but per station (``pooled=False``: every
+    test station has its own training rows, the same sites on a new summer). ``predict`` gets the test ``site`` feature
+    frame (its rows are the keys of the result) and returns the ``(n, 19)`` value grids of t, td, wind and wbgt aligned
+    with it, NaN where the corrector has no forecast.
+
+    Raises:
+        ValueError: ``predict`` returns a grid of the wrong shape, or a target is missing.
+    """
+    train_features, test_features = _feature_frames(train, test, window=window, stats=stats)
+    keys = test_features.select(_KEY_COLUMNS).with_columns(pl.lit(fold_name).alias("fold"))
+    corrected = predict(test_features)
+    grids: dict[tuple[Target, str], F64] = {}
+    expected = (test_features.height, _N_LEVELS)
+    for target in Target:
+        grid = np.asarray(corrected[target], dtype=np.float64)
+        if grid.shape != expected:
+            raise ValueError(f"the predictor's {target.value} grid has shape {grid.shape}, expected {expected}")
+        grids[(target, CORRECTOR)] = grid
+    grids.update(_baseline_grids(train_features, test_features, pooled=False))
+    output = _FoldOutput(
+        keys, grids, None, None, _base_rates(fold_name, train_features), _fallback_rows(fold_name, test_features)
+    )
+    return _assemble([output], (), tercile_edges)
 
 
 # === skill tables ===================================================================================================

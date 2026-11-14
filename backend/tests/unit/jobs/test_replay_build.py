@@ -515,6 +515,7 @@ def test_sb_jobs_help_runs_without_the_training_packages_or_the_ml_package() -> 
             ["replay", "build", "--help"],
             ["evaluate-dev", "--help"],
             ["train", "--help"],
+            ["evaluate-2026", "--help"],
         ):
             result = CliRunner().invoke(app, arguments)
             assert result.exit_code == 0, (arguments, result.output)
