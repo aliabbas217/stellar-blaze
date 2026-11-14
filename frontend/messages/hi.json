@@ -18,6 +18,51 @@
       "nightTheme": "रात",
       "phrase": "आज की गर्मी का स्तर",
       "time": "13:05"
+    },
+    "kit": {
+      "kicker": "Stellar Blaze · component kit · {locale}",
+      "title": "Component kit",
+      "lead": "Every shared component in every state. Use the controls above to change the theme and the language. Development only.",
+      "sections": {
+        "levelSign": {
+          "title": "Level sign",
+          "note": "The level is a word, a position on the four-step scale and a small mark. Stale and fallback signs are dashed, never hatched."
+        },
+        "levelScale": {
+          "title": "Level scale",
+          "note": "Four segments, the current one marked. With labels for the hero sign, without for the mini sign."
+        },
+        "pictograms": {
+          "title": "Pictograms",
+          "note": "Solid shapes on a 24 grid in the text color. They sit beside words and are never the only message."
+        },
+        "states": {
+          "title": "States",
+          "note": "Empty, error, stale, offline, pending and missing provenance, and skeletons that reserve the final height."
+        },
+        "stamps": {
+          "title": "Stamps",
+          "note": "Where a screen shows replayed, recorded, simulated, designed or development data, a stamp says so."
+        }
+      },
+      "sample": {
+        "kickerNow": "Site level now",
+        "kickerStale": "Last known level",
+        "kickerFallback": "Forecast expired",
+        "untilNow": "until 17:00",
+        "untilStale": "at 06:00",
+        "emptyTitle": "No shift today",
+        "emptyReason": "Your next shift starts tomorrow at 06:00. The forecast for tomorrow arrives at 18:00 tonight.",
+        "emptyPrimary": "Open Today",
+        "emptySecondary": "Alert settings",
+        "errorGuidance": "Until it loads, follow the site rules. Rest in shade every hour and drink water.",
+        "offlineAge": "1 h 30 min",
+        "staleAge": "5 h",
+        "pendingWhat": "The 2026 scoreboard",
+        "missingWhat": "Hours of work under the ban",
+        "stampDetail": "3 Sep 2026",
+        "medicalLabel": "Medical help"
+      }
     }
   },
   "shell": {
@@ -60,13 +105,46 @@
       "title": "पृष्ठ नहीं मिला",
       "body": "यह पृष्ठ मौजूद नहीं है या कहीं और चला गया है।",
       "home": "शुरुआत पर वापस जाएँ"
+    },
+    "demo": {
+      "banner": "Synthetic demo site: no real people, no real data",
+      "reset": {
+        "button": "Reset demo site",
+        "done": "Demo site reset (new epoch {epoch}).",
+        "unavailable": "Reset is not available on this deployment.",
+        "failed": "We could not reset the demo site. Try again."
+      },
+      "mode": {
+        "label": "Data source",
+        "live": "Live",
+        "replay": "Replay",
+        "liveUnavailable": "Live is not running on this deployment"
+      }
+    },
+    "field": {
+      "noSite": "No site chosen",
+      "clockLabel": "Time at the site",
+      "pendingClock": "--:--"
+    },
+    "desk": {
+      "menu": "Main",
+      "nav": {
+        "story": "The story",
+        "scoreboard": "Scoreboard",
+        "day": "One day",
+        "try": "Try a plan",
+        "governance": "Governance",
+        "crews": "For crews"
+      }
     }
   },
   "worker": {
     "nav": {
       "label": "कामगार नेविगेशन",
       "today": "आज",
-      "alerts": "अलर्ट"
+      "alerts": "अलर्ट",
+      "unwell": "I feel unwell",
+      "myData": "My data"
     }
   },
   "today": {
@@ -241,6 +319,26 @@
     "stale": {
       "title": "आख़िरी अपडेट {time}",
       "detail": "यह जानकारी पुरानी हो सकती है। ऑनलाइन लौटने पर स्तर ताज़ा हो जाते हैं।"
+    },
+    "staleBanner": {
+      "title": "Last known level",
+      "body": "Updated <bdi>{time}</bdi>, <bdi>{age}</bdi> ago. This may be out of date."
+    },
+    "offlineBanner": {
+      "title": "You are offline",
+      "body": "Showing what this phone saved. It updates when you are back online.",
+      "lastKnown": "Last known level, updated <bdi>{time}</bdi>, <bdi>{age}</bdi> ago."
+    },
+    "pendingBanner": "{what} is not scored yet. The numbers appear here when it is.",
+    "missingProvenance": "{what} is not shown because its source is missing.",
+    "requestIdLabel": "Request ID",
+    "stamp": {
+      "replay": "Replay",
+      "recorded": "Recorded",
+      "simulated": "Simulated",
+      "designed": "Designed",
+      "dev2025": "DEV 2025",
+      "notClinicallyReviewed": "Not clinically reviewed"
     }
   },
   "levels": {
@@ -252,7 +350,14 @@
       "red": "लाल"
     },
     "cellLabel": "{time}, {name}, स्तर {index}",
-    "banActive": "काम पर रोक का समय"
+    "banActive": "काम पर रोक का समय",
+    "siteRules": "Site rules",
+    "scale": {
+      "live": "Level {index} of 4, {name}",
+      "stale": "Last known level {index} of 4, {name}",
+      "fallback": "Fallback level {index} of 4, {name}",
+      "none": "No level, the site rules apply"
+    }
   },
   "actions": {
     "draft": "प्रारूप",
