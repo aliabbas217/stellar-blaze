@@ -254,11 +254,52 @@ def test_rule_p_h7_run_high_heavy_rest_is_forty_minutes() -> None:
     assert "P-H7.run" not in ids(full)
 
 
-def test_rule_p_h7_run_rest_is_that_of_the_zone_where_the_run_ended() -> None:
-    """The run ended in Medium (15 min rest) although the next tick is High: three ticks of rest are enough."""
-    zones = zones_by_tick((5, TICKS, HIGH), default=MEDIUM)
-    result = run_validator(plan_of(by_tick((0, 4, W), (7, 8, W))), zones, crew_of(workload="heavy"))
-    assert "P-H7.run" not in ids(result)
+def test_rule_p_h7_run_rest_branch_a_zone_of_the_last_work_tick() -> None:
+    """R-AA (a): the run ended in High (20/40) and the zone eases to Medium: the 40 min rest is still owed."""
+    zones = zones_by_tick((4, TICKS, MEDIUM), default=HIGH)
+    crew = crew_of(workload="heavy")
+    short = run_validator(plan_of(by_tick((0, 4, W), (4, 11, R), (11, 12, W))), zones, crew)
+    assert only(short, "P-H7.run").tick_ranges == ((11, 12),)  # 7 rest ticks of the 8 owed
+    full = run_validator(plan_of(by_tick((0, 4, W), (4, 12, R), (12, 13, W))), zones, crew)
+    assert "P-H7.run" not in ids(full)
+
+
+def test_rule_p_h7_run_rest_branch_b_zone_of_the_tick_that_ended_the_run() -> None:
+    """R-AA (b): Medium work cut by a worsening to High at an attendance tick: the High rest (40 min) is owed."""
+    zones = zones_by_tick((3, TICKS, HIGH), default=MEDIUM)
+    crew = crew_of(workload="heavy")
+    short = run_validator(plan_of(by_tick((0, 3, W), (3, 10, R), (10, 11, W))), zones, crew)
+    assert only(short, "P-H7.run").tick_ranges == ((10, 11),)
+    full = run_validator(plan_of(by_tick((0, 3, W), (3, 11, R), (11, 12, W))), zones, crew)
+    assert "P-H7.run" not in ids(full)
+    for ending in (R, S, B):
+        plan = plan_of(by_tick((0, 3, W), (3, 4, ending), (4, 10, R), (10, 11, W)))
+        assert "P-H7.run" in ids(run_validator(plan, zones, crew)), ending
+
+
+@pytest.mark.parametrize("ending", [OFF_, BAN])
+def test_rule_p_h7_run_rest_branch_b_off_and_ban_ticks_contribute_nothing(ending: TickState) -> None:
+    zones = zones_by_tick((3, TICKS, HIGH), default=MEDIUM)
+    plan = plan_of(by_tick((0, 3, W), (3, 4, ending), (6, 7, W)))  # only the Medium rest (3 ticks) is owed
+    assert "P-H7.run" not in ids(run_validator(plan, zones, crew_of(workload="heavy")))
+
+
+def test_rule_p_h7_run_rest_branch_b_red_tick_contributes_nothing() -> None:
+    zones = zones_by_tick((3, 4, RED), default=MEDIUM)
+    plan = plan_of(by_tick((0, 3, W), (3, 6, S), (6, 7, W)))
+    assert "P-H7.run" not in ids(run_validator(plan, zones, crew_of(workload="heavy")))
+
+
+def test_rule_p_h7_run_rest_the_longer_of_the_two_wins_and_cycle_less_zones_add_nothing() -> None:
+    crew = crew_of(workload="heavy")
+    # last work tick Medium (3 ticks), ending tick Low (no cycle): 3 ticks owed
+    low_end = zones_by_tick((3, TICKS, LOW), default=MEDIUM)
+    assert "P-H7.run" not in ids(run_validator(plan_of(by_tick((0, 3, W), (3, 6, R), (6, 7, W))), low_end, crew))
+    assert "P-H7.run" in ids(run_validator(plan_of(by_tick((0, 3, W), (3, 5, R), (5, 6, W))), low_end, crew))
+    # last work tick Low (no cycle), ending tick High: the High rest (8 ticks) is owed through branch (b)
+    low_run = zones_by_tick((3, TICKS, HIGH), default=LOW)
+    assert "P-H7.run" in ids(run_validator(plan_of(by_tick((0, 3, W), (3, 10, R), (10, 11, W))), low_run, crew))
+    assert "P-H7.run" not in ids(run_validator(plan_of(by_tick((0, 3, W), (3, 11, R), (11, 12, W))), low_run, crew))
 
 
 def test_rule_p_h7_run_reports_the_run_and_the_rest_findings_with_the_same_id() -> None:
@@ -627,8 +668,14 @@ def test_rule_p_h8_heavy7_boundary_legal() -> None:
 
 
 def test_rule_p_h8_heavy7_applies_to_returning_members_too() -> None:
-    returning = member(days_away=3, away_reason="leave", days_on_site=5)  # 100 % ramp, but before day 7
+    returning = member(days_away=4, away_reason="leave", days_on_site=5)  # 4-5 row, 100 % on day 5, before day 7
     assert ids(_declaration((returning,), (), 0)) == {"P-H8.heavy7"}
+    short_leave = member(days_away=3, away_reason="leave", days_on_site=5)  # R-Y: the lt4 row is a full share
+    assert ids(_declaration((short_leave,), (), 0)) == set()
+    short_leave_day1 = member(days_away=2, away_reason="leave", days_on_site=1)
+    assert "P-H8.heavy7" not in ids(_declaration((short_leave_day1,), (), 0))
+    illness = member(days_away=1, away_reason="illness", days_on_site=5)  # illness 1-3 d is the 4-5 row
+    assert ids(_declaration((illness,), (), 0)) == {"P-H8.heavy7"}
     experienced_and_here = member(days_on_site=2)
     assert ids(_declaration((experienced_and_here,), (), 0)) == {"P-H8.ramp"}  # 60 %, but not new nor returning
 
@@ -739,10 +786,59 @@ def test_shift_and_plan_violations_partition_the_result() -> None:
     result = run_validator(plan, uniform(MEDIUM), crew_of(workload="heavy", days_per_week=6))
     assert {"P-H2.daily", "P-H2.weekly", "P-H3", "P-H7.run"} <= ids(result)
     assert {v.rule_id for v in result.shift_violations} == {"P-H2.daily", "P-H2.weekly"}
+    assert {v.origin for v in result.shift_violations} == {"shift"}
     assert result.plan_violations
+    assert {v.origin for v in result.plan_violations} == {"plan"}
     assert {v.rule_id for v in result.plan_violations}.isdisjoint(SHIFT_RULES)
     assert set(result.shift_violations) | set(result.plan_violations) == set(result.violations)
     assert len(result.shift_violations) + len(result.plan_violations) == len(result.violations)
+
+
+def _six_hours_five() -> tuple[TickState, ...]:
+    """73 ticks of attendance (6 h 05 min) split by a credited hour so that only the juvenile hours rule is over."""
+    return by_tick((at("07:00"), at("10:00"), S), (at("10:00"), at("11:00"), B), (at("11:00"), at("11:00") + 37, S))
+
+
+def test_a_missing_juvenile_declaration_is_plan_origin_although_its_id_is_a_shift_rule() -> None:
+    """R-Z: the partition follows ``origin``. A shift-origin P-H5.hours and a plan-origin one can coexist."""
+    crew = crew_of(workload="light", members=(member(juvenile=True), member()))
+    undeclared = plan_of(by_tick((at("07:00"), at("08:00"), S)), local_date=SUMMER)
+    result = run_validator(undeclared, uniform(LOW), crew)
+    missing = first(result, "P-H5.hours")
+    assert missing.origin == "plan"
+    assert "P-H5.hours" in SHIFT_RULES
+    assert missing in result.plan_violations
+    assert result.shift_violations == ()
+    # the same id, from the shift itself (73 ticks = 6 h 05 min), with the declaration present
+    declared = plan_of(
+        _six_hours_five(),
+        local_date=SUMMER,
+        restrictions=("P-H5.hours",),
+        restricted_headcount=1,
+    )
+    over = run_validator(declared, uniform(LOW), crew)
+    assert [v.origin for v in over.violations if v.rule_id == "P-H5.hours"] == ["shift"]
+    assert over.plan_violations == ()
+    # both at once
+    both = run_validator(plan_of(_six_hours_five(), local_date=SUMMER), uniform(LOW), crew)
+    assert sorted(v.origin for v in both.violations if v.rule_id == "P-H5.hours") == [
+        "plan",
+        "plan",
+        "shift",
+    ]  # missing declaration, headcount shortfall, 6 h 05 min
+
+
+@pytest.mark.parametrize("rule_id", ["P-H5.window", "P-H5.hours", "P-H5.run", "P-H2.daily", "P-H2.weekly"])
+def test_shift_rules_report_shift_origin_when_they_come_from_the_shift(rule_id: str) -> None:
+    crew = crew_of(workload="light", members=(member(juvenile=True), member()))
+    plan = plan_of(
+        by_tick((at("06:00"), at("06:00") + 145, S)),
+        local_date=WINTER,
+        restrictions=("P-H5.hours",),
+        restricted_headcount=1,
+    )
+    result = run_validator(plan, uniform(LOW), crew)
+    assert {v.origin for v in result.violations if v.rule_id == rule_id} == {"shift"}
 
 
 def test_a_clean_result_has_empty_partitions() -> None:

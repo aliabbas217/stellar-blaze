@@ -3,8 +3,8 @@
 It shares nothing with the rule planner except the plan types, ``PlannerRules`` (the ruleset-derived zone caps, cycles
 and labour values) and the zone timeline. The rolling 60-minute window, the run and rest logic, the Art. 18 runs and
 the people rules are implemented here from the definitions, so that a bug in the planner cannot hide a bug in this
-module. A plan with any violation is never shown as valid; the caller turns a violation of a ``SHIFT_RULES`` rule into a
-422 (the published shift itself is illegal) and any other violation into a 500 (a planner bug).
+module. A plan with any violation is never shown as valid; every ``Violation`` has an ``origin``: ``"shift"`` when the
+published shift itself breaks the rule (the caller answers 422) and ``"plan"`` for everything else (a planner bug, 500).
 
 Ticks are the 216 five-minute ticks from 04:00 local (``domain.plans.ticks``): the local wall time of tick ``i`` is
 ``04:00 + 5 min * i`` (the demo site has no daylight-saving change, so the validator needs no time zone). A violation's
@@ -16,8 +16,9 @@ Definitions (the controller's task-6 definitions, settled once for planner and v
 * ``P-H7.cap60``: for every window of 12 consecutive ticks, ``M`` is the most severe zone among the window's ``A`` ticks
   that are not ``RED``; work minutes in the window must not exceed ``cap_minutes(M, workload)``. No such tick: no cap.
 * ``P-H7.run``: per ``WORK`` tick, the minutes of the continuous work run so far must not exceed the work length of the
-  cycle of that tick's zone; after a run the full rest of the cycle of the zone of the run's last work tick must pass
-  (every non-work tick counts) before work resumes.
+  cycle of that tick's zone; after a run the rest owed (R-AA) is the longer of the rest of the cycle of the zone of the
+  run's last work tick and, when the tick that ended the run is an attendance tick (``ADOSH_REST``, ``STOPPED``,
+  ``ART18_BREAK``), the rest of the cycle of that tick's zone. Every non-work tick counts down the rest.
 * ``P-H3``: attendance runs are split by credited breaks (a block of ``art18_break_h`` of ``ART18_BREAK`` or ``OFF``
   ticks outside the ban window; ban ticks and ADOSH rest only when the ruleset's switches say so); a run of more than
   ``art18_max_run_h`` of ``A`` ticks is a violation.
@@ -29,7 +30,7 @@ import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, time
-from typing import Final
+from typing import Final, Literal
 
 from stellar_blaze.domain.plans.model import CrewMember, CrewPlan, CrewSpec, ShiftBlock, TickState, ZoneTimeline
 from stellar_blaze.domain.plans.rules import PlannerRules
@@ -39,8 +40,12 @@ from stellar_blaze.domain.rules.ruleset import ClauseRef
 
 type TickRanges = tuple[tuple[int, int], ...]
 
+type Origin = Literal["shift", "plan"]
+
 SHIFT_RULES: Final[frozenset[str]] = frozenset({"P-H2.daily", "P-H2.weekly", "P-H5.hours", "P-H5.run", "P-H5.window"})
-"""The rules whose violation comes from the published shift itself, not from how the planner treated it."""
+"""The rule ids whose violation has origin ``"shift"`` when it comes from the published shift (hours and juvenile
+checks). It is documentation only: the partition uses ``Violation.origin``, because a rule id can have both origins
+(a missing juvenile declaration is ``P-H5.hours`` with origin ``"plan"``)."""
 
 _DAY_TICKS: Final = 216  # the 04:00-22:00 grid of domain.plans.ticks (a test pins the equality)
 _DAY_START_MINUTE: Final = 4 * 60
@@ -62,6 +67,8 @@ class Violation:
     source_id: str
     tick_ranges: TickRanges
     detail: str
+    origin: Origin
+    """``"shift"``: the published shift itself breaks the rule (422); ``"plan"``: the plan is wrong (500)."""
 
 
 @dataclass(frozen=True)
@@ -77,13 +84,13 @@ class ValidationResult:
 
     @property
     def shift_violations(self) -> tuple[Violation, ...]:
-        """Violations of rules that the published shift itself breaks (``SHIFT_RULES``)."""
-        return tuple(v for v in self.violations if v.rule_id in SHIFT_RULES)
+        """Violations whose origin is the published shift."""
+        return tuple(v for v in self.violations if v.origin == "shift")
 
     @property
     def plan_violations(self) -> tuple[Violation, ...]:
         """Every other violation: the plan, not the shift, is wrong."""
-        return tuple(v for v in self.violations if v.rule_id not in SHIFT_RULES)
+        return tuple(v for v in self.violations if v.origin == "plan")
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,7 @@ class _Finding:
     rule_id: str
     ranges: TickRanges
     detail: str
+    origin: Origin = "plan"
 
 
 @dataclass(frozen=True)
@@ -196,9 +204,15 @@ def _run(day: _Day) -> list[_Finding]:
                 too_soon.append(i)
             continue
         if run_ticks:
-            cycle = day.rules.cycle(day.zones[i - 1], day.crew.workload)
-            if cycle is not None:
-                rest_until = max(rest_until, i + math.ceil(cycle[1] / TICK_MINUTES))
+            # R-AA: the longer of (a) the rest of the cycle of the zone of the run's last work tick and (b) the rest of
+            # the cycle of the zone of the tick that ended the run, when that is an attendance tick (never OFF/BAN).
+            ending_zones = [day.zones[i - 1]]
+            if state in _ATTENDANCE or state is TickState.ART18_BREAK:
+                ending_zones.append(day.zones[i])
+            for zone in ending_zones:
+                cycle = day.rules.cycle(zone, day.crew.workload)
+                if cycle is not None:
+                    rest_until = max(rest_until, i + math.ceil(cycle[1] / TICK_MINUTES))
         run_ticks = 0
     out: list[_Finding] = []
     if too_long:
@@ -244,8 +258,14 @@ def _lone(day: _Day) -> list[_Finding]:
     ]
 
 
-def _is_returning(member: CrewMember) -> bool:
+def _has_away_period(member: CrewMember) -> bool:
+    """An away period is on record: it feeds the re-acclimatisation table (the ``lt4`` row is a full share)."""
     return member.away_reason != "none" and member.days_away > 0
+
+
+def _is_returning(member: CrewMember) -> bool:
+    """Back from an away period whose re-acclimatisation band is not ``lt4`` (R-Y: that row is a 100 percent share)."""
+    return _has_away_period(member) and _reacclimatisation_band(member) != "lt4"
 
 
 def _reacclimatisation_band(member: CrewMember) -> str:
@@ -270,10 +290,10 @@ def _ramp_share(member: CrewMember, rules: PlannerRules) -> int:
     table = rules.acclimatisation
     day = max(member.days_on_site, 1)
     shares: list[int] = []
-    if _is_returning(member):
+    if _has_away_period(member):
         # A day beyond the band's last row is a full share.
         shares.append(table.reacclimatisation_pct.get(f"{_reacclimatisation_band(member)}.{day}", 100))
-    if not _is_returning(member) or not member.experienced:
+    if not _has_away_period(member) or not member.experienced:
         ramp = table.experienced_ramp_pct if member.experienced else table.new_ramp_pct
         shares.append(ramp[str(min(day, 5))])
     return min(shares)
@@ -400,6 +420,7 @@ def _hours(day: _Day) -> list[_Finding]:
                 f"{minutes / 60:.2f} h of attendance a day on a {days}-day week exceeds the daily hours limits "
                 f"({labour.normal_hours_per_day:g} h normal, {overtime_cap / 60:g} h with overtime, "
                 f"{labour.total_hours_per_3_weeks:g} h per 3 weeks)",
+                "shift",
             )
         )
     if days * minutes > labour.normal_hours_per_week * 60:
@@ -409,6 +430,7 @@ def _hours(day: _Day) -> list[_Finding]:
                 _ranges(ticks),
                 f"{days} days x {minutes / 60:.2f} h = {days * minutes / 60:.2f} h a week exceeds "
                 f"{labour.normal_hours_per_week:g} h",
+                "shift",
             )
         )
     return out
@@ -430,6 +452,7 @@ def _juvenile(day: _Day) -> list[_Finding]:
                 _ranges(outside),
                 f"juvenile attendance outside {labour.juvenile_window[0]:%H:%M}-{labour.juvenile_window[1]:%H:%M} "
                 f"from {_label(outside[0])}",
+                "shift",
             )
         )
     ticks = _attendance_ticks(day)
@@ -439,6 +462,7 @@ def _juvenile(day: _Day) -> list[_Finding]:
                 "P-H5.hours",
                 _ranges(ticks),
                 f"{len(ticks) * TICK_MINUTES / 60:.2f} h of juvenile attendance exceeds {labour.juvenile_max_h:g} h",
+                "shift",
             )
         )
     spans = _long_runs(day, labour.juvenile_max_run_h)
@@ -448,6 +472,7 @@ def _juvenile(day: _Day) -> list[_Finding]:
                 "P-H5.run",
                 spans,
                 f"juvenile attendance run from {_label(spans[0][0])} is longer than {labour.juvenile_max_run_h:g} h",
+                "shift",
             )
         )
     return out
@@ -571,7 +596,7 @@ def validate_plan(
         raise MissingClauseError(f"clauses has no entry for the rule id(s) {missing}")
 
     violations = tuple(
-        Violation(f.rule_id, clauses[f.rule_id].clause, clauses[f.rule_id].source, f.ranges, f.detail)
+        Violation(f.rule_id, clauses[f.rule_id].clause, clauses[f.rule_id].source, f.ranges, f.detail, f.origin)
         for _, check in groups
         for f in check()
     )

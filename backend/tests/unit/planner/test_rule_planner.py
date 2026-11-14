@@ -1,5 +1,6 @@
 import dataclasses
 import math
+import random
 from datetime import date, time
 
 import pytest
@@ -393,3 +394,71 @@ def test_evening_shifted_shift_has_no_break_and_full_low_work() -> None:
     plan = _plan([Zone.LOW] * TICKS, shift=EVENING_SHIFTED)
     assert plan.work_minutes == 480
     assert plan.art18_minutes == 0
+
+
+# ---- ruling R-AA: the rest after a run is the longer of the last work tick's and the ending attendance tick's cycle
+
+
+@pytest.mark.parametrize("workload", ["heavy", "moderate"])
+def test_rest_follows_the_zone_of_the_last_work_tick_when_the_zone_has_eased(workload: str) -> None:
+    # (a) All Medium with High at ticks 54-56 (08:30-08:45): the run 08:35-08:45 worked in High; the cap-blocked tick
+    # 08:45 is Medium (3 rest ticks), but the run owes the full High rest (40 minutes = 8 ticks): rest to 09:25.
+    zones = zones_from(Zone.MEDIUM)
+    for i in (54, 55, 56):
+        zones[i] = Zone.HIGH
+    plan = plan_crew(crew(L1, workload=workload, headcount=2), timeline(JULY, zones), rules(), local_date=JULY, tz=TZ)
+    assert all_violations(plan, zones, L1, JULY, workload) == []
+    assert block(plan, "08:35", "08:45") == {W}
+    assert block(plan, "08:45", "09:25") == {R}
+    assert plan.states[idx("09:25")] is W
+
+
+def test_rest_follows_the_zone_of_the_tick_that_ended_the_run() -> None:
+    # (b) The Low run 07:55-08:00 (self-paced, no rest of its own) is cut at 08:00 where the zone worsens to High; the
+    # new cycle's full rest (8 ticks) follows, so no work at 08:05 (an "only the last work tick's zone" rule worked
+    # there). The Red stop from 08:25 comes after the rest has started.
+    zones = zones_from(Zone.LOW, ("06:15", Zone.HIGH), ("07:00", Zone.LOW), ("08:00", Zone.HIGH), ("08:25", Zone.RED))
+    plan = _plan(zones)
+    assert block(plan, "07:55", "08:00") == {W}
+    assert block(plan, "08:00", "08:25") == {R}
+
+
+def test_a_red_tick_ending_a_run_contributes_no_rest_of_its_own() -> None:
+    # Medium all day, one Red tick at 06:30: the run 06:00-06:30 owes the Medium rest (3 ticks, the Red tick is the
+    # first); Red has no cycle, so work resumes at 06:45 and not later.
+    zones = zones_from(Zone.MEDIUM)
+    zones[idx("06:30")] = Zone.RED
+    plan = _plan(zones)
+    assert block(plan, "06:30", "06:35") == {TickState.STOPPED}
+    assert block(plan, "06:35", "06:45") == {R}
+    assert block(plan, "06:45", "07:30") == {W}
+
+
+def test_an_off_tick_ending_a_run_contributes_no_rest_of_its_own() -> None:
+    # A 5-minute OFF gap inside the shift: its zone is High, but OFF contributes nothing, so the Medium run before it
+    # owes the Medium rest only (3 ticks, the OFF tick is the first) and work resumes at 06:45.
+    shift = (ShiftBlock(time(6, 0), time(6, 30)), ShiftBlock(time(6, 35), time(9, 0)))
+    zones = zones_from(Zone.MEDIUM)
+    zones[idx("06:30")] = Zone.HIGH
+    plan = _plan(zones, shift=shift)
+    assert block(plan, "06:30", "06:35") == {TickState.OFF}
+    assert block(plan, "06:35", "06:45") == {R}
+    assert plan.states[idx("06:45")] is W
+
+
+def test_the_rest_rule_holds_on_a_seeded_sweep_of_random_days() -> None:
+    """1500 reproducible random days (light and heavy, L1 and B0): the oracle's R-AA rest, caps, runs and Art. 18."""
+    rng = random.Random(7)  # noqa: S311  (a reproducible test sweep, not security)
+    for _ in range(1500):
+        zones: list[Zone] = []
+        for _segment in range(rng.randint(2, 14)):
+            zones += [rng.choice(list(Zone))] * rng.randint(1, 12)
+        zones = (zones + [zones[-1]] * TICKS)[:TICKS]
+        workload = rng.choice(["light", "heavy"])
+        shift = rng.choice([L1, B0])
+        plan = plan_crew(crew(shift, workload=workload), timeline(JULY, zones), rules(), local_date=JULY, tz=TZ)
+        assert all_violations(plan, zones, shift, JULY, workload) == [], (
+            workload,
+            shift == L1,
+            [z.value for z in zones],
+        )

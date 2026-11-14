@@ -205,9 +205,9 @@ def _wall(tick: int) -> time:
 
 @st.composite
 def _members(draw: st.DrawFn) -> CrewMember:
-    """A random member. Leave of 1-3 days is excluded: it is the open finding of the xfail test below."""
+    """A random member (leave of 1-3 days included: R-Y, the lt4 row is a full share, not a returning member)."""
     reason = draw(st.sampled_from(["none", "leave", "illness"]))
-    away = 0 if reason == "none" else draw(st.integers(4 if reason == "leave" else 1, 30))
+    away = 0 if reason == "none" else draw(st.integers(1, 30))
     return CrewMember(
         days_on_site=draw(st.integers(1, 12)),
         days_away=away,
@@ -233,16 +233,17 @@ def test_rule_plans_with_members_always_pass_property(
     assert result.passed, f"{shift_name} {day_name} {workload} members={crew_members}: {summary}"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "OPEN FINDING (task 6 report): the validator reads 'returning' literally (any recorded leave or illness), so "
-        "an experienced member back after 1-3 days of leave on a heavy task needs P-H8.heavy7 declared; the planner "
-        "does not declare it (it treats the 'lt4' row, 100% share, as not returning). Controller ruling needed."
-    ),
-)
-def test_open_finding_experienced_member_back_after_two_days_of_leave_on_heavy_work() -> None:
+def test_experienced_member_back_after_two_days_of_leave_on_heavy_work_needs_no_heavy7() -> None:
+    """R-Y: the lt4 row is a 100 percent share, so a member back after 1-3 days of leave is not restricted."""
     returning = member(days_on_site=1, days_away=2, away_reason="leave", experienced=True)
     crew = _crew("heavy", 2, L1, members=(returning, returning))
     result, summary = _validate(crew, TIMELINES["all-medium"], SUMMER)
+    assert result.passed, summary
+
+
+def test_rest_after_a_high_run_is_not_shortened_when_the_zone_eases() -> None:
+    """R-AA: the planner and the validator both owe the longer of the two cycle rests."""
+    zones = [Zone.MEDIUM] * TICKS
+    zones[54:57] = [Zone.HIGH] * 3
+    result, summary = _validate(_crew("heavy", 2, L1, days=5), zones, SUMMER)
     assert result.passed, summary

@@ -178,17 +178,20 @@ def run_violations(plan: CrewPlan, zones: Sequence[Zone], workload: str) -> list
 
 
 def rest_violations(plan: CrewPlan, zones: Sequence[Zone], workload: str) -> list[str]:
-    """After a work run ends at tick ``e`` the next non-work ticks must cover the milder of the cycle rests of the
-    last work tick's zone and ``zones[e]`` (the planner uses one of the two; it never uses less)."""
+    """After a work run ends at tick ``e`` (the first non-work tick) the next ticks must hold no WORK for the LONGER of
+    (a) the cycle rest of the zone of the last work tick and (b) the cycle rest of the zone of tick ``e``, where (b)
+    counts only if ``e`` is an attendance tick (ADOSH_REST, STOPPED, ART18_BREAK): OFF and BAN contribute nothing, and
+    Red or a zone without a cycle has no rest (ruling R-AA). Tick ``e`` itself counts as the first rest tick."""
     bad: list[str] = []
     states = plan.states
     for e in range(1, TICKS):
         if states[e] is TickState.WORK or states[e - 1] is not TickState.WORK:
             continue
-        need = min(rest_minutes(zones[e - 1], workload), rest_minutes(zones[e], workload)) // 5
-        end = min(e + need, TICKS)
+        ended_by_attendance = states[e] in (TickState.ADOSH_REST, TickState.STOPPED, TickState.ART18_BREAK)
+        owed = max(rest_minutes(zones[e - 1], workload), rest_minutes(zones[e], workload) if ended_by_attendance else 0)
+        end = min(e + owed // 5, TICKS)
         if any(states[j] is TickState.WORK for j in range(e, end)):
-            bad.append(f"run ending at {hhmm(e)}: work again before {need} rest ticks passed")
+            bad.append(f"run ending at {hhmm(e)}: work again before {owed // 5} rest ticks passed")
     return bad
 
 

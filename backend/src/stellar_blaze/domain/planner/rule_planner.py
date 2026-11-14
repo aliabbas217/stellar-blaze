@@ -35,11 +35,12 @@ Medium/High and fewer than ``lone_work_min_headcount`` members are acclimatized 
 ``STOP.no_acclimatised``). Otherwise ``WORK`` only when no cycle rest is pending, the zone's cycle (if any) allows one
 more tick (run so far < cycle work length of the tick's zone: a worsening zone cuts a longer run immediately), and every
 window containing the tick has work already placed + 1 tick <= its cap (future ticks only add work, so placed work is
-the whole check). Else ``ADOSH_REST``. When a work run ends the pending rest is the full rest of the cycle of the zone
-of the tick where it ended (``ADOSH_REST`` ends) or of its last work tick (``OFF``/``BAN``/``STOPPED``/``ART18_BREAK``
-ends); every non-work tick counts it down; it is never shortened when the zone eases. Self-paced cells (no cycle)
-have no
-pending rest: a cap-blocked tick is simply ``ADOSH_REST``.
+the whole check). Else ``ADOSH_REST``. When a work run ends (ruling R-AA) the pending rest is the LONGER of the full
+rest of the cycle of the zone of its last ``WORK`` tick and of the zone of the first non-work tick that ended it; the
+second counts only when that tick is an attendance tick (``ADOSH_REST``, ``STOPPED``, ``ART18_BREAK``): ``OFF``/``BAN``
+ticks, Red and zones without a cycle contribute nothing. Every non-work tick counts the rest down; it is never shortened
+when the zone eases and never extended later. Self-paced cells (no cycle) have no pending rest: a cap-blocked tick is
+simply ``ADOSH_REST``.
 
 ``CrewPlan.rule_ids`` is the sorted tuple of the distinct rule ids that fired in the day (``P-H1`` ban, ``P-H3`` Art.
 18, ``P-H7.run`` cycle rest, ``P-H7.cap60`` window-cap rest, ``STOP.red``, ``P-H7.lone`` / ``STOP.no_acclimatised``,
@@ -251,10 +252,17 @@ class _Pacer:
         self.run += 1
         self.last_work_zone = zone
 
-    def non_work(self, zone_at_end: Zone) -> None:
-        """A non-work tick: a run ends (full rest of ``zone_at_end``'s cycle starts) and the tick counts as rest."""
+    def non_work(self, ending_zone: Zone | None) -> None:
+        """A non-work tick; it counts as rest. If it ends a run, the full rest starts (ruling R-AA).
+
+        The rest is the longer of the cycle rests of the run's last work tick's zone and of ``ending_zone``, the zone of
+        this tick when it is an attendance tick (``ADOSH_REST``, ``STOPPED``, ``ART18_BREAK``); ``None`` for ``OFF`` and
+        ``BAN``. A Red zone or a zone without a cycle has no rest, so it contributes nothing.
+        """
         if self.run > 0:
-            self.rest_left = self._rest_ticks(zone_at_end)
+            self.rest_left = self._rest_ticks(self.last_work_zone)
+            if ending_zone is not None:
+                self.rest_left = max(self.rest_left, self._rest_ticks(ending_zone))
             self.run = 0
         if self.rest_left > 0:
             self.rest_left -= 1
@@ -318,23 +326,23 @@ def plan_crew(crew: CrewSpec, zones: ZoneTimeline, rules: PlannerRules, *, local
         zone = zones.zones[i]
         if not on_shift[i]:
             states.append(TickState.OFF)
-            pacer.non_work(pacer.last_work_zone)
+            pacer.non_work(None)
             continue
         if ban_window[i]:
             states.append(TickState.BAN)
             fired.add("P-H1")
-            pacer.non_work(pacer.last_work_zone)
+            pacer.non_work(None)
             continue
         if i in break_at:
             states.append(TickState.ART18_BREAK)
             fired.add("P-H3")
-            pacer.non_work(pacer.last_work_zone)
+            pacer.non_work(zone)
             continue
         stop = _stop_rule(zone, people, rules)
         if stop is not None:
             states.append(TickState.STOPPED)
             fired.add(stop)
-            pacer.non_work(pacer.last_work_zone)
+            pacer.non_work(zone)
             continue
         windows = range(max(0, i - _WINDOW_TICKS + 1), min(len(caps) - 1, i) + 1)
         cap_ok = _fits(caps, placed, windows)
