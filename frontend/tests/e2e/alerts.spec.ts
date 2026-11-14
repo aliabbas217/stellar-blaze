@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page, type Request } from "@playwright/test";
 import ar from "../../messages/ar.json";
 import en from "../../messages/en.json";
 import ur from "../../messages/ur.json";
@@ -229,9 +229,10 @@ test.describe("service worker push handling", () => {
       })),
     );
 
-  test("shows a notification in the worker's own language, and a neutral one for a payload it cannot read", async ({ page, context }) => {
+  /** Opens `path` in `locale`, waits until the worker holds the page's language, and returns a way to deliver pushes to the real worker (DevTools protocol). */
+  async function connectDelivery(page: Page, context: BrowserContext, locale: "ur" | "en", path: string) {
     await context.grantPermissions(["notifications"]);
-    await page.goto("/ur/worker/alerts");
+    await page.goto(path);
 
     // The page leaves its language where the worker can read it (Cache Storage), and the worker must be active.
     await expect
@@ -242,9 +243,8 @@ test.describe("service worker push handling", () => {
           return { prefs: (await response?.json()) as unknown, state: registration?.active?.state };
         }),
       )
-      .toEqual({ prefs: { locale: "ur" }, state: "activated" });
+      .toEqual({ prefs: { locale }, state: "activated" });
 
-    // Deliver pushes to the real worker through the DevTools protocol.
     const cdp = await context.newCDPSession(page);
     const registrations = new Map<string, string>();
     cdp.on("ServiceWorker.workerRegistrationUpdated", ({ registrations: list }) => {
@@ -255,7 +255,11 @@ test.describe("service worker push handling", () => {
     await expect.poll(() => registrations.has(`${origin}/`)).toBe(true);
     const registrationId = registrations.get(`${origin}/`) ?? "";
     const deliverRaw = (data: string) => cdp.send("ServiceWorker.deliverPushMessage", { origin, registrationId, data });
-    const deliver = (payload: unknown) => deliverRaw(JSON.stringify(payload));
+    return { deliverRaw, deliver: (payload: unknown) => deliverRaw(JSON.stringify(payload)) };
+  }
+
+  test("shows a notification in the worker's own language, and a neutral one for a payload it cannot read", async ({ page, context }) => {
+    const { deliver, deliverRaw } = await connectDelivery(page, context, "ur", "/ur/worker/alerts");
 
     const tags = async () => (await shown(page)).map((notification) => notification.tag).sort();
     // Ids unique to this run: on a Windows host the notification centre is shared by every browser, so two runs of this
@@ -284,13 +288,13 @@ test.describe("service worker push handling", () => {
       title: ur.push.title.site.replace("{level}", ur.push.level.red),
       body: ur.push.body,
       lang: "ur",
-      data: { url: "/ur/worker?from=push&level=red" },
+      data: { url: `/ur/worker/alert?audience=site&target=${SITE_DEMO}-${run}&level=red&valid_from=2026-11-11T09%3A00%3A00Z` },
       vibrate: [400, 100, 400, 100, 400],
     });
     const crew = notifications.find((notification) => notification.tag === crewTag);
     expect(crew).toMatchObject({
       title: ur.push.title.crew.replace("{level}", ur.push.level.amber),
-      data: { url: "/ur/worker?from=push&level=amber" },
+      data: { url: `/ur/worker/alert?audience=crew&target=crew-${run}&level=amber&valid_from=2026-11-11T09%3A00%3A00Z` },
       vibrate: [200],
     });
 
@@ -313,5 +317,27 @@ test.describe("service worker push handling", () => {
     await expect.poll(tags).toEqual([crewTag, siteTag].sort());
     await deliverRaw("this is not json");
     await expect.poll(tags).toEqual([crewTag, "fallback", siteTag].sort());
+  });
+
+  test("tapping a notification opens the alert in the worker's language, from the notification's own content", async ({ page, context }) => {
+    const { deliver } = await connectDelivery(page, context, "ur", "/ur/worker/alerts");
+    const run = randomUUID().slice(0, 8);
+    // The warning is for the demo site: orange from 10:00 on the replay day, a stretch the mock forecast has.
+    const payload = { v: 1, audience: "site", target_id: SITE_DEMO, level: "orange", template_id: "level-change", valid_from: "2026-09-03T06:00:00Z" };
+    await deliver(payload);
+    await expect.poll(async () => (await shown(page)).map((notification) => notification.tag)).toContain(`site:${SITE_DEMO}`);
+
+    // What a tap does: opens the notification's `data.url` (the click handler's own logic is covered in sw-handlers.test.ts).
+    const target = (await shown(page)).find((notification) => notification.tag === `site:${SITE_DEMO}`);
+    const url = (target?.data as { url: string }).url;
+    expect(url, `run ${run}`).toBe(`/ur/worker/alert?audience=site&target=${SITE_DEMO}&level=orange&valid_from=2026-09-03T06%3A00%3A00Z`);
+    await page.goto(url);
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "ur");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    // The level word is the worker's own language; the card is the alert's, not Today.
+    await expect(page.getByRole("heading", { name: ur.levels.name.orange, level: 2 })).toBeVisible();
+    await expect(page.getByRole("link", { name: ur.worker.alert.gotIt })).toHaveAttribute("href", "/ur/worker");
+    await expect(page).toHaveURL(/\/ur\/worker\/alert\?audience=site/);
   });
 });

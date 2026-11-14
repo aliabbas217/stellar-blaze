@@ -46,9 +46,15 @@ function supportedLocale(locale: string): Locale {
   return routing.locales.find((candidate) => candidate === locale) ?? routing.defaultLocale;
 }
 
-/** The page a tap on the notification opens: the worker route in the worker's own language. */
+/**
+ * The page a tap on the notification opens: the alert card in the worker's own language (F2 Task 17, ADR 0058). The
+ * payload's identity travels in the query, so the card knows which warning it is (audience, target, level, when it applies)
+ * with the app closed and no server round trip. The values are encoded, so an id or a UTC offset with a reserved character
+ * cannot add a parameter of its own.
+ */
 export function notificationTargetUrl(locale: string, payload: PushPayload): string {
-  return `/${supportedLocale(locale)}/worker?from=push&level=${payload.level}`;
+  const { audience, target_id, level, valid_from } = payload;
+  return `/${supportedLocale(locale)}/worker/alert?audience=${audience}&target=${encodeURIComponent(target_id)}&level=${level}&valid_from=${encodeURIComponent(valid_from)}`;
 }
 
 /**

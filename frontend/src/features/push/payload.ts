@@ -28,11 +28,11 @@ const KEYS: readonly string[] = ["v", "audience", "target_id", "level", "templat
 // Date and time with a zone designator, fractions of a second optional: what the API's `date-time` produces.
 const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
-function isLevel(value: unknown): value is PushLevel {
+export function isLevel(value: unknown): value is PushLevel {
   return PUSH_LEVELS.some((level) => level === value);
 }
 
-function isAudience(value: unknown): value is PushAudience {
+export function isAudience(value: unknown): value is PushAudience {
   return PUSH_AUDIENCES.some((audience) => audience === value);
 }
 
@@ -40,7 +40,7 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value !== "";
 }
 
-function isIsoDateTime(value: unknown): value is string {
+export function isIsoDateTime(value: unknown): value is string {
   return typeof value === "string" && ISO_DATE_TIME.test(value) && !Number.isNaN(Date.parse(value));
 }
 

@@ -32,12 +32,22 @@ describe("notificationTargetUrl", () => {
     expect(notificationTargetUrl("ur", base).startsWith("/ur/worker")).toBe(true);
   });
 
-  it.each(routing.locales)("is /%s/worker?from=push&level=<level>", (locale) => {
-    expect(notificationTargetUrl(locale, { ...base, level: "orange" })).toBe(`/${locale}/worker?from=push&level=orange`);
+  it.each(routing.locales)("test_notification_target_url_carries_alert_identity: /%s/worker/alert?audience=&target=&level=&valid_from=", (locale) => {
+    expect(notificationTargetUrl(locale, { ...base, level: "orange" })).toBe(
+      `/${locale}/worker/alert?audience=site&target=site-demo-mussafah&level=orange&valid_from=2026-11-11T09%3A00%3A00Z`,
+    );
+  });
+
+  it("names the crew for a crew alert, and encodes the time so '+' and ':' survive a query string", () => {
+    expect(notificationTargetUrl("en", { ...base, audience: "crew", target_id: "crew-b", valid_from: "2026-11-11T13:00:00+04:00" })).toBe(
+      "/en/worker/alert?audience=crew&target=crew-b&level=red&valid_from=2026-11-11T13%3A00%3A00%2B04%3A00",
+    );
   });
 
   it("falls back to the default locale for a locale it does not know", () => {
-    expect(notificationTargetUrl("xx", base)).toBe("/en/worker?from=push&level=red");
+    expect(notificationTargetUrl("xx", base)).toBe(
+      "/en/worker/alert?audience=site&target=site-demo-mussafah&level=red&valid_from=2026-11-11T09%3A00%3A00Z",
+    );
   });
 });
 

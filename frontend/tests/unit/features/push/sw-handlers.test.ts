@@ -76,7 +76,7 @@ describe("showPushNotification", () => {
       vibrate: [400, 100, 400, 100, 400],
       renotify: true,
       icon: "/icons/icon-192.png",
-      data: { url: "/ur/worker?from=push&level=red" },
+      data: { url: "/ur/worker/alert?audience=site&target=site-demo-mussafah&level=red&valid_from=2026-11-11T09%3A00%3A00Z" },
     });
     expect(content.title).toBe(ur.push.title.site.replace("{level}", ur.push.level.red));
   });
@@ -84,7 +84,9 @@ describe("showPushNotification", () => {
   it("falls back to English when the stored locale is one the worker has no strings for", async () => {
     const { deps, show } = pushDeps("xx");
     await showPushNotification(red, deps);
-    expect(show.mock.calls[0]?.[1].data).toEqual({ url: "/en/worker?from=push&level=red" });
+    expect(show.mock.calls[0]?.[1].data).toEqual({
+      url: "/en/worker/alert?audience=site&target=site-demo-mussafah&level=red&valid_from=2026-11-11T09%3A00%3A00Z",
+    });
   });
 
   it("falls back to English, and still shows, when the stored locale cannot be read", async () => {

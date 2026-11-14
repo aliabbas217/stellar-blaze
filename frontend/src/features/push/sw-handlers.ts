@@ -100,7 +100,7 @@ export interface ClickDeps {
 
 /**
  * What a tap on a notification does: bring the window that is already on the target page to the front and give it the
- * target's query (`?from=push&level=`, which the page reads), else open the target in a new window. A window on another
+ * target's query (an alert's `?audience=&target=&level=&valid_from=`, which the page reads), else open the target in a new window. A window on another
  * page of the app is left alone rather than navigated: it may hold a half-filled form, and the target is one tap away
  * from wherever it is. A window that cannot be focused (it went away) is replaced by a new one.
  */
