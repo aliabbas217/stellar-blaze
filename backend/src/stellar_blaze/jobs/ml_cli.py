@@ -12,6 +12,14 @@ The 2026 summer is locked (``HELD_OUT_SUMMERS``) until the architect's go-ahead.
 failed, 2 bad usage or configuration, or a held-out summer. Like every ``sb-jobs`` command it reads
 the ``SB_*`` environment, which includes ``SB_DATABASE_URL``, though this command never connects to it.
 
+Training, a job with a ``job_run`` row and an advisory lock per config name::
+
+    sb-jobs train --config PATH [--release] [--dev-skill PATH]
+
+``train`` fits the corrector on the 2024-2025 development rows only (``load_dev_pairs``) and writes the model directory
+to ``$SB_DATA_DIR/models-eval/``, or, with ``--release``, to ``SB_MODELS_DIR``. A release refuses a dirty working tree
+and a corrector whose corrected median equals the raw forecast on every sampled row of t, td or wind.
+
 The API image has no training dependencies and ``sb-jobs --help`` must work there, so this module imports only typer,
 the standard library and ``stellar_blaze.config`` at module level. Every command imports what it needs
 (``stellar_blaze.ml`` included) inside its body, and a test pins that ``sb-jobs --help`` runs with the training
@@ -22,12 +30,15 @@ import asyncio
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 import typer
 from pydantic import JsonValue
 
 from stellar_blaze.config import Settings
+
+if TYPE_CHECKING:
+    from stellar_blaze.ml.git import GitReader
 
 ml_app = typer.Typer(
     no_args_is_help=True,
@@ -235,6 +246,188 @@ def evaluate_dev_command(
         "grid": grid,
     }
     code = asyncio.run(run_job(settings, "evaluate-dev", params, work, lock_key=f"evaluate-dev:{cfg.name}"))
+    if outcome:
+        typer.echo(json.dumps(outcome[0], sort_keys=True))
+    raise typer.Exit(code)
+
+
+def _git_reader(root: Path) -> "GitReader":
+    """The git queries of a release (a module attribute, so a test can replace it with a fake)."""
+    from stellar_blaze.ml.git import SubprocessGit
+
+    return SubprocessGit(root)
+
+
+def _train(
+    settings: Settings,
+    config: Path,
+    *,
+    release: bool,
+    dev_metrics: Mapping[str, Mapping[str, float]] | None,
+    selection: Mapping[str, object] | None,
+) -> dict[str, JsonValue]:
+    """The body of ``sb-jobs train``: load the dev pairs, train, (release: smoke-check), write the model (blocking).
+
+    Everything that can fail cheaply (the manifest, the commit, the lock file, the pairs hash) fails before the fit.
+    """
+    import hashlib
+    from datetime import UTC, datetime
+
+    from stellar_blaze.domain.weather.dataset import GoldManifest
+    from stellar_blaze.jobs.replay_build import git_head, repo_root
+    from stellar_blaze.ml.artefacts import write_model
+    from stellar_blaze.ml.data import load_dev_pairs
+    from stellar_blaze.ml.release_check import release_smoke_check
+    from stellar_blaze.ml.train import train_corrector
+    from stellar_blaze.ml.training_config import load_training_config
+
+    cfg, cfg_sha256 = load_training_config(config)
+    root = repo_root()
+    backend = root / "backend"
+    uv_lock = backend / "uv.lock"
+    if not uv_lock.is_file():
+        raise FileNotFoundError(f"{uv_lock} not found: a model records the SHA-256 of the dependency lock")
+    gold = settings.data_dir / "gold"
+    manifest_bytes = (gold / "manifest.json").read_bytes()
+    manifest = GoldManifest.model_validate_json(manifest_bytes)
+    gold_manifest_sha256 = hashlib.sha256(manifest_bytes.replace(b"\r\n", b"\n")).hexdigest()
+    git_sha = git_head(root)
+    try:
+        cfg_path = config.resolve().relative_to(backend.resolve()).as_posix()
+    except ValueError:
+        cfg_path = config.as_posix()
+    pairs = load_dev_pairs(gold / "pairs.parquet", expected_sha256=manifest.output.sha256)  # 2026 never loads
+    trained = train_corrector(pairs, cfg, cfg_sha256=cfg_sha256)
+    smoke: dict[str, JsonValue] = {}
+    if release:
+        smoke = dict(release_smoke_check(trained, pairs))
+    metrics: Mapping[str, Mapping[str, float]] = (
+        {"training": {"fit_rows": float(trained.train_rows), "calibration_rows": float(trained.cal_rows)}}
+        if dev_metrics is None
+        else dev_metrics
+    )
+    models_dir = settings.models_dir if release else settings.data_dir / "models-eval"
+    directory = write_model(
+        trained,
+        models_dir=models_dir,
+        created_at=datetime.now(UTC),
+        git_sha=git_sha,
+        uv_lock=uv_lock,
+        gold_manifest_sha256=gold_manifest_sha256,
+        cfg_path=cfg_path,
+        dev_metrics=metrics,
+        selection=selection,
+    )
+    return {
+        "model_id": directory.name,
+        "directory": str(directory),
+        "release": release,
+        "git_sha": git_sha,
+        "config_sha256": cfg_sha256,
+        "fit_rows": trained.train_rows,
+        "calibration_rows": trained.cal_rows,
+        "metrics": {regime: dict(values) for regime, values in metrics.items()},
+        "smoke_mean_abs_shift": smoke,
+    }
+
+
+def _dev_skill_inputs(path: Path) -> tuple[dict[str, dict[str, float]], dict[str, object] | None]:
+    """The headline metrics of ``dev_skill.json`` and the content of the ``selection.json`` beside it (if any).
+
+    Raises:
+        typer.BadParameter: The file is unreadable, not JSON, or has no skill table in the expected shape.
+    """
+    from stellar_blaze.ml.release_check import loco_headline_metrics
+
+    try:
+        skill = json.loads(path.read_bytes())
+        beside = path.parent / "selection.json"
+        selection = json.loads(beside.read_bytes()) if beside.is_file() else None
+        if not isinstance(skill, dict) or (selection is not None and not isinstance(selection, dict)):
+            raise ValueError("dev_skill.json and the selection.json beside it must be JSON objects")
+        metrics = loco_headline_metrics(skill)
+    except (OSError, ValueError) as exc:  # json.JSONDecodeError is a ValueError
+        raise typer.BadParameter(f"{path}: {exc}", param_hint="--dev-skill") from None
+    return metrics, selection
+
+
+@ml_app.command("train")
+def train_command(
+    config: Annotated[Path, typer.Option("--config", help="Training config TOML (backend/training/configs/).")],
+    release: Annotated[
+        bool,
+        typer.Option(
+            "--release",
+            help="Write to SB_MODELS_DIR (the image's models) instead of $SB_DATA_DIR/models-eval/. Refuses a dirty "
+            "working tree and a corrector that does not change the raw forecast.",
+        ),
+    ] = False,
+    dev_skill: Annotated[
+        Path | None,
+        typer.Option(
+            "--dev-skill",
+            help="dev_skill.json of `evaluate-dev`: its LOCO CRPS (leads 1-3, working daytime) goes in the manifest; "
+            "the selection.json beside it goes in the model card.",
+        ),
+    ] = None,
+) -> None:
+    """Train the corrector on 2024-2025 and write a model directory (never reads 2026).
+
+    Runs as the job ``train:<config name>`` (a ``job_run`` row, one advisory lock per config name). Without
+    ``--release`` the model goes to ``$SB_DATA_DIR/models-eval/``; with it, to ``SB_MODELS_DIR``, and only from a clean
+    working tree (exit 1, nothing written, otherwise) and after the release smoke check. A model over 15 MB is
+    refused with the breakdown and the remedies (exit 1). Exit codes: 0 done or skipped (locked), 1 failed or refused,
+    2 bad usage or configuration.
+    """
+    import tomllib
+
+    from pydantic import ValidationError
+
+    from stellar_blaze.jobs.replay_build import repo_root
+    from stellar_blaze.jobs.runner import run_job
+    from stellar_blaze.ml.artefacts import ModelTooLargeError
+    from stellar_blaze.ml.git import GitError
+    from stellar_blaze.ml.release_check import DegenerateModelError
+    from stellar_blaze.ml.training_config import load_training_config
+
+    settings = _settings()
+    try:
+        cfg, cfg_sha256 = load_training_config(config)
+    except (OSError, tomllib.TOMLDecodeError, ValidationError) as exc:
+        raise typer.BadParameter(f"{config}: {exc}", param_hint="--config") from None
+    dev_metrics, selection = (None, None) if dev_skill is None else _dev_skill_inputs(dev_skill)
+    if release:
+        try:
+            clean = _git_reader(repo_root()).is_clean()
+        except GitError as exc:
+            _fail(f"train --release refused: cannot read the git state: {exc}")
+        if not clean:
+            _fail(
+                "train --release refused: the working tree is not clean (modified, staged or untracked files); "
+                "commit or remove them, so the model's git_sha names the code that trained it. Nothing was written."
+            )
+    outcome: list[dict[str, JsonValue]] = []
+
+    async def work() -> Mapping[str, JsonValue]:
+        try:
+            summary = await asyncio.to_thread(
+                _train, settings, config, release=release, dev_metrics=dev_metrics, selection=selection
+            )
+        except (ModelTooLargeError, DegenerateModelError) as exc:
+            typer.echo(f"train refused: {exc}", err=True)
+            raise
+        outcome.append(summary)
+        return summary
+
+    params: dict[str, JsonValue] = {
+        "config": str(config),
+        "config_name": cfg.name,
+        "config_sha256": cfg_sha256,
+        "release": release,
+        "dev_skill": None if dev_skill is None else str(dev_skill),
+    }
+    job = f"train:{cfg.name}"
+    code = asyncio.run(run_job(settings, job, params, work, lock_key=job))
     if outcome:
         typer.echo(json.dumps(outcome[0], sort_keys=True))
     raise typer.Exit(code)
