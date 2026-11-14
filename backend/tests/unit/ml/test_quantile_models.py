@@ -503,3 +503,37 @@ def test_dump_booster_of_a_refit_is_byte_identical(train_frames: dict[FeatureSet
 def test_load_booster_rejects_non_gzip_bytes() -> None:
     with pytest.raises(gzip.BadGzipFile):
         load_booster(b"tree\nversion=v4\n")
+
+
+# === the levels override (selection rule 6.1's cheap score) =========================================================
+
+
+def test_levels_override_fits_only_those_boosters_identical_to_the_19_level_ones(
+    train_frames: dict[FeatureSet, pl.DataFrame], site_models: tuple[lgb.Booster, ...]
+) -> None:
+    frame = train_frames[FeatureSet.SITE]
+    levels = (0.1, 0.5, 0.9)
+
+    few = fit_quantile_models(frame, target=Target.T, cfg=_cfg(FeatureSet.SITE), levels=levels)
+
+    assert len(few) == 3
+    for booster, level in zip(few, levels, strict=True):
+        assert booster.params["alpha"] == level
+        assert booster.model_to_string() == site_models[LEVELS.index(level)].model_to_string()
+
+
+def test_levels_override_keeps_its_guards(train_frames: dict[FeatureSet, pl.DataFrame]) -> None:
+    frame = train_frames[FeatureSet.SITE]
+    cfg = _cfg(FeatureSet.SITE)
+
+    with pytest.raises(ValueError, match="not among the 19"):
+        fit_quantile_models(frame, target=Target.T, cfg=cfg, levels=(0.1, 0.12))
+    with pytest.raises(ValueError, match="duplicate-free"):
+        fit_quantile_models(frame, target=Target.T, cfg=cfg, levels=(0.5, 0.5))
+    with pytest.raises(ValueError, match="duplicate-free"):
+        fit_quantile_models(frame, target=Target.T, cfg=cfg, levels=())
+    stray = frame.filter(pl.col("y_t").is_not_null()).head(200).with_columns(pl.lit(5).cast(pl.Int8).alias("lead_days"))
+    with pytest.raises(ValueError, match="lie outside the config"):
+        fit_quantile_models(stray, target=Target.T, cfg=cfg, levels=(0.5,))  # the lead guard still applies
+    with pytest.raises(ValueError, match="at least"):
+        fit_quantile_models(frame.head(10), target=Target.T, cfg=cfg, levels=(0.5,))
