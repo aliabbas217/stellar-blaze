@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { applyRouteTheme, setTheme } from "@/lib/sun/route-theme";
 
 /**
@@ -13,26 +13,16 @@ import { applyRouteTheme, setTheme } from "@/lib/sun/route-theme";
  *   path, night on anything else.
  * - `"desk"`: always night (judge, HSE and admin routes are night only), whatever a field route left behind.
  *
- * `skipInitial` is for the guard mounted once in the layout: it skips the first run (see the effect).
+ * A page with neither shell (landing, offline) is covered by the field shell's unmount, which puts night back (FieldShell.tsx).
  *
  * The attribute on `<html>` is the one source of truth, and SunToggle reads it during render. After each application the
  * shell is rendered again so the toggle (a child) reads the current value.
  */
-export function useRouteTheme(kind: "route" | "desk", options: { skipInitial?: boolean } = {}): void {
+export function useRouteTheme(kind: "route" | "desk"): void {
   const pathname = usePathname();
   const [, rerender] = useState(0);
-  const first = useRef(true);
-  const skipInitial = options.skipInitial === true;
 
   useEffect(() => {
-    // On the document's first load the inline script has already decided (and tests/unit/lib/sun/route-theme.test.ts pins
-    // that this module would decide the same), so the layout-level guard only reacts to route CHANGES. A shell that mounts
-    // on a client navigation does not skip: nothing else ran for that route.
-    if (skipInitial && first.current) {
-      first.current = false;
-      return;
-    }
-    first.current = false;
     let current = true;
     const settled = kind === "desk" ? Promise.resolve(setTheme("night")) : applyRouteTheme(pathname);
     void settled.then(() => {
@@ -43,5 +33,5 @@ export function useRouteTheme(kind: "route" | "desk", options: { skipInitial?: b
     return () => {
       current = false;
     };
-  }, [kind, pathname, skipInitial]);
+  }, [kind, pathname]);
 }

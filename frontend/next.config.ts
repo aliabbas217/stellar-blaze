@@ -72,7 +72,19 @@ const nextConfig: NextConfig = {
 };
 
 // Finds src/i18n/request.ts (the default location) and wires next-intl into the build.
-const withNextIntl = createNextIntlPlugin();
+const withNextIntl = createNextIntlPlugin({
+  experimental: {
+    // Precompiles the ICU messages at build time (next-intl `experimental.messages.precompile`: "smaller bundles and faster
+    // message formatting"). The client then needs only the formatter of the compiled form, not the ICU message parser, which
+    // was the largest single piece of the shared script (a 12 KB gzip chunk on every route). Measured with a locked
+    // `pnpm build` and `lhci collect` (F2 Part 0, resource-summary:script:size): /en/worker 178,773 -> 169,443 B,
+    // /en/supervisor 178,002 -> 168,672 B, /en 158,549 -> 149,219 B, /en/worker/alerts 187,209 -> 177,879 B (budget 174,080).
+    // Only files under ./messages go through the loader; the service worker's strings are generated from the raw JSON
+    // (scripts/build-sw-strings.ts) and are unaffected. The option is marked experimental by next-intl: if a later release
+    // changes it, the shape of the message files stays plain nested JSON, so removing this block restores the parser.
+    messages: { path: "./messages", format: "json", locales: "infer", sourceLocale: "en", precompile: true },
+  },
+});
 
 // Keeps esbuild out of the server bundle: it builds the service worker (src/app/serwist/[path]/route.ts).
 export default withSerwist(withNextIntl(nextConfig));

@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { DraftBadge } from "@/components/shell/DraftBadge";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
 import { SunToggle } from "@/components/shell/SunToggle";
+import { Link } from "@/i18n/navigation";
 import { KIT_SECTIONS } from "./sections/registry";
 
 /*
@@ -13,7 +14,8 @@ import { KIT_SECTIONS } from "./sections/registry";
  *
  * It renders in the language of its route and in either theme (the sun toggle in the header), so the same page checks
  * the kit in each script and each theme. The sections are a registry (sections/registry.ts): a later task adds a
- * section file and one registry entry, not an edit to this page. The spine kit page is its own route (kit/spine).
+ * section file and one registry entry, not an edit to this page. The time spine is not a registry section: it has its own
+ * route (kit/spine), registered here by the link in the header so the gallery reaches it.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -41,6 +43,9 @@ export default async function KitPage(props: PageProps<"/[locale]/dev/kit">) {
           <LocaleSwitcher />
           <SunToggle />
           <DraftBadge />
+          <Link href="/dev/kit/spine" className="inline-flex min-h-(--target) items-center text-base text-ink-2 underline">
+            {t("spineLink")}
+          </Link>
         </div>
         <nav aria-label={t("title")} className="flex flex-wrap gap-x-4 gap-y-1">
           {KIT_SECTIONS.map(({ id }) => (

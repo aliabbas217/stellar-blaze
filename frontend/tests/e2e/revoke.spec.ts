@@ -300,3 +300,37 @@ test("a removal that could not finish is still said after a reload, is retried e
   expect(after.apiRows).toBe(0);
   expect(after.caches).not.toContain("sb-api");
 });
+
+/** The paths in the service worker's RSC prefetch cache (empty when the cache does not exist). */
+function prefetchedPaths(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    if (!(await caches.keys()).includes("pages-rsc-prefetch")) return [];
+    return (await (await caches.open("pages-rsc-prefetch")).keys()).map((request) => new URL(request.url).pathname).sort();
+  });
+}
+
+test("a page with an empty state never prefetches its links, and no prefetch cache remains after a removal", async ({ page }) => {
+  await page.route("**/api/v1/push/subscriptions/*", (route) => route.fulfill({ status: 204 }));
+  // The component kit renders an EmptyState whose two links go to field routes (/worker and /worker/alerts): with a
+  // prefetching Link, scrolling it into view is what makes Next request the targets' RSC payloads, which the service worker
+  // writes to `pages-rsc-prefetch`. The kit's other links (a desk page's, which may prefetch) go elsewhere, so the assertion is
+  // about the field targets, not about the cache being absent.
+  await loadControlled(page, "/en/dev/kit");
+  const emptyStateLink = page.locator('#states a[href="/en/worker/alerts"]').first();
+  await emptyStateLink.scrollIntoViewIfNeeded();
+  await expect(emptyStateLink).toBeVisible();
+  // Give a prefetch the time it would take: the idle callback Next uses, then the worker's cache write.
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 1500)));
+  expect(
+    (await prefetchedPaths(page)).filter((path) => path.startsWith("/en/worker")),
+    "the EmptyState's targets were not prefetched",
+  ).toEqual([]);
+
+  // Then the worker's data is removed (Alerts, with a profile): no prefetch cache remains.
+  await seedStore(page, true);
+  await page.goto(`/en/worker/alerts?site=${SITE_DEMO}`);
+  await removeMyData(page);
+  await expect(result(page)).toHaveText(en.alerts.removeData.done);
+  expect((await deviceState(page)).caches).not.toContain("pages-rsc-prefetch");
+});

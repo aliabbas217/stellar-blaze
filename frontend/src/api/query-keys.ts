@@ -8,6 +8,7 @@
  */
 
 export const queryKeys = {
+  sites: () => ["sites"] as const,
   riskPolicy: () => ["risk-policy"] as const,
   today: (siteId: string) => ["today", siteId] as const,
   crews: (siteId: string, date?: string) => ["crews", siteId, date ?? null] as const,

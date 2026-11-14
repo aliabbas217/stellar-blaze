@@ -34,13 +34,13 @@ export function parseDemoMode(raw: string | null): DemoMode {
  * the unwell sheet shows the number and a confirmation instead of dialling a `tel:` link, and no real phone number or
  * ambulance is ever reached from a demo.
  *
- * It reads NEXT_PUBLIC_SB_DEMO, which Next.js inlines at BUILD time: the image built for the public demo must be built
- * with NEXT_PUBLIC_SB_DEMO=1 (Dockerfile build arg), and no runtime variable changes it. It is a separate setting from
- * DEMO_EMPLOYER_TOKEN, which the BFF reads per request; the deployment owner sets both, and the e2e asserts the demo
- * build.
+ * It reads NEXT_PUBLIC_SB_DEMO, which Next.js inlines at BUILD time, and DEFAULTS TO DEMO: a missing variable means demo,
+ * so a build that forgot the flag can never dial a synthetic number. Demo is off only when the variable is exactly "0"
+ * (a real deployment builds with NEXT_PUBLIC_SB_DEMO=0 on purpose). It is a separate setting from DEMO_EMPLOYER_TOKEN,
+ * which the BFF reads per request; the deployment owner sets both, and the e2e asserts the demo build.
  */
 export function isDemoMode(): boolean {
-  return process.env.NEXT_PUBLIC_SB_DEMO === "1";
+  return process.env.NEXT_PUBLIC_SB_DEMO !== "0";
 }
 
 /** The demo site: the first synthetic entry of `list_sites`, never a literal id (ADR 0057). */

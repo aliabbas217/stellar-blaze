@@ -25,7 +25,9 @@ import tseslint from "typescript-eslint";
 // class (it would match the directory "l"), and `[[]` is the class that holds only a literal "[".
 //
 // Options of these two rules replace, never merge, across config objects that match the same file, so the blocks
-// below cover disjoint files and a later block must not set either rule for them.
+// below cover disjoint files and a later block must not set either rule for them. The one deliberate overlap is the last
+// block (field shell, dock, state components), which repeats the shared-code rule of the block before it and adds the ban on
+// the raw links, because the later block wins whole.
 // tests/unit/lint/route-group-isolation.test.ts resolves the real config per path and fails if one did.
 const WORKER_FEATURES = ["today", "profile", "risk", "push", "alert", "unwell"];
 const SHARED_DIRS = ["components", "api", "lib", "i18n"];
@@ -47,15 +49,30 @@ const NO_WORKER_CODE = `Supervisor and HSE code must not import worker code: on-
 const NO_ROLE_CODE = `The judge pages, the landing page and the shared demo feature must not import worker, supervisor or HSE code (ADR 0009 section 7, F2 Task 3): they are public and static, and must not be able to reach on-device personal data. ${SHARED_HOME}`;
 const NO_FEATURE_CODE = `Shared code must not import a feature or a route group (ADR 0009 section 7): features use shared code, never the reverse.`;
 const NO_PARENT_RELATIVE = `Feature code reaches other directories through the "@/" alias, not "../": the isolation rule matches import paths by name (ADR 0009 section 7).`;
+const NO_RAW_LINK = `Field surfaces use FieldLink (src/components/shell/FieldLink.tsx), not the raw locale Link or next/link: a prefetch writes the service worker's prefetch cache and ships the target route's script, which a field page must never do (F2 Part 0, F1 invariant b).`;
 
-/** A config object that applies no-restricted-imports and no-restricted-syntax to `files`; one `forbid` entry per message. */
-function isolation(files, forbid) {
+// The raw links, for `no-restricted-imports` `paths`: the locale-aware `Link` of next-intl and `next/link` itself. Only
+// FieldLink.tsx (and the desk and judge surfaces, which are not field surfaces) may import them.
+const RAW_LINK_PATHS = [
+  { name: "@/i18n/navigation", importNames: ["Link"], message: NO_RAW_LINK },
+  { name: "next/link", message: NO_RAW_LINK },
+];
+
+/**
+ * A config object that applies no-restricted-imports and no-restricted-syntax to `files`; one `forbid` entry per message.
+ * `fieldLinks` adds the ban on the raw links (RAW_LINK_PATHS) for the files of a field surface: it is a `paths` entry of the
+ * same rule because the options of a rule replace, never merge (see above), so it cannot be a block of its own.
+ */
+function isolation(files, forbid, { fieldLinks = false } = {}) {
   return {
     files,
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: forbid.map(({ targets, message }) => ({ group: targets.flatMap((t) => t.globs), message })) },
+        {
+          ...(fieldLinks ? { paths: RAW_LINK_PATHS } : {}),
+          patterns: forbid.map(({ targets, message }) => ({ group: targets.flatMap((t) => t.globs), message })),
+        },
       ],
       "no-restricted-syntax": [
         "error",
@@ -90,24 +107,36 @@ const forbidRoleCode = {
 };
 const forbidParentRelative = { targets: [PARENT_RELATIVE], message: NO_PARENT_RELATIVE };
 
+const forbidFeatureCode = {
+  targets: [ANY_FEATURE, routeGroup("worker"), routeGroup("supervisor"), routeGroup("hse"), routeGroup("judge")],
+  message: NO_FEATURE_CODE,
+};
+
+// The field surfaces (`fieldLinks: true`): the worker and supervisor route groups and their features, the field shell and
+// the dock, and the state components (the empty and error states link from field pages as well as judge pages). The HSE
+// group, the judge group, the landing page and the desk shell are desk surfaces and keep the raw Link.
 const routeGroupIsolation = [
-  isolation(["src/app/[[]locale]/(worker)/**"], [forbidSupervisorCode]),
+  isolation(["src/app/[[]locale]/(worker)/**"], [forbidSupervisorCode], { fieldLinks: true }),
   isolation(
     WORKER_FEATURES.map((name) => `src/features/${name}/**`),
     [forbidSupervisorCode, forbidParentRelative],
+    { fieldLinks: true },
   ),
-  isolation(["src/app/[[]locale]/(supervisor)/**", "src/app/[[]locale]/(hse)/**"], [forbidWorkerCode]),
-  isolation(["src/features/supervisor/**"], [forbidWorkerCode, forbidParentRelative]),
+  isolation(["src/app/[[]locale]/(supervisor)/**"], [forbidWorkerCode], { fieldLinks: true }),
+  isolation(["src/app/[[]locale]/(hse)/**"], [forbidWorkerCode]),
+  isolation(["src/features/supervisor/**"], [forbidWorkerCode, forbidParentRelative], { fieldLinks: true }),
   isolation(["src/app/[[]locale]/(judge)/**", "src/app/[[]locale]/page.tsx"], [forbidRoleCode]),
   isolation(["src/features/judge/**", "src/features/demo/**"], [forbidRoleCode, forbidParentRelative]),
   isolation(
     SHARED_DIRS.map((name) => `src/${name}/**`),
-    [
-      {
-        targets: [ANY_FEATURE, routeGroup("worker"), routeGroup("supervisor"), routeGroup("hse"), routeGroup("judge")],
-        message: NO_FEATURE_CODE,
-      },
-    ],
+    [forbidFeatureCode],
+  ),
+  // Later than the shared block above, which matches the same files: the options replace, so this block repeats the shared
+  // rule and adds the raw-link ban. FieldLink.tsx is not listed: it is the one file that imports the raw Link.
+  isolation(
+    ["src/components/shell/FieldShell.tsx", "src/components/shell/WorkerDock.tsx", "src/components/states/**"],
+    [forbidFeatureCode],
+    { fieldLinks: true },
   ),
 ];
 

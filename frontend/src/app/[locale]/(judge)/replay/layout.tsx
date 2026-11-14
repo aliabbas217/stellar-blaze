@@ -19,7 +19,7 @@ export default async function ReplayLayout({ children }: { children: ReactNode }
     { href: "/replay/day", label: t("day") },
     { href: "/replay/try", label: t("try") },
     { href: "/replay/governance", label: t("governance") },
-    { href: "/worker", label: t("crews") },
+    { href: "/supervisor", label: t("crews") },
   ];
 
   return <DeskShell items={items}>{children}</DeskShell>;

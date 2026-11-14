@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 import { LevelMark } from "@/components/level/LevelSign";
 import type { Level } from "@/components/level/level";
-import { Link } from "@/i18n/navigation";
+import { FieldLink } from "@/components/shell/FieldLink";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "./actions";
 import { isDeferredRoute } from "./deferred-routes";
 
@@ -56,14 +56,14 @@ export function EmptyState({ title, reason, primary, secondary, level }: EmptySt
       {main === null && other === null ? null : (
         <div className="flex flex-wrap gap-3">
           {main === null ? null : (
-            <Link href={main.href} className={ACTION_PRIMARY}>
+            <FieldLink href={main.href} className={ACTION_PRIMARY}>
               {main.label}
-            </Link>
+            </FieldLink>
           )}
           {other === null ? null : (
-            <Link href={other.href} className={main === null ? ACTION_PRIMARY : ACTION_SECONDARY}>
+            <FieldLink href={other.href} className={main === null ? ACTION_PRIMARY : ACTION_SECONDARY}>
               {other.label}
-            </Link>
+            </FieldLink>
           )}
         </div>
       )}

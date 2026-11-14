@@ -1,7 +1,10 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
 import { useState, type ReactNode } from "react";
+import enMessages from "../../../messages/en.json";
 import { DeskShell } from "@/components/shell/DeskShell";
+import { useFieldCrewLabel } from "@/components/shell/FieldHeading";
 import { FieldShell } from "@/components/shell/FieldShell";
 import { THEME_COLORS } from "@/lib/sun/theme-colors";
 import { THEME_STORAGE_KEY } from "@/lib/sun/theme-storage";
@@ -130,6 +133,63 @@ describe("FieldShell", () => {
       expect(screen.getByRole("button", { name: "Sun mode: off" })).toBeInTheDocument();
     });
     expect(document.documentElement.dataset["theme"]).toBeUndefined();
+  });
+
+  it("test_field_shell_puts_night_back_when_it_unmounts (a client link out of a field route, to a page with no shell)", async () => {
+    const meta = chrome();
+    const { unmount } = renderWithIntl(
+      <FieldShell {...props}>
+        <main>page</main>
+      </FieldShell>,
+    );
+    await waitFor(() => {
+      expect(document.documentElement.dataset["theme"]).toBe("sun");
+    });
+
+    unmount();
+
+    expect(document.documentElement.dataset["theme"]).toBeUndefined();
+    expect(meta.content).toBe(THEME_COLORS.night);
+  });
+
+  it("names the crew a page reports (useFieldCrewLabel) and drops it when the page goes", () => {
+    chrome();
+    function Page({ label }: { label: string | null }) {
+      useFieldCrewLabel(label);
+      return <main>page</main>;
+    }
+    function Harness({ show }: { show: boolean }) {
+      return (
+        <FieldShell siteName="Site" clock="11:10">
+          {show ? <Page label="Crew B" /> : <main>other</main>}
+        </FieldShell>
+      );
+    }
+    const { rerender } = renderWithIntl(<Harness show />);
+    expect(within(screen.getByRole("banner")).getByText("Crew B").tagName).toBe("BDI");
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={enMessages} timeZone="Asia/Dubai">
+        <Harness show={false} />
+      </NextIntlClientProvider>,
+    );
+    expect(within(screen.getByRole("banner")).queryByText("Crew B")).toBeNull();
+  });
+
+  it("the layout's crewLabel wins over a page's", () => {
+    chrome();
+    function Page() {
+      useFieldCrewLabel("From the page");
+      return <main>page</main>;
+    }
+    renderWithIntl(
+      <FieldShell siteName="Site" crewLabel="From the layout" clock="11:10">
+        <Page />
+      </FieldShell>,
+    );
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("From the layout")).toBeInTheDocument();
+    expect(within(header).queryByText("From the page")).toBeNull();
   });
 });
 

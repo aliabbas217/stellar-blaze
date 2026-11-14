@@ -3,9 +3,15 @@
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { ViewTransition, type ReactNode } from "react";
+import { FieldLink } from "@/components/shell/FieldLink";
 import { useRouteTheme } from "@/components/shell/useRouteTheme";
 import { Link } from "@/i18n/navigation";
 import "@/styles/view-transitions.css";
+
+/** A route of a field surface (`/worker`, `/supervisor` and anything below): a desk page must not prefetch it (FieldLink.tsx). */
+function isFieldRoute(href: string): boolean {
+  return /^\/(?:worker|supervisor)(?:\/|$)/.test(href);
+}
 
 export interface DeskNavItem {
   /** A route without the locale prefix, as the locale-aware Link takes it. */
@@ -62,17 +68,20 @@ export function DeskShell({
         </ViewTransition>
         <nav aria-label={t("shell.desk.menu")} className="min-w-0 flex-1 overflow-x-auto">
           <ul className="flex gap-1">
-            {items.map((item) => (
-              <li key={item.href} className="flex-none">
-                <Link
-                  href={item.href}
-                  aria-current={item.href === current ? "page" : undefined}
-                  className="inline-flex min-h-(--target) items-center rounded-sign border border-transparent px-3 font-body text-sm text-ink-2 no-underline aria-[current=page]:border-ink aria-[current=page]:font-semibold aria-[current=page]:text-ink"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
+            {items.map((item) => {
+              const Anchor = isFieldRoute(item.href) ? FieldLink : Link;
+              return (
+                <li key={item.href} className="flex-none">
+                  <Anchor
+                    href={item.href}
+                    aria-current={item.href === current ? "page" : undefined}
+                    className="inline-flex min-h-(--target) items-center rounded-sign border border-transparent px-3 font-body text-sm text-ink-2 no-underline aria-[current=page]:border-ink aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+                  >
+                    {item.label}
+                  </Anchor>
+                </li>
+              );
+            })}
           </ul>
         </nav>
         {trailing}

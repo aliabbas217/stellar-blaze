@@ -39,6 +39,7 @@ export function useUrlParam<T extends Param>(
     }
   }, [raw, parse, fallback]);
 
+  // The setter builds the query from the URL as of this render: two writes in one tick overwrite each other (the second starts from the same `current`).
   const current = searchParams.toString();
   const set = useCallback(
     (next: T) => {

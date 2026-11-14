@@ -8,7 +8,7 @@ import { StampsSection } from "./stamps";
 import { StatesSection } from "./states";
 
 /**
- * The sections of the kit page, in reading order. To add a component's section (Tasks 5, 6 and 7 do): write
+ * The sections of the kit page, in reading order. To add a component's section (the proof and evidence sections did; the time spine did not: it is its own route, `kit/spine`, linked from the page header): write
  * `sections/<name>.tsx` exporting one component, add its id to `KitSectionId`, its `title` and `note` under
  * `common.kit.sections.<id>` in messages, and one entry below. The page owns the heading, the anchor and the layout.
  */

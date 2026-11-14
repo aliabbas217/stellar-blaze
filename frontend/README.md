@@ -54,6 +54,12 @@ image (ADR 0009). These variables are wiring only; tunable values (bands, lead t
 | `DEMO_STOP_RATE_PER_MIN`, `DEMO_STOP_GLOBAL_RATE_PER_MIN` | the BFF proxy | The **stop** class, Stop work only (create and clear a stop): a reserve nothing else draws on, counted the same way. Per client default 10, global default 20; clamped the same way (global at most 20, per-client at most the global, so the per-client limit never exceeds the reserve). A 429 on a stop is a safety failure: the screen must say it was not sent and to tell the crew now |
 | `TRUSTED_PROXY_HOPS` | the BFF proxy (`rate-limit.ts`) | How many reverse proxies in front of the app append to `x-forwarded-for` (default 1: the platform ingress). The per-client bucket is keyed on the entry that many from the right, because earlier entries are whatever the caller wrote; with 2 (a CDN and an ingress) it is the second from the right. 0 trusts none and puts every caller in one bucket; a header shorter than the hops does the same. Wrong in either direction weakens only the per-client bucket; the global bucket holds regardless |
 
+**The demo switch is a build-time setting, not a runtime one.** `NEXT_PUBLIC_SB_DEMO` is the one `NEXT_PUBLIC_*` variable, read by
+`isDemoMode()` (`src/features/demo/constants.ts`) and inlined by `next build`. A missing variable means **demo mode** (so a build that
+forgot the flag can never dial a synthetic number); demo is off only when it is exactly `0`, so a real deployment must build with
+`NEXT_PUBLIC_SB_DEMO=0`. The Dockerfile comment that says the demo image is built with `NEXT_PUBLIC_SB_DEMO=1` is out of date: the flag
+now defaults on (the Dockerfile itself is unchanged here).
+
 **Invariant: no rate limit on another operation may block the safety path (stop work, the unwell call actions).** The
 API limits employer operations to 60 per 60 s per token (`x-rate-limit` in `openapi/stellar-blaze.openapi.json`) and does
 not say whether that is one quota per operation or one for all; the demo has one shared token, so the BFF assumes the

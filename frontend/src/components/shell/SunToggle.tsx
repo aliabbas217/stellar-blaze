@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useSyncExternalStore } from "react";
-import { THEME_COLORS } from "@/lib/sun/theme-colors";
+import { setTheme } from "@/lib/sun/route-theme";
 import { nextLocalMidnight, THEME_STORAGE_KEY, type ThemeName, type ThemeOverride } from "@/lib/sun/theme-storage";
 
 /*
@@ -19,10 +19,9 @@ function readTheme(): ThemeName {
 }
 
 function applyTheme(theme: ThemeName): void {
-  if (theme === "sun") document.documentElement.dataset["theme"] = "sun";
-  else delete document.documentElement.dataset["theme"];
-  // The browser chrome follows the theme (a static <meta> cannot, so it is moved here and by the inline script).
-  document.head.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[theme]);
+  // The attribute and EVERY theme-color meta, the same function the route changes use: a production document has two
+  // (the layout's and the copy React hoists into <head>), and moving only the first left the other on the old colour.
+  setTheme(theme);
   for (const notify of listeners) notify();
 }
 

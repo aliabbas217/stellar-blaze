@@ -7,19 +7,25 @@ afterEach(() => {
 });
 
 describe("isDemoMode", () => {
-  it("is on only for NEXT_PUBLIC_SB_DEMO=1", () => {
+  it("is off only for NEXT_PUBLIC_SB_DEMO=0", () => {
+    vi.stubEnv("NEXT_PUBLIC_SB_DEMO", "0");
+    expect(isDemoMode()).toBe(false);
+  });
+
+  it("is on for 1", () => {
     vi.stubEnv("NEXT_PUBLIC_SB_DEMO", "1");
     expect(isDemoMode()).toBe(true);
   });
 
-  it.each(["", "0", "true", "yes", " 1"])("is off for %j", (value) => {
+  // A missing or malformed flag must never turn real calls on: anything but the exact "0" is demo.
+  it.each(["", "false", "off", "no", " 0", "00", "true", "yes"])("is on for %j", (value) => {
     vi.stubEnv("NEXT_PUBLIC_SB_DEMO", value);
-    expect(isDemoMode()).toBe(false);
+    expect(isDemoMode()).toBe(true);
   });
 
-  it("is off when unset", () => {
+  it("is on when unset (a missing build flag can never dial a synthetic number)", () => {
     vi.stubEnv("NEXT_PUBLIC_SB_DEMO", undefined);
-    expect(isDemoMode()).toBe(false);
+    expect(isDemoMode()).toBe(true);
   });
 });
 

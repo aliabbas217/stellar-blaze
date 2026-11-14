@@ -5,7 +5,6 @@ import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { fontClassFor } from "@/app/fonts";
 import { titleTemplate } from "@/app/titles";
-import { RouteTheme } from "@/components/shell/RouteTheme";
 import { sunScript } from "@/components/shell/theme-script";
 import { LocalePrefs } from "@/features/pwa/LocalePrefs";
 import { APPLE_TOUCH_ICON, MANIFEST_COLORS } from "@/features/pwa/manifest";
@@ -60,7 +59,8 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
           <NextIntlClientProvider>
             {/* Leaves the language for the service worker, which shows push notifications with no page open. */}
             <LocalePrefs />
-            <RouteTheme />
+            {/* Sun mode is reset to night by the field shell when it unmounts (FieldShell.tsx), not by a guard here: a guard
+                at the root shipped its code to every route, the landing page included. */}
             {/* No QueryProvider here on purpose (F2 Task 3): TanStack Query is mounted only in the worker and supervisor
                 layouts and the judge (live) sub-layout, so the landing and the static judge pages do not ship it. */}
             {children}

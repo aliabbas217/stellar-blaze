@@ -21,6 +21,8 @@ function meta(): HTMLMetaElement {
 }
 
 afterEach(() => {
+  vi.doUnmock("@/lib/sun/solar");
+  window.history.pushState({}, "", "/");
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -125,6 +127,7 @@ describe("applyRouteTheme", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     window.localStorage.setItem(DEMO_STORAGE_KEY, "live");
     meta();
+    window.history.pushState({}, "", "/en/worker");
 
     vi.setSystemTime(NOON_DUBAI);
     await applyRouteTheme("/en/worker");
@@ -133,6 +136,32 @@ describe("applyRouteTheme", () => {
     vi.setSystemTime(MIDNIGHT_DUBAI);
     await applyRouteTheme("/en/worker");
     expect(document.documentElement.dataset["theme"]).toBeUndefined();
+  });
+
+  it("a navigation to a desk page while the solar module loads wins: sun is never left on a night-only page (live mode)", async () => {
+    // The solar function is a dynamic import in live mode, so a field-to-desk navigation can land inside that window.
+    vi.resetModules();
+    let release: () => void = () => undefined;
+    const loaded = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.doMock("@/lib/sun/solar", async () => {
+      await loaded;
+      return { solarElevationDeg: () => 40, UAE_CENTROID: { lat: 24.4, lon: 54.4 } };
+    });
+    window.localStorage.setItem(DEMO_STORAGE_KEY, "live");
+    const chrome = meta();
+    window.history.pushState({}, "", "/en/worker");
+
+    const pending = applyRouteTheme("/en/worker");
+    // The visitor leaves for a judge page; the desk shell has already put night on <html>.
+    window.history.pushState({}, "", "/en/replay");
+    setTheme("night");
+    release();
+    await pending;
+
+    expect(document.documentElement.dataset["theme"]).toBeUndefined();
+    expect(chrome.content).toBe(THEME_COLORS.night);
   });
 
   it("returns the theme it applied, and survives blocked storage", async () => {

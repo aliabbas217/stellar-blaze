@@ -90,7 +90,8 @@
         "proofValue": "2.6 alerts per shift",
         "proofChangedWhat": "Alerts per shift, file changed after export",
         "verdictSample": "Sample outcome sentence for the kit. It is not a result."
-      }
+      },
+      "spineLink": "Time spine kit"
     }
   },
   "shell": {
@@ -174,6 +175,97 @@
       "alerts": "التنبيهات",
       "unwell": "I feel unwell",
       "myData": "My data"
+    },
+    "today": {
+      "title": "Today",
+      "kicker": {
+        "site": "Site level now",
+        "personal": "Your level now",
+        "stale": "Last known level",
+        "fallback": "No fresh forecast: protective plan",
+        "noHour": "No forecast for this hour"
+      },
+      "until": "until <bdi>{time}</bdi>",
+      "personalHigher": "Your own level is higher than the site level.",
+      "lead": {
+        "cycle": "Work {work} min, rest {rest} min in shade",
+        "shade": "Rest in shade",
+        "stop": "Stop work. Go to shade",
+        "siteRules": "Follow the site rules",
+        "protective": "Site rules: rest in shade every hour, drink water"
+      },
+      "draftWording": "Draft wording, awaiting clinical review",
+      "also": {
+        "heading": "Also now",
+        "water": "Drink water",
+        "buddy": "Never work alone"
+      },
+      "why": {
+        "level": "Why {level}?",
+        "siteRules": "Why site rules?"
+      },
+      "proofWhat": {
+        "level": "{level} level now, from the forecast",
+        "siteRules": "Site rules, because no level could be worked out"
+      },
+      "turnOnWarnings": "Turn on warnings",
+      "spine": {
+        "now": "Now",
+        "breakIn": "Break in {duration}",
+        "backToWork": "Back to work {time}",
+        "shiftEnds": "Shift ends {time}",
+        "noBreakAfter": "No midday break by law after {date}",
+        "noBreakUntil": "No midday break by law until {date}",
+        "aria": "Heat level by hour, {from} to {to}. {waypoints}"
+      },
+      "age": {
+        "hoursMinutes": "{hours} h {minutes} min",
+        "hours": "{hours} h",
+        "minutes": "{minutes} min"
+      },
+      "entry": {
+        "title": "Scan your crew's code",
+        "reason": "Point your camera at the poster on site, or open the link in your crew's group. No account, nothing to type.",
+        "demo": "See the demo yard",
+        "loading": "Finding the demo yard",
+        "unavailable": "The demo yard could not be loaded. Check your connection and try again."
+      },
+      "noShift": {
+        "title": "No shift for {crew} today",
+        "titleNoCrew": "No shift today",
+        "reason": "Your crew has no shift on this date. The site level still applies.",
+        "primary": "Turn on warnings"
+      },
+      "errorRules": "Until it loads, follow the site rules: rest in shade every hour, drink water."
+    },
+    "alert": {
+      "title": "Heat warning",
+      "kicker": {
+        "site": "Site heat warning",
+        "crew": "Crew heat warning"
+      },
+      "from": "from <bdi>{time}</bdi>",
+      "changed": {
+        "heading": "What changed in your shift",
+        "was": "Was {previous}, now {level}",
+        "now": "Now {level}"
+      },
+      "spine": {
+        "now": "Now",
+        "starts": "{level} from {time}",
+        "ends": "Until {time}",
+        "aria": "Heat level by hour. {summary}"
+      },
+      "personalHigher": "Your level is higher: {level}",
+      "doNow": "What to do",
+      "gotIt": "Got it",
+      "ended": {
+        "title": "This warning ended at {time}",
+        "titleNoTime": "This warning has ended",
+        "reason": "The level may have changed since the alert was sent. Open Today to see the level now.",
+        "primary": "Open Today"
+      },
+      "saved": "The forecast is not available right now. This is the level the alert gave, saved on this phone."
     }
   },
   "today": {

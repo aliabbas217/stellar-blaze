@@ -94,6 +94,10 @@ export async function applyRouteTheme(pathname: string): Promise<ThemeName> {
   let theme: ThemeName;
   if (decision === "solar") {
     const { solarElevationDeg, UAE_CENTROID } = await import("@/lib/sun/solar");
+    // The import takes time, and the visitor can leave the field route inside that window (field to desk). The desk shell
+    // has already put night on <html>; applying the sun now would leave it on a night-only judge page. The caller that
+    // changed the route owns the theme from here, so this one reports what is showing and writes nothing.
+    if (!isFieldPath(window.location.pathname)) return currentTheme();
     theme = solarElevationDeg(UAE_CENTROID.lat, UAE_CENTROID.lon, new Date()) > 0 ? "sun" : "night";
   } else {
     theme = decision;

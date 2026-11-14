@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { browserEffects, type ProfileEffects } from "@/features/profile/effects";
 import { isNonEmptyString, toProfile, type Profile } from "@/features/profile/profile-shape";
+import { PROFILE_STORAGE_KEY, publishSitePin, toSitePin, type SitePin } from "@/features/profile/site-pin";
 import {
   beginRevokeActivity,
   clearRevokeIncomplete,
@@ -32,7 +33,7 @@ import {
  * 9 KB left of its 170 KB budget. What is read back from storage goes through `toProfile` (profile-shape.ts) instead.
  */
 
-export const PROFILE_STORAGE_KEY = "sb-profile-v1";
+export { PROFILE_STORAGE_KEY };
 
 export type { ProfileEffects, RevokeStep };
 
@@ -45,11 +46,11 @@ export interface PushRegistration {
   readonly siteId: string;
 }
 
-/** Which site, and optionally which crew, this phone is pinned to. Chosen on the phone; the API never hears of it. */
-export interface DeviceSite {
-  readonly siteId: string;
-  readonly crewId: string | null;
-}
+/**
+ * Which site, and optionally which crew, this phone is pinned to. Chosen on the phone; the API never hears of it. Defined in
+ * site-pin.ts (a module with no store in it, which the worker header reads); the store publishes every change there.
+ */
+export type DeviceSite = SitePin;
 
 export interface RevokeOutcome {
   /** The steps that did not finish; empty when each one did. The profile is cleared in memory either way. */
@@ -128,15 +129,6 @@ function within<T>(run: () => Promise<T>, ms: number): Promise<T> {
         clearTimeout(timer);
       });
   });
-}
-
-/** A stored value is a pin only when it has a site id and a crew id that is a string or null. */
-function toDeviceSite(value: unknown): DeviceSite | null {
-  if (typeof value !== "object" || value === null) return null;
-  const { siteId, crewId } = value as Record<string, unknown>;
-  if (!isNonEmptyString(siteId)) return null;
-  if (crewId !== null && !isNonEmptyString(crewId)) return null;
-  return { siteId, crewId };
 }
 
 /** Clears the caches and Serwist's expiration record: both are attempted, and a failure of either is thrown. */
@@ -235,9 +227,12 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
         },
         chooseSite: (site) => {
           set({ site });
+          // After the write (persist stores synchronously inside `set`): the worker header reads the pin without this store.
+          publishSitePin(get().site);
         },
         clearSite: () => {
           set({ site: null });
+          publishSitePin(null);
         },
         save: (profile) => {
           const previous = get().profile;
@@ -270,6 +265,7 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
           // from this phone whatever happens after.
           set({ profile: null, push: null, site: null, revokeEpoch: get().revokeEpoch + 1 });
           api.persist.clearStorage();
+          publishSitePin(null);
           // The guarded storage swallows a failed removal; reading the key back is how it is noticed.
           const stored = guardedLocalStorage.getItem(PROFILE_STORAGE_KEY) !== null;
 
@@ -364,7 +360,7 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
           const stored = persisted as { profile?: unknown; push?: unknown; site?: unknown } | null | undefined;
           const profile = toProfile(stored?.profile);
           const push = toPushRegistration(stored?.push);
-          const site = toDeviceSite(stored?.site);
+          const site = toSitePin(stored?.site);
           // What was read removed everything this tab held: another tab revoked (see the listener below). That counts as
           // a revoke here, so the epoch moves; it moves here, in the merge, because setting it afterwards would go
           // through persist and write the key back (ruling R37).
