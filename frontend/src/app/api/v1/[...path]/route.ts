@@ -1,8 +1,12 @@
 import { problemResponse, UPSTREAM_UNAVAILABLE_TYPE } from "@/api/problem";
-import { employerAuth, forwardHeaders, isWorkerCacheableRead, type WriteClass } from "./employer-auth";
-import { clientKey, createRateLimiter, trustedProxyHops, type RateLimiter } from "./rate-limit";
+import { employerAuth, forwardHeaders, isWorkerCacheableRead, type LimitClass } from "./employer-auth";
+import { clientKey, limitersFor, trustedProxyHops } from "./rate-limit";
 
 /*
+ * INVARIANT: no rate limit on another operation may block the safety path (stop work, unwell call actions). The
+ * employer operations share one upstream quota per token and the demo has one shared token, so the buckets below add
+ * up to that quota (rate-limit.ts) and Stop work has a reserve nothing else can drain.
+ *
  * The BFF proxy: the browser calls only same-origin /api/v1/*, and this handler forwards each call to the API at
  * API_ORIGIN (read per request, so the container's runtime env decides, not the build). Web health is
  * /api/healthz, which is a different route and never proxied.
@@ -10,7 +14,7 @@ import { clientKey, createRateLimiter, trustedProxyHops, type RateLimiter } from
  * Only an allow-list of headers crosses either way (forwardHeaders in employer-auth.ts). A client's cookie and
  * authorization header never go upstream; the one credential the API sees is the demo employer token, which the BFF
  * attaches itself, only on the allow-listed method and path pairs of the demo fixture (F2 decision D4). Those pairs
- * that write are rate limited per client and globally (two classes, below). Back come content-type, x-request-id and
+ * (every one of them carries the token) are rate limited per client and globally, in two classes (below). Back come content-type, x-request-id and
  * retry-after. Every response is `Cache-Control: no-store` except the two reads the worker's service worker may cache
  * (forecast/today and risk-policy), so no employer or personal response is kept by a browser or a shared cache.
  */
@@ -25,62 +29,19 @@ const UPSTREAM_TIMEOUT_MS = 10_000;
 const API_PREFIX = "/api/v1/";
 
 /*
- * The write limits. The API limits employer operations to 60 per 60 s per token (its `x-rate-limit`), and the demo has
- * one shared token, so 60 a minute is one global ceiling for every visitor; the global defaults below match it and are
- * what a visitor meets first, as a 429 from here with a Retry-After, instead of from the API. The per-client bucket
- * keeps one visitor from using all of it.
- *
- * Stop work has its OWN pair of buckets, so sign-off, data-request and reset traffic can never drain it: a stop that is
- * refused with a 429 is a safety failure (the screen must say "Not sent. Tell the crew now."), so its per-client
- * default is larger. The global ceiling of 60 is the API's, a higher number here could never be used.
+ * The limits (rate-limit.ts has the arithmetic). Two classes that add up to the upstream quota of one token:
+ *  - "stop": Stop work (create and clear a stop), a reserve of 20 a minute that nothing else draws on. A stop is refused
+ *    only by this bucket. A 429 on a stop is a safety failure: the screen must say "Not sent. Tell the crew now."
+ *  - "general": every other token-bearing request, the day-plan GET included (it spends the same upstream quota): sign-off,
+ *    data requests, demo reset. 40 a minute for everyone together; the BFF refuses these first.
+ * Each class has a global bucket and a per-client bucket (the per-client limit never exceeds its global), so one
+ * visitor cannot take a whole slice. The environment can only lower the defaults.
  */
-interface LimitSettings {
-  perClientEnv: string;
-  perClientDefault: number;
-  globalEnv: string;
-  globalDefault: number;
-}
-
-const LIMITS: Record<WriteClass, LimitSettings> = {
-  write: { perClientEnv: "DEMO_WRITE_RATE_PER_MIN", perClientDefault: 20, globalEnv: "DEMO_WRITE_GLOBAL_RATE_PER_MIN", globalDefault: 60 },
-  stop: { perClientEnv: "DEMO_STOP_RATE_PER_MIN", perClientDefault: 30, globalEnv: "DEMO_STOP_GLOBAL_RATE_PER_MIN", globalDefault: 60 },
-};
-
 const GLOBAL_KEY = "demo-token";
 
-function positiveInt(raw: string | undefined, fallback: number): number {
-  const value = Number(raw);
-  return raw !== undefined && Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-interface Limiters {
-  settings: string;
-  perClient: RateLimiter;
-  global: RateLimiter;
-}
-
-const limiters = new Map<WriteClass, Limiters>();
-
-/** The two buckets of a class for the limits in the environment now (read per request, so a restart is not needed). */
-function limitersFor(writeClass: WriteClass): Limiters {
-  const config = LIMITS[writeClass];
-  const perClient = positiveInt(process.env[config.perClientEnv], config.perClientDefault);
-  const global = positiveInt(process.env[config.globalEnv], config.globalDefault);
-  const settings = `${String(perClient)}/${String(global)}`;
-  const held = limiters.get(writeClass);
-  if (held?.settings === settings) return held;
-  const fresh: Limiters = {
-    settings,
-    perClient: createRateLimiter({ perMinute: perClient, now: Date.now }),
-    global: createRateLimiter({ perMinute: global, now: Date.now }),
-  };
-  limiters.set(writeClass, fresh);
-  return fresh;
-}
-
 /** A 429 problem with Retry-After when either bucket is empty; otherwise takes one token from each and returns null. */
-function rateLimited(request: Request, writeClass: WriteClass): Response | null {
-  const { perClient, global } = limitersFor(writeClass);
+function rateLimited(request: Request, limitClass: LimitClass): Response | null {
+  const { perClient, global } = limitersFor(limitClass, process.env);
   const key = clientKey(request.headers, trustedProxyHops(process.env.TRUSTED_PROXY_HOPS));
   const mine = perClient.peek(key);
   const all = global.peek(GLOBAL_KEY);
@@ -128,8 +89,8 @@ async function answer(request: Request): Promise<Response> {
     return problemResponse({ type: "about:blank", title: "Not Found", status: 404, request_id: requestIdOf(request) });
   }
   const decision = employerAuth(request.method, incoming.pathname);
-  if (decision.writeClass !== null) {
-    const limited = rateLimited(request, decision.writeClass);
+  if (decision.limitClass !== null) {
+    const limited = rateLimited(request, decision.limitClass);
     if (limited !== null) return limited;
   }
   // The token is read now, per request, from the server's environment. Never a NEXT_PUBLIC variable.

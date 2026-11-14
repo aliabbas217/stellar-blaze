@@ -16,38 +16,40 @@ const CREW = "crew-[a-d]";
 const SITE = "site-demo-[a-z0-9-]+";
 const STOP = "[A-Za-z0-9_-]+";
 
-/** The rate-limit class of an allow-listed write: Stop work has its own buckets (see route.ts). */
-export type WriteClass = "write" | "stop";
+/**
+ * The rate-limit class of an allow-listed, token-bearing request: Stop work has a reserved bucket of its own and every
+ * other one (reads of the day plan included) shares the rest of the upstream quota (see rate-limit.ts and route.ts).
+ */
+export type LimitClass = "general" | "stop";
 
 interface Rule {
   method: "GET" | "POST" | "DELETE";
   path: RegExp;
-  /** Set for a write, absent for a read. */
-  writeClass?: WriteClass;
+  limitClass: LimitClass;
 }
 
 const ALLOW_LIST: readonly Rule[] = [
-  { method: "GET", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan$`) },
-  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan/sign-off$`), writeClass: "write" },
-  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/stops$`), writeClass: "stop" },
-  { method: "DELETE", path: new RegExp(`^/api/v1/crews/${CREW}/stops/${STOP}$`), writeClass: "stop" },
-  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/data-requests$`), writeClass: "write" },
+  { method: "GET", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan$`), limitClass: "general" },
+  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan/sign-off$`), limitClass: "general" },
+  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/stops$`), limitClass: "stop" },
+  { method: "DELETE", path: new RegExp(`^/api/v1/crews/${CREW}/stops/${STOP}$`), limitClass: "stop" },
+  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/data-requests$`), limitClass: "general" },
   // reset_demo_site: synthetic site ids only (the API also answers 409 not-a-demo-site for any other).
-  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/demo-reset$`), writeClass: "write" },
+  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/demo-reset$`), limitClass: "general" },
 ];
 
 export interface EmployerAuthDecision {
   /** Attach the demo employer token to the upstream request. */
   inject: boolean;
-  /** The rate-limit class when the pair is an allow-listed write (POST or DELETE); null for a read or a pair off the list. */
-  writeClass: WriteClass | null;
+  /** The rate-limit class of an allow-listed pair, reads included (each carries the token); null for a pair off the list. */
+  limitClass: LimitClass | null;
 }
 
 /** Whether the BFF attaches the demo token to `method` `path` (the URL's pathname, without the query string). */
 export function employerAuth(method: string, path: string): EmployerAuthDecision {
   const verb = method.toUpperCase();
   const rule = ALLOW_LIST.find((candidate) => candidate.method === verb && candidate.path.test(path));
-  return { inject: rule !== undefined, writeClass: rule?.writeClass ?? null };
+  return { inject: rule !== undefined, limitClass: rule?.limitClass ?? null };
 }
 
 const WORKER_CACHEABLE_READS: readonly RegExp[] = [/^\/api\/v1\/risk-policy$/, /^\/api\/v1\/sites\/[^/]+\/forecast\/today$/];

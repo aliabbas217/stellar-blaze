@@ -2,6 +2,7 @@
 import { http, HttpResponse } from "msw/http";
 import { DELETE, GET, POST } from "@/app/api/v1/[...path]/route";
 import { employerAuth, forwardHeaders, isWorkerCacheableRead } from "@/app/api/v1/[...path]/employer-auth";
+import { resetLimiters } from "@/app/api/v1/[...path]/rate-limit";
 import { server } from "@/mocks/node";
 
 /*
@@ -12,19 +13,24 @@ import { server } from "@/mocks/node";
 
 const UPSTREAM = "http://upstream.test";
 
+// The buckets live in module state; every test starts with full ones.
+beforeEach(() => {
+  resetLimiters();
+});
+
 describe("employerAuth: the allow-list", () => {
   it.each([
-    ["GET", "/api/v1/crews/crew-b/day-plan", null],
-    ["POST", "/api/v1/sites/site-demo-mussafah/data-requests", "write"],
+    ["GET", "/api/v1/crews/crew-b/day-plan", "general"],
+    ["POST", "/api/v1/sites/site-demo-mussafah/data-requests", "general"],
     ["POST", "/api/v1/crews/crew-b/stops", "stop"],
     ["DELETE", "/api/v1/crews/crew-b/stops/stop-0001", "stop"],
-    ["POST", "/api/v1/crews/crew-b/day-plan/sign-off", "write"],
-    ["POST", "/api/v1/sites/site-demo-mussafah/demo-reset", "write"],
-    ["GET", "/api/v1/crews/crew-a/day-plan", null],
+    ["POST", "/api/v1/crews/crew-b/day-plan/sign-off", "general"],
+    ["POST", "/api/v1/sites/site-demo-mussafah/demo-reset", "general"],
+    ["GET", "/api/v1/crews/crew-a/day-plan", "general"],
     ["POST", "/api/v1/crews/crew-d/stops", "stop"],
     ["post", "/api/v1/crews/crew-c/stops", "stop"],
-  ])("test_bff_injects_token_only_on_allow_list: %s %s injects", (method, path, writeClass) => {
-    expect(employerAuth(method, path)).toEqual({ inject: true, writeClass });
+  ])("test_bff_injects_token_only_on_allow_list: %s %s injects", (method, path, limitClass) => {
+    expect(employerAuth(method, path)).toEqual({ inject: true, limitClass });
   });
 
   it.each([
@@ -61,7 +67,7 @@ describe("employerAuth: the allow-list", () => {
     ["GET", "/api/v2/crews/crew-b/day-plan"],
     ["GET", "/crews/crew-b/day-plan"],
   ])("does not inject for %s %s", (method, path) => {
-    expect(employerAuth(method, path)).toEqual({ inject: false, writeClass: null });
+    expect(employerAuth(method, path)).toEqual({ inject: false, limitClass: null });
   });
 });
 
@@ -292,17 +298,62 @@ describe("the proxy route: write rate limit (decision D4)", () => {
     expect(statuses).toEqual([200, 200, 200, 429]);
   });
 
-  it("does not limit reads, and does not limit a write path outside the allow-list", async () => {
+  it("does not limit requests that carry no token: public reads and a write path outside the allow-list", async () => {
     vi.stubEnv("DEMO_WRITE_RATE_PER_MIN", "1");
     vi.stubEnv("DEMO_WRITE_GLOBAL_RATE_PER_MIN", "1");
-    const read = () => GET(new Request("http://localhost:3000/api/v1/crews/crew-b/day-plan", { headers: { "x-forwarded-for": "192.0.2.9" } }));
-    const other = () =>
-      POST(new Request("http://localhost:3000/api/v1/plans/validate", { method: "POST", body: "{}", headers: { "x-forwarded-for": "192.0.2.9" } }));
+    const headers = { "x-forwarded-for": "192.0.2.9" };
+    const reads = ["/api/v1/sites", "/api/v1/sites/site-demo-mussafah/crews", "/api/v1/crews/crew-b/timeline", "/api/v1/sites/site-demo-mussafah/forecast/today"];
+    const other = () => POST(new Request("http://localhost:3000/api/v1/plans/validate", { method: "POST", body: "{}", headers }));
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      expect((await read()).status).toBe(200);
+      for (const path of reads) expect((await GET(new Request(`http://localhost:3000${path}`, { headers }))).status).toBe(200);
       expect((await other()).status).toBe(200);
     }
+  });
+
+  it("counts the token-bearing day-plan read against the same budget as the writes, because upstream does", async () => {
+    vi.stubEnv("DEMO_WRITE_GLOBAL_RATE_PER_MIN", "2");
+    const headers = { "x-forwarded-for": "192.0.2.20" };
+    const read = () => GET(new Request("http://localhost:3000/api/v1/crews/crew-b/day-plan", { headers }));
+
+    expect((await read()).status).toBe(200);
+    expect((await read()).status).toBe(200);
+    expect((await read()).status).toBe(429);
+    expect((await POST(write("192.0.2.21"))).status).toBe(429);
+  });
+
+  it("never rejects a stop for the budget of the other operations: with that budget exhausted, a stop still reaches upstream", async () => {
+    const seen: string[] = [];
+    server.use(
+      http.all(`${UPSTREAM}/api/v1/*`, ({ request }) => {
+        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+        return HttpResponse.json({});
+      }),
+    );
+    // Exhaust the general budget (40 a minute for everyone), from several addresses so no per-client bucket is the cause.
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 41; attempt += 1) statuses.push((await POST(write(`198.19.0.${String(Math.floor(attempt / 10))}`))).status);
+    expect(statuses.filter((status) => status === 200)).toHaveLength(40);
+    expect(statuses[40]).toBe(429);
+    expect((await GET(new Request("http://localhost:3000/api/v1/crews/crew-b/day-plan", { headers: { "x-forwarded-for": "198.19.9.9" } }))).status).toBe(429);
+    seen.length = 0;
+
+    // The same address that was just refused, and fresh ones: stop and clear stop go through.
+    expect((await POST(stop("198.19.0.0"))).status).toBe(200);
+    expect((await POST(stop("198.19.9.9"))).status).toBe(200);
+    const clear = await DELETE(new Request("http://localhost:3000/api/v1/crews/crew-b/stops/stop-0001", { method: "DELETE", headers: { "x-forwarded-for": "198.19.9.9" } }));
+    expect(clear.status).toBe(200);
+    expect(seen).toEqual(["POST /api/v1/crews/crew-b/stops", "POST /api/v1/crews/crew-b/stops", "DELETE /api/v1/crews/crew-b/stops/stop-0001"]);
+  });
+
+  it("refuses a stop only by the stop reserve itself: its own global and per-client buckets", async () => {
+    vi.stubEnv("DEMO_STOP_RATE_PER_MIN", "3");
+    vi.stubEnv("DEMO_STOP_GLOBAL_RATE_PER_MIN", "4");
+    const own = ["198.20.0.1", "198.20.0.1", "198.20.0.1", "198.20.0.1"].map((ip) => stop(ip));
+    expect((await Promise.all(own.slice(0, 3).map((request) => POST(request)))).map((res) => res.status)).toEqual([200, 200, 200]);
+    expect((await POST(own[3] ?? stop("198.20.0.1"))).status).toBe(429);
+    expect((await POST(stop("198.20.0.2"))).status).toBe(200);
+    expect((await POST(stop("198.20.0.3"))).status).toBe(429);
   });
 
   it("keeps Stop work out of the buckets of the other writes: a 429 there never stops a stop, and a stop never drains them", async () => {
