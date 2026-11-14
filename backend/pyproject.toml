@@ -214,6 +214,18 @@ forbidden_modules = [
     "scoringrules",
 ]
 
+[[tool.importlinter.contracts]]
+name = "The independent validator does not know the planner or the compute adapters"
+type = "forbidden"
+source_modules = ["stellar_blaze.domain.validator"]
+forbidden_modules = ["stellar_blaze.domain.planner", "stellar_blaze.adapters.compute"]
+
+[[tool.importlinter.contracts]]
+name = "The planner does not know the validator"
+type = "forbidden"
+source_modules = ["stellar_blaze.domain.planner"]
+forbidden_modules = ["stellar_blaze.domain.validator"]
+
 # Transitive dependency imported directly on purpose, instead of adding a new pin: errors.py (Task 2) uses starlette
 # types, and starlette is pinned by fastapi==0.162.4.
 [tool.deptry.per_rule_ignores]
