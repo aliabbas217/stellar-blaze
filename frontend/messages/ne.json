@@ -63,6 +63,10 @@
         "proof": {
           "title": "Proof chip and drawer",
           "note": "Every scored number carries a chip that opens where it comes from. No provenance block means no number. Press a chip to open the drawer, then Recount to hash the file in this browser."
+        },
+        "evidence": {
+          "title": "Evidence components",
+          "note": "The scoreboard table, counters, verdict, season ribbon, day chart and roster frontier. Ribbon and counts are drawn from the recorded forecast file; scored cells are sample numbers with a sample proof, never a result."
         }
       },
       "sample": {
@@ -84,7 +88,8 @@
         "medicalLabel": "Medical help",
         "proofWhat": "Alerts per shift, P3 protect",
         "proofValue": "2.6 alerts per shift",
-        "proofChangedWhat": "Alerts per shift, file changed after export"
+        "proofChangedWhat": "Alerts per shift, file changed after export",
+        "verdictSample": "Sample outcome sentence for the kit. It is not a result."
       }
     }
   },
@@ -429,5 +434,226 @@
     "title": "तपाईं अफलाइन हुनुहुन्छ",
     "body": "यो पृष्ठ अहिलेसम्म यो फोनमा सुरक्षित छैन। पहिले खोलेका पृष्ठहरू चल्छन्।",
     "openToday": "आजका स्तर खोल्नुहोस्"
+  },
+  "judge": {
+    "scoreboard": {
+      "title": "Summer 2026, replayed honestly",
+      "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded.",
+      "facts": "Forecast made about 24 hours ahead · Scored against station thermometers · Held-out 2026, every choice fixed on 2024-2025 data",
+      "skip": "Skip to the scores",
+      "season": {
+        "heading": "The season, daily peak forecast",
+        "aria": "Daily peak forecast WBGT at Abu Dhabi airport, {days} days, {from} to {to}. {daysOver} of {days} days peak above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
+        "ariaNoBreak": "Daily peak forecast WBGT at Abu Dhabi airport, {days} days, {from} to {to}. {daysOver} of {days} days peak above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
+        "limit": "Heavy-work limit {limit} °C",
+        "slot": "Midday break in force, {from} to {to}, {start} to {end}",
+        "slotShort": "Midday break in force",
+        "peak": "{value} °C, {day}, {hour}, the hottest forecast",
+        "coolest": "Coolest day still peaked at {value} °C, {day}",
+        "tableToggle": "Show the daily numbers as a table",
+        "tableCaption": "Daily peak forecast, one row per day",
+        "columns": {
+          "day": "Day",
+          "peak": "Peak, °C",
+          "over": "Working hours over the limit",
+          "inBreak": "Midday break in force"
+        },
+        "yes": "Yes",
+        "no": "No"
+      },
+      "tally": {
+        "through": "Through {date}",
+        "final": "Through {date}, final",
+        "daysOf": "of {total}",
+        "days": "days the forecast peak crossed {limit} °C",
+        "hours": "working hours forecast above the limit",
+        "inBreak": "of those inside the midday break",
+        "whatDays": "Days the forecast peak crossed the limit",
+        "whatHours": "Working hours forecast above the limit",
+        "whatInBreak": "Hours above the limit inside the midday break"
+      },
+      "player": {
+        "play": "Play the season",
+        "pause": "Pause",
+        "resume": "Resume",
+        "note": "Plays {days} days in 8 seconds. The forecast counts are recorded; the scores below fill from the scoring run.",
+        "reducedMotion": "Animation is off on this device, so the whole season is shown."
+      },
+      "verdict": {
+        "heading": "What the season showed",
+        "pending": "Chosen from the pre-registered outcome table after the single scoring run.",
+        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change."
+      },
+      "warnings": {
+        "heading": "Warnings",
+        "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
+        "defs": "A danger hour is an hour the station was in the ADOSH High zone. Stellar Blaze warns when the calibrated chance of the High zone passes a threshold set on 2024 and 2025 data only.",
+        "caption": "Four ways to warn a crew, scored on the season",
+        "columns": {
+          "policy": "Policy",
+          "missed": "Danger hours nobody was warned about",
+          "falseAlarm": "False-alarm hours",
+          "warned": "Share of danger hours warned",
+          "falseShare": "Share of warnings that were false alarms"
+        },
+        "whatMissed": "Danger hours nobody was warned about, {policy}",
+        "whatFalseAlarm": "False-alarm hours, {policy}",
+        "whatWarned": "Share of danger hours warned, {policy}",
+        "whatFalseShare": "Share of warnings that were false alarms, {policy}",
+        "pending": "Warnings, summer 2026: danger hours nobody was warned about, false alarms and the two shares",
+        "policies": {
+          "P0": {
+            "label": "Midday break only",
+            "sub": "12:30 to 15:00 by law, nothing else"
+          },
+          "P1": {
+            "label": "Fixed 32 °C rule",
+            "sub": "Stop when the raw forecast reaches 32 °C"
+          },
+          "P2": {
+            "label": "ADOSH zones on the raw forecast",
+            "sub": "The regulator's zones, no correction"
+          },
+          "P3_protect": {
+            "label": "Stellar Blaze",
+            "sub": "Corrected forecast, warns at the protective threshold"
+          },
+          "P3_balanced": {
+            "label": "Stellar Blaze, balanced",
+            "sub": "Corrected forecast, warns at the balanced threshold"
+          }
+        }
+      },
+      "plans": {
+        "heading": "Plans",
+        "sub": "Each shift plan checked by the independent validator against what the station recorded.",
+        "defs": "Rest minutes added are a simulated cost on an assumed crew. We report rule-violation minutes, never illness prevented.",
+        "caption": "Shift plans, checked on the season",
+        "columns": {
+          "plan": "Plan",
+          "violation": "Rule-violation minutes per worker-season",
+          "cycled": "Share of High-zone heavy work planned as cycled",
+          "missed": "Minutes worked in a milder plan zone than the truth",
+          "rest": "Rest minutes added per worker-season"
+        },
+        "whatViolation": "Rule-violation minutes per worker-season, {plan}",
+        "whatCycled": "Share of High-zone heavy work planned as cycled, {plan}",
+        "whatMissed": "Minutes worked in a milder plan zone than the truth, {plan}",
+        "whatRest": "Rest minutes added per worker-season, {plan}",
+        "pending": "Plans, summer 2026: rule-violation minutes, cycled share, missed protection and rest minutes",
+        "roster": "Roster: {roster}",
+        "rows": {
+          "merged": {
+            "label": "Ban only (= working every shift minute outside the midday break, on the legal roster)",
+            "sub": "The legal minimum. Working through and ban only are the same plan."
+          },
+          "rule_raw": {
+            "label": "Rule plan on the raw forecast",
+            "sub": "ADOSH cycles from the raw forecast"
+          },
+          "rule_corrected": {
+            "label": "Rule plan on our corrected forecast",
+            "sub": "The protective quantile of the corrected forecast"
+          }
+        }
+      },
+      "table": {
+        "notScored": "not scored yet",
+        "ours": "This is the Stellar Blaze row.",
+        "interval": "95% interval {lo} to {hi}"
+      },
+      "partial": {
+        "title": "The Plans table is not on this page yet",
+        "reason": "The Plans file has not been written. The table appears here as soon as it is."
+      },
+      "empty": {
+        "title": "The scoring run has not written its file yet",
+        "reason": "Results appear after the single pre-registered run. Until then, one forecast number on this page shows exactly how a proof is read.",
+        "primary": "See how a number is proved"
+      },
+      "error": {
+        "title": "The scoreboard file could not be read",
+        "reason": "The season chart above is drawn from a separate recorded file. Nothing on this page is guessed in the meantime.",
+        "primary": "Try again"
+      },
+      "limits": {
+        "station": "Airport station, not a worksite.",
+        "crew": "The crew of {size} is an assumed schedule.",
+        "truth": "Truth is station temperature, humidity and wind plus modelled sunshine.",
+        "twl": "Thermal work limit aligned with ADOSH zones, not certified."
+      },
+      "loading": "Loading the season"
+    },
+    "frontier": {
+      "heading": "No roster shape outruns the heat under law, sleep and commute. Making the common roster legal does more.",
+      "sub": "Each point is a daily roster. Higher means more summer hours at 30 °C or more per scheduled hour; further right means more sleep. Pick a one-way commute.",
+      "whatPending": "The roster frontier analysis",
+      "loading": "Loading the roster frontier",
+      "commute": "One-way commute",
+      "commuteValue": "{minutes} min",
+      "aria": "Heat exposure against sleep for rosters at a {minutes} minute commute, with the legal default and the common practice roster marked.",
+      "xAxis": "Sleep per night, hours",
+      "yAxis": "Summer hours at 30 °C WBGT or more, per scheduled hour",
+      "gate": "{hours} h sleep gate",
+      "baselineLegal": "Legal default",
+      "baselineCommon": "Common practice",
+      "bestTitle": "Best roster that keeps the sleep gate",
+      "bestUnit": "fewer hours at 30 °C or more than the legal default, with sleep kept at {hours} h or more",
+      "bestNone": "No roster beats the legal default and keeps the sleep gate at this commute.",
+      "legalTitle": "Making the common roster legal",
+      "legalUnit": "fewer hours at 30 °C or more. This gain belongs to the law, not to Stellar Blaze.",
+      "whatBest": "Share of hours at 30 °C or more avoided against the legal default at a {minutes} minute commute",
+      "whatLegal": "Share of hours at 30 °C or more avoided by making the common roster legal",
+      "tableToggle": "Show the roster numbers as a table",
+      "tableCaption": "Rosters at a {minutes} minute commute",
+      "columns": {
+        "roster": "Roster",
+        "sleep": "Sleep, hours",
+        "exposure": "Hours at 30 °C or more per scheduled hour"
+      }
+    },
+    "story": {
+      "label": "Story",
+      "chapter": "Step {n} of {total}: {label}",
+      "back": "Back: {label}",
+      "next": "Next: {label}",
+      "copy": "Copy link to this step",
+      "copied": "Link copied",
+      "copyFailed": "Could not copy the link",
+      "steps": {
+        "problem": "The problem",
+        "scoreboard": "Scoreboard",
+        "day": "One day",
+        "proof": "Proof",
+        "product": "The product"
+      }
+    },
+    "proof": {
+      "title": "Proof sheet",
+      "back": "Back to the scoreboard",
+      "openSheet": "Open the proof sheet",
+      "rowsHeading": "Where it comes from",
+      "timelineHeading": "The number's timeline",
+      "timeline": {
+        "forecast": "Forecast made",
+        "protocol": "Protocol committed",
+        "run": "Scoring run",
+        "shown": "Shown here"
+      },
+      "notes": {
+        "forecastAhead": "About 24 hours ahead of each day, by the ECMWF model.",
+        "notAForecast": "Not a forecast: recorded station observations and a roster model.",
+        "protocolCommitted": "The pre-registration, commit 661b373, before 2026 was scored.",
+        "noProtocolForecast": "No scoring protocol: this count is made from the recorded forecast file.",
+        "noProtocolAnalysis": "No scoring protocol: this is a recorded analysis, not a scored result.",
+        "runScored": "The single scoring run wrote this file.",
+        "runDev": "The 2025 development run wrote this file. It is not the result.",
+        "runNotScoring": "Not a scoring run: nothing here is scored.",
+        "shown": "This page reads the file whose fingerprint is above."
+      },
+      "emptyTitle": "No provenance recorded for this number",
+      "emptyReason": "No provenance recorded for this number. It is not shown as a result.",
+      "emptyAction": "Open a number that has proof"
+    }
   }
 }

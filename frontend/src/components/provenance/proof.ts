@@ -41,6 +41,11 @@ export interface Proof {
   readonly modelId: string | null;
   /** UTC instant the file or forecast was written, ISO 8601. */
   readonly generatedAt: string | null;
+  /**
+   * The stable id of the number's proof sheet (`/replay/proof/<claim>`, for example `policy.p3.missed_danger_hours`), when
+   * it has one. The drawer then offers a link to the sheet.
+   */
+  readonly claim?: string;
 }
 
 /**
@@ -76,7 +81,7 @@ export function proofFromProvenance(
   anchor: string,
   what: string,
   file: { readonly path: string; readonly sha256: string | null },
-  options: { readonly label?: ProofLabel } = {},
+  options: { readonly label?: ProofLabel; readonly claim?: string } = {},
 ): Proof | null {
   if (provenance === null || provenance === undefined) return null;
   const { protocol_path, protocol_anchor, script, function: fn, git_sha, data_sha256, label, generated_at } = provenance;
@@ -96,6 +101,32 @@ export function proofFromProvenance(
     label: isDevPath(file.path) ? "DEV 2025" : (options.label ?? label),
     modelId: provenance.model_id ?? null,
     generatedAt: generated_at,
+    ...(options.claim === undefined ? {} : { claim: options.claim }),
+  };
+}
+
+/**
+ * The proof for a number counted from a recorded static file (the forecast file, the roster analysis): there is no exporter
+ * provenance block, so the caller says in words what the file is (`protocol`) and which function counted (`script`). The
+ * label is the manifest's (RECORDED, or REAL weather + assumed crew); it is never a scored-result label.
+ */
+export function proofFromStaticFile(
+  file: { readonly path: string; readonly sha256: string },
+  what: string,
+  source: { readonly protocol: string; readonly script: string; readonly label: ProofLabel; readonly claim?: string },
+): Proof {
+  return {
+    what,
+    protocol: source.protocol,
+    protocolHref: null,
+    script: source.script,
+    file: file.path,
+    fileSha256: file.sha256,
+    sourceSha256: null,
+    label: source.label,
+    modelId: null,
+    generatedAt: null,
+    ...(source.claim === undefined ? {} : { claim: source.claim }),
   };
 }
 

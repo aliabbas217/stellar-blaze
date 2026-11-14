@@ -1,11 +1,21 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import type { ReactNode } from "react";
 import { Proved } from "@/components/provenance/Proved";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import type { Proof } from "@/components/provenance/proof";
 import { server } from "@/mocks/node";
 import { renderWithIntl } from "../../../utils/intl";
+
+// The locale-aware Link needs the Next.js app router; only the href it is given matters here (the drawer links to the proof sheet).
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
+}));
 
 const BODY = "stellar blaze";
 
@@ -163,6 +173,17 @@ describe("ProofChip", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).queryByRole("button", { name: "Recount in this browser" })).not.toBeInTheDocument();
     expect(within(dialog).getByText(/not published here/)).toBeInTheDocument();
+  });
+
+  it("links to the proof sheet only for a number that has one", async () => {
+    const { unmount } = renderWithIntl(<ProofChip proof={proofOf({ claim: "policy.p3.missed_danger_hours" })} />);
+    await userEvent.click(screen.getByRole("button", { name: /Alerts per shift, P3 protect/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("link", { name: "Open the proof sheet" })).toHaveAttribute("href", "/replay/proof/policy.p3.missed_danger_hours");
+    unmount();
+    renderWithIntl(<ProofChip proof={proofOf()} />);
+    await userEvent.click(screen.getByRole("button", { name: /Alerts per shift, P3 protect/ }));
+    expect(within(await screen.findByRole("dialog")).queryByRole("link", { name: "Open the proof sheet" })).toBeNull();
   });
 
   it("writes Not recorded for a missing fingerprint or model, never a blank", async () => {

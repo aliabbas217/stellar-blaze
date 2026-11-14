@@ -56,6 +56,7 @@ const NAMESPACES = [
   "levels",
   "actions",
   "offline",
+  "judge",
 ] as const;
 
 const en = load("en");
