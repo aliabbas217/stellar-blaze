@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { http, HttpResponse } from "msw/http";
 import { DELETE, GET, POST } from "@/app/api/v1/[...path]/route";
-import { employerAuth, forwardHeaders } from "@/app/api/v1/[...path]/employer-auth";
+import { employerAuth, forwardHeaders, isWorkerCacheableRead } from "@/app/api/v1/[...path]/employer-auth";
 import { server } from "@/mocks/node";
 
 /*
@@ -14,17 +14,17 @@ const UPSTREAM = "http://upstream.test";
 
 describe("employerAuth: the allow-list", () => {
   it.each([
-    ["GET", "/api/v1/crews/crew-b/day-plan", false],
-    ["POST", "/api/v1/sites/site-demo-mussafah/data-requests", true],
-    ["POST", "/api/v1/crews/crew-b/stops", true],
-    ["DELETE", "/api/v1/crews/crew-b/stops/stop-mock-1", true],
-    ["POST", "/api/v1/crews/crew-b/day-plan/sign-off", true],
-    ["POST", "/api/v1/sites/site-demo-mussafah/demo-reset", true],
-    ["GET", "/api/v1/crews/crew-a/day-plan", false],
-    ["POST", "/api/v1/crews/crew-d/stops", true],
-    ["post", "/api/v1/crews/crew-c/stops", true],
-  ])("test_bff_injects_token_only_on_allow_list: %s %s injects", (method, path, write) => {
-    expect(employerAuth(method, path)).toEqual({ inject: true, write });
+    ["GET", "/api/v1/crews/crew-b/day-plan", null],
+    ["POST", "/api/v1/sites/site-demo-mussafah/data-requests", "write"],
+    ["POST", "/api/v1/crews/crew-b/stops", "stop"],
+    ["DELETE", "/api/v1/crews/crew-b/stops/stop-0001", "stop"],
+    ["POST", "/api/v1/crews/crew-b/day-plan/sign-off", "write"],
+    ["POST", "/api/v1/sites/site-demo-mussafah/demo-reset", "write"],
+    ["GET", "/api/v1/crews/crew-a/day-plan", null],
+    ["POST", "/api/v1/crews/crew-d/stops", "stop"],
+    ["post", "/api/v1/crews/crew-c/stops", "stop"],
+  ])("test_bff_injects_token_only_on_allow_list: %s %s injects", (method, path, writeClass) => {
+    expect(employerAuth(method, path)).toEqual({ inject: true, writeClass });
   });
 
   it.each([
@@ -61,7 +61,25 @@ describe("employerAuth: the allow-list", () => {
     ["GET", "/api/v2/crews/crew-b/day-plan"],
     ["GET", "/crews/crew-b/day-plan"],
   ])("does not inject for %s %s", (method, path) => {
-    expect(employerAuth(method, path)).toEqual({ inject: false, write: false });
+    expect(employerAuth(method, path)).toEqual({ inject: false, writeClass: null });
+  });
+});
+
+describe("isWorkerCacheableRead", () => {
+  it("is true only for the GETs of forecast/today and risk-policy", () => {
+    expect(isWorkerCacheableRead("GET", "/api/v1/sites/site-demo-mussafah/forecast/today")).toBe(true);
+    expect(isWorkerCacheableRead("get", "/api/v1/risk-policy")).toBe(true);
+    for (const [method, path] of [
+      ["POST", "/api/v1/risk-policy"],
+      ["GET", "/api/v1/sites"],
+      ["GET", "/api/v1/sites/site-demo-mussafah/crews"],
+      ["GET", "/api/v1/crews/crew-b/day-plan"],
+      ["GET", "/api/v1/crews/crew-b/timeline"],
+      ["GET", "/api/v1/sites/site-demo-mussafah/transparency-log"],
+      ["GET", "/api/v1/sites/a/b/forecast/today"],
+    ] as const) {
+      expect(isWorkerCacheableRead(method, path), `${method} ${path}`).toBe(false);
+    }
   });
 });
 
@@ -169,11 +187,72 @@ describe("the proxy route", () => {
   });
 });
 
-describe("the proxy route: write rate limit (decision D4)", () => {
-  const WRITE = "/api/v1/crews/crew-b/stops";
+describe("the proxy route: Cache-Control", () => {
+  beforeEach(() => {
+    vi.stubEnv("API_ORIGIN", UPSTREAM);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    server.use(http.all(`${UPSTREAM}/api/v1/*`, () => HttpResponse.json({}, { headers: { "cache-control": "public, max-age=600" } })));
+  });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const call = (path: string) => GET(new Request(`http://localhost:3000${path}`));
+
+  it.each([
+    "/api/v1/crews/crew-b/day-plan",
+    "/api/v1/sites/site-demo-mussafah/transparency-log",
+    "/api/v1/sites/site-demo-mussafah/crews",
+    "/api/v1/crews/crew-b/timeline",
+    "/api/v1/sites",
+  ])("sets no-store on %s, whatever the upstream said", async (path) => {
+    expect((await call(path)).headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("sets no-store on the writes, the 429 and the 502 as well", async () => {
+    vi.stubEnv("DEMO_WRITE_RATE_PER_MIN", "1");
+    vi.stubEnv("DEMO_WRITE_GLOBAL_RATE_PER_MIN", "1");
+    const post = () =>
+      POST(new Request("http://localhost:3000/api/v1/sites/site-demo-mussafah/data-requests", { method: "POST", body: "{}", headers: { "x-forwarded-for": "198.18.0.1" } }));
+
+    expect((await post()).headers.get("cache-control")).toBe("no-store");
+    const limited = await post();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("cache-control")).toBe("no-store");
+    vi.stubEnv("API_ORIGIN", "");
+    const unavailable = await call("/api/v1/sites");
+    expect(unavailable.status).toBe(502);
+    expect(unavailable.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("stores a success of forecast/today and risk-policy as the upstream said, and no error of them", async () => {
+    expect((await call("/api/v1/sites/site-demo-mussafah/forecast/today")).headers.get("cache-control")).toBeNull();
+    expect((await call("/api/v1/risk-policy")).headers.get("cache-control")).toBeNull();
+    server.use(http.get(`${UPSTREAM}/api/v1/risk-policy`, () => new HttpResponse(null, { status: 503 })));
+    expect((await call("/api/v1/risk-policy")).headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("passes the upstream Retry-After of a 429 through", async () => {
+    server.use(http.post(`${UPSTREAM}/api/v1/crews/crew-b/stops`, () => new HttpResponse(null, { status: 429, headers: { "retry-after": "17" } })));
+    vi.stubEnv("DEMO_STOP_RATE_PER_MIN", "50");
+
+    const res = await POST(new Request("http://localhost:3000/api/v1/crews/crew-b/stops", { method: "POST", body: "{}", headers: { "x-forwarded-for": "198.18.0.2" } }));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("17");
+  });
+});
+
+describe("the proxy route: write rate limit (decision D4)", () => {
+  /** A write of the general class (data request); Stop work is its own class, see stop(). */
   function write(ip: string): Request {
-    return new Request(`http://localhost:3000${WRITE}`, { method: "POST", body: "{}", headers: { "x-forwarded-for": ip } });
+    return new Request("http://localhost:3000/api/v1/sites/site-demo-mussafah/data-requests", { method: "POST", body: "{}", headers: { "x-forwarded-for": ip } });
+  }
+
+  function stop(ip: string): Request {
+    return new Request("http://localhost:3000/api/v1/crews/crew-b/stops", { method: "POST", body: "{}", headers: { "x-forwarded-for": ip } });
   }
 
   beforeEach(() => {
@@ -224,6 +303,35 @@ describe("the proxy route: write rate limit (decision D4)", () => {
       expect((await read()).status).toBe(200);
       expect((await other()).status).toBe(200);
     }
+  });
+
+  it("keeps Stop work out of the buckets of the other writes: a 429 there never stops a stop, and a stop never drains them", async () => {
+    vi.stubEnv("DEMO_WRITE_RATE_PER_MIN", "1");
+    vi.stubEnv("DEMO_WRITE_GLOBAL_RATE_PER_MIN", "1");
+    vi.stubEnv("DEMO_STOP_RATE_PER_MIN", "5");
+    vi.stubEnv("DEMO_STOP_GLOBAL_RATE_PER_MIN", "5");
+    const ip = "198.18.1.1";
+    const other = () =>
+      POST(new Request("http://localhost:3000/api/v1/crews/crew-b/day-plan/sign-off", { method: "POST", body: "{}", headers: { "x-forwarded-for": ip } }));
+
+    expect((await other()).status).toBe(200);
+    expect((await other()).status).toBe(429);
+    const stops: number[] = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) stops.push((await POST(stop(ip))).status);
+    expect(stops).toEqual([200, 200, 200, 200, 200, 429]);
+    expect((await other()).status).toBe(429);
+  });
+
+  it("honours TRUSTED_PROXY_HOPS: with two hops, visitors behind one CDN address do not share a bucket", async () => {
+    vi.stubEnv("TRUSTED_PROXY_HOPS", "2");
+    vi.stubEnv("DEMO_WRITE_RATE_PER_MIN", "1");
+    vi.stubEnv("DEMO_WRITE_GLOBAL_RATE_PER_MIN", "50");
+    const post = (forwarded: string) =>
+      POST(new Request("http://localhost:3000/api/v1/sites/site-demo-mussafah/data-requests", { method: "POST", body: "{}", headers: { "x-forwarded-for": forwarded } }));
+
+    expect((await post("203.0.113.10, 198.51.100.9")).status).toBe(200);
+    expect((await post("203.0.113.11, 198.51.100.9")).status).toBe(200);
+    expect((await post("6.6.6.6, 203.0.113.10, 198.51.100.9")).status).toBe(429);
   });
 
   it("falls back to the default limits for an invalid setting (20 per client per minute)", async () => {

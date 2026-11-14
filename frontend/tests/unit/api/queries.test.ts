@@ -1,4 +1,4 @@
-import { MutationObserver, QueryClient } from "@tanstack/react-query";
+import { MutationObserver, QueryClient, onlineManager } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw/http";
 import type { Middleware } from "openapi-fetch";
 import { apiClient } from "@/api/client";
@@ -57,6 +57,7 @@ beforeEach(() => {
 
 afterEach(() => {
   apiClient.eject(bff);
+  onlineManager.setOnline(true);
 });
 
 describe("query keys", () => {
@@ -100,7 +101,7 @@ describe("read options", () => {
     );
 
     expect((await newClient().query(crewTimelineQueryOptions("crew-b"))).date).toBe("2026-09-03");
-    expect((await newClient().query(crewTimelineQueryOptions("crew-b", "2026-11-11"))).ban_window).toBeNull();
+    expect((await newClient().query(crewTimelineQueryOptions("crew-b", "2026-11-11"))).ban_window.active_on_date).toBe(false);
     expect(seen).toEqual([null, "2026-11-11"]);
   });
 
@@ -140,7 +141,7 @@ describe("write options", () => {
     const result = await mutate(newClient(), validatePlanMutation(), {
       site_id: DEMO_SITE,
       date: "2026-09-03",
-      crew: { workload: "heavy", headcount: 20 },
+      crew: { workload: "heavy", headcount: 20, acclimatised: true, days_per_week: 6 },
       roster_text: "06:00-12:30 work\n15:00-17:00 work",
       segments: null,
     });
@@ -180,7 +181,7 @@ describe("write options", () => {
 
     await mutate(client, clearStopMutation("crew-b"), stop.id);
     const reset = await mutate(client, resetDemoMutation(DEMO_SITE), undefined);
-    expect(reset.epoch).toBe(2);
+    expect(reset).toMatchObject({ epoch_id: 2, previous_epoch_id: 1 });
     expect((await client.query({ ...crewDayPlanQueryOptions("crew-b"), staleTime: 0 })).signoff_state).toBe("unsigned");
   });
 
@@ -197,5 +198,50 @@ describe("write options", () => {
     await mutate(newClient(), stopMutation("crew-b"), { reason_code: "worker_unwell" });
 
     expect(seen).toEqual(["POST /api/v1/crews/crew-b/stops"]);
+  });
+
+  it.each([
+    ["stopMutation", () => stopMutation("crew-b")],
+    ["clearStopMutation", () => clearStopMutation("crew-b")],
+    ["signOffMutation", () => signOffMutation("crew-b")],
+  ] as const)("%s sets networkMode always, so it is not held back while the device looks offline", (_name, options) => {
+    expect(options().networkMode).toBe("always");
+  });
+
+  it("a stop made while the device is offline fails at once as a network ApiProblem, and is not queued to fire on reconnect", async () => {
+    asBff();
+    const seen: string[] = [];
+    server.use(
+      http.all("*/api/v1/*", ({ request }) => {
+        seen.push(request.method);
+        return HttpResponse.error();
+      }),
+    );
+    onlineManager.setOnline(false);
+    const client = newClient();
+
+    const failure = await Promise.race([
+      mutate(client, stopMutation("crew-b"), { reason_code: "heat" }).catch((error: unknown) => error),
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve("still paused");
+        }, 1000);
+      }),
+    ]);
+
+    expect(failure).toBeInstanceOf(ApiProblem);
+    expect((failure as ApiProblem).problem.status).toBe(0);
+    expect(seen).toEqual(["POST"]);
+    // Coming back online sends nothing more: the failed stop is not a pending one.
+    onlineManager.setOnline(true);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+    expect(seen).toEqual(["POST"]);
+  });
+
+  it("the sign-off mutation and the stop mutation take their own mutation keys, so one cannot pause the other", () => {
+    expect(stopMutation("crew-b").mutationKey).toEqual(["crew-stop", "crew-b"]);
+    expect(signOffMutation("crew-b", "2026-09-03").mutationKey).toEqual(["sign-off", "crew-b", "2026-09-03"]);
   });
 });

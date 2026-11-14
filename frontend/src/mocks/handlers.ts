@@ -2,7 +2,6 @@ import { http, HttpResponse, type HttpResponseResolver } from "msw/http";
 import { z } from "zod";
 import type { components } from "@/api/schema";
 import { MOCK_SCENARIO_HEADER } from "../api/mock-scenario.ts";
-import { problemResponse } from "../api/problem.ts";
 import {
   REPLAY_DATE,
   STALE_AGE_MS,
@@ -10,10 +9,13 @@ import {
   clearStop,
   createStop,
   crewDayPlan,
+  crewExists,
   crewTimeline,
-  crews,
   forecastToday,
   isIsoDate,
+  listCrews,
+  listSites,
+  parseRoster,
   resetDemoState,
   riskPolicy,
   signOffDayPlan,
@@ -22,13 +24,12 @@ import {
   validateTyped,
   type DayOptions,
 } from "./fixtures.ts";
-import { parseRoster, ticksOfRoster } from "./rules.ts";
 
 /*
- * MSW handlers for the whole contract in openapi/stellar-blaze.openapi.json: the 14 operations of ADR 0051 and its
- * amendment, plus the candidate `reset_demo_site`. The same handlers run in three places: Vitest (`setupServer`,
- * src/mocks/node.ts), the standalone mock server that e2e and `pnpm mock:api` use (@msw/serve, scripts/mock-api.ts),
- * and any test that overrides one with `server.use(...)`.
+ * MSW handlers for the whole contract in openapi/stellar-blaze.openapi.json (B3's v1): the 15 operations. The same
+ * handlers run in three places: Vitest (`setupServer`, src/mocks/node.ts), the standalone mock server that e2e and
+ * `pnpm mock:api` use (@msw/serve, scripts/mock-api.ts), and any test that overrides one with `server.use(...)`.
+ * The answers are canned (src/mocks/fixtures.ts); there is no rule engine here.
  *
  * Paths start with `*` so they match on any origin: the browser's own origin in jsdom, API_ORIGIN for the BFF
  * proxy and for server components, and the mock server's.
@@ -36,13 +37,13 @@ import { parseRoster, ticksOfRoster } from "./rules.ts";
  * Because e2e has no per-test `server.use`, every handler also honours the request header
  * `x-sb-mock-scenario`:
  *   error       a 500 problem+json whose request_id is "mock-req-1" (on writes too)
- *   stale       the forecast generated 26 hours ago, forecast_status "stale" (also on the day plan)
+ *   stale       the forecast generated 26 hours ago, forecast_status "stale"; the day plan is the protective fallback
  *   empty       an empty result: `[]` for the lists, no hours for the forecast and the crew timeline, no segments for
  *               the day plan, no entries in the transparency log
  *   fallback    forecast_status "fallback": no hour has data or a level; the day plan is the protective fallback
  *   suppressed  every crew is below k: timelines say suppressed, day plans hide the restricted headcount
  * Any other value is ignored. The employer routes answer 401 without an `Authorization: Bearer` header (the BFF adds
- * the demo token on its allow-list); the mock accepts any non-empty token.
+ * the demo token on its allow-list); the mock accepts any non-empty token. It does not rate limit: the BFF does.
  *
  * Loaded by scripts/mock-api.ts under Node's type stripping: only `import type` uses the "@/" alias (it is
  * erased), runtime imports are relative and end in ".ts", and there are no enums or parameter properties.
@@ -58,48 +59,66 @@ const FORECAST_PATH = "*/api/v1/sites/:site_id/forecast/today";
 
 const PROBLEM_PREFIX = "urn:stellar-blaze:problem:";
 
-const STATUS_TITLES: Record<number, string> = {
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  422: "Unprocessable Content",
-  500: "Internal Server Error",
-  501: "Not Implemented",
-  502: "Bad Gateway",
-  503: "Service Unavailable",
+/** The type and title the contract's own examples give each status (openapi/stellar-blaze.openapi.json). */
+const PROBLEMS: Record<number, { type: string; title: string }> = {
+  401: { type: `${PROBLEM_PREFIX}unauthorized`, title: "Unauthorized" },
+  403: { type: `${PROBLEM_PREFIX}forbidden-employer`, title: "Forbidden" },
+  404: { type: `${PROBLEM_PREFIX}not-found`, title: "Not found" },
+  409: { type: `${PROBLEM_PREFIX}conflict`, title: "Conflict" },
+  422: { type: "about:blank", title: "Unprocessable Entity" },
+  429: { type: `${PROBLEM_PREFIX}rate-limited`, title: "Rate limited" },
+  500: { type: `${PROBLEM_PREFIX}mock-500`, title: "Internal Server Error" },
+  501: { type: `${PROBLEM_PREFIX}not-implemented`, title: "Not implemented" },
+  502: { type: `${PROBLEM_PREFIX}mock-502`, title: "Bad Gateway" },
+  503: { type: `${PROBLEM_PREFIX}mock-503`, title: "Service Unavailable" },
 };
 
-function mockProblem(status: number, detail?: string): Response {
-  return problemResponse({
-    type: `${PROBLEM_PREFIX}mock-${String(status)}`,
-    title: STATUS_TITLES[status] ?? "Error",
-    status,
-    ...(detail === undefined ? {} : { detail }),
+interface ProblemInit {
+  status: number;
+  type?: string;
+  title?: string;
+  detail?: string;
+  /** Members beyond the base shape: `errors`, `missing_items`. */
+  extra?: Record<string, unknown>;
+  headers?: Record<string, string>;
+}
+
+/** A problem+json as the contract defines it: type, title, status, detail, instance (the path), request_id. */
+function problem(request: Request, init: ProblemInit): Response {
+  const known = PROBLEMS[init.status] ?? { type: `${PROBLEM_PREFIX}mock-${String(init.status)}`, title: "Error" };
+  const body = {
+    type: init.type ?? known.type,
+    title: init.title ?? known.title,
+    status: init.status,
+    ...(init.detail === undefined ? {} : { detail: init.detail }),
+    instance: new URL(request.url).pathname,
     request_id: MOCK_REQUEST_ID,
+    ...init.extra,
+  };
+  return new Response(JSON.stringify(body), {
+    status: init.status,
+    headers: { "content-type": "application/problem+json", "x-request-id": MOCK_REQUEST_ID, ...init.headers },
   });
 }
 
-/** A problem+json of a named type, with members beyond the base shape (`missing_items`, `errors`) where the contract has them. */
-function namedProblem(
-  status: number,
-  type: string,
-  detail: string,
-  extra: Record<string, unknown> = {},
-  headers: Record<string, string> = {},
-): Response {
-  const body = {
-    type: `${PROBLEM_PREFIX}${type}`,
-    title: STATUS_TITLES[status] ?? "Error",
-    status,
-    detail,
-    request_id: MOCK_REQUEST_ID,
-    ...extra,
-  };
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/problem+json", "x-request-id": MOCK_REQUEST_ID, ...headers },
-  });
+function mockProblem(request: Request, status: number, detail?: string): Response {
+  return problem(request, { status, ...(detail === undefined ? {} : { detail }) });
+}
+
+type ValidationError = Schemas["ValidationErrorItem"];
+
+function validationProblem(request: Request, errors: ValidationError[]): Response {
+  return problem(request, { status: 422, detail: "Request validation failed", extra: { errors } });
+}
+
+/** The 422 for a body that failed the contract: one item per zod issue, located in the body. */
+function bodyProblem(request: Request, error: z.ZodError): Response {
+  const errors = error.issues.map((issue) => ({
+    loc: ["body", ...issue.path.map((part) => (typeof part === "number" ? part : String(part)))],
+    msg: issue.message,
+    type: issue.code,
+  }));
+  return validationProblem(request, errors);
 }
 
 function scenarioOf(request: Request): Scenario | null {
@@ -118,7 +137,7 @@ function withScenario(
 ): HttpResponseResolver {
   return (info) => {
     const scenario = scenarioOf(info.request);
-    return scenario === "error" ? mockProblem(500) : resolve(info, scenario);
+    return scenario === "error" ? mockProblem(info.request, 500) : resolve(info, scenario);
   };
 }
 
@@ -126,7 +145,7 @@ function withScenario(
 function unauthorized(request: Request): Response | null {
   const header = request.headers.get("authorization") ?? "";
   if (/^Bearer\s+\S+/.test(header)) return null;
-  return namedProblem(401, "unauthorized", "An employer token is required.", {}, { "www-authenticate": "Bearer" });
+  return problem(request, { status: 401, detail: "A bearer token is required.", headers: { "www-authenticate": "Bearer" } });
 }
 
 function dayOptions(scenario: Scenario | null): DayOptions {
@@ -144,15 +163,17 @@ function dateOf(request: Request): string | null {
   return isIsoDate(raw) ? raw : null;
 }
 
-const DATE_DETAIL = "date must be YYYY-MM-DD.";
+function badDate(request: Request): Response {
+  return validationProblem(request, [{ loc: ["query", "date"], msg: "Input should be a valid date", type: "date_parsing" }]);
+}
 
-function forecastResponse(siteId: string, date: string, scenario: Scenario | null): Response {
+function forecastResponse(request: Request, siteId: string, date: string, scenario: Scenario | null): Response {
   const forecast = forecastToday(siteId, {
     date,
     ...(scenario === "stale" ? { ageMs: STALE_AGE_MS } : {}),
     ...(scenario === "fallback" ? { status: "fallback" as const } : {}),
   });
-  if (forecast === undefined) return mockProblem(404, `No site ${siteId}.`);
+  if (forecast === undefined) return mockProblem(request, 404, `No site ${siteId}.`);
   return HttpResponse.json(scenario === "empty" ? { ...forecast, hours: [] } : forecast);
 }
 
@@ -180,21 +201,25 @@ const DataRequestCreateSchema = z.strictObject({
 
 const CrewStopCreateSchema = z.strictObject({ reason_code: z.enum(["heat", "worker_unwell", "other"]) });
 
-const SignOffRequestSchema = z.strictObject({
-  acknowledged_items: z.array(z.string()),
-  deviation_reason_code: z.string().nullable(),
+const PlanSignOffRequestSchema = z.strictObject({
+  acknowledged_items: z.array(z.string().min(1)).max(32),
+  deviation_reason_code: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]{0,39}$/)
+    .nullable()
+    .optional(),
 });
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const PlanValidateRequestSchema = z.strictObject({
-  site_id: z.string(),
+  site_id: z.string().min(1).max(100),
   date: z.string(),
   crew: z.strictObject({
     workload: z.enum(["light", "moderate", "heavy"]),
     headcount: z.number().int().min(1).max(200),
-    acclimatised: z.boolean().default(true),
-    days_per_week: z.number().int().min(1).max(7).default(6),
+    acclimatised: z.boolean().optional(),
+    days_per_week: z.number().int().min(1).max(7).optional(),
   }),
   roster_text: z.string().max(2000).nullable().optional(),
   segments: z
@@ -206,15 +231,15 @@ const PlanValidateRequestSchema = z.strictObject({
 export const handlers = [
   http.get(
     "*/api/v1/sites",
-    withScenario((_info, scenario) => HttpResponse.json(scenario === "empty" ? [] : sites)),
+    withScenario((_info, scenario) => HttpResponse.json(scenario === "empty" ? [] : listSites())),
   ),
 
   http.get(
     FORECAST_PATH,
     withScenario(({ request, params }, scenario) => {
       const date = dateOf(request);
-      if (date === null) return mockProblem(422, DATE_DETAIL);
-      return forecastResponse(pathParam(params, "site_id"), date, scenario);
+      if (date === null) return badDate(request);
+      return forecastResponse(request, pathParam(params, "site_id"), date, scenario);
     }),
   ),
 
@@ -225,11 +250,12 @@ export const handlers = [
 
   http.get(
     "*/api/v1/sites/:site_id/crews",
-    withScenario(({ params }, scenario) => {
+    withScenario(({ request, params }, scenario) => {
+      if (dateOf(request) === null) return badDate(request);
       const siteId = pathParam(params, "site_id");
-      if (!sites.some((site) => site.id === siteId)) return mockProblem(404, `No site ${siteId}.`);
-      const found: Schemas["Crew"][] = scenario === "empty" ? [] : crews.filter((crew) => crew.site_id === siteId);
-      return HttpResponse.json(found);
+      const found = listCrews(siteId, dayOptions(scenario));
+      if (found === undefined) return mockProblem(request, 404, `No site ${siteId}.`);
+      return HttpResponse.json(scenario === "empty" ? [] : found);
     }),
   ),
 
@@ -237,10 +263,10 @@ export const handlers = [
     "*/api/v1/crews/:crew_id/timeline",
     withScenario(({ request, params }, scenario) => {
       const date = dateOf(request);
-      if (date === null) return mockProblem(422, DATE_DETAIL);
+      if (date === null) return badDate(request);
       const crewId = pathParam(params, "crew_id");
       const timeline = crewTimeline(crewId, date, dayOptions(scenario));
-      if (timeline === undefined) return mockProblem(404, `No crew ${crewId}.`);
+      if (timeline === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
       return HttpResponse.json(scenario === "empty" ? { ...timeline, hours: [] } : timeline);
     }),
   ),
@@ -251,10 +277,10 @@ export const handlers = [
       const refused = unauthorized(request);
       if (refused !== null) return refused;
       const date = dateOf(request);
-      if (date === null) return mockProblem(422, DATE_DETAIL);
+      if (date === null) return badDate(request);
       const crewId = pathParam(params, "crew_id");
       const plan = crewDayPlan(crewId, date, dayOptions(scenario));
-      if (plan === undefined) return mockProblem(404, `No crew ${crewId}.`);
+      if (plan === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
       return HttpResponse.json(scenario === "empty" ? { ...plan, segments: [], zone_hours: [], ack_items: [] } : plan);
     }),
   ),
@@ -265,18 +291,29 @@ export const handlers = [
       const refused = unauthorized(request);
       if (refused !== null) return refused;
       const crewId = pathParam(params, "crew_id");
-      if (!crews.some((crew) => crew.id === crewId)) return mockProblem(404, `No crew ${crewId}.`);
-      const parsed = SignOffRequestSchema.safeParse(await jsonBody(request));
-      if (!parsed.success) return mockProblem(422, "Body is not a sign-off request.");
-      const outcome = signOffDayPlan(crewId, parsed.data.acknowledged_items, dayOptions(scenario));
-      if (outcome === undefined) return mockProblem(404, `No crew ${crewId}.`);
-      if (outcome.kind === "unknown-items") return mockProblem(422, `Not items of this plan: ${outcome.unknown.join(", ")}.`);
+      if (!crewExists(crewId)) return mockProblem(request, 404, `No crew ${crewId}.`);
+      const date = dateOf(request);
+      if (date === null) return badDate(request);
+      const parsed = PlanSignOffRequestSchema.safeParse(await jsonBody(request));
+      if (!parsed.success) return bodyProblem(request, parsed.error);
+      const outcome = signOffDayPlan(crewId, parsed.data.acknowledged_items, parsed.data.deviation_reason_code ?? null, dayOptions(scenario), date);
+      if (outcome === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
+      if (outcome.kind === "unknown-items") {
+        return validationProblem(
+          request,
+          outcome.unknown.map(({ id, index }) => ({ loc: ["body", "acknowledged_items", index], msg: `${id} is not an item of this plan`, type: "value_error" })),
+        );
+      }
       if (outcome.kind === "review-required") {
-        return namedProblem(409, "review-required", "Every item that needs review must be acknowledged before sign-off.", {
-          missing_items: outcome.missing,
+        return problem(request, {
+          status: 409,
+          type: `${PROBLEM_PREFIX}review-required`,
+          title: "Review required",
+          detail: "Every Medium and High item must be acknowledged before signing.",
+          extra: { missing_items: outcome.missing },
         });
       }
-      return HttpResponse.json(outcome.plan);
+      return HttpResponse.json(outcome.signOff, { status: 201 });
     }),
   ),
 
@@ -284,27 +321,25 @@ export const handlers = [
     "*/api/v1/plans/validate",
     withScenario(async ({ request }, scenario) => {
       const parsed = PlanValidateRequestSchema.safeParse(await jsonBody(request));
-      if (!parsed.success) return mockProblem(422, "Body is not a plan validation request.");
-      const { site_id: siteId, date, crew, roster_text: rosterText, segments } = parsed.data;
-      if (!isIsoDate(date)) return mockProblem(422, DATE_DETAIL);
-      if (!sites.some((site) => site.id === siteId)) return mockProblem(404, `No site ${siteId}.`);
-      if ((rosterText == null) === (segments == null)) return mockProblem(422, "Send exactly one of roster_text and segments.");
+      if (!parsed.success) return bodyProblem(request, parsed.error);
+      const { site_id: siteId, date, roster_text: rosterText, segments } = parsed.data;
+      if (!isIsoDate(date)) return validationProblem(request, [{ loc: ["body", "date"], msg: "Input should be a valid date", type: "date_parsing" }]);
+      if (!sites.some((site) => site.id === siteId)) return mockProblem(request, 404, `No site ${siteId}.`);
+      if ((rosterText == null) === (segments == null)) {
+        return validationProblem(request, [{ loc: ["body"], msg: "Send exactly one of roster_text and segments", type: "value_error" }]);
+      }
       const text = rosterText ?? (segments ?? []).map((segment) => `${segment.start}-${segment.end} ${segment.state}`).join("\n");
       const roster = parseRoster(text);
       if ("errors" in roster) {
-        return namedProblem(422, "roster-invalid", "The roster could not be read.", { errors: roster.errors });
+        return problem(request, {
+          status: 422,
+          type: `${PROBLEM_PREFIX}roster-invalid`,
+          title: "Roster invalid",
+          detail: "The roster could not be read.",
+          extra: { errors: roster.errors },
+        });
       }
-      const response = validateTyped(
-        {
-          date,
-          workload: crew.workload,
-          daysPerWeek: crew.days_per_week,
-          segments: roster.segments,
-          states: ticksOfRoster(roster.segments),
-        },
-        dayOptions(scenario),
-      );
-      return HttpResponse.json(response);
+      return HttpResponse.json(validateTyped({ date, segments: roster.segments }, dayOptions(scenario)));
     }),
   ),
 
@@ -312,11 +347,11 @@ export const handlers = [
     "*/api/v1/push/subscriptions",
     withScenario(async ({ request }) => {
       const parsed = PushSubscriptionCreateSchema.safeParse(await jsonBody(request));
-      if (!parsed.success) return mockProblem(422, "Body is not a push subscription request.");
+      if (!parsed.success) return bodyProblem(request, parsed.error);
       const { site_id: siteId, crew_id: crewId } = parsed.data;
-      if (!sites.some((site) => site.id === siteId)) return mockProblem(404, `No site ${siteId}.`);
-      if (crewId !== null && !crews.some((crew) => crew.id === crewId && crew.site_id === siteId)) {
-        return mockProblem(404, `No crew ${crewId} at ${siteId}.`);
+      if (!sites.some((site) => site.id === siteId)) return mockProblem(request, 404, `No site ${siteId}.`);
+      if (crewId !== null && !(listCrews(siteId)?.some((crew) => crew.id === crewId) ?? false)) {
+        return mockProblem(request, 404, `No crew ${crewId} at ${siteId}.`);
       }
       const created: Schemas["PushSubscriptionCreated"] = { id: "sub-mock-1" };
       return HttpResponse.json(created, { status: 201 });
@@ -334,25 +369,26 @@ export const handlers = [
       const refused = unauthorized(request);
       if (refused !== null) return refused;
       const siteId = pathParam(params, "site_id");
-      if (!sites.some((site) => site.id === siteId)) return mockProblem(404, `No site ${siteId}.`);
+      if (!sites.some((site) => site.id === siteId)) return mockProblem(request, 404, `No site ${siteId}.`);
       const parsed = DataRequestCreateSchema.safeParse(await jsonBody(request));
-      if (!parsed.success) return mockProblem(422, "Body is not a data request.");
+      if (!parsed.success) return bodyProblem(request, parsed.error);
       // worker_ref is validated and dropped: never stored, logged or echoed (ADR 0054).
       appendRefusal(siteId);
-      return namedProblem(
-        403,
-        "individual-data-refused",
-        "Individual health data is not held by this service and is never released to an employer.",
-      );
+      return problem(request, {
+        status: 403,
+        type: `${PROBLEM_PREFIX}individual-data-refused`,
+        title: "Individual data refused",
+        detail: "Individual health data is not held by this service and is never released to an employer (ADR 0004).",
+      });
     }),
   ),
 
   http.get(
     "*/api/v1/sites/:site_id/transparency-log",
-    withScenario(({ params }, scenario) => {
+    withScenario(({ request, params }, scenario) => {
       const siteId = pathParam(params, "site_id");
       const found = transparencyLog(siteId);
-      if (found === undefined) return mockProblem(404, `No site ${siteId}.`);
+      if (found === undefined) return mockProblem(request, 404, `No site ${siteId}.`);
       return HttpResponse.json(scenario === "empty" ? { ...found, entries: [] } : found);
     }),
   ),
@@ -363,9 +399,9 @@ export const handlers = [
       const refused = unauthorized(request);
       if (refused !== null) return refused;
       const crewId = pathParam(params, "crew_id");
-      if (!crews.some((crew) => crew.id === crewId)) return mockProblem(404, `No crew ${crewId}.`);
+      if (!crewExists(crewId)) return mockProblem(request, 404, `No crew ${crewId}.`);
       const parsed = CrewStopCreateSchema.safeParse(await jsonBody(request));
-      if (!parsed.success) return mockProblem(422, "Body is not a stop request.");
+      if (!parsed.success) return bodyProblem(request, parsed.error);
       // A stop never waits for anything: no sign-off, no validation, no forecast.
       return HttpResponse.json(createStop(crewId), { status: 201 });
     }),
@@ -377,7 +413,7 @@ export const handlers = [
       const refused = unauthorized(request);
       if (refused !== null) return refused;
       const crewId = pathParam(params, "crew_id");
-      if (!crews.some((crew) => crew.id === crewId)) return mockProblem(404, `No crew ${crewId}.`);
+      if (!crewExists(crewId)) return mockProblem(request, 404, `No crew ${crewId}.`);
       clearStop(crewId, pathParam(params, "stop_id"));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -390,10 +426,11 @@ export const handlers = [
       if (refused !== null) return refused;
       const siteId = pathParam(params, "site_id");
       const site = sites.find((candidate) => candidate.id === siteId);
-      if (site === undefined) return mockProblem(404, `No site ${siteId}.`);
-      if (!site.synthetic) return mockProblem(403, "Only a synthetic demo site can be reset.");
-      const reset: Schemas["DemoReset"] = { epoch: resetDemoState() };
-      return HttpResponse.json(reset);
+      if (site === undefined) return mockProblem(request, 404, `No site ${siteId}.`);
+      if (!site.synthetic) {
+        return problem(request, { status: 409, type: `${PROBLEM_PREFIX}not-a-demo-site`, title: "Not a demo site", detail: `Site ${siteId} is not synthetic.` });
+      }
+      return HttpResponse.json(resetDemoState(siteId));
     }),
   ),
 ];
@@ -409,13 +446,13 @@ function onAnyOrigin(path: string): string {
  * Use as `server.use(problemOnce("/api/v1/sites", 500))`.
  */
 export function problemOnce(path: string, status: number) {
-  return http.all(onAnyOrigin(path), () => mockProblem(status), { once: true });
+  return http.all(onAnyOrigin(path), ({ request }) => mockProblem(request, status), { once: true });
 }
 
 /** An override that serves every site's forecast as generated 26 hours ago. */
 export function staleToday() {
   return http.get(FORECAST_PATH, ({ request, params }) => {
     const date = dateOf(request) ?? REPLAY_DATE;
-    return forecastResponse(pathParam(params, "site_id"), date, "stale");
+    return forecastResponse(request, pathParam(params, "site_id"), date, "stale");
   });
 }

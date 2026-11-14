@@ -16,33 +16,48 @@ const CREW = "crew-[a-d]";
 const SITE = "site-demo-[a-z0-9-]+";
 const STOP = "[A-Za-z0-9_-]+";
 
+/** The rate-limit class of an allow-listed write: Stop work has its own buckets (see route.ts). */
+export type WriteClass = "write" | "stop";
+
 interface Rule {
   method: "GET" | "POST" | "DELETE";
   path: RegExp;
+  /** Set for a write, absent for a read. */
+  writeClass?: WriteClass;
 }
 
 const ALLOW_LIST: readonly Rule[] = [
   { method: "GET", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan$`) },
-  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan/sign-off$`) },
-  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/stops$`) },
-  { method: "DELETE", path: new RegExp(`^/api/v1/crews/${CREW}/stops/${STOP}$`) },
-  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/data-requests$`) },
-  // reset_demo_site (candidate G1): synthetic site ids only.
-  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/demo-reset$`) },
+  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/day-plan/sign-off$`), writeClass: "write" },
+  { method: "POST", path: new RegExp(`^/api/v1/crews/${CREW}/stops$`), writeClass: "stop" },
+  { method: "DELETE", path: new RegExp(`^/api/v1/crews/${CREW}/stops/${STOP}$`), writeClass: "stop" },
+  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/data-requests$`), writeClass: "write" },
+  // reset_demo_site: synthetic site ids only (the API also answers 409 not-a-demo-site for any other).
+  { method: "POST", path: new RegExp(`^/api/v1/sites/${SITE}/demo-reset$`), writeClass: "write" },
 ];
 
 export interface EmployerAuthDecision {
   /** Attach the demo employer token to the upstream request. */
   inject: boolean;
-  /** The pair is an allow-listed write (POST or DELETE): it is rate limited. */
-  write: boolean;
+  /** The rate-limit class when the pair is an allow-listed write (POST or DELETE); null for a read or a pair off the list. */
+  writeClass: WriteClass | null;
 }
 
 /** Whether the BFF attaches the demo token to `method` `path` (the URL's pathname, without the query string). */
 export function employerAuth(method: string, path: string): EmployerAuthDecision {
   const verb = method.toUpperCase();
-  const inject = ALLOW_LIST.some((rule) => rule.method === verb && rule.path.test(path));
-  return { inject, write: inject && verb !== "GET" };
+  const rule = ALLOW_LIST.find((candidate) => candidate.method === verb && candidate.path.test(path));
+  return { inject: rule !== undefined, writeClass: rule?.writeClass ?? null };
+}
+
+const WORKER_CACHEABLE_READS: readonly RegExp[] = [/^\/api\/v1\/risk-policy$/, /^\/api\/v1\/sites\/[^/]+\/forecast\/today$/];
+
+/**
+ * The two non-personal reads the worker's service worker may cache (F2 decision D2: forecast/today and risk-policy).
+ * Every other response of the proxy is `Cache-Control: no-store`.
+ */
+export function isWorkerCacheableRead(method: string, path: string): boolean {
+  return method.toUpperCase() === "GET" && WORKER_CACHEABLE_READS.some((pattern) => pattern.test(path));
 }
 
 /** The request headers that cross to the API; nothing else does. */

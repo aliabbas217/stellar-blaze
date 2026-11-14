@@ -1,6 +1,6 @@
 import { problemResponse, UPSTREAM_UNAVAILABLE_TYPE } from "@/api/problem";
-import { employerAuth, forwardHeaders } from "./employer-auth";
-import { clientKey, createRateLimiter, type RateLimiter } from "./rate-limit";
+import { employerAuth, forwardHeaders, isWorkerCacheableRead, type WriteClass } from "./employer-auth";
+import { clientKey, createRateLimiter, trustedProxyHops, type RateLimiter } from "./rate-limit";
 
 /*
  * The BFF proxy: the browser calls only same-origin /api/v1/*, and this handler forwards each call to the API at
@@ -10,20 +10,42 @@ import { clientKey, createRateLimiter, type RateLimiter } from "./rate-limit";
  * Only an allow-list of headers crosses either way (forwardHeaders in employer-auth.ts). A client's cookie and
  * authorization header never go upstream; the one credential the API sees is the demo employer token, which the BFF
  * attaches itself, only on the allow-listed method and path pairs of the demo fixture (F2 decision D4). Those pairs
- * that write are rate limited per client and globally. Nothing but content-type and x-request-id comes back.
+ * that write are rate limited per client and globally (two classes, below). Back come content-type, x-request-id and
+ * retry-after. Every response is `Cache-Control: no-store` except the two reads the worker's service worker may cache
+ * (forecast/today and risk-policy), so no employer or personal response is kept by a browser or a shared cache.
  */
 
 export const dynamic = "force-dynamic";
 
-const RESPONSE_HEADERS = ["content-type", "x-request-id"];
+const RESPONSE_HEADERS = ["content-type", "x-request-id", "retry-after"];
 
 // A hung API must end as a problem the UI can show, not as a request that never answers.
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
 const API_PREFIX = "/api/v1/";
 
-const DEFAULT_WRITES_PER_MIN = 20;
-const DEFAULT_GLOBAL_WRITES_PER_MIN = 120;
+/*
+ * The write limits. The API limits employer operations to 60 per 60 s per token (its `x-rate-limit`), and the demo has
+ * one shared token, so 60 a minute is one global ceiling for every visitor; the global defaults below match it and are
+ * what a visitor meets first, as a 429 from here with a Retry-After, instead of from the API. The per-client bucket
+ * keeps one visitor from using all of it.
+ *
+ * Stop work has its OWN pair of buckets, so sign-off, data-request and reset traffic can never drain it: a stop that is
+ * refused with a 429 is a safety failure (the screen must say "Not sent. Tell the crew now."), so its per-client
+ * default is larger. The global ceiling of 60 is the API's, a higher number here could never be used.
+ */
+interface LimitSettings {
+  perClientEnv: string;
+  perClientDefault: number;
+  globalEnv: string;
+  globalDefault: number;
+}
+
+const LIMITS: Record<WriteClass, LimitSettings> = {
+  write: { perClientEnv: "DEMO_WRITE_RATE_PER_MIN", perClientDefault: 20, globalEnv: "DEMO_WRITE_GLOBAL_RATE_PER_MIN", globalDefault: 60 },
+  stop: { perClientEnv: "DEMO_STOP_RATE_PER_MIN", perClientDefault: 30, globalEnv: "DEMO_STOP_GLOBAL_RATE_PER_MIN", globalDefault: 60 },
+};
+
 const GLOBAL_KEY = "demo-token";
 
 function positiveInt(raw: string | undefined, fallback: number): number {
@@ -37,27 +59,29 @@ interface Limiters {
   global: RateLimiter;
 }
 
-let limiters: Limiters | undefined;
+const limiters = new Map<WriteClass, Limiters>();
 
-/** The two write buckets for the limits in the environment now (read per request, so a restart is not needed). */
-function writeLimiters(): Limiters {
-  const perClient = positiveInt(process.env.DEMO_WRITE_RATE_PER_MIN, DEFAULT_WRITES_PER_MIN);
-  const global = positiveInt(process.env.DEMO_WRITE_GLOBAL_RATE_PER_MIN, DEFAULT_GLOBAL_WRITES_PER_MIN);
+/** The two buckets of a class for the limits in the environment now (read per request, so a restart is not needed). */
+function limitersFor(writeClass: WriteClass): Limiters {
+  const config = LIMITS[writeClass];
+  const perClient = positiveInt(process.env[config.perClientEnv], config.perClientDefault);
+  const global = positiveInt(process.env[config.globalEnv], config.globalDefault);
   const settings = `${String(perClient)}/${String(global)}`;
-  if (limiters?.settings !== settings) {
-    limiters = {
-      settings,
-      perClient: createRateLimiter({ perMinute: perClient, now: Date.now }),
-      global: createRateLimiter({ perMinute: global, now: Date.now }),
-    };
-  }
-  return limiters;
+  const held = limiters.get(writeClass);
+  if (held?.settings === settings) return held;
+  const fresh: Limiters = {
+    settings,
+    perClient: createRateLimiter({ perMinute: perClient, now: Date.now }),
+    global: createRateLimiter({ perMinute: global, now: Date.now }),
+  };
+  limiters.set(writeClass, fresh);
+  return fresh;
 }
 
 /** A 429 problem with Retry-After when either bucket is empty; otherwise takes one token from each and returns null. */
-function rateLimited(request: Request): Response | null {
-  const { perClient, global } = writeLimiters();
-  const key = clientKey(request.headers);
+function rateLimited(request: Request, writeClass: WriteClass): Response | null {
+  const { perClient, global } = limitersFor(writeClass);
+  const key = clientKey(request.headers, trustedProxyHops(process.env.TRUSTED_PROXY_HOPS));
   const mine = perClient.peek(key);
   const all = global.peek(GLOBAL_KEY);
   if (mine.allowed && all.allowed) {
@@ -68,7 +92,7 @@ function rateLimited(request: Request): Response | null {
   const retryAfter = Math.max(mine.allowed ? 0 : mine.retryAfterSeconds, all.allowed ? 0 : all.retryAfterSeconds);
   const response = problemResponse({
     type: "urn:stellar-blaze:problem:rate-limited",
-    title: "Too Many Requests",
+    title: "Rate limited",
     status: 429,
     detail: "The demo allows a limited number of changes per minute. Wait and try again.",
     request_id: requestIdOf(request),
@@ -93,7 +117,7 @@ function unavailable(request: Request, reason: string, cause?: unknown): Respons
   });
 }
 
-async function forward(request: Request): Promise<Response> {
+async function answer(request: Request): Promise<Response> {
   const origin = process.env.API_ORIGIN;
   if (origin === undefined || origin === "") return unavailable(request, "API_ORIGIN is not set");
 
@@ -104,8 +128,8 @@ async function forward(request: Request): Promise<Response> {
     return problemResponse({ type: "about:blank", title: "Not Found", status: 404, request_id: requestIdOf(request) });
   }
   const decision = employerAuth(request.method, incoming.pathname);
-  if (decision.write) {
-    const limited = rateLimited(request);
+  if (decision.writeClass !== null) {
+    const limited = rateLimited(request, decision.writeClass);
     if (limited !== null) return limited;
   }
   // The token is read now, per request, from the server's environment. Never a NEXT_PUBLIC variable.
@@ -134,6 +158,14 @@ async function forward(request: Request): Promise<Response> {
   }
   // The body is streamed back as it arrives; a 204 has none.
   return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+}
+
+async function forward(request: Request): Promise<Response> {
+  const response = await answer(request);
+  // Only a successful answer to one of the two worker-cacheable reads may be stored; everything else, errors included, never.
+  const cacheable = response.ok && isWorkerCacheableRead(request.method, new URL(request.url).pathname);
+  if (!cacheable) response.headers.set("cache-control", "no-store");
+  return response;
 }
 
 export const GET = forward;

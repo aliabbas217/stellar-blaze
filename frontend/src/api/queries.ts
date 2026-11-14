@@ -13,6 +13,11 @@ import type { components } from "@/api/schema";
  * answer offline (forecast/today and risk-policy, in src/features/today/useSiteToday.ts). Everything here is either
  * employer-scoped (never cached, F2 decision D2) or needs the network by nature. The employer routes carry no
  * credential from the browser: the BFF adds the demo token on its allow-list (src/app/api/v1/[...path]/employer-auth.ts).
+ *
+ * The safety mutations (stop, clear stop, sign-off) set `networkMode: "always"`. With the default ("online") TanStack
+ * Query pauses a mutation while it believes the device is offline and fires it on reconnect, which would show a stop as
+ * pending, then send it minutes later: "never shown as delivered when it was not". With "always" the request is made
+ * at once, fails at once offline, and the failure is an `ApiProblem` with status 0 that the screen words as "Not sent".
  */
 
 type Schemas = components["schemas"];
@@ -31,10 +36,12 @@ function dateQuery(date: string | undefined): { date?: string } {
 
 // --- Reads -----------------------------------------------------------------------------------------------------------------
 
-export function crewsQueryOptions(siteId: string) {
+/** The crews of a site with their stop and sign-off state for `date` (omitted: the API's default date). */
+export function crewsQueryOptions(siteId: string, date?: string) {
   return queryOptions<Schemas["Crew"][], ApiProblem>({
-    queryKey: queryKeys.crews(siteId),
-    queryFn: ({ signal }) => orThrow(apiClient.GET("/api/v1/sites/{site_id}/crews", { params: { path: { site_id: siteId } }, signal })),
+    queryKey: queryKeys.crews(siteId, date),
+    queryFn: ({ signal }) =>
+      orThrow(apiClient.GET("/api/v1/sites/{site_id}/crews", { params: { path: { site_id: siteId }, query: dateQuery(date) }, signal })),
   });
 }
 
@@ -96,6 +103,7 @@ export function dataRequestMutation(siteId: string) {
 export function stopMutation(crewId: string) {
   return mutationOptions<Schemas["CrewStop"], ApiProblem, Schemas["CrewStopCreate"]>({
     mutationKey: ["crew-stop", crewId],
+    networkMode: "always",
     mutationFn: (body) => orThrow(apiClient.POST("/api/v1/crews/{crew_id}/stops", { params: { path: { crew_id: crewId } }, body })),
   });
 }
@@ -104,17 +112,27 @@ export function stopMutation(crewId: string) {
 export function clearStopMutation(crewId: string) {
   return mutationOptions<undefined, ApiProblem, string>({
     mutationKey: ["crew-stop-clear", crewId],
+    networkMode: "always",
     mutationFn: (stopId) =>
       orThrow(apiClient.DELETE("/api/v1/crews/{crew_id}/stops/{stop_id}", { params: { path: { crew_id: crewId, stop_id: stopId } } })),
   });
 }
 
-/** Signs the crew's day plan off. A 409 review-required is an `ApiProblem` with status 409. */
-export function signOffMutation(crewId: string) {
-  return mutationOptions<Schemas["DayPlan"], ApiProblem, Schemas["SignOffRequest"]>({
-    mutationKey: ["sign-off", crewId],
+/**
+ * Signs the crew's day plan off (201 with the recorded sign-off). A 409 review-required is an `ApiProblem` with status
+ * 409. `date` is the site-local date of the plan; omitted, the API's default date applies.
+ */
+export function signOffMutation(crewId: string, date?: string) {
+  return mutationOptions<Schemas["PlanSignOff"], ApiProblem, Schemas["PlanSignOffRequest"]>({
+    mutationKey: ["sign-off", crewId, date ?? null],
+    networkMode: "always",
     mutationFn: (body) =>
-      orThrow(apiClient.POST("/api/v1/crews/{crew_id}/day-plan/sign-off", { params: { path: { crew_id: crewId } }, body })),
+      orThrow(
+        apiClient.POST("/api/v1/crews/{crew_id}/day-plan/sign-off", {
+          params: { path: { crew_id: crewId }, query: dateQuery(date) },
+          body,
+        }),
+      ),
   });
 }
 

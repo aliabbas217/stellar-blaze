@@ -10,7 +10,7 @@
 export const queryKeys = {
   riskPolicy: () => ["risk-policy"] as const,
   today: (siteId: string) => ["today", siteId] as const,
-  crews: (siteId: string) => ["crews", siteId] as const,
+  crews: (siteId: string, date?: string) => ["crews", siteId, date ?? null] as const,
   crewTimeline: (crewId: string, date?: string) => ["crew-timeline", crewId, date ?? null] as const,
   crewDayPlan: (crewId: string, date?: string) => ["crew-day-plan", crewId, date ?? null] as const,
   transparencyLog: (siteId: string) => ["transparency-log", siteId] as const,

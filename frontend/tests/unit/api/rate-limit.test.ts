@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { clientKey, createRateLimiter } from "@/app/api/v1/[...path]/rate-limit";
+import { clientKey, createRateLimiter, trustedProxyHops } from "@/app/api/v1/[...path]/rate-limit";
 
 /* The token bucket behind the BFF write limit, driven by an injected clock: no timers, no sleeping. */
 
@@ -64,13 +64,40 @@ describe("createRateLimiter", () => {
 });
 
 describe("clientKey", () => {
-  it("is the last x-forwarded-for entry, the one the ingress appended", () => {
-    expect(clientKey(new Headers({ "x-forwarded-for": "6.6.6.6, 203.0.113.7" }))).toBe("203.0.113.7");
-    expect(clientKey(new Headers({ "x-forwarded-for": "203.0.113.7" }))).toBe("203.0.113.7");
+  const header = (value: string) => new Headers({ "x-forwarded-for": value });
+
+  it("with one trusted proxy (the default) is the last entry, the one the ingress appended", () => {
+    expect(clientKey(header("6.6.6.6, 203.0.113.7"))).toBe("203.0.113.7");
+    expect(clientKey(header("203.0.113.7"))).toBe("203.0.113.7");
   });
 
-  it("shares one bucket when the header is missing or empty", () => {
+  it("with two trusted proxies is the second entry from the right, so a CDN hop in front does not share one bucket", () => {
+    // client 203.0.113.7 -> CDN (appends the client) -> ingress (appends the CDN) -> app; the caller wrote 6.6.6.6.
+    expect(clientKey(header("6.6.6.6, 203.0.113.7, 198.51.100.9"), 2)).toBe("203.0.113.7");
+    expect(clientKey(header("203.0.113.7, 198.51.100.9"), 2)).toBe("203.0.113.7");
+    // With the wrong assumption (one hop) every visitor would share the CDN address:
+    expect(clientKey(header("203.0.113.7, 198.51.100.9"), 1)).toBe("198.51.100.9");
+  });
+
+  it("ignores what the caller prepended: rotating the leftmost entries does not change the key", () => {
+    expect(clientKey(header("1.1.1.1, 203.0.113.7"))).toBe(clientKey(header("2.2.2.2, 203.0.113.7")));
+  });
+
+  it("shares one bucket when the header is missing, empty, shorter than the hops, or no proxy is trusted", () => {
     expect(clientKey(new Headers())).toBe("unknown");
-    expect(clientKey(new Headers({ "x-forwarded-for": " " }))).toBe("unknown");
+    expect(clientKey(header(" "))).toBe("unknown");
+    expect(clientKey(header("203.0.113.7"), 2)).toBe("unknown");
+    expect(clientKey(header("203.0.113.7"), 0)).toBe("unknown");
+  });
+});
+
+describe("trustedProxyHops", () => {
+  it("is 1 when unset or invalid, and the number otherwise (0 means none is trusted)", () => {
+    expect(trustedProxyHops(undefined)).toBe(1);
+    expect(trustedProxyHops("two")).toBe(1);
+    expect(trustedProxyHops("-1")).toBe(1);
+    expect(trustedProxyHops("1.5")).toBe(1);
+    expect(trustedProxyHops("2")).toBe(2);
+    expect(trustedProxyHops("0")).toBe(0);
   });
 });

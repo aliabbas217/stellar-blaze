@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /*
- * Governance guards on the API contract proposal (ADR 0004, plan section 8.8): the worker profile and personal
- * risk stay on the device, the push subscription carries site and crew ids only, and supervisor-facing schemas
- * hold crew aggregates and nothing about a person. These run against the v1 contract file, hand-written from the B3
- * plan until backend/openapi/v1.json replaces it (F2 Task 24); the real spec must keep passing them.
+ * Governance guards on the API contract (ADR 0004, plan section 8.8): the worker profile and personal risk stay on
+ * the device, the push subscription carries site and crew ids only, and supervisor-facing schemas hold crew
+ * aggregates and nothing about a person. These run against B3's v1 contract (backend/openapi/v1.json, copied unedited
+ * into openapi/stellar-blaze.openapi.json); a newer copy must keep passing them.
  *
  * The finders are plain functions, and the last block feeds them a doctored copy of the spec, so a guard that
  * has gone blind (a changed regex, a walker that stops at "items") fails here instead of passing over a leak.
@@ -32,6 +32,7 @@ const CREW_ALLOWED = new Set([
   "ban_window",
   "shift",
   "signoff_state",
+  "forecast_status",
 ]);
 const PERSONAL_NAME = /worker|member_id|name_of|employee|heart|symptom/i;
 /**
@@ -40,12 +41,14 @@ const PERSONAL_NAME = /worker|member_id|name_of|employee|heart|symptom/i;
  */
 const PERSONAL_NAME_EXCEPTIONS = new Set(["crew_name", "worker_ref"]);
 /**
- * B3 uses a wider pattern in its own contract test (worker|member|employee|heart|symptom|acclimat|juvenile). The v1
- * contract carries these names that it would match besides worker_ref, all counts or policy numbers and none a member
- * value; pinned here so a new one cannot slip in, and reported to the architect as a contradiction in the B3 plan.
+ * B3 uses a wider pattern in its own contract test (worker|member|employee|heart|symptom|acclimat|juvenile) and
+ * allow-lists four names. They are the ones this contract carries (counts or policy numbers, none a member value);
+ * pinned here so a fifth cannot slip in.
  */
 const B3_WIDE_PATTERN = /worker|member|employee|heart|symptom|acclimat|juvenile/i;
 const B3_WIDE_PATTERN_KNOWN = ["acclimatisation_days_required", "acclimatised", "member_count", "worker_ref"];
+/** The problem family is open on purpose (RFC 9457 allows extension members); every other object forbids extras. */
+const PROBLEM_FAMILY = ["Problem", "ValidationProblem", "ReviewRequiredProblem", "RosterInvalidProblem"];
 const OPERATION_IDS = [
   "create_crew_stop",
   "create_data_request",
@@ -57,6 +60,8 @@ const OPERATION_IDS = [
   "get_risk_policy",
   "get_site_forecast_today",
   "get_site_transparency_log",
+  "health_live",
+  "health_ready",
   "list_site_crews",
   "list_sites",
   "reset_demo_site",
@@ -128,16 +133,20 @@ function crewDerivationRuleGaps(doc: JsonObject): string[] {
     ["CrewHour", "crew_level", "no member-derived information", /no member-derived information/],
     ["CrewTimeline", "suppressed", "withholds member-derived fields only", /withholds member-derived fields only/],
     ["CrewTimeline", "suppressed", "no member-derived information", /no member-derived information/],
-    ["DayPlan", "restricted_headcount", "null when suppressed", /Null when suppressed/],
+    ["DayPlan", "restricted_headcount", "null when suppressed", /null when `suppressed`/],
   ];
   return required
     .filter(([schemaName, property, , pattern]) => !pattern.test(propertyDescription(doc, schemaName, property)))
     .map(([schemaName, property, statement]) => `${schemaName}.${property} does not say: ${statement}`);
 }
 
-/** Object schemas (inline ones too) that do not set `additionalProperties: false`. */
-function objectsOpenToExtraProperties(doc: Json): JsonObject[] {
-  return [...walk(doc)].filter((node) => node.type === "object" && node.additionalProperties !== false);
+/** Object schemas (inline ones too) that do not set `additionalProperties: false`, the problem family aside. */
+function objectsOpenToExtraProperties(doc: JsonObject): JsonObject[] {
+  const copy = JSON.parse(JSON.stringify(doc)) as JsonObject;
+  const components = copy.components;
+  const all = isObject(components) && isObject(components.schemas) ? components.schemas : {};
+  for (const name of PROBLEM_FAMILY) Reflect.deleteProperty(all, name);
+  return [...walk(copy)].filter((node) => node.type === "object" && node.additionalProperties !== false);
 }
 
 /** Every operation of the document. */
@@ -147,41 +156,38 @@ function operationsOf(doc: JsonObject): JsonObject[] {
   return Object.values(paths).flatMap((item) => (isObject(item) ? Object.values(item).filter(isObject) : []));
 }
 
+/** The schema names a response body refers to, directly, in an array, or in a oneOf. */
+function referencedSchemas(schema: Json | undefined): string[] {
+  if (!isObject(schema)) return [];
+  if (typeof schema.$ref === "string") return [schema.$ref.split("/").pop() ?? ""];
+  const alternatives = Array.isArray(schema.oneOf) ? schema.oneOf : Array.isArray(schema.anyOf) ? schema.anyOf : [];
+  return alternatives.flatMap((alternative) => referencedSchemas(alternative));
+}
+
 describe("contract governance", () => {
-  it("declares the proposed component schemas, and no others", () => {
-    expect(Object.keys(schemas(spec)).sort()).toEqual(
-      [
-        "AckItem",
+  it("declares the components the F2 screens and the static artefacts are typed from", () => {
+    expect(Object.keys(schemas(spec))).toEqual(
+      expect.arrayContaining([
+        "AlertLevel",
+        "BanWindow",
+        "Site",
         "Crew",
-        "CrewHour",
-        "CrewStop",
-        "CrewStopCreate",
         "CrewTimeline",
-        "DataRequestCreate",
         "DayPlan",
-        "DaySignoff",
-        "DemoReset",
-        "HourForecast",
-        "Level",
-        "PlanSegment",
+        "AckItem",
+        "PlanSignOff",
+        "PlanSignOffRequest",
         "PlanValidateRequest",
         "PlanValidateResponse",
-        "Problem",
-        "PushSubscriptionCreate",
-        "PushSubscriptionCreated",
-        "ReviewRequiredProblem",
-        "RiskPolicy",
-        "RosterInvalidProblem",
-        "SignOffRequest",
-        "Site",
-        "SiteForecastToday",
-        "TimeRange",
         "TransparencyLog",
-        "ValidatorResult",
-        "Violation",
-        "Zone",
-        "ZoneHour",
-      ].sort(),
+        "DemoReset",
+        "Provenance",
+        "PolicyScoreboard",
+        "PlanScoreboard",
+        "DemoDay",
+        "ThetaDecision",
+        ...PROBLEM_FAMILY,
+      ]),
     );
   });
 
@@ -212,7 +218,7 @@ describe("contract governance", () => {
     expect(JSON.stringify(spec)).not.toContain("share_above_amber");
   });
 
-  it("has exactly the 14 operations of ADR 0051 and its amendment, plus the candidate reset_demo_site", () => {
+  it("has exactly the 15 operations of B3's v1 (ADR 0051, its sign-off amendment, reset_demo_site) and the two health routes", () => {
     expect(operationsOf(spec).map((operation) => operation.operationId).sort()).toEqual(OPERATION_IDS);
   });
 
@@ -225,61 +231,65 @@ describe("contract governance", () => {
     expect(secured).toEqual(EMPLOYER_OPERATIONS);
   });
 
-  it("marks the requested gaps with x-sb-requested R1, R2, R3, G1 and G2, so Task 24 can find them", () => {
-    const marks = new Set<string>();
-    for (const node of walk(spec)) {
-      const mark = node["x-sb-requested"];
-      if (typeof mark === "string") marks.add(mark);
+  it("lists a rate limit on every employer operation, and a Retry-After on its 429", () => {
+    for (const operation of operationsOf(spec).filter((candidate) => EMPLOYER_OPERATIONS.includes(describeOperation(candidate)))) {
+      const id = describeOperation(operation);
+      expect(Array.isArray(operation["x-rate-limit"]) && operation["x-rate-limit"].length > 0, `${id} has x-rate-limit`).toBe(true);
+      const responses = operation.responses;
+      const tooMany = isObject(responses) ? responses["429"] : undefined;
+      const headers = isObject(tooMany) && isObject(tooMany.headers) ? Object.keys(tooMany.headers) : [];
+      expect(headers, `${id} 429 headers`).toContain("Retry-After");
     }
-    expect([...marks].sort()).toEqual(["G1", "G2", "R1", "R2", "R3"]);
+  });
 
-    const marked = (schemaName: string, group: string) =>
-      Object.entries((schemas(spec)[schemaName]?.properties ?? {}) as JsonObject)
-        .filter(([, value]) => isObject(value) && value["x-sb-requested"] === group)
-        .map(([name]) => name)
-        .sort();
-    expect(marked("SiteForecastToday", "R1")).toEqual(["ban_window"]);
-    expect(marked("CrewTimeline", "R1")).toEqual(["ban_window"]);
-    expect(marked("Crew", "R2")).toEqual(["task_label", "workload"]);
-    expect(marked("CrewTimeline", "R2")).toEqual(["shift", "signoff_state"]);
-    expect(marked("DayPlan", "R3")).toEqual(["ack_items", "signoff"]);
-    expect(marked("Site", "G2")).toEqual(["first_aider_phone", "supervisor_phone"]);
-    expect(schemas(spec).SignOffRequest?.["x-sb-requested"]).toBe("R3");
-    expect(schemas(spec).DemoReset?.["x-sb-requested"]).toBe("G1");
-    const byId = (id: string) => operationsOf(spec).find((operation) => operation.operationId === id);
-    expect(byId("sign_off_day_plan")?.["x-sb-requested"]).toBe("R3");
-    expect(byId("reset_demo_site")?.["x-sb-requested"]).toBe("G1");
+  it("carries no x-sb-requested marker: the gaps R1, R2, R3, G1 and G2 were delivered by B3", () => {
+    const marked = [...walk(spec)].filter((node) => "x-sb-requested" in node);
+
+    expect(marked).toEqual([]);
+  });
+
+  it("delivers the fields the F2 screens asked for", () => {
+    expect(propertyNames(spec, "SiteForecastToday")).toEqual(expect.arrayContaining(["ban_window", "forecast_status", "model_id", "mode"]));
+    expect(propertyNames(spec, "CrewTimeline")).toEqual(expect.arrayContaining(["ban_window", "shift", "signoff_state"]));
+    expect(propertyNames(spec, "Crew")).toEqual(expect.arrayContaining(["task_label", "workload", "shift", "signoff_state", "plan_status", "stopped", "active_stop_id", "stopped_at"]));
+    expect(propertyNames(spec, "DayPlan")).toEqual(expect.arrayContaining(["ack_items", "signoff_state", "signoff_label_code", "signed_at", "signed_by_role"]));
+    expect(propertyNames(spec, "Site")).toEqual(expect.arrayContaining(["supervisor_phone", "first_aider_phone", "epoch_id"]));
+    expect(propertyNames(spec, "DemoReset").sort()).toEqual(["epoch_id", "previous_epoch_id", "reset_at", "site_id"]);
   });
 
   it("makes a push subscription carry exactly the browser subscription, a site id and an optional crew id", () => {
     expect(propertyNames(spec, "PushSubscriptionCreate").sort()).toEqual(["crew_id", "site_id", "subscription"]);
   });
 
-  it("forbids extra properties on every object schema, inline ones included", () => {
+  it("forbids extra properties on every object schema, inline ones included, the open problem family aside", () => {
     expect(objectsOpenToExtraProperties(spec)).toEqual([]);
+  });
+
+  it("keeps the problem family open and gives each member instance and request_id", () => {
+    for (const name of PROBLEM_FAMILY) {
+      const schema = schemas(spec)[name];
+      expect(schema?.additionalProperties, `${name} is open`).toBe(true);
+      expect(schema?.required, `${name} requires`).toEqual(expect.arrayContaining(["type", "title", "status", "instance", "request_id"]));
+    }
   });
 
   it("states in the contract where crew aggregates come from and what a suppressed crew withholds", () => {
     expect(crewDerivationRuleGaps(spec)).toEqual([]);
   });
 
-  it("answers every error with application/problem+json that references Problem", () => {
-    const paths = spec.paths;
-    if (!isObject(paths)) throw new Error("spec has no paths");
-    const operations = Object.values(paths).flatMap((item) => (isObject(item) ? Object.values(item) : []));
-    const components = spec.components;
-    const responses = isObject(components) && isObject(components.responses) ? components.responses : {};
-
-    expect(operations.length).toBe(OPERATION_IDS.length);
-    for (const operation of operations) {
-      if (!isObject(operation) || !isObject(operation.responses)) continue;
-      expect(Object.keys(operation.responses)).toEqual(expect.arrayContaining(["502", "default"]));
-      for (const [status, response] of Object.entries(operation.responses)) {
-        if (/^2\d\d$/.test(status)) continue;
-        const target = isObject(response) && typeof response.$ref === "string" ? response.$ref.split("/").pop() : undefined;
-        const resolved = target === undefined ? undefined : responses[target];
-        const content = isObject(resolved) && isObject(resolved.content) ? resolved.content : {};
-        expect(Object.keys(content), `${status} of ${describeOperation(operation)}`).toEqual(["application/problem+json"]);
+  it("answers every error with application/problem+json that references the problem family, and has a default", () => {
+    for (const operation of operationsOf(spec)) {
+      const id = describeOperation(operation);
+      const responses = operation.responses;
+      if (!isObject(responses)) throw new Error(`${id} has no responses`);
+      expect(Object.keys(responses), `${id} has a default`).toContain("default");
+      for (const [status, response] of Object.entries(responses)) {
+        if (/^2\d\d$/.test(status) || !isObject(response)) continue;
+        const content = isObject(response.content) ? response.content : {};
+        expect(Object.keys(content), `${status} of ${id}`).toEqual(["application/problem+json"]);
+        const media = content["application/problem+json"];
+        const names = isObject(media) ? referencedSchemas(media.schema) : [];
+        expect(names.length > 0 && names.every((name) => PROBLEM_FAMILY.includes(name)), `${status} of ${id} refers to ${names.join(", ")}`).toBe(true);
       }
     }
   });
@@ -349,12 +359,26 @@ describe("the guards themselves", () => {
     expect(propertyNames(leaky, "CrewHour").filter((name) => !CREW_ALLOWED.has(name))).toEqual(["share_above_amber"]);
   });
 
-  it("flags an inline object that allows extra properties", () => {
+  it("flags an object that allows extra properties, and does not flag the open problem family", () => {
     const open = doctored((copy) => {
-      const wbgt = (schemas(copy).HourForecast?.properties as JsonObject).wbgt_c as JsonObject;
-      delete wbgt.additionalProperties;
+      delete (schemas(copy).WbgtQuantiles as JsonObject).additionalProperties;
     });
 
     expect(objectsOpenToExtraProperties(open)).toHaveLength(1);
+    expect(objectsOpenToExtraProperties(spec)).toHaveLength(0);
+  });
+
+  it("flags an error response that is not problem+json", () => {
+    const plain = doctored((copy) => {
+      const operation = ((copy.paths as JsonObject)["/api/v1/sites"] as JsonObject).get as JsonObject;
+      const responses = operation.responses as JsonObject;
+      responses["501"] = { description: "x", content: { "application/json": { schema: { type: "string" } } } };
+    });
+
+    const failing = operationsOf(plain)
+      .filter((operation) => operation.operationId === "list_sites")
+      .flatMap((operation) => Object.entries(operation.responses as JsonObject))
+      .filter(([status, response]) => status === "501" && isObject(response) && !("application/problem+json" in (response.content as JsonObject)));
+    expect(failing).toHaveLength(1);
   });
 });

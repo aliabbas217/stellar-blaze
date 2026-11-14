@@ -80,12 +80,27 @@ export function createRateLimiter({ perMinute, now, maxKeys = DEFAULT_MAX_KEYS }
 }
 
 /**
- * The client of a request, for the per-client bucket: the last `x-forwarded-for` entry, the one the platform's ingress
- * appended (earlier entries are whatever the caller sent). A request without the header shares the "unknown" bucket.
+ * How many reverse proxies sit in front of the app and append to `x-forwarded-for` (`TRUSTED_PROXY_HOPS`, default 1: the
+ * platform ingress). 0 means none is trusted. An invalid value is the default.
  */
-export function clientKey(headers: Headers): string {
+export function trustedProxyHops(raw: string | undefined): number {
+  const value = Number(raw);
+  return raw !== undefined && Number.isInteger(value) && value >= 0 ? value : 1;
+}
+
+/**
+ * The client of a request, for the per-client bucket: the `hops`-th entry of `x-forwarded-for` counted from the RIGHT.
+ *
+ * Topology assumption: each trusted proxy APPENDS the address it received the request from, so the entry `hops` from the
+ * right is the address the outermost trusted proxy saw, and everything left of it is whatever the caller wrote. With
+ * one ingress (the default) that is the last entry; behind a CDN and an ingress it is the second from the right. A
+ * header with fewer entries than `hops`, a missing header and `hops` of 0 (no trusted proxy: the header is entirely
+ * caller-controlled) all share one "unknown" bucket, the strictest choice; the global bucket is the backstop either way.
+ */
+export function clientKey(headers: Headers, hops = 1): string {
   const forwarded = headers.get("x-forwarded-for");
-  if (forwarded === null) return "unknown";
-  const last = forwarded.split(",").at(-1)?.trim();
-  return last === undefined || last === "" ? "unknown" : last;
+  if (forwarded === null || hops < 1) return "unknown";
+  const entries = forwarded.split(",").map((entry) => entry.trim());
+  const entry = entries[entries.length - hops];
+  return entry === undefined || entry === "" ? "unknown" : entry;
 }

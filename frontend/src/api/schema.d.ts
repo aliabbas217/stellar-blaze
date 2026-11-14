@@ -4,91 +4,6 @@
  */
 
 export interface paths {
-    "/api/v1/sites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List sites. */
-        get: operations["list_sites"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sites/{site_id}/forecast/today": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The hourly WBGT forecast and site level for a site's local day. */
-        get: operations["get_site_forecast_today"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/risk-policy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The active risk policy the device uses to compute personal risk. */
-        get: operations["get_risk_policy"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sites/{site_id}/crews": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List the crews of a site. */
-        get: operations["list_site_crews"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/crews/{crew_id}/timeline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Crew-level aggregate timeline for one day (k-suppressed below k). */
-        get: operations["get_crew_timeline"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/crews/{crew_id}/day-plan": {
         parameters: {
             query?: never;
@@ -97,8 +12,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The crew's rule plan for one day, checked by the independent validator.
-         * @description Employer token, own employer only. Advisory only: the employer remains the duty-holder. Never cache (NetworkOnly).
+         * The crew's day plan
+         * @description The rule plan for the crew's site-local day, checked by the independent validator. Employer token, own crew only.
+         *
+         *     Every plan carries the floor banner code, and is `unsigned` until `sign_off_day_plan`. A plan the validator
+         *     rejects is never served: the answer is the `plan-invalid` problem (500).
+         *
+         *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
         get: operations["get_crew_day_plan"];
         put?: never;
@@ -119,101 +39,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Sign the crew's day plan off (B3 Task 17; ADR 0011 section 7.1).
-         * @description Employer token, own employer only. One-tap sign-off is allowed only when the plan equals the last accepted plan and has no Medium, High or Red work item; otherwise every item of DayPlan.ack_items must be listed in acknowledged_items, else 409 review-required with the missing ids. Sign-off never delays an alert or a stop. The 200 body is the plan as signed.
+         * Sign off the day plan
+         * @description Record a named supervisor's acknowledgement of the day plan. Employer token, own crew only.
+         *
+         *     Answers `review-required` (409, with `missing_items`) unless every Medium, High and Red item of `ack_items` is
+         *     acknowledged. Sign-off is independent of stops and of the warning dispatch job: it never delays either. Signing a
+         *     plan that is already signed answers 201 with the
+         *     recorded sign-off again.
+         *
+         *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
         post: operations["sign_off_day_plan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/plans/validate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check a typed roster against the rules for one site day (try-a-plan).
-         * @description Public. Exactly one of roster_text and segments. A roster that cannot be parsed is 422 roster-invalid.
-         */
-        post: operations["validate_plan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/push/subscriptions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Register a Web Push subscription for site and optional crew alerts. */
-        post: operations["create_push_subscription"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/push/subscriptions/{subscription_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove a Web Push subscription. */
-        delete: operations["delete_push_subscription"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sites/{site_id}/data-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * An employer's request for one worker's individual data. Always refused and logged.
-         * @description Employer token. The answer is always 403 urn:stellar-blaze:problem:individual-data-refused (ADR 0054); worker_ref is validated and discarded, never stored, logged or echoed. Without a token: 401.
-         */
-        post: operations["create_data_request"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sites/{site_id}/transparency-log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The worker-visible log of refused employer requests at a site, newest first, at most 50. */
-        get: operations["get_site_transparency_log"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -230,8 +66,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Record a crew-lead stop. It never waits for sign-off, validation or a forecast.
-         * @description Employer token, own employer only. The row means the stop is recorded; the API does not confirm that anyone was alerted (ADR 0058: no HTTP push trigger).
+         * Stop work for a crew
+         * @description Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.
+         *
+         *     Stop recorded. It takes effect on the crew's plan and level immediately; push alerts are sent by the alert
+         *     dispatch job, not by this call.
+         *
+         *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
         post: operations["create_crew_stop"];
         delete?: never;
@@ -250,8 +91,234 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Clear a crew-lead stop (the 10 second undo, or the end of the stop). Idempotent. */
+        /**
+         * Clear a crew stop
+         * @description Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.
+         *
+         *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
+         */
         delete: operations["delete_crew_stop"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/crews/{crew_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Crew level timeline for a day
+         * @description The crew's level for each working hour of the site-local day. Aggregates only, suppressed below `k` members.
+         */
+        get: operations["get_crew_timeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness probe
+         * @description The process is up and serving requests. Checks no dependency, so an orchestrator never restarts on a DB blip.
+         */
+        get: operations["health_live"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness probe
+         * @description The API can serve requests: its database answers a trivial query within the readiness timeout, and it has a
+         *     runtime config to decide with.
+         *
+         *     Answers 503 (problem details, ``dependency: database``) when the database does not answer, and 503 with
+         *     ``dependency: config`` when no config has been loaded (nothing seeded, or the database was down at startup). A
+         *     config that is loaded but cannot follow the latest activation is still ready: ``checks.config`` says ``stale``.
+         */
+        get: operations["health_ready"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plans/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a roster against the day's zones
+         * @description Run the independent validator on a roster given as text or as segments, for a hypothetical crew.
+         *
+         *     Nothing is stored. A roster that does not parse is `roster-invalid` (422, `errors` with 1-based line numbers).
+         */
+        post: operations["validate_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register a Web Push subscription
+         * @description Register the browser's subscription for site alerts and, optionally, one crew's alerts.
+         *
+         *     The endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown
+         *     `site_id` or `crew_id` is `not-found`. The body holds no worker identifier by design.
+         */
+        post: operations["create_push_subscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/subscriptions/{subscription_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a Web Push subscription
+         * @description Remove a subscription. Idempotent: deleting one that is already gone is also 204.
+         */
+        delete: operations["delete_push_subscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/risk-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The active risk policy
+         * @description The policy the device uses to turn a forecast into a personal level: bands, workloads, clothing, thresholds.
+         *
+         *     The device must check that `config_version` equals the forecast's before it computes a personal level.
+         */
+        get: operations["get_risk_policy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sites
+         * @description All sites the API serves, with their time zone and whether they are synthetic demo data.
+         */
+        get: operations["list_sites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/crews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the crews of a site
+         * @description The crews of the site with the status the supervisor list shows: workload, shift, sign-off, plan status, stop.
+         *
+         *     The sign-off and plan status are those of the response date (`date`, same default rule as the other routes);
+         *     the stop is the one active at the time of the response.
+         */
+        get: operations["list_site_crews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/data-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request individual data (always refused)
+         * @description An employer asks for individual worker data. The answer is always the `individual-data-refused` problem (403).
+         *
+         *     No such data is held by this service. The refusal is written to an append-only audit log that every worker of the
+         *     site can read through `get_site_transparency_log`; the `worker_ref` is discarded and never stored, logged or echoed.
+         *     Without a token the answer is 401.
+         *
+         *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
+         */
+        post: operations["create_data_request"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -267,10 +334,60 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start a new demo epoch for a synthetic site.
-         * @description Candidate operation, not yet confirmed with B3. Valid only for a site with synthetic: true (else 403). Employer token. Crew stops and sign-offs revert to the seed; the transparency log is append-only and keeps every row. A real API may answer 404 or 501.
+         * Reset a synthetic demo site
+         * @description Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.
+         *
+         *     A reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events
+         *     and push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not
+         *     epoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic
+         *     answers `not-a-demo-site` (409).
+         *
+         *     Rate limit, per access token: 1 per 60 s, 10 per 3600 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
         post: operations["reset_demo_site"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/forecast/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hourly forecast and site level for a day
+         * @description The corrected hourly WBGT range and the warning level of each working hour of the site-local day.
+         *
+         *     Every instant is UTC; `date` and the ban window are site-local. `forecast_status` says whether the forecast is
+         *     fresh, stale (shown anyway) or missing (the plan is then the most protective one).
+         */
+        get: operations["get_site_forecast_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/transparency-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Worker-visible audit entries of a site
+         * @description Refused employer data requests at the site, newest first, at most 50. Never says whose data was asked for.
+         */
+        get: operations["get_site_transparency_log"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -282,642 +399,2944 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
-         * @description Heat level. Never shown by colour alone.
-         * @enum {string}
+         * AckItem
+         * @description One acknowledgement tick: a run of consecutive work and ADOSH-rest segments at the same zone above Low.
+         * @example {
+         *       "ends_at": "2026-07-01T03:00:00Z",
+         *       "id": "high-0600",
+         *       "starts_at": "2026-07-01T02:00:00Z",
+         *       "text_code": "cycle.high.heavy.20-40",
+         *       "zone": "high"
+         *     }
          */
-        Level: "green" | "amber" | "orange" | "red";
-        /**
-         * @description ADOSH zone of the effective TWL with a fourth stop edge (ADR 0046).
-         * @enum {string}
-         */
-        Zone: "low" | "medium" | "high" | "red";
-        Problem: {
-            /** @description URI reference identifying the problem type. */
-            type: string;
-            title: string;
-            status: number;
-            detail?: string;
-            instance?: string;
-            /** @description Same value as the X-Request-ID response header. */
-            request_id: string;
-        };
-        ReviewRequiredProblem: {
-            /** @description urn:stellar-blaze:problem:review-required */
-            type: string;
-            title: string;
-            status: number;
-            detail?: string;
-            instance?: string;
-            request_id: string;
-            /** @description Ids from DayPlan.ack_items that acknowledged_items did not list. */
-            missing_items: string[];
-        };
-        TimeRange: {
-            /** Format: date-time */
-            starts_at: string;
-            /** Format: date-time */
+        AckItem: {
+            /**
+             * Ends At
+             * Format: date-time
+             * @description UTC end of the run, exclusive.
+             */
             ends_at: string;
-        };
-        Site: {
+            /**
+             * Id
+             * @description Format `<zone>-<HHMM>`: the zone, then the zero-padded 24-hour LOCAL (site time zone) start of the run, for example `high-0600` or `medium-1500`. Send it back in `acknowledged_items`.
+             */
             id: string;
-            name: string;
-            /** @description IANA time zone; the UI renders every time in it. */
-            timezone: string;
-            /** @description True for demo data. */
-            synthetic: boolean;
-            /** @description E.164 style number of the site supervisor, null when the site has none on file. SYNTHETIC on the demo site. */
-            supervisor_phone: string | null;
-            /** @description E.164 style number of the site first-aider, null when the site has none on file. SYNTHETIC on the demo site. */
-            first_aider_phone: string | null;
-        };
-        HourForecast: {
-            /** Format: date-time */
+            /**
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the run.
+             */
             starts_at: string;
-            wbgt_c: {
-                p05: number | null;
-                p50: number | null;
-                p95: number | null;
-            };
-            site_level: components["schemas"]["Level"] | null;
-            action_codes: string[];
-            /** @description Midday work ban in force during this hour. */
-            ban_active: boolean;
-        };
-        SiteForecastToday: {
-            site_id: string;
-            /** Format: date */
-            date: string;
-            /** Format: date-time */
-            generated_at: string;
-            /** @description Backend ruleset id (ae-heat-<yyyy>.<n>). Shown verbatim, never parsed. */
-            policy_version: string;
-            /** @description Active runtime configuration version id (ADR 0010). */
-            config_version: number;
             /**
-             * @description replay: a recorded day; stamped on every screen that shows forecast data.
+             * Text Code
+             * @description Ruleset action code of the run's cycle for the crew's workload and the run's zone, for example `cycle.medium.heavy.45-15` or `cycle.high.heavy.20-40`; the client maps it to copy.
+             */
+            text_code: string;
+            /**
+             * Zone
+             * @description The zone of the run; Low runs need no acknowledgement.
              * @enum {string}
              */
-            mode: "replay" | "live";
+            zone: "medium" | "high" | "red";
+        };
+        /**
+         * AlertLevel
+         * @description The four warning levels of plan section 8.4, declared in ascending severity.
+         *
+         *     The values are the lowercase codes of the wire contracts (the API's ``Level`` and the Web Push payload). Members
+         *     compare as strings, not by severity, so rank them by their position in this declaration. The probability
+         *     thresholds that map a forecast onto a level belong to the risk policy (B3), not to this vocabulary.
+         * @enum {string}
+         */
+        AlertLevel: "green" | "amber" | "orange" | "red";
+        /**
+         * BanWindow
+         * @description The midday outdoor-work ban as data, so no client carries its constants.
+         * @example {
+         *       "active_on_date": true,
+         *       "end": "15:00",
+         *       "ends_at": "2026-07-01T11:00:00Z",
+         *       "season_end": "09-15",
+         *       "season_start": "06-15",
+         *       "start": "12:30",
+         *       "starts_at": "2026-07-01T08:30:00Z",
+         *       "timezone": "Asia/Dubai"
+         *     }
+         */
+        BanWindow: {
             /**
-             * @description stale and fallback are never drawn as live. fallback: no usable forecast, every hour has site_level null (ADR 0058).
-             * @enum {string}
+             * Active On Date
+             * @description True when the ban applies on the date of the response that carries it.
              */
-            forecast_status: "fresh" | "stale" | "fallback";
-            model_id: string | null;
-            /** @description Forecast lead in days: 1 is about 24 hours ahead. */
-            lead_days: number;
-            /** @description The midday work ban of this date as UTC instants: 12:30 to 15:00 local, 15 Jun to 15 Sep inclusive local dates, otherwise null. The UI never writes these edges as literals. */
-            ban_window: components["schemas"]["TimeRange"] | null;
-            hours: components["schemas"]["HourForecast"][];
+            active_on_date: boolean;
+            /**
+             * End
+             * @description Site-local end of the daily ban, `HH:MM`, exclusive (15:00).
+             */
+            end: string;
+            /**
+             * Ends At
+             * @description UTC instant the ban ends (exclusive) on the response's own date; null when `active_on_date` is false.
+             */
+            ends_at: string | null;
+            /**
+             * Season End
+             * @description Last local date of the ban season, `MM-DD`, inclusive (09-15).
+             */
+            season_end: string;
+            /**
+             * Season Start
+             * @description First local date of the ban season, `MM-DD`, inclusive (06-15).
+             */
+            season_start: string;
+            /**
+             * Start
+             * @description Site-local start of the daily ban, `HH:MM` (12:30).
+             */
+            start: string;
+            /**
+             * Starts At
+             * @description UTC instant the ban starts on the response's own date; null when `active_on_date` is false.
+             */
+            starts_at: string | null;
+            /**
+             * Timezone
+             * @description IANA time zone `start`, `end` and the season dates are in.
+             */
+            timezone: string;
         };
-        RiskPolicy: {
-            /** @description Backend ruleset id (ae-heat-<yyyy>.<n>). Shown verbatim, never parsed. */
-            version: string;
-            /** @description Must equal the forecast's config_version before the device computes personal risk. */
-            config_version: number;
-            /** @description Smallest crew size whose aggregates are shown (k_exposure, ADR 0050). */
-            k_suppression: number;
-            /** @description Smallest group behind any health-related count (ADR 0050). */
-            k_health: number;
-            acclimatisation_days_required: number;
-            bands: {
-                level: components["schemas"]["Level"];
-                min_exceedance_probability: number;
-            }[];
-            workload_classes: {
-                /** @enum {string} */
-                code: "light" | "moderate" | "heavy";
-                metabolic_rate_w: number;
-            }[];
-            clothing_options: {
-                code: string;
-                adjustment_c: number;
-                source: string;
-            }[];
+        /** ClothingOption */
+        ClothingOption: {
+            /**
+             * Adjustment C
+             * @description WBGT adjustment in degrees Celsius added for this clothing.
+             */
+            adjustment_c: number;
+            /**
+             * Code
+             * @description Clothing option code; the client holds the words.
+             */
+            code: string;
+            /**
+             * Source
+             * @description Where the adjustment comes from.
+             */
+            source: string;
         };
+        /**
+         * Crew
+         * @example {
+         *       "id": "crew-b",
+         *       "member_count": 20,
+         *       "name": "Crew B",
+         *       "plan_status": "rule",
+         *       "shift": [
+         *         {
+         *           "end": "11:00",
+         *           "start": "06:00"
+         *         },
+         *         {
+         *           "end": "18:00",
+         *           "start": "15:00"
+         *         }
+         *       ],
+         *       "signoff_state": "unsigned",
+         *       "site_id": "site-demo-mussafah",
+         *       "stopped": false,
+         *       "task_label": "Concrete pour",
+         *       "workload": "heavy"
+         *     }
+         */
         Crew: {
+            /**
+             * Active Stop Id
+             * @description Id of the active stop, to pass to `delete_crew_stop` after a reload; null when `stopped` is false.
+             */
+            active_stop_id: string | null;
+            /** Id */
             id: string;
-            site_id: string;
-            name: string;
+            /**
+             * Member Count
+             * @description Head count of the crew. An aggregate; the crew is suppressed below `k`.
+             */
             member_count: number;
-            /** @description What the crew is doing today, for example Concrete pour. Task allocation, shown to the crew's own supervisor. */
+            /** Name */
+            name: string;
+            /**
+             * Plan Status
+             * @description Status of the plan for the response date: `rule` (from the forecast) or `fallback` (no fresh forecast: protective plan).
+             * @enum {string}
+             */
+            plan_status: "rule" | "fallback";
+            /**
+             * Shift
+             * @description The published shift blocks, site-local; work outside them is never planned.
+             */
+            shift: components["schemas"]["ShiftWindow"][];
+            /**
+             * Signoff State
+             * @description Sign-off of the plan for the response date: `unsigned`; `signed`; or `changed_since_signed` (a plan was signed earlier that day and the current rule plan differs from the signed one).
+             * @enum {string}
+             */
+            signoff_state: "unsigned" | "signed" | "changed_since_signed";
+            /** Site Id */
+            site_id: string;
+            /**
+             * Stopped
+             * @description True while a crew-lead stop is active at the time of the response. Equivalent to `active_stop_id` being non-null.
+             */
+            stopped: boolean;
+            /**
+             * Stopped At
+             * @description UTC time the active stop was recorded; null when `stopped` is false.
+             */
+            stopped_at: string | null;
+            /**
+             * Task Label
+             * @description What the crew does, for example `Concrete pour`.
+             */
             task_label: string;
             /**
-             * @description The crew's workload class (a crew input, not a member reading).
+             * Workload
+             * @description The crew's workload class; ADOSH Table 1 cycles follow it.
              * @enum {string}
              */
             workload: "light" | "moderate" | "heavy";
         };
+        /**
+         * CrewHour
+         * @example {
+         *       "ban_active": false,
+         *       "crew_level": "orange",
+         *       "starts_at": "2026-07-01T06:00:00Z"
+         *     }
+         */
         CrewHour: {
-            /** Format: date-time */
-            starts_at: string;
-            /** @description The crew's level for this hour: the site level of that hour, raised to red by a crew-lead stop (ADR 0050). Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data. */
-            crew_level: components["schemas"]["Level"] | null;
+            /**
+             * Ban Active
+             * @description True when the midday work ban is in force for any part of this hour.
+             */
             ban_active: boolean;
-        };
-        CrewTimeline: {
-            crew_id: string;
-            crew_name: string;
-            site_id: string;
-            /** Format: date */
-            date: string;
-            /** @description True when the crew has fewer than k members (k_exposure). It withholds member-derived fields only, such as the restricted headcount of the day plan; crew_level carries no member-derived information (it comes from site and crew inputs, or is null): nothing in the response may single out a member. */
-            suppressed: boolean;
-            k: number;
-            /** @description As SiteForecastToday.ban_window, for the crew's site and this date. */
-            ban_window: components["schemas"]["TimeRange"] | null;
-            /** @description The crew's published shift blocks for this date, as UTC instants. */
-            shift: components["schemas"]["TimeRange"][];
+            /** @description The crew's level for this hour: the site level, raised to red by a crew-lead stop. Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data. */
+            crew_level: components["schemas"]["AlertLevel"] | null;
             /**
-             * @description Whether the crew's day plan is signed off. Never gates an alert or a stop.
-             * @enum {string}
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the hour; the hour covers [starts_at, starts_at + 1 h).
              */
-            signoff_state: "unsigned" | "signed";
-            hours: components["schemas"]["CrewHour"][];
-        };
-        PlanSegment: {
-            /** Format: date-time */
             starts_at: string;
-            /** Format: date-time */
-            ends_at: string;
-            /** @enum {string} */
-            state: "work" | "adosh_rest" | "art18_break" | "ban" | "stopped" | "off";
-            zone: components["schemas"]["Zone"] | null;
-            rule_id: string;
-            clause: string;
         };
-        Violation: {
-            rule_id: string;
-            clause: string;
-            source_id: string;
-            ranges: components["schemas"]["TimeRange"][];
-            detail: string;
-        };
-        ValidatorResult: {
-            passed: boolean;
-            violations: components["schemas"]["Violation"][];
-            checked_rules: string[];
-        };
-        ZoneHour: {
-            /** Format: date-time */
-            starts_at: string;
-            zone: components["schemas"]["Zone"] | null;
-            level: components["schemas"]["Level"] | null;
-        };
-        AckItem: {
-            /** @description One acknowledgement is one run of consecutive plan blocks in the same zone above low. Format ack-<zone>-<HHMM>, the local start time, for example ack-high-1000. Unique within a day plan. */
-            id: string;
-            /** @enum {string} */
-            zone: "medium" | "high" | "red";
-            /** Format: date-time */
-            starts_at: string;
-            /** Format: date-time */
-            ends_at: string;
-            /** @description Action code the client maps to text, for example cycle.medium.heavy.45-15 or stop-work. */
-            text_code: string;
-        };
-        DaySignoff: {
-            /** @enum {string} */
-            state: "unsigned" | "signed";
-            signed_at: string | null;
-            signed_by_role: "employer" | null;
-        };
-        DayPlan: {
-            crew_id: string;
-            /** Format: date */
-            date: string;
-            /** @enum {string} */
-            status: "rule" | "fallback";
+        /**
+         * CrewStop
+         * @description A recorded crew-lead stop. It takes effect on the crew's plan and level immediately.
+         * @example {
+         *       "crew_id": "crew-b",
+         *       "id": "stop-0001",
+         *       "started_at": "2026-07-01T06:00:00Z"
+         *     }
+         */
+        CrewStop: {
             /**
-             * @description Widened from the unsigned-only value of B3 Task 0 by the sign-off decision (ADR 0051 amendment). With no sign-off the plan stays unsigned (plan.unsigned_fallback).
-             * @enum {string}
+             * Cleared At
+             * @description UTC time the stop was cleared; null while it is active.
              */
-            signoff_state: "unsigned" | "signed";
-            /** @enum {string} */
-            banner_code: "plan.floor_banner";
-            segments: components["schemas"]["PlanSegment"][];
-            zone_hours: components["schemas"]["ZoneHour"][];
-            validator: components["schemas"]["ValidatorResult"];
-            suppressed: boolean;
-            /** @description Members limited by acclimatisation, the 7-day heavy rule or the juvenile rule. Null when suppressed. */
-            restricted_headcount: number | null;
-            restrictions: string[];
-            /** @enum {string} */
-            forecast_status: "fresh" | "stale" | "fallback";
-            policy_version: string;
-            config_version: number;
-            model_id: string | null;
-            /** @description The items that need a per-item acknowledgement before sign-off, in time order. */
-            ack_items: components["schemas"]["AckItem"][];
-            signoff: components["schemas"]["DaySignoff"];
-        };
-        PlanValidateRequest: {
-            site_id: string;
-            /** Format: date */
-            date: string;
-            crew: {
-                /** @enum {string} */
-                workload: "light" | "moderate" | "heavy";
-                headcount: number;
-                /** @description Optional; true when omitted (the default is applied by the API, not declared here, so the generated type stays optional). */
-                acclimatised?: boolean;
-                /** @description Optional; 6 when omitted (applied by the API). */
-                days_per_week?: number;
-            };
-            roster_text?: string | null;
-            segments?: {
-                start: string;
-                end: string;
-                /** @enum {string} */
-                state: "work" | "rest" | "break";
-            }[] | null;
-        };
-        PlanValidateResponse: {
-            validator: components["schemas"]["ValidatorResult"];
-            zone_hours: components["schemas"]["ZoneHour"][];
-            policy_version: string;
-            config_version: number;
-        };
-        RosterInvalidProblem: {
-            /** @description urn:stellar-blaze:problem:roster-invalid */
-            type: string;
-            title: string;
-            status: number;
-            detail?: string;
-            instance?: string;
-            request_id: string;
-            errors: {
-                line: number;
-                message: string;
-            }[];
-        };
-        PushSubscriptionCreate: {
-            subscription: {
-                endpoint: string;
-                expirationTime: number | null;
-                keys: {
-                    p256dh: string;
-                    auth: string;
-                };
-            };
-            site_id: string;
-            crew_id: string | null;
-        };
-        PushSubscriptionCreated: {
+            cleared_at: string | null;
+            /** Crew Id */
+            crew_id: string;
+            /** Id */
             id: string;
+            /**
+             * Started At
+             * Format: date-time
+             * @description UTC time the stop was recorded. A stop is never delayed by sign-off or validation.
+             */
+            started_at: string;
         };
-        DataRequestCreate: {
-            /** @enum {string} */
-            subject: "worker";
-            /** @enum {string} */
-            data_class: "health" | "personal" | "exposure";
-            /** @description Free text; validated and discarded. Never stored, logged or echoed. */
-            worker_ref: string;
-        };
+        /**
+         * CrewStopCreate
+         * @example {
+         *       "reason_code": "heat"
+         *     }
+         */
         CrewStopCreate: {
-            /** @enum {string} */
+            /**
+             * Reason Code
+             * @description Why the crew lead stops work. Never free text.
+             * @enum {string}
+             */
             reason_code: "heat" | "worker_unwell" | "other";
         };
-        CrewStop: {
-            id: string;
+        /**
+         * CrewTimeline
+         * @example {
+         *       "ban_window": {
+         *         "active_on_date": true,
+         *         "end": "15:00",
+         *         "ends_at": "2026-07-01T11:00:00Z",
+         *         "season_end": "09-15",
+         *         "season_start": "06-15",
+         *         "start": "12:30",
+         *         "starts_at": "2026-07-01T08:30:00Z",
+         *         "timezone": "Asia/Dubai"
+         *       },
+         *       "crew_id": "crew-b",
+         *       "crew_name": "Crew B",
+         *       "date": "2026-07-01",
+         *       "forecast_status": "fresh",
+         *       "hours": [
+         *         {
+         *           "ban_active": false,
+         *           "crew_level": "orange",
+         *           "starts_at": "2026-07-01T06:00:00Z"
+         *         }
+         *       ],
+         *       "k": 5,
+         *       "shift": [
+         *         {
+         *           "ends_at": "2026-07-01T07:00:00Z",
+         *           "starts_at": "2026-07-01T02:00:00Z"
+         *         },
+         *         {
+         *           "ends_at": "2026-07-01T14:00:00Z",
+         *           "starts_at": "2026-07-01T11:00:00Z"
+         *         }
+         *       ],
+         *       "signoff_state": "unsigned",
+         *       "site_id": "site-demo-mussafah",
+         *       "suppressed": false
+         *     }
+         */
+        CrewTimeline: {
+            /** @description The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object. */
+            ban_window: components["schemas"]["BanWindow"];
+            /** Crew Id */
             crew_id: string;
-            /** Format: date-time */
-            started_at: string;
-            cleared_at: string | null;
-        };
-        TransparencyLog: {
+            /** Crew Name */
+            crew_name: string;
+            /**
+             * Date
+             * Format: date
+             * @description The site-local date the hours belong to.
+             */
+            date: string;
+            /**
+             * Forecast Status
+             * @description `fresh`, `stale` (shown anyway, label it) or `fallback` (no usable forecast; hours may be null).
+             * @enum {string}
+             */
+            forecast_status: "fresh" | "stale" | "fallback";
+            /**
+             * Hours
+             * @description Working-day hours in time order (06:00-19:00 site-local).
+             */
+            hours: components["schemas"]["CrewHour"][];
+            /**
+             * K
+             * @description The suppression threshold in force (`k_exposure`, ADR 0050).
+             */
+            k: number;
+            /**
+             * Shift
+             * @description The crew's published shift blocks on this date as UTC instants, in time order.
+             */
+            shift: components["schemas"]["TimeRange"][];
+            /**
+             * Signoff State
+             * @description Sign-off of the crew's plan for this date: `unsigned`, `signed` or `changed_since_signed`.
+             * @enum {string}
+             */
+            signoff_state: "unsigned" | "signed" | "changed_since_signed";
+            /** Site Id */
             site_id: string;
-            entries: {
-                /** Format: date-time */
-                at: string;
-                /** @enum {string} */
-                kind: "data_request.refused";
-                /** @enum {string} */
-                outcome: "refused";
-                /** @enum {string} */
-                actor_role: "employer";
-                rule: string;
-                policy_version: string;
-                config_version: number;
-                model_id: string | null;
-            }[];
+            /**
+             * Suppressed
+             * @description True when the crew has fewer than k members. Suppression withholds member-derived fields only (the restricted head count of the day plan); `crew_level` carries no member-derived information and is returned either way. Nothing in the response may single out a member.
+             */
+            suppressed: boolean;
         };
-        SignOffRequest: {
-            /** @description Ids of the DayPlan.ack_items the supervisor ticked. */
-            acknowledged_items: string[];
-            deviation_reason_code: string | null;
+        /**
+         * DataRequestCreate
+         * @description An employer's request for individual data. It is always refused (403) and the refusal is logged (ADR 0054).
+         * @example {
+         *       "data_class": "health",
+         *       "subject": "worker",
+         *       "worker_ref": "staff no. 4471"
+         *     }
+         */
+        DataRequestCreate: {
+            /**
+             * Data Class
+             * @description The class of individual data requested.
+             * @enum {string}
+             */
+            data_class: "health" | "personal" | "exposure";
+            /**
+             * Subject
+             * @description Whose data is requested. Only `worker` exists.
+             * @constant
+             */
+            subject: "worker";
+            /**
+             * Worker Ref
+             * @description Free text naming the person. Write-only: validated, then discarded; never stored, logged or echoed.
+             */
+            worker_ref: string;
         };
+        /**
+         * DayPlan
+         * @example {
+         *       "ack_items": [
+         *         {
+         *           "ends_at": "2026-07-01T03:00:00Z",
+         *           "id": "high-0600",
+         *           "starts_at": "2026-07-01T02:00:00Z",
+         *           "text_code": "cycle.high.heavy.20-40",
+         *           "zone": "high"
+         *         }
+         *       ],
+         *       "ban_window": {
+         *         "active_on_date": true,
+         *         "end": "15:00",
+         *         "ends_at": "2026-07-01T11:00:00Z",
+         *         "season_end": "09-15",
+         *         "season_start": "06-15",
+         *         "start": "12:30",
+         *         "starts_at": "2026-07-01T08:30:00Z",
+         *         "timezone": "Asia/Dubai"
+         *       },
+         *       "banner_code": "plan.floor_banner",
+         *       "config_version": 1,
+         *       "crew_id": "crew-b",
+         *       "date": "2026-07-01",
+         *       "forecast_status": "fresh",
+         *       "model_id": "corrector-20261112-0000000-000001",
+         *       "policy_version": "ae-heat-2026.1",
+         *       "restricted_headcount": 0,
+         *       "restrictions": [],
+         *       "segments": [
+         *         {
+         *           "clause": "ADOSH Technical Guideline Table 1, High zone, heavy work: 20 minutes of work, 40 minutes of rest.",
+         *           "ends_at": "2026-07-01T02:20:00Z",
+         *           "rule_id": "P-H7.cycle",
+         *           "starts_at": "2026-07-01T02:00:00Z",
+         *           "state": "work",
+         *           "zone": "high"
+         *         },
+         *         {
+         *           "clause": "ADOSH Technical Guideline Table 1, High zone, heavy work: 20 minutes of work, 40 minutes of rest.",
+         *           "ends_at": "2026-07-01T03:00:00Z",
+         *           "rule_id": "P-H7.cycle",
+         *           "starts_at": "2026-07-01T02:20:00Z",
+         *           "state": "adosh_rest",
+         *           "zone": "high"
+         *         },
+         *         {
+         *           "clause": "Ministerial Resolution 44 of 2022: no outdoor work 12:30-15:00 from 15 June to 15 September.",
+         *           "ends_at": "2026-07-01T11:00:00Z",
+         *           "rule_id": "P-H1",
+         *           "starts_at": "2026-07-01T08:30:00Z",
+         *           "state": "ban"
+         *         }
+         *       ],
+         *       "signoff_label_code": "plan.unsigned_fallback",
+         *       "signoff_state": "unsigned",
+         *       "status": "rule",
+         *       "suppressed": false,
+         *       "validator": {
+         *         "checked_rules": [
+         *           "P-H1",
+         *           "P-H2.daily",
+         *           "P-H3",
+         *           "P-H7.cap60",
+         *           "P-H7.run",
+         *           "STOP.red"
+         *         ],
+         *         "passed": true,
+         *         "violations": []
+         *       },
+         *       "zone_hours": [
+         *         {
+         *           "level": "orange",
+         *           "starts_at": "2026-07-01T02:00:00Z",
+         *           "zone": "high"
+         *         }
+         *       ]
+         *     }
+         */
+        DayPlan: {
+            /**
+             * Ack Items
+             * @description The acknowledgements a sign-off needs: one per run above Low. Empty on an all-Low day.
+             */
+            ack_items: components["schemas"]["AckItem"][];
+            /** @description The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object. */
+            ban_window: components["schemas"]["BanWindow"];
+            /**
+             * Banner Code
+             * @description Always present on every plan payload: the client shows the floor banner ("Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.").
+             * @constant
+             */
+            banner_code: "plan.floor_banner";
+            /**
+             * Config Version
+             * @description Active runtime configuration id; 0 when running without a database configuration.
+             */
+            config_version: number;
+            /** Crew Id */
+            crew_id: string;
+            /**
+             * Date
+             * Format: date
+             * @description The site-local date of the plan.
+             */
+            date: string;
+            /**
+             * Forecast Status
+             * @description `fresh`, `stale` or `fallback`; on the latter two the plan is protective.
+             * @enum {string}
+             */
+            forecast_status: "fresh" | "stale" | "fallback";
+            /**
+             * Model Id
+             * @description Id of the corrector model behind the zones; null in fallback.
+             */
+            model_id: string | null;
+            /**
+             * Policy Version
+             * @description Id of the ruleset the plan was made under.
+             */
+            policy_version: string;
+            /**
+             * Restricted Headcount
+             * @description Crew members limited by acclimatisation, the 7-day heavy-work rule or age rules; null when `suppressed`.
+             */
+            restricted_headcount: number | null;
+            /**
+             * Restrictions
+             * @description Restriction rule ids that apply to some members, without a count.
+             */
+            restrictions: string[];
+            /**
+             * Segments
+             * @description The plan in time order, merged runs of equal state, zone and rule.
+             */
+            segments: components["schemas"]["PlanSegment"][];
+            /**
+             * Signed At
+             * @description UTC time of the sign-off; null while `unsigned`; the time of the earlier sign-off when `changed_since_signed`.
+             */
+            signed_at: string | null;
+            /**
+             * Signed By Role
+             * @description Role of the signer; null while unsigned. The API never exposes a person's name.
+             */
+            signed_by_role: "supervisor" | null;
+            /**
+             * Signoff Label Code
+             * @description Non-null exactly when `signoff_state` is not `signed`: `plan.unsigned_fallback` for `unsigned`, `plan.changed_since_signed` for `changed_since_signed`. The client shows the matching label.
+             */
+            signoff_label_code: ("plan.unsigned_fallback" | "plan.changed_since_signed") | null;
+            /**
+             * Signoff State
+             * @description `unsigned` until a supervisor of the employer signs; `signed`; `changed_since_signed` when a plan was signed earlier that day and the current rule plan differs from it. Never gates an alert or a stop.
+             * @enum {string}
+             */
+            signoff_state: "unsigned" | "signed" | "changed_since_signed";
+            /**
+             * Status
+             * @description `rule` from the forecast; `fallback` when the forecast is missing or stale.
+             * @enum {string}
+             */
+            status: "rule" | "fallback";
+            /**
+             * Suppressed
+             * @description True when the crew has fewer than k members (ADR 0050).
+             */
+            suppressed: boolean;
+            /** @description The independent validator's verdict on this plan. */
+            validator: components["schemas"]["ValidatorResult"];
+            /**
+             * Zone Hours
+             * @description The zone and level of each hour the plan was made from.
+             */
+            zone_hours: components["schemas"]["ZoneHour"][];
+        };
+        /**
+         * DemoDay
+         * @description The demo day (``artifacts/eval/2026/demo_day.json``), chosen on truth alone before any P3 output was read.
+         */
+        DemoDay: {
+            /**
+             * Candidates
+             * @description Number of candidate dates that satisfied the pre-registered conditions.
+             */
+            candidates: number;
+            /**
+             * Date
+             * Format: date
+             * @description Selected local date.
+             */
+            date: string;
+            /**
+             * Evaluation Set
+             * @description `scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".
+             * @enum {string}
+             */
+            evaluation_set: "dev_2025" | "scored_2026";
+            /**
+             * High Hours
+             * @description Observed High-or-Red working hours on the date, ban hours included (demo_high_h).
+             */
+            high_hours: number;
+            /**
+             * High Hours Outside Ban
+             * @description High-or-Red working hours outside the ban window, weighted (demo_high_outside_ban_h); equals `score`.
+             */
+            high_hours_outside_ban: number;
+            /**
+             * Hours
+             * @description The nine working hours 06:00-14:59 UTC in order.
+             */
+            hours: components["schemas"]["DemoDayHour"][];
+            /**
+             * Lead Days
+             * @description Lead of the forecasts shown (1).
+             */
+            lead_days: number;
+            /**
+             * P3 Hits
+             * @description Danger hours P3 at theta_protect warned (demo_p3_hits).
+             */
+            p3_hits: number;
+            /** @description Where the numbers in this file came from. */
+            provenance: components["schemas"]["Provenance"];
+            /**
+             * Raw Hits
+             * @description Danger hours the raw-forecast policy P2 warned (demo_raw_hits).
+             */
+            raw_hits: number;
+            /**
+             * Rule
+             * @description The selection rule in words (pre-registration 7.4); ties go to the earliest date.
+             */
+            rule: string;
+            /** @description Second-best candidate; null when there was only one. */
+            runner_up: components["schemas"]["RunnerUp"] | null;
+            /**
+             * Score
+             * @description The pre-registration 7.4 selection score: observed High-zone working hours outside the ban window, weighted by the non-ban fraction. It equals `high_hours_outside_ban`; it is kept under this name because it is the quantity the selection rule maximizes.
+             */
+            score: number;
+            /**
+             * Station
+             * @description ICAO id of the demo station (OMAA).
+             */
+            station: string;
+        };
+        /**
+         * DemoDayHour
+         * @description One working hour of the demo day: the truth, what the raw forecast said, and what each policy did.
+         */
+        DemoDayHour: {
+            /**
+             * Ban Weight
+             * @description Non-ban fraction of the hour, 0 to 1 (0.5 for the hour 08:00 UTC, which holds 30 minutes of ban).
+             */
+            ban_weight: number;
+            /** @description Corrected WBGT range (5th, 50th, 95th percentile) in degrees Celsius; null when no finite sample. */
+            corrected_wbgt_c: components["schemas"]["WbgtQuantiles"] | null;
+            /**
+             * P High
+             * @description P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample.
+             */
+            p_high: number | null;
+            /**
+             * Protective Twl W M2
+             * @description 10th percentile of the corrected effective TWL in W/m2 (the plan quantile).
+             */
+            protective_twl_w_m2: number | null;
+            /**
+             * Raw Twl Eff W M2
+             * @description Effective TWL of the raw IFS forecast in W/m2; null when missing.
+             */
+            raw_twl_eff_w_m2: number | null;
+            /**
+             * Raw Wbgt C
+             * @description Raw IFS WBGT forecast in degrees Celsius; null when missing.
+             */
+            raw_wbgt_c: number | null;
+            /**
+             * Raw Zone
+             * @description ADOSH zone of the raw forecast (the P2 basis); null when missing.
+             */
+            raw_zone: ("low" | "medium" | "high" | "red") | null;
+            /**
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the hour; the hour covers [starts_at, starts_at + 1 h).
+             */
+            starts_at: string;
+            /**
+             * Truth Twl Eff W M2
+             * @description Effective TWL of the observation in W/m2 (after the margin).
+             */
+            truth_twl_eff_w_m2: number;
+            /**
+             * Truth Wbgt C
+             * @description Observed WBGT in degrees Celsius.
+             */
+            truth_wbgt_c: number;
+            /**
+             * Truth Zone
+             * @description ADOSH zone of the truth TWL; High and Red are danger hours.
+             * @enum {string}
+             */
+            truth_zone: "low" | "medium" | "high" | "red";
+            /**
+             * Warned By
+             * @description Policies that warned this hour.
+             */
+            warned_by: ("P0" | "P1" | "P2" | "P3_protect" | "P3_balanced")[];
+        };
+        /**
+         * DemoReset
+         * @description A reset starts a new epoch of a synthetic demo site. Nothing is deleted.
+         * @example {
+         *       "epoch_id": 2,
+         *       "previous_epoch_id": 1,
+         *       "reset_at": "2026-07-01T05:00:00Z",
+         *       "site_id": "site-demo-mussafah"
+         *     }
+         */
         DemoReset: {
-            /** @description The new demo epoch, counting from 1. */
-            epoch: number;
+            /**
+             * Epoch Id
+             * @description A reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events and push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not epoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted.
+             */
+            epoch_id: number;
+            /**
+             * Previous Epoch Id
+             * @description The epoch that was current before the reset (`epoch_id` minus 1).
+             */
+            previous_epoch_id: number;
+            /**
+             * Reset At
+             * Format: date-time
+             * @description UTC time of the reset.
+             */
+            reset_at: string;
+            /** Site Id */
+            site_id: string;
         };
-    };
-    responses: {
-        /** @description No bearer token, or an unknown one. */
-        Unauthorized: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                /** @description Bearer */
-                "WWW-Authenticate"?: string;
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+        /**
+         * HourForecast
+         * @example {
+         *       "action_codes": [
+         *         "rest_in_shade",
+         *         "water_every_15_min"
+         *       ],
+         *       "ban_active": false,
+         *       "site_level": "orange",
+         *       "starts_at": "2026-07-01T06:00:00Z",
+         *       "wbgt_c": {
+         *         "p05": 30.1,
+         *         "p50": 32.4,
+         *         "p95": 34
+         *       }
+         *     }
+         */
+        HourForecast: {
+            /**
+             * Action Codes
+             * @description Ruleset action codes for the level; the client holds the words.
+             */
+            action_codes: string[];
+            /**
+             * Ban Active
+             * @description True when the midday work ban is in force for any part of this hour.
+             */
+            ban_active: boolean;
+            /** @description The site's warning level for the hour (ADR 0046). Null when no usable forecast exists for the hour: treat it as the most protective workable plan (ADR 0058). */
+            site_level: components["schemas"]["AlertLevel"] | null;
+            /**
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the hour; the hour covers [starts_at, starts_at + 1 h).
+             */
+            starts_at: string;
+            /** @description Corrected WBGT range of the hour, degrees Celsius. */
+            wbgt_c: components["schemas"]["WbgtQuantiles"];
         };
-        /** @description The token's employer may not do this, or the request is refused by rule. */
-        Forbidden: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+        /**
+         * HypothesisVerdict
+         * @description The pre-registered verdict on one hypothesis. Negative results are shown as they are (section 13).
+         */
+        HypothesisVerdict: {
+            /**
+             * Comparisons
+             * @description The paired differences the verdict is computed from.
+             */
+            comparisons: components["schemas"]["PairedComparison"][];
+            /**
+             * Id
+             * @description Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans).
+             */
+            id: string;
+            /**
+             * Outcome
+             * @description `supported` when every interval excludes zero in the stated direction.
+             * @enum {string}
+             */
+            outcome: "supported" | "negative";
+            /**
+             * Primary
+             * @description True for the one primary hypothesis of the row.
+             */
+            primary: boolean;
+            /**
+             * Statement
+             * @description The hypothesis as pre-registered, in words.
+             */
+            statement: string;
+            /**
+             * Text
+             * @description The sentence the scoreboard shows, per section 13 (names the failing side on a negative).
+             */
+            text: string;
         };
-        /** @description The resource does not exist. */
-        NotFound: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+        /**
+         * Interval
+         * @description A 95% percentile interval of the paired moving-block bootstrap (7-day blocks, B = 2,000, seed 20261112).
+         */
+        Interval: {
+            /**
+             * Hi
+             * @description Upper end of the interval, in the unit of the metric it belongs to.
+             */
+            hi: number;
+            /**
+             * Lo
+             * @description Lower end of the interval, in the unit of the metric it belongs to.
+             */
+            lo: number;
         };
-        /** @description Conflict. For sign-off: review-required, listing the missing item ids in missing_items. Other problems of status 409 use Problem. */
-        ReviewRequired: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ReviewRequiredProblem"];
-            };
+        /**
+         * LeadResult
+         * @description Every policy at one forecast lead.
+         */
+        LeadResult: {
+            /**
+             * Headline
+             * @description True for lead 1, the pre-registered headline lead.
+             */
+            headline: boolean;
+            /**
+             * Label
+             * @description How the lead may be worded: lead 1 `about 24 hours ahead`; lead 2 `issued by 18:00 GST the evening before`.
+             */
+            label: string;
+            /**
+             * Lead Days
+             * @description Forecast lead in days: 1 headline, 2 strict-availability, 3, and 5 and 7 report-only.
+             */
+            lead_days: number;
+            /**
+             * Report Only
+             * @description True for leads 5 and 7, which are reported in the report only, never headlined.
+             */
+            report_only: boolean;
+            /**
+             * Rows
+             * @description P0, P1, P2 and P3 at theta_protect and theta_balanced, in that order.
+             */
+            rows: components["schemas"]["PolicyRow"][];
+            /** @description Weighted truth danger hours in the season at this lead: the denominator of POD. */
+            truth_danger_hours: components["schemas"]["Metric"];
         };
-        /** @description The request failed validation, or the roster could not be parsed: roster-invalid lists errors by line. */
-        RosterInvalid: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["RosterInvalidProblem"];
-            };
+        /** LiveResponse */
+        LiveResponse: {
+            /**
+             * Status
+             * @default ok
+             * @constant
+             */
+            status: "ok";
         };
-        /** @description The request failed validation. A roster that cannot be parsed lists its errors (RosterInvalidProblem). */
-        Unprocessable: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+        /**
+         * Metric
+         * @description One number with its uncertainty, sample size and protocol anchor.
+         */
+        Metric: {
+            /**
+             * Anchor
+             * @description Heading slug of the pre-registration section that defines this metric.
+             */
+            anchor: string;
+            /** @description 95% bootstrap interval; null where none is defined (a total, a constant). */
+            ci: components["schemas"]["Interval"] | null;
+            /**
+             * N
+             * @description Number of observations behind the value (days, hours or ticks, as the field says).
+             */
+            n: number;
+            /**
+             * Value
+             * @description Point estimate, in the unit the field name or description states.
+             */
+            value: number;
         };
-        /** @description Not implemented by this API. */
-        NotImplemented: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+        /**
+         * PairedComparison
+         * @description One paired difference between a policy or plan and its baseline, as a hypothesis uses it.
+         */
+        PairedComparison: {
+            /**
+             * Baseline
+             * @description Policy or plan id it is compared with, for example `P0`.
+             */
+            baseline: string;
+            /** @description subject minus baseline; negative means fewer. `ci` is of the difference. */
+            difference: components["schemas"]["Metric"];
+            /**
+             * Metric
+             * @description Metric the difference is of, for example `missed_danger_hours`.
+             */
+            metric: string;
+            /**
+             * Subject
+             * @description Policy or plan id that is being tested, for example `P3_protect`.
+             */
+            subject: string;
         };
-        /** @description The API could not reach a dependency. */
-        BadGateway: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+        /**
+         * PlanCrewInput
+         * @example {
+         *       "acclimatised": true,
+         *       "days_per_week": 6,
+         *       "headcount": 20,
+         *       "workload": "heavy"
+         *     }
+         */
+        PlanCrewInput: {
+            /**
+             * Acclimatised
+             * @description One flag for the whole hypothetical crew: heat-acclimatised or not.
+             * @default true
+             */
+            acclimatised: boolean;
+            /**
+             * Days Per Week
+             * @description Working days per week, for the weekly-hours rule.
+             * @default 6
+             */
+            days_per_week: number;
+            /**
+             * Headcount
+             * @description Head count of the hypothetical crew.
+             */
+            headcount: number;
+            /**
+             * Workload
+             * @description The hypothetical crew's workload class.
+             * @enum {string}
+             */
+            workload: "light" | "moderate" | "heavy";
         };
-        /** @description Any other error. */
+        /**
+         * PlanRow
+         * @description One plan scored by the independent validator against truth zones (section 7.3).
+         */
+        PlanRow: {
+            /** @description Share of truth-High-or-Red on-shift heavy ticks whose plan zone is High or worse, 0 to 1. */
+            high_cycled_share: components["schemas"]["Metric"];
+            /**
+             * Label
+             * @description Display name; naive and ban_only share the label `Ban only` (ADR 0057).
+             */
+            label: string;
+            /** @description Worked ticks whose plan zone is milder than the truth zone (5-minute ticks). */
+            missed_protection_ticks: components["schemas"]["Metric"];
+            /**
+             * Plan
+             * @description naive, ban_only, rule_raw (zones from raw IFS) or rule_corrected (q10 of corrected samples).
+             * @enum {string}
+             */
+            plan: "naive" | "ban_only" | "rule_raw" | "rule_corrected";
+            /** @description Rest minutes the plan adds compared with naive, per worker-season (SIMULATED). */
+            rest_minutes_added_vs_naive: components["schemas"]["Metric"];
+            /** @description Ticks with at least one rule violation times 5 minutes, per worker, over the season. */
+            violation_minutes_per_season: components["schemas"]["Metric"];
+        };
+        /**
+         * PlanScoreboard
+         * @description The Plans row (``artifacts/eval/2026/plan_scoreboard.json``).
+         */
+        PlanScoreboard: {
+            /**
+             * Crew Id
+             * @description The one scored crew (crew-b).
+             */
+            crew_id: string;
+            /**
+             * Crew Label
+             * @description Words shown with the row, for example `SIMULATED crew: 20 experienced adults, heavy work`.
+             */
+            crew_label: string;
+            /**
+             * Evaluation Set
+             * @description `scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".
+             * @enum {string}
+             */
+            evaluation_set: "dev_2025" | "scored_2026";
+            /**
+             * Fixture Sha256
+             * @description SHA-256 of `backend/fixtures/demo_site.toml` (frozen, ADR 0057).
+             */
+            fixture_sha256: string;
+            /**
+             * Headcount
+             * @description Crew size of the scored crew (20), simulated.
+             */
+            headcount: number;
+            /**
+             * Identical By Construction
+             * @description Plan ids whose rows are identical by construction; [naive, ban_only] on L1.
+             */
+            identical_by_construction: ("naive" | "ban_only" | "rule_raw" | "rule_corrected")[];
+            /**
+             * N Days
+             * @description Days in the scored season with all inputs present.
+             */
+            n_days: number;
+            /** @description Where the numbers in this file came from. */
+            provenance: components["schemas"]["Provenance"];
+            /**
+             * Roster
+             * @description The roster in words, for example `L1: 06:00-11:00 + 15:00-18:00 GST`.
+             */
+            roster: string;
+            /**
+             * Rows
+             * @description naive, ban_only, rule_raw, rule_corrected, in that order.
+             */
+            rows: components["schemas"]["PlanRow"][];
+            /**
+             * Ruleset Id
+             * @description Frozen ruleset id.
+             */
+            ruleset_id: string;
+            /**
+             * Ruleset Sha256
+             * @description SHA-256 of that ruleset.
+             */
+            ruleset_sha256: string;
+            /**
+             * Season End
+             * Format: date
+             * @description Last local date of the scored season.
+             */
+            season_end: string;
+            /**
+             * Season Start
+             * Format: date
+             * @description First local date of the scored season.
+             */
+            season_start: string;
+            /**
+             * Site Id
+             * @description Id of the SIMULATED demo site whose crew is scored (ADR 0057).
+             */
+            site_id: string;
+            /**
+             * Station
+             * @description ICAO id of the weather station (OMAA).
+             */
+            station: string;
+            /**
+             * Verdicts
+             * @description H6 (primary) and H7 (secondary).
+             */
+            verdicts: components["schemas"]["HypothesisVerdict"][];
+        };
+        /** PlanSegment */
+        PlanSegment: {
+            /**
+             * Clause
+             * @description Text of the legal or policy clause behind the rule, from the ruleset.
+             */
+            clause: string;
+            /**
+             * Ends At
+             * Format: date-time
+             * @description UTC end of the segment, exclusive; equals the next segment's start.
+             */
+            ends_at: string;
+            /**
+             * Rule Id
+             * @description Id of the rule that produced the segment, for example `P-H7.cap60`.
+             */
+            rule_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the segment.
+             */
+            starts_at: string;
+            /** @description What the crew does in this segment. */
+            state: components["schemas"]["PlanState"];
+            /** @description ADOSH zone of the segment; null for `off` and for a segment with no zone data. */
+            zone: components["schemas"]["PlanZone"] | null;
+        };
+        /**
+         * PlanSignOff
+         * @example {
+         *       "acknowledged_items": [
+         *         "high-0600"
+         *       ],
+         *       "crew_id": "crew-b",
+         *       "date": "2026-07-01",
+         *       "signed_at": "2026-07-01T01:10:00Z",
+         *       "signed_by_role": "supervisor",
+         *       "signoff_state": "signed"
+         *     }
+         */
+        PlanSignOff: {
+            /**
+             * Acknowledged Items
+             * @description The ack item ids recorded.
+             */
+            acknowledged_items: string[];
+            /** Crew Id */
+            crew_id: string;
+            /**
+             * Date
+             * Format: date
+             * @description The site-local date of the signed plan.
+             */
+            date: string;
+            /**
+             * Deviation Reason Code
+             * @description The deviation reason recorded; null when none.
+             */
+            deviation_reason_code: string | null;
+            /**
+             * Signed At
+             * Format: date-time
+             * @description UTC time of the sign-off.
+             */
+            signed_at: string;
+            /**
+             * Signed By Role
+             * @description Role of the signer. The API never exposes a person's name, and a worker never signs.
+             * @constant
+             */
+            signed_by_role: "supervisor";
+            /**
+             * Signoff State
+             * @description Always `signed` on success.
+             * @constant
+             */
+            signoff_state: "signed";
+        };
+        /**
+         * PlanSignOffRequest
+         * @example {
+         *       "acknowledged_items": [
+         *         "high-0600"
+         *       ]
+         *     }
+         */
+        PlanSignOffRequest: {
+            /**
+             * Acknowledged Items
+             * @description Ids of the `ack_items` the supervisor ticked (`<zone>-<HHMM>`).
+             */
+            acknowledged_items: string[];
+            /**
+             * Deviation Reason Code
+             * @description Reason code when the supervisor deviates from the plan: lower-case words joined by underscores.
+             */
+            deviation_reason_code?: string | null;
+        };
+        /**
+         * PlanState
+         * @description What a crew does in a stretch of the day (wire values of the planner's tick states).
+         * @enum {string}
+         */
+        PlanState: "work" | "adosh_rest" | "art18_break" | "ban" | "stopped" | "off";
+        /**
+         * PlanValidateRequest
+         * @example {
+         *       "crew": {
+         *         "acclimatised": true,
+         *         "days_per_week": 6,
+         *         "headcount": 20,
+         *         "workload": "heavy"
+         *       },
+         *       "date": "2026-07-01",
+         *       "roster_text": "06:00-12:30 work\n15:00-17:00 work",
+         *       "site_id": "site-demo-mussafah"
+         *     }
+         */
+        PlanValidateRequest: {
+            /** @description The hypothetical crew the roster is checked for. */
+            crew: components["schemas"]["PlanCrewInput"];
+            /**
+             * Date
+             * Format: date
+             * @description The site-local date to check the plan on.
+             */
+            date: string;
+            /**
+             * Roster Text
+             * @description The roster as text, one `HH:MM-HH:MM work|rest|break` per line (`#` starts a comment). Exactly one of `roster_text` and `segments` must be given.
+             */
+            roster_text?: string | null;
+            /**
+             * Segments
+             * @description The roster as segments (at most 40). Exactly one of `roster_text` and `segments` must be given; a malformed segment is answered with `roster-invalid`, `line` being its 1-based index.
+             */
+            segments?: components["schemas"]["RosterSegmentInput"][] | null;
+            /**
+             * Site Id
+             * @description Site whose forecast zones the plan is checked against.
+             */
+            site_id: string;
+        };
+        /**
+         * PlanValidateResponse
+         * @example {
+         *       "ban_window": {
+         *         "active_on_date": true,
+         *         "end": "15:00",
+         *         "ends_at": "2026-07-01T11:00:00Z",
+         *         "season_end": "09-15",
+         *         "season_start": "06-15",
+         *         "start": "12:30",
+         *         "starts_at": "2026-07-01T08:30:00Z",
+         *         "timezone": "Asia/Dubai"
+         *       },
+         *       "banner_code": "plan.floor_banner",
+         *       "config_version": 1,
+         *       "forecast_status": "fresh",
+         *       "model_id": "corrector-20261112-0000000-000001",
+         *       "policy_version": "ae-heat-2026.1",
+         *       "validator": {
+         *         "checked_rules": [
+         *           "P-H1",
+         *           "P-H2.daily",
+         *           "P-H3",
+         *           "P-H7.cap60",
+         *           "P-H7.run"
+         *         ],
+         *         "passed": false,
+         *         "violations": [
+         *           {
+         *             "clause": "Labour Art. 18: a break of one hour after five hours of work.",
+         *             "detail": "6.5 hours of attendance without a one-hour break.",
+         *             "ranges": [
+         *               {
+         *                 "ends_at": "2026-07-01T08:30:00Z",
+         *                 "starts_at": "2026-07-01T02:00:00Z"
+         *               }
+         *             ],
+         *             "rule_id": "P-H3",
+         *             "source_id": "ae-labour-art-18"
+         *           }
+         *         ]
+         *       },
+         *       "zone_hours": [
+         *         {
+         *           "level": "orange",
+         *           "starts_at": "2026-07-01T02:00:00Z",
+         *           "zone": "high"
+         *         }
+         *       ]
+         *     }
+         */
+        PlanValidateResponse: {
+            /** @description The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object. */
+            ban_window: components["schemas"]["BanWindow"];
+            /**
+             * Banner Code
+             * @description Always present on every plan payload: the client shows the floor banner ("Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.").
+             * @constant
+             */
+            banner_code: "plan.floor_banner";
+            /**
+             * Config Version
+             * @description Active runtime configuration id; 0 when running without a database configuration.
+             */
+            config_version: number;
+            /**
+             * Forecast Status
+             * @description `fresh`, `stale` or `fallback`; a fallback day is High everywhere.
+             * @enum {string}
+             */
+            forecast_status: "fresh" | "stale" | "fallback";
+            /**
+             * Model Id
+             * @description Id of the corrector model behind the zones; null in fallback.
+             */
+            model_id: string | null;
+            /**
+             * Policy Version
+             * @description Id of the ruleset the check ran under.
+             */
+            policy_version: string;
+            /** @description The independent validator's verdict on the roster. */
+            validator: components["schemas"]["ValidatorResult"];
+            /**
+             * Zone Hours
+             * @description The zones of the day the plan was checked against.
+             */
+            zone_hours: components["schemas"]["ZoneHour"][];
+        };
+        /**
+         * PlanZone
+         * @description ADOSH heat zone of the effective TWL: Low, Medium, High, and Red (stop work, ADR 0046).
+         * @enum {string}
+         */
+        PlanZone: "low" | "medium" | "high" | "red";
+        /**
+         * PolicyRow
+         * @description One warning policy at one lead: the counters of section 7.2, each with an interval.
+         */
+        PolicyRow: {
+            /** @description Warned runs per day: how many alerts one shift receives. */
+            alerts_per_shift: components["schemas"]["Metric"];
+            /** @description Critical success index, 0 to 1. */
+            csi: components["schemas"]["Metric"];
+            /** @description False-alarm hours times the assumed crew size (ASSUMED). */
+            false_alarm_crew_hours: components["schemas"]["Metric"];
+            /** @description Warned hours whose truth is not High or Red, weighted by non-ban fraction. */
+            false_alarm_hours: components["schemas"]["Metric"];
+            /** @description False-alarm ratio, 0 to 1. */
+            far: components["schemas"]["Metric"];
+            /**
+             * Label
+             * @description Display name of the policy.
+             */
+            label: string;
+            /** @description Missed danger hours times the assumed crew size (ASSUMED). */
+            missed_danger_crew_hours: components["schemas"]["Metric"];
+            /** @description Truth-High (or Red) worked hours not warned, weighted by non-ban fraction. */
+            missed_danger_hours: components["schemas"]["Metric"];
+            /** @description Probability of detection of danger hours, 0 to 1. */
+            pod: components["schemas"]["Metric"];
+            /**
+             * Policy
+             * @description P0 ban only, P1 raw WBGT >= 32, P2 ADOSH zones on raw, P3 Stellar Blaze.
+             * @enum {string}
+             */
+            policy: "P0" | "P1" | "P2" | "P3_protect" | "P3_balanced";
+            /**
+             * Rule
+             * @description One-line definition of when the policy warns an hour.
+             */
+            rule: string;
+            /**
+             * Theta
+             * @description Warning threshold on P(High) for the P3 rows; null for P0, P1 and P2.
+             */
+            theta: number | null;
+        };
+        /**
+         * PolicyScoreboard
+         * @description The Warnings row (``artifacts/eval/2026/policy_scoreboard.json``).
+         */
+        PolicyScoreboard: {
+            /**
+             * Assumed Crew Label
+             * @description The words shown next to every worker-hour number, for example `assumed crew of 20`.
+             */
+            assumed_crew_label: string;
+            /**
+             * Assumed Crew Size
+             * @description Crew size used for worker-hours: 20, ASSUMED, never a measured crew.
+             */
+            assumed_crew_size: number;
+            /**
+             * Evaluation Set
+             * @description `scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".
+             * @enum {string}
+             */
+            evaluation_set: "dev_2025" | "scored_2026";
+            /**
+             * Leads
+             * @description One entry per lead 1, 2, 3, 5, 7, in that order.
+             */
+            leads: components["schemas"]["LeadResult"][];
+            /**
+             * Margin W M2
+             * @description Frozen TWL margin in W/m2 (7).
+             */
+            margin_w_m2: number;
+            /**
+             * N Days
+             * @description Days in the scored season with all inputs present.
+             */
+            n_days: number;
+            /** @description Where the numbers in this file came from. */
+            provenance: components["schemas"]["Provenance"];
+            /**
+             * Ruleset Id
+             * @description Frozen ruleset id the zones come from.
+             */
+            ruleset_id: string;
+            /**
+             * Ruleset Sha256
+             * @description SHA-256 of that ruleset, as recorded in the freeze addendum.
+             */
+            ruleset_sha256: string;
+            /**
+             * Season End
+             * Format: date
+             * @description Last local date of the scored season (30 Sep 2026).
+             */
+            season_end: string;
+            /**
+             * Season Start
+             * Format: date
+             * @description First local date of the scored season (15 May 2026).
+             */
+            season_start: string;
+            /**
+             * Sensitivity
+             * @description The four cells of the 2 x 2 truth sensitivity, headline cell included.
+             */
+            sensitivity: components["schemas"]["SensitivityCell"][];
+            /**
+             * Station
+             * @description ICAO id of the demo station the row is computed at (OMAA).
+             */
+            station: string;
+            /**
+             * Theta Balanced
+             * @description Frozen warning threshold of the balanced P3 policy (maximum Peirce score).
+             */
+            theta_balanced: number;
+            /**
+             * Theta Protect
+             * @description Frozen warning threshold of the protective P3 policy (pre-registration 6.5).
+             */
+            theta_protect: number;
+            /**
+             * Verdicts
+             * @description H4 (primary) and H5 (secondary) at the headline lead.
+             */
+            verdicts: components["schemas"]["HypothesisVerdict"][];
+            /**
+             * Withdrawal Limits
+             * @description Frozen withdrawal-limit switch (off).
+             */
+            withdrawal_limits: boolean;
+            /**
+             * Working Hours Utc
+             * @description Scored working hours, for example `06:00-14:59 UTC (10:00-18:59 GST)`.
+             */
+            working_hours_utc: string;
+        };
+        /**
+         * Problem
+         * @description An RFC 9457 problem details object, sent as ``application/problem+json`` for every error response.
+         *
+         *     Extension members (for example ``dependency`` or ``errors``) may be present. ``detail`` is omitted when there is
+         *     none.
+         */
         Problem: {
-            headers: {
-                "X-Request-ID": components["headers"]["XRequestId"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
+            /**
+             * Detail
+             * @default null
+             */
+            detail: string;
+            /** Instance */
+            instance: string;
+            /** Request Id */
+            request_id: string;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * Provenance
+         * @description Where an exported number came from: protocol section, script and function, commit, data hash, model, label.
+         *
+         *     This is a local stand-in with exactly the fields of B2 Task 13's ``domain/provenance.py``; it is replaced by an
+         *     import from there when that task is merged. The class and field names stay identical so the OpenAPI component
+         *     names do not change.
+         */
+        Provenance: {
+            /**
+             * Data Sha256
+             * @description SHA-256 of the input data (the gold pairs file, or the OOF export for DEV).
+             */
+            data_sha256: string;
+            /**
+             * Function
+             * @description Function inside the script that computed the numbers.
+             */
+            function: string;
+            /**
+             * Generated At
+             * Format: date-time
+             * @description UTC instant the file was written.
+             */
+            generated_at: string;
+            /**
+             * Git Sha
+             * @description Commit the numbers were produced from.
+             */
+            git_sha: string;
+            /** @description REAL, REAL weather + assumed crew, or SIMULATED. Shown with the number. */
+            label: components["schemas"]["ProvenanceLabel"];
+            /**
+             * Model Id
+             * @description Id of the released corrector model; null when no model was involved.
+             */
+            model_id: string | null;
+            /**
+             * Protocol Anchor
+             * @description Heading slug inside the protocol, for example `#72-warnings-row`.
+             */
+            protocol_anchor: string;
+            /**
+             * Protocol Path
+             * @description Repository path of the pre-registration the metric is defined in.
+             */
+            protocol_path: string;
+            /**
+             * Script
+             * @description Module path of the script that wrote the file.
+             */
+            script: string;
+        };
+        /**
+         * ProvenanceLabel
+         * @description What a number rests on (pre-registration section 12).
+         * @enum {string}
+         */
+        ProvenanceLabel: "REAL" | "REAL weather + assumed crew" | "SIMULATED";
+        /**
+         * PushSubscriptionCreate
+         * @description The browser's ``PushSubscription.toJSON()`` plus the scope the worker chose. No other member exists.
+         * @example {
+         *       "site_id": "site-demo-mussafah",
+         *       "subscription": {
+         *         "endpoint": "https://push.example/send/abc123",
+         *         "keys": {
+         *           "auth": "AAAAAAAAAAAAAAAAAAAAAA",
+         *           "p256dh": "BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+         *         }
+         *       }
+         *     }
+         */
+        PushSubscriptionCreate: {
+            /**
+             * Crew Id
+             * @description A crew id of that site from `list_site_crews`, or null for site alerts only.
+             */
+            crew_id: string | null;
+            /**
+             * Site Id
+             * @description A site id from `list_sites`. Site alerts go to every subscription of the site.
+             */
+            site_id: string;
+            /** @description The browser's subscription, exactly as `PushSubscription.toJSON()`. */
+            subscription: components["schemas"]["PushSubscriptionDetails"];
+        };
+        /**
+         * PushSubscriptionCreated
+         * @example {
+         *       "id": "sub-7d1f3a90"
+         *     }
+         */
+        PushSubscriptionCreated: {
+            /**
+             * Id
+             * @description Subscription id. Keep it to delete the subscription; a repeat POST of an endpoint returns it.
+             */
+            id: string;
+        };
+        /**
+         * PushSubscriptionDetails
+         * @example {
+         *       "endpoint": "https://push.example/send/abc123",
+         *       "keys": {
+         *         "auth": "AAAAAAAAAAAAAAAAAAAAAA",
+         *         "p256dh": "BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+         *       }
+         *     }
+         */
+        PushSubscriptionDetails: {
+            /**
+             * Endpoint
+             * @description The browser's push endpoint. A per-device address stored for delivery only, never logged.
+             */
+            endpoint: string;
+            /**
+             * Expirationtime
+             * @description Epoch milliseconds when the browser says the subscription expires, or null.
+             */
+            expirationTime: number | null;
+            /** @description The encryption keys of the subscription. */
+            keys: components["schemas"]["PushSubscriptionKeys"];
+        };
+        /**
+         * PushSubscriptionKeys
+         * @example {
+         *       "auth": "AAAAAAAAAAAAAAAAAAAAAA",
+         *       "p256dh": "BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+         *     }
+         */
+        PushSubscriptionKeys: {
+            /**
+             * Auth
+             * @description The browser's auth secret, base64url, exactly as produced.
+             */
+            auth: string;
+            /**
+             * P256Dh
+             * @description The browser's P-256 public key, base64url, exactly as produced.
+             */
+            p256dh: string;
+        };
+        /** ReadyChecks */
+        ReadyChecks: {
+            /**
+             * Config
+             * @default ok
+             * @enum {string}
+             */
+            config: "ok" | "stale";
+            /**
+             * Database
+             * @default ok
+             * @constant
+             */
+            database: "ok";
+        };
+        /** ReadyResponse */
+        ReadyResponse: {
+            checks: components["schemas"]["ReadyChecks"];
+            /**
+             * Status
+             * @default ok
+             * @constant
+             */
+            status: "ok";
+        };
+        /**
+         * ReviewRequiredProblem
+         * @description The 409 problem of ``sign_off_day_plan``: Medium, High or Red items still need an acknowledgement.
+         * @example {
+         *       "detail": "Every Medium and High item must be acknowledged before signing.",
+         *       "instance": "/api/v1/crews/crew-b/day-plan/sign-off",
+         *       "missing_items": [
+         *         "high-0600"
+         *       ],
+         *       "request_id": "00000000-0000-4000-8000-000000000001",
+         *       "status": 409,
+         *       "title": "Review required",
+         *       "type": "urn:stellar-blaze:problem:review-required"
+         *     }
+         */
+        ReviewRequiredProblem: {
+            /**
+             * Detail
+             * @default null
+             */
+            detail: string;
+            /** Instance */
+            instance: string;
+            /**
+             * Missing Items
+             * @description Ids of the `ack_items` that were not acknowledged.
+             */
+            missing_items: string[];
+            /** Request Id */
+            request_id: string;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** RiskBand */
+        RiskBand: {
+            /** @description The personal level the band starts at. */
+            level: components["schemas"]["AlertLevel"];
+            /**
+             * Min Exceedance Probability
+             * @description Smallest probability of exceeding the NIOSH limit, 0 to 0.95, at which the level applies; a probability equal to the minimum takes the level (ADR 0049).
+             */
+            min_exceedance_probability: number;
+        };
+        /**
+         * RiskPolicy
+         * @example {
+         *       "acclimatisation_days_required": 7,
+         *       "bands": [
+         *         {
+         *           "level": "green",
+         *           "min_exceedance_probability": 0
+         *         },
+         *         {
+         *           "level": "amber",
+         *           "min_exceedance_probability": 0.1
+         *         },
+         *         {
+         *           "level": "orange",
+         *           "min_exceedance_probability": 0.5
+         *         },
+         *         {
+         *           "level": "red",
+         *           "min_exceedance_probability": 0.9
+         *         }
+         *       ],
+         *       "clothing_options": [
+         *         {
+         *           "adjustment_c": 0,
+         *           "code": "work_clothes",
+         *           "source": "ACGIH TLV clothing table"
+         *         },
+         *         {
+         *           "adjustment_c": 3,
+         *           "code": "double_layer_woven",
+         *           "source": "ACGIH TLV clothing table"
+         *         }
+         *       ],
+         *       "config_version": 1,
+         *       "k_health": 10,
+         *       "k_suppression": 5,
+         *       "version": "ae-heat-2026.1",
+         *       "workload_classes": [
+         *         {
+         *           "code": "light",
+         *           "metabolic_rate_w": 180
+         *         },
+         *         {
+         *           "code": "moderate",
+         *           "metabolic_rate_w": 300
+         *         },
+         *         {
+         *           "code": "heavy",
+         *           "metabolic_rate_w": 415
+         *         }
+         *       ]
+         *     }
+         */
+        RiskPolicy: {
+            /**
+             * Acclimatisation Days Required
+             * @description Days of heat work before the device stops using the recommended alert limit (ADR 0049).
+             */
+            acclimatisation_days_required: number;
+            /**
+             * Bands
+             * @description Ascending by probability; the first is green at 0.
+             */
+            bands: components["schemas"]["RiskBand"][];
+            /**
+             * Clothing Options
+             * @description Clothing choices and their WBGT adjustments.
+             */
+            clothing_options: components["schemas"]["ClothingOption"][];
+            /**
+             * Config Version
+             * @description Must equal the forecast's `config_version` before the device computes a level.
+             */
+            config_version: number;
+            /**
+             * K Health
+             * @description Smallest count of any health-related figure that may be shown (floor 10; ADR 0050).
+             */
+            k_health: number;
+            /**
+             * K Suppression
+             * @description Smallest crew size whose aggregates are shown (`k_exposure`, floor 5; ADR 0050).
+             */
+            k_suppression: number;
+            /**
+             * Version
+             * @description Id of the ruleset in force. Shown verbatim, never parsed.
+             */
+            version: string;
+            /**
+             * Workload Classes
+             * @description The three workload classes and their metabolic rates.
+             */
+            workload_classes: components["schemas"]["WorkloadClass"][];
+        };
+        /**
+         * RosterError
+         * @description One problem in the roster text or segments of ``validate_plan``.
+         */
+        RosterError: {
+            /**
+             * Line
+             * @description 1-based line of `roster_text`, or 1-based index into `segments`.
+             */
+            line: number;
+            /**
+             * Message
+             * @description What is wrong with that line.
+             */
+            message: string;
+        };
+        /**
+         * RosterInvalidProblem
+         * @description The 422 problem of ``validate_plan`` when the roster does not parse: `errors` names the lines.
+         * @example {
+         *       "detail": "The roster could not be read.",
+         *       "errors": [
+         *         {
+         *           "line": 2,
+         *           "message": "end 25:00 is not a time"
+         *         }
+         *       ],
+         *       "instance": "/api/v1/plans/validate",
+         *       "request_id": "00000000-0000-4000-8000-000000000001",
+         *       "status": 422,
+         *       "title": "Roster invalid",
+         *       "type": "urn:stellar-blaze:problem:roster-invalid"
+         *     }
+         */
+        RosterInvalidProblem: {
+            /**
+             * Detail
+             * @default null
+             */
+            detail: string;
+            /**
+             * Errors
+             * @description Every line of the roster that could not be read.
+             */
+            errors: components["schemas"]["RosterError"][];
+            /** Instance */
+            instance: string;
+            /** Request Id */
+            request_id: string;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * RosterSegmentInput
+         * @example {
+         *       "end": "11:00",
+         *       "start": "06:00",
+         *       "state": "work"
+         *     }
+         */
+        RosterSegmentInput: {
+            /**
+             * End
+             * @description Site-local end, `HH:MM`, exclusive, after `start`.
+             */
+            end: string;
+            /**
+             * Start
+             * @description Site-local start, `HH:MM`, within 04:00-22:00.
+             */
+            start: string;
+            /**
+             * State
+             * @description `work`, `rest` (ADOSH rest) or `break` (Article 18 break).
+             * @enum {string}
+             */
+            state: "work" | "rest" | "break";
+        };
+        /**
+         * RunnerUp
+         * @description The second-best candidate day, kept so the selection can be audited.
+         */
+        RunnerUp: {
+            /**
+             * Date
+             * Format: date
+             * @description Local date of the runner-up.
+             */
+            date: string;
+            /**
+             * Score
+             * @description Its score under the same rule.
+             */
+            score: number;
+        };
+        /**
+         * SensitivityCell
+         * @description One cell of the always-reported 2 x 2 truth sensitivity: margin {0, 7} x withdrawal limits {off, on}.
+         */
+        SensitivityCell: {
+            /**
+             * Headline
+             * @description True for the frozen setting (margin 7, withdrawal off): the headline numbers.
+             */
+            headline: boolean;
+            /**
+             * Lead Days
+             * @description Lead the cell is scored at (the headline lead, 1).
+             */
+            lead_days: number;
+            /**
+             * Margin W M2
+             * @description TWL margin subtracted from the truth TWL, in W/m2 (0 or 7).
+             */
+            margin_w_m2: number;
+            /**
+             * Rows
+             * @description Every policy re-scored against this truth definition.
+             */
+            rows: components["schemas"]["PolicyRow"][];
+            /** @description Weighted truth danger hours under this truth definition. */
+            truth_danger_hours: components["schemas"]["Metric"];
+            /**
+             * Withdrawal Limits
+             * @description Whether the withdrawal-limit cap was applied to the truth TWL.
+             */
+            withdrawal_limits: boolean;
+        };
+        /** ShiftWindow */
+        ShiftWindow: {
+            /**
+             * End
+             * @description Site-local end of the block, `HH:MM`, exclusive.
+             */
+            end: string;
+            /**
+             * Start
+             * @description Site-local start of a published shift block, `HH:MM`.
+             */
+            start: string;
+        };
+        /**
+         * Site
+         * @example {
+         *       "epoch_id": 1,
+         *       "first_aider_phone": "+12025550144",
+         *       "id": "site-demo-mussafah",
+         *       "name": "Mussafah M-14 yard (synthetic)",
+         *       "supervisor_phone": "+12025550143",
+         *       "synthetic": true,
+         *       "timezone": "Asia/Dubai"
+         *     }
+         */
+        Site: {
+            /**
+             * Epoch Id
+             * @description Current demo epoch of a synthetic site (1 or more); null for a site that is not synthetic. Plans, sign-offs, stop events, data requests, alert events and push subscriptions are scoped to one epoch and resolved server-side; `reset_demo_site` starts the next.
+             */
+            epoch_id: number | null;
+            /**
+             * First Aider Phone
+             * @description Site first aider's number in E.164, for the same one-tap `tel:` call; null when the site has none. SYNTHETIC, from the site fixture config. Nothing is logged or sent when a worker calls.
+             */
+            first_aider_phone: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Supervisor Phone
+             * @description Site supervisor's number in E.164, for the worker's one-tap `tel:` call; null when the site has none. SYNTHETIC numbers from the site fixture config. Nothing is logged or sent when a worker calls, and no health data reaches any dashboard (CoP 3.1.2(e): workers report symptoms to their supervisor). Not personal data of a worker.
+             */
+            supervisor_phone: string | null;
+            /**
+             * Synthetic
+             * @description True for demo data. Only a synthetic site can be reset (`reset_demo_site`).
+             */
+            synthetic: boolean;
+            /**
+             * Timezone
+             * @description IANA time zone of the site. Every local date and time of the API is in it.
+             */
+            timezone: string;
+        };
+        /**
+         * SiteForecastToday
+         * @example {
+         *       "ban_window": {
+         *         "active_on_date": true,
+         *         "end": "15:00",
+         *         "ends_at": "2026-07-01T11:00:00Z",
+         *         "season_end": "09-15",
+         *         "season_start": "06-15",
+         *         "start": "12:30",
+         *         "starts_at": "2026-07-01T08:30:00Z",
+         *         "timezone": "Asia/Dubai"
+         *       },
+         *       "config_version": 1,
+         *       "date": "2026-07-01",
+         *       "forecast_status": "fresh",
+         *       "generated_at": "2026-06-30T14:00:00Z",
+         *       "hours": [
+         *         {
+         *           "action_codes": [
+         *             "rest_in_shade",
+         *             "water_every_15_min"
+         *           ],
+         *           "ban_active": false,
+         *           "site_level": "orange",
+         *           "starts_at": "2026-07-01T06:00:00Z",
+         *           "wbgt_c": {
+         *             "p05": 30.1,
+         *             "p50": 32.4,
+         *             "p95": 34
+         *           }
+         *         }
+         *       ],
+         *       "lead_days": 1,
+         *       "mode": "replay",
+         *       "model_id": "corrector-20261112-0000000-000001",
+         *       "policy_version": "ae-heat-2026.1",
+         *       "site_id": "site-demo-mussafah"
+         *     }
+         */
+        SiteForecastToday: {
+            /** @description The midday ban in force at the site, as data. The values come from the ruleset in force (`labour.ban_window`, `labour.ban_season`); no client carries them as constants. `active_on_date` is for this response's own date. The object is always present: check `active_on_date` (and the null instants), never a null object. */
+            ban_window: components["schemas"]["BanWindow"];
+            /**
+             * Config Version
+             * @description Id of the active runtime configuration; 0 when the API runs without a database configuration.
+             */
+            config_version: number;
+            /**
+             * Date
+             * Format: date
+             * @description The site-local date the hours belong to.
+             */
+            date: string;
+            /**
+             * Forecast Status
+             * @description `fresh`; `stale` (older than the stale limit, shown anyway); `fallback` (no usable forecast).
+             * @enum {string}
+             */
+            forecast_status: "fresh" | "stale" | "fallback";
+            /**
+             * Generated At
+             * Format: date-time
+             * @description UTC issue time of the forecast run behind the response; with no run at all, the time the response was computed.
+             */
+            generated_at: string;
+            /**
+             * Hours
+             * @description Working-day hours in time order (06:00-19:00 site-local).
+             */
+            hours: components["schemas"]["HourForecast"][];
+            /**
+             * Lead Days
+             * @description Forecast lead in days the run was issued ahead of the date.
+             */
+            lead_days: number;
+            /**
+             * Mode
+             * @description `replay` serves a fixed snapshot (never stale); `live` serves the newest run.
+             * @enum {string}
+             */
+            mode: "replay" | "live";
+            /**
+             * Model Id
+             * @description Id of the corrector model behind the numbers; null in fallback.
+             */
+            model_id: string | null;
+            /**
+             * Policy Version
+             * @description Id of the ruleset in force (`ae-heat-<year>.<n>`). Shown verbatim, never parsed.
+             */
+            policy_version: string;
+            /** Site Id */
+            site_id: string;
+        };
+        /**
+         * ThetaDecision
+         * @description The warning thresholds chosen by the pre-registered rule (``artifacts/eval/dev/theta.json``).
+         */
+        ThetaDecision: {
+            /**
+             * Grid
+             * @description Every grid point, ascending in theta.
+             */
+            grid: components["schemas"]["ThetaGridPoint"][];
+            /**
+             * N Hours
+             * @description Hours in the 2024-2025 selection set.
+             */
+            n_hours: number;
+            /** @description Where the numbers in this file came from. */
+            provenance: components["schemas"]["Provenance"];
+            /**
+             * Red Hour Share
+             * @description Weighted share of truth hours in Red, 0 to 1 (information only, ADR 0046).
+             */
+            red_hour_share: number;
+            /**
+             * Rule
+             * @description The rule that produced the thresholds.
+             * @constant
+             */
+            rule: "preregistration §6.5";
+            /**
+             * Theta Balanced
+             * @description Theta with the maximum Peirce score; ties go to the smaller theta.
+             */
+            theta_balanced: number;
+            /**
+             * Theta Protect
+             * @description Largest theta with POD >= 0.90; 0.05 when none reaches it.
+             */
+            theta_protect: number;
+        };
+        /**
+         * ThetaGridPoint
+         * @description Skill of the P(High) warning at one threshold on the 2024-2025 out-of-fold samples.
+         */
+        ThetaGridPoint: {
+            /**
+             * Far
+             * @description False-alarm ratio at this threshold.
+             */
+            far: number;
+            /**
+             * N Hours
+             * @description Number of hours behind the point.
+             */
+            n_hours: number;
+            /**
+             * Pod
+             * @description Probability of detection at this threshold, weighted by non-ban fraction.
+             */
+            pod: number;
+            /**
+             * Pss
+             * @description Peirce skill score (POD minus probability of false detection).
+             */
+            pss: number;
+            /**
+             * Theta
+             * @description Threshold on P(High), from the grid 0.05 to 0.95.
+             */
+            theta: number;
+        };
+        /** TimeRange */
+        TimeRange: {
+            /**
+             * Ends At
+             * Format: date-time
+             * @description UTC end of the range, exclusive.
+             */
+            ends_at: string;
+            /**
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the range.
+             */
+            starts_at: string;
+        };
+        /** TransparencyEntry */
+        TransparencyEntry: {
+            /**
+             * Actor Role
+             * @description Role that made the request. Never a name, never an employer id.
+             * @constant
+             */
+            actor_role: "employer";
+            /**
+             * At
+             * Format: date-time
+             * @description UTC time the request was refused.
+             */
+            at: string;
+            /**
+             * Config Version
+             * @description Active runtime configuration id at that time.
+             */
+            config_version: number;
+            /**
+             * Kind
+             * @description The only worker-visible kind of audit entry.
+             * @constant
+             */
+            kind: "data_request.refused";
+            /**
+             * Model Id
+             * @description Corrector model id at that time; null when none was loaded.
+             */
+            model_id: string | null;
+            /**
+             * Outcome
+             * @description What happened to the request.
+             * @constant
+             */
+            outcome: "refused";
+            /**
+             * Policy Version
+             * @description Ruleset id in force when the request was refused.
+             */
+            policy_version: string;
+            /**
+             * Rule
+             * @description The rule the refusal applied, for example `ADR 0004; PDPL purpose limitation`.
+             */
+            rule: string;
+        };
+        /**
+         * TransparencyLog
+         * @example {
+         *       "entries": [
+         *         {
+         *           "actor_role": "employer",
+         *           "at": "2026-07-01T07:42:10Z",
+         *           "config_version": 1,
+         *           "kind": "data_request.refused",
+         *           "model_id": "corrector-20261112-0000000-000001",
+         *           "outcome": "refused",
+         *           "policy_version": "ae-heat-2026.1",
+         *           "rule": "ADR 0004; PDPL purpose limitation"
+         *         }
+         *       ],
+         *       "site_id": "site-demo-mussafah"
+         *     }
+         */
+        TransparencyLog: {
+            /**
+             * Entries
+             * @description Worker-visible audit entries of the site, newest first, at most 50. Says an employer request was refused at this site, never whose data it was.
+             */
+            entries: components["schemas"]["TransparencyEntry"][];
+            /** Site Id */
+            site_id: string;
+        };
+        /**
+         * ValidationErrorItem
+         * @description One framework validation error: where, what, which kind. The input value is never echoed.
+         */
+        ValidationErrorItem: {
+            /**
+             * Loc
+             * @description Path to the offending member, for example `["body", "crew", "headcount"]`.
+             */
+            loc: (string | number)[];
+            /**
+             * Msg
+             * @description Human-readable message.
+             */
+            msg: string;
+            /**
+             * Type
+             * @description Machine-readable error kind.
+             */
+            type: string;
+        };
+        /**
+         * ValidationProblem
+         * @description The 422 problem of a request that fails validation: `errors` lists where and why (never the input value).
+         * @example {
+         *       "detail": "Request validation failed",
+         *       "errors": [
+         *         {
+         *           "loc": [
+         *             "query",
+         *             "date"
+         *           ],
+         *           "msg": "Input should be a valid date",
+         *           "type": "date_parsing"
+         *         }
+         *       ],
+         *       "instance": "/api/v1/crews/crew-b/timeline",
+         *       "request_id": "00000000-0000-4000-8000-000000000001",
+         *       "status": 422,
+         *       "title": "Unprocessable Entity",
+         *       "type": "about:blank"
+         *     }
+         */
+        ValidationProblem: {
+            /**
+             * Detail
+             * @default null
+             */
+            detail: string;
+            /**
+             * Errors
+             * @description Every member that failed validation.
+             */
+            errors: components["schemas"]["ValidationErrorItem"][];
+            /** Instance */
+            instance: string;
+            /** Request Id */
+            request_id: string;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ValidatorResult */
+        ValidatorResult: {
+            /**
+             * Checked Rules
+             * @description Every rule the validator evaluated, including the ones that passed.
+             */
+            checked_rules: string[];
+            /**
+             * Passed
+             * @description True when no rule is violated.
+             */
+            passed: boolean;
+            /**
+             * Violations
+             * @description Violated rules; empty when `passed`.
+             */
+            violations: components["schemas"]["Violation"][];
+        };
+        /** Violation */
+        Violation: {
+            /**
+             * Clause
+             * @description Text of the clause the rule comes from, from the ruleset.
+             */
+            clause: string;
+            /**
+             * Detail
+             * @description What the plan does wrong, in one sentence.
+             */
+            detail: string;
+            /**
+             * Ranges
+             * @description Where the plan violates the rule, in time order.
+             */
+            ranges: components["schemas"]["TimeRange"][];
+            /**
+             * Rule Id
+             * @description Id of the violated rule, for example `P-H3`.
+             */
+            rule_id: string;
+            /**
+             * Source Id
+             * @description Id of the legal or policy source of the clause.
+             */
+            source_id: string;
+        };
+        /**
+         * WbgtQuantiles
+         * @description A WBGT range in degrees Celsius: the 5th, 50th and 95th percentile of the corrected forecast.
+         */
+        WbgtQuantiles: {
+            /**
+             * P05
+             * @description 5th percentile of the corrected WBGT, degrees Celsius; null with no forecast.
+             */
+            p05: number | null;
+            /**
+             * P50
+             * @description Median of the corrected WBGT, degrees Celsius; null with no forecast.
+             */
+            p50: number | null;
+            /**
+             * P95
+             * @description 95th percentile of the corrected WBGT, degrees Celsius; null with no forecast.
+             */
+            p95: number | null;
+        };
+        /** WorkloadClass */
+        WorkloadClass: {
+            /**
+             * Code
+             * @description Workload class code.
+             * @enum {string}
+             */
+            code: "light" | "moderate" | "heavy";
+            /**
+             * Metabolic Rate W
+             * @description Metabolic rate of the class in watts, used on the device.
+             */
+            metabolic_rate_w: number;
+        };
+        /** ZoneHour */
+        ZoneHour: {
+            /** @description Warning level of the hour; null with no forecast. */
+            level: components["schemas"]["AlertLevel"] | null;
+            /**
+             * Starts At
+             * Format: date-time
+             * @description UTC start of the hour.
+             */
+            starts_at: string;
+            /** @description ADOSH zone of the hour at the protective quantile; null with no forecast. */
+            zone: components["schemas"]["PlanZone"] | null;
         };
     };
+    responses: never;
     parameters: never;
     requestBodies: never;
-    headers: {
-        /** @description Correlation id of this request. Repeated as request_id in every problem body. */
-        XRequestId: string;
-    };
+    headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_sites: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description All sites. */
-            200: {
-                headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Site"][];
-                };
-            };
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    get_site_forecast_today: {
-        parameters: {
-            query?: {
-                /** @description The site's local date, YYYY-MM-DD. Missing: the site's local today in live mode, the replay default date in replay mode (ADR 0051 decision 4). */
-                date?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Site id, from GET /api/v1/sites. */
-                site_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Hourly forecast for the site's local day, 06:00 to 19:00 local. */
-            200: {
-                headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SiteForecastToday"];
-                };
-            };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    get_risk_policy: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The active risk policy. */
-            200: {
-                headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RiskPolicy"];
-                };
-            };
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    list_site_crews: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Site id, from GET /api/v1/sites. */
-                site_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Crews of the site. */
-            200: {
-                headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Crew"][];
-                };
-            };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    get_crew_timeline: {
-        parameters: {
-            query?: {
-                /** @description The crew's site's local date, YYYY-MM-DD. Missing: as for the site forecast. */
-                date?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
-                crew_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Aggregates only; never one person's state. */
-            200: {
-                headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CrewTimeline"];
-                };
-            };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
     get_crew_day_plan: {
         parameters: {
             query?: {
-                /** @description The crew's site's local date, YYYY-MM-DD. Missing: as for the site forecast. */
-                date?: string;
+                /** @description The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode. */
+                date?: string | null;
             };
             header?: never;
             path: {
-                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
+                /** @description Crew id, from `list_site_crews` (for example `crew-b`). */
                 crew_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The day plan. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["DayPlan"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Unauthorized: No bearer token, or a token this service does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden: The token belongs to another employer than the one that owns the resource. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before the request may be repeated. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Plan invalid: The independent validator rejected the planner's own plan. A bug, never served as a plan; the incident is audited. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     sign_off_day_plan: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode. */
+                date?: string | null;
+            };
             header?: never;
             path: {
-                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
+                /** @description Crew id, from `list_site_crews` (for example `crew-b`). */
                 crew_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SignOffRequest"];
+                "application/json": components["schemas"]["PlanSignOffRequest"];
             };
         };
         responses: {
-            /** @description The day plan, now signed. */
-            200: {
+            /** @description Successful Response */
+            201: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DayPlan"];
+                    "application/json": components["schemas"]["PlanSignOff"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["ReviewRequired"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Unauthorized: No bearer token, or a token this service does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden: The token belongs to another employer than the one that owns the resource. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Review required: Medium, High or Red items of the plan were not acknowledged; `missing_items` lists them. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ReviewRequiredProblem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before the request may be repeated. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Plan invalid: The independent validator rejected the planner's own plan. A bug, never served as a plan; the incident is audited. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_crew_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Crew id, from `list_site_crews` (for example `crew-b`). */
+                crew_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewStopCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewStop"];
+                };
+            };
+            /** @description Unauthorized: No bearer token, or a token this service does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden: The token belongs to another employer than the one that owns the resource. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before the request may be repeated. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_crew_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Crew id, from `list_site_crews` (for example `crew-b`). */
+                crew_id: string;
+                /** @description Stop id, from `create_crew_stop`. */
+                stop_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized: No bearer token, or a token this service does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden: The token belongs to another employer than the one that owns the resource. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before the request may be repeated. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_crew_timeline: {
+        parameters: {
+            query?: {
+                /** @description The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode. */
+                date?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Crew id, from `list_site_crews` (for example `crew-b`). */
+                crew_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewTimeline"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    health_live: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveResponse"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    health_ready: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadyResponse"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     validate_plan: {
@@ -933,20 +3352,60 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The validator's findings. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["PlanValidateResponse"];
                 };
             };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["RosterInvalid"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. Roster invalid: The roster text or segments could not be read; `errors` names the lines. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"] | components["schemas"]["RosterInvalidProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     create_push_subscription: {
@@ -962,20 +3421,51 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Subscription registered. */
+            /** @description Successful Response */
             201: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["PushSubscriptionCreated"];
                 };
             };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     delete_push_subscription: {
@@ -983,25 +3473,194 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Id returned by POST /api/v1/push/subscriptions. */
+                /** @description Id returned by `create_push_subscription`. */
                 subscription_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Subscription removed (idempotent). */
+            /** @description Successful Response */
             204: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_risk_policy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskPolicy"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_sites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site"][];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_site_crews: {
+        parameters: {
+            query?: {
+                /** @description The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode. */
+                date?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Site id, from `list_sites` (for example `site-demo-mussafah`). */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Crew"][];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     create_data_request: {
@@ -1009,7 +3668,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Site id, from GET /api/v1/sites. */
+                /** @description Site id, from `list_sites` (for example `site-demo-mussafah`). */
                 site_id: string;
             };
             cookie?: never;
@@ -1020,104 +3679,80 @@ export interface operations {
             };
         };
         responses: {
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    get_site_transparency_log: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Site id, from GET /api/v1/sites. */
-                site_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The site's transparency log. */
-            200: {
+            /** @description Unauthorized: No bearer token, or a token this service does not know. */
+            401: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TransparencyLog"];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    create_crew_stop: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
-                crew_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CrewStopCreate"];
-            };
-        };
-        responses: {
-            /** @description The stop is recorded. */
-            201: {
+            /** @description Individual data refused: Individual health, personal or exposure data is not held by this service and is never released to an employer (ADR 0004). Every request is refused and the refusal is logged. */
+            403: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CrewStop"];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
-        };
-    };
-    delete_crew_stop: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
-                crew_id: string;
-                /** @description Id returned by POST /api/v1/crews/{crew_id}/stops. */
-                stop_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The stop is cleared. */
-            204: {
+            /** @description Not found: No such site, crew or other id. */
+            404: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["Unprocessable"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before the request may be repeated. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     reset_demo_site: {
@@ -1125,29 +3760,235 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Site id of a synthetic site. */
+                /** @description Site id, from `list_sites` (for example `site-demo-mussafah`). */
                 site_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The new epoch. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-Request-ID": components["headers"]["XRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["DemoReset"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            501: components["responses"]["NotImplemented"];
-            502: components["responses"]["BadGateway"];
-            default: components["responses"]["Problem"];
+            /** @description Unauthorized: No bearer token, or a token this service does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden: The token belongs to another employer than the one that owns the resource. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a demo site: Only a synthetic site (`Site.synthetic`) can be reset. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before the request may be repeated. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal server error: An unexpected failure; nothing internal is revealed. Quote `request_id`. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_site_forecast_today: {
+        parameters: {
+            query?: {
+                /** @description The site-local calendar date, `YYYY-MM-DD`. When omitted: the site's local today in live mode, and the configured replay date in replay mode. */
+                date?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Site id, from `list_sites` (for example `site-demo-mussafah`). */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteForecastToday"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_site_transparency_log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Site id, from `list_sites` (for example `site-demo-mussafah`). */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransparencyLog"];
+                };
+            };
+            /** @description Not found: No such site, crew or other id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                };
+            };
+            /** @description Not implemented: The route exists in the contract but is not built yet. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Any other problem (RFC 9457). */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
 }

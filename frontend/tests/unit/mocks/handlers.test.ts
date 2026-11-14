@@ -8,8 +8,8 @@ import { server } from "@/mocks/node";
 
 /*
  * The fixtures and handlers are the contract the later tasks build and test against (unit tests, and e2e through
- * the standalone mock server), so the values other tasks rely on are pinned here: one case per operation of the v1
- * contract (openapi/stellar-blaze.openapi.json), typed from the generated schema.
+ * the standalone mock server), so the values other tasks rely on are pinned here: one case per operation of B3's v1
+ * contract (openapi/stellar-blaze.openapi.json), typed from the generated schema. The answers are canned.
  */
 
 type Schemas = components["schemas"];
@@ -50,6 +50,10 @@ async function dayPlan(crewId: string, query = "", scenario?: string): Promise<S
   return json(await get(`/api/v1/crews/${crewId}/day-plan${query}`, scenario, EMPLOYER));
 }
 
+async function crewList(scenario?: string): Promise<Schemas["Crew"][]> {
+  return json(await get(`/api/v1/sites/${DEMO_SITE}/crews`, scenario));
+}
+
 /** The local hour of an instant at Asia/Dubai (UTC+4, no daylight saving), as "HH:00". */
 function dubaiHour(startsAt: string): string {
   const hour = (new Date(startsAt).getUTCHours() + 4) % 24;
@@ -64,8 +68,36 @@ beforeEach(() => {
   resetDemoStateHard();
 });
 
+describe("every problem", () => {
+  it("has the contract's members: type, title, status, instance (the path) and request_id", async () => {
+    const res = await get("/api/v1/sites/nope/crews?date=2026-09-03");
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(await res.json()).toEqual({
+      type: `${PROBLEM_TYPE}not-found`,
+      title: "Not found",
+      status: 404,
+      detail: "No site nope.",
+      instance: "/api/v1/sites/nope/crews",
+      request_id: "mock-req-1",
+    });
+  });
+
+  it("lists validation errors by location for a bad query parameter", async () => {
+    const res = await get(`/api/v1/sites/${DEMO_SITE}/forecast/today?date=2026-02-30`);
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({
+      type: "about:blank",
+      status: 422,
+      errors: [{ loc: ["query", "date"], msg: "Input should be a valid date", type: "date_parsing" }],
+    });
+  });
+});
+
 describe("list_sites", () => {
-  it("returns the two synthetic demo yards in Asia/Dubai, with SYNTHETIC phones on the demo yard only", async () => {
+  it("returns the two synthetic demo yards in Asia/Dubai: epoch 1, SYNTHETIC phones on the demo yard only", async () => {
     const res = await get("/api/v1/sites");
 
     expect(res.status).toBe(200);
@@ -75,17 +107,11 @@ describe("list_sites", () => {
         name: "Mussafah M-14 yard (synthetic)",
         timezone: "Asia/Dubai",
         synthetic: true,
-        supervisor_phone: "+97150000001",
-        first_aider_phone: "+97150000002",
+        epoch_id: 1,
+        supervisor_phone: "+12025550143",
+        first_aider_phone: "+12025550144",
       },
-      {
-        id: "site-demo-empty",
-        name: "Demo yard B (synthetic, no crews)",
-        timezone: "Asia/Dubai",
-        synthetic: true,
-        supervisor_phone: null,
-        first_aider_phone: null,
-      },
+      { id: "site-demo-empty", name: "Demo yard B (synthetic, no crews)", timezone: "Asia/Dubai", synthetic: true, epoch_id: 1, supervisor_phone: null, first_aider_phone: null },
     ]);
   });
 });
@@ -124,26 +150,38 @@ describe("get_site_forecast_today", () => {
     expect(hours.every((hour) => hour.site_level !== null && hour.action_codes.length === 0)).toBe(true);
   });
 
-  it("gives the midday ban window 12:30 to 15:00 local as UTC instants in season, and marks 12:00, 13:00 and 14:00", async () => {
+  it("gives the ban window as an object: 12:30 to 15:00 local, the season, and UTC instants in force", async () => {
     const today = await forecast();
 
-    expect(today.ban_window).toEqual({ starts_at: "2026-09-03T08:30:00Z", ends_at: "2026-09-03T11:00:00Z" });
+    expect(today.ban_window).toEqual({
+      start: "12:30",
+      end: "15:00",
+      season_start: "06-15",
+      season_end: "09-15",
+      timezone: "Asia/Dubai",
+      active_on_date: true,
+      starts_at: "2026-09-03T08:30:00Z",
+      ends_at: "2026-09-03T11:00:00Z",
+    });
     const banned = today.hours.filter((hour) => hour.ban_active).map((hour) => dubaiHour(hour.starts_at));
     expect(banned).toEqual(["12:00", "13:00", "14:00"]);
   });
 
   it.each([
-    ["the day before the season", "2026-06-14", null],
-    ["the first day of the season", "2026-06-15", { starts_at: "2026-06-15T08:30:00Z", ends_at: "2026-06-15T11:00:00Z" }],
-    ["the last day of the season", "2026-09-15", { starts_at: "2026-09-15T08:30:00Z", ends_at: "2026-09-15T11:00:00Z" }],
-    ["the day after the season", "2026-09-16", null],
-    ["a November date", "2026-11-11", null],
-  ])("ban_window on %s", async (_name, date, expected) => {
+    ["the day before the season", "2026-06-14", false],
+    ["the first day of the season", "2026-06-15", true],
+    ["the last day of the season", "2026-09-15", true],
+    ["the day after the season", "2026-09-16", false],
+    ["a November date", "2026-11-11", false],
+  ])("ban_window on %s", async (_name, date, active) => {
     const today = await forecast(DEMO_SITE, undefined, `?date=${date}`);
 
     expect(today.date).toBe(date);
-    expect(today.ban_window).toEqual(expected);
-    expect(today.hours.some((hour) => hour.ban_active)).toBe(expected !== null);
+    expect(today.ban_window).toMatchObject({ start: "12:30", end: "15:00", active_on_date: active });
+    expect(today.ban_window.starts_at === null).toBe(!active);
+    expect(today.ban_window.ends_at === null).toBe(!active);
+    if (active) expect(today.ban_window.starts_at).toBe(`${date}T08:30:00Z`);
+    expect(today.hours.some((hour) => hour.ban_active)).toBe(active);
   });
 
   it("is fresh by default and 26 hours old, stale, for the stale scenario", async () => {
@@ -171,13 +209,11 @@ describe("get_site_forecast_today", () => {
     expect(today.hours).toHaveLength(14);
   });
 
-  it("returns a 404 problem for an unknown site and 422 for a bad date", async () => {
+  it("returns a 404 problem for an unknown site", async () => {
     const missing = await get("/api/v1/sites/nope/forecast/today");
 
     expect(missing.status).toBe(404);
-    expect(missing.headers.get("content-type")).toBe("application/problem+json");
     expect(ProblemSchema.parse(await missing.json())).toMatchObject({ status: 404 });
-    expect((await get(`/api/v1/sites/${DEMO_SITE}/forecast/today?date=2026-02-30`)).status).toBe(422);
   });
 });
 
@@ -205,16 +241,47 @@ describe("get_risk_policy", () => {
 });
 
 describe("list_site_crews", () => {
-  it("lists the four crews of ADR 0057 with their task and workload, and none for the empty yard", async () => {
-    const crews = await json<Schemas["Crew"][]>(await get(`/api/v1/sites/${DEMO_SITE}/crews`));
+  it("lists the four crews of ADR 0057 with task, workload, local shift and the seed sign-off state", async () => {
+    const crews = await crewList();
 
-    expect(crews.map((crew) => [crew.id, crew.member_count, crew.task_label, crew.workload])).toEqual([
-      ["crew-a", 12, "Rebar fixing", "heavy"],
-      ["crew-b", 20, "Concrete pour", "heavy"],
-      ["crew-c", 9, "Formwork", "moderate"],
-      ["crew-d", 4, "Survey and inspection", "light"],
+    expect(crews.map((crew) => [crew.id, crew.member_count, crew.task_label, crew.workload, crew.signoff_state])).toEqual([
+      ["crew-a", 12, "Rebar fixing", "heavy", "signed"],
+      ["crew-b", 20, "Concrete pour", "heavy", "unsigned"],
+      ["crew-c", 9, "Formwork", "moderate", "changed_since_signed"],
+      ["crew-d", 4, "Survey and inspection", "light", "signed"],
     ]);
+    expect(crews[1]).toEqual({
+      id: "crew-b",
+      site_id: DEMO_SITE,
+      name: "Crew B",
+      task_label: "Concrete pour",
+      workload: "heavy",
+      member_count: 20,
+      shift: [
+        { start: "06:00", end: "11:00" },
+        { start: "15:00", end: "18:00" },
+      ],
+      signoff_state: "unsigned",
+      plan_status: "rule",
+      stopped: false,
+      active_stop_id: null,
+      stopped_at: null,
+    });
     expect(await (await get(`/api/v1/sites/${EMPTY_SITE}/crews`)).json()).toEqual([]);
+  });
+
+  it("shows an active stop on the crew, with its id for the undo after a reload", async () => {
+    await send("POST", "/api/v1/crews/crew-b/stops", { reason_code: "heat" }, EMPLOYER);
+
+    const crew = (await crewList()).find((candidate) => candidate.id === "crew-b");
+    expect(crew).toMatchObject({ stopped: true, active_stop_id: "stop-0001", stopped_at: "2026-09-03T07:10:00Z" });
+  });
+
+  it("is plan_status fallback when the forecast is missing or stale, and accepts a date", async () => {
+    expect((await crewList("fallback")).every((crew) => crew.plan_status === "fallback")).toBe(true);
+    expect((await crewList("stale")).every((crew) => crew.plan_status === "fallback")).toBe(true);
+    expect((await get(`/api/v1/sites/${DEMO_SITE}/crews?date=2026-11-11`)).status).toBe(200);
+    expect((await get(`/api/v1/sites/${DEMO_SITE}/crews?date=x`)).status).toBe(422);
   });
 
   it("answers 404 for an unknown site", async () => {
@@ -223,11 +290,19 @@ describe("list_site_crews", () => {
 });
 
 describe("get_crew_timeline", () => {
-  it("shows crew-b (20) unsuppressed with the ban window, the L1 shift and an unsigned plan", async () => {
+  it("shows crew-b (20) unsuppressed with the ban window, the L1 shift as UTC instants and an unsigned plan", async () => {
     const result = await timeline("crew-b");
 
-    expect(result).toMatchObject({ crew_id: "crew-b", site_id: DEMO_SITE, date: REPLAY_DATE, suppressed: false, k: 5, signoff_state: "unsigned" });
-    expect(result.ban_window).toEqual({ starts_at: "2026-09-03T08:30:00Z", ends_at: "2026-09-03T11:00:00Z" });
+    expect(result).toMatchObject({
+      crew_id: "crew-b",
+      site_id: DEMO_SITE,
+      date: REPLAY_DATE,
+      suppressed: false,
+      k: 5,
+      forecast_status: "fresh",
+      signoff_state: "unsigned",
+    });
+    expect(result.ban_window).toMatchObject({ active_on_date: true, starts_at: "2026-09-03T08:30:00Z", ends_at: "2026-09-03T11:00:00Z" });
     expect(result.shift).toEqual([
       { starts_at: "2026-09-03T02:00:00Z", ends_at: "2026-09-03T07:00:00Z" },
       { starts_at: "2026-09-03T11:00:00Z", ends_at: "2026-09-03T14:00:00Z" },
@@ -237,25 +312,23 @@ describe("get_crew_timeline", () => {
   });
 
   it("has no share_above_amber anywhere (ADR 0050)", async () => {
-    const result = await timeline("crew-b");
-
-    expect(JSON.stringify(result)).not.toContain("share_above_amber");
+    expect(JSON.stringify(await timeline("crew-b"))).not.toContain("share_above_amber");
   });
 
-  it("suppresses crew-d (4 members) but keeps its level; crew-a is signed in the seed", async () => {
+  it("suppresses crew-d (4 members) but keeps its level; crew-c shows changed_since_signed", async () => {
     const result = await timeline("crew-d");
 
     expect(result).toMatchObject({ suppressed: true, k: 5, signoff_state: "signed" });
     expect(hourAt(result.hours, "10:00")?.crew_level).toBe("orange");
-    expect((await timeline("crew-a")).signoff_state).toBe("signed");
+    expect((await timeline("crew-c")).signoff_state).toBe("changed_since_signed");
   });
 
-  it("builds the hours for the requested date and has no ban window out of season", async () => {
+  it("builds the hours for the requested date and its ban window is not in force out of season", async () => {
     const result = await timeline("crew-b", "?date=2026-11-11");
 
     expect(result.date).toBe("2026-11-11");
     expect(result.hours[0]?.starts_at).toBe("2026-11-11T02:00:00Z");
-    expect(result.ban_window).toBeNull();
+    expect(result.ban_window).toMatchObject({ active_on_date: false, starts_at: null, ends_at: null });
     expect(result.hours.some((hour) => hour.ban_active)).toBe(false);
   });
 
@@ -271,9 +344,11 @@ describe("get_crew_timeline", () => {
     expect((await get("/api/v1/crews/nope/timeline")).status).toBe(404);
   });
 
-  it("suppressed scenario: every crew is suppressed; fallback scenario: no level in any hour", async () => {
+  it("suppressed scenario: every crew is suppressed; fallback scenario: no level in any hour, status fallback", async () => {
     expect((await timeline("crew-b", "", "suppressed")).suppressed).toBe(true);
-    expect((await timeline("crew-b", "", "fallback")).hours.every((hour) => hour.crew_level === null)).toBe(true);
+    const fallback = await timeline("crew-b", "", "fallback");
+    expect(fallback.forecast_status).toBe("fallback");
+    expect(fallback.hours.every((hour) => hour.crew_level === null)).toBe(true);
   });
 });
 
@@ -287,7 +362,7 @@ describe("get_crew_day_plan", () => {
     expect(ProblemSchema.parse(await res.json())).toMatchObject({ type: `${PROBLEM_TYPE}unauthorized`, status: 401 });
   });
 
-  it("gives crew-b's rule plan: banner, validator passed with its checked rules, unsigned, no stops", async () => {
+  it("gives crew-b's canned plan: banner, validator passed with its checked rules, unsigned with its label code", async () => {
     const plan = await dayPlan("crew-b");
 
     expect(plan).toMatchObject({
@@ -295,6 +370,9 @@ describe("get_crew_day_plan", () => {
       date: REPLAY_DATE,
       status: "rule",
       signoff_state: "unsigned",
+      signoff_label_code: "plan.unsigned_fallback",
+      signed_at: null,
+      signed_by_role: null,
       banner_code: "plan.floor_banner",
       suppressed: false,
       restricted_headcount: 0,
@@ -302,68 +380,78 @@ describe("get_crew_day_plan", () => {
       policy_version: "mock-0",
       config_version: 1,
       model_id: "mock",
-      signoff: { state: "unsigned", signed_at: null, signed_by_role: null },
     });
-    expect(plan.validator.passed).toBe(true);
-    expect(plan.validator.violations).toEqual([]);
-    expect(plan.validator.checked_rules).toEqual(expect.arrayContaining(["P-H1", "P-H3", "P-H7.cap60", "STOP.red"]));
+    expect(plan.ban_window.active_on_date).toBe(true);
+    expect(plan.validator).toEqual({ passed: true, violations: [], checked_rules: ["P-H1", "P-H2.daily", "P-H3", "P-H7.cap60", "P-H7.run", "STOP.red"] });
     expect(plan.zone_hours).toHaveLength(14);
   });
 
-  it("covers 04:00 to 22:00 local without gaps, and cycles 45/15 in Medium and 20/40 in High", async () => {
-    const { segments } = await dayPlan("crew-b");
-
-    expect(segments[0]?.starts_at).toBe("2026-09-03T00:00:00Z");
-    expect(segments.at(-1)?.ends_at).toBe("2026-09-03T18:00:00Z");
-    expect(segments.every((segment, index) => index === 0 || segment.starts_at === segments[index - 1]?.ends_at)).toBe(true);
-    const at = (iso: string) => segments.find((segment) => segment.starts_at === iso);
-    expect(at("2026-09-03T04:15:00Z")).toMatchObject({ state: "work", zone: "medium", rule_id: "P-H7.cap60" });
-    expect(segments.some((segment) => segment.state === "adosh_rest" && segment.zone === "high" && segment.clause.includes("20 work / 40 rest"))).toBe(true);
-    expect(segments.every((segment) => segment.clause !== "")).toBe(true);
+  it("carries sign-off labels by state: signed has none and a role, changed_since_signed has its own", async () => {
+    expect(await dayPlan("crew-a")).toMatchObject({ signoff_state: "signed", signoff_label_code: null, signed_at: "2026-09-03T01:40:00Z", signed_by_role: "supervisor" });
+    expect(await dayPlan("crew-c")).toMatchObject({ signoff_state: "changed_since_signed", signoff_label_code: "plan.changed_since_signed", signed_by_role: "supervisor" });
   });
 
-  it("derives one acknowledgement item per run of the same Medium or High zone, with ids and text codes", async () => {
+  it("lists the on-shift blocks and the ban in time order, with the contract's own clause texts and no others", async () => {
+    const { segments } = await dayPlan("crew-b");
+
+    expect(segments[0]).toMatchObject({ starts_at: "2026-09-03T02:00:00Z", state: "work", zone: "low" });
+    expect(segments.at(-1)?.ends_at).toBe("2026-09-03T14:00:00Z");
+    expect(segments.every((segment, index) => index === 0 || segment.starts_at >= (segments[index - 1]?.ends_at ?? ""))).toBe(true);
+    const ban = segments.find((segment) => segment.state === "ban");
+    expect(ban).toMatchObject({
+      starts_at: "2026-09-03T08:30:00Z",
+      ends_at: "2026-09-03T11:00:00Z",
+      rule_id: "P-H1",
+      clause: "Ministerial Resolution 44 of 2022: no outdoor work 12:30-15:00 from 15 June to 15 September.",
+    });
+    const highRest = segments.find((segment) => segment.state === "adosh_rest" && segment.zone === "high");
+    expect(highRest).toMatchObject({
+      rule_id: "P-H7.cycle",
+      clause: "ADOSH Technical Guideline Table 1, High zone, heavy work: 20 minutes of work, 40 minutes of rest.",
+    });
+    // Where the contract gives no clause text the clause is empty rather than invented.
+    expect(segments.find((segment) => segment.zone === "medium")?.clause).toBe("");
+    expect(segments.every((segment) => !segment.clause.includes("Art. 17"))).toBe(true);
+  });
+
+  it("derives one acknowledgement item per run of the same Medium or High zone, with ids like high-0600", async () => {
     const { ack_items: items } = await dayPlan("crew-b");
 
     expect(items.map((item) => [item.id, item.zone, item.text_code])).toEqual([
-      ["ack-medium-0800", "medium", "cycle.medium.heavy.45-15"],
-      ["ack-high-1000", "high", "cycle.high.heavy.20-40"],
-      ["ack-high-1500", "high", "cycle.high.heavy.20-40"],
-      ["ack-medium-1700", "medium", "cycle.medium.heavy.45-15"],
+      ["medium-0800", "medium", "cycle.medium.heavy.45-15"],
+      ["high-1000", "high", "cycle.high.heavy.20-40"],
+      ["high-1500", "high", "cycle.high.heavy.20-40"],
+      ["medium-1700", "medium", "cycle.medium.heavy.45-15"],
     ]);
     expect(items[0]).toMatchObject({ starts_at: "2026-09-03T04:00:00Z", ends_at: "2026-09-03T06:00:00Z" });
   });
 
-  it("passes the validator for every crew, and light work uses the 45/15 High cycle", async () => {
-    for (const id of ["crew-a", "crew-b", "crew-c", "crew-d"]) {
-      const plan = await dayPlan(id);
-      expect(plan.validator.passed, id).toBe(true);
-    }
+  it("gives the light crew the 45/15 High cycle and the other crews theirs", async () => {
     expect((await dayPlan("crew-d")).ack_items.some((item) => item.text_code === "cycle.high.light.45-15")).toBe(true);
+    expect((await dayPlan("crew-c")).ack_items.map((item) => item.id)).toEqual((await dayPlan("crew-b")).ack_items.map((item) => item.id));
   });
 
-  it("hides the restricted headcount of the suppressed crew-d but not its restrictions, and shows crew-a's", async () => {
+  it("hides the restricted headcount and every restriction of the suppressed crew-d, and shows crew-a's", async () => {
     const small = await dayPlan("crew-d");
     const big = await dayPlan("crew-a");
 
-    expect(small).toMatchObject({ suppressed: true, restricted_headcount: null });
-    expect(big).toMatchObject({ suppressed: false, restricted_headcount: 2, restrictions: ["restricted.acclimatisation_ramp"] });
-    expect((await dayPlan("crew-a", "", "suppressed")).restricted_headcount).toBeNull();
+    expect(small).toMatchObject({ suppressed: true, restricted_headcount: null, restrictions: [] });
+    expect(big).toMatchObject({ suppressed: false, restricted_headcount: 2, restrictions: ["P-H8.ramp"] });
+    expect(await dayPlan("crew-a", "", "suppressed")).toMatchObject({ restricted_headcount: null, restrictions: [] });
   });
 
   it("is the protective fallback with every on-shift hour High when the forecast is missing", async () => {
     const plan = await dayPlan("crew-b", "", "fallback");
 
-    expect(plan.status).toBe("fallback");
-    expect(plan.forecast_status).toBe("fallback");
+    expect(plan).toMatchObject({ status: "fallback", forecast_status: "fallback" });
     expect(plan.validator.passed).toBe(true);
     expect(plan.ack_items.every((item) => item.zone === "high")).toBe(true);
     const onShift = plan.segments.filter((segment) => segment.state === "work" || segment.state === "adosh_rest");
-    expect(onShift.every((segment) => segment.zone === "high")).toBe(true);
+    expect(onShift.every((segment) => segment.zone === "high" && segment.rule_id === "FALLBACK.high")).toBe(true);
   });
 
-  it("stale scenario labels the plan stale; empty scenario returns no segments", async () => {
-    expect((await dayPlan("crew-b", "", "stale")).forecast_status).toBe("stale");
+  it("stale scenario: forecast_status stale and a fallback plan; empty scenario returns no segments", async () => {
+    expect(await dayPlan("crew-b", "", "stale")).toMatchObject({ forecast_status: "stale", status: "fallback" });
     expect(await dayPlan("crew-b", "", "empty")).toMatchObject({ segments: [], zone_hours: [], ack_items: [] });
   });
 
@@ -374,16 +462,15 @@ describe("get_crew_day_plan", () => {
 });
 
 describe("sign_off_day_plan", () => {
-  const signOff = (crewId: string, body: unknown, headers: Record<string, string> = EMPLOYER) =>
-    send("POST", `/api/v1/crews/${crewId}/day-plan/sign-off`, body, headers);
+  const signOff = (crewId: string, body: unknown, headers: Record<string, string> = EMPLOYER, query = "") =>
+    send("POST", `/api/v1/crews/${crewId}/day-plan/sign-off${query}`, body, headers);
 
   it("answers 401 without a token", async () => {
-    expect((await signOff("crew-b", { acknowledged_items: [], deviation_reason_code: null }, {})).status).toBe(401);
+    expect((await signOff("crew-b", { acknowledged_items: [] }, {})).status).toBe(401);
   });
 
-  it("answers 409 review-required listing the missing ids, then 200 once every item is acknowledged", async () => {
-    const { ack_items: items } = await dayPlan("crew-b");
-    const ids = items.map((item) => item.id);
+  it("answers 409 review-required listing the missing ids, then 201 once every item is acknowledged", async () => {
+    const ids = (await dayPlan("crew-b")).ack_items.map((item) => item.id);
 
     const refused = await signOff("crew-b", { acknowledged_items: ids.slice(0, 2), deviation_reason_code: null });
     expect(refused.status).toBe(409);
@@ -391,70 +478,104 @@ describe("sign_off_day_plan", () => {
     expect(await refused.json()).toMatchObject({ type: `${PROBLEM_TYPE}review-required`, status: 409, missing_items: ids.slice(2) });
     expect((await dayPlan("crew-b")).signoff_state).toBe("unsigned");
 
-    const accepted = await signOff("crew-b", { acknowledged_items: ids, deviation_reason_code: null });
-    expect(accepted.status).toBe(200);
-    const signed = await json<Schemas["DayPlan"]>(accepted);
-    expect(signed).toMatchObject({ signoff_state: "signed", signoff: { state: "signed", signed_by_role: "employer" } });
-    expect(signed.signoff.signed_at).toMatch(/Z$/);
+    const accepted = await signOff("crew-b", { acknowledged_items: ids, deviation_reason_code: "weather_change" });
+    expect(accepted.status).toBe(201);
+    expect(await accepted.json()).toEqual({
+      crew_id: "crew-b",
+      date: REPLAY_DATE,
+      signoff_state: "signed",
+      signed_at: "2026-09-03T07:10:00Z",
+      signed_by_role: "supervisor",
+      acknowledged_items: ids,
+      deviation_reason_code: "weather_change",
+    });
     expect((await timeline("crew-b")).signoff_state).toBe("signed");
+    expect((await dayPlan("crew-b")).signoff_label_code).toBeNull();
   });
 
-  it("answers 422 for an item that is not in the plan, and for a body outside the contract", async () => {
-    expect((await signOff("crew-b", { acknowledged_items: ["ack-high-0000"], deviation_reason_code: null })).status).toBe(422);
-    expect((await signOff("crew-b", { acknowledged_items: [] })).status).toBe(422);
+  it("moves crew-c from changed_since_signed to signed, and answers a signed plan with its recorded sign-off again", async () => {
+    const ids = (await dayPlan("crew-c")).ack_items.map((item) => item.id);
+
+    expect((await signOff("crew-c", { acknowledged_items: ids })).status).toBe(201);
+    expect((await timeline("crew-c")).signoff_state).toBe("signed");
+    const again = await signOff("crew-a", { acknowledged_items: (await dayPlan("crew-a")).ack_items.map((item) => item.id) });
+    expect(again.status).toBe(201);
+    expect((await json<Schemas["PlanSignOff"]>(again)).signed_at).toBe("2026-09-03T01:40:00Z");
   });
 
-  it("answers 404 for an unknown crew, and a signed plan keeps its first signature when signed again", async () => {
-    expect((await signOff("nope", { acknowledged_items: [], deviation_reason_code: null })).status).toBe(404);
-    const ids = (await dayPlan("crew-a")).ack_items.map((item) => item.id);
-    const again = await signOff("crew-a", { acknowledged_items: ids, deviation_reason_code: null });
-    expect(again.status).toBe(200);
-    expect((await json<Schemas["DayPlan"]>(again)).signoff.signed_at).toBe("2026-09-03T01:40:00Z");
+  it("answers 422 for an item that is not in the plan, a bad reason code and a body outside the contract", async () => {
+    const unknown = await signOff("crew-b", { acknowledged_items: ["high-0000"] });
+    expect(unknown.status).toBe(422);
+    expect(await unknown.json()).toMatchObject({ errors: [{ loc: ["body", "acknowledged_items", 0] }] });
+    expect((await signOff("crew-b", { acknowledged_items: [], deviation_reason_code: "Bad Code" })).status).toBe(422);
+    expect((await signOff("crew-b", {})).status).toBe(422);
+    expect((await signOff("crew-b", { acknowledged_items: [], extra: 1 })).status).toBe(422);
+    expect((await signOff("crew-b", { acknowledged_items: [] }, EMPLOYER, "?date=x")).status).toBe(422);
+  });
+
+  it("answers 404 for an unknown crew", async () => {
+    expect((await signOff("nope", { acknowledged_items: [] })).status).toBe(404);
   });
 });
 
 describe("validate_plan", () => {
   const crew = { workload: "heavy", headcount: 20, acclimatised: true, days_per_week: 6 };
   const validate = (body: Record<string, unknown>) => send("POST", "/api/v1/plans/validate", { site_id: DEMO_SITE, date: REPLAY_DATE, crew, ...body });
+  const answer = async (body: Record<string, unknown>) => json<Schemas["PlanValidateResponse"]>(await validate(body));
 
-  it("finds P-H3 and P-H2.daily, each with clause text, in the common roster B0", async () => {
+  it("finds P-H3 (with the contract's Art. 18 clause) and P-H2.daily in the common roster B0", async () => {
     const res = await validate({ roster_text: "06:00-12:30 work\n15:00-17:00 work" });
 
     expect(res.status).toBe(200);
     const body = await json<Schemas["PlanValidateResponse"]>(res);
-    const ids = body.validator.violations.map((violation) => violation.rule_id);
     expect(body.validator.passed).toBe(false);
-    expect(ids).toEqual(expect.arrayContaining(["P-H3", "P-H2.daily", "P-H7.run"]));
-    for (const violation of body.validator.violations) {
-      expect(violation.clause.length).toBeGreaterThan(20);
-      expect(violation.source_id).not.toBe("");
-      expect(violation.ranges.length).toBeGreaterThan(0);
-    }
-    expect(body.validator.violations.find((violation) => violation.rule_id === "P-H3")?.clause).toContain("five");
+    expect(body.validator.violations.map((violation) => violation.rule_id)).toEqual(["P-H3", "P-H2.daily"]);
+    expect(body.validator.violations[0]).toEqual({
+      rule_id: "P-H3",
+      clause: "Labour Art. 18: a break of one hour after five hours of work.",
+      source_id: "ae-labour-art-18",
+      ranges: [{ starts_at: "2026-09-03T02:00:00Z", ends_at: "2026-09-03T08:30:00Z" }],
+      detail: "6.5 hours of attendance without a one-hour break.",
+    });
+    // The contract gives no clause text for the daily-hours rule: it is empty, not invented.
+    expect(body.validator.violations[1]).toMatchObject({ rule_id: "P-H2.daily", clause: "", source_id: "" });
+    expect(body).toMatchObject({ banner_code: "plan.floor_banner", model_id: "mock", forecast_status: "fresh", policy_version: "mock-0", config_version: 1 });
     expect(body.zone_hours).toHaveLength(14);
-    expect(body).toMatchObject({ policy_version: "mock-0", config_version: 1 });
+    expect(body.ban_window.active_on_date).toBe(true);
   });
 
-  it("passes the legal default L1 given as segments, and lists the rules it checked", async () => {
-    const res = await validate({
+  it("gives the same answer for the common roster given as segments", async () => {
+    const body = await answer({
       segments: [
-        { start: "06:00", end: "11:00", state: "rest" },
-        { start: "15:00", end: "18:00", state: "rest" },
+        { start: "15:00", end: "17:00", state: "work" },
+        { start: "06:00", end: "12:30", state: "work" },
       ],
     });
 
-    const body = await json<Schemas["PlanValidateResponse"]>(res);
-    expect(body.validator.passed).toBe(true);
-    expect(body.validator.checked_rules).toContain("P-H2.daily");
+    expect(body.validator.violations.map((violation) => violation.rule_id)).toEqual(["P-H3", "P-H2.daily"]);
   });
 
-  it("flags work inside the midday ban (P-H1) and not outside the season", async () => {
-    const roster = "12:30-14:00 work";
-    const inSeason = await json<Schemas["PlanValidateResponse"]>(await validate({ roster_text: roster }));
-    const november = await json<Schemas["PlanValidateResponse"]>(await validate({ roster_text: roster, date: "2026-11-11" }));
+  it("has no violations for the legal default L1, and lists the rules it checked", async () => {
+    const body = await answer({ roster_text: "06:00-11:00 work\n15:00-18:00 work" });
 
-    expect(inSeason.validator.violations.map((violation) => violation.rule_id)).toContain("P-H1");
-    expect(november.validator.violations.map((violation) => violation.rule_id)).not.toContain("P-H1");
+    expect(body.validator).toEqual({ passed: true, violations: [], checked_rules: ["P-H1", "P-H2.daily", "P-H3", "P-H7.cap60", "P-H7.run"] });
+  });
+
+  it("has a canned violation list for work straight through, with P-H1 only in season", async () => {
+    const inSeason = await answer({ roster_text: "06:00-18:00 work" });
+    const november = await answer({ roster_text: "06:00-18:00 work", date: "2026-11-11" });
+
+    expect(inSeason.validator.violations.map((violation) => violation.rule_id)).toEqual(["P-H1", "P-H3", "P-H2.daily"]);
+    expect(inSeason.validator.violations[0]?.clause).toContain("Ministerial Resolution 44 of 2022");
+    expect(november.validator.violations.map((violation) => violation.rule_id)).toEqual(["P-H3", "P-H2.daily"]);
+  });
+
+  it("answers any other roster with no violations and the checked rules listed", async () => {
+    const body = await answer({ roster_text: "07:00-10:00 work\n10:00-10:30 break\n10:30-12:00 work" });
+
+    expect(body.validator.passed).toBe(true);
+    expect(body.validator.violations).toEqual([]);
+    expect(body.validator.checked_rules.length).toBeGreaterThan(0);
   });
 
   it("answers 422 roster-invalid with the line numbers of what could not be read", async () => {
@@ -462,9 +583,10 @@ describe("validate_plan", () => {
 
     expect(res.status).toBe(422);
     expect(res.headers.get("content-type")).toBe("application/problem+json");
-    const body = await json<{ type: string; errors: { line: number; message: string }[] }>(res);
+    const body = await json<Schemas["RosterInvalidProblem"]>(res);
     expect(body.type).toBe(`${PROBLEM_TYPE}roster-invalid`);
     expect(body.errors.map((error) => error.line)).toEqual([2, 3, 4]);
+    expect(body.errors[1]?.message).toBe("start 25:00 is not a time");
   });
 
   it("needs exactly one of roster_text and segments, a known site and a real date", async () => {
@@ -494,11 +616,13 @@ describe("push subscriptions", () => {
     expect(await removed.text()).toBe("");
   });
 
-  it("answers 422 for a body that is not a subscription, and 404 for an unknown site", async () => {
+  it("answers 422 for a body that is not a subscription, and 404 for an unknown site or crew", async () => {
     const post = (payload: unknown) => send("POST", "/api/v1/push/subscriptions", payload);
 
     expect((await post({ site_id: DEMO_SITE })).status).toBe(422);
     expect((await post({ ...body, site_id: "nope" })).status).toBe(404);
+    expect((await post({ ...body, crew_id: "crew-z" })).status).toBe(404);
+    expect((await post({ ...body, crew_id: "crew-b" })).status).toBe(201);
   });
 });
 
@@ -518,7 +642,7 @@ describe("create_data_request and get_site_transparency_log", () => {
     expect(res.status).toBe(403);
     expect(res.headers.get("content-type")).toBe("application/problem+json");
     const text = await res.text();
-    expect(JSON.parse(text)).toMatchObject({ type: `${PROBLEM_TYPE}individual-data-refused`, status: 403 });
+    expect(JSON.parse(text)).toMatchObject({ type: `${PROBLEM_TYPE}individual-data-refused`, title: "Individual data refused", status: 403 });
     expect(text).not.toContain("Ahmed");
     expect(text).not.toContain("4471");
   });
@@ -569,10 +693,10 @@ describe("create_crew_stop and delete_crew_stop", () => {
 
     const res = await stop();
     expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({ id: "stop-mock-1", crew_id: "crew-b", started_at: "2026-09-03T07:10:00Z", cleared_at: null });
+    expect(await res.json()).toEqual({ id: "stop-0001", crew_id: "crew-b", started_at: "2026-09-03T07:10:00Z", cleared_at: null });
   });
 
-  it("turns the crew level red from the stop's hour and stops the planned work after it, validator still passed", async () => {
+  it("turns the crew level red from the stop's hour and stops the planned work after it", async () => {
     await stop();
 
     const result = await timeline("crew-b");
@@ -581,14 +705,15 @@ describe("create_crew_stop and delete_crew_stop", () => {
     expect(hourAt(result.hours, "19:00")?.crew_level).toBe("red");
     const plan = await dayPlan("crew-b");
     expect(plan.validator.passed).toBe(true);
-    expect(plan.segments.some((segment) => segment.state === "stopped" && segment.rule_id === "STOP.red")).toBe(true);
+    expect(plan.segments.some((segment) => segment.state === "stopped" && segment.zone === "red" && segment.rule_id === "STOP.red")).toBe(true);
     expect(plan.segments.some((segment) => segment.state === "work" && segment.starts_at >= "2026-09-03T07:00:00Z")).toBe(false);
+    expect(plan.ack_items.some((item) => item.zone === "red" && item.text_code === "stop-work")).toBe(true);
     // Other crews are not stopped.
     expect(hourAt((await timeline("crew-a")).hours, "11:00")?.crew_level).toBe("orange");
   });
 
   it("never waits for sign-off: it works with an unsigned plan and after a refused sign-off", async () => {
-    const refused = await send("POST", "/api/v1/crews/crew-b/day-plan/sign-off", { acknowledged_items: [], deviation_reason_code: null }, EMPLOYER);
+    const refused = await send("POST", "/api/v1/crews/crew-b/day-plan/sign-off", { acknowledged_items: [] }, EMPLOYER);
     expect(refused.status).toBe(409);
 
     expect((await stop()).status).toBe(201);
@@ -602,7 +727,7 @@ describe("create_crew_stop and delete_crew_stop", () => {
     expect((await clear()).status).toBe(204);
     expect((await clear()).status).toBe(204);
     expect(hourAt((await timeline("crew-b")).hours, "11:00")?.crew_level).toBe("orange");
-    expect((await send("DELETE", "/api/v1/crews/crew-b/stops/stop-mock-99", undefined, EMPLOYER)).status).toBe(204);
+    expect((await send("DELETE", "/api/v1/crews/crew-b/stops/stop-9999", undefined, EMPLOYER)).status).toBe(204);
     expect((await send("DELETE", `/api/v1/crews/crew-b/stops/${id}`, undefined, {})).status).toBe(401);
     expect((await send("DELETE", `/api/v1/crews/nope/stops/${id}`, undefined, EMPLOYER)).status).toBe(404);
   });
@@ -619,21 +744,32 @@ describe("reset_demo_site", () => {
   it("starts a new epoch: stops and sign-offs revert to the seed, the transparency log keeps every row", async () => {
     await send("POST", "/api/v1/crews/crew-b/stops", { reason_code: "heat" }, EMPLOYER);
     const ids = (await dayPlan("crew-b")).ack_items.map((item) => item.id);
-    await send("POST", "/api/v1/crews/crew-b/day-plan/sign-off", { acknowledged_items: ids, deviation_reason_code: null }, EMPLOYER);
+    await send("POST", "/api/v1/crews/crew-b/day-plan/sign-off", { acknowledged_items: ids }, EMPLOYER);
     await send("POST", `/api/v1/sites/${DEMO_SITE}/data-requests`, { subject: "worker", data_class: "health", worker_ref: "x" }, EMPLOYER);
 
     const first = await reset();
     expect(first.status).toBe(200);
-    expect(await first.json()).toEqual({ epoch: 2 });
-    expect((await json<{ epoch: number }>(await reset())).epoch).toBe(3);
+    expect(await first.json()).toMatchObject({ site_id: DEMO_SITE, epoch_id: 2, previous_epoch_id: 1 });
+    expect(await json<Schemas["DemoReset"]>(await reset())).toMatchObject({ epoch_id: 3, previous_epoch_id: 2 });
 
     const after = await dayPlan("crew-b");
     expect(after.signoff_state).toBe("unsigned");
     expect(after.segments.some((segment) => segment.state === "stopped")).toBe(false);
-    expect((await timeline("crew-a")).signoff_state).toBe("signed");
+    expect((await timeline("crew-c")).signoff_state).toBe("changed_since_signed");
+    expect((await json<Schemas["Site"][]>(await get("/api/v1/sites")))[0]?.epoch_id).toBe(3);
     const log = await json<Schemas["TransparencyLog"]>(await get(`/api/v1/sites/${DEMO_SITE}/transparency-log`));
     expect(log.entries).toHaveLength(1);
     expect(JSON.stringify(log)).not.toContain("epoch");
+  });
+
+  it("never repeats a stop id across epochs, so an old undo cannot clear a new stop", async () => {
+    const first = await json<Schemas["CrewStop"]>(await send("POST", "/api/v1/crews/crew-b/stops", { reason_code: "heat" }, EMPLOYER));
+    await reset();
+    const second = await json<Schemas["CrewStop"]>(await send("POST", "/api/v1/crews/crew-b/stops", { reason_code: "heat" }, EMPLOYER));
+
+    expect(second.id).not.toBe(first.id);
+    expect((await send("DELETE", `/api/v1/crews/crew-b/stops/${first.id}`, undefined, EMPLOYER)).status).toBe(204);
+    expect((await crewList()).find((crew) => crew.id === "crew-b")).toMatchObject({ stopped: true, active_stop_id: second.id });
   });
 
   it("answers 401 without a token and 404 for an unknown site", async () => {
@@ -664,7 +800,7 @@ describe("x-sb-mock-scenario", () => {
     ["POST", "/api/v1/plans/validate"],
     ["POST", `/api/v1/sites/${DEMO_SITE}/data-requests`],
     ["POST", "/api/v1/crews/crew-b/stops"],
-    ["DELETE", "/api/v1/crews/crew-b/stops/stop-mock-1"],
+    ["DELETE", "/api/v1/crews/crew-b/stops/stop-0001"],
     ["POST", "/api/v1/crews/crew-b/day-plan/sign-off"],
     ["POST", `/api/v1/sites/${DEMO_SITE}/demo-reset`],
   ])("error also fails the write %s %s, before the token is read", async (method, path) => {
@@ -679,7 +815,7 @@ describe("x-sb-mock-scenario", () => {
 
   it("empty returns [] for lists and no hours for the day views", async () => {
     expect(await (await get("/api/v1/sites", "empty")).json()).toEqual([]);
-    expect(await (await get(`/api/v1/sites/${DEMO_SITE}/crews`, "empty")).json()).toEqual([]);
+    expect(await crewList("empty")).toEqual([]);
     expect((await forecast(DEMO_SITE, "empty")).hours).toEqual([]);
     expect((await timeline("crew-b", "", "empty")).hours).toEqual([]);
   });

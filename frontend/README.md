@@ -49,8 +49,12 @@ image (ADR 0009). These variables are wiring only; tunable values (bands, lead t
 | `VAPID_PUBLIC_KEY` | the Alerts page (`src/app/[locale]/(worker)/worker/alerts/page.tsx`) | The Web Push application server key, public half only, base64url. Unset, the page logs an error and cannot turn alerts on; the rest of the app is unaffected |
 | `APP_VERSION` | `GET /api/healthz` (returns it as `version`, `dev` when unset) | The release id, which the Dockerfile takes as `ARG APP_VERSION` and sets in the runtime stage. The build also uses it, when set, as the revision of the offline pages the service worker precaches (`src/app/serwist/[path]/route.ts`); unset, each build gets a random one |
 | `PORT`, `HOSTNAME` | the standalone server (`server.js`) | Where it listens. The Dockerfile sets `3000` and `0.0.0.0` |
+| `DEMO_EMPLOYER_TOKEN` | the BFF proxy (`route.ts`, `employer-auth.ts`) | The demo employer token. A **secret**: a container secret, never `NEXT_PUBLIC_*`, never logged, never sent to the browser. The BFF attaches it as `Authorization: Bearer` only on the allow-listed method and path pairs of the synthetic demo fixture (day plan, sign-off, stops, data requests, demo reset) and strips any client `Authorization`. Unset, those routes reach the API without a token and it answers 401 |
+| `DEMO_WRITE_RATE_PER_MIN`, `DEMO_WRITE_GLOBAL_RATE_PER_MIN` | the BFF proxy (`route.ts`, `rate-limit.ts`) | Writes per minute allowed per client (default 20) and over all clients (default 60, the API's own ceiling of 60 per 60 s per token) for sign-off, data requests and demo reset. Over either: 429 `application/problem+json` with `Retry-After`. Per process; each replica keeps its own buckets. An invalid or zero value is the default |
+| `DEMO_STOP_RATE_PER_MIN`, `DEMO_STOP_GLOBAL_RATE_PER_MIN` | the BFF proxy | The same, for Stop work (create and clear a stop) only, in buckets the other writes cannot drain: per client default 30, global default 60 (the API's ceiling; a higher number could never be used). A 429 on a stop is a safety failure: the screen must say it was not sent and to tell the crew now |
+| `TRUSTED_PROXY_HOPS` | the BFF proxy (`rate-limit.ts`) | How many reverse proxies in front of the app append to `x-forwarded-for` (default 1: the platform ingress). The per-client bucket is keyed on the entry that many from the right, because earlier entries are whatever the caller wrote; with 2 (a CDN and an ingress) it is the second from the right. 0 trusts none and puts every caller in one bucket; a header shorter than the hops does the same. Wrong in either direction weakens only the per-client bucket; the global bucket holds regardless |
 
-The deployment sets `API_ORIGIN`, `VAPID_PUBLIC_KEY` and `APP_VERSION` on the `web` container app and gates a release
+The deployment sets `API_ORIGIN`, `VAPID_PUBLIC_KEY` and `APP_VERSION` (and, for the public demo, the secret `DEMO_EMPLOYER_TOKEN` and `TRUSTED_PROXY_HOPS`) on the `web` container app and gates a release
 on `GET /api/healthz`, which answers on port 3000 and is never under the proxied `/api/v1`.
 
 ## Where things live
@@ -72,7 +76,7 @@ on `GET /api/healthz`, which answers on port 3000 and is never under the proxied
 - `src/api/`: the typed API client (`apiClient` for the browser, `serverApiClient()` for server code), `call()` (turns a
   response into a `Result`), `problem.ts` (`application/problem+json`) and the generated `schema.d.ts`. The browser calls
   only same-origin `/api/v1/*`; `src/app/api/v1/[...path]/route.ts` forwards it to `API_ORIGIN`.
-- `src/mocks/`: the fixtures and MSW handlers for the contract proposal in `openapi/`. Vitest starts them for every
+- `src/mocks/`: the canned fixtures and MSW handlers for the contract in `openapi/` (B3's v1, copied unedited from `backend/openapi/v1.json`). Vitest starts them for every
   test (`tests/setup-msw.ts`); `pnpm mock:api` serves them over HTTP. A request header `x-sb-mock-scenario: error | stale
   | empty` selects a failure, a stale forecast or an empty result (forwarded only outside production, or with
   `SB_MOCK_SCENARIOS=1`).
