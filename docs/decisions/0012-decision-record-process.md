@@ -50,3 +50,6 @@ A decision is found in chat, a plan or a research doc with no ADR; or the parkin
 
 ## Links
 [README index](README.md) · [parking lot](../parking-lot.md) · [roadmap](../superpowers/plans/2026-11-11-roadmap.md)
+
+## Amendments
+- **2026-11-14 (process note: model routing for execution; decision text unchanged).** Ali's rule, given in chat on 2026-11-14: **all subagents run on Sonnet. Opus is used only with his explicit permission each time, requested through a prompt that gives the reasons.** It applies to every subagent dispatch for execution (implementers, reviewers, researchers, and plan-writing agents), and every dispatch passes its model explicitly. It is recorded in the roadmap's "Decisions recorded 2026-11-14". It is recorded here because ADR 0012 rule 6 says a chat decision gets its record the same day, and this is a rule about how decisions and plans get produced. Two earlier texts conflict with it and are not edited (history stays): the I1 plan's Execution paragraph ("an Opus review runs at the end") and the F1 plan's Execution paragraph; each now needs Ali's per-use permission. The `architect` agent type defaults to Opus, so each use of it needs the same permission. The user-level memory entry `feedback_subagent_model_routing` ("Opus for plans + final review") is superseded by this rule; it sits outside `docs/` and was not changed here.

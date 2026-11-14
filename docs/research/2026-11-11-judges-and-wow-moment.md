@@ -6,6 +6,8 @@
 
 **Every number in the wow storyboard that does not exist yet is shown as `⟨name⟩`.** It is produced by B2/B3 code on real data, and the slot names the file that will hold it. Nothing in this document is a result we have not computed.
 
+> **Erratum 2026-11-14 (ADR 0034 amendment; full list at the end of this file).** Four things below are corrected, and the text is kept as written: (1) the "forecast as issued at 18:00 the evening before" stamp is replaced by "forecast made about 24 hours ahead" (18:00 only on the lead-2 sensitivity run); (2) "untouched" and "never looked at" wording becomes "held-out 2026, every choice fixed on 2024-2025 data"; (3) OMAA is a known site, so "new site" claims rest only on the leave-one-cluster-out regimes; (4) the protocol file is `docs/research/2026-11-12-preregistration-2026-evaluation.md` (committed as `661b373`), not `docs/research/2026-11-12-evaluation-protocol.md`.
+
 ## Changelog
 
 | Version | Date | Change |
@@ -199,6 +201,8 @@ The example in the brief ("time machine replay of a real heat day … raw foreca
 
 Commit `docs/research/2026-11-12-evaluation-protocol.md` containing: section 4.2 verbatim; the metrics; θ-selection on 2024-2025 only; the demo-day rule; the success criterion stated in advance; and the rule that every amendment after scoring is logged with its reason. Proposed success criterion: P3 has fewer unwarned danger hours than P0 **and** fewer alarm hours than P1, both with bootstrap intervals that exclude zero. B2 then scores 2026 **once**.
 
+> **Correction 2026-11-14 (path and wording; the paragraph above is kept).** The pre-registration that was committed is `docs/research/2026-11-12-preregistration-2026-evaluation.md` (commit `661b373`, approved by Ali on 14 Nov, after the "by end of 12 Nov" date above). `docs/research/2026-11-12-evaluation-protocol.md` does not exist. The committed file refines §4.2 rather than quoting it verbatim: the issue time, the held-out wording and the demo-day candidate rule differ, as listed in the erratum at the end of this file.
+
 ### 4.4 Storyboard (50 seconds of the video; the same sequence opens the 7-minute live pitch)
 
 | t | Screen | What is on it | Narration (one line) | Numbers that must be real (slot → source file) |
@@ -337,6 +341,8 @@ One number or one visual per beat. Each slot is filled by real output or the lin
 | 1 | **Pre-registered evaluation protocol + evaluation report with reliability diagram.** `docs/research/2026-11-12-evaluation-protocol.md`, committed before 2026 is scored, so its commit time precedes the results commit; `evaluation-report.md` with the three regimes, CRPS, coverage, PIT and the reliability diagram | The numbers were not tuned after the fact. "When we say 70%, it happens `⟨obs_freq_at_70⟩` of the time" | Yes (section 4.3, B2) |
 | 2 | **Independent validator output.** Feed it any plan (the common 06:00-12:30 + 15:00-17:00 roster, our rule plan, a judge's hand edit) and it returns violations with rule id, clause (ADOSH Table 1, Labour Law Art. 18, ban) and tick ranges. It shares no code path with the planners (ADR 0011 §3) | Rules are enforced by code a stranger can poke, not described in a PDF | Yes (ADR 0011 MUST) |
 | 3 | **Roster frontier chart.** Exposure vs sleep for 14,596 legal templates, commute slider, B0 vs B1, the legalisation arrow attributed to the law. Caption: "no roster shape outruns the heat under law, sleep and commute" | We tested the obvious optimiser idea on real data and report that it does not survive. A negative result told plainly reads as competence | Yes (ADR 0011 MUST, static) |
+
+> **Correction 2026-11-14 (applies to the path in artefact 1 above; the row is kept).** The protocol file is `docs/research/2026-11-12-preregistration-2026-evaluation.md`, committed as `661b373` on or after 14 Nov, not `docs/research/2026-11-12-evaluation-protocol.md`. "Committed before 2026 is scored" still holds and is what the B2 gate checks; do not quote "12 Nov".
 
 Also available, one click deeper (not in the video): the audit trail (append-only rows including the refused employer request), the governance test names in CI, the data declaration with SHA-256 manifests, and `uv run` one-command reproduction of every scoreboard number.
 
@@ -485,3 +491,16 @@ Marginal days are on top of the never-cut plan (B1-B3, F1-F2, I1, D) and ADR 001
 - Planner evidence (R): `docs/decisions/0011-heat-aware-planner.md` v2; `docs/research/2026-11-11-roster-feasibility.md` (erratum); `docs/research/scripts/roster/results/roster_frontier.json`.
 - Vault (V): "Future Health Challenge", "Judges & Evaluation Mindset", "Past Winners & Participant Experiences", "Competitor Reconnaissance (2026-11)" under `C:\Users\LEGION\Documents\Compendium\Ali\Future-Health-Challenge\`.
 - Repo (R): `docs/research/2026-11-11-data-availability.md` §5-§7; `docs/research/2026-11-11-claims-verification.md` §1-§3, §11; ADRs 0004-0007; roadmap.
+
+## Erratum 2026-11-14: issue time, held-out wording, known site, protocol path
+
+Added after Ali approved and committed the pre-registration (`docs/research/2026-11-12-preregistration-2026-evaluation.md`, commit `661b373`). Decision record: the "Amendments" of [ADR 0034](../decisions/0034-demo-strategy.md), 2026-11-14. Everything above is kept as written; where it conflicts with this list, this list applies. Evidence: pre-registration §0 (three findings), §4, §10, §14.
+
+| # | Where above | What it says | What applies now |
+|---|---|---|---|
+| 1 | §0 point 3(a) and point 4; §2.1 (the "evening-before forecast" cell); §3 rank 1; §4.1 candidate A and the "exposure warned vs unwarned" paragraph; §4.2 "Issue time" and "Scoreboard counters"; §4.4 storyboard stamp and narration (0:00-0:08, "as issued" at 0:28-0:42, 0:42-0:50); §5 opening sentence | The forecast is "as issued at 18:00 the evening before", "known the night before" | The headline is **"forecast made about 24 hours ahead"** (`lead_days = 1`, Open-Meteo `previous_day1`). "Issued by 18:00 GST the evening before" is used only for the `lead_days = 2` strict-availability run shown beside it. Reason: the newest IFS run anyone could hold at 18:00 GST on D-1 is the 06 UTC run; the value for 16:00-18:59 GST comes from a run published after 18:00 GST (pre-registration §0.1, §4). The on-screen stamp reads "Forecast made about 24 hours ahead · scored against the station's thermometers · summer never seen in training". The numbers do not change. B2 Task 2 audits `previous_day1`; a further amendment may restore the 18:00 wording if the audit allows |
+| 2 | §1.2 criterion 2 ("2026 as an untouched test summer"); §4.2 "Season" ("never used for model selection") | 2026 was untouched | Say **"held-out 2026, every choice fixed on 2024-2025 data"**. Never say "untouched" or "never looked at": raw-forecast diagnostics on 2026 were computed and read on 11-12 Nov (pre-registration §0.2, §10). "Never used for model selection" and "summer never seen in training" stay true |
+| 3 | §0 point 3(b) ("sites the model never saw"); §4.2 "Site" and "Season" (the OMAA replay framed as the held-out test) | Reads as if the OMAA scoreboard tested an unseen site | OMAA is in the 2024-2025 training data. The OMAA scoreboard is regime (a), known site and unseen summer. "New site" claims rest only on leave-one-cluster-out regimes (b) and (c), worded "held-out airport clusters", never "any worksite" and never "a site never seen" for OMAA (pre-registration §0.3) |
+| 4 | §4.2 heading ("commit by end of 12 Nov"); §4.3; §6 action 2; §8.1 artefact 1 | The protocol is `docs/research/2026-11-12-evaluation-protocol.md`, committed 12 Nov | The file is `docs/research/2026-11-12-preregistration-2026-evaluation.md`, committed as `661b373` after Ali's approval on 14 Nov. §4.2 is refined, not quoted verbatim (for example, demo-day candidates must have all nine working-daytime hours observed; pre-registration §7.4 step 1). The file's own header reads DRAFT and is left unedited because the B2 gate checks its SHA-256 |
+| 5 | §9.1 method; §10 row 1 ("climate-scenario method" in the pre-registration) | The climate method is pre-registered with the protocol | The committed file contains no climate-scenario method. Until it is committed (a separate dated file, or a row in the pre-registration's amendment log), no climate number may be shown as pre-registered |
+
