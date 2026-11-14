@@ -52,6 +52,7 @@ from stellar_blaze.domain.forecast.conformal import (
     block_indices,
     lead_values,
     stratum_key,
+    value_grid,
 )
 from stellar_blaze.domain.forecast.features import FeatureSet, FoldStats, Target, build_features, fit_fold_stats
 from stellar_blaze.domain.forecast.features import history_features as _history_features
@@ -60,6 +61,7 @@ from stellar_blaze.domain.forecast.sampling import (
     MIN_COPULA_ROWS,
     WbgtJointGrid,
     fit_copula,
+    reject_thin_wbgt_rows,
     sample_joint,
 )
 from stellar_blaze.domain.forecast.sampling import wbgt_joint_grid as _wbgt_joint_grid
@@ -215,34 +217,6 @@ def model_id(created: date, git_sha: str, cfg_sha256: str) -> str:
     if not re.fullmatch(MODEL_ID, identifier):  # cannot happen after the checks above; the manifest regex is the law
         raise ValueError(f"{identifier!r} does not match the model id pattern {MODEL_ID}")
     return identifier
-
-
-def value_grid(error_grid: F64, raw: F64, target: Target) -> F64:
-    """The VALUE quantile grid of a target: the raw forecast plus the error grid, wind clipped at 0.
-
-    The corrected wind is never negative (pre-registration 3.1). The clip keeps the rows sorted (it is monotone) and
-    makes ties at 0, which ``grid.cdf`` and ``grid.ppf`` handle. A row whose raw forecast is NaN comes back all-NaN.
-
-    Args:
-        error_grid: ``(n, 19)`` sorted error quantiles (``predict_grid``, optionally conformalised).
-        raw: ``(n,)`` raw forecast of the target (NaN where missing).
-        target: The variable.
-    """
-    grid = np.asarray(error_grid, dtype=np.float64) + np.asarray(raw, dtype=np.float64)[:, None]
-    return np.asarray(np.maximum(grid, 0.0) if target is Target.WIND else grid, dtype=np.float64)
-
-
-def reject_thin_wbgt_rows(grid: F64, n_finite: NDArray[np.int64], n_samples: int) -> tuple[F64, int]:
-    """Rows of a joint WBGT grid that rest on fewer than ``n_samples / 2`` finite samples become all-NaN (R30).
-
-    A row with some rejected samples still has a grid from the finite ones, but one that rests on a minority of the
-    draws is no distribution of the forecast: it is treated as missing, so it is excluded from the offsets.
-
-    Returns:
-        A new grid and the number of rows set to NaN, counting rows that were all-NaN already.
-    """
-    thin = np.asarray(n_finite) < n_samples / 2.0
-    return np.where(thin[:, None], np.nan, np.asarray(grid, dtype=np.float64)), int(thin.sum())
 
 
 def _floats(frame: pl.DataFrame, name: str) -> F64:

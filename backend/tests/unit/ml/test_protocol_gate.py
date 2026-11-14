@@ -15,6 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Final
 from unittest.mock import MagicMock
 
 import pytest
@@ -512,6 +513,79 @@ def test_the_real_lock_file_is_consistent_with_the_committed_documents() -> None
         assert sha((REPO_ROOT / amendment.path).read_bytes()) == amendment.sha256, amendment.path
     if lock.freeze_path is not None:
         assert sha((REPO_ROOT / lock.freeze_path).read_bytes()) == lock.freeze_sha256
+
+
+REAL_PROTOCOL: Final = "docs/research/2026-11-12-preregistration-2026-evaluation.md"
+REAL_AMENDMENTS: Final = (
+    "docs/research/2026-11-14-preregistration-amendment-1.md",
+    "docs/research/2026-11-15-preregistration-amendment-2.md",
+)
+
+
+def test_the_real_lock_lists_the_preregistration_and_exactly_the_two_amendments() -> None:
+    lock = load_lock(REAL_LOCK)
+
+    assert lock.protocol_path == REAL_PROTOCOL
+    assert tuple(amendment.path for amendment in lock.amendments) == REAL_AMENDMENTS  # in this order, none else
+    for path, pinned in [(lock.protocol_path, lock.protocol_sha256), *((a.path, a.sha256) for a in lock.amendments)]:
+        assert sha((REPO_ROOT / path).read_bytes()) == pinned, (
+            path
+        )  # the committed working-tree bytes are the pinned ones
+
+
+def _copy_of_the_real_repository_files(tmp_path: Path, *, edited: str | None = None) -> tuple[Path, Path, FakeGit]:
+    """The real lock and the three documents it pins, copied under ``tmp_path``, with a fake git that vouches for them.
+
+    ``edited`` is the path of one document whose COPY gets an extra byte (git still holds the pinned bytes).
+    """
+    lock = load_lock(REAL_LOCK)
+    repo = tmp_path / "repo"
+    git = FakeGit(files={}, ancestors=set())
+    pinned = [(lock.protocol_path, lock.protocol_commit), *((a.path, a.commit) for a in lock.amendments)]
+    for path, commit in pinned:
+        data = (REPO_ROOT / path).read_bytes()
+        (repo / path).parent.mkdir(parents=True, exist_ok=True)
+        (repo / path).write_bytes(data + b"\n" if path == edited else data)
+        git.files[(commit, path)] = data
+        git.ancestors.add((commit, HEAD))
+    copied_lock = repo / "backend" / "training" / "protocol.lock.toml"
+    copied_lock.parent.mkdir(parents=True)
+    shutil.copyfile(REAL_LOCK, copied_lock)
+    return repo, copied_lock, git
+
+
+def _open_the_copied_gate(tmp_path: Path, repo: Path, copied_lock: Path, git: FakeGit) -> list[str]:
+    with pytest.raises(GateRefusedError) as refused:  # always refused: the real lock has no model_id and no go yet
+        open_gate(
+            repo_root=repo,
+            lock_path=copied_lock,
+            part=Part.FORECAST,
+            results_dir=tmp_path / "no-results",
+            models_dir=tmp_path / "no-models",
+            go_path=tmp_path / "no-go.toml",
+            git=git,
+        )
+    return list(refused.value.reasons)
+
+
+def test_the_gate_accepts_the_real_documents_and_names_no_amendment_problem(tmp_path: Path) -> None:
+    repo, copied_lock, git = _copy_of_the_real_repository_files(tmp_path)
+
+    reasons = _open_the_copied_gate(tmp_path, repo, copied_lock, git)
+
+    assert not [reason for reason in reasons if reason.startswith(("amendment-", "protocol-", "commit-"))]
+
+
+@pytest.mark.parametrize("which", REAL_AMENDMENTS)
+def test_the_gate_refuses_when_either_amendment_changes(tmp_path: Path, which: str) -> None:
+    repo, copied_lock, git = _copy_of_the_real_repository_files(tmp_path, edited=which)
+
+    reasons = _open_the_copied_gate(tmp_path, repo, copied_lock, git)
+
+    mismatches = [reason for reason in reasons if reason.startswith("amendment-hash-mismatch")]
+    assert len(mismatches) == 1
+    assert which in mismatches[0]  # and only the edited amendment is named
+    assert not any(reason.startswith(("amendment-content", "amendment-not")) for reason in reasons)
 
 
 REAL_GO = REAL_LOCK.parent / "2026-go.toml"

@@ -75,8 +75,25 @@ def _write_gold(data_dir: Path) -> str:
     return manifest.output.sha256
 
 
+class FakeGit:
+    """A ``GitReader`` with a settable answer to "is the tree clean"; the run never runs git."""
+
+    def __init__(self) -> None:
+        self.clean = True
+
+    def is_clean(self) -> bool:
+        return self.clean
+
+
 @pytest.fixture
-def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+def git(monkeypatch: pytest.MonkeyPatch) -> FakeGit:
+    fake = FakeGit()
+    monkeypatch.setattr(ml_cli, "_git_reader", lambda root: fake)
+    return fake
+
+
+@pytest.fixture
+def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, git: FakeGit) -> Path:
     """``SB_*`` environment under ``tmp_path``, a synthetic gold file with its manifest, a config and a stubbed git."""
     monkeypatch.chdir(tmp_path)  # a developer's backend/.env must not reach the test
     monkeypatch.setenv("SB_DATABASE_URL", DATABASE_URL)
@@ -96,9 +113,34 @@ def _fixture_selection(monkeypatch: pytest.MonkeyPatch, calls: list[dict[str, An
 
     real = selection.run_dev_selection
 
-    def wrapped(pairs: pl.DataFrame, cfg: Any, sha: str, *, grid: bool) -> Any:
-        calls.append({"grid": grid, "rows": pairs.height, "summers": sorted(pairs["summer"].unique().to_list())})
-        return real(pairs, cfg, sha, grid=grid, clusters=CLUSTERS, grid_points=TINY_GRID[:2], n_boot=20)
+    def wrapped(pairs: pl.DataFrame, cfg: Any, sha: str, *, grid: bool, **kwargs: Any) -> Any:
+        preflights: list[Any] = []
+        call_preflight = kwargs["preflight"]
+
+        def counted(oof: Any, used: Any) -> None:
+            preflights.append(used)
+            call_preflight(oof, used)  # the real preflight: it must build the export from the first LOCO output
+
+        calls.append(
+            {
+                "grid": grid,
+                "rows": pairs.height,
+                "summers": sorted(pairs["summer"].unique().to_list()),
+                "calibration_targets": kwargs["calibration_targets"],
+                "preflights": preflights,
+            }
+        )
+        return real(
+            pairs,
+            cfg,
+            sha,
+            grid=grid,
+            clusters=CLUSTERS,
+            grid_points=TINY_GRID[:2],
+            n_boot=20,
+            calibration_targets=kwargs["calibration_targets"],
+            preflight=counted,
+        )
 
     monkeypatch.setattr(selection, "run_dev_selection", wrapped)
 
@@ -113,32 +155,61 @@ def test_help_lists_the_command_and_its_options() -> None:
 
     assert top.exit_code == command.exit_code == 0
     assert "evaluate-dev" in top.output
-    for option in ("--config", "--grid", "--out"):
+    for option in ("--config", "--grid", "--out", "--calibration-targets", "--allow-dirty"):
         assert option in command.output
 
 
 @pytest.mark.parametrize(
-    ("config", "grid", "out", "expected"),
+    ("config", "grid", "out", "targets", "dirty", "expected"),
     [
         (
-            Path("backend/training/configs/dev.toml"),
+            "backend/training/configs/dev.toml",
             False,
             None,
-            "sb-jobs evaluate-dev --config backend/training/configs/dev.toml",
+            "all",
+            False,
+            "sb-jobs evaluate-dev --config backend/training/configs/dev.toml --calibration-targets all",
         ),
         (
-            Path("backend/training/configs/dev.toml"),
+            "backend/training/configs/dev.toml",
             True,
             None,
-            "sb-jobs evaluate-dev --config backend/training/configs/dev.toml --grid",
+            "wbgt",
+            False,
+            "sb-jobs evaluate-dev --config backend/training/configs/dev.toml --grid --calibration-targets wbgt",
         ),
-        (Path("a b.toml"), True, Path("out dir"), "sb-jobs evaluate-dev --config 'a b.toml' --grid --out 'out dir'"),
+        (
+            "a b.toml",
+            True,
+            "out dir",
+            "all",
+            True,
+            "sb-jobs evaluate-dev --config 'a b.toml' --grid --calibration-targets all --allow-dirty --out 'out dir'",
+        ),
     ],
 )
 def test_the_recorded_command_is_built_from_the_real_arguments(
-    config: Path, grid: bool, out: Path | None, expected: str
+    tmp_path: Path, config: str, grid: bool, out: str | None, targets: str, dirty: bool, expected: str
 ) -> None:
-    assert ml_cli.evaluate_dev_invocation(config, grid=grid, out_dir=out) == expected
+    command = ml_cli.evaluate_dev_invocation(
+        tmp_path / config,
+        grid=grid,
+        out_dir=None if out is None else tmp_path / out,
+        root=tmp_path,
+        calibration_targets=ml_cli.CalibrationTargets(targets),
+        allow_dirty=dirty,
+    )
+
+    assert command == expected
+    assert str(tmp_path) not in command  # never an absolute local path
+
+
+def test_a_path_outside_the_repository_is_recorded_by_its_file_name_only(tmp_path: Path) -> None:
+    outside = tmp_path / "elsewhere" / "private-dir" / "dev.toml"
+
+    command = ml_cli.evaluate_dev_invocation(outside, grid=False, out_dir=outside.parent, root=tmp_path / "repo")
+
+    assert command == "sb-jobs evaluate-dev --config dev.toml --calibration-targets all --out private-dir"
 
 
 def test_importing_the_cli_does_not_import_the_ml_package() -> None:
@@ -161,13 +232,27 @@ def test_a_single_run_writes_the_exports_and_records_the_job(env: Path, monkeypa
     calls: list[dict[str, Any]] = []
     _fixture_selection(monkeypatch, calls)
     out = env / "exports"
+    from stellar_blaze.ml import exporters
+
+    real_preflight = exporters.preflight_dev_exports
+    exports_checked: list[str] = []
+
+    def preflight(oof: Any, pairs: pl.DataFrame, cfg: Any) -> None:
+        exports_checked.append(cfg.name)
+        real_preflight(oof, pairs, cfg)
+
+    monkeypatch.setattr(exporters, "preflight_dev_exports", preflight)
 
     result = _invoke("--config", str(env / "unit-dev.toml"), "--out", str(out))
 
     assert result.exit_code == 0, result.output
+    assert exports_checked == ["unit-dev"]  # the real export preflight ran, once, on the config's first LOCO output
     assert lock.keys == ["evaluate-dev:unit-dev"]  # the command and the config name
     assert [status for status, _, _ in runs.finished] == ["succeeded"]
-    assert calls == [{"grid": False, "rows": calls[0]["rows"], "summers": [2024, 2025]}]  # 2026 never reached it
+    assert [call["summers"] for call in calls] == [[2024, 2025]]  # 2026 never reached it
+    assert [call["grid"] for call in calls] == [False]
+    assert calls[0]["calibration_targets"] == "all"  # the default reading (amendment 2)
+    assert len(calls[0]["preflights"]) == 1  # the export was built once from the first LOCO output
     summary = json.loads(result.output.strip().splitlines()[-1])
     assert summary["mode"] == "single"
     assert [d["rule"] for d in summary["decisions"]] == ["6.4 calibration window"]
@@ -180,17 +265,19 @@ def test_a_single_run_writes_the_exports_and_records_the_job(env: Path, monkeypa
     for name, digest in summary["exports"].items():
         assert hashlib.sha256((out / name).read_bytes()).hexdigest() == digest
     manifest = json.loads((out / "oof_samples_abu_dhabi.manifest.json").read_bytes())
-    assert (
-        manifest["command"]
-        == f"sb-jobs evaluate-dev --config {(env / 'unit-dev.toml').as_posix()} --out {out.as_posix()}"
-    )
+    assert manifest["command"] == "sb-jobs evaluate-dev --config unit-dev.toml --calibration-targets all --out exports"
+    assert str(env) not in manifest["command"]  # outside the repository: the file name, never a local path
     assert manifest["git_sha"] == GIT_SHA
+    assert manifest["git_clean"] is True
     assert manifest["sha256"] == summary["exports"]["oof_samples_abu_dhabi.parquet"]
     selection = json.loads((out / "selection.json").read_bytes())
     assert selection["provenance"]["git_sha"] == GIT_SHA
     gold_sha = hashlib.sha256((env / "data" / "gold" / "pairs.parquet").read_bytes()).hexdigest()
     assert selection["provenance"]["data_sha256"] == gold_sha  # the manifest's hash, which is the file's
-    assert selection["chosen_configuration"]["config_sha256"] == hashlib.sha256(CONFIG_TOML.encode("utf-8")).hexdigest()
+    chosen = selection["chosen_configuration"]
+    assert chosen["config_fingerprint"] == hashlib.sha256(CONFIG_TOML.encode("utf-8")).hexdigest()
+    assert chosen["fingerprint_of"] == "toml_file"
+    assert (selection["git_clean"], selection["allow_dirty"], selection["calibration_targets"]) == (True, False, "all")
     samples = pl.read_parquet(out / "oof_samples_abu_dhabi.parquet")
     assert set(samples["summer"]) == {2024, 2025}
     # the dev rows the command loaded are exactly the 2024-2025 leads 1-3 rows of the gold file
@@ -210,6 +297,8 @@ def test_grid_flag_reaches_the_selection_and_the_default_directory_is_under_the_
 
     assert result.exit_code == 0, result.output
     assert [call["grid"] for call in calls] == [True]
+    assert len(calls[0]["preflights"]) == 1  # once, at the first LOCO output (the site run), not at the last step
+    assert calls[0]["preflights"][0].feature_set.value == "site"
     summary = json.loads(result.output.strip().splitlines()[-1])
     assert summary["mode"] == "grid"
     assert [d["rule"] for d in summary["decisions"]] == [
@@ -224,7 +313,13 @@ def test_grid_flag_reaches_the_selection_and_the_default_directory_is_under_the_
     selection = json.loads((default / "selection.json").read_bytes())
     assert selection["applied"] is True
     manifest = json.loads((default / "oof_samples_abu_dhabi.manifest.json").read_bytes())
-    assert manifest["command"] == f"sb-jobs evaluate-dev --config {(env / 'unit-dev.toml').as_posix()} --grid"
+    assert manifest["command"] == "sb-jobs evaluate-dev --config unit-dev.toml --grid --calibration-targets all"
+    chosen = selection["chosen_configuration"]
+    assert (
+        chosen["fingerprint_of"] == "derived_configuration"
+    )  # grid mode: no file, a fingerprint of the derived config
+    assert chosen["name"] == "unit-dev-selected"
+    assert len(chosen["config_fingerprint"]) == 64
     assert selection["grid_scores"]["rows"]
     assert set(selection["inputs"]) >= {"feature_set_site", "feature_set_cold", "wbgt_joint", "wbgt_direct"}
 
@@ -287,3 +382,114 @@ def test_a_bad_config_is_a_usage_error(env: Path, monkeypatch: pytest.MonkeyPatc
     assert bad.exit_code == missing.exit_code == 2
     assert runs.finished == []
     assert runs.skipped == []
+
+
+# === a dirty tree, the calibration reading and the recorded command =================================================
+
+
+def test_a_dirty_grid_run_is_refused_with_exit_two_and_nothing_is_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch, git: FakeGit
+) -> None:
+    runs = FakeRuns()
+    use_fake_database(monkeypatch, runs)
+    calls: list[dict[str, Any]] = []
+    _fixture_selection(monkeypatch, calls)
+    git.clean = False
+    out = env / "exports"
+
+    result = _invoke("--config", str(env / "unit-dev.toml"), "--grid", "--out", str(out))
+
+    assert result.exit_code == 2
+    assert "not clean" in result.output  # the reason, on stderr (CliRunner mixes the streams)
+    assert "--allow-dirty" in result.output
+    assert calls == []
+    assert runs.finished == []
+    assert runs.skipped == []  # no job row, no lock
+    assert not out.exists()
+
+
+@pytest.mark.slow
+def test_allow_dirty_runs_a_grid_and_records_it(env: Path, monkeypatch: pytest.MonkeyPatch, git: FakeGit) -> None:
+    use_fake_database(monkeypatch, FakeRuns())
+    calls: list[dict[str, Any]] = []
+    _fixture_selection(monkeypatch, calls)
+    git.clean = False
+    out = env / "exports"
+
+    result = _invoke("--config", str(env / "unit-dev.toml"), "--grid", "--allow-dirty", "--out", str(out))
+
+    assert result.exit_code == 0, result.output
+    selection = json.loads((out / "selection.json").read_bytes())
+    manifest = json.loads((out / "oof_samples_abu_dhabi.manifest.json").read_bytes())
+    assert (selection["git_clean"], selection["allow_dirty"]) == (False, True)
+    assert manifest["git_clean"] is False
+    assert manifest["command"] == (
+        "sb-jobs evaluate-dev --config unit-dev.toml --grid --calibration-targets all --allow-dirty --out exports"
+    )
+
+
+@pytest.mark.slow
+def test_a_dirty_single_run_is_allowed_and_recorded_as_dirty(
+    env: Path, monkeypatch: pytest.MonkeyPatch, git: FakeGit
+) -> None:
+    use_fake_database(monkeypatch, FakeRuns())
+    _fixture_selection(monkeypatch, [])
+    git.clean = False
+    out = env / "exports"
+
+    result = _invoke("--config", str(env / "unit-dev.toml"), "--out", str(out))
+
+    assert result.exit_code == 0, result.output  # only a --grid run is refused
+    selection = json.loads((out / "selection.json").read_bytes())
+    assert (selection["git_clean"], selection["allow_dirty"]) == (False, False)
+
+
+@pytest.mark.slow
+def test_the_calibration_targets_option_reaches_the_selection_and_the_record(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_fake_database(monkeypatch, FakeRuns())
+    calls: list[dict[str, Any]] = []
+    _fixture_selection(monkeypatch, calls)
+    out = env / "exports"
+
+    result = _invoke("--config", str(env / "unit-dev.toml"), "--calibration-targets", "wbgt", "--out", str(out))
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["calibration_targets"] == "wbgt"
+    selection = json.loads((out / "selection.json").read_bytes())
+    assert selection["calibration_targets"] == "wbgt"
+    assert selection["decisions"][0]["evidence"]["deciding_targets"] == 1.0
+    manifest = json.loads((out / "oof_samples_abu_dhabi.manifest.json").read_bytes())
+    assert "--calibration-targets wbgt" in manifest["command"]
+
+
+def test_an_unknown_calibration_reading_is_a_usage_error(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs = FakeRuns()
+    use_fake_database(monkeypatch, runs)
+
+    result = _invoke("--config", str(env / "unit-dev.toml"), "--calibration-targets", "t")
+
+    assert result.exit_code == 2
+    assert runs.finished == []
+
+
+@pytest.mark.slow
+def test_a_config_inside_the_repository_is_recorded_repository_relative(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_fake_database(monkeypatch, FakeRuns())
+    _fixture_selection(monkeypatch, [])
+    configs = env / "repo" / "backend" / "training" / "configs"
+    configs.mkdir(parents=True)
+    (configs / "unit-dev.toml").write_bytes(CONFIG_TOML.encode("utf-8"))
+    out = env / "repo" / "artifacts" / "eval" / "dev"
+
+    result = _invoke("--config", str(configs / "unit-dev.toml"), "--out", str(out))
+
+    assert result.exit_code == 0, result.output
+    manifest = json.loads((out / "oof_samples_abu_dhabi.manifest.json").read_bytes())
+    assert manifest["command"] == (
+        "sb-jobs evaluate-dev --config backend/training/configs/unit-dev.toml --calibration-targets all "
+        "--out artifacts/eval/dev"
+    )

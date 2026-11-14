@@ -10,15 +10,18 @@ feed both the same rows in the same order.
 """
 
 import copy
+import gzip
 import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
+import lightgbm as lgb
 import numpy as np
 import polars as pl
 import pytest
@@ -26,10 +29,10 @@ import structlog
 from scipy.stats import spearmanr
 
 from stellar_blaze.adapters.compute import lgbm_corrector
-from stellar_blaze.adapters.compute.lgbm_corrector import LightGbmCorrector, predict_grid
+from stellar_blaze.adapters.compute.lgbm_corrector import LightGbmCorrector, dump_booster, predict_grid
 from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.domain.config.models import LoadedModel
-from stellar_blaze.domain.forecast import sampling
+from stellar_blaze.domain.forecast import conformal, sampling
 from stellar_blaze.domain.forecast.features import (
     FeatureSet,
     Target,
@@ -47,6 +50,7 @@ from stellar_blaze.domain.forecast.schemas import (
     quantile_matrix,
 )
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, SchemaMismatchError
+from stellar_blaze.ml import train as train_module
 from stellar_blaze.ml.artefacts import write_model
 from stellar_blaze.ml.predict import corrected_grids
 from stellar_blaze.ml.train import TrainedCorrector, train_corrector
@@ -164,6 +168,7 @@ def _row(corrected: pl.DataFrame, i: int) -> pl.DataFrame:
 # === the port, the files and the schema =============================================================================
 
 
+@pytest.mark.slow  # the first user of the module's fixtures pays about 9 s of training and writing
 def test_the_corrector_satisfies_the_port(bundle: Bundle) -> None:
     corrector: ForecastCorrector = bundle.corrector  # mypy checks the structural fit; the Protocol is not runtime
     assert corrector.model_id == bundle.loaded.manifest.model_id
@@ -413,6 +418,65 @@ def test_a_joint_wbgt_on_fewer_than_half_the_samples_is_missing_for_the_wbgt_row
         assert _row(out, i)["status"].to_list() == ["ok", "ok", "ok", status]
 
 
+# === stations the model was not trained on (R53) ====================================================================
+
+
+def _unseen(frame: pl.DataFrame) -> pl.DataFrame:
+    """The first five rows of ``frame`` relabelled to OMAD, a station the fixture models were not trained on."""
+    return frame.head(5).with_columns(pl.lit("OMAD").alias("station"))
+
+
+def test_a_site_model_does_not_claim_calibration_for_a_station_it_was_not_trained_on(
+    site: Bundle, ifs: pl.DataFrame, gfs: pl.DataFrame, history: pl.DataFrame, history_ifs: pl.DataFrame
+) -> None:
+    assert site.trained.stations == ("OMAA", "OMDB", "OMFJ")  # the training stations params.json carries
+    trained_station = _correct(site.corrector, ifs.head(5), gfs.head(0), history, history_ifs)
+    assert set(trained_station["status"]) == {"ok"}, "the rows are calibrated under their own name"
+
+    out = _correct(site.corrector, _unseen(ifs), gfs.head(0), history, history_ifs)
+
+    assert set(out["status"]) == {CorrectionStatus.UNCORRECTED.value}
+    quantiles = out.select(QUANTILE_COLUMNS).to_numpy()
+    np.testing.assert_array_equal(quantiles, np.repeat(out["raw"].to_numpy()[:, None], len(LEVELS), axis=1))
+    assert np.isnan(site.corrector.sample(out, n_samples=5, seed=0)).all()  # no calibrated distribution to draw from
+
+
+def test_an_unseen_station_does_not_touch_its_trained_neighbors(
+    site: Bundle, ifs: pl.DataFrame, gfs: pl.DataFrame, history: pl.DataFrame, history_ifs: pl.DataFrame
+) -> None:
+    neighbors = ifs.slice(5, 6)
+    alone = _correct(site.corrector, neighbors, gfs.head(0), history, history_ifs)
+
+    mixed = _correct(site.corrector, pl.concat([_unseen(ifs), neighbors]), gfs.head(0), history, history_ifs)
+
+    assert mixed.head(5 * len(VARIABLES))["status"].to_list() == ["uncorrected"] * (5 * len(VARIABLES))
+    assert set(mixed.slice(5 * len(VARIABLES))["status"]) == {"ok"}
+    for variable in ("t", "td", "wind"):  # the boosted variables do not depend on the batch
+        np.testing.assert_allclose(
+            _grid(mixed.slice(5 * len(VARIABLES)), variable), _grid(alone, variable), rtol=0, atol=1e-9
+        )
+
+
+def test_a_cold_model_is_not_gated_by_station(
+    cold: Bundle, ifs: pl.DataFrame, gfs: pl.DataFrame, history: pl.DataFrame
+) -> None:
+    out = _correct(cold.corrector, _unseen(ifs), gfs.head(0), history, None)
+
+    assert set(out["status"]) == {CorrectionStatus.OK.value}  # a cold model does not use station identity
+    median = out.filter(pl.col("variable") == "t")["q50"].to_numpy()
+    raw = out.filter(pl.col("variable") == "t")["raw"].to_numpy()
+    assert np.abs(median - raw).max() > 0.5  # and it really corrects (the fixture's bias is +3 C at two stations)
+
+
+def test_a_station_outside_stations_is_still_refused_by_both_models(
+    site: Bundle, cold: Bundle, ifs: pl.DataFrame, gfs: pl.DataFrame, history: pl.DataFrame, history_ifs: pl.DataFrame
+) -> None:
+    nowhere = ifs.head(2).with_columns(pl.lit("ZZZZ").alias("station"))
+    for bundle in (site, cold):
+        with pytest.raises(ValueError, match="ZZZZ"):
+            _correct(bundle.corrector, nowhere, gfs.head(0), history, history_ifs)
+
+
 # === input checks ===================================================================================================
 
 
@@ -565,6 +629,31 @@ def test_sample_returns_joint_samples_in_row_order(
     assert np.isfinite(reversed_rows).all()
 
 
+def test_sample_rows_are_the_distinct_keys_in_order_of_first_appearance(
+    site: Bundle, ifs: pl.DataFrame, gfs: pl.DataFrame, history: pl.DataFrame, history_ifs: pl.DataFrame
+) -> None:
+    """Protocol rule: row ``i`` of the samples is the ``i``-th distinct key as it first appears, never a sorted order.
+
+    The frame is fed with its four-row key blocks in REVERSE order, so first-appearance order is the reverse of the
+    sorted one. Each sampled row must then follow the marginal of the key at its own position (its own ``q50``) and not
+    the marginal of the same position in the original order: a ``sort`` of the keys would fail both.
+    """
+    out = _correct(site.corrector, ifs, gfs, history, history_ifs)
+    n = ifs.height
+    blocks_reversed = pl.concat([out.slice(len(VARIABLES) * i, len(VARIABLES)) for i in reversed(range(n))])
+    own = _grid(blocks_reversed, "t")[:, MEDIAN]
+    original = _grid(out, "t")[:, MEDIAN]
+
+    samples = site.corrector.sample(blocks_reversed, n_samples=2000, seed=11)
+
+    assert samples.shape == (n, 2000, 3)
+    median_t = np.median(samples[:, :, 0], axis=1)
+    assert np.abs(median_t - own).max() < 0.35  # within sampling tolerance of ITS OWN key's q50 (as the marginals test)
+    apart = np.abs(own - original) > 1.0
+    assert apart.sum() >= 5, "the rows must differ enough between the two orders, or the test is vacuous"
+    assert (np.abs(median_t - original)[apart] > 0.5).all()  # and far from the original-order row of that position
+
+
 def test_samples_follow_the_marginals_of_the_corrected_rows(
     site: Bundle, ifs: pl.DataFrame, gfs: pl.DataFrame, history: pl.DataFrame, history_ifs: pl.DataFrame
 ) -> None:
@@ -645,28 +734,110 @@ def test_sample_refuses_bad_arguments(
 # === loading is checked =============================================================================================
 
 
-def test_load_refuses_parts_that_disagree(site: Bundle, tmp_path: Path) -> None:
-    def broken(edit_name: str, edit: str) -> LoadedModel:
-        target = tmp_path / edit_name
-        shutil.copytree(site.loaded.root, target)
-        if edit == "features":
-            path = target / "params.json"
-            document = json.loads(path.read_bytes())
-            document["feature_columns"] = document["feature_columns"][:-1]
-            path.write_text(json.dumps(document), encoding="utf-8")
-        elif edit == "copula":
-            path = target / "copula.json"
-            document = json.loads(path.read_bytes())
-            document["corr"].pop("1|peak")
-            path.write_text(json.dumps(document), encoding="utf-8")
-        return LoadedModel(manifest=copy.copy(site.loaded.manifest), root=target)
+def _edit_json(name: str, change: Callable[[dict[str, Any]], None]) -> Callable[[Path], None]:
+    """An edit of a model directory: ``change`` applied to the parsed ``name`` file, written back."""
 
-    with pytest.raises(ValueError, match="feature columns"):
-        LightGbmCorrector.load(broken("a", "features"))
-    with pytest.raises(ValueError, match=r"copula\.json"):
-        LightGbmCorrector.load(broken("b", "copula"))
+    def edit(root: Path) -> None:
+        path = root / name
+        document = json.loads(path.read_bytes())
+        change(document)
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+    return edit
+
+
+def _rename_a_booster_feature(root: Path) -> None:
+    """The t median booster is rewritten with its first feature under another name (trained on other features)."""
+    path = root / "boosters" / "t" / "q50.txt.gz"
+    text = gzip.decompress(path.read_bytes()).decode("utf-8")
+    assert "feature_names=" in text
+    path.write_bytes(dump_booster(lgb.Booster(model_str=text.replace("feature_names=", "feature_names=other_", 1))))
+
+
+def _boost_wbgt_for_a_joint_model(document: dict[str, Any]) -> None:
+    document["boosted_targets"] = [*document["boosted_targets"], "wbgt"]  # only a direct model boosts WBGT
+
+
+def _drop_an_offset_stratum(document: dict[str, Any]) -> None:
+    """The td offsets lose a stratum the config's leads need (consistently, so ``ConformalOffsets`` still parses)."""
+    document["offsets"]["td"].pop("2|late")
+    document["n"]["td"].pop("2|late")
+    document["fallback"]["td"] = [key for key in document["fallback"]["td"] if key != "2|late"]
+
+
+_CASES: Final = [
+    ("feature columns", _edit_json("params.json", lambda d: d.update(feature_columns=d["feature_columns"][:-1]))),
+    (r"copula\.json", _edit_json("copula.json", lambda d: d["corr"].pop("1|peak"))),
+    ("not a finite 3x3", _edit_json("copula.json", lambda d: d["corr"].update({"1|peak": [[1.0, 0.0], [0.0, 1.0]]}))),
+    (
+        "not a finite 3x3",
+        _edit_json(
+            "copula.json",
+            lambda d: d["corr"].update({"1|peak": [[1.0, float("nan"), 0.0], [0.0, 1.0, 0.0], [0.0] * 3]}),
+        ),
+    ),
+    ("trained on other features", _rename_a_booster_feature),
+    ("boosted targets", _edit_json("params.json", _boost_wbgt_for_a_joint_model)),
+    ("offsets cover", _edit_json("conformal.json", _drop_an_offset_stratum)),
+    ("stations", _edit_json("params.json", lambda d: d.pop("stations"))),
+    ("no training stations", _edit_json("params.json", lambda d: d.update(stations=[]))),
+    ("does not know", _edit_json("params.json", lambda d: d.update(stations=["OMAA", "ZZZZ"]))),
+]
+
+
+@pytest.mark.parametrize(("message", "edit"), _CASES, ids=[case[0] for case in _CASES])
+def test_load_refuses_parts_that_disagree(
+    site: Bundle, tmp_path: Path, message: str, edit: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "edited"
+    shutil.copytree(site.loaded.root, target)
+    edit(target)
+
+    with pytest.raises(ValueError, match=message):  # pydantic's ValidationError is a ValueError too
+        LightGbmCorrector.load(LoadedModel(manifest=copy.copy(site.loaded.manifest), root=target))
+
+
+def test_load_refuses_a_model_directory_that_is_not_there(site: Bundle, tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         LightGbmCorrector.load(LoadedModel(manifest=site.loaded.manifest, root=tmp_path / "nowhere"))
+
+
+@pytest.mark.parametrize(
+    "omitted",
+    [
+        "params.json",
+        "conformal.json",
+        "copula.json",
+        "fold_stats/pooled.parquet",
+        "fold_stats/station.parquet",
+        "boosters/t/q50.txt.gz",
+    ],
+)
+def test_load_reads_only_files_the_manifest_lists(site: Bundle, omitted: str) -> None:
+    """``scan_models`` verifies what the manifest lists: a file it omits would be read without being verified."""
+    manifest = site.loaded.manifest
+    assert omitted in {file.path for file in manifest.files}, "the file is part of the written model"
+    cut = manifest.model_copy(update={"files": tuple(file for file in manifest.files if file.path != omitted)})
+
+    with pytest.raises(ValueError, match="does not list"):
+        LightGbmCorrector.load(LoadedModel(manifest=cut, root=site.loaded.root))
+
+
+def test_a_manifest_that_lists_everything_loads(site: Bundle) -> None:
+    assert LightGbmCorrector.load(site.loaded).model_id == site.loaded.manifest.model_id
+
+
+# === one recipe, shared by training and serving ====================================================================
+
+
+def test_training_and_serving_share_the_value_grid_and_the_thin_row_rule() -> None:
+    """The recipe the copulas were fitted on lives once, in ``domain.forecast``; neither side keeps a copy."""
+    adapter = vars(lgbm_corrector)  # names it imports, not part of its ``__all__``
+    assert adapter["value_grid"] is conformal.value_grid
+    assert train_module.value_grid is conformal.value_grid  # ml.train re-exports it: its public name keeps working
+    assert adapter["reject_thin_wbgt_rows"] is sampling.reject_thin_wbgt_rows
+    assert train_module.reject_thin_wbgt_rows is sampling.reject_thin_wbgt_rows
+    assert not hasattr(lgbm_corrector, "_value_grid")  # the adapter's old private copy is gone
 
 
 # === layering: serving never needs the training libraries ===========================================================

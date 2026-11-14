@@ -20,6 +20,11 @@ Statuses (pre-registration R18/R44), per forecast row:
   a finite, sorted number for a NaN feature. A missing GFS row is only a missing feature (the row is still ``ok``).
 * A row whose UTC hour or lead is outside what the model was fitted on (``params.json``) is ``uncorrected``: every
   quantile equals the raw value, because calibration is never claimed outside the fitted range.
+* A row of a station the model was not trained on is ``uncorrected`` too, for a ``site`` model (ruling R53): its
+  features (station climatology, the station's own recent errors) describe a site the boosters, the offsets and the
+  copulas never saw, so a calibrated claim would be unfounded. ``params.json`` lists the training ``stations``. A
+  ``cold`` model does not use station identity (its features are the pooled climatology and the forecast), so it is not
+  gated by station; the station must still be one of ``STATIONS`` (``pairs_from_forecasts`` raises otherwise).
 * Otherwise ``ok``, except a WBGT row whose raw forecast WBGT the solver rejected, or (joint method) that rests on
   fewer than ``n_joint_samples / 2`` finite samples: that wbgt row alone is ``missing_input``.
 
@@ -27,6 +32,12 @@ Joint WBGT draws are made per ``<lead>|<block>`` stratum from one seeded generat
 position inside its stratum in the call (``ml.predict`` says the same): the same batch in the same order reproduces
 the offline numbers exactly, a different batch or order gives different, equally valid draws. Rows that are gated keep
 their position in the batch (with NaN grids), exactly as ``ml.predict`` keeps them.
+
+What a caller of ``sample`` may rely on. A variable that is not ``ok`` makes the WHOLE row NaN (all three sampled
+variables, not only that one): ``missing_input`` has no grid and ``uncorrected`` (outside the fitted hours, leads or
+stations) has no calibrated distribution to draw from. A row's samples depend on which other ``ok`` rows are in the
+call, because each ``<lead>|<block>`` stratum has ONE generator for all its rows: dropping or adding a neighbor in the
+same stratum changes the draws of the rest (equally valid, not equal). The same call reproduces itself exactly.
 
 Station history (the ``site`` feature set). The ``bias7_*`` features are past lead-1 IFS errors, so ``correct`` needs
 ``history_ifs`` (past lead-1 forecasts) next to ``history`` (observations). They are built with ``history_features``,
@@ -62,6 +73,7 @@ from stellar_blaze.domain.forecast.conformal import (
     block_indices,
     lead_values,
     stratum_key,
+    value_grid,
 )
 from stellar_blaze.domain.forecast.features import (
     FeatureSet,
@@ -74,7 +86,7 @@ from stellar_blaze.domain.forecast.features import (
     pairs_from_forecasts,
 )
 from stellar_blaze.domain.forecast.grid import F64, LEVELS, sort_grid
-from stellar_blaze.domain.forecast.sampling import sample_joint, wbgt_joint_grid
+from stellar_blaze.domain.forecast.sampling import reject_thin_wbgt_rows, sample_joint, wbgt_joint_grid
 from stellar_blaze.domain.forecast.schemas import (
     CORRECTED_FORECAST_SCHEMA,
     QUANTILE_COLUMNS,
@@ -85,7 +97,7 @@ from stellar_blaze.domain.forecast.schemas import (
 from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.domain.weather.replay import HELD_OUT_SUMMERS
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, OBS_HOURLY_SCHEMA, conform
-from stellar_blaze.domain.weather.stations import station
+from stellar_blaze.domain.weather.stations import STATIONS, station
 
 __all__ = ["LightGbmCorrector", "ModelHoldoutError", "dump_booster", "load_booster", "predict_grid"]
 
@@ -199,22 +211,12 @@ class _Params(_Frozen):
     feature_columns: tuple[str, ...]
     boosted_targets: tuple[str, ...]
     summers: tuple[int, ...]
+    stations: tuple[str, ...]
 
 
 def _floats(frame: pl.DataFrame, name: str) -> F64:
     """A column as a float64 array, a null as NaN."""
     return frame[name].cast(pl.Float64()).fill_null(float("nan")).to_numpy().astype(np.float64, copy=False)
-
-
-def _value_grid(error_grid: F64, raw: F64, target: Target) -> F64:
-    """The VALUE grid of a target: the raw forecast plus the error grid, wind floored at 0 (``ml.train.value_grid``).
-
-    This is the recipe the copula was fitted on (the PIT of the calibrated value grids, wind floored), so serving must
-    build the same grids before ``sample_joint``. The floor is monotone, so the rows stay sorted; a NaN raw gives an
-    all-NaN row. The two lines live here because serving code may not import ``stellar_blaze.ml``.
-    """
-    grid = np.asarray(error_grid, dtype=np.float64) + np.asarray(raw, dtype=np.float64)[:, None]
-    return np.asarray(np.maximum(grid, 0.0) if target is Target.WIND else grid, dtype=np.float64)
 
 
 def _feature_matrix(frame: pl.DataFrame, names: Sequence[str]) -> F64:
@@ -297,9 +299,11 @@ class LightGbmCorrector:
         offsets: ConformalOffsets,
         copulas: Mapping[str, F64],
         stats: FoldStats,
+        stations: Sequence[str],
     ) -> None:
         """Hold the parts ``load`` read (private: construct through ``load``, which validates their consistency)."""
         self._identifier = identifier
+        self._stations = frozenset(stations)
         self._config = config
         self._boosters = dict(boosters)
         self._offsets = offsets
@@ -311,18 +315,22 @@ class LightGbmCorrector:
     def load(cls, model: LoadedModel) -> Self:
         """Read a model directory (``write_model`` layout) into a corrector.
 
-        The directory is trusted to be intact (``scan_models`` verified every hash); what is checked here is that the
-        parts agree with each other and with this code: the feature columns, the boosters' feature names, the target
-        set for the WBGT method, and the strata of the offsets and the copulas against the config's leads.
+        ``scan_models`` verified every file the manifest lists; this method also asserts that every file it reads IS
+        listed (a manifest that omitted ``copula.json``, ``conformal.json``, a booster or a fold-statistics file would
+        otherwise leave that file read unverified). What is checked here is that the parts agree with each other and
+        with this code: the feature columns, the boosters' feature names, the target set for the WBGT method, the
+        strata of the offsets and the copulas against the config's leads, and that the training stations are listed.
 
         Raises:
             FileNotFoundError: A file of the layout is missing.
             pydantic.ValidationError: ``params.json`` or ``conformal.json`` is malformed.
             ModelHoldoutError: ``params.json`` lists a held-out summer, or a fold-statistics frame has a time column
-                (``summer``, ``valid_time``, ``date``, ``year``) or any column it should not have (a ``ValueError``).
-            ValueError: The parts disagree (the message names what).
+                (``summer``, ``valid_time``, ``date``, ``year``) or any column it should not have (both a ``ValueError``
+                subclass).
+            ValueError: The parts disagree, or a file this method reads is not in the manifest (the message names what).
         """
         root, identifier = model.root, model.manifest.model_id
+        _require_listed(identifier, model)
         params = _Params.model_validate_json((root / "params.json").read_bytes())
         config = params.config
         held_out = sorted(set(params.summers) & HELD_OUT_SUMMERS)
@@ -334,6 +342,11 @@ class LightGbmCorrector:
             pooled_climatology=_read_fold_stats(identifier, root, "pooled", _POOLED_COLUMNS),
             station_climatology=_read_fold_stats(identifier, root, "station", _STATION_COLUMNS),
         )
+        if not params.stations:
+            raise ValueError(f"{identifier}: params.json lists no training stations: a site model cannot be gated")
+        unknown = sorted(set(params.stations) - {known.icao for known in STATIONS})
+        if unknown:
+            raise ValueError(f"{identifier}: params.json lists stations {unknown} that this code does not know")
         names = feature_columns(config.feature_set)
         if params.feature_columns != names:
             raise ValueError(
@@ -346,6 +359,7 @@ class LightGbmCorrector:
                 f"{identifier}: boosted targets {sorted(params.boosted_targets)} do not fit the "
                 f"{config.wbgt_method} WBGT method"
             )
+        _require_booster_files_listed(identifier, model, targets)
         boosters: dict[Target, tuple[lgb.Booster, ...]] = {}
         for target in targets:
             loaded = tuple(
@@ -372,6 +386,7 @@ class LightGbmCorrector:
             offsets=offsets,
             copulas=_read_copulas(identifier, json.loads((root / "copula.json").read_bytes()), expected),
             stats=stats,
+            stations=params.stations,
         )
 
     @property
@@ -399,7 +414,8 @@ class LightGbmCorrector:
         The result has ``CORRECTED_FORECAST_SCHEMA``, four rows (``t``, ``td``, ``wind``, ``wbgt``) per row of ``ifs``,
         grouped by input row and in its order. ``raw`` is the IFS value (for WBGT the forecast's own WBGT, null where
         the solver rejects it). Joint WBGT draws depend on the batch (module docstring): the same ``ifs`` rows in the
-        same order give the same numbers.
+        same order give the same numbers. A row outside the fitted hours or leads, or (``site`` model) of a station
+        outside the training stations, is ``uncorrected``: its quantiles are the raw value.
 
         Raises:
             SchemaMismatchError: A frame does not have its schema.
@@ -430,6 +446,8 @@ class LightGbmCorrector:
         modelled = np.isin(spine["lead_days"].to_numpy(), self._config.leads) & np.isin(
             spine["hour_utc"].to_numpy(), self._config.hours_utc
         )
+        if self._config.feature_set is FeatureSet.SITE:  # R53: a site model says nothing about a station it never saw
+            modelled &= np.isin(spine["station"].to_numpy(), sorted(self._stations))
         usable = present & modelled  # the gate of R44, BEFORE any booster: a booster answers a number for a NaN feature
         grids = self._calibrated_grids(spine, backup_rows, raw, usable, modelled, observed, past)
         return self._frame(spine, raw, grids, present=present, modelled=modelled, usable=usable)
@@ -463,7 +481,7 @@ class LightGbmCorrector:
         raw_at = {target: raw[usable, index] for index, target in enumerate(Target)}
 
         def calibrated(target: Target, error: F64) -> F64:
-            return _value_grid(apply_offsets(error, lead, block, self._offsets, target), raw_at[target], target)
+            return value_grid(apply_offsets(error, lead, block, self._offsets, target), raw_at[target], target)
 
         values = {target: calibrated(target, predict_grid(self._boosters[target], x)) for target in _JOINT}
         if self._config.wbgt_method == "direct":
@@ -527,11 +545,10 @@ class LightGbmCorrector:
                 pressure_hpa=pressure[chosen],
             )
             joint[chosen], n_finite[chosen] = result.grid, result.n_finite
-        thin = n_finite < config.n_joint_samples / 2.0  # R30: a minority of finite draws is no distribution
-        joint = np.where(thin[:, None], np.nan, joint)
+        joint, _ = reject_thin_wbgt_rows(joint, n_finite, config.n_joint_samples)  # R30, the rule training uses
         raw_wbgt = raw[modelled, 3]
         error = apply_offsets(joint - raw_wbgt[:, None], lead, block, self._offsets, Target.WBGT)
-        return _value_grid(error, raw_wbgt, Target.WBGT)[in_batch]
+        return value_grid(error, raw_wbgt, Target.WBGT)[in_batch]
 
     def _history(
         self, rows: pl.DataFrame, history: pl.DataFrame, history_ifs: pl.DataFrame | None
@@ -645,10 +662,12 @@ class LightGbmCorrector:
         ``wind >= 0`` hold.
 
         A row whose ``t``, ``td`` or ``wind`` is not ``ok`` (``missing_input`` or ``uncorrected``) gives NaN for all
-        three variables of that row: ``missing_input`` has no grid, and ``uncorrected`` has no calibrated distribution
-        to draw from, so no sample is better than a confident one. Rows are drawn per stratum, each stratum from its
-        own generator derived from ``seed`` and the stratum, so rows of different strata do not share random numbers;
-        the same ``corrected``, ``n_samples`` and ``seed`` give the same samples.
+        three variables of that row (the WHOLE row, not only the variable that is not ``ok``): ``missing_input`` has no
+        grid, and ``uncorrected`` has no calibrated distribution to draw from, so no sample is better than a confident
+        one. Rows are drawn per stratum, each stratum from its own generator derived from ``seed`` and the stratum, so
+        rows of different strata do not share random numbers; the same ``corrected``, ``n_samples`` and ``seed`` give
+        the same samples. Because a stratum has ONE generator, a row's samples depend on which other ``ok`` rows of its
+        stratum are in the call and where: the same row in another call can get different (equally valid) draws.
 
         Raises:
             SchemaMismatchError: ``corrected`` is not a ``CORRECTED_FORECAST_SCHEMA`` frame.
@@ -692,6 +711,39 @@ class LightGbmCorrector:
                 seed=stratum_seed,
             )
         return out
+
+
+def _require_listed(identifier: str, model: LoadedModel) -> None:
+    """Every file ``LightGbmCorrector.load`` reads must be in the manifest, so ``scan_models`` has verified it.
+
+    Raises:
+        ValueError: A file of the layout the loader reads is missing from ``model.manifest.files``.
+    """
+    listed = {file.path for file in model.manifest.files}
+    needed = {
+        "params.json",
+        "conformal.json",
+        "copula.json",
+        "fold_stats/pooled.parquet",
+        "fold_stats/station.parquet",
+    }
+    absent = sorted(needed - listed)
+    if absent:
+        raise ValueError(
+            f"{identifier}: the manifest does not list {absent}, which the corrector reads: unverified files"
+        )
+
+
+def _require_booster_files_listed(identifier: str, model: LoadedModel, targets: Sequence[Target]) -> None:
+    listed = {file.path for file in model.manifest.files}
+    absent = sorted(
+        path
+        for target in targets
+        for column in QUANTILE_COLUMNS
+        if (path := f"{_BOOSTER_DIRECTORY}/{target.value}/{column}.txt.gz") not in listed
+    )
+    if absent:
+        raise ValueError(f"{identifier}: the manifest does not list the boosters {absent}: unverified files")
 
 
 def _read_copulas(identifier: str, document: object, expected: set[str]) -> dict[str, F64]:

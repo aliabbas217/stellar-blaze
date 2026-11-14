@@ -16,13 +16,24 @@ The gated 2026 evaluation, behind the pre-registration gate (``jobs/evaluate_202
 
     sb-jobs evaluate-2026 --part forecast|warnings|plans|all [--amendment ID]
 
+Development evaluation and selection, a job with a ``job_run`` row and an advisory lock per config name::
+
+    sb-jobs evaluate-dev --config PATH [--grid] [--calibration-targets wbgt|all] [--allow-dirty] [--out DIR]
+
 Training, a job with a ``job_run`` row and an advisory lock per config name::
 
-    sb-jobs train --config PATH [--release] [--dev-skill PATH]
+    sb-jobs train --config PATH [--release --dev-skill PATH] [--dev-skill PATH]
 
 ``train`` fits the corrector on the 2024-2025 development rows only (``load_dev_pairs``) and writes the model directory
-to ``$SB_DATA_DIR/models-eval/``, or, with ``--release``, to ``SB_MODELS_DIR``. A release refuses a dirty working tree
-and a corrector whose corrected median equals the raw forecast on every sampled row of t, td or wind.
+to ``$SB_DATA_DIR/models-eval/``, or, with ``--release``, to ``SB_MODELS_DIR``. A release REQUIRES ``--dev-skill`` and
+is bound to the evaluation that selected the model (exit 2, nothing written, on any mismatch): the config's fields
+(all but ``name``) must equal the ``configuration`` of ``dev_skill.json`` (and the ``chosen_configuration`` of the
+``selection.json`` beside it), and the ``data_sha256`` of its provenance must be the gold manifest's output hash. The
+chain from a model id to its evidence is model id -> ``training_config_sha256`` (the TOML) -> that TOML's fields =
+``selection.json`` ``chosen_configuration`` (in grid mode its ``config_fingerprint`` is a hash of the derived
+configuration, which has no file of its own). A release also refuses a dirty working tree and a corrector whose
+corrected median equals the raw forecast on every sampled row of t, td or wind, and exits 1 when the run was skipped
+because another one holds the lock (nothing was released).
 
 The API image has no training dependencies and ``sb-jobs --help`` must work there, so this module imports only typer,
 the standard library and ``stellar_blaze.config`` at module level. Every command imports what it needs
@@ -33,7 +44,8 @@ packages blocked.
 import asyncio
 import json
 import shlex
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn
@@ -46,6 +58,7 @@ from stellar_blaze.config import Settings
 if TYPE_CHECKING:
     from stellar_blaze.ml.git import GitReader
     from stellar_blaze.ml.protocol_gate import Part
+    from stellar_blaze.ml.training_config import TrainingConfig
 
 ml_app = typer.Typer(
     no_args_is_help=True,
@@ -156,26 +169,68 @@ def replay_build_command(
     )
 
 
-def evaluate_dev_invocation(config: Path, *, grid: bool, out_dir: Path | None) -> str:
-    """The ``sb-jobs evaluate-dev`` invocation that was run, from its real arguments (shell-quoted, POSIX paths)."""
-    words = ["sb-jobs", "evaluate-dev", "--config", config.as_posix()]
+class CalibrationTargets(StrEnum):
+    """``--calibration-targets`` of ``evaluate-dev``: which variables' top-tercile coverage can switch rule 6.4."""
+
+    WBGT = "wbgt"
+    ALL = "all"
+
+
+def repo_relative(path: Path, root: Path) -> str:
+    """``path`` relative to the repository ``root`` (POSIX), or just its file name when it is outside the repository.
+
+    A recorded command must reproduce on another machine, so it never holds an absolute local path.
+    """
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
+def evaluate_dev_invocation(
+    config: Path,
+    *,
+    grid: bool,
+    out_dir: Path | None,
+    root: Path,
+    calibration_targets: CalibrationTargets = CalibrationTargets.ALL,
+    allow_dirty: bool = False,
+) -> str:
+    """The ``sb-jobs evaluate-dev`` invocation that was run, from its real arguments (shell-quoted, POSIX paths).
+
+    Paths are relative to the repository ``root`` (``repo_relative``). ``--calibration-targets`` is always spelled out,
+    so the recorded command does not depend on the default of the day.
+    """
+    words = ["sb-jobs", "evaluate-dev", "--config", repo_relative(config, root)]
     if grid:
         words.append("--grid")
+    words += ["--calibration-targets", calibration_targets.value]
+    if allow_dirty:
+        words.append("--allow-dirty")
     if out_dir is not None:
-        words += ["--out", out_dir.as_posix()]
+        words += ["--out", repo_relative(out_dir, root)]
     return shlex.join(words)
 
 
-def _evaluate_dev(settings: Settings, config: Path, *, grid: bool, out_dir: Path | None) -> dict[str, JsonValue]:
+def _evaluate_dev(
+    settings: Settings,
+    config: Path,
+    *,
+    grid: bool,
+    out_dir: Path | None,
+    calibration_targets: CalibrationTargets,
+    git_clean: bool,
+    allow_dirty: bool,
+) -> dict[str, JsonValue]:
     """The body of ``sb-jobs evaluate-dev``: load the dev pairs, run the selection, write the exports (blocking).
 
-    Fails before any model is fitted if the manifest, the git commit or the pairs file cannot be had: a run of tens of
-    minutes must not end at its last step on a missing hash.
+    Fails before any model is fitted if the manifest, the git commit or the pairs file cannot be had, and the export is
+    built once from the first LOCO output (the preflight): a run of tens of minutes must not end at its last step.
     """
     from stellar_blaze.domain.weather.dataset import GoldManifest
     from stellar_blaze.jobs.replay_build import git_head, repo_root
     from stellar_blaze.ml.data import load_dev_pairs
-    from stellar_blaze.ml.exporters import write_dev_exports
+    from stellar_blaze.ml.exporters import preflight_dev_exports, write_dev_exports
     from stellar_blaze.ml.selection import run_dev_selection
     from stellar_blaze.ml.training_config import load_training_config
 
@@ -187,7 +242,14 @@ def _evaluate_dev(settings: Settings, config: Path, *, grid: bool, out_dir: Path
     data_sha256 = manifest.output.sha256
     git_sha = git_head(root)
     pairs = load_dev_pairs(gold / "pairs.parquet", expected_sha256=data_sha256)  # 2024-2025 only; 2026 never loads
-    selection = run_dev_selection(pairs, cfg, cfg_sha256, grid=grid)
+    selection = run_dev_selection(
+        pairs,
+        cfg,
+        cfg_sha256,
+        grid=grid,
+        calibration_targets=calibration_targets.value,
+        preflight=lambda oof, used: preflight_dev_exports(oof, pairs, used),
+    )
     hashes = write_dev_exports(
         selection.oof,
         selection.decisions,
@@ -196,9 +258,19 @@ def _evaluate_dev(settings: Settings, config: Path, *, grid: bool, out_dir: Path
         cfg=selection.cfg,
         cfg_sha256=selection.cfg_sha256,
         git_sha=git_sha,
+        git_clean=git_clean,
         data_sha256=data_sha256,
-        command=evaluate_dev_invocation(config, grid=grid, out_dir=out_dir),
+        command=evaluate_dev_invocation(
+            config,
+            grid=grid,
+            out_dir=out_dir,
+            root=root,
+            calibration_targets=calibration_targets,
+            allow_dirty=allow_dirty,
+        ),
         mode=selection.mode,
+        calibration_targets=selection.calibration_targets,
+        allow_dirty=allow_dirty,
         grid_scores=selection.grid_scores,
         tables=selection.tables,
         summer_split=selection.summer_split,
@@ -226,6 +298,23 @@ def evaluate_dev_command(
             "instead of the single config.",
         ),
     ] = False,
+    calibration_targets: Annotated[
+        CalibrationTargets,
+        typer.Option(
+            "--calibration-targets",
+            help="Which variables rule 6.4 looks at: all (T, Td, wind and WBGT; the committed reading) or wbgt (only "
+            "the WBGT interval). The window switches if any deciding variable is below 0.85 in the top forecast-WBGT "
+            "tercile for any lead 1-3.",
+        ),
+    ] = CalibrationTargets.ALL,
+    allow_dirty: Annotated[
+        bool,
+        typer.Option(
+            "--allow-dirty",
+            help="Run --grid from a dirty working tree (tests and development only; recorded as allow_dirty in "
+            "selection.json). Without it a dirty --grid run is refused.",
+        ),
+    ] = False,
     out: Annotated[
         Path | None, typer.Option("--out", help="Export directory (default: artifacts/eval/dev/ at the repo root).")
     ] = None,
@@ -235,15 +324,19 @@ def evaluate_dev_command(
     Without ``--grid`` only the given config runs; with it the hyperparameters, feature set, WBGT method and
     calibration window are chosen by the pre-registered rules (section 6) and the chosen configuration's out-of-fold
     predictions are exported. Writes ``selection.json``, ``dev_skill.json``, ``oof_samples_abu_dhabi.parquet`` and its
-    ``oof_samples_abu_dhabi.manifest.json`` (which records this command) and prints the decisions as JSON. Runs as the
-    ``evaluate-dev`` job (a ``job_run`` row, one advisory lock per config name). Exit codes: 0 done or skipped
-    (locked), 1 failed, 2 bad usage or configuration.
+    ``oof_samples_abu_dhabi.manifest.json`` (which records this command with repository-relative paths) and prints the
+    decisions as JSON. ``git_clean`` (was the tree clean at the recorded commit) is written to ``selection.json`` and
+    the sample manifest; a dirty ``--grid`` run is refused (exit 2, nothing written, no job) unless ``--allow-dirty``.
+    Runs as the ``evaluate-dev`` job (a ``job_run`` row, one advisory lock per config name). Exit codes: 0 done or
+    skipped (locked), 1 failed, 2 bad usage or configuration or a refused dirty ``--grid`` run.
     """
     import tomllib
 
     from pydantic import ValidationError
 
+    from stellar_blaze.jobs.replay_build import repo_root
     from stellar_blaze.jobs.runner import run_job
+    from stellar_blaze.ml.git import GitError
     from stellar_blaze.ml.training_config import load_training_config
 
     settings = _settings()
@@ -251,10 +344,31 @@ def evaluate_dev_command(
         cfg, cfg_sha256 = load_training_config(config)
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as exc:
         raise typer.BadParameter(f"{config}: {exc}", param_hint="--config") from None
+    try:
+        git_clean = _git_reader(repo_root()).is_clean()
+    except GitError as exc:
+        _fail(f"evaluate-dev refused: cannot read the git state: {exc}")
+    if grid and not git_clean and not allow_dirty:
+        typer.echo(
+            "evaluate-dev --grid refused: the working tree is not clean (modified, staged or untracked files), so the "
+            "recorded git_sha would not name the code that ran; commit or remove them (--allow-dirty is for tests and "
+            "development only). Nothing was run.",
+            err=True,
+        )
+        raise typer.Exit(2)
     outcome: list[dict[str, JsonValue]] = []
 
     async def work() -> Mapping[str, JsonValue]:
-        summary = await asyncio.to_thread(_evaluate_dev, settings, config, grid=grid, out_dir=out)
+        summary = await asyncio.to_thread(
+            _evaluate_dev,
+            settings,
+            config,
+            grid=grid,
+            out_dir=out,
+            calibration_targets=calibration_targets,
+            git_clean=git_clean,
+            allow_dirty=allow_dirty,
+        )
         outcome.append(summary)
         return summary
 
@@ -263,6 +377,9 @@ def evaluate_dev_command(
         "config_name": cfg.name,
         "config_sha256": cfg_sha256,
         "grid": grid,
+        "calibration_targets": calibration_targets.value,
+        "git_clean": git_clean,
+        "allow_dirty": allow_dirty,
     }
     code = asyncio.run(run_job(settings, "evaluate-dev", params, work, lock_key=f"evaluate-dev:{cfg.name}"))
     if outcome:
@@ -350,8 +467,25 @@ def _train(
     }
 
 
-def _dev_skill_inputs(path: Path) -> tuple[dict[str, dict[str, float]], dict[str, object] | None]:
-    """The headline metrics of ``dev_skill.json`` and the content of the ``selection.json`` beside it (if any).
+@dataclass(frozen=True)
+class _DevSkillInputs:
+    """What ``train`` reads from the evaluation that selected the model.
+
+    Attributes:
+        metrics: The headline LOCO CRPS of ``dev_skill.json`` (what the model manifest carries).
+        selection: The ``selection.json`` beside it, or ``None`` (what the model card carries).
+        configuration: The ``configuration`` of ``dev_skill.json`` (the final config's JSON), or ``None``.
+        data_sha256: The ``provenance.data_sha256`` of ``dev_skill.json`` (the gold file it was computed from).
+    """
+
+    metrics: dict[str, dict[str, float]]
+    selection: dict[str, object] | None
+    configuration: Mapping[str, object] | None
+    data_sha256: str | None
+
+
+def _dev_skill_inputs(path: Path) -> _DevSkillInputs:
+    """The headline metrics, configuration and data hash of ``dev_skill.json`` and the ``selection.json`` beside it.
 
     Raises:
         typer.BadParameter: The file is unreadable, not JSON, or has no skill table in the expected shape.
@@ -367,7 +501,81 @@ def _dev_skill_inputs(path: Path) -> tuple[dict[str, dict[str, float]], dict[str
         metrics = loco_headline_metrics(skill)
     except (OSError, ValueError) as exc:  # json.JSONDecodeError is a ValueError
         raise typer.BadParameter(f"{path}: {exc}", param_hint="--dev-skill") from None
-    return metrics, selection
+    configuration = skill.get("configuration")
+    provenance = skill.get("provenance")
+    data_sha256 = provenance.get("data_sha256") if isinstance(provenance, dict) else None
+    return _DevSkillInputs(
+        metrics=metrics,
+        selection=selection,
+        configuration=configuration if isinstance(configuration, dict) else None,
+        data_sha256=data_sha256 if isinstance(data_sha256, str) else None,
+    )
+
+
+def _release_binding_problems(
+    config_fields: Mapping[str, object], evaluated: _DevSkillInputs, gold_data_sha256: str
+) -> list[str]:
+    """What ties a release to the evaluation that selected the model, as a list of mismatches (empty: bound).
+
+    Compares every field of the loaded config but ``name`` with ``dev_skill.json``'s ``configuration`` (feature set,
+    WBGT method, calibration window, leads, hours, sampling and every ``lgbm`` value) and, when a ``selection.json``
+    sits beside it, with its ``chosen_configuration``; and the gold manifest's output hash with the evaluation's
+    ``provenance.data_sha256``. The name is ignored: a derived configuration is named ``<base>-selected`` and the
+    release TOML has its own.
+
+    Args:
+        config_fields: The loaded config as JSON-native values (``json.loads(cfg.model_dump_json())``).
+        evaluated: What ``_dev_skill_inputs`` read.
+        gold_data_sha256: ``GoldManifest.output.sha256`` of the gold file the model would be trained on.
+    """
+    problems: list[str] = []
+    wanted = {key: value for key, value in config_fields.items() if key != "name"}
+
+    def compare(what: str, recorded: Mapping[str, object] | None, keys: Sequence[str]) -> None:
+        if recorded is None:
+            problems.append(f"{what} is missing")
+            return
+        for key in keys:
+            if key not in recorded:
+                problems.append(f"{what} has no {key!r}")
+            elif recorded[key] != wanted[key]:
+                problems.append(f"{key}: the config has {wanted[key]!r} but {what} has {recorded[key]!r}")
+
+    compare("dev_skill.json 'configuration'", evaluated.configuration, list(wanted))
+    if evaluated.selection is not None:
+        chosen = evaluated.selection.get("chosen_configuration")
+        compare(
+            "selection.json 'chosen_configuration'",
+            chosen if isinstance(chosen, dict) else None,
+            ["feature_set", "wbgt_method", "calibration_window", "lgbm"],
+        )
+    if evaluated.data_sha256 != gold_data_sha256:
+        problems.append(
+            f"data_sha256: the gold manifest has {gold_data_sha256} but dev_skill.json's provenance has "
+            f"{evaluated.data_sha256}"
+        )
+    return problems
+
+
+def _refuse_unbound_release(settings: Settings, cfg: "TrainingConfig", evaluated: _DevSkillInputs) -> None:
+    """Exit 2 (nothing written) unless the release is bound to the evaluation (``_release_binding_problems``)."""
+    from pydantic import ValidationError
+
+    from stellar_blaze.domain.weather.dataset import GoldManifest
+
+    manifest_path = settings.data_dir / "gold" / "manifest.json"
+    try:
+        gold_sha256 = GoldManifest.model_validate_json(manifest_path.read_bytes()).output.sha256
+    except (OSError, ValidationError) as exc:
+        _fail(f"train --release refused: cannot read the gold manifest {manifest_path}: {exc}")
+    problems = _release_binding_problems(json.loads(cfg.model_dump_json()), evaluated, gold_sha256)
+    if problems:
+        typer.echo(
+            "train --release refused: the model is not the one the evaluation selected (nothing was written):\n  "
+            + "\n  ".join(problems),
+            err=True,
+        )
+        raise typer.Exit(2)
 
 
 @ml_app.command("train")
@@ -377,8 +585,9 @@ def train_command(
         bool,
         typer.Option(
             "--release",
-            help="Write to SB_MODELS_DIR (the image's models) instead of $SB_DATA_DIR/models-eval/. Refuses a dirty "
-            "working tree and a corrector that does not change the raw forecast.",
+            help="Write to SB_MODELS_DIR (the image's models) instead of $SB_DATA_DIR/models-eval/. Needs "
+            "--dev-skill and refuses (exit 2) a config or gold file that is not the one the evaluation used; refuses "
+            "a dirty working tree and a corrector that does not change the raw forecast.",
         ),
     ] = False,
     dev_skill: Annotated[
@@ -386,7 +595,8 @@ def train_command(
         typer.Option(
             "--dev-skill",
             help="dev_skill.json of `evaluate-dev`: its LOCO CRPS (leads 1-3, working daytime) goes in the manifest; "
-            "the selection.json beside it goes in the model card.",
+            "the selection.json beside it goes in the model card. Required with --release, which compares the config "
+            "and the gold hash with it.",
         ),
     ] = None,
 ) -> None:
@@ -394,9 +604,12 @@ def train_command(
 
     Runs as the job ``train:<config name>`` (a ``job_run`` row, one advisory lock per config name). Without
     ``--release`` the model goes to ``$SB_DATA_DIR/models-eval/``; with it, to ``SB_MODELS_DIR``, and only from a clean
-    working tree (exit 1, nothing written, otherwise) and after the release smoke check. A model over 15 MB is
-    refused with the breakdown and the remedies (exit 1). Exit codes: 0 done or skipped (locked), 1 failed or refused,
-    2 bad usage or configuration.
+    working tree (exit 1, nothing written, otherwise) and after the release smoke check. A release needs
+    ``--dev-skill`` and exits 2 (nothing written) when the loaded config's fields (all but ``name``) differ from the
+    evaluation's configuration or when the gold manifest's hash is not the evaluation's ``data_sha256``. A model over
+    15 MB is refused with the breakdown and the remedies (exit 1). Exit codes: 0 done or skipped (locked; a skipped
+    ``--release`` exits 1: nothing was released), 1 failed or refused, 2 bad usage or configuration or an unbound
+    release.
     """
     import tomllib
 
@@ -414,7 +627,16 @@ def train_command(
         cfg, cfg_sha256 = load_training_config(config)
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as exc:
         raise typer.BadParameter(f"{config}: {exc}", param_hint="--config") from None
-    dev_metrics, selection = (None, None) if dev_skill is None else _dev_skill_inputs(dev_skill)
+    if release and dev_skill is None:
+        raise typer.BadParameter(
+            "--release needs the evaluation that selected the model: pass the dev_skill.json of `evaluate-dev`",
+            param_hint="--dev-skill",
+        )
+    evaluated = None if dev_skill is None else _dev_skill_inputs(dev_skill)
+    dev_metrics = None if evaluated is None else evaluated.metrics
+    selection = None if evaluated is None else evaluated.selection
+    if release and evaluated is not None:
+        _refuse_unbound_release(settings, cfg, evaluated)
     if release:
         try:
             clean = _git_reader(repo_root()).is_clean()
@@ -449,6 +671,9 @@ def train_command(
     code = asyncio.run(run_job(settings, job, params, work, lock_key=job))
     if outcome:
         typer.echo(json.dumps(outcome[0], sort_keys=True))
+    elif release and code == 0:  # skipped: another run holds the lock, so nothing was released
+        typer.echo(f"train --release: the run was skipped (the lock of {job} is held); nothing was released.", err=True)
+        raise typer.Exit(1)
     raise typer.Exit(code)
 
 

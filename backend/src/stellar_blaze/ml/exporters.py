@@ -1,6 +1,7 @@
 """The dev exports: canonical JSON with provenance, the dev skill tables and the abu_dhabi out-of-fold samples.
 
-``write_dev_exports`` writes four files to ``artifacts/eval/dev/`` (pre-registration section 6 and 7.1):
+``write_dev_exports`` writes four files to ``artifacts/eval/dev/`` (pre-registration section 6 and 7.1; it renders every
+file in memory first, so a failure at any step leaves the directory untouched):
 
 * ``oof_samples_abu_dhabi.parquet``: the held-out abu_dhabi fold's out-of-fold joint (t, td, wind) samples at lead 1,
   working daytime, with what B3's theta rule (6.5) needs to turn them into TWL and to score them (see
@@ -14,7 +15,9 @@
 
 Every number written comes from code. JSON is canonical (sorted keys, compact separators, UTF-8, LF written as bytes
 because ``Path.write_text`` writes CRLF on Windows while git stores LF: R21) and carries a ``provenance`` block; the
-parquet carries the same block in its key-value metadata. Floats in ``dev_skill.json`` are rounded to
+parquet carries the same block in its key-value metadata WITHOUT ``generated_at``, so identical samples give identical
+bytes (a regenerated parquet reproduces the hash its manifest records; the manifest, a JSON file, keeps the
+time). Floats in ``dev_skill.json`` are rounded to
 ``FLOAT_DECIMALS`` places (far below the 0.29 degree noise floor of the METAR truth) so the file stays small; a table
 is ``{"columns": [...], "rows": [[...]]}`` (column names once, not per row), a null is a score that is undefined for
 its group, and a non-finite float is never written (``write_json`` refuses one).
@@ -46,6 +49,7 @@ __all__ = [
     "FLOAT_DECIMALS",
     "OOF_SAMPLES_FILE",
     "OOF_SAMPLES_MANIFEST_FILE",
+    "PREFLIGHT_N_BOOT",
     "PROTOCOL_PATH",
     "REPORT_HOUR_BLOCKS",
     "REPORT_LEADS",
@@ -55,6 +59,9 @@ __all__ = [
     "github_slug",
     "oof_samples_frame",
     "oof_samples_manifest",
+    "preflight_dev_exports",
+    "render_json",
+    "render_oof_samples",
     "table_payload",
     "write_dev_exports",
     "write_json",
@@ -129,6 +136,28 @@ SKILL_ANCHOR: Final = _anchor(SECTION_7_1_HEADING)
 # === canonical JSON =================================================================================================
 
 
+def render_json(payload: Mapping[str, JsonValue], provenance: Provenance) -> bytes:
+    """The canonical bytes of ``payload`` with its provenance (what ``write_json`` writes).
+
+    Raises:
+        ValueError: A float is NaN or infinite, or the payload already has a ``provenance`` key.
+    """
+    document = attach_provenance(payload, provenance)
+    return (
+        json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False) + "\n"
+    ).encode("utf-8")
+
+
+def _write_bytes(path: Path, data: bytes, *, exclusive: bool = False) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if exclusive:
+        with path.open("xb") as file:
+            file.write(data)
+    else:
+        path.write_bytes(data)
+    return hashlib.sha256(data).hexdigest()
+
+
 def write_json(path: Path, payload: Mapping[str, JsonValue], provenance: Provenance, *, exclusive: bool = False) -> str:
     """Write ``payload`` with its provenance as canonical JSON and return the SHA-256 of the bytes written.
 
@@ -146,17 +175,7 @@ def write_json(path: Path, payload: Mapping[str, JsonValue], provenance: Provena
         ValueError: A float is NaN or infinite, or the payload already has a ``provenance`` key.
         FileExistsError: ``exclusive`` and ``path`` exists.
     """
-    document = attach_provenance(payload, provenance)
-    data = (
-        json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False) + "\n"
-    ).encode("utf-8")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if exclusive:
-        with path.open("xb") as file:
-            file.write(data)
-    else:
-        path.write_bytes(data)
-    return hashlib.sha256(data).hexdigest()
+    return _write_bytes(path, render_json(payload, provenance), exclusive=exclusive)
 
 
 def _cell(value: object, decimals: int) -> JsonValue:
@@ -251,30 +270,41 @@ def oof_samples_frame(
     )
 
 
-def write_oof_samples(path: Path, frame: pl.DataFrame, provenance: Provenance) -> str:
-    """Write the sample frame as zstd parquet (fixed level, provenance in the key-value metadata); return its SHA-256.
+def render_oof_samples(frame: pl.DataFrame, provenance: Provenance) -> bytes:
+    """The bytes of the sample parquet: zstd at a fixed level, provenance in the key-value metadata.
 
-    The file is smaller than JSON by far, but the samples dominate its size (50 x 3 float32 per row): see the Task 12
-    report for the measured size against the 500 KB commit limit.
+    The metadata omits ``generated_at``: a wall-clock time inside the file would give every regeneration of the same
+    samples a different hash, and the manifest's ``sha256`` could never be reproduced. The deterministic provenance
+    (commit, data hash, protocol, script) stays.
     """
-    metadata = json.dumps(provenance.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    metadata = json.dumps(
+        provenance.model_dump(mode="json", exclude={"generated_at"}), sort_keys=True, separators=(",", ":")
+    )
     buffer = io.BytesIO()
     frame.rechunk().write_parquet(
         buffer, compression="zstd", compression_level=_PARQUET_LEVEL, metadata={"provenance": metadata}
     )
-    data = buffer.getvalue()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return hashlib.sha256(data).hexdigest()
+    return buffer.getvalue()
+
+
+def write_oof_samples(path: Path, frame: pl.DataFrame, provenance: Provenance) -> str:
+    """Write the sample frame as zstd parquet (``render_oof_samples``); return its SHA-256.
+
+    The file is smaller than JSON by far, but the samples dominate its size (50 x 3 float32 per row): see the Task 12
+    report for the measured size against the 500 KB commit limit.
+    """
+    return _write_bytes(path, render_oof_samples(frame, provenance))
 
 
 def oof_samples_manifest(
-    frame: pl.DataFrame, *, parquet_sha256: str, command: str, git_sha: str
+    frame: pl.DataFrame, *, parquet_sha256: str, command: str, git_sha: str, git_clean: bool
 ) -> dict[str, JsonValue]:
     """What a reader needs to check a regenerated ``oof_samples_abu_dhabi.parquet`` against the one that was run.
 
     The parquet is not committed (``.gitignore``), so this small JSON is: the file name, its row count, its columns
-    (name and polars dtype, as strings), the SHA-256 of its bytes, the exact command that wrote it and the commit.
+    (name and polars dtype, as strings), the SHA-256 of its bytes, the exact command that wrote it, the commit and
+    whether the working tree was clean at that commit (``git_clean``: False means ``git_sha`` does not name all the
+    code that ran).
     """
     columns: list[JsonValue] = [{"name": name, "dtype": str(dtype)} for name, dtype in frame.schema.items()]
     return {
@@ -284,6 +314,7 @@ def oof_samples_manifest(
         "sha256": parquet_sha256,
         "command": command,
         "git_sha": git_sha,
+        "git_clean": git_clean,
     }
 
 
@@ -337,7 +368,7 @@ def dev_skill_payload(
         for hours in ("working", "all")
     }
     fallbacks = (
-        oof.fallbacks.group_by("target", "model")
+        oof.fallbacks.group_by("target", "model", maintain_order=True)
         .agg(pl.col("n_rows").sum(), pl.col("n_fallback").sum())
         .sort("target", "model")
     )
@@ -397,6 +428,26 @@ def _provenance(
     )
 
 
+PREFLIGHT_N_BOOT: Final = 2
+"""Bootstrap replicates of the preflight's skill tables (it checks that the export builds, not the numbers)."""
+
+
+def preflight_dev_exports(oof: OofPredictions, pairs: pl.DataFrame, cfg: TrainingConfig) -> None:
+    """Build what the dev exports build from one LOCO run, discarding it: a run of hours must not die at its export.
+
+    ``evaluate-dev`` calls this right after the first LOCO run, so a 2026 row, a missing sample cluster, a column the
+    skill tables cannot score or a non-finite number stops the command minutes into it and not at its last step. The
+    skill tables use ``PREFLIGHT_N_BOOT`` replicates and no summer split.
+
+    Raises:
+        HoldoutViolationError: The OOF keys or the pairs hold summer 2026.
+        ValueError: The OOF holds no joint samples or the skill tables hold a non-finite number.
+    """
+    oof_samples_frame(oof, pairs)
+    skill = dev_skill_payload(oof, cfg=cfg, summer_split=None, counts={}, n_boot=PREFLIGHT_N_BOOT)
+    json.dumps(skill, allow_nan=False)
+
+
 def write_dev_exports(
     oof: OofPredictions,
     decisions: Sequence[Decision],
@@ -406,9 +457,12 @@ def write_dev_exports(
     cfg: TrainingConfig,
     cfg_sha256: str,
     git_sha: str,
+    git_clean: bool,
     data_sha256: str,
     command: str,
     mode: Literal["grid", "single"],
+    calibration_targets: str,
+    allow_dirty: bool = False,
     grid_scores: pl.DataFrame | None = None,
     tables: Mapping[str, pl.DataFrame] | None = None,
     summer_split: OofPredictions | None = None,
@@ -418,10 +472,17 @@ def write_dev_exports(
 ) -> dict[str, str]:
     """Write the parquet, its manifest, ``dev_skill.json`` and ``selection.json`` to ``out_dir``.
 
-    Everything is computed (and the 2026 assertion made) before the first file is written, so a refusal leaves
-    ``out_dir`` untouched. The parquet, its ``oof_samples_abu_dhabi.manifest.json`` and ``dev_skill.json`` are written
-    first so ``selection.json`` can carry their hashes. The parquet is not committed (``.gitignore``); the manifest,
-    ``dev_skill.json`` and ``selection.json`` are.
+    Every file is rendered in memory (with the 2026 assertion and every JSON check) before the first is written, so a
+    failure at any step leaves ``out_dir`` untouched, not even created. ``selection.json`` carries the hashes of the
+    other three. The parquet is not committed (``.gitignore``); the manifest, ``dev_skill.json`` and ``selection.json``
+    are.
+
+    The chain from a released model back to this evaluation: the model's manifest holds the SHA-256 of its training
+    config TOML (``training_config_sha256``); ``sb-jobs train --release --dev-skill`` refuses a TOML whose fields differ
+    from ``dev_skill.json``'s ``configuration`` (and from this file's ``chosen_configuration``) or whose gold hash
+    differs from the provenance's ``data_sha256``. ``chosen_configuration.config_fingerprint`` is the TOML's hash in
+    ``single`` mode and, in ``grid`` mode where the chosen configuration has no file, a fingerprint of the derived
+    configuration (its field values are in ``chosen_configuration`` for ``train`` to compare).
 
     Args:
         oof: The final configuration's LOCO predictions (with abu_dhabi samples).
@@ -431,9 +492,13 @@ def write_dev_exports(
         cfg: The final configuration.
         cfg_sha256: Its hash (``DevSelection.cfg_sha256``).
         git_sha: The commit the run was at.
+        git_clean: Whether the working tree was clean at ``git_sha`` (recorded in ``selection.json`` and the sample
+            manifest, not in ``Provenance``).
         data_sha256: SHA-256 of the gold pairs file (from its manifest).
-        command: The exact ``sb-jobs evaluate-dev`` invocation, recorded in the sample manifest.
+        command: The exact ``sb-jobs evaluate-dev`` invocation (repository-relative paths), in the sample manifest.
         mode: ``"grid"`` (the decisions were applied) or ``"single"`` (only the 6.4 coverage report; not applied).
+        calibration_targets: The 6.4 reading, ``"wbgt"`` or ``"all"`` (recorded in ``selection.json``).
+        allow_dirty: ``--allow-dirty`` was given (recorded as ``allow_dirty``).
         grid_scores: The 6.1 scores, if the grid ran.
         tables: The frames each decision read, written under ``inputs``.
         summer_split: The R23 diagnostic OOF, if it ran.
@@ -451,32 +516,35 @@ def write_dev_exports(
     stage_counts = dict(counts or {})
     samples = oof_samples_frame(oof, pairs)
     skill = dev_skill_payload(oof, cfg=cfg, summer_split=summer_split, counts=stage_counts, n_boot=n_boot)
+    inputs: dict[str, JsonValue] = {
+        name: table_payload(frame, decimals=12) for name, frame in sorted((tables or {}).items())
+    }
 
     def provenance(anchor: str, script: str, function: str) -> Provenance:
         return _provenance(
             anchor, script, function, git_sha=git_sha, data_sha256=data_sha256, generated_at=generated_at
         )
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    hashes: dict[str, str] = {}
-    hashes[OOF_SAMPLES_FILE] = write_oof_samples(
-        out_dir / OOF_SAMPLES_FILE, samples, provenance(SELECTION_ANCHOR, _EXPORTERS, "oof_samples_frame")
-    )
-    hashes[OOF_SAMPLES_MANIFEST_FILE] = write_json(
-        out_dir / OOF_SAMPLES_MANIFEST_FILE,
-        oof_samples_manifest(samples, parquet_sha256=hashes[OOF_SAMPLES_FILE], command=command, git_sha=git_sha),
+    files: dict[str, bytes] = {}
+    files[OOF_SAMPLES_FILE] = render_oof_samples(samples, provenance(SELECTION_ANCHOR, _EXPORTERS, "oof_samples_frame"))
+    files[OOF_SAMPLES_MANIFEST_FILE] = render_json(
+        oof_samples_manifest(
+            samples,
+            parquet_sha256=hashlib.sha256(files[OOF_SAMPLES_FILE]).hexdigest(),
+            command=command,
+            git_sha=git_sha,
+            git_clean=git_clean,
+        ),
         provenance(SELECTION_ANCHOR, _EXPORTERS, "oof_samples_manifest"),
     )
-    hashes["dev_skill.json"] = write_json(
-        out_dir / "dev_skill.json", skill, provenance(SKILL_ANCHOR, _EXPORTERS, "dev_skill_payload")
-    )
-    inputs: dict[str, JsonValue] = {
-        name: table_payload(frame, decimals=12) for name, frame in sorted((tables or {}).items())
-    }
+    files["dev_skill.json"] = render_json(skill, provenance(SKILL_ANCHOR, _EXPORTERS, "dev_skill_payload"))
+    hashes = {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
     selection: dict[str, JsonValue] = {
         "mode": mode,
         "applied": mode == "grid",
+        "git_clean": git_clean,
+        "allow_dirty": allow_dirty,
+        "calibration_targets": calibration_targets,
         "decisions": [json.loads(decision.model_dump_json()) for decision in decisions],
         "chosen_configuration": {
             "name": cfg.name,
@@ -484,7 +552,8 @@ def write_dev_exports(
             "wbgt_method": cfg.wbgt_method,
             "calibration_window": cfg.calibration_window,
             "lgbm": json.loads(cfg.lgbm.model_dump_json()),
-            "config_sha256": cfg_sha256,
+            "config_fingerprint": cfg_sha256,
+            "fingerprint_of": "toml_file" if mode == "single" else "derived_configuration",
         },
         "grid_scores": None if grid_scores is None else table_payload(grid_scores, decimals=12),
         "inputs": inputs,
@@ -492,10 +561,10 @@ def write_dev_exports(
         "samples_rows": samples.height,
         "exports": dict(sorted(hashes.items())),
     }
-    hashes["selection.json"] = write_json(
-        out_dir / "selection.json",
-        selection,
-        provenance(SELECTION_ANCHOR, "stellar_blaze.ml.selection", "run_dev_selection"),
+    files["selection.json"] = render_json(
+        selection, provenance(SELECTION_ANCHOR, "stellar_blaze.ml.selection", "run_dev_selection")
     )
+    for name, data in files.items():  # the first write: everything above has been built and checked
+        hashes[name] = _write_bytes(out_dir / name, data)
     _log.info("exports.written", directory=str(out_dir), hashes=hashes, sample_rows=samples.height)
     return dict(sorted(hashes.items()))

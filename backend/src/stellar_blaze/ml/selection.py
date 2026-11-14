@@ -25,14 +25,26 @@ different one to the same numbers:
   "by >= 1%" includes 1%, 6.3's tie is strictly under 1%;
 * "the interval excluding zero" (6.2) means on the improvement side (``diff_hi < 0``): an interval above zero is a worse
   site model, never a reason to choose it;
-* 6.4's "90% interval in the top forecast-WBGT tercile" is the WBGT interval (the quantity the warnings use); the other
-  targets' coverage in that tercile is recorded but does not decide.
+* 6.4's "90% interval in the top forecast-WBGT tercile" has two readings, chosen by ``calibration_targets`` and
+  recorded in the decision's evidence (``decides_<target>``) and in ``selection.json``: ``wbgt`` (the interval the
+  warnings use; the other targets' coverage is recorded but does not decide) and ``all`` (T, Td, wind and WBGT: the
+  window switches if ANY of them is below 0.85 in the top tercile for ANY lead 1-3). The committed run uses ``all``
+  (the pre-registration's amendment 2: the rule applies to all four variables);
+* 6.2 and 6.3 are decided on the numbers of ``paired_loco_crps`` WITHOUT the section 8 noise floor (the floor is for
+  reporting skill, not for choosing a configuration); 6.3 compares the calibrated joint grid with the calibrated direct
+  grid on the rows where both (and the B2d grid that rides along for the Brier scores) are finite.
+
+A structural limitation of 6.2, recorded in its evidence (``heldout_null_sclim_t_share`` and ``heldout_rows_t``): in
+leave-one-cluster-out the held-out station is not in the fold's training rows, so its station climatology ``sclim_*`` is
+null on (nearly) every held-out row, and the ``site`` feature set differs from ``cold`` there mostly by ``bias7_*``, the
+station's own recent forecast error. The comparison therefore measures what ``site`` adds on a NEW station through its
+history, not what a station's own climatology would add on a station the model was trained on.
 """
 
 import hashlib
 import re
 import time
-from collections.abc import Collection, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Final, Literal
@@ -44,6 +56,7 @@ from pydantic import BaseModel, ConfigDict
 
 from stellar_blaze.domain.forecast.features import (
     FeatureSet,
+    FoldStats,
     Target,
     build_features,
     fit_fold_stats,
@@ -67,6 +80,7 @@ from stellar_blaze.ml.training_config import TrainingConfig
 
 __all__ = [
     "CALIBRATION_COVERAGE_FLOOR",
+    "CALIBRATION_TARGET_READINGS",
     "EXPORT_CLUSTER",
     "FEATURE_SET_MIN_IMPROVEMENT",
     "GRID_LEVELS",
@@ -78,6 +92,7 @@ __all__ = [
     "Decision",
     "DevSelection",
     "config_fingerprint",
+    "held_out_missing_station_climatology",
     "paired_loco_crps",
     "parse_hyperparameter_choice",
     "run_dev_selection",
@@ -113,6 +128,12 @@ WORKING_HOURS_UTC: Final[tuple[int, ...]] = tuple(range(6, 15))
 
 EXPORT_CLUSTER: Final = "abu_dhabi"
 """The held-out cluster whose joint samples B3's theta rule (6.5) reads."""
+
+CALIBRATION_TARGET_READINGS: Final[Mapping[str, tuple[str, ...]]] = {
+    "wbgt": ("wbgt",),
+    "all": tuple(target.value for target in Target),
+}
+"""The two readings of 6.4: which targets' top-tercile coverage can switch the calibration window."""
 
 _RULE_HYPERPARAMETERS: Final = "6.1 hyperparameters"
 _RULE_FEATURE_SET: Final = "6.2 feature set"
@@ -245,13 +266,17 @@ def select_hyperparameters(grid_scores: pl.DataFrame) -> Decision:
 # === 6.2 feature set ================================================================================================
 
 
-def select_feature_set(site: pl.DataFrame, cold: pl.DataFrame) -> Decision:
+def select_feature_set(
+    site: pl.DataFrame, cold: pl.DataFrame, *, extra_evidence: Mapping[str, float] | None = None
+) -> Decision:
     """Rule 6.2: ``site`` only if it beats ``cold`` on T and on Td by >= 1% LOCO CRPS, each with its interval below 0.
 
     Args:
         site: Columns ``target``, ``crps``, ``diff_lo``, ``diff_hi`` (the paired 95% interval of site minus cold mean
             CRPS), one row for ``t`` and one for ``td`` (other targets are ignored).
         cold: Columns ``target`` and ``crps``, the same two targets.
+        extra_evidence: Numbers to record beside the rule's own (they never enter the decision): the orchestration
+            passes the share of held-out rows without a station climatology (see the module docstring).
 
     Returns:
         ``site`` or ``cold``. A null interval is no evidence for ``site``.
@@ -261,7 +286,7 @@ def select_feature_set(site: pl.DataFrame, cold: pl.DataFrame) -> Decision:
     """
     _require_columns(site, ["target", "crps", "diff_lo", "diff_hi"], "site")
     _require_columns(cold, ["target", "crps"], "cold")
-    evidence: dict[str, float] = {"min_improvement": FEATURE_SET_MIN_IMPROVEMENT}
+    evidence: dict[str, float] = {"min_improvement": FEATURE_SET_MIN_IMPROVEMENT, **(extra_evidence or {})}
     passes: list[bool] = []
     for target in ("t", "td"):
         site_row, cold_row = _row_of(site, target, "site"), _row_of(cold, target, "cold")
@@ -333,8 +358,9 @@ def select_calibration_window(
     Args:
         coverage_by_tercile: ``evaluate.coverage_by_forecast_tercile`` output for leads 1-3, working daytime.
         current: The window now in use.
-        targets: The targets whose interval decides (default the WBGT interval; see the module docstring). The
-            coverage of every target in the frame is recorded in the evidence.
+        targets: The targets whose interval decides: ``CALIBRATION_TARGET_READINGS["wbgt"]`` (the default of this
+            pure function) or ``["all"]`` (what ``run_dev_selection`` passes by default); see the module docstring. The
+            coverage of every target in the frame is recorded in the evidence, with a ``decides_<target>`` flag.
 
     Raises:
         ValueError: ``current`` is not a window, a column is missing, or a decisive lead has no top-tercile row.
@@ -363,6 +389,9 @@ def select_calibration_window(
         )
     low = min(decisive)
     evidence["min_top_coverage"] = low
+    evidence["deciding_targets"] = float(len(targets))
+    for target in sorted(set(top["target"].to_list())):
+        evidence[f"decides_{target}"] = 1.0 if target in targets else 0.0
     switch = current != _WEEKS and low < CALIBRATION_COVERAGE_FLOOR
     return Decision(
         rule=_RULE_CALIBRATION,
@@ -382,13 +411,19 @@ def _refuse_holdout_rows(pairs: pl.DataFrame) -> None:
         raise HoldoutViolationError(f"the frame holds summer {TEST_SUMMER}, the hold-out: selection works on 2024-2025")
 
 
+def _fold_stats(train: pl.DataFrame, cfg: TrainingConfig) -> FoldStats:
+    """The fold statistics, fitted on the fold's fit and calibration rows as ``train_corrector`` fits them."""
+    window = cfg.calibration_window
+    calendar = train.select(pl.col("valid_time").dt.date().alias("valid_date"), pl.col("summer"))
+    return fit_fold_stats(train.filter(fit_mask(calendar, window) | calibration_mask(calendar, window)))
+
+
 def _fold_frames(
     train: pl.DataFrame, test: pl.DataFrame, cfg: TrainingConfig, leads: Sequence[int]
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """The fit rows and the scored test rows of one fold, built as ``train_corrector`` builds them (L3, L4, L7)."""
     window = cfg.calibration_window
-    calendar = train.select(pl.col("valid_time").dt.date().alias("valid_date"), pl.col("summer"))
-    stats = fit_fold_stats(train.filter(fit_mask(calendar, window) | calibration_mask(calendar, window)))
+    stats = _fold_stats(train, cfg)
     site = cfg.feature_set is FeatureSet.SITE
     train_frame = build_features(
         train, feature_set=cfg.feature_set, stats=stats, history=history_features(train) if site else None
@@ -505,6 +540,58 @@ def score_hyperparameter_grid(
     )
 
 
+def held_out_missing_station_climatology(
+    pairs: pl.DataFrame,
+    cfg: TrainingConfig,
+    *,
+    clusters: Sequence[str] | None = None,
+    leads: Sequence[int] = SELECTION_LEADS,
+) -> tuple[int, int]:
+    """How many held-out rows the 6.2 comparison scores on T have no station climatology (``sclim_t`` null).
+
+    Rebuilds, per leave-one-cluster-out fold, the ``site`` features of the held-out cluster exactly as the evaluation
+    builds them (the fold's own statistics and history) and counts, among the rows at ``leads`` in the working daytime
+    whose T truth and raw forecast exist, those whose ``sclim_t`` is null. A held-out station is by construction not
+    in the fold's training rows, so this is expected to be (nearly) all of them: the limitation the module docstring
+    states, measured here and not assumed.
+
+    Args:
+        pairs: Dev rows (``load_dev_pairs`` shape).
+        cfg: The config whose calibration window selects the statistics' rows (the feature set is always ``site``).
+        clusters: Held-out clusters (default all six).
+        leads: The leads scored.
+
+    Returns:
+        ``(rows without sclim_t, rows)`` over the held-out clusters.
+
+    Raises:
+        HoldoutViolationError: ``pairs`` holds summer 2026.
+        ValueError: A cluster is unknown or no held-out row is scored.
+    """
+    _refuse_holdout_rows(pairs)
+    wanted = tuple(CLUSTERS if clusters is None else clusters)
+    unknown = sorted(set(wanted) - set(CLUSTERS))
+    if unknown:
+        raise ValueError(f"unknown cluster(s) {unknown}; the clusters are {list(CLUSTERS)}")
+    summers = frozenset(int(summer) for summer in pairs["summer"].unique().to_list())
+    missing = rows = 0
+    for fold in (f for f in loco_folds(summers) if next(iter(f.test_clusters)) in wanted):
+        train, test = split(pairs, fold)
+        stats = _fold_stats(train, cfg)
+        scored = build_features(test, feature_set=FeatureSet.SITE, stats=stats, history=history_features(test)).filter(
+            pl.col("hour_block").is_not_null()
+            & pl.col("lead_days").is_in(list(leads))
+            & pl.col("hour_utc").is_in(list(WORKING_HOURS_UTC))
+            & pl.col("y_t").is_not_null()
+            & pl.col("raw_t").is_not_null()
+        )
+        rows += scored.height
+        missing += int(scored["sclim_t"].is_null().sum())
+    if rows == 0:
+        raise ValueError("no held-out row has a T truth and a raw forecast: nothing to count")
+    return missing, rows
+
+
 # === the paired LOCO CRPS tables (6.2, 6.3) =========================================================================
 
 
@@ -577,14 +664,16 @@ class DevSelection:
         mode: ``"grid"`` (all four rules ran) or ``"single"`` (only the given config ran; the 6.4 decision is a report,
             not applied).
         decisions: The rules' decisions in order.
-        cfg: The final configuration (the base config with the chosen values applied in ``grid`` mode).
+        cfg: The final configuration (the base config with the chosen values applied in ``grid`` mode, named
+            ``<base name>-selected``).
         cfg_sha256: SHA-256 of the base config file in ``single`` mode; of the derived config's canonical JSON in
-            ``grid`` mode (the final configuration is a new config, so it has a new hash).
+            ``grid`` mode (the final configuration is a new config: a fingerprint, not a file hash).
         oof: The final configuration's LOCO predictions (what the exports are written from).
         summer_split: The R23 diagnostic (``grid`` mode only; reported, never used to select).
         grid_scores: The 6.1 scores (``grid`` mode only).
         tables: The intermediate frames each decision read, by name, kept so the decisions can be re-derived.
-        counts: Per-stage counts, computed from the data.
+        counts: Per-stage counts, computed from the data (``loco_runs`` is counted where each LOCO run starts).
+        calibration_targets: The 6.4 reading in force, ``"wbgt"`` or ``"all"``.
     """
 
     mode: Literal["grid", "single"]
@@ -596,6 +685,7 @@ class DevSelection:
     grid_scores: pl.DataFrame | None
     tables: dict[str, pl.DataFrame]
     counts: dict[str, int]
+    calibration_targets: str
 
 
 def config_fingerprint(cfg: TrainingConfig) -> str:
@@ -613,8 +703,19 @@ def _stage(name: str, **fields: object) -> Iterator[None]:
         _log.info("selection.stage_done", stage=name, seconds=round(time.monotonic() - started, 1), **fields)
 
 
-def _loco(pairs: pl.DataFrame, cfg: TrainingConfig, cfg_sha256: str, clusters: Sequence[str] | None) -> OofPredictions:
-    return evaluate_dev(pairs, cfg, cfg_sha256=cfg_sha256, clusters=clusters, sample_clusters=(EXPORT_CLUSTER,))
+@dataclass
+class _LocoRunner:
+    """Runs the full LOCO evaluation and counts the runs (``loco_runs`` is read from here, never written by hand)."""
+
+    pairs: pl.DataFrame
+    clusters: Sequence[str] | None
+    runs: int = 0
+
+    def __call__(self, cfg: TrainingConfig, cfg_sha256: str) -> OofPredictions:
+        self.runs += 1
+        return evaluate_dev(
+            self.pairs, cfg, cfg_sha256=cfg_sha256, clusters=self.clusters, sample_clusters=(EXPORT_CLUSTER,)
+        )
 
 
 def _coverage(oof: OofPredictions) -> pl.DataFrame:
@@ -626,6 +727,10 @@ def _counts(oof: OofPredictions, **extra: int) -> dict[str, int]:
     return {"oof_rows": oof.keys.height, "oof_days": days, **extra}
 
 
+type Preflight = Callable[[OofPredictions, TrainingConfig], None]
+"""A check run on the FIRST LOCO output (``exporters.preflight_dev_exports``): it raises if the export would fail."""
+
+
 def run_dev_selection(
     pairs: pl.DataFrame,
     base_cfg: TrainingConfig,
@@ -635,6 +740,8 @@ def run_dev_selection(
     clusters: Sequence[str] | None = None,
     grid_points: Sequence[tuple[int, int, int]] = HYPERPARAMETER_GRID,
     n_boot: int = 2000,
+    calibration_targets: Literal["wbgt", "all"] = "all",
+    preflight: Preflight | None = None,
 ) -> DevSelection:
     """Run the dev selection (pre-registration section 6) in the pre-registered order, reusing every run it can.
 
@@ -644,7 +751,7 @@ def run_dev_selection(
     decide 6.4 from the chosen run's top-tercile coverage and, if it switches, re-run the chosen configuration once with
     the weeks window so the exports come from the final configuration; (e) run the 2024-to-2025 and 2025-to-2024
     diagnostic (R23). A run that loses its decision is dropped before the next starts, so at most three LOCO runs are in
-    memory.
+    memory. The final configuration is the base config with the chosen values, named ``<base name>-selected``.
 
     With ``grid=False``: only ``base_cfg`` runs through ``evaluate_dev``; the only decision is the 6.4 coverage report
     (``DevSelection.mode == "single"``: it is not applied).
@@ -658,15 +765,23 @@ def run_dev_selection(
         clusters: Held-out clusters (default all six; a fixture passes the ones it has).
         grid_points: The 6.1 configurations (default the pre-registered eight; a test passes fewer).
         n_boot: Bootstrap replicates of the paired intervals (the pre-registered 2,000).
+        calibration_targets: The 6.4 reading (``CALIBRATION_TARGET_READINGS``): ``"all"`` (default; the rule applies to
+            T, Td, wind and WBGT) or ``"wbgt"`` (only the WBGT interval decides).
+        preflight: Called once with the first LOCO output and its config, before anything else is run (the CLI passes
+            ``exporters.preflight_dev_exports``); an exception ends the run there.
 
     Returns:
         The decisions, the final configuration and its LOCO predictions, the diagnostic and the intermediate tables.
     """
+    deciding = CALIBRATION_TARGET_READINGS[calibration_targets]
+    loco = _LocoRunner(pairs, clusters)
     if not grid:
         with _stage("loco_single", config=base_cfg.name):
-            oof = _loco(pairs, base_cfg, base_cfg_sha256, clusters)
+            oof = loco(base_cfg, base_cfg_sha256)
+        if preflight is not None:
+            preflight(oof, base_cfg)
         coverage = _coverage(oof)
-        decision = select_calibration_window(coverage, base_cfg.calibration_window)
+        decision = select_calibration_window(coverage, base_cfg.calibration_window, targets=deciding)
         return DevSelection(
             mode="single",
             decisions=(decision,),
@@ -676,7 +791,8 @@ def run_dev_selection(
             summer_split=None,
             grid_scores=None,
             tables={"coverage_by_forecast_tercile": coverage},
-            counts=_counts(oof, dev_pairs_rows=pairs.height, loco_runs=1),
+            counts=_counts(oof, dev_pairs_rows=pairs.height, loco_runs=loco.runs),
+            calibration_targets=calibration_targets,
         )
 
     with _stage("grid_scores", configurations=len(grid_points)):
@@ -689,32 +805,45 @@ def run_dev_selection(
     site_cfg = tuned.model_copy(update={"feature_set": FeatureSet.SITE, "wbgt_method": "joint"})
     cold_cfg = tuned.model_copy(update={"feature_set": FeatureSet.COLD, "wbgt_method": "joint"})
     with _stage("loco_site"):
-        site_oof = _loco(pairs, site_cfg, config_fingerprint(site_cfg), clusters)
+        site_oof = loco(site_cfg, config_fingerprint(site_cfg))
+    if preflight is not None:
+        preflight(site_oof, site_cfg)  # the export must build from a LOCO output before hours more are spent
     with _stage("loco_cold"):
-        cold_oof = _loco(pairs, cold_cfg, config_fingerprint(cold_cfg), clusters)
+        cold_oof = loco(cold_cfg, config_fingerprint(cold_cfg))
     with _stage("feature_set_tables"):
         site_table, cold_table = paired_loco_crps(site_oof, cold_oof, targets=(Target.T, Target.TD), n_boot=n_boot)
-    feature = select_feature_set(site_table, cold_table)
+    with _stage("site_history_coverage"):
+        no_sclim, scored_rows = held_out_missing_station_climatology(pairs, site_cfg, clusters=clusters)
+    feature = select_feature_set(
+        site_table,
+        cold_table,
+        extra_evidence={
+            "heldout_rows_t": float(scored_rows),
+            "heldout_null_sclim_t_rows": float(no_sclim),
+            "heldout_null_sclim_t_share": no_sclim / scored_rows,
+        },
+    )
     joint_cfg, joint_oof = (site_cfg, site_oof) if feature.choice == "site" else (cold_cfg, cold_oof)
     del site_oof, cold_oof
 
     direct_cfg = joint_cfg.model_copy(update={"wbgt_method": "direct"})
     with _stage("loco_direct"):
-        direct_oof = _loco(pairs, direct_cfg, config_fingerprint(direct_cfg), clusters)
+        direct_oof = loco(direct_cfg, config_fingerprint(direct_cfg))
     with _stage("wbgt_tables"):
         direct_table, joint_table = paired_loco_crps(direct_oof, joint_oof, targets=(Target.WBGT,), n_boot=n_boot)
     method = select_wbgt_method(joint_table, direct_table)
     cfg, oof = (joint_cfg, joint_oof) if method.choice == "joint" else (direct_cfg, direct_oof)
     del joint_oof, direct_oof
+    cfg = cfg.model_copy(update={"name": f"{base_cfg.name}-selected"})  # a derived config is not the base config
 
     coverage = _coverage(oof)
-    window = select_calibration_window(coverage, cfg.calibration_window)
+    window = select_calibration_window(coverage, cfg.calibration_window, targets=deciding)
     rerun = window.choice != cfg.calibration_window
     if rerun:
         cfg = cfg.model_copy(update={"calibration_window": window.choice})
         del oof
         with _stage("loco_final_weeks_window"):
-            oof = _loco(pairs, cfg, config_fingerprint(cfg), clusters)
+            oof = loco(cfg, config_fingerprint(cfg))
     fingerprint = config_fingerprint(cfg)
 
     with _stage("summer_split"):
@@ -738,8 +867,9 @@ def run_dev_selection(
             oof,
             dev_pairs_rows=pairs.height,
             hyperparameter_configurations=grid_scores.height,
-            loco_runs=4 + int(rerun),
+            loco_runs=loco.runs,
             summer_split_rows=split_oof.keys.height,
             calibration_window_rerun=int(rerun),
         ),
+        calibration_targets=calibration_targets,
     )

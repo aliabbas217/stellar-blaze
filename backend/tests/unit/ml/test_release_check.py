@@ -1,6 +1,7 @@
 """The release smoke check and the headline dev metrics of ``sb-jobs train``."""
 
 import copy
+import math
 
 import numpy as np
 import polars as pl
@@ -33,6 +34,33 @@ def test_a_real_corrector_passes_and_the_sample_is_deterministic_and_bounded() -
     assert first == second
     assert set(first) == {"t", "td", "wind"}
     assert first["t"] > 1.0  # the fixture runs +3 degrees warm at two stations: the correction is real
+
+
+@pytest.mark.slow
+def test_the_sample_sees_every_lead_even_when_a_fixed_stride_would_be_a_multiple_of_seven(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pairs, trained = trained_small()
+    real = predict.corrected_grids
+    sampled: list[pl.DataFrame] = []
+
+    def spy(trained: TrainedCorrector, rows: pl.DataFrame) -> dict[Target, F64]:
+        sampled.append(rows)
+        return real(trained, rows)
+
+    monkeypatch.setattr(CORRECTED_GRIDS, spy)
+    release_smoke_check(trained, pairs, max_rows=1_000_000, summer=SUMMER)
+    height = sampled[0].height
+    max_rows = next(rows for rows in range(1, height) if math.ceil(height / rows) == 7)  # the old stride was 7
+
+    release_smoke_check(trained, pairs, max_rows=max_rows, summer=SUMMER)
+
+    sample = sampled[1]
+    assert 0.5 * max_rows <= sample.height <= max_rows
+    assert set(sample["lead_days"].unique().to_list()) == {1, 2, 3, 4, 5, 6, 7}
+    assert sample.select("station", "valid_time", "lead_days").equals(
+        sample.select("station", "valid_time", "lead_days").sort("station", "valid_time", "lead_days")
+    )  # still in the deterministic order
 
 
 def _unchanged(*targets: Target) -> object:

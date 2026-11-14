@@ -49,13 +49,22 @@ class DegenerateModelError(ValueError):
     """The corrector leaves the raw forecast unchanged on every sampled row of a target (or there is no sample)."""
 
 
+def _spread_indices(height: int, max_rows: int) -> list[int]:
+    """At most ``max_rows`` distinct row positions spread evenly over ``height`` rows (all of them when they fit)."""
+    if height <= max_rows:
+        return list(range(height))
+    positions = np.unique(np.linspace(0, height - 1, num=max_rows).round().astype(np.int64))
+    return [int(position) for position in positions]
+
+
 def release_smoke_check(
     trained: TrainedCorrector, pairs: pl.DataFrame, *, max_rows: int = SMOKE_SAMPLE_ROWS, summer: int = SMOKE_SUMMER
 ) -> dict[str, float]:
     """Predict a deterministic sample of ``summer``'s rows and refuse a corrector that changes nothing.
 
-    The sample is the modelled IFS rows of ``summer`` in ``pairs`` sorted by station, time and lead, thinned by a fixed
-    stride to at most ``max_rows``; the same ``pairs`` always give the same rows. Features are built with the
+    The sample is the modelled IFS rows of ``summer`` in ``pairs`` sorted by station, time and lead, thinned to at most
+    ``max_rows`` evenly spaced rows (``np.linspace`` indices, never a fixed stride: a stride that is a multiple of the
+    seven leads would see one lead only); the same ``pairs`` always give the same rows. Features are built with the
     corrector's own fold statistics (and the station history for the ``site`` set), as in training.
 
     Args:
@@ -80,7 +89,7 @@ def release_smoke_check(
     if frame.height == 0:
         raise DegenerateModelError(f"no modelled row of summer {summer} to smoke-check the model on")
     ordered = frame.sort("station", "valid_time", "lead_days")
-    sample = ordered.gather_every(math.ceil(ordered.height / max_rows))
+    sample = ordered[_spread_indices(ordered.height, max_rows)]
     grids = corrected_grids(trained, sample)
     shifts: dict[str, float] = {}
     unchanged: list[str] = []

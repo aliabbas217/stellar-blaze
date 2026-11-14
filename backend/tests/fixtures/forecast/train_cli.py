@@ -5,6 +5,7 @@ purpose: the command must never load it. Nothing here touches the real gold file
 """
 
 import hashlib
+import json
 from functools import cache
 from pathlib import Path
 from typing import Final
@@ -78,8 +79,14 @@ def manifest_sha256(data_dir: Path) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def dev_skill_payload() -> dict[str, object]:
-    """A ``dev_skill.json`` skill table holding what ``loco_headline_metrics`` reads, for t only, with known numbers."""
+def dev_skill_payload(
+    *, configuration: dict[str, object] | None = None, data_sha256: str | None = None
+) -> dict[str, object]:
+    """A ``dev_skill.json`` skill table holding what ``loco_headline_metrics`` reads, for t only, with known numbers.
+
+    With ``configuration`` and ``data_sha256`` it also holds the two things a ``--release`` is bound to: the final
+    config's JSON and the provenance's data hash.
+    """
     columns = ["target", "lead_days", "hour_block", "n_rows", "crps_corrector", "crps_b0", "crps_b2d"]
     rows: list[list[object]] = [
         ["t", 1, "working", 100, 0.5, 2.0, 1.0],
@@ -90,4 +97,18 @@ def dev_skill_payload() -> dict[str, object]:
         ["td", 2, "working", 100, 0.5, 2.0, 1.0],
         ["td", 3, "working", 100, 0.5, 2.0, 1.0],
     ]
-    return {"skill": {"columns": columns, "rows": rows}}
+    payload: dict[str, object] = {"skill": {"columns": columns, "rows": rows}}
+    if configuration is not None:
+        payload["configuration"] = configuration
+    if data_sha256 is not None:
+        payload["provenance"] = {"data_sha256": data_sha256}
+    return payload
+
+
+def config_fields(toml: str = CONFIG_TOML) -> dict[str, object]:
+    """The JSON fields of a training config TOML (what an evaluation records as its ``configuration``)."""
+    import tomllib
+
+    from stellar_blaze.ml.training_config import TrainingConfig
+
+    return dict(json.loads(TrainingConfig.model_validate(tomllib.loads(toml)).model_dump_json()))

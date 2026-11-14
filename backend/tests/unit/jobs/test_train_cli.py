@@ -22,6 +22,7 @@ from tests.fixtures.forecast.train_cli import (
     CONFIG_NAME,
     CONFIG_TOML,
     GIT_SHA,
+    config_fields,
     dev_skill_payload,
     fake_repo,
     manifest_sha256,
@@ -87,6 +88,41 @@ def _use_git(monkeypatch: pytest.MonkeyPatch, git: FakeGit) -> None:
     monkeypatch.setattr(ml_cli, "_git_reader", lambda root: git)
 
 
+def _gold_sha256(env: Path) -> str:
+    return hashlib.sha256((env / "data" / "gold" / "pairs.parquet").read_bytes()).hexdigest()
+
+
+def _exports(
+    env: Path,
+    *,
+    configuration: dict[str, object] | None = None,
+    data_sha256: str | None = None,
+    selection: dict[str, object] | None = None,
+    directory: str = "exports",
+) -> str:
+    """An ``evaluate-dev`` output that a release is bound to; returns the ``dev_skill.json`` path.
+
+    By default it matches ``CONFIG_TOML`` and the gold file (the evaluation's config has another ``name``: ignored).
+    """
+    folder = env / directory
+    folder.mkdir(exist_ok=True)
+    fields = config_fields() | {"name": "unit-train-selected"} if configuration is None else configuration
+    payload = dev_skill_payload(
+        configuration=fields, data_sha256=_gold_sha256(env) if data_sha256 is None else data_sha256
+    )
+    (folder / "dev_skill.json").write_bytes(json.dumps(payload).encode("utf-8"))
+    if selection is None:
+        selection = {
+            "mode": "grid",
+            "marker": "from-selection",
+            "chosen_configuration": {
+                key: fields[key] for key in ("feature_set", "wbgt_method", "calibration_window", "lgbm")
+            },
+        }
+    (folder / "selection.json").write_bytes(json.dumps(selection).encode("utf-8"))
+    return str(folder / "dev_skill.json")
+
+
 def _spy_train(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """Replace the (slow) body of the command with one that records that it ran and raises."""
     calls: list[dict[str, Any]] = []
@@ -119,7 +155,7 @@ def test_release_refuses_dirty_tree(env: Path, monkeypatch: pytest.MonkeyPatch) 
     _use_git(monkeypatch, git)
     calls = _spy_train(monkeypatch)
 
-    result = _invoke("--config", _config(env), "--release")
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env))
 
     assert result.exit_code == 1
     assert "not clean" in result.output
@@ -136,7 +172,7 @@ def test_release_refuses_when_git_cannot_answer(env: Path, monkeypatch: pytest.M
     _use_git(monkeypatch, FakeGit(error=GitError("git is gone")))
     calls = _spy_train(monkeypatch)
 
-    result = _invoke("--config", _config(env), "--release")
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env))
 
     assert result.exit_code == 1
     assert "git is gone" in result.output
@@ -189,6 +225,143 @@ def test_bad_arguments_are_usage_errors_and_record_nothing(env: Path, monkeypatc
     assert runs.skipped == []
 
 
+# === a release is bound to the evaluation that selected the model ==================================================
+
+
+def _assert_refused_before_anything(
+    env: Path, result: Any, runs: FakeRuns, git: FakeGit, calls: list[dict[str, Any]], *, code: int = 2
+) -> None:
+    assert result.exit_code == code, result.output
+    assert calls == []  # never trained
+    assert git.asked == 0  # the binding is checked before the git state
+    assert runs.finished == []
+    assert runs.skipped == []  # no run row, no lock
+    assert not (env / "models").exists()
+    assert not (env / "data" / "models-eval").exists()
+
+
+def test_release_without_dev_skill_is_a_usage_error(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs, git = FakeRuns(), FakeGit(clean=True)
+    use_fake_database(monkeypatch, runs)
+    _use_git(monkeypatch, git)
+    calls = _spy_train(monkeypatch)
+
+    result = _invoke("--config", _config(env), "--release")
+
+    _assert_refused_before_anything(env, result, runs, git, calls)
+    assert "--dev-skill" in result.output
+
+
+def _changed(**changes: object) -> dict[str, object]:
+    return config_fields() | changes
+
+
+@pytest.mark.parametrize(
+    ("configuration", "field"),
+    [
+        (_changed(feature_set="cold"), "feature_set"),
+        (_changed(wbgt_method="direct"), "wbgt_method"),
+        (_changed(calibration_window="weeks_4_8_12_16"), "calibration_window"),
+        (_changed(lgbm=config_fields()["lgbm"] | {"num_leaves": 15}), "lgbm"),  # type: ignore[operator]
+        (_changed(lgbm=config_fields()["lgbm"] | {"learning_rate": 0.05}), "lgbm"),  # type: ignore[operator]
+        (_changed(leads=[1, 2]), "leads"),
+        (_changed(n_joint_samples=50), "n_joint_samples"),
+    ],
+)
+def test_release_refuses_a_config_that_differs_from_the_evaluated_one(
+    env: Path, monkeypatch: pytest.MonkeyPatch, configuration: dict[str, object], field: str
+) -> None:
+    runs, git = FakeRuns(), FakeGit(clean=True)
+    use_fake_database(monkeypatch, runs)
+    _use_git(monkeypatch, git)
+    calls = _spy_train(monkeypatch)
+
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env, configuration=configuration))
+
+    _assert_refused_before_anything(env, result, runs, git, calls)
+    assert f"{field}:" in result.output
+    assert "not the one the evaluation selected" in result.output
+
+
+def test_release_refuses_a_gold_file_that_is_not_the_evaluated_one(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs, git = FakeRuns(), FakeGit(clean=True)
+    use_fake_database(monkeypatch, runs)
+    _use_git(monkeypatch, git)
+    calls = _spy_train(monkeypatch)
+
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env, data_sha256="f" * 64))
+
+    _assert_refused_before_anything(env, result, runs, git, calls)
+    assert "data_sha256" in result.output
+    assert "f" * 64 in result.output
+
+
+def test_release_refuses_an_evaluation_that_records_no_configuration_or_data_hash(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runs, git = FakeRuns(), FakeGit(clean=True)
+    use_fake_database(monkeypatch, runs)
+    _use_git(monkeypatch, git)
+    calls = _spy_train(monkeypatch)
+    bare = env / "bare"
+    bare.mkdir()
+    (bare / "dev_skill.json").write_bytes(json.dumps(dev_skill_payload()).encode("utf-8"))
+
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", str(bare / "dev_skill.json"))
+
+    _assert_refused_before_anything(env, result, runs, git, calls)
+    assert "'configuration' is missing" in result.output
+    assert "data_sha256" in result.output
+
+
+def test_release_refuses_when_the_selection_beside_it_chose_another_configuration(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runs, git = FakeRuns(), FakeGit(clean=True)
+    use_fake_database(monkeypatch, runs)
+    _use_git(monkeypatch, git)
+    calls = _spy_train(monkeypatch)
+    other = {"feature_set": "cold", "wbgt_method": "joint", "calibration_window": "september", "lgbm": {}}
+
+    result = _invoke(
+        "--config",
+        _config(env),
+        "--release",
+        "--dev-skill",
+        _exports(env, selection={"mode": "grid", "chosen_configuration": other}),
+    )
+
+    _assert_refused_before_anything(env, result, runs, git, calls)
+    assert "selection.json 'chosen_configuration'" in result.output
+
+
+def test_a_dev_run_is_not_bound_to_an_evaluation(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use_fake_database(monkeypatch, FakeRuns())
+    _use_git(monkeypatch, FakeGit(clean=False))
+    calls = _spy_train(monkeypatch)
+    mismatched = _exports(env, configuration=_changed(feature_set="cold"), data_sha256="f" * 64)
+
+    result = _invoke("--config", _config(env), "--dev-skill", mismatched)
+
+    assert "not the one the evaluation selected" not in result.output  # the binding is for a --release only
+    assert len(calls) == 1  # it reached the training (the spy then raised)
+
+
+def test_a_skipped_release_exits_one_because_nothing_was_released(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs, lock = FakeRuns(), FakeLock(granted=False)
+    use_fake_database(monkeypatch, runs, lock)
+    _use_git(monkeypatch, FakeGit(clean=True))
+    calls = _spy_train(monkeypatch)
+
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env))
+
+    assert result.exit_code == 1
+    assert "nothing was released" in result.output
+    assert [name for name, _ in runs.skipped] == [f"train:{CONFIG_NAME}"]
+    assert calls == []
+    assert not (env / "models").exists()
+
+
 # === the runs =======================================================================================================
 
 
@@ -202,7 +375,9 @@ def test_a_run_writes_a_model_to_models_eval_with_the_dev_metrics_and_records_th
     _use_git(monkeypatch, git)
     exports = env / "exports"
     exports.mkdir()
-    (exports / "dev_skill.json").write_bytes(json.dumps(dev_skill_payload()).encode("utf-8"))
+    (exports / "dev_skill.json").write_bytes(
+        json.dumps(dev_skill_payload()).encode("utf-8")
+    )  # no binding data: a dev run
     (exports / "selection.json").write_bytes(json.dumps({"mode": "single", "marker": "from-selection"}).encode("utf-8"))
 
     result = _invoke("--config", _config(env), "--dev-skill", str(exports / "dev_skill.json"))
@@ -238,7 +413,7 @@ def test_a_release_from_a_clean_tree_writes_to_the_models_directory_with_the_tra
     use_fake_database(monkeypatch, FakeRuns())
     _use_git(monkeypatch, FakeGit(clean=True))
 
-    result = _invoke("--config", _config(env), "--release")
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env))
 
     assert result.exit_code == 0, result.output
     summary = json.loads(result.output.strip().splitlines()[-1])
@@ -248,8 +423,8 @@ def test_a_release_from_a_clean_tree_writes_to_the_models_directory_with_the_tra
     assert set(summary["smoke_mean_abs_shift"]) == {"t", "td", "wind"}
     registry = scan_models(env / "models")
     assert registry.ids() == (summary["model_id"],)
-    assert registry.get(summary["model_id"]).manifest.metrics == {
-        "training": {"fit_rows": float(summary["fit_rows"]), "calibration_rows": float(summary["calibration_rows"])}
+    assert registry.get(summary["model_id"]).manifest.metrics == {  # the bound evaluation's LOCO CRPS (t only here)
+        "loco_crps_t": pytest.approx({"corrector": 0.65, "b0": 2.3, "b2d": 1.15}),
     }
 
 
@@ -270,7 +445,7 @@ def test_release_refuses_a_model_that_does_not_change_the_forecast_and_leaves_no
 
     monkeypatch.setattr("stellar_blaze.ml.release_check.corrected_grids", constant)
 
-    result = _invoke("--config", _config(env), "--release")
+    result = _invoke("--config", _config(env), "--release", "--dev-skill", _exports(env))
 
     assert result.exit_code == 1
     assert "equals the raw forecast" in result.output
