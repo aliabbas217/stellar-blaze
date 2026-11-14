@@ -15,6 +15,7 @@ reading any row, so a changed file is refused rather than scored.
 """
 
 import hashlib
+from collections.abc import Collection
 from pathlib import Path
 from typing import Final
 
@@ -40,6 +41,8 @@ TEST_SUMMER: Final = 2026
 """The hold-out summer: read only through ``load_test_pairs`` with a gate token."""
 
 _MODELS: Final = (NwpModel.ECMWF_IFS025.value, NwpModel.GFS_SEAMLESS.value)
+_TEST_MODELS_ALLOWED: Final = frozenset({*_MODELS, NwpModel.ECMWF_AIFS025.value})
+"""The models ``load_test_pairs`` may return: the two corrector models and raw AIFS (the 7.1 raw comparison)."""
 
 
 class HoldoutViolationError(RuntimeError):
@@ -62,8 +65,8 @@ def _verify_sha256(path: Path, expected: str) -> None:
         raise ValueError(f"{path} has sha256 {actual}, expected {expected.lower()}")
 
 
-def _load(path: Path, *, summers: frozenset[int]) -> pl.DataFrame:
-    """The modelled rows of ``summers``: filtered inside the lazy scan, then checked again after the collect.
+def _load(path: Path, *, summers: frozenset[int], models: Collection[str] = _MODELS) -> pl.DataFrame:
+    """The modelled rows of ``summers`` and ``models``: filtered inside the lazy scan, checked again after the collect.
 
     Raises:
         HoldoutViolationError: The collected frame holds a summer outside ``summers``.
@@ -74,7 +77,7 @@ def _load(path: Path, *, summers: frozenset[int]) -> pl.DataFrame:
         pl.col("summer").is_in(sorted(summers))
         & pl.col("lead_days").is_in(list(MODEL_LEADS))
         & pl.col("hour_utc").is_in(list(MODELLED_HOURS_UTC))
-        & pl.col("model").is_in(_MODELS)
+        & pl.col("model").is_in(sorted(models))
     )
     frame = conform(lazy.collect(), GOLD_PAIRS_SCHEMA)
     present = {int(summer) for summer in frame["summer"].unique().to_list()}
@@ -107,7 +110,14 @@ def load_dev_pairs(path: Path, *, expected_sha256: str | None) -> pl.DataFrame:
     return _load(path, summers=DEV_SUMMERS)
 
 
-def load_test_pairs(path: Path, *, token: GateToken, part: Part = Part.FORECAST, expected_sha256: str) -> pl.DataFrame:
+def load_test_pairs(
+    path: Path,
+    *,
+    token: GateToken,
+    part: Part = Part.FORECAST,
+    expected_sha256: str,
+    models: frozenset[str] = frozenset(_MODELS),
+) -> pl.DataFrame:
     """The rows of the gold pair file including the 2026 hold-out, for the gated evaluation only.
 
     The same filters as ``load_dev_pairs`` with ``summer`` in 2024, 2025 and 2026. The caller must hold a
@@ -119,6 +129,9 @@ def load_test_pairs(path: Path, *, token: GateToken, part: Part = Part.FORECAST,
         token: The token ``open_gate`` returned.
         part: The part being evaluated; it must be the token's part.
         expected_sha256: The file's SHA-256 (lowercase hex); required, and it must equal the lock's ``gold_sha256``.
+        models: The ``model`` values to return: ``ecmwf_ifs025`` and ``gfs_seamless`` (the default), and
+            ``ecmwf_aifs025_single``, which the raw comparison of pre-registration 7.1 needs. The development loader
+            has no such option: it returns the first two only.
 
     Returns:
         A ``GOLD_PAIRS_SCHEMA`` frame.
@@ -126,12 +139,19 @@ def load_test_pairs(path: Path, *, token: GateToken, part: Part = Part.FORECAST,
     Raises:
         TypeError: ``token`` is not exactly a ``GateToken`` (a ``GateToken`` cannot be built outside ``open_gate``, and
             it cannot be subclassed).
+        ValueError: ``models`` is empty or names a model other than the three above (nothing is read).
         HoldoutViolationError: The token is for a different part, its lock has no ``gold_sha256``, ``expected_sha256``
             is not the lock's value, the file hashes to something other than the lock's value, or the collected
             frame holds a summer outside 2024-2026.
     """
     if type(token) is not GateToken:
         raise TypeError(f"token must be a GateToken from open_gate, got {type(token).__name__}")
+    unknown = sorted(models - _TEST_MODELS_ALLOWED)
+    if unknown or not models:
+        raise ValueError(
+            f"models must be a non-empty subset of {sorted(_TEST_MODELS_ALLOWED)}, got {sorted(models)}"
+            + (f" (unknown: {unknown})" if unknown else "")
+        )
     if token.part != part:
         raise HoldoutViolationError(f"the gate token is for part {token.part.value!r}, not {part.value!r}")
     pinned = token.lock.gold_sha256
@@ -142,4 +162,4 @@ def load_test_pairs(path: Path, *, token: GateToken, part: Part = Part.FORECAST,
     actual = _file_sha256(path)
     if actual != pinned:
         raise HoldoutViolationError(f"{path} has sha256 {actual}, the lock's gold_sha256 is {pinned}")
-    return _load(path, summers=DEV_SUMMERS | {TEST_SUMMER})
+    return _load(path, summers=DEV_SUMMERS | {TEST_SUMMER}, models=models)

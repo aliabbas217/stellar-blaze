@@ -509,7 +509,14 @@ def test_sb_jobs_help_runs_without_the_training_packages_or_the_ml_package() -> 
         from typer.testing import CliRunner
         from stellar_blaze.jobs.cli import app
 
-        for arguments in (["--help"], ["replay", "--help"], ["replay", "build", "--help"]):
+        for arguments in (
+            ["--help"],
+            ["replay", "--help"],
+            ["replay", "build", "--help"],
+            ["evaluate-dev", "--help"],
+            ["train", "--help"],
+            ["evaluate-2026", "--help"],
+        ):
             result = CliRunner().invoke(app, arguments)
             assert result.exit_code == 0, (arguments, result.output)
         assert not [name for name in sys.modules if name.startswith("stellar_blaze.ml")]

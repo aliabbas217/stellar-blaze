@@ -17,6 +17,7 @@ What is fetched, for a valid date ``D`` and leads ``L``:
   (``history_ifs``), because the station-history features are past lead-1 forecast errors.
 """
 
+import asyncio
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Final
@@ -67,9 +68,14 @@ async def corrected_forecast(
 ) -> pl.DataFrame:
     """The corrected forecast of one station for one UTC valid date and the given leads.
 
-    ``corrector.correct`` is a synchronous call. It is CPU-bound and takes a fraction of a second for one station and
-    day, so it is called directly on the event loop rather than through a thread; a caller that corrects many
-    stations or dates in one request should move it to a worker thread.
+    ``corrector.correct`` is a synchronous, CPU-bound call (0.36 s per station-day was measured, dominated by the WBGT
+    solver), so it runs in a worker thread (``asyncio.to_thread``): a single-worker API keeps serving other requests
+    while one is corrected. A corrector must therefore be safe to call from a thread (``LightGbmCorrector`` keeps no
+    state; the fake neither).
+
+    The IEM observations are fetched for every corrector: the port exposes no way to ask whether a corrector ignores
+    ``history`` (``needs_history_forecasts`` is about ``history_ifs`` only), so a ``cold`` model still pays that fetch.
+    Skipping it would need a port property, which is parked, not guessed from the forecasts flag.
 
     Args:
         forecasts: Source of the IFS and GFS previous runs.
@@ -112,4 +118,4 @@ async def corrected_forecast(
         if corrector.needs_history_forecasts
         else None
     )
-    return corrector.correct(ifs=ifs, gfs=gfs, history=history, history_ifs=history_ifs)
+    return await asyncio.to_thread(corrector.correct, ifs=ifs, gfs=gfs, history=history, history_ifs=history_ifs)

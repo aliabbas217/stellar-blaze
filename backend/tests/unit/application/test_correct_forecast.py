@@ -1,5 +1,6 @@
 """``corrected_forecast``: what is fetched for one station and day, and that the corrector is asked once with it."""
 
+import threading
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -61,6 +62,7 @@ class RecordingCorrector:
         self._inner = FakeCorrector(0.5)
         self._needs = needs_history_forecasts
         self.calls: list[dict[str, pl.DataFrame | None]] = []
+        self.threads: list[int] = []
 
     @property
     def model_id(self) -> str | None:
@@ -78,6 +80,7 @@ class RecordingCorrector:
         history: pl.DataFrame,
         history_ifs: pl.DataFrame | None = None,
     ) -> pl.DataFrame:
+        self.threads.append(threading.get_ident())
         self.calls.append({"ifs": ifs, "gfs": gfs, "history": history, "history_ifs": history_ifs})
         return self._inner.correct(ifs=ifs, gfs=gfs, history=history, history_ifs=history_ifs)
 
@@ -250,3 +253,13 @@ async def test_the_corrector_result_is_returned_unchanged() -> None:
     assert call["gfs"] is not None
     assert call["history"] is not None
     assert out.equals(FakeCorrector(0.5).correct(ifs=call["ifs"], gfs=call["gfs"], history=call["history"]))
+
+
+@pytest.mark.asyncio
+async def test_the_corrector_runs_in_a_worker_thread_so_the_event_loop_is_not_blocked() -> None:
+    corrector = RecordingCorrector(needs_history_forecasts=False)
+
+    await _run(_forecasts(), _observations(), corrector)
+
+    (worker,) = corrector.threads
+    assert worker != threading.get_ident()  # the loop's own thread would block a single-worker API for 0.36 s a call

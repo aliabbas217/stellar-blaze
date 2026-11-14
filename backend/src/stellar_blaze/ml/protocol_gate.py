@@ -16,13 +16,22 @@ Reasons start with a stable code, then ``: ``, then the message. Codes: ``lock-m
 ``protocol-hash-mismatch``, ``commit-not-ancestor``, ``commit-content-mismatch``, ``amendment-hash-mismatch``,
 ``amendment-not-ancestor``, ``amendment-content-mismatch``, ``tree-dirty``, ``git-error``, ``model-id-missing``,
 ``model-not-found``, ``model-integrity``, ``gold-sha-missing``, ``freeze-missing``, ``freeze-hash-mismatch``,
-``result-exists`` (from ``open_gate``) and ``head-changed``, ``tree-dirty`` (from ``GateToken.recheck``).
+``go-missing``, ``go-invalid``, ``go-mismatch``, ``result-exists`` (from ``open_gate``) and ``head-changed``,
+``tree-dirty`` (from ``GateToken.recheck``).
 
 The lock (``backend/training/protocol.lock.toml``) holds ``protocol_path`` (relative to the repository root),
 ``protocol_sha256`` and ``protocol_commit``, optional ``[[amendments]]`` (``path``, ``sha256``, ``commit``: each is
 checked like the protocol itself), ``gold_sha256`` (the one gold file the evaluation may read), and ``model_id`` and the
 ``freeze_*`` keys; all optional keys are absent until they exist (TOML cannot hold a null, so an absent key means
 ``None``, or no amendments).
+
+The "2026 go" marker (``backend/training/2026-go.toml``) is the architect's written go-ahead: ``protocol_sha256``,
+``model_id``, ``approved_by`` and ``approved_at`` (an offset date-time). It must exist and parse (``go-missing``,
+``go-invalid``), and its ``protocol_sha256`` and ``model_id`` must equal the lock's (``go-mismatch``), so a go-ahead
+for one pre-registration or one model can never unlock another. No code writes it. Without a readable lock there is
+nothing to bind to, so only its existence and form are judged; a lock that names no ``model_id`` is already refused by
+``model-id-missing`` and the model binding is then not judged a second time. The marker is committed like everything
+else the gate reads: the clean-tree check covers it.
 """
 
 import hashlib
@@ -33,7 +42,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated, Final, NoReturn, final
 
 import structlog
-from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator
 
 from stellar_blaze.adapters.config.models import ModelIntegrityError, scan_models
 from stellar_blaze.domain.config.models import MODEL_ID, Sha256
@@ -43,9 +52,11 @@ __all__ = [
     "RESULT_FILES",
     "GateRefusedError",
     "GateToken",
+    "GoMarker",
     "Part",
     "ProtocolAmendment",
     "ProtocolLock",
+    "load_go",
     "load_lock",
     "open_gate",
 ]
@@ -144,6 +155,29 @@ def load_lock(path: Path) -> ProtocolLock:
     """
     with path.open("rb") as file:
         return ProtocolLock.model_validate(tomllib.load(file))
+
+
+class GoMarker(BaseModel):
+    """``training/2026-go.toml``: the architect's written go-ahead, bound to one pre-registration and one model."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    protocol_sha256: Sha256
+    model_id: str = Field(min_length=1)
+    approved_by: str = Field(min_length=1)
+    approved_at: AwareDatetime
+
+
+def load_go(path: Path) -> GoMarker:
+    """Read and validate the go marker.
+
+    Raises:
+        FileNotFoundError: ``path`` does not exist.
+        tomllib.TOMLDecodeError: ``path`` is not TOML.
+        pydantic.ValidationError: The keys or values are not a ``GoMarker`` (``approved_at`` needs an offset).
+    """
+    with path.open("rb") as file:
+        return GoMarker.model_validate(tomllib.load(file))
 
 
 # The sentinel only open_gate's factory passes; a GateToken built without it is refused.
@@ -294,6 +328,27 @@ def _check_model(lock: ProtocolLock, models_dir: Path) -> list[str]:
     return []
 
 
+def _check_go(go_path: Path, lock: ProtocolLock | None) -> list[str]:
+    """The go marker exists, parses, and (when there is a lock) is bound to its protocol hash and its model id."""
+    if not go_path.is_file():
+        return [
+            f"go-missing: {go_path} does not exist (the architect's 2026 go-ahead is written by hand, never by code)"
+        ]
+    try:
+        marker = load_go(go_path)
+    except (tomllib.TOMLDecodeError, ValidationError) as exc:
+        return [f"go-invalid: {go_path} is not a valid go marker: {exc}"]
+    reasons: list[str] = []
+    if lock is not None and marker.protocol_sha256 != lock.protocol_sha256:
+        reasons.append(
+            f"go-mismatch: {go_path} approves protocol_sha256 {marker.protocol_sha256}, the lock has "
+            f"{lock.protocol_sha256}"
+        )
+    if lock is not None and lock.model_id is not None and marker.model_id != lock.model_id:
+        reasons.append(f"go-mismatch: {go_path} approves model_id {marker.model_id}, the lock has {lock.model_id}")
+    return reasons
+
+
 def _check_freeze(repo_root: Path, lock: ProtocolLock, git: GitReader, head: str | None) -> list[str]:
     if lock.freeze_path is None or lock.freeze_sha256 is None:
         return ["freeze-missing: the lock has no freeze_path and freeze_sha256 (the section 11 addendum)"]
@@ -326,6 +381,7 @@ def open_gate(
     part: Part,
     results_dir: Path,
     models_dir: Path,
+    go_path: Path,
     git: GitReader,
     amendment: str | None = None,
 ) -> GateToken:
@@ -340,6 +396,7 @@ def open_gate(
         part: The part about to run.
         results_dir: ``artifacts/eval/2026``.
         models_dir: ``backend/models``.
+        go_path: ``backend/training/2026-go.toml``, the architect's go marker (module docstring).
         git: The repository queries.
         amendment: The id of the section 13 amendment-log row that allows a re-run; a non-blank string lifts the
             once-only check for this part.
@@ -378,6 +435,7 @@ def open_gate(
             reasons.append("gold-sha-missing: the lock has no gold_sha256 (the one gold file the evaluation may read)")
         if part in _FREEZE_PARTS:
             reasons += _check_freeze(repo_root, lock, git, head)
+    reasons += _check_go(go_path, lock)
     result = results_dir / RESULT_FILES[part]
     if result.exists() and not (amendment and amendment.strip()):
         reasons.append(f"result-exists: {result} exists; a re-run needs an amendment id from the section 13 log")

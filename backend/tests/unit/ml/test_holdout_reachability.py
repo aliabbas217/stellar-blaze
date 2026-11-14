@@ -5,9 +5,11 @@ does not prove that nothing else unlocks 2026: the guarantee also rests on a sho
 that list explicit and fails when it grows without someone deciding it should:
 
 * ``open_gate`` and ``load_test_pairs`` are referenced only by ``ml/protocol_gate.py``, ``ml/data.py`` and
-  ``jobs/evaluate_2026.py`` (the job does not exist yet; Task 15 creates it and this test must then pass);
+  ``jobs/evaluate_2026.py`` (the gated evaluation job, Task 15);
 * the job hands ``open_gate`` a ``SubprocessGit(...)`` written inline as the ``git`` argument, never a fake or a
   variable;
+* ``GateToken.recheck`` (the last check before a write) is called only by the job, on a token that is a parameter typed
+  ``GateToken`` or the result of ``open_gate``, with a ``SubprocessGit(...)`` written inline as its reader;
 * inside ``ml/`` only ``ml/data.py`` reads Parquet; the readers outside ``ml/`` are listed below with the reason each
   is not a gold reader.
 """
@@ -28,6 +30,10 @@ EVALUATE_2026 = SRC / "jobs" / "evaluate_2026.py"
 PARQUET_READERS = frozenset({"read_parquet", "scan_parquet"})
 ML_PARQUET_READERS = frozenset({"ml/data.py"})
 PARQUET_READERS_OUTSIDE_ML = {
+    "adapters/compute/lgbm_corrector.py": (
+        "reads the model's two fold_stats climatology parquet files from bytes via io.BytesIO after scan_models "
+        "verified their hashes; never the gold file"
+    ),
     "adapters/sources/ghcnh.py": "decodes the NOAA GHCNh download held in memory (io.BytesIO), never the gold file",
     "adapters/sources/replay.py": (
         "decodes the two data files of a replay snapshot from bytes just checked against snapshot.json (io.BytesIO); "
@@ -97,11 +103,97 @@ def test_only_the_gate_the_loader_and_the_job_reference_the_2026_entry_points() 
 
 
 def test_the_job_gives_open_gate_a_subprocess_git_inline() -> None:
-    if not EVALUATE_2026.exists():
-        return  # Task 15 creates jobs/evaluate_2026.py; the synthetic cases below prove this check can fail
+    assert EVALUATE_2026.exists(), "the gated evaluation job jobs/evaluate_2026.py must exist"
     arguments = open_gate_git_arguments(ast.parse(EVALUATE_2026.read_text(encoding="utf-8")))
     assert arguments, "jobs/evaluate_2026.py must call open_gate"
     assert all(is_subprocess_git_call(argument) for argument in arguments)
+
+
+def recheck_calls(tree: ast.AST) -> list[tuple[ast.Call, ast.FunctionDef | ast.AsyncFunctionDef | None]]:
+    """Every ``<receiver>.recheck(...)`` call with the function that encloses it (``None`` at module level)."""
+    found: list[tuple[ast.Call, ast.FunctionDef | ast.AsyncFunctionDef | None]] = []
+
+    def visit(node: ast.AST, enclosing: ast.FunctionDef | ast.AsyncFunctionDef | None) -> None:
+        for child in ast.iter_child_nodes(node):
+            inner = child if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef) else enclosing
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute) and child.func.attr == "recheck":
+                found.append((child, enclosing))
+            visit(child, inner)
+
+    visit(tree, None)
+    return found
+
+
+def is_gate_token_receiver(call: ast.Call, function: ast.FunctionDef | ast.AsyncFunctionDef | None) -> bool:
+    """The receiver is a plain name that is a ``GateToken``-typed parameter or is assigned from ``open_gate(...)``."""
+    receiver = call.func.value if isinstance(call.func, ast.Attribute) else None
+    if function is None or not isinstance(receiver, ast.Name):
+        return False
+    for argument in [*function.args.args, *function.args.kwonlyargs]:
+        annotation = argument.annotation
+        if argument.arg == receiver.id and isinstance(annotation, ast.Name) and annotation.id == "GateToken":
+            return True
+    for node in ast.walk(function):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name | ast.Attribute)
+            and (getattr(node.value.func, "id", None) or getattr(node.value.func, "attr", None)) == "open_gate"
+            and any(isinstance(target, ast.Name) and target.id == receiver.id for target in node.targets)
+        ):
+            return True
+    return False
+
+
+def recheck_call_is_safe(call: ast.Call, function: ast.FunctionDef | ast.AsyncFunctionDef | None) -> bool:
+    """One ``token.recheck(SubprocessGit(...))`` on a token the gate issued."""
+    return (
+        is_gate_token_receiver(call, function)
+        and len(call.args) == 1
+        and not call.keywords
+        and is_subprocess_git_call(call.args[0])
+    )
+
+
+def test_only_the_job_calls_recheck_on_its_own_token_with_an_inline_subprocess_git() -> None:
+    callers = {
+        name: calls
+        for name, tree in _python_files().items()
+        if name != "ml/protocol_gate.py" and (calls := recheck_calls(tree))
+    }
+    assert set(callers) == {"jobs/evaluate_2026.py"}, f"recheck is called by {sorted(callers)}"
+    assert all(recheck_call_is_safe(call, function) for call, function in callers["jobs/evaluate_2026.py"])
+
+
+_SAFE = "def run(token: GateToken):\n    token.recheck(SubprocessGit(root))\n"
+_OPENED = "def run():\n    token = open_gate(git=SubprocessGit(root))\n    token.recheck(SubprocessGit(root))\n"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (_SAFE, True),
+        ("def run(token: GateToken):\n    token.recheck(git.SubprocessGit(root))\n", True),
+        (_OPENED, True),
+        ("def run(token: GateToken):\n    token.recheck(FakeGit())\n", False),
+        ("def run(token: GateToken):\n    token.recheck(reader)\n", False),
+        ("def run(token: GateToken):\n    token.recheck(git=SubprocessGit(root))\n", False),
+        ("def run(token):\n    token.recheck(SubprocessGit(root))\n", False),  # an untyped token: unknown origin
+        ("def run(token: object):\n    token.recheck(SubprocessGit(root))\n", False),
+        ("def run(token: GateToken):\n    other.recheck(SubprocessGit(root))\n", False),
+        ("token.recheck(SubprocessGit(root))\n", False),  # at module level there is no token
+        ("def run():\n    token = make()\n    token.recheck(SubprocessGit(root))\n", False),
+    ],
+)
+def test_the_recheck_check_can_fail(source: str, expected: bool) -> None:
+    calls = recheck_calls(ast.parse(source))
+    assert len(calls) == 1
+    assert recheck_call_is_safe(*calls[0]) is expected
+
+
+def test_the_recheck_scan_sees_a_call_and_ignores_docstrings() -> None:
+    assert recheck_calls(ast.parse(_SAFE))
+    assert not recheck_calls(ast.parse('"""token.recheck(x)"""\nrechecked = 1'))
 
 
 @pytest.mark.parametrize(

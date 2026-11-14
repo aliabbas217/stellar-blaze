@@ -19,7 +19,14 @@ import numpy as np
 import polars as pl
 import pytest
 
-from stellar_blaze.domain.forecast.features import FeatureSet, Target, feature_columns
+from stellar_blaze.domain.forecast.features import (
+    FeatureSet,
+    Target,
+    build_features,
+    feature_columns,
+    fit_fold_stats,
+    history_features,
+)
 from stellar_blaze.domain.forecast.grid import LEVELS, exceedance_probability
 from stellar_blaze.ml import baselines, metrics
 from stellar_blaze.ml import evaluate as evaluate_module
@@ -720,26 +727,36 @@ def test_the_tercile_edges_come_from_all_dev_rows_forecast_values_only_not_the_s
     assert run.tercile_edges[1] > oof.tercile_edges[1]
 
 
-def _cold_features_and_raw(n: int) -> pl.DataFrame:
-    """``n`` complete test-feature rows: every cold feature, every raw forecast and every ``bias7`` present."""
-    cold = {name: [1.0] * n for name in feature_columns(FeatureSet.COLD)}
-    raw = {f"raw_{target.value}": [20.0] * n for target in Target}
-    bias7 = {f"bias7_{target.value}": [0.5] * n for target in (Target.T, Target.TD, Target.WIND)}
-    return pl.DataFrame(cold | raw | bias7)
+def _fitted_baselines() -> tuple[dict[Target, baselines.BaselineModel], pl.DataFrame]:
+    """Pooled baselines of every target fitted on the fixture's site features, and five of those feature rows."""
+    pairs = dev_pairs()
+    features = build_features(
+        pairs, feature_set=FeatureSet.SITE, stats=fit_fold_stats(pairs), history=history_features(pairs)
+    ).filter(pl.col("hour_block").is_not_null())
+    models = {target: baselines.fit_baselines(features, target=target, pooled=True) for target in Target}
+    return models, features.head(5)
 
 
 def test_fallback_rows_count_the_null_bias7_and_the_null_cold_feature_rows() -> None:
     """One null ``bias7_t`` (row 0), one null cold feature (row 1) and one row without a raw t (row 2, uncounted)."""
+    models, rows = _fitted_baselines()
     cold_name = feature_columns(FeatureSet.COLD)[0]
-    frame = _cold_features_and_raw(5).with_columns(
-        pl.Series("bias7_t", [None, 0.5, None, 0.5, 0.5], dtype=pl.Float64),  # rows 0 and 2 have no history
-        pl.Series("raw_t", [20.0, 20.0, None, 20.0, 20.0], dtype=pl.Float64),
-        pl.Series(cold_name, [1.0, None, 1.0, 1.0, 1.0], dtype=pl.Float64),
+    cold = {name: [1.0] * 5 for name in feature_columns(FeatureSet.COLD)}
+    raw = {f"raw_{target.value}": [20.0] * 5 for target in Target}
+    bias7 = {f"bias7_{target.value}": [0.5] * 5 for target in (Target.T, Target.TD, Target.WIND)}
+    frame = (
+        rows.select("lead_days", "hour_block")
+        .with_columns(*(pl.Series(name, values, dtype=pl.Float64) for name, values in (cold | raw | bias7).items()))
+        .with_columns(
+            pl.Series("bias7_t", [None, 0.5, None, 0.5, 0.5], dtype=pl.Float64),  # rows 0 and 2 have no history
+            pl.Series("raw_t", [20.0, 20.0, None, 20.0, 20.0], dtype=pl.Float64),
+            pl.Series(cold_name, [1.0, None, 1.0, 1.0, 1.0], dtype=pl.Float64),
+        )
     )
 
     counts = {
         (row["target"], row["model"]): (row["n_rows"], row["n_fallback"])
-        for row in evaluate_module._fallback_rows("fold_x", frame).iter_rows(named=True)  # noqa: SLF001
+        for row in evaluate_module._fallback_rows("fold_x", frame, models).iter_rows(named=True)  # noqa: SLF001
     }
 
     assert counts == {
@@ -751,6 +768,33 @@ def test_fallback_rows_count_the_null_bias7_and_the_null_cold_feature_rows() -> 
         ("wind", "b4"): (5, 1),
         ("wbgt", "b4"): (5, 1),  # B3d is not defined for WBGT: no row
     }
+
+
+def test_fallback_rows_ask_the_baselines_module_for_every_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One source of truth: every count is ``baselines.fallback_count``'s, never a second implementation."""
+    models, rows = _fitted_baselines()
+    asked: list[tuple[Target, str]] = []
+
+    def counted(model: baselines.BaselineModel, frame: pl.DataFrame, baseline: baselines.Baseline) -> int:
+        asked.append((model.target, baseline.value))
+        return 7
+
+    monkeypatch.setattr(evaluate_module, "fallback_count", counted)
+
+    table = evaluate_module._fallback_rows("fold_x", rows, models)  # noqa: SLF001
+
+    assert sorted(asked) == sorted(
+        [
+            (Target.T, "b3d"),
+            (Target.T, "b4"),
+            (Target.TD, "b3d"),
+            (Target.TD, "b4"),
+            (Target.WIND, "b3d"),
+            (Target.WIND, "b4"),
+            (Target.WBGT, "b4"),
+        ]
+    )
+    assert set(table["n_fallback"]) == {7}
 
 
 @pytest.mark.slow

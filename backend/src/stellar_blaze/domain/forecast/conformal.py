@@ -44,6 +44,7 @@ __all__ = [
     "block_indices",
     "lead_values",
     "stratum_key",
+    "value_grid",
 ]
 
 STRATUM_BLOCKS: Final[tuple[HourBlock, ...]] = tuple(HOUR_BLOCKS)
@@ -169,6 +170,23 @@ class ConformalOffsets(BaseModel):
             fallback={**self.fallback, **other.fallback},
             negative={**self.negative, **other.negative},
         )
+
+
+def value_grid(error_grid: F64, raw: F64, target: Target) -> F64:
+    """The VALUE quantile grid of a target: the raw forecast plus the error grid, wind clipped at 0.
+
+    The corrected wind is never negative (pre-registration 3.1). The clip keeps the rows sorted (it is monotone) and
+    makes ties at 0, which ``grid.cdf`` and ``grid.ppf`` handle. A row whose raw forecast is NaN comes back all-NaN.
+    This is the recipe the copulas are fitted on and serving must reproduce, so training (``ml.train``, which
+    re-exports it) and the serving adapter both import it from here.
+
+    Args:
+        error_grid: ``(n, 19)`` sorted error quantiles (``predict_grid``, optionally conformalised).
+        raw: ``(n,)`` raw forecast of the target (NaN where missing).
+        target: The variable.
+    """
+    grid = np.asarray(error_grid, dtype=np.float64) + np.asarray(raw, dtype=np.float64)[:, None]
+    return np.asarray(np.maximum(grid, 0.0) if target is Target.WIND else grid, dtype=np.float64)
 
 
 def apply_offsets(

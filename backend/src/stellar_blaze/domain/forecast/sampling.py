@@ -34,6 +34,7 @@ __all__ = [
     "WbgtJointGrid",
     "fit_copula",
     "nearest_correlation",
+    "reject_thin_wbgt_rows",
     "sample_joint",
     "screen_solver_inputs",
     "wbgt_joint_grid",
@@ -54,6 +55,20 @@ _SOLVER_TEMPERATURE_C: Final = (-60.0, 70.0)
 
 _EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
 _MICROSECOND: Final = timedelta(microseconds=1)
+
+
+def reject_thin_wbgt_rows(grid: F64, n_finite: NDArray[np.int64], n_samples: int) -> tuple[F64, int]:
+    """Rows of a joint WBGT grid that rest on fewer than ``n_samples / 2`` finite samples become all-NaN (R30).
+
+    A row with some rejected samples still has a grid from the finite ones, but one that rests on a minority of the
+    draws is no distribution of the forecast: it is treated as missing, so it is excluded from the offsets. Training
+    (``ml.train``, which re-exports this) and the serving adapter share this one rule.
+
+    Returns:
+        A new grid and the number of rows set to NaN, counting rows that were all-NaN already.
+    """
+    thin = np.asarray(n_finite) < n_samples / 2.0
+    return np.where(thin[:, None], np.nan, np.asarray(grid, dtype=np.float64)), int(thin.sum())
 
 
 class WbgtJointGrid(NamedTuple):

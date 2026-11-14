@@ -7,7 +7,7 @@ dev_run.py``): its out-of-fold predictions are computed once for the module.
 import dataclasses
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -30,6 +30,9 @@ from stellar_blaze.ml.exporters import (
     dev_skill_payload,
     github_slug,
     oof_samples_frame,
+    preflight_dev_exports,
+    render_json,
+    render_oof_samples,
     write_dev_exports,
     write_json,
     write_oof_samples,
@@ -43,6 +46,7 @@ pytestmark = pytest.mark.unit
 GENERATED: Final = datetime(2026, 11, 14, 9, 30, tzinfo=UTC)
 GIT_SHA: Final = "a" * 40
 DATA_SHA: Final = "b" * 64
+COMMAND: Final = "sb-jobs evaluate-dev --config backend/training/configs/unit.toml --grid"
 REPO_ROOT: Final = Path(__file__).resolve().parents[4]
 
 
@@ -158,6 +162,7 @@ def _with_keys(oof: OofPredictions, keys: pl.DataFrame) -> OofPredictions:
 # === the abu_dhabi sample export ====================================================================================
 
 
+@pytest.mark.slow
 def test_oof_samples_frame_holds_the_consumer_columns_for_lead_one_working_hours(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions],
 ) -> None:
@@ -201,6 +206,7 @@ def test_oof_samples_frame_holds_the_consumer_columns_for_lead_one_working_hours
     assert frame.height == expected_rows
 
 
+@pytest.mark.slow
 def test_oof_samples_frame_values_come_from_the_oof_and_the_pairs(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions],
 ) -> None:
@@ -245,6 +251,7 @@ def test_oof_samples_frame_values_come_from_the_oof_and_the_pairs(
     )
 
 
+@pytest.mark.slow
 def test_oof_export_refuses_2026_rows(run: tuple[pl.DataFrame, OofPredictions, OofPredictions]) -> None:
     pairs, oof, _ = run
     exported = oof.keys.with_row_index("_i").filter(
@@ -292,6 +299,7 @@ def test_oof_export_refuses_2026_rows(run: tuple[pl.DataFrame, OofPredictions, O
     assert oof_samples_frame(oof, pairs).height > 0  # the untampered run is fine
 
 
+@pytest.mark.slow
 def test_oof_samples_frame_needs_the_samples_and_rows(run: tuple[pl.DataFrame, OofPredictions, OofPredictions]) -> None:
     pairs, oof, _ = run
 
@@ -301,6 +309,7 @@ def test_oof_samples_frame_needs_the_samples_and_rows(run: tuple[pl.DataFrame, O
         oof_samples_frame(oof, pairs, cluster="fujairah", lead=7)
 
 
+@pytest.mark.slow
 def test_write_oof_samples_is_zstd_parquet_with_provenance_and_is_deterministic(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
 ) -> None:
@@ -315,14 +324,70 @@ def test_write_oof_samples_is_zstd_parquet_with_provenance_and_is_deterministic(
     np.testing.assert_array_equal(back["samples"].to_numpy(), frame["samples"].to_numpy())
     metadata = pl.read_parquet_metadata(tmp_path / "a.parquet")
     assert json.loads(metadata["provenance"])["script"] == "stellar_blaze.ml.exporters"
+    assert json.loads(metadata["provenance"])["git_sha"] == GIT_SHA  # the deterministic provenance stays
+    assert "generated_at" not in json.loads(metadata["provenance"])  # a clock inside the file would change its hash
     metadata_pq = pq.ParquetFile(tmp_path / "a.parquet").metadata
     codecs = {metadata_pq.row_group(0).column(i).compression for i in range(metadata_pq.num_columns)}
     assert codecs == {"ZSTD"}
 
 
+@pytest.mark.slow
+def test_the_parquet_bytes_do_not_depend_on_the_generation_time(
+    run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
+) -> None:
+    pairs, oof, _ = run
+    frame = oof_samples_frame(oof, pairs)
+    later = _provenance().model_copy(update={"generated_at": GENERATED + timedelta(days=3, seconds=17)})
+
+    first = render_oof_samples(frame, _provenance())
+    second = render_oof_samples(frame, later)
+
+    assert first == second
+    assert write_oof_samples(tmp_path / "a.parquet", frame, _provenance()) == hashlib.sha256(first).hexdigest()
+    # the JSON files keep the time: only the parquet is made reproducible
+    assert render_json({"n": 1}, _provenance()) != render_json({"n": 1}, later)
+
+
+@pytest.mark.slow
+def test_samples_are_float32_with_nan_where_the_forecast_was_missing(
+    run: tuple[pl.DataFrame, OofPredictions, OofPredictions],
+) -> None:
+    pairs, oof, _ = run
+    assert oof.samples is not None
+    assert oof.sample_index is not None
+    exported = (
+        oof.keys[oof.sample_index]
+        .with_row_index("_s")
+        .filter((pl.col("lead_days") == 1) & pl.col("hour_utc").is_in(list(range(6, 15))))
+    )
+    missing = exported.row(3, named=True)
+    samples = oof.samples.copy()
+    samples[missing["_s"]] = np.nan  # the forecast was missing: nothing is imputed
+    mask = oof.keys.with_row_index("_i")["_i"] == int(oof.sample_index[missing["_s"]])
+    keys = oof.keys.with_columns(
+        *(pl.when(mask).then(None).otherwise(pl.col(name)).alias(name) for name in ("raw_t", "raw_td", "raw_wind"))
+    )
+
+    frame = oof_samples_frame(dataclasses.replace(oof, samples=samples, keys=keys), pairs)
+
+    n_samples = dev_cfg().n_joint_samples
+    assert samples.shape[1:] == (n_samples, 3)
+    assert frame.schema["samples"] == pl.Array(pl.Float32, (n_samples, 3))
+    values = frame["samples"].to_numpy()
+    assert values.dtype == np.float32
+    assert values.shape == (frame.height, n_samples, 3)
+    nan_rows = np.flatnonzero(np.isnan(values).all(axis=(1, 2)))
+    row = frame.row(int(nan_rows[0]), named=True)
+    assert nan_rows.size == 1
+    assert (row["station"], row["valid_time"]) == (missing["station"], missing["valid_time"])
+    assert row["raw_t"] is None
+    assert np.isfinite(np.delete(values, nan_rows, axis=0)).all()  # and every other row is finite
+
+
 # === dev_skill.json and the whole export ============================================================================
 
 
+@pytest.mark.slow
 def test_dev_skill_payload_has_every_table_the_report_quotes(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions],
 ) -> None:
@@ -391,6 +456,7 @@ def test_dev_skill_payload_has_every_table_the_report_quotes(
     json.dumps(payload, allow_nan=False)  # every number is finite JSON
 
 
+@pytest.mark.slow
 def test_dev_skill_payload_without_a_summer_split_says_so(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions],
 ) -> None:
@@ -408,7 +474,8 @@ def _table(value: object) -> pl.DataFrame:
     return pl.DataFrame(rows, schema=[str(c) for c in columns], orient="row", infer_schema_length=None)
 
 
-def test_write_dev_exports_writes_three_hashed_files_with_provenance(
+@pytest.mark.slow
+def test_write_dev_exports_writes_four_hashed_files_with_provenance(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
 ) -> None:
     pairs, oof, split = run
@@ -423,15 +490,23 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
         cfg=dev_cfg(),
         cfg_sha256=CFG_SHA256,
         git_sha=GIT_SHA,
+        git_clean=True,
         data_sha256=DATA_SHA,
+        command=COMMAND,
         mode="single",
+        calibration_targets="all",
         summer_split=split,
         counts={"oof_rows": oof.keys.height},
         n_boot=20,
         now=GENERATED,
     )
 
-    assert sorted(hashes) == ["dev_skill.json", "oof_samples_abu_dhabi.parquet", "selection.json"]
+    assert sorted(hashes) == [
+        "dev_skill.json",
+        "oof_samples_abu_dhabi.manifest.json",
+        "oof_samples_abu_dhabi.parquet",
+        "selection.json",
+    ]
     for name, digest in hashes.items():
         assert digest == hashlib.sha256((tmp_path / name).read_bytes()).hexdigest(), name
     selection = json.loads((tmp_path / "selection.json").read_bytes())
@@ -439,16 +514,47 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
     assert selection["decisions"] == [json.loads(decision.model_dump_json())]
     assert selection["mode"] == "single"
     assert selection["applied"] is False
-    assert selection["exports"] == {
+    assert selection["exports"] == {  # every export but selection.json itself; agrees with the returned hashes
         "dev_skill.json": hashes["dev_skill.json"],
+        "oof_samples_abu_dhabi.manifest.json": hashes["oof_samples_abu_dhabi.manifest.json"],
         "oof_samples_abu_dhabi.parquet": hashes["oof_samples_abu_dhabi.parquet"],
     }
-    assert selection["chosen_configuration"]["config_sha256"] == CFG_SHA256
+    chosen = selection["chosen_configuration"]
+    assert chosen["config_fingerprint"] == CFG_SHA256  # the TOML's hash in single mode, a fingerprint in grid mode
+    assert "config_sha256" not in chosen
+    assert chosen["fingerprint_of"] == "toml_file"
+    assert {key: chosen[key] for key in ("feature_set", "wbgt_method", "calibration_window")} == {
+        "feature_set": dev_cfg().feature_set.value,
+        "wbgt_method": dev_cfg().wbgt_method,
+        "calibration_window": dev_cfg().calibration_window,
+    }  # the field values `train --release` compares
+    assert chosen["lgbm"] == json.loads(dev_cfg().lgbm.model_dump_json())
+    assert selection["git_clean"] is True
+    assert selection["allow_dirty"] is False
+    assert selection["calibration_targets"] == "all"
     assert selection["chosen_configuration"]["lgbm"]["num_leaves"] == 7
     assert selection["counts"] == {"oof_rows": oof.keys.height}
     assert selection["provenance"]["protocol_anchor"] == "#6-selection-rules-on-2024-2025-loco-out-of-fold-only"
     assert skill["provenance"]["protocol_anchor"] == "#71-forecast-row-b2-artifactseval2026forecast_skilljson"
-    for block in (selection["provenance"], skill["provenance"]):
+    manifest_bytes = (tmp_path / "oof_samples_abu_dhabi.manifest.json").read_bytes()
+    manifest = json.loads(manifest_bytes)
+    samples = pl.read_parquet(tmp_path / "oof_samples_abu_dhabi.parquet")
+    assert manifest_bytes.endswith(b"}\n")
+    assert b"\r" not in manifest_bytes
+    assert manifest_bytes == (json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    assert {key: manifest[key] for key in manifest if key != "provenance"} == {
+        "file": "oof_samples_abu_dhabi.parquet",
+        "rows": samples.height,
+        "columns": [{"name": name, "dtype": str(dtype)} for name, dtype in samples.schema.items()],
+        "sha256": hashlib.sha256((tmp_path / "oof_samples_abu_dhabi.parquet").read_bytes()).hexdigest(),
+        "command": COMMAND,
+        "git_sha": GIT_SHA,
+        "git_clean": True,
+    }
+    assert manifest["rows"] == selection["samples_rows"] > 0
+    assert {"name": "samples", "dtype": str(samples.schema["samples"])} in manifest["columns"]
+    assert manifest["provenance"]["function"] == "oof_samples_manifest"
+    for block in (selection["provenance"], skill["provenance"], manifest["provenance"]):
         assert block["git_sha"] == GIT_SHA
         assert block["data_sha256"] == DATA_SHA
         assert block["model_id"] is None
@@ -460,6 +566,7 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
     assert (tmp_path / "dev_skill.json").stat().st_size < 500_000
 
 
+@pytest.mark.slow
 def test_write_dev_exports_never_writes_when_the_holdout_is_in_the_rows(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
 ) -> None:
@@ -476,10 +583,100 @@ def test_write_dev_exports_never_writes_when_the_holdout_is_in_the_rows(
             cfg=dev_cfg(),
             cfg_sha256=CFG_SHA256,
             git_sha=GIT_SHA,
+            git_clean=True,
             data_sha256=DATA_SHA,
+            command=COMMAND,
             mode="single",
+            calibration_targets="all",
             n_boot=20,
             now=GENERATED,
         )
 
     assert list(tmp_path.iterdir()) == []  # nothing, not even the files that do not read the 2026 rows
+
+
+def _export_kwargs(oof: OofPredictions, pairs: pl.DataFrame, **overrides: object) -> dict[str, object]:
+    decision = Decision(rule="6.4 calibration window", choice="september", evidence={"floor": 0.85}, tie_broken=False)
+    return {
+        "decisions": (decision,),
+        "pairs": pairs,
+        "cfg": dev_cfg(),
+        "cfg_sha256": CFG_SHA256,
+        "git_sha": GIT_SHA,
+        "git_clean": True,
+        "data_sha256": DATA_SHA,
+        "command": COMMAND,
+        "mode": "single",
+        "calibration_targets": "all",
+        "n_boot": 20,
+        "now": GENERATED,
+        **overrides,
+    }
+
+
+@pytest.mark.slow
+def test_two_exports_of_the_same_inputs_at_different_times_have_the_same_parquet_and_hash(
+    run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
+) -> None:
+    pairs, oof, _ = run
+    first = write_dev_exports(oof, out_dir=tmp_path / "one", **_export_kwargs(oof, pairs))  # type: ignore[arg-type]
+    second = write_dev_exports(
+        oof,
+        out_dir=tmp_path / "two",
+        **_export_kwargs(oof, pairs, now=GENERATED + timedelta(hours=5)),  # type: ignore[arg-type]
+    )
+
+    name = "oof_samples_abu_dhabi.parquet"
+    assert (tmp_path / "one" / name).read_bytes() == (tmp_path / "two" / name).read_bytes()
+    assert first[name] == second[name]
+    manifests = [
+        json.loads((tmp_path / d / "oof_samples_abu_dhabi.manifest.json").read_bytes()) for d in ("one", "two")
+    ]
+    assert manifests[0]["sha256"] == manifests[1]["sha256"] == first[name]  # the reproducible hash the manifest records
+    assert manifests[0]["provenance"]["generated_at"] != manifests[1]["provenance"]["generated_at"]  # JSON keeps it
+
+
+@pytest.mark.slow
+def test_a_failure_while_building_the_last_file_leaves_the_directory_untouched(
+    run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
+) -> None:
+    pairs, oof, _ = run
+    out = tmp_path / "exports"
+    unwritable = {"bad": pl.DataFrame({"x": [timedelta(days=1)]})}  # a type table_payload refuses, found last
+
+    with pytest.raises(TypeError, match="cannot write"):
+        write_dev_exports(oof, out_dir=out, tables=unwritable, **_export_kwargs(oof, pairs))  # type: ignore[arg-type]
+
+    assert not out.exists()  # not even created: nothing was written before the failure
+
+
+@pytest.mark.slow
+def test_a_dirty_tree_and_an_allowed_dirty_run_are_recorded(
+    run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
+) -> None:
+    pairs, oof, _ = run
+    write_dev_exports(
+        oof,
+        out_dir=tmp_path,
+        **_export_kwargs(oof, pairs, git_clean=False, allow_dirty=True, calibration_targets="wbgt"),  # type: ignore[arg-type]
+    )
+
+    selection = json.loads((tmp_path / "selection.json").read_bytes())
+    manifest = json.loads((tmp_path / "oof_samples_abu_dhabi.manifest.json").read_bytes())
+    assert (selection["git_clean"], selection["allow_dirty"], selection["calibration_targets"]) == (False, True, "wbgt")
+    assert manifest["git_clean"] is False
+    assert "git_clean" not in selection["provenance"]  # Provenance is extra="forbid" and not ours to extend
+
+
+@pytest.mark.slow
+def test_the_preflight_builds_the_export_and_refuses_what_the_export_would_refuse(
+    run: tuple[pl.DataFrame, OofPredictions, OofPredictions],
+) -> None:
+    pairs, oof, _ = run
+    tampered = _with_keys(oof, oof.keys.with_columns(pl.col("summer").cast(pl.Int16).replace({2025: 2026})))
+
+    preflight_dev_exports(oof, pairs, dev_cfg())  # builds the sample frame and the skill tables, writes nothing
+    with pytest.raises(HoldoutViolationError):
+        preflight_dev_exports(tampered, pairs, dev_cfg())
+    with pytest.raises(ValueError, match="no joint samples"):
+        preflight_dev_exports(dataclasses.replace(oof, samples=None, sample_index=None), pairs, dev_cfg())

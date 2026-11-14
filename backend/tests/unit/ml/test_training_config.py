@@ -163,27 +163,30 @@ def test_load_rejects_unknown_key_in_file(tmp_path: Path) -> None:
 # === the shipped files ==============================================================================================
 
 
-def test_shipped_configs_validate_and_differ_only_in_name_and_feature_set() -> None:
-    site, site_hash = load_training_config(SITE_TOML)
+def test_shipped_configs_validate_and_differ_only_in_name() -> None:
+    # After the pre-registered selection (rule 6.2 chose `cold`), corrector-v1 and corrector-cold-v1 carry the same
+    # settings; only the name (and so the file hash and the cfg6 of a model id) differs.
+    main, main_hash = load_training_config(SITE_TOML)
     cold, cold_hash = load_training_config(COLD_TOML)
-    assert site.feature_set is FeatureSet.SITE
+    assert main.feature_set is FeatureSet.COLD
     assert cold.feature_set is FeatureSet.COLD
-    assert site_hash != cold_hash
-    assert site.model_dump(exclude={"name", "feature_set"}) == cold.model_dump(exclude={"name", "feature_set"})
-    assert site.name == "corrector-v1"
+    assert main_hash != cold_hash
+    assert main.model_dump(exclude={"name"}) == cold.model_dump(exclude={"name"})
+    assert main.name == "corrector-v1"
     assert cold.name == "corrector-cold-v1"
 
 
-@pytest.mark.parametrize("path", [SITE_TOML, COLD_TOML], ids=["site", "cold"])
-def test_shipped_configs_hold_the_preregistered_starting_point(path: Path) -> None:
+@pytest.mark.parametrize("path", [SITE_TOML, COLD_TOML], ids=["v1", "cold-v1"])
+def test_shipped_configs_hold_the_selected_configuration(path: Path) -> None:
+    # The values selection.json recorded on 2024-2025 (6.1 grid point, 6.2 cold, 6.3 joint, 6.4 weeks window).
     cfg, _ = load_training_config(path)
     assert cfg.levels == LEVELS  # exact doubles, as round(k * 0.05, 2)
     assert cfg.leads == tuple(MODEL_LEADS)
     assert cfg.hours_utc == tuple(MODELLED_HOURS_UTC)
-    assert cfg.calibration_window == "september"
+    assert cfg.calibration_window == "weeks_4_8_12_16"
     assert cfg.wbgt_method == "joint"
-    assert cfg.lgbm.num_leaves == 15
-    assert cfg.lgbm.min_child_samples == 200
+    assert cfg.lgbm.num_leaves == 7
+    assert cfg.lgbm.min_child_samples == 1000
     assert cfg.lgbm.n_estimators == 150
     assert cfg.lgbm.learning_rate == 0.05
     assert cfg.lgbm.feature_fraction == 0.8
