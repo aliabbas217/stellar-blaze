@@ -206,6 +206,95 @@ def test_apply_offsets_negative_offsets_stop_at_the_median() -> None:
     assert np.all(out == grid[0, 9])
 
 
+def test_apply_offsets_negative_offset_that_does_not_reach_the_median_narrows_exactly() -> None:
+    grid = _linear_grid(0.0, 1.0)  # quantile k is k; the median is 9
+    offsets = [-0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    out = apply_symmetric_offsets(grid, offsets)
+    assert out[0, 0] == pytest.approx(grid[0, 0] + 0.1, abs=1e-12)
+    assert out[0, 18] == pytest.approx(grid[0, 18] - 0.1, abs=1e-12)
+    assert np.array_equal(out[0, 1:18], grid[0, 1:18])
+    spaced = _linear_grid(0.0, 4.0)  # a larger offset narrows by exactly its size while it stays clear of the median
+    wide = apply_symmetric_offsets(spaced, [-1.5] + [0.0] * 8)
+    assert wide[0, 0] == pytest.approx(1.5)
+    assert wide[0, 18] == pytest.approx(70.5)
+    every_pair = apply_symmetric_offsets(grid, [-0.25 * (i + 1) / 9 for i in range(9)])
+    for i in range(9):
+        assert every_pair[0, i] == pytest.approx(grid[0, i] + 0.25 * (i + 1) / 9)
+        assert every_pair[0, 18 - i] == pytest.approx(grid[0, 18 - i] - 0.25 * (i + 1) / 9)
+
+
+def _asymmetric_grid(lower_gap: float, upper_gap: float) -> F64:
+    """Median 10; the quantiles next to it are ``lower_gap`` below and ``upper_gap`` above, then 0.5 or 2.0 apart."""
+    lower = [10.0 - lower_gap - 0.5 * (8 - k) for k in range(9)]  # columns 0..8
+    upper = [10.0 + upper_gap + 2.0 * (k - 10) for k in range(10, 19)]  # columns 10..18
+    return _grid([*lower, 10.0, *upper])
+
+
+def test_apply_offsets_when_only_the_lower_side_reaches_the_median_only_it_stops_there() -> None:
+    grid = _asymmetric_grid(lower_gap=0.5, upper_gap=2.0)  # column 8 is 9.5, column 10 is 12.0
+    out = apply_symmetric_offsets(grid, [0.0] * 8 + [-1.0])  # pair 8 is columns 8 and 10
+    assert out[0, 8] == 10.0  # 9.5 + 1.0 would pass the median: it stops there
+    assert out[0, 10] == pytest.approx(11.0)  # 12.0 - 1.0 stays above the median: the full offset
+    assert np.all(np.diff(out, axis=1) >= 0.0)
+    rest = [k for k in range(19) if k not in (8, 10)]
+    assert np.array_equal(out[0, rest], grid[0, rest])
+
+
+def test_apply_offsets_when_only_the_upper_side_reaches_the_median_only_it_stops_there() -> None:
+    grid = _asymmetric_grid(lower_gap=2.0, upper_gap=0.5)  # column 8 is 8.0, column 10 is 10.5
+    out = apply_symmetric_offsets(grid, [0.0] * 8 + [-1.0])
+    assert out[0, 10] == 10.0  # 10.5 - 1.0 would pass the median: it stops there
+    assert out[0, 8] == pytest.approx(9.0)  # 8.0 + 1.0 stays below the median: the full offset
+    assert np.all(np.diff(out, axis=1) >= 0.0)
+    rest = [k for k in range(19) if k not in (8, 10)]
+    assert np.array_equal(out[0, rest], grid[0, rest])
+
+
+# === NaN and infinities: a row is usable or it is all NaN ==========================================================
+
+
+def _with_bad_value(value: float, column: int = 3) -> F64:
+    grid = _linear_grid(0.0, 1.0, rows=3)
+    grid[1, column] = value
+    return grid
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+def test_sort_grid_turns_a_row_with_a_non_finite_value_into_an_all_nan_row(bad: float) -> None:
+    out = sort_grid(_with_bad_value(bad))
+    assert np.isnan(out[1]).all()
+    assert np.array_equal(out[[0, 2]], _linear_grid(0.0, 1.0, rows=2))
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+def test_apply_offsets_turns_a_row_with_a_non_finite_value_into_an_all_nan_row(bad: float) -> None:
+    out = apply_symmetric_offsets(_with_bad_value(bad), [0.0] * 9)  # zero offsets: nothing else may change
+    assert np.isnan(out[1]).all()  # not [0, 1, 2, 4, ..., 18, nan]
+    assert np.array_equal(out[[0, 2]], _linear_grid(0.0, 1.0, rows=2))
+    # also when the bad value is the median and when it is an extreme
+    assert np.isnan(apply_symmetric_offsets(_with_bad_value(bad, 9), [0.5] * 9)[1]).all()
+    assert np.isnan(apply_symmetric_offsets(_with_bad_value(bad, 0), [0.5] * 9)[1]).all()
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+@pytest.mark.parametrize("position", [0, 4, 8])
+def test_a_non_finite_offset_makes_every_row_all_nan(bad: float, position: int) -> None:
+    offsets = [0.1] * 9
+    offsets[position] = bad
+    out = apply_symmetric_offsets(_linear_grid(0.0, 1.0, rows=3), offsets)
+    assert out.shape == (3, 19)
+    assert np.isnan(out).all()
+
+
+@pytest.mark.parametrize("bad", [np.inf, -np.inf])
+def test_ppf_and_cdf_treat_an_infinite_grid_row_as_all_nan_without_warnings(bad: float) -> None:
+    grid = _with_bad_value(bad)
+    assert np.isnan(ppf(grid, np.array([0.5, 0.5, 0.5]))[1])
+    assert np.isnan(cdf(grid, np.array([5.0, 5.0, 5.0]))[1])
+    assert np.isfinite(ppf(grid, np.array([0.5, 0.5, 0.5]))[[0, 2]]).all()
+    assert np.isfinite(cdf(grid, np.array([5.0, 5.0, 5.0]))[[0, 2]]).all()
+
+
 @_SETTINGS
 @given(
     grid=strictly_increasing_grids(),

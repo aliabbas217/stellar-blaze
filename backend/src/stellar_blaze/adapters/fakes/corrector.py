@@ -6,8 +6,9 @@ nothing is corrected and every quantile equals the raw value (status ``uncorrect
 the gold dataset computes ``wbgt_fc_c``: Liljegren over the forecast's own temperature, dew point, wind, radiation and
 pressure at the station's coordinates, so a test that compares the two is meaningful.
 
-Samples are independent draws from the three grids (no copula). It uses ``statistics.NormalDist`` for the normal
-quantile: adapters do not import scipy.
+Samples are independent draws from the three grids (no copula) and are not physically screened: wind can be
+negative and the dew point can exceed the temperature, unlike the real corrector's samples. It uses
+``statistics.NormalDist`` for the normal quantile: adapters do not import scipy.
 """
 
 import math

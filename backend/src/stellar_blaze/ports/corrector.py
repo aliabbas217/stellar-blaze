@@ -49,8 +49,26 @@ class ForecastCorrector(Protocol):
 
         Returns:
             ``CORRECTED_FORECAST_SCHEMA`` rows, one per row of ``ifs`` and variable (``t``, ``td``, ``wind``,
-            ``wbgt``), grouped by the input row and in its order. A row that cannot be corrected because an input is
-            missing has ``status = "missing_input"`` and null quantiles, never a number.
+            ``wbgt``), grouped by the input row and in its order.
+
+        History cutoff (pre-registration L3, a contract every implementation must keep): for the row being corrected,
+        with UTC valid date ``D`` and ``lead_days`` ``L``, the forecast was issued on ``D - L``, so only ``history``
+        and ``history_ifs`` rows whose UTC valid date is ``<= D - L - 1`` may influence that row's output. The
+        implementation MUST ignore later rows itself: a caller may pass one window for all rows (for a lead-3 row it
+        then holds the truth of ``D - 3`` and ``D - 2``, which did not exist at issue time). The helper
+        ``assert_respects_history_cutoff`` in ``tests/unit/forecast/contract.py`` checks it for any implementation.
+
+        Statuses and what a caller may rely on:
+
+        * ``ok``: calibrated, sorted quantiles.
+        * ``missing_input``: null quantiles and, if the raw value itself cannot be computed, null ``raw``; it is for
+          an IFS row that lacks a value the corrector needs. A missing GFS row is not ``missing_input``: it is a
+          missing feature (null GFS features) and the row is still corrected.
+        * ``uncorrected``: the quantile columns are populated and all equal to ``raw`` (null quantiles occur only for
+          ``missing_input``). A grid of equal quantiles gives ``exceedance_probability(grid, raw) == 0.5`` (mid-rank),
+          so compare ``status`` with ``CorrectionStatus`` instead of inferring "uncorrected" from the grid. A real
+          corrector also returns ``uncorrected`` for a row outside ``MODELLED_HOURS_UTC`` or ``MODEL_LEADS``: it never
+          claims calibration it does not have. ``FakeCorrector`` does not distinguish those rows.
         """
         ...
 
@@ -68,6 +86,10 @@ class ForecastCorrector(Protocol):
             second. ``rows`` are the distinct (station, valid_time, lead_days) keys of ``corrected`` in order of first
             appearance. The samples of a forecast row with any of the three variables ``missing_input`` are NaN for
             that variable.
+
+            The real corrector's samples satisfy ``td <= t`` and ``wind >= 0``. ``FakeCorrector`` does not screen its
+            samples (wind can be negative, ``td`` can exceed ``t``), so code that needs those properties must not rely
+            on the fake to supply them.
 
         Raises:
             ValueError: ``n_samples`` is below 1, or a key lacks one of the three variables or repeats one.

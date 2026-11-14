@@ -16,6 +16,7 @@ from types import MappingProxyType
 from typing import Final
 
 import numpy as np
+from numpy.typing import NDArray
 
 from stellar_blaze.domain.physics.types import F64  # NDArray[np.float64], the one alias the domain uses
 
@@ -90,18 +91,32 @@ def _checked_grid(grid: F64) -> F64:
     return array
 
 
-def _require_sorted(grid: F64) -> None:
-    if np.any(np.diff(grid, axis=1) < 0.0):
+def _usable(array: F64) -> tuple[F64, NDArray[np.bool_]]:
+    """The grid with every row that holds a NaN or an infinity replaced by zeros, and the mask of those rows.
+
+    The arithmetic below runs on the clean copy (so it cannot warn on ``inf - inf`` or ``nan`` comparisons) and the
+    caller turns the masked rows into all-NaN rows at the end.
+    """
+    bad = ~np.isfinite(array).all(axis=1, keepdims=True)
+    return np.where(bad, 0.0, array), bad
+
+
+def _require_sorted(clean: F64) -> None:
+    if np.any(np.diff(clean, axis=1) < 0.0):
         raise ValueError("the quantile grid must be sorted along its levels (use sort_grid first)")
 
 
 def sort_grid(grid: F64) -> F64:
     """Each row of ``(n, 19)`` sorted ascending, as a new array (quantile crossing repaired by rearrangement).
 
+    A row that holds a NaN or an infinity is returned as an all-NaN row: sorting would move the NaN to the end and
+    shift every later level, which would look like a grid.
+
     Raises:
         ValueError: ``grid`` does not have 19 columns.
     """
-    return np.sort(_checked_grid(grid), axis=1)
+    clean, bad = _usable(_checked_grid(grid))
+    return np.where(bad, np.nan, np.sort(clean, axis=1))
 
 
 def apply_symmetric_offsets(grid: F64, offsets: Sequence[float]) -> F64:
@@ -112,6 +127,9 @@ def apply_symmetric_offsets(grid: F64, offsets: Sequence[float]) -> F64:
     the upper one): an interval cannot be thinner than the median it is centered on. The result is re-sorted, because
     offsets that differ between pairs can make neighboring quantiles cross.
 
+    A row that holds a NaN or an infinity, and every row if any offset is NaN or infinite, comes back as an all-NaN row
+    (never a partly shifted one).
+
     Args:
         grid: Sorted quantiles, shape ``(n, 19)``.
         offsets: Nine offsets, one per pair of ``PAIRS``, in the grid's units.
@@ -119,16 +137,18 @@ def apply_symmetric_offsets(grid: F64, offsets: Sequence[float]) -> F64:
     Raises:
         ValueError: The grid does not have 19 columns or is not sorted, or there are not exactly 9 offsets.
     """
-    array = _checked_grid(grid)
+    array, bad = _usable(_checked_grid(grid))
     q = np.asarray(offsets, dtype=np.float64)
     if q.shape != (len(PAIRS),):
         raise ValueError(f"expected {len(PAIRS)} offsets, one per pair, got shape {q.shape}")
     _require_sorted(array)
+    if not np.isfinite(q).all():
+        return np.full(array.shape, np.nan)
     out = array.copy()
     median = array[:, [_MEDIAN]]
     out[:, :_MEDIAN] = np.minimum(array[:, :_MEDIAN] - q, median)
     out[:, _MEDIAN + 1 :] = np.maximum(array[:, _MEDIAN + 1 :][:, ::-1] + q, median)[:, ::-1]
-    return np.sort(out, axis=1)
+    return np.where(bad, np.nan, np.sort(out, axis=1))
 
 
 def _rows_of_values(grid: F64, values: F64, what: str) -> tuple[F64, bool]:
@@ -148,12 +168,13 @@ def ppf(grid: F64, u: F64) -> F64:
 
     Returns:
         An array with the shape of ``u``. Below 0.05 and above 0.95 the line through the outermost segment is extended
-        (a zero-width outermost segment extends as a constant). A NaN in the grid row gives NaN.
+        (a zero-width outermost segment extends as a constant). A grid row holding a NaN or an infinity (infinities
+        are not supported) gives NaN.
 
     Raises:
         ValueError: A shape is wrong, the grid is not sorted, or a probability is outside [0, 1].
     """
-    array = _checked_grid(grid)
+    array, bad = _usable(_checked_grid(grid))
     _require_sorted(array)
     probabilities, flat = _rows_of_values(array, u, "u")
     if np.any((probabilities < 0.0) | (probabilities > 1.0)):
@@ -164,7 +185,7 @@ def ppf(grid: F64, u: F64) -> F64:
     lower = np.take_along_axis(array, segment, axis=1)
     upper = np.take_along_axis(array, segment + 1, axis=1)
     out = lower + (position - segment) * (upper - lower)
-    out[missing | np.isnan(array).any(axis=1, keepdims=True)] = np.nan
+    out[missing | bad] = np.nan
     return out[:, 0] if flat else out
 
 
@@ -182,12 +203,13 @@ def cdf(grid: F64, x: F64) -> F64:
         x: Values, shape ``(n,)`` (one per row) or ``(n, k)`` (``k`` per row). NaN stays NaN.
 
     Returns:
-        An array of probabilities with the shape of ``x``. A NaN in the grid row gives NaN.
+        An array of probabilities with the shape of ``x``. A grid row holding a NaN or an infinity (infinities are not
+        supported) gives NaN.
 
     Raises:
         ValueError: A shape is wrong or the grid is not sorted.
     """
-    array = _checked_grid(grid)
+    array, bad = _usable(_checked_grid(grid))
     _require_sorted(array)
     values, flat = _rows_of_values(array, x, "x")
     levels = np.asarray(LEVELS, dtype=np.float64)
@@ -222,7 +244,7 @@ def cdf(grid: F64, x: F64) -> F64:
     out = np.where(below == 0, np.where(ties > 0, mid_rank, extended_low), out)
     out = np.where(at_or_below == _N, np.where(ties > 0, mid_rank, extended_high), out)
     out = np.clip(out, 0.0, 1.0)
-    out[np.isnan(values) | np.isnan(array).any(axis=1, keepdims=True)] = np.nan
+    out[np.isnan(values) | bad] = np.nan
     return out[:, 0] if flat else out
 
 

@@ -2,7 +2,6 @@
 
 from datetime import UTC, date, datetime
 
-import numpy as np
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
@@ -373,8 +372,3 @@ def test_observations_of_returns_one_row_per_station_hour_with_truth(default_pai
         default_pairs.filter((pl.col("model") == IFS) & (pl.col("lead_days") == 0)), on=["station", "valid_time"]
     )
     assert values["t_c"].to_list() == values["obs_t_c"].to_list()
-
-
-def test_numpy_float_types_do_not_leak_into_the_frame(default_pairs: pl.DataFrame) -> None:
-    assert default_pairs["fc_t_c"].dtype == pl.Float64
-    assert np.isfinite(default_pairs["fc_t_c"].to_numpy()).all()

@@ -183,7 +183,9 @@ def make_pairs(
         station_bias_c: Mean forecast minus truth of the temperature in degrees Celsius, per ICAO identifier; a station
             that is not named has none. It applies to every model and lead.
         stations: ICAO identifiers to generate (default: all 8, with their real clusters).
-        leads: Leads in days, 0 to 7.
+        leads: Leads in days, 0 to 7. Omitting lead 0 leaves every ``ref_*`` null and so every truth WBGT NaN (reject
+            code ``NONFINITE_INPUT``): a caller that passes ``MODEL_LEADS`` (1-7) and needs the WBGT truth must keep
+            lead 0 in the selection or build the truth separately.
         hours_utc: Hours of the UTC day (the default is all 24, so that a loader's hour filter has something to filter).
         summer_days: 1-based days of the summer (1 is 15 May, 110 is 1 September, 139 is 30 September); the default is
             ``SUMMER_DAYS``, days 1-30 and 110-139.
