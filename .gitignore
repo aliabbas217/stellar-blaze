@@ -18,3 +18,7 @@ backend/data/
 # Staging directory of a crashed replay build (jobs/replay_build.py: replay/.<snapshot_id>.building)
 backend/replay/.*.building/
 .numba-cache/
+
+# The dev out-of-fold sample parquet is regenerated, not committed. Its manifest (oof_samples_abu_dhabi.manifest.json:
+# rows, columns, SHA-256, command), selection.json and dev_skill.json stay tracked: no other pattern matches them.
+artifacts/eval/dev/*.parquet

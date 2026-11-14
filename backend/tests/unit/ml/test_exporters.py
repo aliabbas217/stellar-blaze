@@ -43,6 +43,7 @@ pytestmark = pytest.mark.unit
 GENERATED: Final = datetime(2026, 11, 14, 9, 30, tzinfo=UTC)
 GIT_SHA: Final = "a" * 40
 DATA_SHA: Final = "b" * 64
+COMMAND: Final = "sb-jobs evaluate-dev --config backend/training/configs/unit.toml --grid"
 REPO_ROOT: Final = Path(__file__).resolve().parents[4]
 
 
@@ -408,7 +409,7 @@ def _table(value: object) -> pl.DataFrame:
     return pl.DataFrame(rows, schema=[str(c) for c in columns], orient="row", infer_schema_length=None)
 
 
-def test_write_dev_exports_writes_three_hashed_files_with_provenance(
+def test_write_dev_exports_writes_four_hashed_files_with_provenance(
     run: tuple[pl.DataFrame, OofPredictions, OofPredictions], tmp_path: Path
 ) -> None:
     pairs, oof, split = run
@@ -424,6 +425,7 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
         cfg_sha256=CFG_SHA256,
         git_sha=GIT_SHA,
         data_sha256=DATA_SHA,
+        command=COMMAND,
         mode="single",
         summer_split=split,
         counts={"oof_rows": oof.keys.height},
@@ -431,7 +433,12 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
         now=GENERATED,
     )
 
-    assert sorted(hashes) == ["dev_skill.json", "oof_samples_abu_dhabi.parquet", "selection.json"]
+    assert sorted(hashes) == [
+        "dev_skill.json",
+        "oof_samples_abu_dhabi.manifest.json",
+        "oof_samples_abu_dhabi.parquet",
+        "selection.json",
+    ]
     for name, digest in hashes.items():
         assert digest == hashlib.sha256((tmp_path / name).read_bytes()).hexdigest(), name
     selection = json.loads((tmp_path / "selection.json").read_bytes())
@@ -439,8 +446,9 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
     assert selection["decisions"] == [json.loads(decision.model_dump_json())]
     assert selection["mode"] == "single"
     assert selection["applied"] is False
-    assert selection["exports"] == {
+    assert selection["exports"] == {  # every export but selection.json itself; agrees with the returned hashes
         "dev_skill.json": hashes["dev_skill.json"],
+        "oof_samples_abu_dhabi.manifest.json": hashes["oof_samples_abu_dhabi.manifest.json"],
         "oof_samples_abu_dhabi.parquet": hashes["oof_samples_abu_dhabi.parquet"],
     }
     assert selection["chosen_configuration"]["config_sha256"] == CFG_SHA256
@@ -448,7 +456,24 @@ def test_write_dev_exports_writes_three_hashed_files_with_provenance(
     assert selection["counts"] == {"oof_rows": oof.keys.height}
     assert selection["provenance"]["protocol_anchor"] == "#6-selection-rules-on-2024-2025-loco-out-of-fold-only"
     assert skill["provenance"]["protocol_anchor"] == "#71-forecast-row-b2-artifactseval2026forecast_skilljson"
-    for block in (selection["provenance"], skill["provenance"]):
+    manifest_bytes = (tmp_path / "oof_samples_abu_dhabi.manifest.json").read_bytes()
+    manifest = json.loads(manifest_bytes)
+    samples = pl.read_parquet(tmp_path / "oof_samples_abu_dhabi.parquet")
+    assert manifest_bytes.endswith(b"}\n")
+    assert b"\r" not in manifest_bytes
+    assert manifest_bytes == (json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    assert {key: manifest[key] for key in manifest if key != "provenance"} == {
+        "file": "oof_samples_abu_dhabi.parquet",
+        "rows": samples.height,
+        "columns": [{"name": name, "dtype": str(dtype)} for name, dtype in samples.schema.items()],
+        "sha256": hashlib.sha256((tmp_path / "oof_samples_abu_dhabi.parquet").read_bytes()).hexdigest(),
+        "command": COMMAND,
+        "git_sha": GIT_SHA,
+    }
+    assert manifest["rows"] == selection["samples_rows"] > 0
+    assert {"name": "samples", "dtype": str(samples.schema["samples"])} in manifest["columns"]
+    assert manifest["provenance"]["function"] == "oof_samples_manifest"
+    for block in (selection["provenance"], skill["provenance"], manifest["provenance"]):
         assert block["git_sha"] == GIT_SHA
         assert block["data_sha256"] == DATA_SHA
         assert block["model_id"] is None
@@ -477,6 +502,7 @@ def test_write_dev_exports_never_writes_when_the_holdout_is_in_the_rows(
             cfg_sha256=CFG_SHA256,
             git_sha=GIT_SHA,
             data_sha256=DATA_SHA,
+            command=COMMAND,
             mode="single",
             n_boot=20,
             now=GENERATED,

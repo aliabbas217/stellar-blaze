@@ -1,13 +1,16 @@
 """The dev exports: canonical JSON with provenance, the dev skill tables and the abu_dhabi out-of-fold samples.
 
-``write_dev_exports`` writes three files to ``artifacts/eval/dev/`` (pre-registration section 6 and 7.1):
+``write_dev_exports`` writes four files to ``artifacts/eval/dev/`` (pre-registration section 6 and 7.1):
 
 * ``oof_samples_abu_dhabi.parquet``: the held-out abu_dhabi fold's out-of-fold joint (t, td, wind) samples at lead 1,
   working daytime, with what B3's theta rule (6.5) needs to turn them into TWL and to score them (see
-  ``oof_samples_frame``). 2024-2025 rows only: building it asserts that and raises ``HoldoutViolationError``.
+  ``oof_samples_frame``). 2024-2025 rows only: building it asserts that and raises ``HoldoutViolationError``. It is
+  not committed (``.gitignore``).
+* ``oof_samples_abu_dhabi.manifest.json``: what the parquet is (rows, columns, SHA-256, the command and the commit
+  that wrote it); this is the committed record of the parquet.
 * ``dev_skill.json``: the skill tables the evaluation report quotes, from ``evaluate.skill_table``.
 * ``selection.json``: every decision with its evidence, the chosen configuration, the 6.1 grid scores, the frames each
-  decision read and the per-stage counts, plus the SHA-256 of the other two files.
+  decision read and the per-stage counts, plus the SHA-256 of the other three files.
 
 Every number written comes from code. JSON is canonical (sorted keys, compact separators, UTF-8, LF written as bytes
 because ``Path.write_text`` writes CRLF on Windows while git stores LF: R21) and carries a ``provenance`` block; the
@@ -41,6 +44,8 @@ from stellar_blaze.ml.training_config import TrainingConfig
 
 __all__ = [
     "FLOAT_DECIMALS",
+    "OOF_SAMPLES_FILE",
+    "OOF_SAMPLES_MANIFEST_FILE",
     "PROTOCOL_PATH",
     "REPORT_HOUR_BLOCKS",
     "REPORT_LEADS",
@@ -49,6 +54,7 @@ __all__ = [
     "dev_skill_payload",
     "github_slug",
     "oof_samples_frame",
+    "oof_samples_manifest",
     "table_payload",
     "write_dev_exports",
     "write_json",
@@ -67,6 +73,8 @@ SECTION_7_1_HEADING: Final = "7.1 Forecast row (B2; `artifacts/eval/2026/forecas
 REPORT_LEADS: Final[tuple[int, ...]] = (1, 2, 3, 5, 7)
 REPORT_HOUR_BLOCKS: Final[tuple[str, ...]] = ("early", "peak", "late", "working")
 FLOAT_DECIMALS: Final = 6
+OOF_SAMPLES_FILE: Final = "oof_samples_abu_dhabi.parquet"
+OOF_SAMPLES_MANIFEST_FILE: Final = "oof_samples_abu_dhabi.manifest.json"
 _EXPORTERS: Final = "stellar_blaze.ml.exporters"
 _PARQUET_LEVEL: Final = 19
 _IFS: Final = NwpModel.ECMWF_IFS025.value
@@ -260,6 +268,25 @@ def write_oof_samples(path: Path, frame: pl.DataFrame, provenance: Provenance) -
     return hashlib.sha256(data).hexdigest()
 
 
+def oof_samples_manifest(
+    frame: pl.DataFrame, *, parquet_sha256: str, command: str, git_sha: str
+) -> dict[str, JsonValue]:
+    """What a reader needs to check a regenerated ``oof_samples_abu_dhabi.parquet`` against the one that was run.
+
+    The parquet is not committed (``.gitignore``), so this small JSON is: the file name, its row count, its columns
+    (name and polars dtype, as strings), the SHA-256 of its bytes, the exact command that wrote it and the commit.
+    """
+    columns: list[JsonValue] = [{"name": name, "dtype": str(dtype)} for name, dtype in frame.schema.items()]
+    return {
+        "file": OOF_SAMPLES_FILE,
+        "rows": frame.height,
+        "columns": columns,
+        "sha256": parquet_sha256,
+        "command": command,
+        "git_sha": git_sha,
+    }
+
+
 # === dev_skill.json =================================================================================================
 
 
@@ -380,6 +407,7 @@ def write_dev_exports(
     cfg_sha256: str,
     git_sha: str,
     data_sha256: str,
+    command: str,
     mode: Literal["grid", "single"],
     grid_scores: pl.DataFrame | None = None,
     tables: Mapping[str, pl.DataFrame] | None = None,
@@ -388,11 +416,12 @@ def write_dev_exports(
     n_boot: int = 2000,
     now: datetime | None = None,
 ) -> dict[str, str]:
-    """Write ``oof_samples_abu_dhabi.parquet``, ``dev_skill.json`` and ``selection.json`` to ``out_dir``.
+    """Write the parquet, its manifest, ``dev_skill.json`` and ``selection.json`` to ``out_dir``.
 
     Everything is computed (and the 2026 assertion made) before the first file is written, so a refusal leaves
-    ``out_dir`` untouched. The parquet and ``dev_skill.json`` are written first so ``selection.json`` can carry their
-    hashes.
+    ``out_dir`` untouched. The parquet, its ``oof_samples_abu_dhabi.manifest.json`` and ``dev_skill.json`` are written
+    first so ``selection.json`` can carry their hashes. The parquet is not committed (``.gitignore``); the manifest,
+    ``dev_skill.json`` and ``selection.json`` are.
 
     Args:
         oof: The final configuration's LOCO predictions (with abu_dhabi samples).
@@ -403,6 +432,7 @@ def write_dev_exports(
         cfg_sha256: Its hash (``DevSelection.cfg_sha256``).
         git_sha: The commit the run was at.
         data_sha256: SHA-256 of the gold pairs file (from its manifest).
+        command: The exact ``sb-jobs evaluate-dev`` invocation, recorded in the sample manifest.
         mode: ``"grid"`` (the decisions were applied) or ``"single"`` (only the 6.4 coverage report; not applied).
         grid_scores: The 6.1 scores, if the grid ran.
         tables: The frames each decision read, written under ``inputs``.
@@ -412,7 +442,7 @@ def write_dev_exports(
         now: The generation time (default now, UTC).
 
     Returns:
-        File name to SHA-256 of the file's bytes, for all three files.
+        File name to SHA-256 of the file's bytes, for all four files.
 
     Raises:
         HoldoutViolationError: The OOF keys or the pairs hold summer 2026.
@@ -430,10 +460,13 @@ def write_dev_exports(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     hashes: dict[str, str] = {}
-    hashes["oof_samples_abu_dhabi.parquet"] = write_oof_samples(
-        out_dir / "oof_samples_abu_dhabi.parquet",
-        samples,
-        provenance(SELECTION_ANCHOR, _EXPORTERS, "oof_samples_frame"),
+    hashes[OOF_SAMPLES_FILE] = write_oof_samples(
+        out_dir / OOF_SAMPLES_FILE, samples, provenance(SELECTION_ANCHOR, _EXPORTERS, "oof_samples_frame")
+    )
+    hashes[OOF_SAMPLES_MANIFEST_FILE] = write_json(
+        out_dir / OOF_SAMPLES_MANIFEST_FILE,
+        oof_samples_manifest(samples, parquet_sha256=hashes[OOF_SAMPLES_FILE], command=command, git_sha=git_sha),
+        provenance(SELECTION_ANCHOR, _EXPORTERS, "oof_samples_manifest"),
     )
     hashes["dev_skill.json"] = write_json(
         out_dir / "dev_skill.json", skill, provenance(SKILL_ANCHOR, _EXPORTERS, "dev_skill_payload")

@@ -28,6 +28,10 @@ EVALUATE_2026 = SRC / "jobs" / "evaluate_2026.py"
 PARQUET_READERS = frozenset({"read_parquet", "scan_parquet"})
 ML_PARQUET_READERS = frozenset({"ml/data.py"})
 PARQUET_READERS_OUTSIDE_ML = {
+    "adapters/compute/lgbm_corrector.py": (
+        "reads the model's two fold_stats climatology parquet files from bytes via io.BytesIO after scan_models "
+        "verified their hashes; never the gold file"
+    ),
     "adapters/sources/ghcnh.py": "decodes the NOAA GHCNh download held in memory (io.BytesIO), never the gold file",
     "adapters/sources/replay.py": (
         "decodes the two data files of a replay snapshot from bytes just checked against snapshot.json (io.BytesIO); "

@@ -20,7 +20,7 @@ from typer.testing import CliRunner
 
 from stellar_blaze.adapters.storage.parquet_store import ParquetStore
 from stellar_blaze.domain.weather.dataset import DatasetSummary
-from stellar_blaze.jobs import replay_build
+from stellar_blaze.jobs import ml_cli, replay_build
 from stellar_blaze.jobs.cli import app
 from tests.fixtures.forecast.dev_run import CLUSTERS, HOURS, STATIONS, TINY_GRID, WARM
 from tests.fixtures.forecast.synthetic import make_pairs
@@ -117,6 +117,30 @@ def test_help_lists_the_command_and_its_options() -> None:
         assert option in command.output
 
 
+@pytest.mark.parametrize(
+    ("config", "grid", "out", "expected"),
+    [
+        (
+            Path("backend/training/configs/dev.toml"),
+            False,
+            None,
+            "sb-jobs evaluate-dev --config backend/training/configs/dev.toml",
+        ),
+        (
+            Path("backend/training/configs/dev.toml"),
+            True,
+            None,
+            "sb-jobs evaluate-dev --config backend/training/configs/dev.toml --grid",
+        ),
+        (Path("a b.toml"), True, Path("out dir"), "sb-jobs evaluate-dev --config 'a b.toml' --grid --out 'out dir'"),
+    ],
+)
+def test_the_recorded_command_is_built_from_the_real_arguments(
+    config: Path, grid: bool, out: Path | None, expected: str
+) -> None:
+    assert ml_cli.evaluate_dev_invocation(config, grid=grid, out_dir=out) == expected
+
+
 def test_importing_the_cli_does_not_import_the_ml_package() -> None:
     code = (
         "import sys\n"
@@ -147,9 +171,21 @@ def test_a_single_run_writes_the_exports_and_records_the_job(env: Path, monkeypa
     summary = json.loads(result.output.strip().splitlines()[-1])
     assert summary["mode"] == "single"
     assert [d["rule"] for d in summary["decisions"]] == ["6.4 calibration window"]
-    assert sorted(summary["exports"]) == ["dev_skill.json", "oof_samples_abu_dhabi.parquet", "selection.json"]
+    assert sorted(summary["exports"]) == [
+        "dev_skill.json",
+        "oof_samples_abu_dhabi.manifest.json",
+        "oof_samples_abu_dhabi.parquet",
+        "selection.json",
+    ]
     for name, digest in summary["exports"].items():
         assert hashlib.sha256((out / name).read_bytes()).hexdigest() == digest
+    manifest = json.loads((out / "oof_samples_abu_dhabi.manifest.json").read_bytes())
+    assert (
+        manifest["command"]
+        == f"sb-jobs evaluate-dev --config {(env / 'unit-dev.toml').as_posix()} --out {out.as_posix()}"
+    )
+    assert manifest["git_sha"] == GIT_SHA
+    assert manifest["sha256"] == summary["exports"]["oof_samples_abu_dhabi.parquet"]
     selection = json.loads((out / "selection.json").read_bytes())
     assert selection["provenance"]["git_sha"] == GIT_SHA
     gold_sha = hashlib.sha256((env / "data" / "gold" / "pairs.parquet").read_bytes()).hexdigest()
@@ -187,6 +223,8 @@ def test_grid_flag_reaches_the_selection_and_the_default_directory_is_under_the_
     assert (default / "selection.json").is_file()
     selection = json.loads((default / "selection.json").read_bytes())
     assert selection["applied"] is True
+    manifest = json.loads((default / "oof_samples_abu_dhabi.manifest.json").read_bytes())
+    assert manifest["command"] == f"sb-jobs evaluate-dev --config {(env / 'unit-dev.toml').as_posix()} --grid"
     assert selection["grid_scores"]["rows"]
     assert set(selection["inputs"]) >= {"feature_set_site", "feature_set_cold", "wbgt_joint", "wbgt_direct"}
 

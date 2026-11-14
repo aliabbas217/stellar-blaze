@@ -28,6 +28,7 @@ packages blocked.
 
 import asyncio
 import json
+import shlex
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, NoReturn
@@ -149,6 +150,16 @@ def replay_build_command(
     )
 
 
+def evaluate_dev_invocation(config: Path, *, grid: bool, out_dir: Path | None) -> str:
+    """The ``sb-jobs evaluate-dev`` invocation that was run, from its real arguments (shell-quoted, POSIX paths)."""
+    words = ["sb-jobs", "evaluate-dev", "--config", config.as_posix()]
+    if grid:
+        words.append("--grid")
+    if out_dir is not None:
+        words += ["--out", out_dir.as_posix()]
+    return shlex.join(words)
+
+
 def _evaluate_dev(settings: Settings, config: Path, *, grid: bool, out_dir: Path | None) -> dict[str, JsonValue]:
     """The body of ``sb-jobs evaluate-dev``: load the dev pairs, run the selection, write the exports (blocking).
 
@@ -180,6 +191,7 @@ def _evaluate_dev(settings: Settings, config: Path, *, grid: bool, out_dir: Path
         cfg_sha256=selection.cfg_sha256,
         git_sha=git_sha,
         data_sha256=data_sha256,
+        command=evaluate_dev_invocation(config, grid=grid, out_dir=out_dir),
         mode=selection.mode,
         grid_scores=selection.grid_scores,
         tables=selection.tables,
@@ -216,9 +228,10 @@ def evaluate_dev_command(
 
     Without ``--grid`` only the given config runs; with it the hyperparameters, feature set, WBGT method and
     calibration window are chosen by the pre-registered rules (section 6) and the chosen configuration's out-of-fold
-    predictions are exported. Writes ``selection.json``, ``dev_skill.json`` and ``oof_samples_abu_dhabi.parquet`` and
-    prints the decisions as JSON. Runs as the ``evaluate-dev`` job (a ``job_run`` row, one advisory lock per config
-    name). Exit codes: 0 done or skipped (locked), 1 failed, 2 bad usage or configuration.
+    predictions are exported. Writes ``selection.json``, ``dev_skill.json``, ``oof_samples_abu_dhabi.parquet`` and its
+    ``oof_samples_abu_dhabi.manifest.json`` (which records this command) and prints the decisions as JSON. Runs as the
+    ``evaluate-dev`` job (a ``job_run`` row, one advisory lock per config name). Exit codes: 0 done or skipped
+    (locked), 1 failed, 2 bad usage or configuration.
     """
     import tomllib
 

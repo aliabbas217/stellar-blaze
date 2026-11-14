@@ -44,6 +44,7 @@ import gzip
 import io
 import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Final, Literal, Self
 
 import lightgbm as lgb
@@ -82,12 +83,17 @@ from stellar_blaze.domain.forecast.schemas import (
     quantile_matrix,
 )
 from stellar_blaze.domain.weather.models import NwpModel
+from stellar_blaze.domain.weather.replay import HELD_OUT_SUMMERS
 from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, OBS_HOURLY_SCHEMA, conform
 from stellar_blaze.domain.weather.stations import station
 
-__all__ = ["LightGbmCorrector", "dump_booster", "load_booster", "predict_grid"]
+__all__ = ["LightGbmCorrector", "ModelHoldoutError", "dump_booster", "load_booster", "predict_grid"]
 
 _log = structlog.get_logger(__name__)
+
+
+class ModelHoldoutError(ValueError):
+    """A model directory could carry information of a held-out summer (``HELD_OUT_SUMMERS``); it is not loaded."""
 
 
 def predict_grid(boosters: Sequence[lgb.Booster], x: F64) -> F64:
@@ -165,6 +171,10 @@ _EMPTY_HISTORY: Final = pl.Schema(
 )
 _SAMPLED_VARIABLES: Final = ("t", "td", "wind")
 _BOOSTER_DIRECTORY: Final = "boosters"
+_POOLED_COLUMNS: Final = frozenset({"hour_utc", "doy", "clim_t", "clim_td", "clim_wbgt"})
+_STATION_COLUMNS: Final = frozenset({"station", "hour_utc", "doy", "sclim_t", "sclim_td", "sclim_wbgt"})
+_TIME_COLUMNS: Final = frozenset({"summer", "valid_time", "date", "year"})
+"""Columns that would tie a fold-statistics row to a calendar year: a model carries none (the frames hold ``doy``)."""
 
 
 class _Frozen(BaseModel):
@@ -188,6 +198,7 @@ class _Params(_Frozen):
     config: _Config
     feature_columns: tuple[str, ...]
     boosted_targets: tuple[str, ...]
+    summers: tuple[int, ...]
 
 
 def _floats(frame: pl.DataFrame, name: str) -> F64:
@@ -222,6 +233,40 @@ def _strata(lead: NDArray[np.int8], block: pl.Series | Sequence[str]) -> NDArray
     """``lead * 3 + block index`` of each row."""
     rows = len(lead)
     return lead_values(lead, rows) * _N_BLOCKS + block_indices(block, rows).astype(np.int64)
+
+
+def _years_in(column: pl.Series) -> set[int]:
+    """The calendar years a time-like column holds: dates and datetimes by their year, integers and strings as years."""
+    if column.dtype in (pl.Date, pl.Datetime):
+        years = column.dt.year()
+    elif column.dtype.is_integer():
+        years = column
+    else:
+        years = column.cast(pl.String).str.slice(0, 4).cast(pl.Int64, strict=False)
+    return {int(year) for year in years.drop_nulls().unique().to_list()}
+
+
+def _read_fold_stats(identifier: str, directory: Path, name: str, allowed: frozenset[str]) -> pl.DataFrame:
+    """One ``fold_stats`` frame, refused if it carries a time column or any column beyond ``allowed``.
+
+    The frames are keyed by ``doy`` and ``hour_utc`` (and ``station``) and hold climatology values: no year. A column
+    that names a year, a date or a summer is refused even when it holds only training years, and one that holds a
+    held-out year is named as such. Any other unexpected column is refused too, because it is unreviewed content.
+    """
+    frame = pl.read_parquet(io.BytesIO(directory.joinpath("fold_stats", f"{name}.parquet").read_bytes()))
+    for column in frame.columns:
+        if column not in _TIME_COLUMNS:
+            continue
+        held = sorted(_years_in(frame[column]) & HELD_OUT_SUMMERS)
+        if held:
+            raise ModelHoldoutError(
+                f"{identifier}: fold_stats/{name}.parquet column {column!r} holds held-out year(s) {held}"
+            )
+        raise ModelHoldoutError(f"{identifier}: fold_stats/{name}.parquet carries the time column {column!r}")
+    unexpected = [column for column in frame.columns if column not in allowed]
+    if unexpected:
+        raise ModelHoldoutError(f"{identifier}: fold_stats/{name}.parquet has unexpected column(s) {unexpected}")
+    return frame
 
 
 def _require_model(frame: pl.DataFrame, expected: str, name: str) -> None:
@@ -273,11 +318,22 @@ class LightGbmCorrector:
         Raises:
             FileNotFoundError: A file of the layout is missing.
             pydantic.ValidationError: ``params.json`` or ``conformal.json`` is malformed.
+            ModelHoldoutError: ``params.json`` lists a held-out summer, or a fold-statistics frame has a time column
+                (``summer``, ``valid_time``, ``date``, ``year``) or any column it should not have (a ``ValueError``).
             ValueError: The parts disagree (the message names what).
         """
         root, identifier = model.root, model.manifest.model_id
         params = _Params.model_validate_json((root / "params.json").read_bytes())
         config = params.config
+        held_out = sorted(set(params.summers) & HELD_OUT_SUMMERS)
+        if held_out:
+            raise ModelHoldoutError(
+                f"{identifier}: params.json lists the held-out summer(s) {held_out} as training data"
+            )
+        stats = FoldStats(  # read (and refused if it carries a year) before the larger files
+            pooled_climatology=_read_fold_stats(identifier, root, "pooled", _POOLED_COLUMNS),
+            station_climatology=_read_fold_stats(identifier, root, "station", _STATION_COLUMNS),
+        )
         names = feature_columns(config.feature_set)
         if params.feature_columns != names:
             raise ValueError(
@@ -309,10 +365,6 @@ class LightGbmCorrector:
                     f"{identifier}: the {target.value} offsets cover {sorted(strata)}, "
                     f"the config needs {sorted(expected)}"
                 )
-        stats = FoldStats(
-            pooled_climatology=pl.read_parquet(io.BytesIO((root / "fold_stats" / "pooled.parquet").read_bytes())),
-            station_climatology=pl.read_parquet(io.BytesIO((root / "fold_stats" / "station.parquet").read_bytes())),
-        )
         return cls(
             identifier=identifier,
             config=config,
