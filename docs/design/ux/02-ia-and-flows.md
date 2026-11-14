@@ -94,7 +94,7 @@ refresh when you are back online." (≤ 3 h old: no banner; > 3 h: banner; > 48 
 
 ### F-W4. Worker: I feel unwell
 Fixed button (every worker screen) → `[W4]` opens straight onto the **escalation card**: 1 Call (998 / site first
-aider, big tel: buttons) · 2 Move to shade · 3 Cool down (steps from ADOSH CoP 11.0 §4.5(c), reviewed text slots) →
+aider, big tel: buttons) · 2 Move to shade · 3 Cool down (steps from ADOSH Technical Guideline §4.5(c), reviewed text slots) →
 optional "Tell my first-aider" (queued if offline: "Will send when you are online", retried while open).
 - ⚠ Offline → call buttons still work (tel: does not need data); message queued with a visible queued state.
 - ⚠ Label: "Reviewed by an independent clinical consultant, ⟨date⟩" **only if** the review happened, else "Not

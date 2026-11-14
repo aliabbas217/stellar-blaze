@@ -113,8 +113,8 @@ tasks already planned, F2 = screens).
 
 | # | Question | Where | Suggested owner |
 |---|---|---|---|
-| Q1 | ADOSH CoP 11.0 §4.5(c)(i) says "notify supervisor" for a heat illness, but rule G9 says symptom reports never reach the supervisor's dashboard. The reviewed "Call" step must reconcile them (for example: the worker or a crew mate *calls* the supervisor; nothing is *logged* to the dashboard) | `worker-unwell.html` step 1 | Ali + clinical consultant (ADR 0035) |
-| Q2 | The wireframe's "sip water if awake" is **not** in CoP §4.5(c) (soak, spray, sponge, fan). Removed; only cited text may appear | `worker-unwell.html` step 3 | clinical review |
+| Q1 | ADOSH Technical Guideline §4.5(c)(i) says "notify supervisor" for a heat illness, but rule G9 says symptom reports never reach the supervisor's dashboard. The reviewed "Call" step must reconcile them (for example: the worker or a crew mate *calls* the supervisor; nothing is *logged* to the dashboard) | `worker-unwell.html` step 1 | Ali + clinical consultant (ADR 0035) |
+| Q2 | The wireframe's "sip water if awake" is **not** in the ADOSH Technical Guideline §4.5(c) (soak, spray, sponge, fan). Removed; only cited text may appear | `worker-unwell.html` step 3 | clinical review |
 | Q3 | k mapping is an inference: stops → `k_health` 10; High-zone hours, plans signed, deviations → `k_exposure` 5 | `hse.html` | B3 (ADR 0011 §7.6) |
 | Q4 | Roadmap status stamps were assigned by the builder (ECMWF path EXISTS; regulator view and self-hosted LLM DESIGNED; wearable, ADPHC pilot, non-airport validation NEEDS PILOT; sub-seasonal REJECTED FOR NOW) | `replay-next.html` | Ali |
 | Q5 | B0 is labelled "common practice, outside the legal limits", not ADR 0011's "not compliant", because "compliant" is banned on screens. Confirm the wording | `replay-frontier.html` | Ali |

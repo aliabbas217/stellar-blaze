@@ -104,7 +104,7 @@ v1 was rejected for its looks, not its structure (v1-04: 27/40 Nielsen). The IA 
 | 8 | Alert | Notification | Phone vibrates: "Level Red from 13:00" (site/crew level code only, ADR 0004 Tier A) | Payload = level code + site/crew id; text rendered from the cached catalogue | 0 |
 | 9 | Alert | W3 Alert card | Taps the notification | Opens the card on the level word + time window + 3 actions; recomputes the personal level on open (Tier B) and shows it if more severe ("Your level is higher: …"); tries autoplay, else a 56 px Play in the first fold | 1 · ≤ 2 s |
 | 10 | Alert | W3 | Taps Done (or nothing) | Returns to Today | 1 |
-| 11 | Unwell | Any worker screen → W4 | Taps the fixed "I feel unwell" | Opens straight onto step 1 Call (998 · site first aider), 2 Move to shade, 3 Cool down (ADOSH CoP 11.0 §4.5(c) text only); clinical label per T6; "Your supervisor does not see this." Works offline. | 1 · ≤ 2 s |
+| 11 | Unwell | Any worker screen → W4 | Taps the fixed "I feel unwell" | Opens straight onto step 1 Call (998 · site first aider), 2 Move to shade, 3 Cool down (ADOSH Technical Guideline §4.5(c) text only); clinical label per T6; "Your supervisor does not see this." Works offline. | 1 · ≤ 2 s |
 | 12 | Unwell | W4 → dialler | Taps "Call 998" | `tel:` opens the dialler pre-filled; worker presses call | 1 (+1 OS) · ≤ 5 s from step 11 |
 | 13 | Unwell | W4 | (Optional, if the destination is decided, HANDOFF decision 2) "Tell my first aider" | Queued in IndexedDB, retried while open; visible "Not sent yet" state | 1 |
 | 14 | Trust | W5 My data | Taps My data | Lists what is on this phone, what the server holds (pseudonymous alert subscription), "Offline copy protected: yes/no", and who asked for data | 1 |

@@ -46,7 +46,7 @@ EmptyState, ErrorState, Skeletons, Unwell button, Stop-work button. The prototyp
 ### W4 I feel unwell `[worker-unwell.html]`
 - **Focal:** step 1 "Call" with two large tel: buttons (998 Ambulance · Site first aider).
 - **Regions:** title "If you feel unwell" · 3 numbered steps, each a pictogram + one short line: 1 Call · 2 Move to
-  shade · 3 Cool down (text slots from ADOSH CoP 11.0 §4.5(c) only: soak, spray, sponge, fan; reviewed) ·
+  shade · 3 Cool down (text slots from ADOSH Technical Guideline §4.5(c) only: soak, spray, sponge, fan; reviewed) ·
   "Stop work now. You will not lose pay for this." **only if** the employer has attested it (else omitted) · optional
   "Tell my first aider" button · clinical label · privacy line "Your supervisor does not see this."
 - **Loading:** none (static, works offline from cache). **Empty:** no site first-aider number configured → the 998
