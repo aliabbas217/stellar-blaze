@@ -86,7 +86,7 @@ def refuse_held_out(summer: int) -> None:
     if summer in HELD_OUT_SUMMERS:
         raise ReplayHoldoutError(
             f"summer {summer} is held out: replay snapshots of it stay locked until the architect's go-ahead "
-            "(HELD_OUT_SUMMERS in stellar_blaze/jobs/replay_build.py)"
+            "(HELD_OUT_SUMMERS in stellar_blaze/domain/weather/replay.py)"
         )
 
 

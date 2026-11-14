@@ -12,15 +12,20 @@ from polars.testing import assert_frame_equal
 from stellar_blaze.domain.forecast.schemas import VARIABLES
 from stellar_blaze.ports.corrector import ForecastCorrector
 
-_BIG = 100.0
+_HISTORY_SHIFT = 100.0
+_HISTORY_IFS_SHIFT = 37.0
+"""The two shifts MUST differ. A ``bias7``-style feature averages forecast MINUS truth, so the same shift on both
+frames cancels in it and a window that leaks the issue day would pass: with different shifts the difference moves by
+``_HISTORY_SHIFT - _HISTORY_IFS_SHIFT`` and the leak shows. Both are positive so no input leaves its physical range
+(wind and radiation stay non-negative)."""
 _HISTORY_VALUES = ("t_c", "td_c", "wind_ms")
-_FORECAST_VALUES = (*_HISTORY_VALUES, "sw_wm2", "direct_wm2")
+_FORECAST_VALUES = (*_HISTORY_VALUES, "sw_wm2", "direct_wm2", "pressure_hpa")
 
 
-def _perturbed(frame: pl.DataFrame, columns: tuple[str, ...], keep: pl.Expr) -> pl.DataFrame:
-    """``frame`` with ``_BIG`` added to ``columns`` on the rows where ``keep`` holds."""
+def _perturbed(frame: pl.DataFrame, columns: tuple[str, ...], keep: pl.Expr, amount: float) -> pl.DataFrame:
+    """``frame`` with ``amount`` added to ``columns`` on the rows where ``keep`` holds."""
     return frame.with_columns(
-        pl.when(keep).then(pl.col(name) + _BIG).otherwise(pl.col(name)).alias(name) for name in columns
+        pl.when(keep).then(pl.col(name) + amount).otherwise(pl.col(name)).alias(name) for name in columns
     )
 
 
@@ -37,8 +42,10 @@ def assert_respects_history_cutoff(
     """Fail unless ``corrector.correct`` ignores history later than each row's cutoff date (``D - lead_days - 1``).
 
     For up to ``max_rows`` rows of ``ifs`` (evenly spread, only rows for which ``history`` holds something after the
-    cutoff, so the check is never vacuous), every value of ``history`` (and ``history_ifs``) with a UTC valid date later
-    than ``D - lead_days - 1`` is shifted by a large amount; the four output rows of that forecast row must not change.
+    cutoff, so the check is never vacuous), every value of ``history`` (the truth, shifted by +100) and ``history_ifs``
+    (the past forecasts, shifted by +37: a DIFFERENT amount, so a forecast-minus-truth feature such as ``bias7`` does
+    not cancel the shift) with a UTC valid date later than ``D - lead_days - 1`` is shifted; the four output rows of
+    that forecast row must not change.
     If ``uses_history`` is false the corrector declares it does not use history at all, and the same shift applied to
     the rows before the cutoff must leave the output unchanged too. A corrector that declares ``uses_history`` may
     change its output there; nothing is asserted.
@@ -69,8 +76,10 @@ def assert_respects_history_cutoff(
             shifted = corrector.correct(
                 ifs=ifs,
                 gfs=gfs,
-                history=_perturbed(history, _HISTORY_VALUES, keep),
-                history_ifs=None if history_ifs is None else _perturbed(history_ifs, _FORECAST_VALUES, keep),
+                history=_perturbed(history, _HISTORY_VALUES, keep, _HISTORY_SHIFT),
+                history_ifs=(
+                    None if history_ifs is None else _perturbed(history_ifs, _FORECAST_VALUES, keep, _HISTORY_IFS_SHIFT)
+                ),
             )
             try:
                 assert_frame_equal(baseline[block], shifted[block])

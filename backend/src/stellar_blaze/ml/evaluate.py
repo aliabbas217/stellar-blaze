@@ -10,7 +10,8 @@ Two runs produce an ``OofPredictions``:
 
 Fold isolation (L3, L4, L6, L7). Per fold the training frame is ``regimes.split``'s train side and nothing else touches
 the model: ``train_corrector`` fits the climatology, boosters, conformal offsets and copulas on it; the baselines
-(``fit_baselines`` with ``pooled=True``, so a held-out station's own bias is never used) are fitted on the same fit and
+(``fit_baselines``; ``pooled=True`` when the test clusters are held out, so a held-out station's own bias is never
+used, ``pooled=False`` in the summer split where every station is also in training) are fitted on the same fit and
 calibration rows' features, built with the same fold statistics. The test side only supplies rows to predict. Its
 station history ``bias7_*`` is built from the test frame's own earlier truth, which L3 allows (a valid date at or before
 the issue day minus one); its station climatology ``sclim_*`` is absent from the fold statistics (the station was never
@@ -267,8 +268,11 @@ def _run_fold(
         del all_samples
     for target, grid in corrected.items():
         grids[(target, CORRECTOR)] = grid
+    # Pooled bias is for HELD-OUT clusters only (pre-registration section 5): when every test cluster is also a
+    # training cluster (the summer split) each station has its own training rows, so its own bias is the baseline.
+    pooled = fold.test_clusters.isdisjoint(fold.train_clusters)
     for target in Target:
-        model = fit_baselines(train_features, target=target, pooled=True)
+        model = fit_baselines(train_features, target=target, pooled=pooled)
         for baseline in _BASELINES_WBGT if target is Target.WBGT else _BASELINES_JOINT:
             grids[(target, baseline.value)] = predict_baseline(model, test_features, baseline)
     base_rates = _base_rates(fold.name, train_features)
@@ -338,7 +342,8 @@ def evaluate_dev(
 
     Folds are ``loco_folds`` of the summers in ``pairs``: ``dubai_sharjah`` holds out OMDB and OMSJ together. Every
     fold fits its statistics, history, offsets, copulas and baselines on the other clusters only (L4, L6): the
-    corrector from ``train_corrector``, the baselines B0, B0d, B2d, B3d (t, td, wind) and B4 with ``pooled=True``.
+    corrector from ``train_corrector``, the baselines B0, B0d, B2d, B3d (t, td, wind) and B4 with ``pooled=True`` (the
+    test cluster is not a training cluster, so its station's own bias is unknown).
 
     Args:
         pairs: Gold-shaped development rows (``load_dev_pairs`` shape: leads 1-7 in ``cfg.leads``, hours 02-15 UTC).
@@ -372,11 +377,14 @@ def evaluate_summer_split(
     """The 2026-like diagnostic (ruling R23; never used for selection): train on one dev summer, test on the other.
 
     Two folds, ``train2024_test2025`` and ``train2025_test2024``, all clusters on both sides, the same corrector and
-    baseline machinery and the same ``OofPredictions`` shape (``fold`` is the fold's name). It measures the in-sample
-    climatology asymmetry: the training and calibration features of ``train_corrector`` carry climatology fitted on
-    their own summer's days (in-sample), while the test summer's features carry that climatology applied out of
-    sample, as 2026 will. A model that leans on the in-sample climatology looks worse here than in the LOCO run, which
-    tests on a held-out cluster of the SAME summers.
+    baseline machinery and the same ``OofPredictions`` shape (``fold`` is the fold's name). Every station is in the
+    training rows too, so the baselines use their PER-STATION static bias (``pooled=False``): the pooled bias of
+    pre-registration section 5 is for held-out clusters only, and a pooled B2d here would be a strawman.
+
+    It measures the in-sample climatology asymmetry: the training and calibration features of ``train_corrector``
+    carry climatology fitted on their own summer's days (in-sample), while the test summer's features carry that
+    climatology applied out of sample, as 2026 will. A model that leans on the in-sample climatology looks worse here
+    than in the LOCO run, which tests on a held-out cluster of the SAME summers.
 
     Raises:
         HoldoutViolationError: ``pairs`` holds summer 2026.

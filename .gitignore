@@ -15,4 +15,6 @@ htmlcov/
 
 # Local data (Parquet training set, raw HTTP cache) and compiled-code caches
 backend/data/
+# Staging directory of a crashed replay build (jobs/replay_build.py: replay/.<snapshot_id>.building)
+backend/replay/.*.building/
 .numba-cache/

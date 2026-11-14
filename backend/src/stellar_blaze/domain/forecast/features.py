@@ -16,6 +16,8 @@ The rules are pre-registration section 3.2 (the closed feature list and leakage 
 
 ``build_features`` never reads ``ref_*``, ``audit_*`` or any truth column to make a *feature*: truth only fills the
 ``y_*`` targets, and only when the truth columns are present, so the same function builds a serving frame.
+``pairs_from_forecasts`` makes that serving frame from raw forecast rows (``FORECAST_SCHEMA``), with the one column the
+gold build computes from the forecast alone (``wbgt_fc_c``).
 """
 
 from collections.abc import Mapping
@@ -27,10 +29,13 @@ from typing import Final
 import numpy as np
 import polars as pl
 
-from stellar_blaze.domain.forecast.grid import HOUR_BLOCKS, MODEL_LEADS
+from stellar_blaze.domain.forecast.grid import F64, HOUR_BLOCKS, MODEL_LEADS
+from stellar_blaze.domain.forecast.sampling import screen_solver_inputs
 from stellar_blaze.domain.physics.psychrometrics import relative_humidity_pct
+from stellar_blaze.domain.physics.wbgt import wbgt_liljegren
 from stellar_blaze.domain.weather.models import NwpModel
-from stellar_blaze.domain.weather.stations import STATIONS
+from stellar_blaze.domain.weather.schemas import FORECAST_SCHEMA, conform
+from stellar_blaze.domain.weather.stations import STATIONS, station
 
 __all__ = [
     "BANNED_COLUMNS",
@@ -44,6 +49,7 @@ __all__ = [
     "fit_fold_stats",
     "history_features",
     "hour_block_expr",
+    "pairs_from_forecasts",
 ]
 
 
@@ -484,3 +490,117 @@ def build_features(
     values = [name for name in feature_columns(feature_set) if name not in _KEYS]
     values += [expr.meta.output_name() for expr in (*raw, *errors)]
     return frame.select(*_KEYS, *[pl.when(modelled).then(pl.col(name)).alias(name) for name in values])
+
+
+# === the serving frame ==============================================================================================
+
+_FORECAST_RENAME: Final = {
+    "t_c": "fc_t_c",
+    "td_c": "fc_td_c",
+    "wind_ms": "fc_wind_ms",
+    "sw_wm2": "fc_sw_wm2",
+    "direct_wm2": "fc_direct_wm2",
+    "pressure_hpa": "fc_pressure_hpa",
+}
+_ELEVATION_OF: Final = {s.icao: s.elevation_m for s in STATIONS}
+_SERVING_COLUMNS: Final = (
+    *("station", "cluster", "model", "summer", "valid_time", "lead_days", "hour_utc", "doy"),
+    *("station_elev_m", "grid_lat", "grid_lon", "grid_elev_m"),
+    *_FORECAST_RENAME.values(),
+    *("wbgt_fc_c", "wbgt_fc_reject"),
+)
+
+
+def _float_array(frame: pl.DataFrame, name: str) -> F64:
+    """A column as float64, a null as NaN."""
+    return np.asarray(frame[name].to_numpy(), dtype=np.float64)
+
+
+def _forecast_wbgt(frame: pl.DataFrame) -> tuple[F64, np.ndarray[tuple[int], np.dtype[np.int8]]]:
+    """The WBGT and reject code of each row's own forecast values, as ``application.dataset`` computes ``wbgt_fc_c``.
+
+    ``wbgt_liljegren`` (mid-point mode) at the station's coordinates over the UTC time of the row, after the shared
+    gross-error screens (``screen_solver_inputs``); a null is NaN and so is rejected as non-finite input.
+    """
+    t, td, wind, pressure = screen_solver_inputs(
+        _float_array(frame, "fc_t_c"),
+        _float_array(frame, "fc_td_c"),
+        _float_array(frame, "fc_wind_ms"),
+        _float_array(frame, "fc_pressure_hpa"),
+    )
+    sw, direct = _float_array(frame, "fc_sw_wm2"), _float_array(frame, "fc_direct_wm2")
+    valid_utc = frame["valid_time"].dt.replace_time_zone(None).to_numpy()
+    stations = frame["station"].to_numpy()
+    wbgt = np.full(frame.height, np.nan, dtype=np.float64)
+    reject = np.zeros(frame.height, dtype=np.int8)
+    for icao in np.unique(stations):
+        rows = np.flatnonzero(stations == icao)
+        where = station(str(icao))
+        result = wbgt_liljegren(
+            t_c=t[rows],
+            td_c=td[rows],
+            wind10m_ms=wind[rows],
+            pressure_hpa=pressure[rows],
+            sw_wm2=sw[rows],
+            direct_wm2=direct[rows],
+            lat=where.lat,
+            lon=where.lon,
+            valid_time_utc=valid_utc[rows],
+        )
+        wbgt[rows] = result.wbgt_c
+        reject[rows] = result.reject
+    return wbgt, reject
+
+
+def pairs_from_forecasts(ifs: pl.DataFrame, gfs: pl.DataFrame) -> pl.DataFrame:
+    """The serving twin of the gold pair frame: raw forecast rows with the columns ``build_features`` needs, no truth.
+
+    The IFS rows come first, then the GFS rows, each in its own order, and no row is dropped: a missing forecast value
+    stays null. ``model`` is kept per row, ``station_elev_m`` and ``cluster`` come from ``STATIONS``, ``summer``,
+    ``hour_utc`` and ``doy`` from the UTC ``valid_time`` (never GST), and the grid cell columns are the forecast's own.
+    NaN and infinities in the forecast columns are treated as missing, as in ``build_pairs``.
+
+    ``wbgt_fc_c`` and ``wbgt_fc_reject`` are computed from the forecast alone exactly as ``build_pairs`` computes them
+    (Liljegren, mid-point mode, the station's coordinates, the forecast's own radiation and pressure, the shared
+    gross-error screens): a row the solver rejects is NaN with its ``WbgtReject`` code. The result equals the forecast
+    columns of the gold frame for the same rows, and ``build_features`` on it equals ``build_features`` on the gold
+    frame with its truth columns removed.
+
+    Args:
+        ifs: IFS forecast rows (``FORECAST_SCHEMA``).
+        gfs: GFS forecast rows (``FORECAST_SCHEMA``); may be empty.
+
+    Returns:
+        The frame, with the columns ``station``, ``cluster``, ``model``, ``summer``, ``valid_time``, ``lead_days``,
+        ``hour_utc``, ``doy``, ``station_elev_m``, ``grid_lat``, ``grid_lon``, ``grid_elev_m``, the six ``fc_*`` columns
+        and ``wbgt_fc_c``, ``wbgt_fc_reject``.
+
+    Raises:
+        SchemaMismatchError: A frame does not have the ``FORECAST_SCHEMA`` columns and dtypes (a naive or a local-time
+            ``valid_time`` included).
+        ValueError: A station is not one of ``STATIONS``, or a (station, model, valid_time, lead_days) key repeats.
+    """
+    forecast = pl.concat([conform(ifs, FORECAST_SCHEMA), conform(gfs, FORECAST_SCHEMA)])
+    unknown = sorted(set(forecast["station"].unique().to_list()) - set(_ELEVATION_OF))
+    if unknown:
+        raise ValueError(f"forecasts for stations that are not in STATIONS: {unknown}")
+    repeated = forecast.filter(forecast.select("station", "model", "valid_time", "lead_days").is_duplicated())
+    if repeated.height:
+        example = repeated.select("station", "model", "valid_time", "lead_days").row(0, named=True)
+        raise ValueError(f"duplicate forecast rows ({repeated.height} rows share a key), for example {example}")
+    floats = [name for name, dtype in FORECAST_SCHEMA.items() if dtype == pl.Float64()]
+    frame = (
+        forecast.with_columns(pl.when(pl.col(name).is_finite()).then(pl.col(name)).alias(name) for name in floats)
+        .rename(_FORECAST_RENAME)
+        .with_columns(
+            pl.col("station").replace_strict(_CLUSTER_OF, return_dtype=pl.String()).alias("cluster"),
+            pl.col("station").replace_strict(_ELEVATION_OF, return_dtype=pl.Float64()).alias("station_elev_m"),
+            pl.col("valid_time").dt.year().cast(pl.Int16()).alias("summer"),
+            pl.col("valid_time").dt.hour().cast(pl.Int8()).alias("hour_utc"),
+            pl.col("valid_time").dt.ordinal_day().cast(pl.Int16()).alias("doy"),
+        )
+    )
+    wbgt, reject = _forecast_wbgt(frame)
+    return frame.with_columns(
+        pl.Series("wbgt_fc_c", wbgt, dtype=pl.Float64()), pl.Series("wbgt_fc_reject", reject, dtype=pl.Int8())
+    ).select(_SERVING_COLUMNS)

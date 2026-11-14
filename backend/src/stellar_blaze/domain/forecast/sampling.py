@@ -35,6 +35,7 @@ __all__ = [
     "fit_copula",
     "nearest_correlation",
     "sample_joint",
+    "screen_solver_inputs",
     "wbgt_joint_grid",
 ]
 
@@ -45,9 +46,10 @@ _PIT_CLIP: Final = 1e-4
 _EIGENVALUE_FLOOR: Final = 1e-6
 _VARIABLES: Final = 3  # (t, td, wind), in this order everywhere
 
-# The solver screens of ``application.dataset._screened`` (private to that module, so copied here; see the module
-# docstring): finite values that no station or model reports are made missing before the solver, which would reach numpy
-# as numbers and raise floating-point warnings. Keep these equal to B1's, a test pins the behavior.
+# The solver screens of ``application.dataset._screened`` (private to that module, so copied here, and public here
+# through ``screen_solver_inputs`` so that ``features.pairs_from_forecasts`` shares this one copy; see the module
+# docstring): finite values that no station or model reports are made missing before the solver, which would reach
+# numpy as numbers and raise floating-point warnings. Keep these equal to B1's, a test pins the behavior.
 _SOLVER_TEMPERATURE_C: Final = (-60.0, 70.0)
 
 _EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
@@ -188,8 +190,13 @@ def _utc_microseconds(valid_time: Sequence[datetime]) -> NDArray[np.datetime64]:
     return micros.view("datetime64[us]")
 
 
-def _screened(t: F64, td: F64, wind: F64, pressure: F64) -> tuple[F64, F64, F64, F64]:
-    """The solver's inputs with the sentinel-like values turned into NaN (``application.dataset._screened``)."""
+def screen_solver_inputs(t: F64, td: F64, wind: F64, pressure: F64) -> tuple[F64, F64, F64, F64]:
+    """The solver's inputs with the sentinel-like values turned into NaN (``application.dataset._screened``).
+
+    Temperature and dew point outside -60 to 70 degrees Celsius, a negative wind and a pressure at or below 0 become
+    NaN, which the solver rejects as non-finite input. Shared by ``wbgt_joint_grid`` and by
+    ``features.pairs_from_forecasts`` (the serving ``wbgt_fc_c``), so the two screens cannot drift apart.
+    """
     low, high = _SOLVER_TEMPERATURE_C
     return (
         np.where((t >= low) & (t <= high), t, np.nan),
@@ -277,7 +284,7 @@ def wbgt_joint_grid(
         group = group.reshape(-1)
         for index in range(int(group.max()) + 1):
             chosen = np.flatnonzero(group == index)
-            t, td, wind, p = _screened(
+            t, td, wind, p = screen_solver_inputs(
                 values[chosen, :, 0].ravel(),
                 values[chosen, :, 1].ravel(),
                 values[chosen, :, 2].ravel(),

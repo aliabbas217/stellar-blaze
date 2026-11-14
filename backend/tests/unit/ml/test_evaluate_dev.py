@@ -10,6 +10,7 @@ with the code under test.
 """
 
 import dataclasses
+from collections.abc import Callable
 from datetime import date
 from functools import cache
 from typing import Final
@@ -18,7 +19,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from stellar_blaze.domain.forecast.features import FeatureSet, Target
+from stellar_blaze.domain.forecast.features import FeatureSet, Target, feature_columns
 from stellar_blaze.domain.forecast.grid import LEVELS, exceedance_probability
 from stellar_blaze.ml import baselines, metrics
 from stellar_blaze.ml import evaluate as evaluate_module
@@ -36,6 +37,8 @@ from stellar_blaze.ml.evaluate import (
 from stellar_blaze.ml.training_config import TrainingConfig
 from tests.fixtures.forecast.synthetic import make_pairs
 from tests.fixtures.forecast.trained import CFG_SHA256, small_config
+
+pytestmark = pytest.mark.unit
 
 IFS: Final = "ecmwf_ifs025"
 STATIONS: Final = ("OMAA", "OMDB", "OMSJ", "OMAL", "OMFJ")
@@ -107,6 +110,7 @@ def _grid(oof: OofPredictions, cluster: str, target: Target, model: str) -> np.n
 # === the run, its shape and the guards ==============================================================================
 
 
+@pytest.mark.slow
 def test_oof_is_aligned_one_fold_per_cluster_and_every_model_is_present(
     dev: tuple[pl.DataFrame, OofPredictions],
 ) -> None:
@@ -136,6 +140,7 @@ def test_oof_is_aligned_one_fold_per_cluster_and_every_model_is_present(
     assert set(oof.keys["hour_utc"].unique()) == set(HOURS)
 
 
+@pytest.mark.slow
 def test_samples_are_kept_for_the_requested_cluster_only(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     _, oof = dev
     assert oof.samples is not None
@@ -301,15 +306,64 @@ def test_summer_split_trains_on_one_summer_and_tests_on_the_other() -> None:
                 else 1e-9,  # polars aggregations in the baselines differ in the last bit
                 err_msg=f"{target.value}/{model}",
             )
+    # every station is in the training rows, so the baselines use the PER-STATION bias (pooled=False): B2d removes the
+    # +3 of a biased station and leaves an unbiased one alone, where B0d (dressed with the pooled error quantiles, so
+    # about -1.8 on the three biased stations of five) is off by about +1.0 at OMAA and -1.8 at OMAL
+    observed = truth(base, Target.T)
+    for station in ("OMAA", "OMAL"):
+        rows = (base.keys["station"] == station).to_numpy() & np.isfinite(observed)
+        bias = {
+            model: float((base.grids[(Target.T, model)][rows, MEDIAN] - observed[rows]).mean())
+            for model in ("b0d", "b2d")
+        }
+        assert abs(bias["b2d"]) < 0.3, (station, bias)
+        assert abs(bias["b0d"]) > 0.8, (station, bias)  # B2d differs from B0d here: B2d is not a strawman
     other = ~mask  # that fold trains on the perturbed 2025: it must move
     assert not np.array_equal(base.grids[(Target.T, "corrector")][other], run.grids[(Target.T, "corrector")][other])
     with pytest.raises(ValueError, match="exactly the dev summers"):
         evaluate_summer_split(pairs.filter(pl.col("summer") == 2024), cfg, cfg_sha256=CFG_SHA256)
 
 
+class _StopAfterFitError(Exception):
+    """Raised by the spy once it has seen the first ``fit_baselines`` call: the rest of the run is not needed."""
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("run", "pooled"),
+    [
+        pytest.param(
+            lambda: evaluate_dev(dev_pairs(), _cfg(FeatureSet.COLD), cfg_sha256=CFG_SHA256, clusters=(HELD_OUT,)),
+            True,
+            id="loco-held-out-cluster",
+        ),
+        pytest.param(
+            lambda: evaluate_summer_split(dev_pairs(), _cfg(FeatureSet.COLD), cfg_sha256=CFG_SHA256),
+            False,
+            id="summer-split-every-station-in-training",
+        ),
+    ],
+)
+def test_the_baseline_bias_is_pooled_only_when_the_test_cluster_is_held_out(
+    monkeypatch: pytest.MonkeyPatch, run: Callable[[], OofPredictions], pooled: bool
+) -> None:
+    """Pre-registration section 5: pooled bias for HELD-OUT clusters only; the summer split keeps each station's own."""
+    seen: list[object] = []
+
+    def spy(train: pl.DataFrame, **kwargs: object) -> object:
+        seen.append(kwargs["pooled"])
+        raise _StopAfterFitError
+
+    monkeypatch.setattr(evaluate_module, "fit_baselines", spy)
+    with pytest.raises(_StopAfterFitError):
+        run()
+    assert seen == [pooled]
+
+
 # === the corrector is not the raw forecast (review focus 5) =========================================================
 
 
+@pytest.mark.slow
 def test_the_corrector_beats_raw_ifs_on_the_biased_held_out_clusters_by_a_clear_margin(
     dev: tuple[pl.DataFrame, OofPredictions],
 ) -> None:
@@ -381,6 +435,7 @@ def _expected_counts(pairs: pl.DataFrame, *, lead: int, hours: tuple[int, ...]) 
     }
 
 
+@pytest.mark.slow
 def test_skill_table_reports_counts_and_excludes_unscored_rows(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     pairs, oof = dev
     for hours, hour_set in (
@@ -414,6 +469,7 @@ def test_skill_table_reports_counts_and_excludes_unscored_rows(dev: tuple[pl.Dat
     assert by_lead.filter(pl.col("target") == "t").height == 3 * 4
 
 
+@pytest.mark.slow
 def test_skill_table_excludes_rows_without_a_forecast_and_counts_them(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     _, oof = dev
     baseline = skill_table(oof, leads=(1,), hours="all", by=[], n_boot=50, intervals=False).filter(
@@ -431,6 +487,7 @@ def test_skill_table_excludes_rows_without_a_forecast_and_counts_them(dev: tuple
     assert hurt["n_no_truth"].item() == baseline["n_no_truth"].item()
 
 
+@pytest.mark.slow
 def test_a_group_with_no_scored_row_appears_with_zero_rows(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     _, oof = dev
     keys = oof.keys.with_columns(pl.when(pl.col("station") == "OMAL").then(None).otherwise(pl.col("y_t")).alias("y_t"))
@@ -444,6 +501,7 @@ def test_a_group_with_no_scored_row_appears_with_zero_rows(dev: tuple[pl.DataFra
     assert table.filter(pl.col("station") == "OMAA")["n_rows"].item() > 0
 
 
+@pytest.mark.slow
 def test_skill_table_scores_match_an_independent_computation(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     _, oof = dev
     table = skill_table(oof, leads=(2,), hours="peak", by=["lead_days", "hour_block"], n_boot=50, intervals=False)
@@ -474,6 +532,7 @@ def test_skill_table_scores_match_an_independent_computation(dev: tuple[pl.DataF
     assert counts.sum() == row["n_rows"]
 
 
+@pytest.mark.slow
 def test_paired_bootstrap_intervals_are_the_preregistered_ones(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     """Seed 20261112, 7-day blocks, dense per-summer days with weight 0 on unscored days, B = 2000."""
     _, oof = dev
@@ -518,6 +577,7 @@ def test_paired_bootstrap_intervals_are_the_preregistered_ones(dev: tuple[pl.Dat
     assert row["crps_diff_b0_lo"] < row["crps_diff_b0"] < row["crps_diff_b0_hi"]
 
 
+@pytest.mark.slow
 def test_brier_scores_and_skill_use_training_base_rates(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     pairs, oof = dev
     # the base rate of a fold is the share of its TRAINING rows (the other clusters) at or above the threshold
@@ -587,6 +647,7 @@ def test_brier_scores_and_skill_use_training_base_rates(dev: tuple[pl.DataFrame,
     assert t["bss_c_clim_30"] is None
 
 
+@pytest.mark.slow
 def test_the_table_refuses_unknown_arguments(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     _, oof = dev
     with pytest.raises(ValueError, match="hours"):
@@ -600,6 +661,7 @@ def test_the_table_refuses_unknown_arguments(dev: tuple[pl.DataFrame, OofPredict
 # === coverage by forecast tercile ===================================================================================
 
 
+@pytest.mark.slow
 def test_coverage_by_forecast_tercile(dev: tuple[pl.DataFrame, OofPredictions]) -> None:
     pairs, oof = dev
     # the edges are terciles of the forecast WBGT over the dev rows (no truth in them), fixed by the harness
@@ -630,10 +692,15 @@ def test_coverage_by_forecast_tercile(dev: tuple[pl.DataFrame, OofPredictions]) 
     assert max(per_tercile) < 1.6 * min(per_tercile)
 
 
-def test_the_tercile_edges_come_from_the_training_rows_not_the_scored_ones(
+@pytest.mark.slow
+def test_the_tercile_edges_come_from_all_dev_rows_forecast_values_only_not_the_scored_rows(
     dev: tuple[pl.DataFrame, OofPredictions],
 ) -> None:
-    """Perturbing the scored (test) rows' forecast WBGT moves the terciles' membership, never the edges."""
+    """The edges are the quantiles of ``wbgt_fc_c`` over ALL dev rows (forecast values only, no truth, no fold split).
+
+    Perturbing the scored rows' forecast WBGT moves the terciles' membership, never the edges, which are read from the
+    OOF object; heating one cluster's forecasts in the input does move them.
+    """
     _, oof = dev
     before = coverage_by_forecast_tercile(oof, leads=(1,))
     shifted = oof.keys.with_columns((pl.col("wbgt_fc_c") + 5.0).alias("wbgt_fc_c"))
@@ -651,6 +718,55 @@ def test_the_tercile_edges_come_from_the_training_rows_not_the_scored_ones(
     )
     run = evaluate_dev(heated, _cfg(), cfg_sha256=CFG_SHA256, clusters=(HELD_OUT,))
     assert run.tercile_edges[1] > oof.tercile_edges[1]
+
+
+def _cold_features_and_raw(n: int) -> pl.DataFrame:
+    """``n`` complete test-feature rows: every cold feature, every raw forecast and every ``bias7`` present."""
+    cold = {name: [1.0] * n for name in feature_columns(FeatureSet.COLD)}
+    raw = {f"raw_{target.value}": [20.0] * n for target in Target}
+    bias7 = {f"bias7_{target.value}": [0.5] * n for target in (Target.T, Target.TD, Target.WIND)}
+    return pl.DataFrame(cold | raw | bias7)
+
+
+def test_fallback_rows_count_the_null_bias7_and_the_null_cold_feature_rows() -> None:
+    """One null ``bias7_t`` (row 0), one null cold feature (row 1) and one row without a raw t (row 2, uncounted)."""
+    cold_name = feature_columns(FeatureSet.COLD)[0]
+    frame = _cold_features_and_raw(5).with_columns(
+        pl.Series("bias7_t", [None, 0.5, None, 0.5, 0.5], dtype=pl.Float64),  # rows 0 and 2 have no history
+        pl.Series("raw_t", [20.0, 20.0, None, 20.0, 20.0], dtype=pl.Float64),
+        pl.Series(cold_name, [1.0, None, 1.0, 1.0, 1.0], dtype=pl.Float64),
+    )
+
+    counts = {
+        (row["target"], row["model"]): (row["n_rows"], row["n_fallback"])
+        for row in evaluate_module._fallback_rows("fold_x", frame).iter_rows(named=True)  # noqa: SLF001
+    }
+
+    assert counts == {
+        ("t", "b3d"): (4, 1),  # rows with a raw t: 0, 1, 3, 4; only row 0 lacks bias7 (row 2 has no raw)
+        ("t", "b4"): (4, 1),  # only row 1 lacks a cold feature
+        ("td", "b3d"): (5, 0),  # the null bias7_t is not td's
+        ("td", "b4"): (5, 1),
+        ("wind", "b3d"): (5, 0),
+        ("wind", "b4"): (5, 1),
+        ("wbgt", "b4"): (5, 1),  # B3d is not defined for WBGT: no row
+    }
+
+
+@pytest.mark.slow
+def test_the_oof_fallbacks_are_counted_per_fold_from_the_rows_it_scored(
+    dev: tuple[pl.DataFrame, OofPredictions],
+) -> None:
+    _, oof = dev
+    fallbacks = oof.fallbacks
+    assert set(fallbacks["fold"].unique()) == {f"loco_{cluster}" for cluster in CLUSTERS}
+    assert set(fallbacks["model"].unique()) == {"b3d", "b4"}
+    assert (fallbacks["n_fallback"] >= 0).all()
+    assert (fallbacks["n_fallback"] <= fallbacks["n_rows"]).all()
+    for target in Target:  # n_rows is the fold's rows that have a raw forecast of the target
+        expected = oof.keys.filter(pl.col(f"raw_{target.value}").is_not_null()).group_by("fold").len()
+        got = fallbacks.filter(pl.col("target") == target.value).group_by("fold").agg(pl.col("n_rows").first())
+        assert dict(got.iter_rows()) == dict(expected.iter_rows()), target.value
 
 
 # === the six-fold run ===============================================================================================
