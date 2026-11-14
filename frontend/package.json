@@ -17,7 +17,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "design:lint": "node scripts/design-lint.mjs",
-    "api:gen": "openapi-typescript openapi/stellar-blaze.mock.openapi.json -o src/api/schema.d.ts",
+    "api:gen": "openapi-typescript openapi/stellar-blaze.openapi.json -o src/api/schema.d.ts",
     "api:check": "pnpm api:gen && git diff --exit-code src/api/schema.d.ts",
     "mock:api": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mock-api.ts",
     "push:send": "node --env-file-if-exists=.env.spike.local --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/send-test-push.ts"

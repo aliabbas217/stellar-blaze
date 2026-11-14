@@ -1,6 +1,6 @@
 import type { components } from "@/api/schema";
 import { STALE_AFTER_MS, currentHour, freshness } from "@/features/today/freshness";
-import { forecastToday, SITE_DEMO } from "@/mocks/fixtures";
+import { legacyForecastToday as forecastToday, SITE_DEMO } from "@/mocks/fixtures";
 
 type HourForecast = components["schemas"]["HourForecast"];
 

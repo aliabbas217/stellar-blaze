@@ -1,7 +1,7 @@
 import type { components } from "@/api/schema";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
 import { selectTodayViewModel } from "@/features/today/useSiteToday";
-import { forecastToday, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
+import { legacyForecastToday as forecastToday, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
 
 type HourForecast = components["schemas"]["HourForecast"];
 type RiskPolicy = components["schemas"]["RiskPolicy"];

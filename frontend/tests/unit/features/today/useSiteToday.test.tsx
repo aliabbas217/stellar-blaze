@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
 import { useProfile } from "@/features/profile/store";
 import { CLOCK_TICK_MS, useNow, useSiteToday, type SiteToday, type TodayViewModel } from "@/features/today/useSiteToday";
-import { problemOnce, staleToday } from "@/mocks/handlers";
-import { forecastToday, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
+import { problemOnce } from "@/mocks/handlers";
+import { legacyForecastToday as forecastToday, riskPolicy, SITE_DEMO, STALE_AGE_MS } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
 
 /*
@@ -19,6 +19,22 @@ import { server } from "@/mocks/node";
  */
 
 const FORECAST_PATH = `/api/v1/sites/${SITE_DEMO}/forecast/today`;
+
+/*
+ * These tests are pinned to F1's forecast day (legacyForecastToday: 11 Nov 2026, 15 hours, the Task 9 vector), not to the
+ * replay day the mock API now serves by default. Each test starts with a handler that answers that day; F2 Task 14
+ * rewrites this view and its tests against the replay day, and deletes the legacy fixture then.
+ */
+function serveLegacyDay(ageMs?: number) {
+  server.use(
+    http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => {
+      const siteId = typeof params.site_id === "string" ? params.site_id : "";
+      const day = forecastToday(siteId, ageMs === undefined ? {} : { ageMs });
+      // An unknown site falls through to the default handler, which answers the 404 problem.
+      return day === undefined ? undefined : HttpResponse.json(day);
+    }),
+  );
+}
 const FROZEN_NOW = "2026-11-11T09:30:00Z";
 
 // The Task 9 vector: moderate, 10 days into heat work, the 13:00 hour {26, 28, 30}: orange, from the person.
@@ -73,6 +89,7 @@ function setSystemTime(instant: string) {
 }
 
 beforeEach(() => {
+  serveLegacyDay();
   localStorage.clear();
   useProfile.setState({ profile });
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -262,7 +279,7 @@ describe("useSiteToday: the forecast fails", () => {
 
 describe("useSiteToday: a stale forecast (review focus 3)", () => {
   it("is marked stale when the forecast was generated 26 hours ago", async () => {
-    server.use(staleToday());
+    serveLegacyDay(STALE_AGE_MS);
     const { result } = mount();
     await waitFor(() => {
       expect(result.current.status).toBe("ready");

@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** List sites. */
-        get: operations["listSites"];
+        get: operations["list_sites"];
         put?: never;
         post?: never;
         delete?: never;
@@ -28,8 +28,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Today's hourly WBGT forecast and site level for a site. */
-        get: operations["getSiteForecastToday"];
+        /** The hourly WBGT forecast and site level for a site's local day. */
+        get: operations["get_site_forecast_today"];
         put?: never;
         post?: never;
         delete?: never;
@@ -46,7 +46,7 @@ export interface paths {
             cookie?: never;
         };
         /** The active risk policy the device uses to compute personal risk. */
-        get: operations["getRiskPolicy"];
+        get: operations["get_risk_policy"];
         put?: never;
         post?: never;
         delete?: never;
@@ -63,7 +63,7 @@ export interface paths {
             cookie?: never;
         };
         /** List the crews of a site. */
-        get: operations["listSiteCrews"];
+        get: operations["list_site_crews"];
         put?: never;
         post?: never;
         delete?: never;
@@ -80,9 +80,69 @@ export interface paths {
             cookie?: never;
         };
         /** Crew-level aggregate timeline for one day (k-suppressed below k). */
-        get: operations["getCrewTimeline"];
+        get: operations["get_crew_timeline"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/crews/{crew_id}/day-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The crew's rule plan for one day, checked by the independent validator.
+         * @description Employer token, own employer only. Advisory only: the employer remains the duty-holder. Never cache (NetworkOnly).
+         */
+        get: operations["get_crew_day_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/crews/{crew_id}/day-plan/sign-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign the crew's day plan off (B3 Task 17; ADR 0011 section 7.1).
+         * @description Employer token, own employer only. One-tap sign-off is allowed only when the plan equals the last accepted plan and has no Medium, High or Red work item; otherwise every item of DayPlan.ack_items must be listed in acknowledged_items, else 409 review-required with the missing ids. Sign-off never delays an alert or a stop. The 200 body is the plan as signed.
+         */
+        post: operations["sign_off_day_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plans/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a typed roster against the rules for one site day (try-a-plan).
+         * @description Public. Exactly one of roster_text and segments. A roster that cannot be parsed is 422 roster-invalid.
+         */
+        post: operations["validate_plan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -99,7 +159,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Register a Web Push subscription for site and optional crew alerts. */
-        post: operations["createPushSubscription"];
+        post: operations["create_push_subscription"];
         delete?: never;
         options?: never;
         head?: never;
@@ -117,7 +177,101 @@ export interface paths {
         put?: never;
         post?: never;
         /** Remove a Web Push subscription. */
-        delete: operations["deletePushSubscription"];
+        delete: operations["delete_push_subscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/data-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * An employer's request for one worker's individual data. Always refused and logged.
+         * @description Employer token. The answer is always 403 urn:stellar-blaze:problem:individual-data-refused (ADR 0054); worker_ref is validated and discarded, never stored, logged or echoed. Without a token: 401.
+         */
+        post: operations["create_data_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/transparency-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The worker-visible log of refused employer requests at a site, newest first, at most 50. */
+        get: operations["get_site_transparency_log"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/crews/{crew_id}/stops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a crew-lead stop. It never waits for sign-off, validation or a forecast.
+         * @description Employer token, own employer only. The row means the stop is recorded; the API does not confirm that anyone was alerted (ADR 0058: no HTTP push trigger).
+         */
+        post: operations["create_crew_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/crews/{crew_id}/stops/{stop_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Clear a crew-lead stop (the 10 second undo, or the end of the stop). Idempotent. */
+        delete: operations["delete_crew_stop"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/demo-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a new demo epoch for a synthetic site.
+         * @description Candidate operation, not yet confirmed with B3. Valid only for a site with synthetic: true (else 403). Employer token. Crew stops and sign-offs revert to the seed; the transparency log is append-only and keeps every row. A real API may answer 404 or 501.
+         */
+        post: operations["reset_demo_site"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -132,6 +286,11 @@ export interface components {
          * @enum {string}
          */
         Level: "green" | "amber" | "orange" | "red";
+        /**
+         * @description ADOSH zone of the effective TWL with a fourth stop edge (ADR 0046).
+         * @enum {string}
+         */
+        Zone: "low" | "medium" | "high" | "red";
         Problem: {
             /** @description URI reference identifying the problem type. */
             type: string;
@@ -142,6 +301,23 @@ export interface components {
             /** @description Same value as the X-Request-ID response header. */
             request_id: string;
         };
+        ReviewRequiredProblem: {
+            /** @description urn:stellar-blaze:problem:review-required */
+            type: string;
+            title: string;
+            status: number;
+            detail?: string;
+            instance?: string;
+            request_id: string;
+            /** @description Ids from DayPlan.ack_items that acknowledged_items did not list. */
+            missing_items: string[];
+        };
+        TimeRange: {
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+        };
         Site: {
             id: string;
             name: string;
@@ -149,6 +325,10 @@ export interface components {
             timezone: string;
             /** @description True for demo data. */
             synthetic: boolean;
+            /** @description E.164 style number of the site supervisor, null when the site has none on file. SYNTHETIC on the demo site. */
+            supervisor_phone: string | null;
+            /** @description E.164 style number of the site first-aider, null when the site has none on file. SYNTHETIC on the demo site. */
+            first_aider_phone: string | null;
         };
         HourForecast: {
             /** Format: date-time */
@@ -173,6 +353,21 @@ export interface components {
             policy_version: string;
             /** @description Active runtime configuration version id (ADR 0010). */
             config_version: number;
+            /**
+             * @description replay: a recorded day; stamped on every screen that shows forecast data.
+             * @enum {string}
+             */
+            mode: "replay" | "live";
+            /**
+             * @description stale and fallback are never drawn as live. fallback: no usable forecast, every hour has site_level null (ADR 0058).
+             * @enum {string}
+             */
+            forecast_status: "fresh" | "stale" | "fallback";
+            model_id: string | null;
+            /** @description Forecast lead in days: 1 is about 24 hours ahead. */
+            lead_days: number;
+            /** @description The midday work ban of this date as UTC instants: 12:30 to 15:00 local, 15 Jun to 15 Sep inclusive local dates, otherwise null. The UI never writes these edges as literals. */
+            ban_window: components["schemas"]["TimeRange"] | null;
             hours: components["schemas"]["HourForecast"][];
         };
         RiskPolicy: {
@@ -180,8 +375,10 @@ export interface components {
             version: string;
             /** @description Must equal the forecast's config_version before the device computes personal risk. */
             config_version: number;
-            /** @description Smallest crew size whose aggregates are shown. */
+            /** @description Smallest crew size whose aggregates are shown (k_exposure, ADR 0050). */
             k_suppression: number;
+            /** @description Smallest group behind any health-related count (ADR 0050). */
+            k_health: number;
             acclimatisation_days_required: number;
             bands: {
                 level: components["schemas"]["Level"];
@@ -203,14 +400,19 @@ export interface components {
             site_id: string;
             name: string;
             member_count: number;
+            /** @description What the crew is doing today, for example Concrete pour. Task allocation, shown to the crew's own supervisor. */
+            task_label: string;
+            /**
+             * @description The crew's workload class (a crew input, not a member reading).
+             * @enum {string}
+             */
+            workload: "light" | "moderate" | "heavy";
         };
         CrewHour: {
             /** Format: date-time */
             starts_at: string;
-            /** @description The crew's level for this hour. Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data. */
+            /** @description The crew's level for this hour: the site level of that hour, raised to red by a crew-lead stop (ADR 0050). Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data. */
             crew_level: components["schemas"]["Level"] | null;
-            /** @description Share of the crew above amber, 0 to 1. Derived only from server-held crew inputs, never from personal risk reported by a device (ADR 0004). Null when the crew is suppressed (on every hour) or there is no data. The data source is for B3 Task 0 to name. */
-            share_above_amber: number | null;
             ban_active: boolean;
         };
         CrewTimeline: {
@@ -219,10 +421,135 @@ export interface components {
             site_id: string;
             /** Format: date */
             date: string;
-            /** @description True when the crew has fewer than k members. When true, share_above_amber is null on every hour and crew_level carries no member-derived information (it comes from site and crew inputs, or is null): nothing in the response may single out a member. */
+            /** @description True when the crew has fewer than k members (k_exposure). It withholds member-derived fields only, such as the restricted headcount of the day plan; crew_level carries no member-derived information (it comes from site and crew inputs, or is null): nothing in the response may single out a member. */
             suppressed: boolean;
             k: number;
+            /** @description As SiteForecastToday.ban_window, for the crew's site and this date. */
+            ban_window: components["schemas"]["TimeRange"] | null;
+            /** @description The crew's published shift blocks for this date, as UTC instants. */
+            shift: components["schemas"]["TimeRange"][];
+            /**
+             * @description Whether the crew's day plan is signed off. Never gates an alert or a stop.
+             * @enum {string}
+             */
+            signoff_state: "unsigned" | "signed";
             hours: components["schemas"]["CrewHour"][];
+        };
+        PlanSegment: {
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            /** @enum {string} */
+            state: "work" | "adosh_rest" | "art18_break" | "ban" | "stopped" | "off";
+            zone: components["schemas"]["Zone"] | null;
+            rule_id: string;
+            clause: string;
+        };
+        Violation: {
+            rule_id: string;
+            clause: string;
+            source_id: string;
+            ranges: components["schemas"]["TimeRange"][];
+            detail: string;
+        };
+        ValidatorResult: {
+            passed: boolean;
+            violations: components["schemas"]["Violation"][];
+            checked_rules: string[];
+        };
+        ZoneHour: {
+            /** Format: date-time */
+            starts_at: string;
+            zone: components["schemas"]["Zone"] | null;
+            level: components["schemas"]["Level"] | null;
+        };
+        AckItem: {
+            /** @description One acknowledgement is one run of consecutive plan blocks in the same zone above low. Format ack-<zone>-<HHMM>, the local start time, for example ack-high-1000. Unique within a day plan. */
+            id: string;
+            /** @enum {string} */
+            zone: "medium" | "high" | "red";
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            /** @description Action code the client maps to text, for example cycle.medium.heavy.45-15 or stop-work. */
+            text_code: string;
+        };
+        DaySignoff: {
+            /** @enum {string} */
+            state: "unsigned" | "signed";
+            signed_at: string | null;
+            signed_by_role: "employer" | null;
+        };
+        DayPlan: {
+            crew_id: string;
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            status: "rule" | "fallback";
+            /**
+             * @description Widened from the unsigned-only value of B3 Task 0 by the sign-off decision (ADR 0051 amendment). With no sign-off the plan stays unsigned (plan.unsigned_fallback).
+             * @enum {string}
+             */
+            signoff_state: "unsigned" | "signed";
+            /** @enum {string} */
+            banner_code: "plan.floor_banner";
+            segments: components["schemas"]["PlanSegment"][];
+            zone_hours: components["schemas"]["ZoneHour"][];
+            validator: components["schemas"]["ValidatorResult"];
+            suppressed: boolean;
+            /** @description Members limited by acclimatisation, the 7-day heavy rule or the juvenile rule. Null when suppressed. */
+            restricted_headcount: number | null;
+            restrictions: string[];
+            /** @enum {string} */
+            forecast_status: "fresh" | "stale" | "fallback";
+            policy_version: string;
+            config_version: number;
+            model_id: string | null;
+            /** @description The items that need a per-item acknowledgement before sign-off, in time order. */
+            ack_items: components["schemas"]["AckItem"][];
+            signoff: components["schemas"]["DaySignoff"];
+        };
+        PlanValidateRequest: {
+            site_id: string;
+            /** Format: date */
+            date: string;
+            crew: {
+                /** @enum {string} */
+                workload: "light" | "moderate" | "heavy";
+                headcount: number;
+                /** @description Optional; true when omitted (the default is applied by the API, not declared here, so the generated type stays optional). */
+                acclimatised?: boolean;
+                /** @description Optional; 6 when omitted (applied by the API). */
+                days_per_week?: number;
+            };
+            roster_text?: string | null;
+            segments?: {
+                start: string;
+                end: string;
+                /** @enum {string} */
+                state: "work" | "rest" | "break";
+            }[] | null;
+        };
+        PlanValidateResponse: {
+            validator: components["schemas"]["ValidatorResult"];
+            zone_hours: components["schemas"]["ZoneHour"][];
+            policy_version: string;
+            config_version: number;
+        };
+        RosterInvalidProblem: {
+            /** @description urn:stellar-blaze:problem:roster-invalid */
+            type: string;
+            title: string;
+            status: number;
+            detail?: string;
+            instance?: string;
+            request_id: string;
+            errors: {
+                line: number;
+                message: string;
+            }[];
         };
         PushSubscriptionCreate: {
             subscription: {
@@ -239,8 +566,75 @@ export interface components {
         PushSubscriptionCreated: {
             id: string;
         };
+        DataRequestCreate: {
+            /** @enum {string} */
+            subject: "worker";
+            /** @enum {string} */
+            data_class: "health" | "personal" | "exposure";
+            /** @description Free text; validated and discarded. Never stored, logged or echoed. */
+            worker_ref: string;
+        };
+        CrewStopCreate: {
+            /** @enum {string} */
+            reason_code: "heat" | "worker_unwell" | "other";
+        };
+        CrewStop: {
+            id: string;
+            crew_id: string;
+            /** Format: date-time */
+            started_at: string;
+            cleared_at: string | null;
+        };
+        TransparencyLog: {
+            site_id: string;
+            entries: {
+                /** Format: date-time */
+                at: string;
+                /** @enum {string} */
+                kind: "data_request.refused";
+                /** @enum {string} */
+                outcome: "refused";
+                /** @enum {string} */
+                actor_role: "employer";
+                rule: string;
+                policy_version: string;
+                config_version: number;
+                model_id: string | null;
+            }[];
+        };
+        SignOffRequest: {
+            /** @description Ids of the DayPlan.ack_items the supervisor ticked. */
+            acknowledged_items: string[];
+            deviation_reason_code: string | null;
+        };
+        DemoReset: {
+            /** @description The new demo epoch, counting from 1. */
+            epoch: number;
+        };
     };
     responses: {
+        /** @description No bearer token, or an unknown one. */
+        Unauthorized: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                /** @description Bearer */
+                "WWW-Authenticate"?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The token's employer may not do this, or the request is refused by rule. */
+        Forbidden: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description The resource does not exist. */
         NotFound: {
             headers: {
@@ -251,8 +645,38 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description The request failed validation. */
+        /** @description Conflict. For sign-off: review-required, listing the missing item ids in missing_items. Other problems of status 409 use Problem. */
+        ReviewRequired: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ReviewRequiredProblem"];
+            };
+        };
+        /** @description The request failed validation, or the roster could not be parsed: roster-invalid lists errors by line. */
+        RosterInvalid: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["RosterInvalidProblem"];
+            };
+        };
+        /** @description The request failed validation. A roster that cannot be parsed lists its errors (RosterInvalidProblem). */
         Unprocessable: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Not implemented by this API. */
+        NotImplemented: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestId"];
                 [name: string]: unknown;
@@ -292,7 +716,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    listSites: {
+    list_sites: {
         parameters: {
             query?: never;
             header?: never;
@@ -315,9 +739,12 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    getSiteForecastToday: {
+    get_site_forecast_today: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The site's local date, YYYY-MM-DD. Missing: the site's local today in live mode, the replay default date in replay mode (ADR 0051 decision 4). */
+                date?: string;
+            };
             header?: never;
             path: {
                 /** @description Site id, from GET /api/v1/sites. */
@@ -327,7 +754,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Hourly forecast for the site's local day. */
+            /** @description Hourly forecast for the site's local day, 06:00 to 19:00 local. */
             200: {
                 headers: {
                     "X-Request-ID": components["headers"]["XRequestId"];
@@ -343,7 +770,7 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    getRiskPolicy: {
+    get_risk_policy: {
         parameters: {
             query?: never;
             header?: never;
@@ -366,7 +793,7 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    listSiteCrews: {
+    list_site_crews: {
         parameters: {
             query?: never;
             header?: never;
@@ -394,11 +821,11 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    getCrewTimeline: {
+    get_crew_timeline: {
         parameters: {
-            query: {
-                /** @description Local date at the crew's site, YYYY-MM-DD. */
-                date: string;
+            query?: {
+                /** @description The crew's site's local date, YYYY-MM-DD. Missing: as for the site forecast. */
+                date?: string;
             };
             header?: never;
             path: {
@@ -425,7 +852,104 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    createPushSubscription: {
+    get_crew_day_plan: {
+        parameters: {
+            query?: {
+                /** @description The crew's site's local date, YYYY-MM-DD. Missing: as for the site forecast. */
+                date?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
+                crew_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The day plan. */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    sign_off_day_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
+                crew_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignOffRequest"];
+            };
+        };
+        responses: {
+            /** @description The day plan, now signed. */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ReviewRequired"];
+            422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    validate_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description The validator's findings. */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanValidateResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["RosterInvalid"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    create_push_subscription: {
         parameters: {
             query?: never;
             header?: never;
@@ -454,7 +978,7 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    deletePushSubscription: {
+    delete_push_subscription: {
         parameters: {
             query?: never;
             header?: never;
@@ -476,6 +1000,152 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    create_data_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Site id, from GET /api/v1/sites. */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataRequestCreate"];
+            };
+        };
+        responses: {
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    get_site_transparency_log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Site id, from GET /api/v1/sites. */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The site's transparency log. */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransparencyLog"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    create_crew_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
+                crew_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewStopCreate"];
+            };
+        };
+        responses: {
+            /** @description The stop is recorded. */
+            201: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewStop"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    delete_crew_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Crew id, from GET /api/v1/sites/{site_id}/crews. */
+                crew_id: string;
+                /** @description Id returned by POST /api/v1/crews/{crew_id}/stops. */
+                stop_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stop is cleared. */
+            204: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            502: components["responses"]["BadGateway"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    reset_demo_site: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Site id of a synthetic site. */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new epoch. */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoReset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["NotImplemented"];
             502: components["responses"]["BadGateway"];
             default: components["responses"]["Problem"];
         };

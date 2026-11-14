@@ -1,24 +1,81 @@
-import { MOCK_SCENARIO_HEADER, mockScenariosEnabled } from "@/api/mock-scenario";
 import { problemResponse, UPSTREAM_UNAVAILABLE_TYPE } from "@/api/problem";
+import { employerAuth, forwardHeaders } from "./employer-auth";
+import { clientKey, createRateLimiter, type RateLimiter } from "./rate-limit";
 
 /*
  * The BFF proxy: the browser calls only same-origin /api/v1/*, and this handler forwards each call to the API at
  * API_ORIGIN (read per request, so the container's runtime env decides, not the build). Web health is
  * /api/healthz, which is a different route and never proxied.
  *
- * Only an allow-list of headers crosses either way. In particular no cookie or authorization header goes
- * upstream (the API takes none today), and nothing but content-type and x-request-id comes back.
+ * Only an allow-list of headers crosses either way (forwardHeaders in employer-auth.ts). A client's cookie and
+ * authorization header never go upstream; the one credential the API sees is the demo employer token, which the BFF
+ * attaches itself, only on the allow-listed method and path pairs of the demo fixture (F2 decision D4). Those pairs
+ * that write are rate limited per client and globally. Nothing but content-type and x-request-id comes back.
  */
 
 export const dynamic = "force-dynamic";
 
-const REQUEST_HEADERS = ["content-type", "accept", "x-request-id"];
 const RESPONSE_HEADERS = ["content-type", "x-request-id"];
 
 // A hung API must end as a problem the UI can show, not as a request that never answers.
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
 const API_PREFIX = "/api/v1/";
+
+const DEFAULT_WRITES_PER_MIN = 20;
+const DEFAULT_GLOBAL_WRITES_PER_MIN = 120;
+const GLOBAL_KEY = "demo-token";
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number(raw);
+  return raw !== undefined && Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+interface Limiters {
+  settings: string;
+  perClient: RateLimiter;
+  global: RateLimiter;
+}
+
+let limiters: Limiters | undefined;
+
+/** The two write buckets for the limits in the environment now (read per request, so a restart is not needed). */
+function writeLimiters(): Limiters {
+  const perClient = positiveInt(process.env.DEMO_WRITE_RATE_PER_MIN, DEFAULT_WRITES_PER_MIN);
+  const global = positiveInt(process.env.DEMO_WRITE_GLOBAL_RATE_PER_MIN, DEFAULT_GLOBAL_WRITES_PER_MIN);
+  const settings = `${String(perClient)}/${String(global)}`;
+  if (limiters?.settings !== settings) {
+    limiters = {
+      settings,
+      perClient: createRateLimiter({ perMinute: perClient, now: Date.now }),
+      global: createRateLimiter({ perMinute: global, now: Date.now }),
+    };
+  }
+  return limiters;
+}
+
+/** A 429 problem with Retry-After when either bucket is empty; otherwise takes one token from each and returns null. */
+function rateLimited(request: Request): Response | null {
+  const { perClient, global } = writeLimiters();
+  const key = clientKey(request.headers);
+  const mine = perClient.peek(key);
+  const all = global.peek(GLOBAL_KEY);
+  if (mine.allowed && all.allowed) {
+    perClient.take(key);
+    global.take(GLOBAL_KEY);
+    return null;
+  }
+  const retryAfter = Math.max(mine.allowed ? 0 : mine.retryAfterSeconds, all.allowed ? 0 : all.retryAfterSeconds);
+  const response = problemResponse({
+    type: "urn:stellar-blaze:problem:rate-limited",
+    title: "Too Many Requests",
+    status: 429,
+    detail: "The demo allows a limited number of changes per minute. Wait and try again.",
+    request_id: requestIdOf(request),
+  });
+  response.headers.set("retry-after", String(retryAfter));
+  return response;
+}
 
 function requestIdOf(request: Request): string {
   return request.headers.get("x-request-id") ?? crypto.randomUUID();
@@ -46,13 +103,13 @@ async function forward(request: Request): Promise<Response> {
   if (!incoming.pathname.startsWith(API_PREFIX)) {
     return problemResponse({ type: "about:blank", title: "Not Found", status: 404, request_id: requestIdOf(request) });
   }
-  const headers = new Headers();
-  for (const name of REQUEST_HEADERS) {
-    const value = request.headers.get(name);
-    if (value !== null) headers.set(name, value);
+  const decision = employerAuth(request.method, incoming.pathname);
+  if (decision.write) {
+    const limited = rateLimited(request);
+    if (limited !== null) return limited;
   }
-  const scenario = request.headers.get(MOCK_SCENARIO_HEADER);
-  if (scenario !== null && mockScenariosEnabled()) headers.set(MOCK_SCENARIO_HEADER, scenario);
+  // The token is read now, per request, from the server's environment. Never a NEXT_PUBLIC variable.
+  const headers = forwardHeaders(request.headers, decision.inject ? process.env.DEMO_EMPLOYER_TOKEN : undefined);
 
   let upstream: Response;
   try {

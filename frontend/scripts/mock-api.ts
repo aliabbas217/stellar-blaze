@@ -5,7 +5,7 @@ import { createServer } from "@msw/serve";
 import { handlers } from "../src/mocks/handlers.ts";
 
 const PORT = 4010;
-// The loopback address, not every interface: it serves synthetic data without authentication, and every caller
+// The loopback address, not every interface: it serves synthetic data, answering the employer routes to any non-empty bearer token, and every caller
 // (Playwright, Lighthouse CI through scripts/serve-stack.mjs, the web server's API_ORIGIN) uses 127.0.0.1.
 const HOST = "127.0.0.1";
 

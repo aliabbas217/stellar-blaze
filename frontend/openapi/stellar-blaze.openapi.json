@@ -1,0 +1,2292 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Stellar Blaze API (v1 contract, hand-written from the B3 plan)",
+    "version": "1.0.0-draft",
+    "description": "Hand-written from B3 plan Task 0 and Task 17, ADRs 0050, 0051, 0054, 0057 and 0058, until backend/openapi/v1.json carries the real contract (B3 Task 0, noon 15 Nov); then Task 24 swaps this file. Properties and operations marked x-sb-requested are gaps the frontend asked B3 for (R1 ban_window, R2 crew task, workload, shift and sign-off state, R3 sign-off items, G1 demo reset, G2 site phones); they are not in the B3 plan text. Every non-2xx response is application/problem+json (RFC 9457 shape plus request_id). Version strings are opaque to the UI: policy_version and RiskPolicy.version carry the backend ruleset id (ADR 0009); config_version is the integer id of the active runtime configuration (ADR 0010). Every instant is ISO 8601 UTC."
+  },
+  "paths": {
+    "/api/v1/sites": {
+      "get": {
+        "operationId": "list_sites",
+        "summary": "List sites.",
+        "responses": {
+          "200": {
+            "description": "All sites.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Site"
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/forecast/today": {
+      "get": {
+        "operationId": "get_site_forecast_today",
+        "summary": "The hourly WBGT forecast and site level for a site's local day.",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id, from GET /api/v1/sites.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "The site's local date, YYYY-MM-DD. Missing: the site's local today in live mode, the replay default date in replay mode (ADR 0051 decision 4).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hourly forecast for the site's local day, 06:00 to 19:00 local.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteForecastToday"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/risk-policy": {
+      "get": {
+        "operationId": "get_risk_policy",
+        "summary": "The active risk policy the device uses to compute personal risk.",
+        "responses": {
+          "200": {
+            "description": "The active risk policy.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskPolicy"
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/crews": {
+      "get": {
+        "operationId": "list_site_crews",
+        "summary": "List the crews of a site.",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id, from GET /api/v1/sites.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crews of the site.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Crew"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/crews/{crew_id}/timeline": {
+      "get": {
+        "operationId": "get_crew_timeline",
+        "summary": "Crew-level aggregate timeline for one day (k-suppressed below k).",
+        "parameters": [
+          {
+            "name": "crew_id",
+            "in": "path",
+            "required": true,
+            "description": "Crew id, from GET /api/v1/sites/{site_id}/crews.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "The crew's site's local date, YYYY-MM-DD. Missing: as for the site forecast.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregates only; never one person's state.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewTimeline"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/crews/{crew_id}/day-plan": {
+      "get": {
+        "operationId": "get_crew_day_plan",
+        "summary": "The crew's rule plan for one day, checked by the independent validator.",
+        "description": "Employer token, own employer only. Advisory only: the employer remains the duty-holder. Never cache (NetworkOnly).",
+        "security": [
+          {
+            "EmployerBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "crew_id",
+            "in": "path",
+            "required": true,
+            "description": "Crew id, from GET /api/v1/sites/{site_id}/crews.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "The crew's site's local date, YYYY-MM-DD. Missing: as for the site forecast.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The day plan.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/crews/{crew_id}/day-plan/sign-off": {
+      "post": {
+        "operationId": "sign_off_day_plan",
+        "summary": "Sign the crew's day plan off (B3 Task 17; ADR 0011 section 7.1).",
+        "description": "Employer token, own employer only. One-tap sign-off is allowed only when the plan equals the last accepted plan and has no Medium, High or Red work item; otherwise every item of DayPlan.ack_items must be listed in acknowledged_items, else 409 review-required with the missing ids. Sign-off never delays an alert or a stop. The 200 body is the plan as signed.",
+        "x-sb-requested": "R3",
+        "security": [
+          {
+            "EmployerBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "crew_id",
+            "in": "path",
+            "required": true,
+            "description": "Crew id, from GET /api/v1/sites/{site_id}/crews.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignOffRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The day plan, now signed.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ReviewRequired"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/plans/validate": {
+      "post": {
+        "operationId": "validate_plan",
+        "summary": "Check a typed roster against the rules for one site day (try-a-plan).",
+        "description": "Public. Exactly one of roster_text and segments. A roster that cannot be parsed is 422 roster-invalid.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanValidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The validator's findings.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanValidateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/RosterInvalid"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/push/subscriptions": {
+      "post": {
+        "operationId": "create_push_subscription",
+        "summary": "Register a Web Push subscription for site and optional crew alerts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription registered.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscriptionCreated"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/push/subscriptions/{subscription_id}": {
+      "delete": {
+        "operationId": "delete_push_subscription",
+        "summary": "Remove a Web Push subscription.",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "description": "Id returned by POST /api/v1/push/subscriptions.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Subscription removed (idempotent).",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/data-requests": {
+      "post": {
+        "operationId": "create_data_request",
+        "summary": "An employer's request for one worker's individual data. Always refused and logged.",
+        "description": "Employer token. The answer is always 403 urn:stellar-blaze:problem:individual-data-refused (ADR 0054); worker_ref is validated and discarded, never stored, logged or echoed. Without a token: 401.",
+        "security": [
+          {
+            "EmployerBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id, from GET /api/v1/sites.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/transparency-log": {
+      "get": {
+        "operationId": "get_site_transparency_log",
+        "summary": "The worker-visible log of refused employer requests at a site, newest first, at most 50.",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id, from GET /api/v1/sites.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The site's transparency log.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransparencyLog"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/crews/{crew_id}/stops": {
+      "post": {
+        "operationId": "create_crew_stop",
+        "summary": "Record a crew-lead stop. It never waits for sign-off, validation or a forecast.",
+        "description": "Employer token, own employer only. The row means the stop is recorded; the API does not confirm that anyone was alerted (ADR 0058: no HTTP push trigger).",
+        "security": [
+          {
+            "EmployerBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "crew_id",
+            "in": "path",
+            "required": true,
+            "description": "Crew id, from GET /api/v1/sites/{site_id}/crews.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrewStopCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stop is recorded.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewStop"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/crews/{crew_id}/stops/{stop_id}": {
+      "delete": {
+        "operationId": "delete_crew_stop",
+        "summary": "Clear a crew-lead stop (the 10 second undo, or the end of the stop). Idempotent.",
+        "security": [
+          {
+            "EmployerBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "crew_id",
+            "in": "path",
+            "required": true,
+            "description": "Crew id, from GET /api/v1/sites/{site_id}/crews.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stop_id",
+            "in": "path",
+            "required": true,
+            "description": "Id returned by POST /api/v1/crews/{crew_id}/stops.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The stop is cleared.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/demo-reset": {
+      "post": {
+        "operationId": "reset_demo_site",
+        "summary": "Start a new demo epoch for a synthetic site.",
+        "description": "Candidate operation, not yet confirmed with B3. Valid only for a site with synthetic: true (else 403). Employer token. Crew stops and sign-offs revert to the seed; the transparency log is append-only and keeps every row. A real API may answer 404 or 501.",
+        "x-sb-requested": "G1",
+        "security": [
+          {
+            "EmployerBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "description": "Site id of a synthetic site.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new epoch.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoReset"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/NotImplemented"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "EmployerBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The demo employer token. The browser never holds it: the BFF injects it on an allow-list of method and path pairs (src/app/api/v1/[...path]/employer-auth.ts)."
+      }
+    },
+    "headers": {
+      "XRequestId": {
+        "description": "Correlation id of this request. Repeated as request_id in every problem body.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "No bearer token, or an unknown one.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          },
+          "WWW-Authenticate": {
+            "description": "Bearer",
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The token's employer may not do this, or the request is refused by rule.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "The resource does not exist.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ReviewRequired": {
+        "description": "Conflict. For sign-off: review-required, listing the missing item ids in missing_items. Other problems of status 409 use Problem.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ReviewRequiredProblem"
+            }
+          }
+        }
+      },
+      "RosterInvalid": {
+        "description": "The request failed validation, or the roster could not be parsed: roster-invalid lists errors by line.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/RosterInvalidProblem"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "The request failed validation. A roster that cannot be parsed lists its errors (RosterInvalidProblem).",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotImplemented": {
+        "description": "Not implemented by this API.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "The API could not reach a dependency.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Problem": {
+        "description": "Any other error.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Level": {
+        "type": "string",
+        "enum": [
+          "green",
+          "amber",
+          "orange",
+          "red"
+        ],
+        "description": "Heat level. Never shown by colour alone."
+      },
+      "Zone": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "red"
+        ],
+        "description": "ADOSH zone of the effective TWL with a fourth stop edge (ADR 0046)."
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "URI reference identifying the problem type."
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Same value as the X-Request-ID response header."
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewRequiredProblem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "urn:stellar-blaze:problem:review-required"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "missing_items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Ids from DayPlan.ack_items that acknowledged_items did not list."
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "request_id",
+          "missing_items"
+        ],
+        "additionalProperties": false,
+        "x-sb-requested": "R3"
+      },
+      "TimeRange": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "starts_at",
+          "ends_at"
+        ],
+        "additionalProperties": false
+      },
+      "Site": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone; the UI renders every time in it."
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True for demo data."
+          },
+          "supervisor_phone": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "E.164 style number of the site supervisor, null when the site has none on file. SYNTHETIC on the demo site.",
+            "x-sb-requested": "G2"
+          },
+          "first_aider_phone": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "E.164 style number of the site first-aider, null when the site has none on file. SYNTHETIC on the demo site.",
+            "x-sb-requested": "G2"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "synthetic",
+          "supervisor_phone",
+          "first_aider_phone"
+        ],
+        "additionalProperties": false
+      },
+      "HourForecast": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wbgt_c": {
+            "type": "object",
+            "properties": {
+              "p05": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "p50": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "p95": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "p05",
+              "p50",
+              "p95"
+            ],
+            "additionalProperties": false
+          },
+          "site_level": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "action_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ban_active": {
+            "type": "boolean",
+            "description": "Midday work ban in force during this hour."
+          }
+        },
+        "required": [
+          "starts_at",
+          "wbgt_c",
+          "site_level",
+          "action_codes",
+          "ban_active"
+        ],
+        "additionalProperties": false
+      },
+      "SiteForecastToday": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policy_version": {
+            "type": "string",
+            "description": "Backend ruleset id (ae-heat-<yyyy>.<n>). Shown verbatim, never parsed."
+          },
+          "config_version": {
+            "type": "integer",
+            "description": "Active runtime configuration version id (ADR 0010)."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replay",
+              "live"
+            ],
+            "description": "replay: a recorded day; stamped on every screen that shows forecast data."
+          },
+          "forecast_status": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "fallback"
+            ],
+            "description": "stale and fallback are never drawn as live. fallback: no usable forecast, every hour has site_level null (ADR 0058)."
+          },
+          "model_id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lead_days": {
+            "type": "integer",
+            "description": "Forecast lead in days: 1 is about 24 hours ahead."
+          },
+          "ban_window": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The midday work ban of this date as UTC instants: 12:30 to 15:00 local, 15 Jun to 15 Sep inclusive local dates, otherwise null. The UI never writes these edges as literals.",
+            "x-sb-requested": "R1"
+          },
+          "hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HourForecast"
+            }
+          }
+        },
+        "required": [
+          "site_id",
+          "date",
+          "generated_at",
+          "policy_version",
+          "config_version",
+          "mode",
+          "forecast_status",
+          "model_id",
+          "lead_days",
+          "ban_window",
+          "hours"
+        ],
+        "additionalProperties": false
+      },
+      "RiskPolicy": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Backend ruleset id (ae-heat-<yyyy>.<n>). Shown verbatim, never parsed."
+          },
+          "config_version": {
+            "type": "integer",
+            "description": "Must equal the forecast's config_version before the device computes personal risk."
+          },
+          "k_suppression": {
+            "type": "integer",
+            "description": "Smallest crew size whose aggregates are shown (k_exposure, ADR 0050)."
+          },
+          "k_health": {
+            "type": "integer",
+            "description": "Smallest group behind any health-related count (ADR 0050)."
+          },
+          "acclimatisation_days_required": {
+            "type": "integer"
+          },
+          "bands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "level": {
+                  "$ref": "#/components/schemas/Level"
+                },
+                "min_exceedance_probability": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "level",
+                "min_exceedance_probability"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workload_classes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "moderate",
+                    "heavy"
+                  ]
+                },
+                "metabolic_rate_w": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "code",
+                "metabolic_rate_w"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "clothing_options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "adjustment_c": {
+                  "type": "number"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "adjustment_c",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "version",
+          "config_version",
+          "k_suppression",
+          "k_health",
+          "acclimatisation_days_required",
+          "bands",
+          "workload_classes",
+          "clothing_options"
+        ],
+        "additionalProperties": false
+      },
+      "Crew": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "site_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "member_count": {
+            "type": "integer"
+          },
+          "task_label": {
+            "type": "string",
+            "description": "What the crew is doing today, for example Concrete pour. Task allocation, shown to the crew's own supervisor.",
+            "x-sb-requested": "R2"
+          },
+          "workload": {
+            "type": "string",
+            "enum": [
+              "light",
+              "moderate",
+              "heavy"
+            ],
+            "description": "The crew's workload class (a crew input, not a member reading).",
+            "x-sb-requested": "R2"
+          }
+        },
+        "required": [
+          "id",
+          "site_id",
+          "name",
+          "member_count",
+          "task_label",
+          "workload"
+        ],
+        "additionalProperties": false
+      },
+      "CrewHour": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "crew_level": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The crew's level for this hour: the site level of that hour, raised to red by a crew-lead stop (ADR 0050). Derived only from server-held inputs for the site and the crew, never from personal risk reported by a device (ADR 0004: personal risk is never sent to the server). It carries no member-derived information, which is why it is also returned for a suppressed crew. Null when there is no data."
+          },
+          "ban_active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "starts_at",
+          "crew_level",
+          "ban_active"
+        ],
+        "additionalProperties": false
+      },
+      "CrewTimeline": {
+        "type": "object",
+        "properties": {
+          "crew_id": {
+            "type": "string"
+          },
+          "crew_name": {
+            "type": "string"
+          },
+          "site_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "suppressed": {
+            "type": "boolean",
+            "description": "True when the crew has fewer than k members (k_exposure). It withholds member-derived fields only, such as the restricted headcount of the day plan; crew_level carries no member-derived information (it comes from site and crew inputs, or is null): nothing in the response may single out a member."
+          },
+          "k": {
+            "type": "integer"
+          },
+          "ban_window": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As SiteForecastToday.ban_window, for the crew's site and this date.",
+            "x-sb-requested": "R1"
+          },
+          "shift": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeRange"
+            },
+            "description": "The crew's published shift blocks for this date, as UTC instants.",
+            "x-sb-requested": "R2"
+          },
+          "signoff_state": {
+            "type": "string",
+            "enum": [
+              "unsigned",
+              "signed"
+            ],
+            "description": "Whether the crew's day plan is signed off. Never gates an alert or a stop.",
+            "x-sb-requested": "R2"
+          },
+          "hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrewHour"
+            }
+          }
+        },
+        "required": [
+          "crew_id",
+          "crew_name",
+          "site_id",
+          "date",
+          "suppressed",
+          "k",
+          "ban_window",
+          "shift",
+          "signoff_state",
+          "hours"
+        ],
+        "additionalProperties": false
+      },
+      "PlanSegment": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "work",
+              "adosh_rest",
+              "art18_break",
+              "ban",
+              "stopped",
+              "off"
+            ]
+          },
+          "zone": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Zone"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "clause": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "starts_at",
+          "ends_at",
+          "state",
+          "zone",
+          "rule_id",
+          "clause"
+        ],
+        "additionalProperties": false
+      },
+      "Violation": {
+        "type": "object",
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "clause": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "ranges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeRange"
+            }
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "clause",
+          "source_id",
+          "ranges",
+          "detail"
+        ],
+        "additionalProperties": false
+      },
+      "ValidatorResult": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            }
+          },
+          "checked_rules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "passed",
+          "violations",
+          "checked_rules"
+        ],
+        "additionalProperties": false
+      },
+      "ZoneHour": {
+        "type": "object",
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zone": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Zone"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "level": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Level"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "starts_at",
+          "zone",
+          "level"
+        ],
+        "additionalProperties": false
+      },
+      "AckItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "One acknowledgement is one run of consecutive plan blocks in the same zone above low. Format ack-<zone>-<HHMM>, the local start time, for example ack-high-1000. Unique within a day plan."
+          },
+          "zone": {
+            "type": "string",
+            "enum": [
+              "medium",
+              "high",
+              "red"
+            ]
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "text_code": {
+            "type": "string",
+            "description": "Action code the client maps to text, for example cycle.medium.heavy.45-15 or stop-work."
+          }
+        },
+        "required": [
+          "id",
+          "zone",
+          "starts_at",
+          "ends_at",
+          "text_code"
+        ],
+        "additionalProperties": false,
+        "x-sb-requested": "R3"
+      },
+      "DaySignoff": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "unsigned",
+              "signed"
+            ]
+          },
+          "signed_at": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signed_by_role": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "employer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "signed_at",
+          "signed_by_role"
+        ],
+        "additionalProperties": false,
+        "x-sb-requested": "R3"
+      },
+      "DayPlan": {
+        "type": "object",
+        "properties": {
+          "crew_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "fallback"
+            ]
+          },
+          "signoff_state": {
+            "type": "string",
+            "enum": [
+              "unsigned",
+              "signed"
+            ],
+            "description": "Widened from the unsigned-only value of B3 Task 0 by the sign-off decision (ADR 0051 amendment). With no sign-off the plan stays unsigned (plan.unsigned_fallback)."
+          },
+          "banner_code": {
+            "type": "string",
+            "enum": [
+              "plan.floor_banner"
+            ]
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanSegment"
+            }
+          },
+          "zone_hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneHour"
+            }
+          },
+          "validator": {
+            "$ref": "#/components/schemas/ValidatorResult"
+          },
+          "suppressed": {
+            "type": "boolean"
+          },
+          "restricted_headcount": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Members limited by acclimatisation, the 7-day heavy rule or the juvenile rule. Null when suppressed."
+          },
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forecast_status": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "fallback"
+            ]
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "integer"
+          },
+          "model_id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ack_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AckItem"
+            },
+            "description": "The items that need a per-item acknowledgement before sign-off, in time order.",
+            "x-sb-requested": "R3"
+          },
+          "signoff": {
+            "$ref": "#/components/schemas/DaySignoff",
+            "x-sb-requested": "R3"
+          }
+        },
+        "required": [
+          "crew_id",
+          "date",
+          "status",
+          "signoff_state",
+          "banner_code",
+          "segments",
+          "zone_hours",
+          "validator",
+          "suppressed",
+          "restricted_headcount",
+          "restrictions",
+          "forecast_status",
+          "policy_version",
+          "config_version",
+          "model_id",
+          "ack_items",
+          "signoff"
+        ],
+        "additionalProperties": false
+      },
+      "PlanValidateRequest": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "crew": {
+            "type": "object",
+            "properties": {
+              "workload": {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "moderate",
+                  "heavy"
+                ]
+              },
+              "headcount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "acclimatised": {
+                "type": "boolean",
+                "description": "Optional; true when omitted (the default is applied by the API, not declared here, so the generated type stays optional)."
+              },
+              "days_per_week": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 7,
+                "description": "Optional; 6 when omitted (applied by the API)."
+              }
+            },
+            "required": [
+              "workload",
+              "headcount"
+            ],
+            "additionalProperties": false
+          },
+          "roster_text": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "description": "One line per segment: HH:MM-HH:MM work|rest|break, # comments allowed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "segments": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "string",
+                      "pattern": "^\\d{2}:\\d{2}$"
+                    },
+                    "end": {
+                      "type": "string",
+                      "pattern": "^\\d{2}:\\d{2}$"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "work",
+                        "rest",
+                        "break"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "start",
+                    "end",
+                    "state"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "site_id",
+          "date",
+          "crew"
+        ],
+        "additionalProperties": false
+      },
+      "PlanValidateResponse": {
+        "type": "object",
+        "properties": {
+          "validator": {
+            "$ref": "#/components/schemas/ValidatorResult"
+          },
+          "zone_hours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneHour"
+            }
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "validator",
+          "zone_hours",
+          "policy_version",
+          "config_version"
+        ],
+        "additionalProperties": false
+      },
+      "RosterInvalidProblem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "urn:stellar-blaze:problem:roster-invalid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "line",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "request_id",
+          "errors"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionCreate": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string"
+              },
+              "expirationTime": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "keys": {
+                "type": "object",
+                "properties": {
+                  "p256dh": {
+                    "type": "string"
+                  },
+                  "auth": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "p256dh",
+                  "auth"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "endpoint",
+              "expirationTime",
+              "keys"
+            ],
+            "additionalProperties": false
+          },
+          "site_id": {
+            "type": "string"
+          },
+          "crew_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "subscription",
+          "site_id",
+          "crew_id"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "DataRequestCreate": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "enum": [
+              "worker"
+            ]
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "health",
+              "personal",
+              "exposure"
+            ]
+          },
+          "worker_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Free text; validated and discarded. Never stored, logged or echoed."
+          }
+        },
+        "required": [
+          "subject",
+          "data_class",
+          "worker_ref"
+        ],
+        "additionalProperties": false
+      },
+      "CrewStopCreate": {
+        "type": "object",
+        "properties": {
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "heat",
+              "worker_unwell",
+              "other"
+            ]
+          }
+        },
+        "required": [
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
+      "CrewStop": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "crew_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cleared_at": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "crew_id",
+          "started_at",
+          "cleared_at"
+        ],
+        "additionalProperties": false
+      },
+      "TransparencyLog": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "data_request.refused"
+                  ]
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "refused"
+                  ]
+                },
+                "actor_role": {
+                  "type": "string",
+                  "enum": [
+                    "employer"
+                  ]
+                },
+                "rule": {
+                  "type": "string"
+                },
+                "policy_version": {
+                  "type": "string"
+                },
+                "config_version": {
+                  "type": "integer"
+                },
+                "model_id": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "at",
+                "kind",
+                "outcome",
+                "actor_role",
+                "rule",
+                "policy_version",
+                "config_version",
+                "model_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "site_id",
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "SignOffRequest": {
+        "type": "object",
+        "properties": {
+          "acknowledged_items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Ids of the DayPlan.ack_items the supervisor ticked."
+          },
+          "deviation_reason_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "acknowledged_items",
+          "deviation_reason_code"
+        ],
+        "additionalProperties": false,
+        "x-sb-requested": "R3"
+      },
+      "DemoReset": {
+        "type": "object",
+        "properties": {
+          "epoch": {
+            "type": "integer",
+            "description": "The new demo epoch, counting from 1."
+          }
+        },
+        "required": [
+          "epoch"
+        ],
+        "additionalProperties": false,
+        "x-sb-requested": "G1"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 /*
  * Every non-2xx response of the API is application/problem+json (RFC 9457 shape plus request_id; see
- * openapi/stellar-blaze.mock.openapi.json, schema `Problem`). This module is the one place that reads that shape
+ * openapi/stellar-blaze.openapi.json, schema `Problem`). This module is the one place that reads that shape
  * and the one place that builds it, so the BFF proxy, the mock handlers and the UI agree on it.
  *
  * It is also loaded by scripts/mock-api.ts, which Node runs with type stripping: keep it free of enums, namespaces

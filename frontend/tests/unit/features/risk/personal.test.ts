@@ -3,7 +3,7 @@ import type { Level } from "@/components/level/level";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
 import { daysBetween, displayedLevel, personalLevel, policyMatchesForecast } from "@/features/risk/personal";
 import { rel } from "@/features/risk/niosh";
-import { forecastToday, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
+import { legacyForecastToday as forecastToday, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
 
 type HourForecast = components["schemas"]["HourForecast"];
 type RiskPolicy = components["schemas"]["RiskPolicy"];
