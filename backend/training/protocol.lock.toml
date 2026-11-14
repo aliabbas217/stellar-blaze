@@ -8,6 +8,8 @@ protocol_sha256 = "ce116fe64a00b8b5509ae567a72973e85d1cf2120af725127b970bdb8885b
 protocol_commit = "661b373b3bf8257e997cf5cebb8691ddc9e9d693"
 # gold/pairs.parquet built by `sb-jobs build-dataset` at code 64efe24 (docs/research/2026-11-12-gold-dataset-manifest.json).
 gold_sha256 = "8124c86c6f3ff55c40184f85be06b54a9ed289cdba1a625347efe4809544a1db"
+# The released model evaluated once on 2026 (B2 Task 14): backend/models/<model_id>/.
+model_id = "corrector-20261114-d327987-6edafa"
 
 [[amendments]]
 path = "docs/research/2026-11-14-preregistration-amendment-1.md"
