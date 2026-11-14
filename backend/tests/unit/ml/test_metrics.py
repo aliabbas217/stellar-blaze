@@ -10,6 +10,7 @@ from scipy import stats
 
 from stellar_blaze.domain.forecast.grid import F64, LEVELS
 from stellar_blaze.ml.metrics import (
+    PREREGISTERED_RELIABILITY_EDGES,
     brier,
     brier_skill,
     covered,
@@ -285,6 +286,88 @@ def test_reliability_schema() -> None:
 def test_reliability_rejects_a_width_that_does_not_tile_the_unit_interval() -> None:
     with pytest.raises(ValueError, match="width"):
         reliability_bins(np.array([0.5]), np.array([True]), width=0.3)
+
+
+# ------------------------------------------------------------------- pre-registered reliability bins (R22)
+
+
+def test_preregistered_edges_constant_is_the_ruled_partition() -> None:
+    assert PREREGISTERED_RELIABILITY_EDGES == (0.0, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.0)
+
+
+def test_the_70_percent_bin_is_0_65_to_0_75() -> None:
+    p = np.array([0.66, 0.74, 0.65, 0.75, 0.64])
+    event = np.array([True, False, True, True, False])
+    table = reliability_bins(p, event, min_count=1, edges=PREREGISTERED_RELIABILITY_EDGES)
+    assert table.height == 11
+    row = table.filter(pl.col("bin_lo") == 0.65).row(0, named=True)
+    assert row["bin_hi"] == 0.75
+    assert (
+        row["n"] == 3
+    )  # 0.66, 0.74 and the lower edge 0.65 itself; 0.75 starts the next bin, 0.64 is in the one below
+    assert row["mean_p"] == pytest.approx((0.66 + 0.74 + 0.65) / 3)
+    assert row["obs_freq"] == pytest.approx(2 / 3)
+    assert table["n"].to_list() == [0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 0]
+
+
+def test_preregistered_edges_edge_values_and_closed_last_bin() -> None:
+    p = np.array([0.3, 0.7, 1.0, 0.0, 0.05, 0.95])
+    event = np.zeros(6, dtype=bool)
+    table = reliability_bins(p, event, min_count=1, edges=PREREGISTERED_RELIABILITY_EDGES)
+    # 0.0 -> [0, 0.05); 0.05 -> [0.05, 0.15); 0.3 -> [0.25, 0.35); 0.7 -> [0.65, 0.75); 0.95 and 1.0 -> [0.95, 1.0].
+    assert table["n"].to_list() == [1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 2]
+
+
+def test_preregistered_bins_report_the_edges_that_assign() -> None:
+    """Every probability is inside the [bin_lo, bin_hi) its row reports: assignment and edges share one array."""
+    rng = np.random.default_rng(21)
+    p = np.concatenate([rng.random(500), np.array(PREREGISTERED_RELIABILITY_EDGES)])
+    event = rng.random(p.shape[0]) < p
+    table = reliability_bins(p, event, min_count=1, edges=PREREGISTERED_RELIABILITY_EDGES)
+    assert table["n"].sum() == p.shape[0]
+    for row in table.iter_rows(named=True):
+        inside = (p >= row["bin_lo"]) & ((p < row["bin_hi"]) | (row["bin_hi"] == 1.0) & (p <= 1.0))
+        assert int(inside.sum()) == row["n"]
+
+
+def test_reliability_with_edges_marks_hollow_per_bin() -> None:
+    p = np.concatenate([np.full(60, 0.7), np.full(49, 0.2)])
+    event = np.zeros(p.shape[0], dtype=bool)
+    table = reliability_bins(p, event, edges=PREREGISTERED_RELIABILITY_EDGES)  # min_count 50
+    assert table["n"].to_list() == [0, 0, 49, 0, 0, 0, 0, 60, 0, 0, 0]
+    by_lo = {row["bin_lo"]: row for row in table.iter_rows(named=True)}
+    assert by_lo[0.65]["n"] == 60
+    assert not by_lo[0.65]["hollow"]
+    assert by_lo[0.15]["n"] == 49
+    assert by_lo[0.15]["hollow"]  # n < min_count
+    assert by_lo[0.0]["hollow"]  # empty bins are hollow too
+
+
+@pytest.mark.parametrize(
+    "edges",
+    [
+        (0.1, 0.5, 1.0),  # does not start at 0
+        (0.0, 0.5, 0.9),  # does not end at 1
+        (0.0, 0.5, 0.5, 1.0),  # not strictly increasing
+        (0.0, 0.7, 0.3, 1.0),
+        (0.0, float("nan"), 1.0),
+        (0.0,),
+    ],
+)
+def test_reliability_rejects_invalid_edges(edges: tuple[float, ...]) -> None:
+    with pytest.raises(ValueError, match="edges"):
+        reliability_bins(np.array([0.5]), np.array([True]), edges=edges)
+
+
+def test_binning_at_100_bins_where_floor_of_p_times_bins_goes_wrong() -> None:
+    """0.29 * 100 is 28.999999999999996, 0.57 * 100 is 56.99999999999999, 0.58 * 100 is 57.99999999999999."""
+    p = np.array([0.29, 0.57, 0.58, 1.0, 0.0])
+    counts = pit_histogram(p, bins=100)
+    assert counts.shape == (100,)
+    assert np.flatnonzero(counts).tolist() == [0, 29, 57, 58, 99]
+    assert counts.sum() == 5
+    table = reliability_bins(p, np.zeros(5, dtype=bool), width=0.01, min_count=1)
+    assert np.flatnonzero(table["n"].to_numpy()).tolist() == [0, 29, 57, 58, 99]
 
 
 # ------------------------------------------------------------------------------------------------- validation

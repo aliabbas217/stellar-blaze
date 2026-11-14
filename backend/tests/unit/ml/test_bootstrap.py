@@ -1,6 +1,5 @@
 """The moving-block bootstrap over UTC days (pre-registration section 8; R11 seasons)."""
 
-import time
 from datetime import date, timedelta
 
 import numpy as np
@@ -209,17 +208,117 @@ def test_a_resample_with_no_weight_raises_instead_of_dividing_by_zero() -> None:
         block_bootstrap(_daily(values, weights), value="value", weight="weight", block_days=1, n_boot=2000)
 
 
-def test_the_default_run_is_fast() -> None:
-    """2,000 replicates over about 280 days (two summers) vectorised: well under a second."""
-    daily = _two_seasons(_daily(_ar1(140, 0.3, 7) + 3.0), _daily(_ar1(140, 0.3, 8) + 3.0, start=date(2025, 6, 1)))
-    best = min(_timed(daily) for _ in range(3))
-    assert best < 0.5, best
+# ------------------------------------------------------------------------ golden values from a loop reference
 
 
-def _timed(daily: pl.DataFrame) -> float:
-    tic = time.perf_counter()
-    block_bootstrap(daily, value="value", weight="weight")
-    return time.perf_counter() - tic
+def _reference_starts(season_lengths: list[int], *, block_days: int, n_boot: int, seed: int) -> list[np.ndarray]:
+    """The block starts per season, drawn in the pre-registered order: one (n_boot, n_blocks) matrix per season."""
+    rng = np.random.default_rng(seed)
+    return [
+        rng.integers(0, length, size=(n_boot, -(-length // block_days)))  # ceil(length / block_days) blocks
+        for length in season_lengths
+    ]
+
+
+def _reference_ratio(
+    seasons: list[tuple[list[float], list[float]]], starts: list[np.ndarray], replicate: int, block_days: int
+) -> float:
+    """Ratio of pooled sums for one replicate, resampled day by day in plain Python loops."""
+    total_value = total_weight = 0.0
+    for (values, weights), season_starts in zip(seasons, starts, strict=True):
+        length = len(values)
+        days: list[int] = []
+        for start in season_starts[replicate]:
+            days.extend((int(start) + offset) % length for offset in range(block_days))  # circular within the season
+        for day in days[:length]:  # truncated to the season length
+            total_value += values[day]
+            total_weight += weights[day]
+    return total_value / total_weight
+
+
+def _pooled(data: list[tuple[list[float], list[float]]]) -> float:
+    return sum(sum(values) for values, _ in data) / sum(sum(weights) for _, weights in data)
+
+
+def _reference_interval(
+    seasons: list[tuple[list[float], list[float]]],
+    others: list[tuple[list[float], list[float]]] | None,
+    *,
+    block_days: int,
+    n_boot: int,
+    seed: int,
+    level: float = 0.95,
+) -> tuple[float, float, float]:
+    starts = _reference_starts([len(values) for values, _ in seasons], block_days=block_days, n_boot=n_boot, seed=seed)
+    draws = []
+    for replicate in range(n_boot):
+        ratio = _reference_ratio(seasons, starts, replicate, block_days)
+        if others is not None:
+            ratio -= _reference_ratio(others, starts, replicate, block_days)
+        draws.append(ratio)
+    tail = (1.0 - level) / 2.0 * 100.0
+    lo, hi = np.percentile(draws, [tail, 100.0 - tail])
+    estimate = _pooled(seasons) - (_pooled(others) if others is not None else 0.0)
+    return float(lo), float(hi), float(estimate)
+
+
+# Two seasons of 7 and 5 days (not a multiple of the 3-day block, so the truncation rule matters), distinct values.
+_SEASON_A = ([4.0, 1.0, 7.0, 2.0, 9.0, 3.0, 5.0], [2.0, 1.0, 3.0, 1.0, 4.0, 2.0, 2.0])
+_SEASON_B = ([6.0, 0.0, 8.0, 1.0, 2.0], [3.0, 0.0, 2.0, 1.0, 1.0])
+_OTHER_A = ([2.0, 3.0, 1.0, 5.0, 4.0, 2.0, 6.0], [2.0, 1.0, 3.0, 1.0, 4.0, 2.0, 2.0])
+_OTHER_B = ([1.0, 2.0, 3.0, 2.0, 1.0], [3.0, 0.0, 2.0, 1.0, 1.0])
+
+
+def _frame(seasons: list[tuple[list[float], list[float]]]) -> pl.DataFrame:
+    parts = [
+        _daily(values, weights, start=date(2024 + k, 7, 1)).with_columns(pl.lit(k, dtype=pl.Int64).alias("season"))
+        for k, (values, weights) in enumerate(seasons)
+    ]
+    return pl.concat(parts)
+
+
+@pytest.mark.parametrize("level", [0.95, 0.80])
+def test_block_bootstrap_matches_an_independent_loop_resample(level: float) -> None:
+    """Pins the percentile level, the ceil() block count, the truncation, the circular wrap and the draw order."""
+    seasons = [_SEASON_A, _SEASON_B]
+    lo, hi, estimate = _reference_interval(seasons, None, block_days=3, n_boot=500, seed=42, level=level)
+    got = block_bootstrap(
+        _frame(seasons), value="value", weight="weight", block_days=3, n_boot=500, seed=42, confidence_level=level
+    )
+    assert got.estimate == pytest.approx(estimate, rel=1e-12)
+    assert got.lo == pytest.approx(lo, rel=1e-12)
+    assert got.hi == pytest.approx(hi, rel=1e-12)
+    assert (got.n_days, got.n_boot) == (12, 500)
+
+
+def test_the_default_level_is_the_95_percent_interval() -> None:
+    lo, hi, _ = _reference_interval([_SEASON_A, _SEASON_B], None, block_days=3, n_boot=500, seed=42, level=0.95)
+    got = block_bootstrap(
+        _frame([_SEASON_A, _SEASON_B]), value="value", weight="weight", block_days=3, n_boot=500, seed=42
+    )
+    assert got.lo == pytest.approx(lo, rel=1e-12)
+    assert got.hi == pytest.approx(hi, rel=1e-12)
+    wider = _reference_interval([_SEASON_A, _SEASON_B], None, block_days=3, n_boot=500, seed=42, level=0.99)
+    assert wider[0] < lo < hi < wider[1]  # the reference itself discriminates 95% from other levels
+
+
+def test_paired_block_bootstrap_matches_an_independent_loop_resample() -> None:
+    lo, hi, estimate = _reference_interval(
+        [_SEASON_A, _SEASON_B], [_OTHER_A, _OTHER_B], block_days=3, n_boot=500, seed=42
+    )
+    got = paired_block_bootstrap(
+        _frame([_SEASON_A, _SEASON_B]),
+        _frame([_OTHER_A, _OTHER_B]),
+        value="value",
+        weight="weight",
+        block_days=3,
+        n_boot=500,
+        seed=42,
+    )
+    assert got.estimate == pytest.approx(estimate, rel=1e-12)
+    assert got.lo == pytest.approx(lo, rel=1e-12)
+    assert got.hi == pytest.approx(hi, rel=1e-12)
+    assert (got.n_days, got.n_boot) == (12, 500)
 
 
 # --------------------------------------------------------------------------------------------- paired

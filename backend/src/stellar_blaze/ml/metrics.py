@@ -14,6 +14,7 @@ about 4.8% (stack doc 6.2), so it is only comparable between models scored on th
 """
 
 import math
+from collections.abc import Sequence
 from typing import Final
 
 import numpy as np
@@ -24,6 +25,7 @@ from numpy.typing import NDArray
 from stellar_blaze.domain.forecast.grid import F64, LEVELS, cdf
 
 __all__ = [
+    "PREREGISTERED_RELIABILITY_EDGES",
     "brier",
     "brier_skill",
     "covered",
@@ -35,6 +37,23 @@ __all__ = [
     "pit_histogram",
     "reliability_bins",
 ]
+
+PREREGISTERED_RELIABILITY_EDGES: Final[tuple[float, ...]] = (
+    0.0,
+    0.05,
+    0.15,
+    0.25,
+    0.35,
+    0.45,
+    0.55,
+    0.65,
+    0.75,
+    0.85,
+    0.95,
+    1.0,
+)
+"""Reliability-diagram bins centered on 0.1, 0.2, ..., 0.9 with half-width end bins (ruling R22): the 0.65-0.75 bin
+is the "70%" bin that pre-registration 7.1 quotes (``obs_freq_at_70``). ``reliability_bins`` takes it as ``edges``."""
 
 _N_LEVELS: Final = len(LEVELS)
 _LEVEL_ARRAY: Final[F64] = np.asarray(LEVELS, dtype=np.float64)
@@ -204,12 +223,20 @@ def pit(y: F64, grid: F64) -> F64:
     return cdf(quantiles, observed)
 
 
-def _bin_index(probabilities: F64, bins: int) -> NDArray[np.intp]:
-    """Lower-inclusive bin of each probability in ``bins`` equal bins of [0, 1], the last one closed.
+def _equal_edges(bins: int) -> F64:
+    """Edges of ``bins`` equal bins of [0, 1], each the double nearest to ``k / bins`` (0.29 is edge 29 of 100)."""
+    return np.arange(bins + 1, dtype=np.float64) / bins
 
-    ``floor(p * bins)`` rather than ``p / width``: 0.3 / 0.1 is 2.9999999999999996, 0.3 * 10 is exactly 3.0.
+
+def _bin_index(probabilities: F64, edges: F64) -> NDArray[np.intp]:
+    """Lower-inclusive bin of each probability, the last bin closed at 1.0.
+
+    The bin is looked up in the very ``edges`` array that is reported, so assignment and edges agree by construction
+    (``floor(p * bins)`` does not: 0.29 * 100 is 28.999999999999996, and ``p / width`` has the same flaw).
     """
-    return np.minimum(np.floor(probabilities * bins), bins - 1).astype(np.intp)
+    index = np.searchsorted(edges, probabilities, side="right").astype(np.intp) - 1
+    last_bin = edges.shape[0] - 2
+    return np.asarray(np.minimum(index, last_bin), dtype=np.intp)  # p == 1.0 sits on the last edge: close the last bin
 
 
 def pit_histogram(pit: F64, bins: int = 10) -> NDArray[np.int64]:
@@ -221,7 +248,7 @@ def pit_histogram(pit: F64, bins: int = 10) -> NDArray[np.int64]:
     if bins < 1:
         raise ValueError(f"bins must be at least 1, got {bins}")
     values = _probabilities("pit", pit)
-    return np.bincount(_bin_index(values, bins), minlength=bins).astype(np.int64)
+    return np.bincount(_bin_index(values, _equal_edges(bins)), minlength=bins).astype(np.int64)
 
 
 def brier(p: F64, event: NDArray[np.bool_]) -> F64:
@@ -260,45 +287,71 @@ def brier_skill(bs: float, bs_ref: float) -> float:
     return 1.0 - score / reference
 
 
-def reliability_bins(p: F64, event: NDArray[np.bool_], *, width: float = 0.1, min_count: int = 50) -> pl.DataFrame:
-    """The reliability table: forecast probability against observed frequency, in equal bins of [0, 1].
+def _checked_edges(edges: Sequence[float]) -> F64:
+    array = np.asarray(edges, dtype=np.float64)
+    if array.ndim != 1 or array.shape[0] < 2 or not np.isfinite(array).all():
+        raise ValueError(f"edges must be a finite sequence of at least 2 values, got {edges!r}")
+    if array[0] != 0.0 or array[-1] != 1.0:
+        raise ValueError(f"edges must start at 0.0 and end at 1.0, got {array[0]} and {array[-1]}")
+    if np.any(np.diff(array) <= 0.0):
+        raise ValueError("edges must be strictly increasing")
+    return array
 
-    Every bin is present, empty ones with ``n = 0`` and null ``mean_p`` and ``obs_freq``. A bin is ``[bin_lo, bin_hi)``
-    except the last, which is closed so that ``p = 1.0`` counts. A bin with fewer than ``min_count`` forecasts is
-    ``hollow`` (drawn hollow and never quoted, pre-registration 7.1).
+
+def reliability_bins(
+    p: F64,
+    event: NDArray[np.bool_],
+    *,
+    width: float = 0.1,
+    min_count: int = 50,
+    edges: Sequence[float] | None = None,
+) -> pl.DataFrame:
+    """The reliability table: forecast probability against observed frequency, in bins of [0, 1].
+
+    By default the bins are equal and ``width`` wide, tiling [0, 1) from 0 (0.0-0.1, 0.1-0.2, ...). Pass ``edges`` (for
+    example ``PREREGISTERED_RELIABILITY_EDGES``) for any other partition; ``width`` is then ignored. Every bin is
+    present, empty ones with ``n = 0`` and null ``mean_p`` and ``obs_freq``. A bin is ``[bin_lo, bin_hi)`` except the
+    last, which is closed so that ``p = 1.0`` counts. A bin with fewer than ``min_count`` forecasts is ``hollow``
+    (drawn hollow and never quoted, pre-registration 7.1).
 
     Args:
         p: Probabilities in [0, 1], shape ``(n,)``.
         event: Whether the event happened, boolean, shape ``(n,)``.
-        width: Bin width; ``1 / width`` must be a whole number.
+        width: Bin width; ``1 / width`` must be a whole number. Ignored when ``edges`` is given.
         min_count: Smallest ``n`` that is not hollow.
+        edges: Strictly increasing bin edges, the first 0.0 and the last 1.0; ``None`` for equal bins of ``width``.
 
     Returns:
         Columns ``bin_lo``, ``bin_hi`` (Float64), ``n`` (Int64), ``mean_p``, ``obs_freq`` (Float64, null if empty),
         ``hollow`` (Boolean).
 
     Raises:
-        ValueError: ``width`` does not tile [0, 1], or ``p`` / ``event`` are invalid (see ``brier``).
+        ValueError: ``width`` does not tile [0, 1], ``edges`` is not a valid partition, or ``p`` / ``event`` are
+            invalid (see ``brier``).
     """
-    if not (math.isfinite(width) and width > 0.0):
-        raise ValueError(f"width must be positive, got {width}")
-    bins = round(1.0 / width)
-    if bins < 1 or abs(bins * width - 1.0) > _LEVEL_TOLERANCE:
-        raise ValueError(f"width {width} does not tile [0, 1] (1 / width must be a whole number)")
+    if edges is None:
+        if not (math.isfinite(width) and width > 0.0):
+            raise ValueError(f"width must be positive, got {width}")
+        equal_bins = round(1.0 / width)
+        if equal_bins < 1 or abs(equal_bins * width - 1.0) > _LEVEL_TOLERANCE:
+            raise ValueError(f"width {width} does not tile [0, 1] (1 / width must be a whole number)")
+        edge_array = _equal_edges(equal_bins)
+    else:
+        edge_array = _checked_edges(edges)
+    bins = edge_array.shape[0] - 1
     probabilities = _probabilities("p", p)
     outcome = _event(event)
     _same_length(("event", outcome.shape[0]), ("p", probabilities.shape[0]))
 
-    index = _bin_index(probabilities, bins)
+    index = _bin_index(probabilities, edge_array)
     n = np.bincount(index, minlength=bins).astype(np.int64)
     sum_p = np.bincount(index, weights=probabilities, minlength=bins)
     sum_event = np.bincount(index, weights=outcome.astype(np.float64), minlength=bins)
     occupied = n > 0
-    edges = np.arange(bins + 1, dtype=np.float64) / bins
     return pl.DataFrame(
         {
-            "bin_lo": edges[:-1],
-            "bin_hi": edges[1:],
+            "bin_lo": edge_array[:-1],
+            "bin_hi": edge_array[1:],
             "n": n,
             "mean_p": [float(s / c) if o else None for s, c, o in zip(sum_p, n, occupied, strict=True)],
             "obs_freq": [float(s / c) if o else None for s, c, o in zip(sum_event, n, occupied, strict=True)],
