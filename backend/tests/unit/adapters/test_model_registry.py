@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -102,9 +103,16 @@ def test_an_empty_directory_is_an_empty_registry(tmp_path: Path) -> None:
 
 
 def test_the_committed_models_directory_is_loadable() -> None:
-    # backend/models/ ships with only .gitkeep until B2 trains a model: still a valid registry, and files are skipped.
-    registry = scan_models(BACKEND_ROOT / "models")
-    assert registry.ids() == ()
+    # Every committed model directory verifies (ids, manifest, file hashes) and is listed; loose files (.gitkeep) are
+    # skipped. The expectation is derived from the directory listing so a later model needs no edit here, and the
+    # released id comes from the protocol lock so a model removed from the repo while the lock names it fails.
+    models_dir = BACKEND_ROOT / "models"
+    committed = {path.name for path in models_dir.iterdir() if path.is_dir() and not path.name.startswith(".")}
+    lock = tomllib.loads((BACKEND_ROOT / "training" / "protocol.lock.toml").read_text(encoding="utf-8"))
+    released = lock["model_id"]
+    registry = scan_models(models_dir)
+    assert set(registry.ids()) == committed
+    assert released in registry.ids()
 
 
 def test_hidden_directories_and_loose_files_are_ignored(tmp_path: Path) -> None:

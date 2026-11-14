@@ -2,6 +2,7 @@
 
 import copy
 import logging.config
+import tomllib
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
@@ -44,9 +45,22 @@ def test_bind_runtime_ids_binds_the_loaded_ruleset_and_model_ids(settings: Setti
     assert bound == {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": f"{FIRST},{SECOND}"}
 
 
-def test_bind_runtime_ids_with_no_models_binds_an_empty_string(settings: Settings) -> None:
-    bind_runtime_ids(build_runtime(settings, today=date(2026, 11, 11)))
+def test_bind_runtime_ids_with_no_models_binds_an_empty_string(settings: Settings, tmp_path: Path) -> None:
+    no_models = tmp_path / "models"
+    no_models.mkdir()
+    bind_runtime_ids(build_runtime(settings.model_copy(update={"models_dir": no_models}), today=date(2026, 11, 11)))
     assert structlog.contextvars.get_contextvars() == {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": ""}
+
+
+def test_bind_runtime_ids_with_the_committed_models_binds_the_released_model_id(settings: Settings) -> None:
+    released = tomllib.loads((BACKEND_ROOT / "training" / "protocol.lock.toml").read_text(encoding="utf-8"))["model_id"]
+    committed = BACKEND_ROOT / "models"
+    runtime = build_runtime(settings.model_copy(update={"models_dir": committed}), today=date(2026, 11, 11))
+    bind_runtime_ids(runtime)
+    bound = structlog.contextvars.get_contextvars()
+    assert released in bound["model_ids"].split(",")
+    directories = sorted(p.name for p in committed.iterdir() if p.is_dir() and not p.name.startswith("."))
+    assert bound["model_ids"] == ",".join(directories)
 
 
 def probe_app(settings: Settings) -> FastAPI:
