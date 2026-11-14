@@ -30,3 +30,7 @@ The consultant agrees in writing to be named; or a pilot needs a formal clinical
 
 ## Links
 [ADR 0036](0036-team-and-naming-in-submission.md) · [ADR 0034](0034-demo-strategy.md) · [roadmap](../superpowers/plans/2026-11-11-roadmap.md)
+
+## Amendments
+- **2026-11-14 (citation erratum; decision text unchanged).** The Decision's scope line cites "ADOSH §4.5(c) call → move → cool". That clause is §4.5(c) of the **ADOSH-SF Technical Guideline "Safety in the Heat" v4.0** (§4.5 Heat Stroke, (c) First Aid, p. 9 of 24), not of CoP 11.0, whose §4 is Record Keeping. The line does not say "CoP", but it can be read as CoP 11.0, and ADR 0045 does say "CoP 11.0 §4.5(c)" (erratum there). Both PDFs were read on 2026-11-14 (MD5s in [ADR 0065](0065-unwell-flow-reconciles-with-cop-3-1-2e.md)). The scope of the review is unchanged.
+- **2026-11-14 (pointer).** The review now also covers the supervisor call row and the "notify supervisor" duty (CoP 11.0 cl. 3.1.2(e)): review pack Q1 and C2, and [ADR 0065](0065-unwell-flow-reconciles-with-cop-3-1-2e.md).

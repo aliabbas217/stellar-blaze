@@ -29,3 +29,9 @@ Plan §8.8 computes personal risk on the worker's device and sends the server on
 
 ## Revisit trigger
 Written confirmation from Meta or a UAE regulator that site-level heat alerts are not health information; pilot-employer data on phone ownership and on-site phone rules; a native wrapper decision.
+
+## Amendments
+- **2026-11-14 (pointers; decision text unchanged).**
+  - The two frontend invariants that enforce this ADR on the device (the service worker caches only the forecast and risk-policy reads; "remove my data" never reports success while data remains) are recorded in [ADR 0059](0059-frontend-governance-invariants-sw-allow-list-and-revocation.md), with the F1 tests that guard them.
+  - Consequences, last bullet: it says a worker's "I feel unwell" message is queued in IndexedDB and retried. The F2 "I feel unwell" is a call sheet that sends and queues nothing ([ADR 0045](0045-f2-scope-core-demo-path.md) Amendments, the minimum form of flag F2). The bullet applies only if a message is ever sent, which HANDOFF decision 2 and the clinical questions in `docs/clinical/review-pack.md` would reopen.
+- **2026-11-14 (second pointer, extending the one above; decision text unchanged).** The pointer above is confirmed: the F2 "I feel unwell" is a call sheet that sends and queues nothing. [ADR 0065](0065-unwell-flow-reconciles-with-cop-3-1-2e.md) records why and answers what the pointer left open: the sheet offers three one-tap calls (supervisor, site first-aider, 998), and an in-app message to a supervisor dashboard is **rejected** under this ADR's decisions 2 and 4 and ADR 0054 (no individual health information on the server; workers have no account). So Consequences' last bullet (a sent message queued in IndexedDB) does not apply to the demo and applies only if ADR 0065 is revisited (its revisit trigger: the clinical consultant's review, a pilot employer's own protocol, or worker accounts). HANDOFF decision 2 is thereby answered for the demo.
