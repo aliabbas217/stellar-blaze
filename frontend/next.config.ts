@@ -44,6 +44,11 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The judge loaders (src/features/judge/data.ts) read data/ with fs at request time, a path the file tracer cannot
+  // follow. Without this the standalone image has no data directory and every scored table silently reads "not scored
+  // yet". Only the published locations: the dev (data/eval/dev) and synthetic files must never ship.
+  // Keys are route globs (https://nextjs.org/docs/app/api-reference/config/next-config-js/output); "/*" is every route.
+  outputFileTracingIncludes: { "/*": ["./data/static/**/*", "./data/eval/2026/**/*"] },
   experimental: {
     // The root layout sits under the dynamic [locale] segment, so Next.js answers an unmatched URL (/en/typo,
     // /file.txt) with its built-in 404 document, which has no lang or direction. global-not-found.tsx replaces it

@@ -8,7 +8,7 @@
   "packageManager": "pnpm@12.18.0",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-sw-strings.ts",
+    "prebuild": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-sw-strings.ts && node scripts/build-data-manifest.mjs",
     "build": "next build",
     "start": "next start",
     "start:standalone": "node scripts/start-standalone.mjs",
@@ -34,6 +34,7 @@
     "openapi-fetch": "0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "server-only": "0.0.1",
     "serwist": "9.5.13",
     "zod": "4.6.7",
     "zustand": "5.1.0"

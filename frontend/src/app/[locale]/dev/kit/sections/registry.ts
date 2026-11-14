@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { LevelScaleSection } from "./level-scale";
 import { LevelSignSection } from "./level-sign";
 import { PictogramsSection } from "./pictograms";
+import { ProofSection } from "./proof";
 import { StampsSection } from "./stamps";
 import { StatesSection } from "./states";
 
@@ -10,7 +11,7 @@ import { StatesSection } from "./states";
  * `sections/<name>.tsx` exporting one component, add its id to `KitSectionId`, its `title` and `note` under
  * `common.kit.sections.<id>` in messages, and one entry below. The page owns the heading, the anchor and the layout.
  */
-export type KitSectionId = "levelSign" | "levelScale" | "pictograms" | "states" | "stamps";
+export type KitSectionId = "levelSign" | "levelScale" | "pictograms" | "states" | "stamps" | "proof";
 
 export interface KitSection {
   readonly id: KitSectionId;
@@ -23,4 +24,5 @@ export const KIT_SECTIONS: readonly KitSection[] = [
   { id: "pictograms", Content: PictogramsSection },
   { id: "states", Content: StatesSection },
   { id: "stamps", Content: StampsSection },
+  { id: "proof", Content: ProofSection },
 ];
