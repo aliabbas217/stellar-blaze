@@ -25,30 +25,33 @@ Rows with a non-finite grid or ``y`` are excluded and never filled.
 Offsets of either sign are legitimate conformal outputs; ``apply_symmetric_offsets`` clamps a negative offset at the
 median. ``ConformalOffsets.negative`` counts how many (stratum, pair) offsets are below zero, so the model card can say
 how often that clamp can matter.
+
+The data model ``ConformalOffsets`` and ``apply_offsets`` live in ``domain.forecast.conformal`` (the serving adapter
+applies stored offsets and may not import ``stellar_blaze.ml``); they are re-exported here. This module keeps the
+training half: ``fit_symmetric_offsets``, ``calibration_mask`` and, for the oracle test, ``ml._mapie``.
 """
 
-import re
-from collections.abc import Mapping, Sequence
-from typing import Final, Literal, Self
+from collections.abc import Sequence
+from typing import Final, Literal
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from pydantic import BaseModel, ConfigDict, model_validator
 
-from stellar_blaze.domain.forecast.features import Target
-from stellar_blaze.domain.forecast.grid import (
-    F64,
-    HOUR_BLOCKS,
-    LEVELS,
-    MODEL_LEADS,
-    PAIRS,
-    HourBlock,
-    apply_symmetric_offsets,
+from stellar_blaze.domain.forecast.conformal import (
+    STRATUM_BLOCKS,
+    ConformalOffsets,
+    apply_offsets,
+    block_indices,
+    lead_values,
+    stratum_key,
 )
+from stellar_blaze.domain.forecast.features import Target
+from stellar_blaze.domain.forecast.grid import F64, LEVELS, PAIRS, HourBlock
 
 __all__ = [
     "CALIBRATION_WINDOWS",
+    "MIN_RANK_N",
     "MIN_STRATUM_ROWS",
     "CalibrationWindow",
     "ConformalOffsets",
@@ -61,107 +64,21 @@ __all__ = [
 MIN_STRATUM_ROWS: Final = 30
 """Fewest usable rows for a stratum to keep its own offset (pre-registration section 3.1; global constraint 4)."""
 
+MIN_RANK_N: Final = 9
+"""Fewest rows for which every pair has a conformal offset: ``ceil((n + 1) * 0.9) <= n`` holds from n = 9."""
+
 type CalibrationWindow = Literal["september", "weeks_4_8_12_16"]
 CALIBRATION_WINDOWS: Final[tuple[CalibrationWindow, ...]] = ("september", "weeks_4_8_12_16")
 
 _N_LEVELS: Final = len(LEVELS)
 _N_PAIRS: Final = len(PAIRS)
-_BLOCKS: Final[tuple[HourBlock, ...]] = tuple(HOUR_BLOCKS)
-_BLOCK_INDEX: Final[Mapping[str, int]] = {block.value: index for index, block in enumerate(_BLOCKS)}
 _LOWER: Final = np.array([LEVELS.index(lo) for lo, _ in PAIRS], dtype=np.intp)  # grid columns of the lower levels
 _UPPER: Final = np.array([LEVELS.index(hi) for _, hi in PAIRS], dtype=np.intp)
 _COVERAGE_TWENTIETHS: Final = (_UPPER - _LOWER).astype(np.int64)  # coverage hi - lo = (hi - lo) / 20, exact
-_KEY: Final = re.compile(r"^([1-7])\|(" + "|".join(block.value for block in _BLOCKS) + r")$")
 
 # Summer day 1 is 15 May; the 4th, 8th, 12th and 16th week of the summer (pre-registration 6.4; 28 days per summer).
 _SUMMER_START: Final = (5, 15)
 _WEEK_DAYS: Final[tuple[range, ...]] = tuple(range(7 * (week - 1) + 1, 7 * week + 1) for week in (4, 8, 12, 16))
-
-
-def stratum_key(lead: int, block: HourBlock | str) -> str:
-    """The key of a stratum, ``"<lead>|<block value>"`` (for example ``"2|peak"``)."""
-    return f"{lead}|{HourBlock(block).value}"
-
-
-class ConformalOffsets(BaseModel):
-    """The symmetric CQR offsets of one or more targets (persisted as ``conformal.json``).
-
-    Attributes:
-        offsets: Target value (``"t"``, ``"td"``, ``"wind"``, ``"wbgt"``) to stratum key to the 9 offsets aligned with
-            ``PAIRS``, in the units of the target's error.
-        n: The same keys to the number of usable calibration rows of the stratum (0 for a stratum that had none).
-        fallback: Target to the keys of the strata that took the lead-pooled offset (``n`` below the minimum).
-        negative: Target to the number of (stratum, pair) offsets below zero, of any stratum including fallbacks.
-    """
-
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-
-    offsets: dict[str, dict[str, list[float]]]
-    n: dict[str, dict[str, int]]
-    fallback: dict[str, list[str]]
-    negative: dict[str, int]
-
-    @model_validator(mode="after")
-    def _consistent(self) -> Self:
-        targets = set(self.offsets)
-        if not (targets == set(self.n) == set(self.fallback) == set(self.negative)):
-            raise ValueError("offsets, n, fallback and negative must name the same targets")
-        for target, strata in self.offsets.items():
-            if set(strata) != set(self.n[target]):
-                raise ValueError(f"{target}: offsets and n must name the same strata")
-            for key, values in strata.items():
-                if _KEY.match(key) is None:
-                    raise ValueError(f"{target}: {key!r} is not a stratum key '<lead 1-7>|<early|peak|late>'")
-                if len(values) != _N_PAIRS:
-                    raise ValueError(f"{target}/{key}: expected {_N_PAIRS} offsets, got {len(values)}")
-            unknown = set(self.fallback[target]) - set(strata)
-            if unknown:
-                raise ValueError(f"{target}: fallback names strata without offsets: {sorted(unknown)}")
-            below_zero = sum(value < 0.0 for values in strata.values() for value in values)
-            if below_zero != self.negative[target]:
-                raise ValueError(f"{target}: negative is {self.negative[target]} but {below_zero} offsets are below 0")
-        return self
-
-    def merge(self, other: "ConformalOffsets") -> "ConformalOffsets":
-        """The union with the offsets of other targets (one object for the four targets of a corrector).
-
-        Raises:
-            ValueError: ``other`` holds a target that this object already holds.
-        """
-        clash = sorted(set(self.offsets) & set(other.offsets))
-        if clash:
-            raise ValueError(f"cannot merge: target(s) {clash} already have offsets")
-        return ConformalOffsets(
-            offsets={**self.offsets, **other.offsets},
-            n={**self.n, **other.n},
-            fallback={**self.fallback, **other.fallback},
-            negative={**self.negative, **other.negative},
-        )
-
-
-def _block_indices(block: Sequence[str] | pl.Series, rows: int) -> NDArray[np.intp]:
-    """The index into ``HOUR_BLOCKS`` of every row's block (a ``HourBlock``, its string value, or a Series of those)."""
-    values = np.asarray(block.to_numpy() if isinstance(block, pl.Series) else block, dtype=np.str_)
-    if values.shape != (rows,):
-        raise ValueError(f"block needs one entry per row ({rows}), got shape {values.shape}")
-    names, inverse = np.unique(values, return_inverse=True)
-    unknown = [str(name) for name in names if str(name) not in _BLOCK_INDEX]
-    if unknown:
-        raise ValueError(f"unknown hour-block(s) {unknown}; expected one of {sorted(_BLOCK_INDEX)}")
-    lookup = np.array([_BLOCK_INDEX[str(name)] for name in names], dtype=np.intp)
-    return lookup[inverse.reshape(-1)]
-
-
-def _lead_values(lead: NDArray[np.int8], rows: int) -> NDArray[np.int64]:
-    leads = np.asarray(lead)
-    if leads.shape != (rows,) or not np.issubdtype(leads.dtype, np.integer):
-        raise ValueError(
-            f"lead must be an integer array with one entry per row ({rows}), got {leads.dtype}{leads.shape}"
-        )
-    out = leads.astype(np.int64)
-    if out.size and (out.min() < MODEL_LEADS[0] or out.max() > MODEL_LEADS[-1]):
-        raise ValueError(f"lead must be within {MODEL_LEADS[0]} to {MODEL_LEADS[-1]}, got {out.min()} to {out.max()}")
-    return out
 
 
 def _checked_grid(grid: F64) -> F64:
@@ -210,24 +127,35 @@ def fit_symmetric_offsets(
         lead: Lead in days (1 to 7) of each row.
         block: Hour-block of each row: ``HourBlock`` members, their string values, or a Polars Series of the strings.
         target: The variable the offsets belong to (the key under which they are stored).
-        min_n: A stratum with fewer usable rows takes the lead-pooled offset.
+        min_n: A stratum with fewer usable rows takes the lead-pooled offset. At least ``MIN_RANK_N`` (9).
+
+    Caveat: ``n`` counts rows, not independent days. The rows of one station-day (its hours, and its stations of one
+    cluster) are strongly correlated, so the exchangeability behind the finite-sample guarantee holds only roughly and a
+    stratum with n = 30 rows can be much less certain than its nominal coverage says. ``ConformalOffsets.n`` and
+    ``fallback`` let a report show how thin each stratum is.
 
     Returns:
         A ``ConformalOffsets`` holding only ``target``.
 
     Raises:
-        ValueError: A shape or a value is wrong (lead outside 1-7, unknown block), or the rows of a stratum that needs
+        ValueError: ``min_n`` is below ``MIN_RANK_N``; a shape or a value is wrong (lead outside 1-7, unknown block),
+            or the rows of a stratum that needs
             the lead-pooled offset are too few at the lead level too (the message names the target and the lead).
     """
+    if min_n < MIN_RANK_N:
+        raise ValueError(
+            f"min_n must be at least {MIN_RANK_N}: below that ceil((n + 1) * 0.9) exceeds n, the 0.05/0.95 offset "
+            f"does not exist and the interval would silently under-cover (MAPIE raises there), got {min_n}"
+        )
     grid = _checked_grid(grid_cal)
     rows = grid.shape[0]
     y = np.asarray(y_cal, dtype=np.float64)
     if y.shape != (rows,):
         raise ValueError(f"y_cal needs one value per grid row ({rows}), got shape {y.shape}")
-    leads = _lead_values(lead, rows)
-    blocks = _block_indices(block, rows)
+    leads = lead_values(lead, rows)
+    blocks = block_indices(block, rows)
 
-    stratum = leads * len(_BLOCKS) + blocks
+    stratum = leads * len(STRATUM_BLOCKS) + blocks
     usable = np.isfinite(grid).all(axis=1) & np.isfinite(y)
     lower, upper = grid[usable][:, _LOWER], grid[usable][:, _UPPER]
     scores = np.maximum(lower - y[usable, None], y[usable, None] - upper)
@@ -242,8 +170,8 @@ def fit_symmetric_offsets(
     n_rows: dict[str, int] = {}
     fallback: list[str] = []
     for sid in np.unique(stratum).tolist():
-        lead_id, block_index = divmod(sid, len(_BLOCKS))
-        key = stratum_key(lead_id, _BLOCKS[block_index])
+        lead_id, block_index = divmod(sid, len(STRATUM_BLOCKS))
+        key = stratum_key(lead_id, STRATUM_BLOCKS[block_index])
         n_rows[key] = n_of.get(sid, 0)
         if n_rows[key] >= min_n:
             offsets[key] = own[sid].tolist()
@@ -263,55 +191,6 @@ def fit_symmetric_offsets(
         fallback={target.value: fallback},
         negative={target.value: below_zero},
     )
-
-
-def apply_offsets(
-    grid: F64,
-    lead: NDArray[np.int8],
-    block: Sequence[HourBlock] | Sequence[str] | pl.Series,
-    offsets: ConformalOffsets,
-    target: Target,
-) -> F64:
-    """Widen (or narrow) each row of an error grid by the offsets of its own stratum; the median never moves.
-
-    Each stratum's rows go through ``domain.forecast.grid.apply_symmetric_offsets`` with that stratum's 9 offsets
-    (aligned with ``PAIRS``), so a negative offset clamps at the median, the result is re-sorted, and a row with a
-    non-finite value comes back as an all-NaN row. The grid is an error grid (``fit_symmetric_offsets``): the caller
-    adds the raw forecast afterwards.
-
-    Args:
-        grid: Sorted error quantiles, shape ``(n, 19)``.
-        lead: Lead in days of each row.
-        block: Hour-block of each row.
-        offsets: The fitted offsets; must hold ``target``.
-        target: The variable the grid belongs to.
-
-    Returns:
-        A new ``(n, 19)`` array.
-
-    Raises:
-        KeyError: The target has no offsets, or a row's stratum key has none (the key is in the message). There is no
-            silent fallback at serving time.
-        ValueError: A shape or a value is wrong, or the grid is not sorted.
-    """
-    array = _checked_grid(grid)
-    rows = array.shape[0]
-    leads = _lead_values(lead, rows)
-    blocks = _block_indices(block, rows)
-    try:
-        by_key = offsets.offsets[target.value]
-    except KeyError:
-        raise KeyError(f"no conformal offsets for target {target.value!r} (have {sorted(offsets.offsets)})") from None
-    stratum = leads * len(_BLOCKS) + blocks
-    out = np.empty_like(array)
-    for sid in np.unique(stratum).tolist():
-        lead_id, block_index = divmod(sid, len(_BLOCKS))
-        key = stratum_key(lead_id, _BLOCKS[block_index])
-        if key not in by_key:
-            raise KeyError(f"no conformal offsets for stratum {key!r} of target {target.value!r}")
-        selected = stratum == sid
-        out[selected] = apply_symmetric_offsets(array[selected], by_key[key])
-    return out
 
 
 def calibration_mask(rows: pl.DataFrame, window: CalibrationWindow) -> pl.Series:

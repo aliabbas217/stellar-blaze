@@ -20,6 +20,7 @@ import pytest
 import structlog
 from numpy.typing import NDArray
 
+from stellar_blaze.domain.forecast import conformal as domain_conformal
 from stellar_blaze.domain.forecast.features import Target
 from stellar_blaze.domain.forecast.grid import F64, HOUR_BLOCKS, LEVELS, PAIRS, HourBlock
 from stellar_blaze.ml import _mapie
@@ -28,6 +29,7 @@ from stellar_blaze.ml.conformal import (
     apply_offsets,
     calibration_mask,
     fit_symmetric_offsets,
+    stratum_key,
 )
 
 pytestmark = pytest.mark.unit
@@ -146,13 +148,17 @@ class TestMatchesMapie:
         # pytest keeps its own handlers on the root logger, which makes MAPIE's logging.basicConfig a no-op: take them
         # off for the call so that the real side effects (a stderr handler, level INFO) would show if they leaked.
         root = logging.getLogger()
-        monkeypatch.setattr(root, "handlers", [])
+        monkeypatch.setattr(root, "handlers", [])  # the original list object comes back at teardown
+        original_level = root.level
         root.setLevel(logging.WARNING)
-        with structlog.testing.capture_logs() as captured:
-            _mapie.mapie_symmetric_interval(models, x, y, x, confidence_level=0.9)
-        assert root.handlers == [], "MAPIE's logging.basicConfig must not leave a stderr handler behind"
-        assert root.level == logging.WARNING
-        assert root.filters == []
+        try:
+            with structlog.testing.capture_logs() as captured:
+                _mapie.mapie_symmetric_interval(models, x, y, x, confidence_level=0.9)
+            assert root.handlers == [], "MAPIE's logging.basicConfig must not leave a stderr handler behind"
+            assert root.level == logging.WARNING
+            assert root.filters == []
+        finally:
+            root.setLevel(original_level)  # setLevel, not an attribute write: it also clears the logger's level cache
         events = [e for e in captured if e["event"] == "mapie_message"]
         assert events, f"the ill-sorted INFO should reach structlog, got {captured}"
         assert "ill-sorted" in events[0]["message"]
@@ -250,6 +256,26 @@ class TestFit:
         offsets_29 = fit_symmetric_offsets(grid, y, lead, block, target=Target.T, min_n=31)
         assert sorted(offsets_29.fallback["t"]) == ["2|early", "2|late", "2|peak"]  # then the pooled n of 90 is used
 
+    def test_min_n_below_the_rank_limit_raises(self) -> None:
+        # n = 5 with min_n = 1 would keep a stratum whose 0.05/0.95 offset needs rank ceil(6 * 0.9) = 6 > 5
+        n = 5
+        args = (normal_grid(n, 1.0), np.zeros(n), np.ones(n, dtype=np.int8), [HourBlock.PEAK] * n)
+        with pytest.raises(ValueError, match=r"min_n must be at least 9"):
+            fit_symmetric_offsets(*args, target=Target.T, min_n=1)
+        with pytest.raises(ValueError, match=r"min_n must be at least 9"):
+            fit_symmetric_offsets(*args, target=Target.T, min_n=8)
+
+    def test_min_n_nine_is_enough_for_every_pair(self) -> None:
+        n = 9  # ceil(10 * 0.9) = 9 <= 9: the widest pair takes the maximum score
+        grid, y = normal_grid(n, 1.0), np.arange(n, dtype=np.float64)
+        offsets = fit_symmetric_offsets(
+            grid, y, np.ones(n, dtype=np.int8), [HourBlock.PEAK] * n, target=Target.T, min_n=9
+        )
+        assert offsets.n["t"]["1|peak"] == 9
+        assert offsets.fallback["t"] == []
+        lo, hi = grid[0, 0], grid[0, 18]
+        assert offsets.offsets["t"]["1|peak"][0] == max(lo - y.min(), y.max() - hi)
+
     def test_pooled_n_too_small_raises_naming_target_and_lead(self) -> None:
         rng = np.random.default_rng(5)
         grid, y, lead, block = strata_frame(rng, 100, leads=(1,))
@@ -335,32 +361,6 @@ class TestFit:
         from_series = fit_symmetric_offsets(grid, y, lead, pl.Series([b.value for b in block]), target=Target.T)
         assert from_list == from_series
 
-    def test_merge_and_json_round_trip(self) -> None:
-        rng = np.random.default_rng(11)
-        grid, y, lead, block = strata_frame(rng, 40, leads=(1,))
-        t = fit_symmetric_offsets(grid, y, lead, block, target=Target.T)
-        td = fit_symmetric_offsets(grid, y, lead, block, target=Target.TD)
-        both = t.merge(td)
-        assert set(both.offsets) == {"t", "td"}
-        assert set(both.negative) == {"t", "td"}
-        assert ConformalOffsets.model_validate_json(both.model_dump_json()) == both
-        with pytest.raises(ValueError, match="already"):
-            both.merge(t)
-
-    def test_model_rejects_malformed_offsets(self) -> None:
-        good = {"t": {"1|peak": [0.1] * 9}}
-        base = {"offsets": good, "n": {"t": {"1|peak": 50}}, "fallback": {"t": []}, "negative": {"t": 0}}
-        ConformalOffsets.model_validate(base)
-        for patch in (
-            {"offsets": {"t": {"1|peak": [0.1] * 8}}},
-            {"offsets": {"t": {"9|peak": [0.1] * 9}}, "n": {"t": {"9|peak": 5}}},
-            {"n": {"t": {"1|late": 50}}},
-            {"fallback": {"t": ["1|late"]}},
-            {"negative": {"t": 3}},
-        ):
-            with pytest.raises(ValueError):  # noqa: PT011
-                ConformalOffsets.model_validate({**base, **patch})
-
 
 class TestCoverage:
     def test_coverage_on_exchangeable_synthetic(self) -> None:
@@ -386,7 +386,7 @@ class TestCoverage:
             assert abs(inside.mean() - (hi - lo)) < 0.02, f"pair {lo}/{hi}: {inside.mean():.4f}"
 
 
-class TestApply:
+class TestFitThenApply:
     def test_median_never_moves(self) -> None:
         rng = np.random.default_rng(13)
         grid, y, lead, block = strata_frame(rng, 100, leads=(1, 2))
@@ -406,43 +406,6 @@ class TestApply:
         assert np.all(out[:, 0] <= out[:, 9])
         assert np.all(out[:, 18] >= out[:, 9])
         np.testing.assert_array_equal(out[:, 9], grid[:, 9])
-
-    def test_each_row_gets_its_own_stratum(self) -> None:
-        rng = np.random.default_rng(14)
-        grid, y, lead, block = strata_frame(rng, 100, leads=(1, 5))
-        offsets = fit_symmetric_offsets(grid, y, lead, block, target=Target.T)
-        order = rng.permutation(len(y))
-        shuffled = apply_offsets(grid[order], lead[order], [block[i] for i in order], offsets, Target.T)
-        in_order = apply_offsets(grid, lead, block, offsets, Target.T)
-        np.testing.assert_array_equal(shuffled, in_order[order])
-        widths = in_order[:, 18] - in_order[:, 0]
-        assert widths[lead == 5].mean() > widths[lead == 1].mean() * 1.1  # lead 5 really got a larger offset
-
-    def test_unknown_stratum_raises_key_error_naming_it(self) -> None:
-        rng = np.random.default_rng(15)
-        grid, y, lead, block = strata_frame(rng, 40, leads=(1,))
-        offsets = fit_symmetric_offsets(grid, y, lead, block, target=Target.T)
-        with pytest.raises(KeyError, match=r"2\|peak"):
-            apply_offsets(grid[:3], np.array([1, 2, 1], dtype=np.int8), [HourBlock.PEAK] * 3, offsets, Target.T)
-        with pytest.raises(KeyError, match="wind"):
-            apply_offsets(grid[:3], lead[:3], block[:3], offsets, Target.WIND)
-
-    def test_non_finite_rows_come_back_all_nan(self) -> None:
-        rng = np.random.default_rng(16)
-        grid, y, lead, block = strata_frame(rng, 40, leads=(1,))
-        offsets = fit_symmetric_offsets(grid, y, lead, block, target=Target.T)
-        probe = grid[:4].copy()
-        probe[1, 5] = np.nan
-        out = apply_offsets(probe, lead[:4], block[:4], offsets, Target.T)
-        assert np.isnan(out[1]).all()
-        assert np.isfinite(out[[0, 2, 3]]).all()
-
-    def test_empty_input_gives_empty_output(self) -> None:
-        rng = np.random.default_rng(17)
-        grid, y, lead, block = strata_frame(rng, 40, leads=(1,))
-        offsets = fit_symmetric_offsets(grid, y, lead, block, target=Target.T)
-        out = apply_offsets(np.empty((0, N_LEVELS)), np.empty(0, dtype=np.int8), [], offsets, Target.T)
-        assert out.shape == (0, N_LEVELS)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -535,3 +498,10 @@ class TestCalibrationMask:
             calibration_mask(rows.with_columns(pl.col("valid_date").cast(pl.String())), "september")
         with pytest.raises(ValueError, match="window"):
             calibration_mask(rows, "october")  # type: ignore[arg-type]
+
+
+def test_domain_names_are_reexported_unchanged() -> None:
+    # ml.conformal keeps the import path of Task 8; the objects are the domain module's, not copies
+    assert ConformalOffsets is domain_conformal.ConformalOffsets
+    assert apply_offsets is domain_conformal.apply_offsets
+    assert stratum_key is domain_conformal.stratum_key
