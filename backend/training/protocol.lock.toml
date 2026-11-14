@@ -1,6 +1,15 @@
 # The 2026 evaluation lock (pre-registration section 9). Written by the controller after Ali approved and committed the
-# pre-registration (T0). `model_id` is added when the released model is frozen (B2 Task 14 step 6); the freeze
-# addendum fields (`freeze_path`, `freeze_sha256`) are added by B3 before the warnings and plans parts run.
+# pre-registration (T0) and extended once for amendment 1 and the gold dataset hash.
+# `model_id` is added when the released model is frozen (B2 Task 14 step 6; a top-level key, so it goes ABOVE the
+# `[[amendments]]` table); the freeze addendum fields (`freeze_path`, `freeze_sha256`) are added by B3 before the
+# warnings and plans parts run.
 protocol_path = "docs/research/2026-11-12-preregistration-2026-evaluation.md"
 protocol_sha256 = "ce116fe64a00b8b5509ae567a72973e85d1cf2120af725127b970bdb8885b7b8"
 protocol_commit = "661b373b3bf8257e997cf5cebb8691ddc9e9d693"
+# gold/pairs.parquet built by `sb-jobs build-dataset` at code 64efe24 (docs/research/2026-11-12-gold-dataset-manifest.json).
+gold_sha256 = "8124c86c6f3ff55c40184f85be06b54a9ed289cdba1a625347efe4809544a1db"
+
+[[amendments]]
+path = "docs/research/2026-11-14-preregistration-amendment-1.md"
+sha256 = "35595fbc7fbeb6b207f468d9b0c81286431e446930fb77f3828cc01c599a7272"
+commit = "9d11442643249894628d7d85d4f3bb6d1d53bda5"
