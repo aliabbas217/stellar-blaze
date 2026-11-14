@@ -1,5 +1,6 @@
 """The composition root: the only place that turns settings into rulesets, models, the config snapshot and adapters."""
 
+import json
 import shutil
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -64,7 +65,7 @@ def test_defaults_build_the_seed_catalog_and_a_file_snapshot() -> None:
     runtime = build_runtime(settings, today=TODAY)
     assert isinstance(runtime, Runtime)
     assert runtime.settings is settings
-    assert runtime.rulesets.ids() == ("ae-heat-0.1",)
+    assert runtime.rulesets.ids() == ("ae-heat-0.1", "ae-heat-2026.1")
     assert runtime.models.ids() == (FIRST, SECOND)
     snapshot = runtime.config.current()
     assert snapshot.source == "file"
@@ -95,9 +96,10 @@ def test_a_dev_model_pin_becomes_an_env_snapshot_with_that_model_loaded() -> Non
 
 
 def test_a_dev_ruleset_pin_becomes_an_env_snapshot() -> None:
-    snapshot = build_runtime(make_settings(env="dev", ruleset_id="ae-heat-0.1"), today=TODAY).config.current()
+    # ae-heat-0.1 cannot be pinned any more: it declares none of the B3 tunables, so no config resolves against it.
+    snapshot = build_runtime(make_settings(env="dev", ruleset_id="ae-heat-2026.1"), today=TODAY).config.current()
     assert snapshot.source == "env"
-    assert snapshot.config.ruleset_pin == "ae-heat-0.1"
+    assert snapshot.config.ruleset_pin == "ae-heat-2026.1"
     assert snapshot.model is None
 
 
@@ -141,7 +143,7 @@ def test_prod_starts_with_an_empty_holder_because_the_database_is_the_source_of_
     with pytest.raises(ConfigUnavailableError):
         runtime.config.current()
     # The rulesets and models are still loaded and verified: the DB-active config is validated against them.
-    assert runtime.rulesets.ids() == ("ae-heat-0.1",)
+    assert runtime.rulesets.ids() == ("ae-heat-0.1", "ae-heat-2026.1")
     assert runtime.models.ids() == (FIRST, SECOND)
 
 
@@ -160,13 +162,16 @@ def test_prod_still_fails_startup_on_a_day_no_ruleset_covers() -> None:
 def test_prod_refuses_a_draft_ruleset_but_dev_loads_it(tmp_path: Path) -> None:
     directory = tmp_path / "rulesets"
     shutil.copytree(RULESETS_DIR, directory)
-    path = directory / "ae-heat-0.1.toml"
+    path = directory / "ae-heat-2026.1.toml"
     path.write_bytes(path.read_bytes().replace(b'status = "released"', b'status = "draft"'))
-    (directory / "lock.json").write_text("{}", encoding="utf-8")
+    lock = json.loads((directory / "lock.json").read_text(encoding="utf-8"))
+    del lock["ae-heat-2026.1"]  # a draft is not locked; the seed stays released
+    (directory / "lock.json").write_text(json.dumps(lock), encoding="utf-8")
     with pytest.raises(RulesetLockError, match="draft"):
         build_runtime(make_settings(env="prod", rulesets_dir=directory), today=TODAY)
     assert build_runtime(make_settings(env="dev", rulesets_dir=directory), today=TODAY).rulesets.ids() == (
         "ae-heat-0.1",
+        "ae-heat-2026.1",
     )
 
 

@@ -15,6 +15,7 @@ from tests.unit.rules.support import RULESETS_DIR, SEED_PATH
 pytestmark = pytest.mark.unit
 
 SEED_ID = "ae-heat-0.1"
+RELEASED_ID = "ae-heat-2026.1"  # supersedes the seed; the committed directory holds both
 
 
 def copy_rulesets(tmp_path: Path) -> Path:
@@ -30,16 +31,22 @@ def write_lock(directory: Path, lock: object) -> None:
 def test_the_committed_rulesets_load_without_drafts() -> None:
     catalog = load_catalog(RULESETS_DIR, allow_drafts=False)
     assert isinstance(catalog, RulesetCatalog)
-    assert catalog.ids() == (SEED_ID,)
-    assert catalog.for_local_date(date(2026, 11, 11)).ruleset.meta.id == SEED_ID
+    assert catalog.ids() == (SEED_ID, RELEASED_ID)
+    assert catalog.for_local_date(date(2026, 11, 11)).ruleset.meta.id == RELEASED_ID
+    assert catalog.get(SEED_ID).ruleset.meta.id == SEED_ID  # still reachable by id, for audit replay and pins
 
 
 def test_the_lock_holds_the_sha256_of_the_stored_bytes() -> None:
-    raw = SEED_PATH.read_bytes()
-    assert b"\r" not in raw, "rulesets are LF files (.gitattributes eol=lf); a CR would change the hash on Windows"
     lock = json.loads((RULESETS_DIR / "lock.json").read_text(encoding="utf-8"))
-    assert lock == {SEED_ID: hashlib.sha256(raw).hexdigest()}
-    assert load_catalog(RULESETS_DIR, allow_drafts=False).get(SEED_ID).sha256 == lock[SEED_ID]
+    paths = {SEED_ID: SEED_PATH, RELEASED_ID: RULESETS_DIR / f"{RELEASED_ID}.toml"}
+    expected: dict[str, str] = {}
+    for ruleset_id, path in paths.items():
+        raw = path.read_bytes()
+        assert b"\r" not in raw, "rulesets are LF files (.gitattributes eol=lf); a CR would change the hash on Windows"
+        expected[ruleset_id] = hashlib.sha256(raw).hexdigest()
+    assert lock == expected
+    catalog = load_catalog(RULESETS_DIR, allow_drafts=False)
+    assert all(catalog.get(ruleset_id).sha256 == digest for ruleset_id, digest in expected.items())
 
 
 def test_one_edited_byte_in_a_released_ruleset_fails_the_lock(tmp_path: Path) -> None:
@@ -70,28 +77,30 @@ def test_a_lock_entry_without_its_file_fails(tmp_path: Path) -> None:
 
 
 def draft_directory(tmp_path: Path) -> Path:
+    """The committed directory with ``ae-heat-2026.1`` made a draft (and so unlocked); the seed stays released."""
     directory = copy_rulesets(tmp_path)
-    path = directory / f"{SEED_ID}.toml"
+    path = directory / f"{RELEASED_ID}.toml"
     draft = path.read_bytes().replace(b'status = "released"', b'status = "draft"')
     assert draft != path.read_bytes()
     path.write_bytes(draft)
-    write_lock(directory, {})  # a draft is not locked
+    write_lock(directory, {SEED_ID: hashlib.sha256(SEED_PATH.read_bytes()).hexdigest()})  # a draft is not locked
     return directory
 
 
 def test_a_draft_is_refused_unless_drafts_are_allowed(tmp_path: Path) -> None:
     directory = draft_directory(tmp_path)
-    with pytest.raises(RulesetLockError, match=f"draft.*{SEED_ID}"):
+    with pytest.raises(RulesetLockError, match=f"draft.*{RELEASED_ID}"):
         load_catalog(directory, allow_drafts=False)
     catalog = load_catalog(directory, allow_drafts=True)
-    assert catalog.get(SEED_ID).ruleset.meta.status == "draft"
+    assert catalog.get(RELEASED_ID).ruleset.meta.status == "draft"
 
 
 def test_a_lock_entry_for_a_draft_fails(tmp_path: Path) -> None:
     # The lock lists released rulesets only; an entry for a file that is a draft is an inconsistent repository.
     directory = draft_directory(tmp_path)
-    write_lock(directory, {SEED_ID: "0" * 64})
-    with pytest.raises(RulesetLockError, match=f"{SEED_ID}.*not a released"):
+    lock = json.loads((RULESETS_DIR / "lock.json").read_text(encoding="utf-8"))
+    write_lock(directory, {**lock, RELEASED_ID: "0" * 64})
+    with pytest.raises(RulesetLockError, match=f"{RELEASED_ID}.*not a released"):
         load_catalog(directory, allow_drafts=True)
 
 
@@ -142,7 +151,8 @@ def test_an_edited_ruleset_changes_the_hash_the_catalog_reports(tmp_path: Path) 
     directory = copy_rulesets(tmp_path)
     path = directory / f"{SEED_ID}.toml"
     path.write_bytes(path.read_bytes() + b"\n# a trailing comment changes the bytes and nothing else\n")
-    write_lock(directory, {SEED_ID: hashlib.sha256(path.read_bytes()).hexdigest()})
+    lock = json.loads((RULESETS_DIR / "lock.json").read_text(encoding="utf-8"))
+    write_lock(directory, {**lock, SEED_ID: hashlib.sha256(path.read_bytes()).hexdigest()})
     original = load_catalog(RULESETS_DIR, allow_drafts=False).get(SEED_ID)
     edited = load_catalog(directory, allow_drafts=False).get(SEED_ID)
     assert edited.ruleset == original.ruleset

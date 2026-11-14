@@ -45,6 +45,13 @@
         "max": 20.0,
         "safer": "higher"
       }
-    }
+    },
+    "labour": null,
+    "adosh_cycles": null,
+    "acclimatisation": null,
+    "workload": null,
+    "privacy": null,
+    "clauses": null,
+    "alerts": null
   }
 }

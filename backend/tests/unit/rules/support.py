@@ -20,6 +20,18 @@ def seed_dict() -> dict[str, Any]:
     return tomllib.loads(SEED_PATH.read_text(encoding="utf-8"))
 
 
+def b3_tunables() -> dict[str, Any]:
+    """The tunables ``ae-heat-2026.1`` adds to the seed's, under the seed's source ``adr-0006``.
+
+    ``Tunables`` has one field per tunable and ``resolve_effective`` needs a default for each, so a test ruleset built
+    from the seed (which predates B3) declares them too; the config tests are about validation, not about these values.
+    """
+    released = tomllib.loads((RULESETS_DIR / "ae-heat-2026.1.toml").read_text(encoding="utf-8"))["tunables"]
+    return {
+        name: {**spec, "source": "adr-0006"} for name, spec in released.items() if name not in seed_dict()["tunables"]
+    }
+
+
 def ruleset_dict(
     ruleset_id: str = "ae-heat-0.1",
     *,
@@ -28,8 +40,9 @@ def ruleset_dict(
     supersedes: tuple[str, ...] = (),
     status: str = "released",
 ) -> dict[str, Any]:
-    """The seed's values under a different identity and effective range."""
+    """The seed's values under a different identity and effective range, with the B3 tunables declared as well."""
     raw = seed_dict()
+    raw["tunables"].update(b3_tunables())
     meta: dict[str, Any] = {
         "id": ruleset_id,
         "effective_from": effective_from,

@@ -40,6 +40,23 @@ TODAY = date(2026, 11, 11)
 SEED = make_ruleset()
 SEED_CATALOG = RulesetCatalog([loaded(SEED)])
 
+# What the test seed resolves to with nothing set: margin 0.0 (the seed's) and the B3 tunables at ae-heat-2026.1 values.
+SEED_EFFECTIVE = EffectiveParams(
+    twl_margin_w_m2=0.0,
+    warning_theta=0.10,
+    red_twl_w_m2=85.0,
+    personal_band_amber=0.10,
+    personal_band_orange=0.50,
+    personal_band_red=0.90,
+    deescalation_dwell_minutes=60,
+    alert_lead_hours=12,
+    alert_dispatch_interval_minutes=5,
+    forecast_stale_after_hours=30,
+    k_health=10,
+    k_exposure=5,
+    low_zone_voluntary_rest_min=0,
+)
+
 
 def models() -> ModelRegistry:
     return scan_models(FIXTURE_MODELS)
@@ -76,8 +93,13 @@ def test_the_default_file_has_the_schema_version_and_empty_tunables_and_flags_ta
 
 def test_the_canonical_hash_is_the_documented_formula() -> None:
     # The sha256 is stored with every config version and every decision (ADR 0010 section 3): the formula is contract.
+    # B3 added twelve tunables (null here), so the body gained twelve null keys and the seed config's hash moved once.
     canonical = (
-        b'{"flags":{},"model_id":null,"ruleset_pin":null,"schema_version":1,"tunables":{"twl_margin_w_m2":null}}'
+        b'{"flags":{},"model_id":null,"ruleset_pin":null,"schema_version":1,"tunables":{'
+        b'"alert_dispatch_interval_minutes":null,"alert_lead_hours":null,"deescalation_dwell_minutes":null,'
+        b'"forecast_stale_after_hours":null,"k_exposure":null,"k_health":null,"low_zone_voluntary_rest_min":null,'
+        b'"personal_band_amber":null,"personal_band_orange":null,"personal_band_red":null,"red_twl_w_m2":null,'
+        b'"twl_margin_w_m2":null,"warning_theta":null}}'
     )
     assert config_sha256(RuntimeConfig()) == hashlib.sha256(canonical).hexdigest()
 
@@ -163,17 +185,19 @@ def test_the_effective_parameters_have_one_field_per_tunable() -> None:
 
 
 def test_an_unset_tunable_takes_the_ruleset_default() -> None:
-    assert resolve_effective(RuntimeConfig(), SEED) == EffectiveParams(twl_margin_w_m2=0.0)
+    assert resolve_effective(RuntimeConfig(), SEED) == SEED_EFFECTIVE
 
 
 def test_a_set_tunable_inside_its_range_resolves_to_itself() -> None:
-    assert resolve_effective(config(tunables={"twl_margin_w_m2": 7.0}), SEED) == EffectiveParams(twl_margin_w_m2=7.0)
+    assert resolve_effective(config(tunables={"twl_margin_w_m2": 7.0}), SEED) == dataclasses.replace(
+        SEED_EFFECTIVE, twl_margin_w_m2=7.0
+    )
 
 
 @pytest.mark.parametrize("value", [0.0, 20.0])
 def test_the_range_ends_are_inside_the_range(value: float) -> None:
-    assert resolve_effective(config(tunables={"twl_margin_w_m2": value}), SEED) == EffectiveParams(
-        twl_margin_w_m2=value
+    assert resolve_effective(config(tunables={"twl_margin_w_m2": value}), SEED) == dataclasses.replace(
+        SEED_EFFECTIVE, twl_margin_w_m2=value
     )
 
 
@@ -191,11 +215,15 @@ def test_a_tunable_the_ruleset_does_not_declare_is_unknown_when_set_and_when_uns
     bare = Ruleset.model_validate(raw)
     set_result = resolve_effective(config(tunables={"twl_margin_w_m2": 1.0}), bare)
     assert isinstance(set_result, list)
-    assert codes(set_result) == [("unknown-tunable", "tunables.twl_margin_w_m2")]
+    # Every tunable the schema has is unknown to a ruleset that declares none: the one that was set, and the others.
+    every = [("unknown-tunable", f"tunables.{name}") for name in Tunables.model_fields]
+    assert codes(set_result) == every
+    assert "is not declared by" in set_result[0].message
+    assert all("has no default in" in v.message for v in set_result[1:])
     # Unset means "the ruleset default"; a ruleset without one cannot supply it.
     unset_result = resolve_effective(RuntimeConfig(), bare)
     assert isinstance(unset_result, list)
-    assert codes(unset_result) == [("unknown-tunable", "tunables.twl_margin_w_m2")]
+    assert codes(unset_result) == every
 
 
 # --- validation ---------------------------------------------------------------------------------------------------

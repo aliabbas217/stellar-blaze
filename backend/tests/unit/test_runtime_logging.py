@@ -41,12 +41,12 @@ def test_bind_runtime_ids_binds_the_loaded_ruleset_and_model_ids(settings: Setti
     runtime = build_runtime(settings.model_copy(update={"models_dir": FIXTURE_MODELS}), today=date(2026, 11, 11))
     bind_runtime_ids(runtime)
     bound = structlog.contextvars.get_contextvars()
-    assert bound == {"ruleset_ids": "ae-heat-0.1", "model_ids": f"{FIRST},{SECOND}"}
+    assert bound == {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": f"{FIRST},{SECOND}"}
 
 
 def test_bind_runtime_ids_with_no_models_binds_an_empty_string(settings: Settings) -> None:
     bind_runtime_ids(build_runtime(settings, today=date(2026, 11, 11)))
-    assert structlog.contextvars.get_contextvars() == {"ruleset_ids": "ae-heat-0.1", "model_ids": ""}
+    assert structlog.contextvars.get_contextvars() == {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": ""}
 
 
 def probe_app(settings: Settings) -> FastAPI:
@@ -77,7 +77,7 @@ def test_under_a_real_server_startup_and_every_request_log_carry_the_loaded_ids(
     assert decision.status_code == 200
 
     lines = json_lines(capsys.readouterr().out)
-    ids = {"ruleset_ids": "ae-heat-0.1", "model_ids": f"{FIRST},{SECOND}"}
+    ids = {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": f"{FIRST},{SECOND}"}
 
     ready = named(lines, "runtime.ready")
     assert len(ready) == 1

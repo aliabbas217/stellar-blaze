@@ -201,24 +201,53 @@ def test_a_tunable_needs_a_direction() -> None:
 
 def test_a_ruleset_field_that_is_not_a_section_is_refused_when_a_file_is_loaded() -> None:
     class Loose(Ruleset):
-        labour: TwlZones | None = None  # an Optional section would escape the source check
+        extra_zones: dict[str, TwlZones] = {}  # noqa: RUF012 - a table of sections would escape the source check
 
     raw = seed_dict()
-    raw["labour"] = {"source": "adosh-twl", "low_min_w_m2": 140.0, "medium_min_w_m2": 115.0}
-    with pytest.raises(ValidationError, match="labour is neither a RulesetSection"):
+    raw["extra_zones"] = {"a": {"source": "adosh-twl", "low_min_w_m2": 140.0, "medium_min_w_m2": 115.0}}
+    with pytest.raises(ValidationError, match="extra_zones is neither a RulesetSection"):
         Loose.model_validate(raw)
 
 
 def test_a_section_added_to_the_schema_gets_the_same_source_check() -> None:
     class Wider(Ruleset):
-        labour: TwlZones
+        extra_zone: TwlZones
 
     raw = seed_dict()
-    raw["labour"] = {"source": "no-such-source", "low_min_w_m2": 140.0, "medium_min_w_m2": 115.0}
-    with pytest.raises(ValidationError, match="labour cites source 'no-such-source'"):
+    raw["extra_zone"] = {"source": "no-such-source", "low_min_w_m2": 140.0, "medium_min_w_m2": 115.0}
+    with pytest.raises(ValidationError, match="extra_zone cites source 'no-such-source'"):
         Wider.model_validate(raw)
-    raw["labour"]["source"] = "adosh-twl"
-    assert Wider.model_validate(raw).labour.low_min_w_m2 == 140.0
+    raw["extra_zone"]["source"] = "adosh-twl"
+    assert Wider.model_validate(raw).extra_zone.low_min_w_m2 == 140.0
+
+
+def test_an_optional_b3_section_gets_the_same_source_check_when_present() -> None:
+    raw = ruleset_with_labour(source="no-such-source")
+    with pytest.raises(ValidationError, match="labour cites source 'no-such-source'"):
+        Ruleset.model_validate(raw)
+    assert Ruleset.model_validate(ruleset_with_labour(source="adosh-twl")).labour is not None
+
+
+def ruleset_with_labour(*, source: str) -> dict[str, Any]:
+    raw = seed_dict()
+    raw["labour"] = {
+        "source": source,
+        "ban_window": [time(12, 30), time(15, 0)],
+        "ban_season": ["06-15", "09-15"],
+        "normal_hours_per_day": 8,
+        "normal_hours_per_week": 48,
+        "overtime_hours_per_day": 2,
+        "total_hours_per_3_weeks": 144,
+        "art18_max_run_h": 5,
+        "art18_break_h": 1,
+        "art18_ban_gap_counts_as_break": False,
+        "art18_adosh_rest_counts_as_break": False,
+        "juvenile_max_h": 6,
+        "juvenile_max_run_h": 4,
+        "juvenile_window": [time(7, 0), time(19, 0)],
+        "ramadan_reduction_h": 2,
+    }
+    return raw
 
 
 def test_rulesets_are_immutable() -> None:

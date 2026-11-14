@@ -6,7 +6,9 @@ validation. Each tunable is bounded by the range its ruleset declares, and in pr
 protective than the ruleset in force today: not on a floor, and not on the range end or the default of a tunable.
 """
 
+import dataclasses
 import hashlib
+import itertools
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -41,9 +43,27 @@ class _Model(BaseModel):
 
 
 class Tunables(_Model):
-    """Operating values; ``None`` means the ruleset default. B3 adds fields additively."""
+    """Operating values; ``None`` means the ruleset default. Each is bounded by its ruleset's ``[tunables]`` range.
+
+    ``twl_margin_w_m2`` is B1 (ADR 0047 moves its default to 7). The rest are B3: the Red edge and the warning
+    probability (ADR 0046, 0048), the personal bands (ADR 0049), the suppression thresholds (ADR 0050), the alert
+    timing, the dispatch cadence and the stale-forecast age (ADR 0058), and the optional voluntary rest in the Low
+    zone (ADR 0011).
+    """
 
     twl_margin_w_m2: float | None = None
+    warning_theta: float | None = None
+    red_twl_w_m2: float | None = None
+    personal_band_amber: float | None = None
+    personal_band_orange: float | None = None
+    personal_band_red: float | None = None
+    deescalation_dwell_minutes: int | None = None
+    alert_lead_hours: int | None = None
+    alert_dispatch_interval_minutes: int | None = None
+    forecast_stale_after_hours: int | None = None
+    k_health: int | None = None
+    k_exposure: int | None = None
+    low_zone_voluntary_rest_min: int | None = None
 
 
 class RuntimeFlags(_Model):
@@ -100,13 +120,39 @@ class ConfigViolation:
 
 @dataclass(frozen=True)
 class EffectiveParams:
-    """The tunables after defaults are applied: one field per ``Tunables`` field, none ``None``. B3 extends it."""
+    """The tunables after defaults are applied: one field per ``Tunables`` field, none ``None``.
+
+    Counts, minutes and hours are ``int``; probabilities and W/m2 are ``float``.
+    """
 
     twl_margin_w_m2: float
+    warning_theta: float
+    red_twl_w_m2: float
+    personal_band_amber: float
+    personal_band_orange: float
+    personal_band_red: float
+    deescalation_dwell_minutes: int
+    alert_lead_hours: int
+    alert_dispatch_interval_minutes: int
+    forecast_stale_after_hours: int
+    k_health: int
+    k_exposure: int
+    low_zone_voluntary_rest_min: int
+
+
+# The tunables whose effective value is an integer (counts, minutes, hours): read off ``EffectiveParams``, not repeated.
+_INTEGER_TUNABLES = frozenset(f.name for f in dataclasses.fields(EffectiveParams) if f.type is int)
+
+# The personal bands in severity order: each must be strictly above the one before it (ADR 0049 decision 1).
+_PERSONAL_BANDS = ("personal_band_amber", "personal_band_orange", "personal_band_red")
 
 
 def resolve_effective(c: RuntimeConfig, ruleset: Ruleset) -> EffectiveParams | list[ConfigViolation]:
-    """Apply ``c.tunables`` to ``ruleset``: a set tunable must be declared and in range; an unset one is the default."""
+    """Apply ``c.tunables`` to ``ruleset``: a set tunable must be declared and in range; an unset one is the default.
+
+    Also refused: an integer tunable whose ruleset default is not a whole number, and personal bands that are not
+    strictly increasing (amber < orange < red; the ranges of ADR 0049 touch at 0.30 and 0.70, so a tie is possible).
+    """
     violations: list[ConfigViolation] = []
     values: dict[str, float] = {}
     for name in Tunables.model_fields:
@@ -117,7 +163,16 @@ def resolve_effective(c: RuntimeConfig, ruleset: Ruleset) -> EffectiveParams | l
             what = "is not declared by" if value is not None else "has no default in"
             violations.append(ConfigViolation("unknown-tunable", path, f"{name} {what} ruleset {ruleset.meta.id}"))
         elif value is None:
-            values[name] = spec.default
+            if name in _INTEGER_TUNABLES and not float(spec.default).is_integer():
+                violations.append(
+                    ConfigViolation(
+                        "out-of-range",
+                        path,
+                        f"{name} default {spec.default} of ruleset {ruleset.meta.id} is not a whole number",
+                    )
+                )
+            else:
+                values[name] = spec.default
         elif not spec.min <= value <= spec.max:
             violations.append(
                 ConfigViolation(
@@ -128,9 +183,34 @@ def resolve_effective(c: RuntimeConfig, ruleset: Ruleset) -> EffectiveParams | l
             )
         else:
             values[name] = value
+    if all(name in values for name in _PERSONAL_BANDS):
+        for lower, upper in itertools.pairwise(_PERSONAL_BANDS):
+            if not values[lower] < values[upper]:
+                violations.append(
+                    ConfigViolation(
+                        "out-of-range",
+                        f"tunables.{upper}",
+                        f"{upper}={values[upper]} must be above {lower}={values[lower]}: the personal bands must "
+                        "be strictly increasing",
+                    )
+                )
     if violations:
         return violations
-    return EffectiveParams(twl_margin_w_m2=values["twl_margin_w_m2"])
+    return EffectiveParams(
+        twl_margin_w_m2=values["twl_margin_w_m2"],
+        warning_theta=values["warning_theta"],
+        red_twl_w_m2=values["red_twl_w_m2"],
+        personal_band_amber=values["personal_band_amber"],
+        personal_band_orange=values["personal_band_orange"],
+        personal_band_red=values["personal_band_red"],
+        deescalation_dwell_minutes=int(values["deescalation_dwell_minutes"]),
+        alert_lead_hours=int(values["alert_lead_hours"]),
+        alert_dispatch_interval_minutes=int(values["alert_dispatch_interval_minutes"]),
+        forecast_stale_after_hours=int(values["forecast_stale_after_hours"]),
+        k_health=int(values["k_health"]),
+        k_exposure=int(values["k_exposure"]),
+        low_zone_voluntary_rest_min=int(values["low_zone_voluntary_rest_min"]),
+    )
 
 
 def _check_pin(

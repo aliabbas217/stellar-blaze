@@ -198,6 +198,87 @@ def test_durations_compare_in_the_direction_the_floor_names() -> None:
     assert model_floor_violations(safer, hours()) == []
 
 
+class Switches(BaseModel):
+    """The comparators B3 adds: a switch that must stay off, a window that may only shrink, a text window."""
+
+    credits_ban: Annotated[bool, Floor(safer="false")]
+    juvenile: Annotated[tuple[time, time], Floor(safer="narrower")]
+    season: Annotated[tuple[str, str], Floor(safer="wider")]
+
+
+def switches(
+    *,
+    credits_ban: bool = False,
+    juvenile: tuple[time, time] = (time(7, 0, 0), time(19, 0, 0)),
+    season: tuple[str, str] = ("06-15", "09-15"),
+) -> Switches:
+    return Switches(credits_ban=credits_ban, juvenile=juvenile, season=season)
+
+
+def test_a_false_floor_is_less_protective_when_the_candidate_turns_it_on() -> None:
+    assert paths(model_floor_violations(switches(credits_ban=True), switches())) == ["credits_ban"]
+    assert model_floor_violations(switches(credits_ban=False), switches()) == []
+    # A reference that already credits it sets no bar: either candidate passes.
+    assert model_floor_violations(switches(credits_ban=True), switches(credits_ban=True)) == []
+    assert model_floor_violations(switches(credits_ban=False), switches(credits_ban=True)) == []
+
+
+@pytest.mark.parametrize(
+    ("candidate_window", "violates"),
+    [
+        ((time(7, 0, 0), time(19, 0, 0)), False),  # same window
+        ((time(8, 0, 0), time(18, 0, 0)), False),  # strictly inside
+        ((time(7, 0, 0), time(18, 0, 0)), False),  # earlier end
+        ((time(8, 0, 0), time(19, 0, 0)), False),  # later start
+        ((time(6, 59, 59), time(19, 0, 0)), True),  # starts earlier
+        ((time(7, 0, 0), time(19, 0, 1)), True),  # ends later
+        ((time(6, 0, 0), time(20, 0, 0)), True),  # wider on both sides
+        ((time(20, 0, 0), time(21, 0, 0)), True),  # disjoint
+    ],
+)
+def test_a_narrower_window_must_lie_inside_the_reference(candidate_window: tuple[time, time], violates: bool) -> None:
+    found = model_floor_violations(switches(juvenile=candidate_window), switches())
+    assert paths(found) == (["juvenile"] if violates else [])
+
+
+@pytest.mark.parametrize(
+    ("candidate_season", "violates"),
+    [
+        (("06-15", "09-15"), False),
+        (("06-01", "09-30"), False),
+        (("06-16", "09-15"), True),
+        (("06-15", "09-14"), True),
+        (("07-01", "08-01"), True),
+    ],
+)
+def test_a_wider_text_window_compares_zero_padded_month_days(candidate_season: tuple[str, str], violates: bool) -> None:
+    found = model_floor_violations(switches(season=candidate_season), switches())
+    assert paths(found) == (["season"] if violates else [])
+
+
+class Section(BaseModel):
+    flag: Annotated[bool, Floor(safer="true")]
+
+
+class WithOptional(BaseModel):
+    section: Section | None = None
+
+
+def test_a_missing_section_is_one_violation_at_the_section_path() -> None:
+    found = model_floor_violations(WithOptional(), WithOptional(section=Section(flag=True)))
+    assert paths(found) == ["section"]
+    assert found[0].candidate is None
+    assert found[0].reference == Section(flag=True)
+
+
+def test_a_missing_reference_section_sets_no_bar() -> None:
+    assert model_floor_violations(WithOptional(section=Section(flag=False)), WithOptional()) == []
+    assert model_floor_violations(WithOptional(), WithOptional()) == []
+    # Both present: the walk descends as before.
+    both = model_floor_violations(WithOptional(section=Section(flag=False)), WithOptional(section=Section(flag=True)))
+    assert paths(both) == ["section.flag"]
+
+
 # --- structural test: no numeric, boolean or window field ships without a comparator -----------------------------
 # The helpers are in `structure`. Every guard runs over the real sections and over deliberately broken ones, so a guard
 # that stopped looking would fail its negative control instead of passing over nothing.
@@ -211,17 +292,41 @@ def real_sections() -> list[type[RulesetSection]]:
 
 def test_every_field_of_a_ruleset_is_a_section_or_explicitly_not_one() -> None:
     assert frozenset({"meta", "sources", "tunables"}) == Ruleset.NON_SECTION_FIELDS
-    assert set(section_fields()) == {"niosh_clothing", "twl_zones", "twl_withdrawal"}
+    assert set(section_fields()) == {
+        "niosh_clothing",
+        "twl_zones",
+        "twl_withdrawal",
+        "labour",
+        "adosh_cycles",
+        "acclimatisation",
+        "workload",
+        "privacy",
+        "clauses",
+        "alerts",
+    }
+    # The B3 sections are Optional so that the released ae-heat-0.1 still loads: every one of them is a section.
+    for name in ("labour", "adosh_cycles", "acclimatisation", "workload", "privacy", "clauses", "alerts"):
+        assert Ruleset.model_fields[name].default is None
 
 
 def test_a_ruleset_field_that_is_not_a_section_and_not_allowlisted_is_found() -> None:
     class LooseRuleset(Ruleset):
-        labour: TwlZones | None = (
-            None  # an Optional section escapes the source check, the golden file and the floor walk
-        )
+        # A table or tuple of sections escapes the source check, the golden file and the floor walk.
+        extra_sections: dict[str, TwlZones] = {}  # noqa: RUF012 - a throwaway class for a negative control
 
-    with pytest.raises(AssertionError, match=r"Ruleset\.labour is neither a RulesetSection"):
+    with pytest.raises(AssertionError, match=r"Ruleset\.extra_sections is neither a RulesetSection"):
         section_fields(LooseRuleset)
+
+    class WrongOptional(Ruleset):
+        maybe: TwlZones | int | None = None  # an Optional of something that is not exactly one section
+
+    with pytest.raises(AssertionError, match=r"Ruleset\.maybe is neither a RulesetSection"):
+        section_fields(WrongOptional)
+
+    class OptionalSection(Ruleset):
+        extra: TwlZones | None = None  # an Optional section is a section (the B3 sections are Optional)
+
+    assert section_fields(OptionalSection)["extra"] is TwlZones
 
     class WrongAllowlist(Ruleset):
         NON_SECTION_FIELDS: ClassVar[frozenset[str]] = frozenset({"meta", "sources", "tunables", "nothing"})
@@ -319,7 +424,14 @@ def test_the_fit_check_finds_a_comparator_on_the_wrong_kind_of_value() -> None:
         optional_number: Annotated[float | None, Floor(safer="higher")] = None
         table_of_flags: dict[str, Annotated[bool, Floor(safer="lower")]]
         nested: Covered
+        false_on_a_float: Annotated[float, Floor(safer="false")]
+        narrower_on_a_float: Annotated[float, Floor(safer="narrower")]
+        narrower_of_mixed_types: Annotated[tuple[time, date], Floor(safer="narrower")]
+        window_of_numbers_as_text: Annotated[tuple[str, int], Floor(safer="wider")]
         fine_flag: Annotated[bool, Floor(safer="true")]
+        fine_false_flag: Annotated[bool, Floor(safer="false")]
+        fine_narrow_window: Annotated[tuple[time, time], Floor(safer="narrower")]
+        fine_text_window: Annotated[tuple[str, str], Floor(safer="wider")]
         fine_window: Annotated[tuple[time, time], Floor(safer="wider")]
         fine_duration: Annotated[timedelta, Floor(safer="higher")]
         fine_table: dict[str, Annotated[float, Floor(safer="higher")]]
@@ -336,6 +448,10 @@ def test_the_fit_check_finds_a_comparator_on_the_wrong_kind_of_value() -> None:
         "lower_on_a_string",
         "optional_number",
         "table_of_flags",
+        "false_on_a_float",
+        "narrower_on_a_float",
+        "narrower_of_mixed_types",
+        "window_of_numbers_as_text",
     ]
     assert floor_misfits(MisfitNested)[0] == "inner.flag_on_a_float"
 

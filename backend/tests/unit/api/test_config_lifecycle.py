@@ -345,7 +345,7 @@ def test_pinned_by_the_environment_the_api_keeps_its_snapshot_and_says_why_once(
     store.calls.clear()  # what the seeding itself read is not what the API reads
     app = create_app(
         settings.model_copy(
-            update={"ruleset_id": "ae-heat-0.1", "rulesets_dir": RULESETS_DIR, "models_dir": FIXTURE_MODELS}
+            update={"ruleset_id": "ae-heat-2026.1", "rulesets_dir": RULESETS_DIR, "models_dir": FIXTURE_MODELS}
         )
     )
     with TestClient(app) as client:

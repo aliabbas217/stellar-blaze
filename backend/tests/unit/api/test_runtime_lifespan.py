@@ -57,7 +57,7 @@ def test_the_lifespan_builds_the_runtime_and_handlers_read_it_through_a_dependen
         assert isinstance(app.state.runtime, Runtime)
         assert app.state.runtime.settings is settings
         body = client.get("/test/runtime").json()
-    assert body == {"same": True, "rulesets": ["ae-heat-0.1"], "env": "test"}
+    assert body == {"same": True, "rulesets": ["ae-heat-0.1", "ae-heat-2026.1"], "env": "test"}
 
 
 def test_the_runtime_dependency_explains_a_missing_lifespan(settings: Settings) -> None:
@@ -144,8 +144,9 @@ def test_a_bad_pin_fails_startup(settings: Settings) -> None:
 @pytest.mark.parametrize(
     ("instant", "starts"),
     [
-        # 2024-01-01 is the seed's effective_from. 21:00 UTC on 31 December is 01:00 on 1 January in Dubai (UTC+4):
-        # a lifespan that used the UTC date would find no ruleset; one that used Dubai's date finds ae-heat-0.1.
+        # 2024-01-01 is the effective_from of both rulesets. 21:00 UTC on 31 December is 01:00 on 1 January in Dubai
+        # (UTC+4): a lifespan that used the UTC date would find no ruleset; one that used Dubai's date finds
+        # ae-heat-2026.1 (it supersedes ae-heat-0.1, which stays reachable by id).
         (datetime(2023, 12, 31, 21, 0, tzinfo=UTC), True),
         (datetime(2023, 12, 31, 19, 0, tzinfo=UTC), False),
     ],
@@ -157,7 +158,7 @@ def test_the_lifespan_resolves_the_ruleset_for_the_asia_dubai_date(
     with time_machine.travel(instant, tick=False):
         if starts:
             with TestClient(app):
-                assert app.state.runtime.rulesets.for_local_date(date(2024, 1, 1)).ruleset.meta.id == "ae-heat-0.1"
+                assert app.state.runtime.rulesets.for_local_date(date(2024, 1, 1)).ruleset.meta.id == "ae-heat-2026.1"
         else:
             with pytest.raises(NoRulesetError, match="2023-12-31"), TestClient(app):
                 pass  # pragma: no cover

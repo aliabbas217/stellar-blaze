@@ -217,7 +217,7 @@ def test_activate_with_a_stale_expected_previous_exits_1_and_changes_nothing(
 ) -> None:
     seeded = seed_it()
     first = out(invoke("config", "propose", str(margin_file(tmp_path, 7.0)), *REASON_ARGS))
-    second = out(invoke("config", "propose", str(margin_file(tmp_path, 3.0, "other.toml")), *REASON_ARGS))
+    second = out(invoke("config", "propose", str(margin_file(tmp_path, 9.0, "other.toml")), *REASON_ARGS))
     assert (
         invoke("config", "activate", str(first["version_id"]), "--actor", "ali", "--reason", "margin trial").exit_code
         == 0

@@ -1,0 +1,345 @@
+{
+  "id": "ae-heat-2026.1",
+  "meta": {
+    "effective_from": "2024-01-01",
+    "effective_to": null,
+    "status": "released",
+    "jurisdiction": "ae",
+    "supersedes": [
+      "ae-heat-0.1"
+    ]
+  },
+  "source_ids": [
+    "niosh-2016",
+    "adosh-twl",
+    "meteohazard-5633d57",
+    "adr-0006",
+    "mohre-mr-44-2022",
+    "fdl-33-2021",
+    "cabinet-res-1-2022",
+    "ad-19-2023",
+    "adosh-tg-s3",
+    "adosh-cop-11",
+    "adr-0011",
+    "adr-0046",
+    "adr-0047",
+    "adr-0048",
+    "adr-0049",
+    "adr-0050",
+    "adr-0058"
+  ],
+  "sections": {
+    "niosh_clothing": {
+      "source": "niosh-2016",
+      "values_c": {
+        "work_clothes": 0.0,
+        "cloth_coveralls": 0.0,
+        "double_layer_woven": 3.0,
+        "sms_coveralls": 0.5,
+        "polyolefin_coveralls": 1.0,
+        "limited_use_vapor_barrier": 11.0
+      }
+    },
+    "twl_zones": {
+      "source": "adosh-twl",
+      "low_min_w_m2": 140.0,
+      "medium_min_w_m2": 115.0
+    },
+    "twl_withdrawal": {
+      "source": "meteohazard-5633d57",
+      "enabled": false,
+      "dry_bulb_c": 44.0,
+      "natural_wet_bulb_c": 32.0,
+      "cap_w_m2": 115.0
+    },
+    "tunables": {
+      "twl_margin_w_m2": {
+        "source": "adr-0047",
+        "default": 7.0,
+        "min": 7.0,
+        "max": 20.0,
+        "safer": "higher"
+      },
+      "warning_theta": {
+        "source": "adr-0048",
+        "default": 0.1,
+        "min": 0.05,
+        "max": 0.5,
+        "safer": "lower"
+      },
+      "red_twl_w_m2": {
+        "source": "adr-0046",
+        "default": 85.0,
+        "min": 60.0,
+        "max": 115.0,
+        "safer": "higher"
+      },
+      "personal_band_amber": {
+        "source": "adr-0049",
+        "default": 0.1,
+        "min": 0.05,
+        "max": 0.3,
+        "safer": "lower"
+      },
+      "personal_band_orange": {
+        "source": "adr-0049",
+        "default": 0.5,
+        "min": 0.3,
+        "max": 0.7,
+        "safer": "lower"
+      },
+      "personal_band_red": {
+        "source": "adr-0049",
+        "default": 0.9,
+        "min": 0.7,
+        "max": 0.95,
+        "safer": "lower"
+      },
+      "deescalation_dwell_minutes": {
+        "source": "adr-0058",
+        "default": 60.0,
+        "min": 0.0,
+        "max": 180.0,
+        "safer": "higher"
+      },
+      "alert_lead_hours": {
+        "source": "adr-0058",
+        "default": 12.0,
+        "min": 1.0,
+        "max": 24.0,
+        "safer": "higher"
+      },
+      "alert_dispatch_interval_minutes": {
+        "source": "adr-0058",
+        "default": 5.0,
+        "min": 1.0,
+        "max": 30.0,
+        "safer": "lower"
+      },
+      "forecast_stale_after_hours": {
+        "source": "adr-0058",
+        "default": 30.0,
+        "min": 6.0,
+        "max": 48.0,
+        "safer": "lower"
+      },
+      "k_health": {
+        "source": "adr-0050",
+        "default": 10.0,
+        "min": 10.0,
+        "max": 50.0,
+        "safer": "higher"
+      },
+      "k_exposure": {
+        "source": "adr-0050",
+        "default": 5.0,
+        "min": 5.0,
+        "max": 50.0,
+        "safer": "higher"
+      },
+      "low_zone_voluntary_rest_min": {
+        "source": "adr-0011",
+        "default": 0.0,
+        "min": 0.0,
+        "max": 15.0,
+        "safer": "higher"
+      }
+    },
+    "labour": {
+      "source": "fdl-33-2021",
+      "ban_window": [
+        "12:30:00",
+        "15:00:00"
+      ],
+      "ban_season": [
+        "06-15",
+        "09-15"
+      ],
+      "normal_hours_per_day": 8.0,
+      "normal_hours_per_week": 48.0,
+      "overtime_hours_per_day": 2.0,
+      "total_hours_per_3_weeks": 144.0,
+      "art18_max_run_h": 5.0,
+      "art18_break_h": 1.0,
+      "art18_ban_gap_counts_as_break": false,
+      "art18_adosh_rest_counts_as_break": false,
+      "juvenile_max_h": 6.0,
+      "juvenile_max_run_h": 4.0,
+      "juvenile_window": [
+        "07:00:00",
+        "19:00:00"
+      ],
+      "ramadan_reduction_h": 2.0
+    },
+    "adosh_cycles": {
+      "source": "adosh-twl",
+      "medium_heavy_work_min": 45,
+      "medium_heavy_rest_min": 15,
+      "high_light_work_min": 45,
+      "high_light_rest_min": 15,
+      "high_heavy_work_min": 20,
+      "high_heavy_rest_min": 40,
+      "moderate_uses_heavy": true,
+      "lone_work_min_headcount": 2
+    },
+    "acclimatisation": {
+      "source": "adosh-tg-s3",
+      "new_ramp_pct": {
+        "1": 20,
+        "2": 40,
+        "3": 60,
+        "4": 80,
+        "5": 100
+      },
+      "experienced_ramp_pct": {
+        "1": 50,
+        "2": 60,
+        "3": 80,
+        "4": 100,
+        "5": 100
+      },
+      "reacclimatisation_pct": {
+        "lt4.1": 100,
+        "4-5.1": 80,
+        "4-5.2": 100,
+        "6-12.1": 80,
+        "6-12.2": 100,
+        "12-20.1": 60,
+        "12-20.2": 80,
+        "12-20.3": 100,
+        "gt20.1": 50,
+        "gt20.2": 60,
+        "gt20.3": 80,
+        "gt20.4": 100
+      },
+      "unacclimatised_after_days_away": 14,
+      "heavy_work_after_days": 7
+    },
+    "workload": {
+      "source": "adr-0006",
+      "metabolic_w": {
+        "light": 180.0,
+        "moderate": 300.0,
+        "heavy": 415.0
+      }
+    },
+    "privacy": {
+      "source": "adr-0050",
+      "k_health_floor": 10,
+      "k_exposure_floor": 5
+    },
+    "clauses": {
+      "source": "adr-0011",
+      "entries": {
+        "P-H1": {
+          "source": "mohre-mr-44-2022",
+          "clause": "Art. 3 Noon Work Ban: \"All work performed directly under the sun and in open places shall not be allowed between the peak hours of 12.30 pm and 3 pm from June 15 to September 15 every year. No business shall be resumed before 3pm\""
+        },
+        "P-H1a": {
+          "source": "ad-19-2023",
+          "clause": "Art. 11 Prohibition of Work During the Midday: \"For technical reasons, the following works are exempt and must continue uninterrupted\"; \"When technical reasons dictate the continuation of work, employers must provide workers with the following\". The attested exempt_reason is a product rule (ADR 0011 P-H1a): an exemption is never inferred"
+        },
+        "P-H2.daily": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 17(1): \"The maximum normal working hours for workers shall be (8) eight hours per day or (48) forty-eight hours per week.\"; Art. 19(1): \"do not exceed two hours per day\" and \"the total working hours shall not exceed (144) one hundred and forty four hours every (3) three weeks.\""
+        },
+        "P-H2.weekly": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 17(1): \"The maximum normal working hours for workers shall be (8) eight hours per day or (48) forty-eight hours per week.\"; Art. 19(1): \"the total working hours shall not exceed (144) one hundred and forty four hours every (3) three weeks.\""
+        },
+        "P-H3": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 18: \"The worker may not work for more than (5) five consecutive hours without a break or breaks of not less than an hour in total, provided that these periods are not included in the working hours.\" PROTECTIVE READING (ADR 0011 P-H3): ban time and ADOSH cycle rest are not credited as the break"
+        },
+        "P-H4": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 21: \"The worker shall be granted a paid weekend of not less than one day, according to the employment contract or the work regulation.\" The one rest day in seven is the reading in ADR 0011 P-H4"
+        },
+        "P-H5.hours": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 5(2)(c): \"The actual working hours shall not exceed six hours per day and shall include one break or more, which shall not be less than one hour in total\"; Art. 5(2)(f): \"The juvenile shall not work overtime\""
+        },
+        "P-H5.run": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 5(2)(c): \"this period(s) shall be defined, so that the juvenile does not work for more than four consecutive hours.\""
+        },
+        "P-H5.window": {
+          "source": "fdl-33-2021",
+          "clause": "Art. 5(2)(d): \"The juvenile shall not work between 7 pm and 7 am.\""
+        },
+        "P-H7.cap60": {
+          "source": "adosh-twl",
+          "clause": "Table 1: Medium Risk, heavy work \"Continuous paced work 45 work - 15 rest\"; High Risk \"Strict Work/Rest cycling required\", light work 45 work - 15 rest, heavy work 20 work - 40 rest. Moderate work uses the heavy column (PROTECTIVE READING, ADR 0046)"
+        },
+        "P-H7.run": {
+          "source": "adosh-twl",
+          "clause": "Table 1: Medium Risk, heavy work \"Continuous paced work 45 work - 15 rest\"; High Risk, light work 45 work - 15 rest, heavy work 20 work - 40 rest"
+        },
+        "P-H7.lone": {
+          "source": "adosh-twl",
+          "clause": "Table 1: Medium Risk \"Working alone to be avoided\"; High Risk \"No person to work alone\""
+        },
+        "P-H7.unacclimatised": {
+          "source": "adosh-twl",
+          "clause": "Table 1: Medium Risk and High Risk \"No unacclimatised person to work\"; \"Unacclimatised workers are defined as new workers or those who have been off work for more than 14 days due to illness or vacation leave (in a cool climate area)\""
+        },
+        "P-H8.ramp": {
+          "source": "adosh-tg-s3",
+          "clause": "Section 3 acclimatisation table: new employee 20% / 40% / 60% / 80% / 100% on days 1-5; experienced employee 50 / 60 / 80 / 100 / 100; re-acclimatisation by days away. The \"R/E*\" row (4-5 days) is read as 80 then 100 (PROTECTIVE READING, ADR 0011 P-H8)"
+        },
+        "P-H8.heavy7": {
+          "source": "adosh-cop-11",
+          "clause": "CoP 11.0 3.2(b)(i): \"with an allowance of 5-7 days for acclimatization before starting hard work in a hot environment\"; 7 days is the protective end (ADR 0011 P-H8)"
+        },
+        "P-H10": {
+          "source": "adr-0011",
+          "clause": "P-H10 No added minutes: a plan never schedules more work minutes per worker than the published shift and never extends it. Product rule, not law (ADR 0011 section 4)"
+        },
+        "STOP.red": {
+          "source": "adr-0046",
+          "clause": "Decisions 2 and 8: below the Red edge (red_twl_w_m2) every crew is stopped. POLICY, beyond the ADOSH table: stop work"
+        },
+        "STOP.no_acclimatised": {
+          "source": "adosh-twl",
+          "clause": "Table 1: Medium Risk and High Risk \"No unacclimatised person to work\"; a Medium or High tick is unworkable for a crew with no acclimatized member (ADR 0011 section 2 steps 4 and 6)"
+        },
+        "FALLBACK.high": {
+          "source": "adr-0058",
+          "clause": "Decision 4: with no usable forecast for an hour the hour is fallback and the planner treats every on-shift tick as High, never less protective than the ban (ADR 0011 P-H12)"
+        }
+      }
+    },
+    "alerts": {
+      "source": "adr-0058",
+      "template_ids": [
+        "level-change",
+        "level-end"
+      ],
+      "action_codes_by_level": {
+        "green": [
+          "self-paced-work",
+          "fluids.light.600ml-1l"
+        ],
+        "amber": [
+          "cycle.medium.heavy.45-15",
+          "no-lone-work",
+          "no-unacclimatised",
+          "fluids.light.1-1.2l",
+          "fluids.heavy.over-1.2l"
+        ],
+        "orange": [
+          "cycle.high.light.45-15",
+          "cycle.high.heavy.20-40",
+          "no-lone-work",
+          "no-unacclimatised",
+          "fluids.over-1.2l",
+          "high-risk-induction",
+          "personal-water-bottle-2l"
+        ],
+        "red": [
+          "stop-work"
+        ]
+      }
+    }
+  }
+}

@@ -28,10 +28,16 @@ class Floor:
         safer: ``"higher"``: a larger number is more protective (a zone edge, a clothing adjustment). ``"lower"``: a
             smaller number is more protective (a withdrawal trigger or cap). ``"true"``: ``True`` is more protective
             (a switch that turns a protection on). ``"wider"``: a window ``(start, end)`` that covers more is more
-            protective (a ban window): the candidate window must contain the reference window.
+            protective (a ban window): the candidate window must contain the reference window. ``"false"``: ``False``
+            is more protective (a switch that, when on, credits something that would otherwise not count: an Art. 18
+            break). ``"narrower"``: a window that covers less is more protective (the hours a juvenile may work): the
+            candidate window must lie inside the reference window.
+
+    A window is a pair ``(start, end)`` of one ordered type: numbers, dates, times, or zero-padded text such as
+    ``"06-15"`` (``"MM-DD"``), which compares correctly as text.
     """
 
-    safer: Literal["higher", "lower", "true", "wider"]
+    safer: Literal["higher", "lower", "true", "false", "wider", "narrower"]
 
 
 @dataclass(frozen=True)
@@ -52,10 +58,16 @@ def _less_protective(safer: str, candidate: Any, reference: Any) -> bool:
             return bool(candidate > reference)
         case "true":
             return bool(reference) and not bool(candidate)
+        case "false":
+            return not bool(reference) and bool(candidate)
         case "wider":
             candidate_start, candidate_end = candidate
             reference_start, reference_end = reference
             return bool(candidate_start > reference_start or candidate_end < reference_end)
+        case "narrower":
+            candidate_start, candidate_end = candidate
+            reference_start, reference_end = reference
+            return bool(candidate_start < reference_start or candidate_end > reference_end)
         case _:  # pragma: no cover - the Literal on Floor makes this unreachable for a type-checked caller
             msg = f"unknown floor direction: {safer!r}"
             raise ValueError(msg)
@@ -85,6 +97,9 @@ def _walk(candidate: BaseModel, reference: BaseModel, prefix: str, found: list[F
         if floor is not None:
             if _less_protective(floor.safer, candidate_value, reference_value):
                 found.append(FloorViolation(path, candidate_value, reference_value))
+        elif isinstance(reference_value, BaseModel) and candidate_value is None:
+            # An absent section protects less than a present one (an older ruleset that predates the section).
+            found.append(FloorViolation(path, None, reference_value))
         elif isinstance(candidate_value, BaseModel) and isinstance(reference_value, BaseModel):
             _walk(candidate_value, reference_value, path, found)
         elif isinstance(reference_value, dict):
@@ -104,7 +119,9 @@ def model_floor_violations(candidate: BaseModel, reference: BaseModel) -> list[F
     """Every ``Floor`` field of ``candidate`` that is less protective than the same field of ``reference``.
 
     Walks the fields of ``reference``'s class, descending into nested models, in definition order. Fields without a
-    comparator are ignored, and so are entries a candidate table has that the reference lacks.
+    comparator are ignored, and so are entries a candidate table has that the reference lacks. A nested model the
+    reference has and the candidate lacks (``None``) is one violation at the model's path; one the reference lacks sets
+    no bar.
     """
     found: list[FloorViolation] = []
     _walk(candidate, reference, "", found)

@@ -116,3 +116,53 @@ def test_the_seed_ships_with_withdrawal_limits_off_and_a_margin_that_starts_at_z
     margin = ruleset.tunables["twl_margin_w_m2"]
     assert (margin.default, margin.min, margin.max, margin.safer) == (0.0, 0.0, 20.0, "higher")
     assert margin.source == "adr-0006"
+
+
+def test_golden_2026_1() -> None:
+    """The released B3 ruleset's golden file pins every floor, every tunable range end and every ``safer``."""
+    ruleset = load(RULESETS_DIR / "ae-heat-2026.1.toml")
+    golden = golden_for(ruleset)
+    sections = golden["sections"]
+    assert golden["id"] == "ae-heat-2026.1"
+    assert golden["meta"]["supersedes"] == ["ae-heat-0.1"]
+    assert golden["meta"]["status"] == "released"
+    assert golden["meta"]["effective_to"] is None
+
+    # No B3 section is pinned as absent: a null in this golden file would mean a section silently dropped.
+    assert all(sections[name] is not None for name in value_sections())
+
+    labour = sections["labour"]
+    assert labour["ban_window"] == ["12:30:00", "15:00:00"]
+    assert labour["ban_season"] == ["06-15", "09-15"]
+    assert labour["juvenile_window"] == ["07:00:00", "19:00:00"]
+    assert (labour["art18_ban_gap_counts_as_break"], labour["art18_adosh_rest_counts_as_break"]) == (False, False)
+    cycles = sections["adosh_cycles"]
+    assert (cycles["high_heavy_work_min"], cycles["high_heavy_rest_min"]) == (20, 40)
+    assert cycles["moderate_uses_heavy"] is True
+    assert sections["privacy"] == {"source": "adr-0050", "k_health_floor": 10, "k_exposure_floor": 5}
+    assert sections["workload"]["metabolic_w"] == {"light": 180.0, "moderate": 300.0, "heavy": 415.0}
+
+    expected = {
+        "twl_margin_w_m2": (7.0, 7.0, 20.0, "higher"),
+        "warning_theta": (0.10, 0.05, 0.50, "lower"),
+        "red_twl_w_m2": (85.0, 60.0, 115.0, "higher"),
+        "personal_band_amber": (0.10, 0.05, 0.30, "lower"),
+        "personal_band_orange": (0.50, 0.30, 0.70, "lower"),
+        "personal_band_red": (0.90, 0.70, 0.95, "lower"),
+        "deescalation_dwell_minutes": (60.0, 0.0, 180.0, "higher"),
+        "alert_lead_hours": (12.0, 1.0, 24.0, "higher"),
+        "alert_dispatch_interval_minutes": (5.0, 1.0, 30.0, "lower"),
+        "forecast_stale_after_hours": (30.0, 6.0, 48.0, "lower"),
+        "k_health": (10.0, 10.0, 50.0, "higher"),
+        "k_exposure": (5.0, 5.0, 50.0, "higher"),
+        "low_zone_voluntary_rest_min": (0.0, 0.0, 15.0, "higher"),
+    }
+    pinned = {name: (t["default"], t["min"], t["max"], t["safer"]) for name, t in sections["tunables"].items()}
+    assert pinned == expected
+    assert all(t["source"] for t in sections["tunables"].values())
+
+
+def test_the_seed_golden_pins_the_b3_sections_as_absent() -> None:
+    golden = golden_for(load(RULESETS_DIR / "ae-heat-0.1.toml"))["sections"]
+    for name in ("labour", "adosh_cycles", "acclimatisation", "workload", "privacy", "clauses", "alerts"):
+        assert golden[name] is None

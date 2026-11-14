@@ -6,7 +6,8 @@ deliberately broken ones, so a guard that stopped looking would fail loudly inst
 
 from collections.abc import Iterator
 from datetime import date, time, timedelta
-from typing import Annotated, Any, get_args, get_origin
+from types import UnionType
+from typing import Annotated, Any, Union, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -112,15 +113,16 @@ def comparator_gaps(model_type: type[BaseModel], prefix: str = "") -> list[str]:
 
 def fits(safer: str, annotation: Any) -> bool:
     """Whether a ``Floor(safer=...)`` makes sense on a value of this type."""
-    if safer == "true":
+    if safer in ("true", "false"):
         return annotation is bool
-    if safer == "wider":
+    if safer in ("wider", "narrower"):
         arguments = get_args(annotation)
+        # A window of one ordered type; zero-padded text ("06-15") is allowed because it compares correctly as text.
         return (
             get_origin(annotation) is tuple
             and len(arguments) == 2
             and arguments[0] is arguments[1]
-            and is_ordered(arguments[0])
+            and (is_ordered(arguments[0]) or arguments[0] is str)
         )
     return is_ordered(annotation)  # "higher" and "lower"
 
@@ -128,8 +130,9 @@ def fits(safer: str, annotation: Any) -> bool:
 def floor_misfits(model_type: type[BaseModel], prefix: str = "") -> list[str]:
     """Floor fields (dotted paths) whose ``safer`` direction does not fit their type, descending into nested models.
 
-    ``true`` needs a bool, ``wider`` a pair of one ordered type (a window), ``higher`` and ``lower`` an ordered number,
-    date, time or duration. An Optional never fits: ``None`` cannot be compared.
+    ``true`` and ``false`` need a bool, ``wider`` and ``narrower`` a pair of one ordered type or of text (a window),
+    ``higher`` and ``lower`` an ordered number, date, time or duration. An Optional never fits: ``None`` cannot be
+    compared.
     """
     misfits: list[str] = []
     for name, info in model_type.model_fields.items():
@@ -140,10 +143,22 @@ def floor_misfits(model_type: type[BaseModel], prefix: str = "") -> list[str]:
     return misfits
 
 
+def optional_section(annotation: Any) -> type[RulesetSection] | None:
+    """The section class of ``X`` or ``X | None`` (exactly one section and optionally ``None``), else ``None``."""
+    if isinstance(annotation, type) and issubclass(annotation, RulesetSection):
+        return annotation
+    if get_origin(annotation) in (Union, UnionType):
+        arguments = [a for a in get_args(annotation) if a is not type(None)]
+        if len(arguments) == 1:
+            return optional_section(arguments[0])
+    return None
+
+
 def section_fields(ruleset_type: type[Ruleset] = Ruleset) -> dict[str, type[RulesetSection]]:
     """The value sections of a ruleset type; every other field must be named in ``NON_SECTION_FIELDS``.
 
-    A field that is neither (an Optional section, a tuple of sections, a bare model) is a failure: the source check,
+    A section may be ``X | None`` (the B3 sections are, so the released ae-heat-0.1 still loads). A field that is
+    neither (a table or tuple of sections, a bare model, a union with something else) is a failure: the source check,
     the golden file and the floor walk all look at sections only, so such a field would escape all three.
     """
     declared = ruleset_type.NON_SECTION_FIELDS
@@ -154,7 +169,7 @@ def section_fields(ruleset_type: type[Ruleset] = Ruleset) -> dict[str, type[Rule
             continue
         annotation = info.annotation
         problem = f"Ruleset.{name} is neither a RulesetSection nor listed in NON_SECTION_FIELDS: {annotation!r}"
-        assert isinstance(annotation, type), problem
-        assert issubclass(annotation, RulesetSection), problem
-        sections[name] = annotation
+        section = optional_section(annotation)
+        assert section is not None, problem
+        sections[name] = section
     return sections
