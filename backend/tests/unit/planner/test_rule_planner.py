@@ -31,6 +31,7 @@ from tests.unit.planner.support import (
     window_violations,
     zones_from,
 )
+from tests.unit.risk.support import released_ruleset
 
 pytestmark = pytest.mark.unit
 
@@ -462,3 +463,87 @@ def test_the_rest_rule_holds_on_a_seeded_sweep_of_random_days() -> None:
             shift == L1,
             [z.value for z in zones],
         )
+
+
+# ---- Feature B review P3 / P4: tick_rules and the no-value Art. 18 window ---------------------------------------
+
+
+def _rules_of(plan: CrewPlan, state: TickState) -> set[str]:
+    return {rule for s, rule in zip(plan.states, plan.tick_rules, strict=True) if s is state}
+
+
+def test_tick_rules_has_one_clause_id_per_tick_and_is_deterministic() -> None:
+    zones = zones_from(Zone.HIGH, ("09:00", Zone.RED), ("10:00", Zone.LOW))
+    plan = _plan(zones)
+    assert len(plan.tick_rules) == len(plan.states) == TICKS
+    assert plan == _plan(zones)
+
+
+def test_tick_rules_mapping_and_every_id_is_a_ruleset_clause() -> None:
+    clauses = released_ruleset().clauses
+    assert clauses is not None
+    zones = zones_from(Zone.HIGH, ("09:00", Zone.RED), ("10:00", Zone.LOW))
+    plan = _plan(zones, shift=(ShiftBlock(time(6, 0), time(18, 0)),))  # the ban 12:30-15:00 and a break are in it
+    assert _rules_of(plan, TickState.OFF) == {"P-H10"}
+    assert _rules_of(plan, TickState.BAN) == {"P-H1"}
+    assert _rules_of(plan, TickState.STOPPED) == {"STOP.red"}
+    assert _rules_of(plan, TickState.ART18_BREAK) == {"P-H3"}
+    assert _rules_of(plan, TickState.ADOSH_REST) <= {"P-H7.run", "P-H7.cap60"}
+    assert _rules_of(plan, TickState.WORK) == {"P-H7.run", "P-H7.cap60"}  # High (cycle) cells, then Low (self-paced)
+    assert set(plan.tick_rules) <= set(clauses.entries)
+    assert set(plan.rule_ids) <= set(clauses.entries)
+
+
+def test_work_in_a_cycle_cell_is_run_and_in_a_self_paced_cell_is_cap60() -> None:
+    assert _rules_of(_plan([Zone.HIGH] * TICKS), TickState.WORK) == {"P-H7.run"}
+    assert _rules_of(_plan([Zone.LOW] * TICKS), TickState.WORK) == {"P-H7.cap60"}
+    assert _rules_of(_plan([Zone.MEDIUM] * TICKS, workload="light"), TickState.WORK) == {"P-H7.cap60"}
+
+
+def test_adosh_rest_is_run_for_cycle_rest_and_cap60_when_only_the_window_cap_blocks() -> None:
+    assert _rules_of(_plan([Zone.HIGH] * TICKS), TickState.ADOSH_REST) == {"P-H7.run"}
+    # Low zone, no cycle: a tick the window cap blocks (the High hour ahead caps the windows) is cap60 rest
+    capped = _plan(zones_from(Zone.LOW, ("07:00", Zone.HIGH)))
+    assert _rules_of(capped, TickState.ADOSH_REST) >= {"P-H7.cap60"}
+
+
+def test_stop_rule_ids_per_tick() -> None:
+    lone = plan_crew(crew(headcount=1), timeline(JULY, [Zone.MEDIUM] * TICKS), rules(), local_date=JULY, tz=TZ)
+    assert _rules_of(lone, TickState.STOPPED) == {"P-H7.lone"}
+    members = (_member(experienced=False, days_on_site=1), _member(experienced=False, days_on_site=3))
+    no_acc = plan_crew(
+        crew(members=members, headcount=2), timeline(JULY, [Zone.HIGH] * TICKS), rules(), local_date=JULY, tz=TZ
+    )
+    assert _rules_of(no_acc, TickState.STOPPED) == {"STOP.no_acclimatised"}
+
+
+def test_fallback_ticks_keep_their_state_id_and_the_plan_keeps_fallback_high() -> None:
+    plan = plan_crew(crew(), fallback_timeline(JULY, TZ), rules(), local_date=JULY, tz=TZ)
+    assert "FALLBACK.high" in plan.rule_ids
+    assert _rules_of(plan, TickState.WORK) == {"P-H7.run"}
+    assert "FALLBACK.high" not in plan.tick_rules
+
+
+def test_art18_break_goes_to_a_window_with_no_twl_value_as_the_hottest() -> None:
+    # A fallback hour has no TWL value and is assumed High, so it is the hottest window (protective): it beats a real
+    # dip of 100 W/m2 elsewhere in the feasible start range (08:30-11:00).
+    twl = [150.0] * TICKS
+    for i in range(idx("11:00"), idx("12:00")):
+        twl[i] = 100.0
+    for i in range(idx("09:30"), idx("10:30")):
+        twl[i] = math.nan
+    zones = [Zone.LOW] * TICKS
+    plan = plan_crew(crew(B0), timeline(JULY, zones, twl=twl), rules(), local_date=JULY, tz=TZ)
+    assert spans(plan, A18) == [("09:30", "10:30")]
+    assert all_violations(plan, zones, B0, JULY, "heavy") == []
+
+
+def test_a_shift_block_outside_the_grid_cannot_reach_the_planner() -> None:
+    with pytest.raises(ValueError, match="grid"):
+        crew((ShiftBlock(time(3, 0), time(9, 0)),))
+    with pytest.raises(ValueError, match="grid"):
+        crew((ShiftBlock(time(22, 0), time(23, 0)),))
+    edge = crew((ShiftBlock(time(4, 0), time(22, 0)),))  # the grid edges are legal
+    assert (
+        plan_crew(edge, timeline(OCTOBER, [Zone.LOW] * TICKS), rules(), local_date=OCTOBER, tz=TZ).art18_minutes == 180
+    )

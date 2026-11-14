@@ -2,7 +2,8 @@
 
 A day is a grid of 216 five-minute ticks from 04:00 local (``ticks.day_ticks``). Every instant is timezone-aware UTC;
 shift times are local ``time`` values converted with the site's ``ZoneInfo`` at the edge. Pure data: the only behavior
-here is ``ZoneTimeline``'s length checks and ``with_zones``.
+here is the input checks of the types (shift blocks inside the grid, members, tick rules) and ``ZoneTimeline``'s
+length checks and ``with_zones``.
 """
 
 import math
@@ -15,6 +16,10 @@ from typing import Literal, Self
 from stellar_blaze.domain.risk.levels import Zone
 
 Workload = Literal["light", "moderate", "heavy"]
+
+GRID_START = time(4, 0)
+GRID_END = time(22, 0)
+"""The local planning grid: a day plan covers 04:00-22:00 (216 ticks); a shift block may not reach outside it."""
 
 
 class TickState(StrEnum):
@@ -35,6 +40,18 @@ class ShiftBlock:
     start: time
     end: time
 
+    def __post_init__(self) -> None:
+        if not self.start < self.end:
+            raise ValueError(f"a shift block must start before it ends, got {self.start}-{self.end}")
+        if self.start < GRID_START:
+            raise ValueError(
+                f"a shift block starts before {GRID_START:%H:%M}, the start of the planning grid ({self.start:%H:%M})"
+            )
+        if self.end > GRID_END:
+            raise ValueError(
+                f"a shift block ends after {GRID_END:%H:%M}, the end of the planning grid ({self.end:%H:%M})"
+            )
+
 
 @dataclass(frozen=True)
 class CrewMember:
@@ -50,6 +67,14 @@ class CrewMember:
     experienced: bool
     juvenile: bool
 
+    def __post_init__(self) -> None:
+        if self.days_on_site < 0 or self.days_away < 0:
+            raise ValueError("days_on_site and days_away must not be negative")
+        if (self.days_away > 0) != (self.away_reason != "none"):
+            raise ValueError(
+                'days_away > 0 needs away_reason "leave" or "illness", and days_away == 0 needs away_reason "none"'
+            )
+
 
 @dataclass(frozen=True)
 class CrewSpec:
@@ -62,6 +87,14 @@ class CrewSpec:
     shift: tuple[ShiftBlock, ...]
     days_per_week: int
     members: tuple[CrewMember, ...] | None = None
+
+    def __post_init__(self) -> None:
+        for before, after in zip(self.shift, self.shift[1:], strict=False):
+            if after.start < before.end:
+                raise ValueError(
+                    f"shift blocks must be sorted and must not overlap, got {before.start:%H:%M}-{before.end:%H:%M} "
+                    f"then {after.start:%H:%M}-{after.end:%H:%M}"
+                )
 
 
 @dataclass(frozen=True)
@@ -124,7 +157,11 @@ class ZoneTimeline:
 
 @dataclass(frozen=True)
 class CrewPlan:
-    """The planned state of every tick of one crew's day, with the rules that fired and the minute counters."""
+    """The planned state of every tick of one crew's day, with the rules that fired and the minute counters.
+
+    ``rule_ids`` is the sorted set of rule ids that fired in the day. ``tick_rules`` is the ruleset clause id behind
+    each tick, parallel to ``states`` (``()`` for a plan that does not carry it, such as a typed roster).
+    """
 
     crew_id: str
     local_date: date
@@ -138,3 +175,8 @@ class CrewPlan:
     adosh_rest_minutes: int
     art18_minutes: int
     stopped_minutes: int
+    tick_rules: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.tick_rules and len(self.tick_rules) != len(self.states):
+            raise ValueError(f"tick_rules needs one rule id per tick ({len(self.states)}), got {len(self.tick_rules)}")

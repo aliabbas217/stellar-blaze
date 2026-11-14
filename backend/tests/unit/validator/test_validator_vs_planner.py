@@ -16,9 +16,11 @@ from hypothesis import strategies as st
 
 from stellar_blaze.domain.planner.rule_planner import plan_crew
 from stellar_blaze.domain.plans.model import CrewMember, CrewSpec, ShiftBlock, TickState, Workload, ZoneTimeline
+from stellar_blaze.domain.plans.rules import PlannerRules
 from stellar_blaze.domain.risk.levels import Zone
 from stellar_blaze.domain.validator.validator import ValidationResult, validate_plan
 from tests.unit.validator.support import (
+    B0,
     EXPERIENCED,
     L1,
     L1_EVENING,
@@ -67,10 +69,13 @@ TIMELINES: dict[str, list[Zone]] = {
 }
 
 
-def _validate(crew: CrewSpec, zones: list[Zone], local_date: date) -> tuple[ValidationResult, str]:
+def _validate(
+    crew: CrewSpec, zones: list[Zone], local_date: date, *, rules: PlannerRules | None = None
+) -> tuple[ValidationResult, str]:
+    rules = rules if rules is not None else rules_of()
     timeline = _timeline(zones, local_date)
-    plan = plan_crew(crew, timeline, rules_of(), local_date=local_date, tz=DUBAI)
-    result = validate_plan(plan, timeline, crew, rules_of(), clauses_of(), published_shift=crew.shift)
+    plan = plan_crew(crew, timeline, rules, local_date=local_date, tz=DUBAI)
+    result = validate_plan(plan, timeline, crew, rules, clauses_of(), published_shift=crew.shift, tz=DUBAI)
     summary = "; ".join(f"{v.rule_id} {v.tick_ranges[:2]} {v.detail}" for v in result.violations)
     return result, summary
 
@@ -247,3 +252,63 @@ def test_rest_after_a_high_run_is_not_shortened_when_the_zone_eases() -> None:
     zones[54:57] = [Zone.HIGH] * 3
     result, summary = _validate(_crew("heavy", 2, L1, days=5), zones, SUMMER)
     assert result.passed, summary
+
+
+@settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(
+    zones=_zone_sequences(),
+    headcount=st.integers(1, 20),
+    workload=st.sampled_from(WORKLOADS),
+    shift_name=st.sampled_from(sorted(LEGAL_SHIFTS)),
+    low_rest=st.sampled_from([0, 5, 10]),
+)
+def test_voluntary_low_zone_rest_plans_always_pass_property(
+    zones: list[Zone], headcount: int, workload: Workload, shift_name: str, low_rest: int
+) -> None:
+    """The Low-zone voluntary rest tunable lowers the Low cap (60 - rest); both sides read it through the rules."""
+    crew = _crew(workload, headcount, LEGAL_SHIFTS[shift_name])
+    result, summary = _validate(crew, zones, SUMMER, rules=rules_of(low_zone_voluntary_rest_min=low_rest))
+    assert result.passed, f"{shift_name} {workload} headcount={headcount} low_rest={low_rest}: {summary}"
+
+
+@st.composite
+def _members_with_minors(draw: st.DrawFn) -> CrewMember:
+    reason = draw(st.sampled_from(["none", "leave", "illness"]))
+    return CrewMember(
+        days_on_site=draw(st.integers(1, 12)),
+        days_away=0 if reason == "none" else draw(st.integers(1, 30)),
+        away_reason=reason,  # type: ignore[arg-type]
+        experienced=draw(st.booleans()),
+        juvenile=draw(st.booleans()),
+    )
+
+
+@settings(max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(
+    zones=_zone_sequences(),
+    crew_members=st.lists(_members_with_minors(), min_size=1, max_size=14).map(tuple),
+    workload=st.sampled_from(WORKLOADS),
+    day_name=st.sampled_from(sorted(DATES)),
+)
+def test_plans_for_crews_with_minors_have_no_plan_violations_property(
+    zones: list[Zone], crew_members: tuple[CrewMember, ...], workload: Workload, day_name: str
+) -> None:
+    """L1 starts before 07:00, so a minor makes the SHIFT illegal (shift origin, 422); the plan itself must be clean."""
+    crew = _crew(workload, len(crew_members), L1, members=crew_members)
+    result, summary = _validate(crew, zones, DATES[day_name])
+    assert not result.plan_violations, f"{day_name} {workload} members={crew_members}: {summary}"
+    if any(m.juvenile for m in crew_members):
+        assert {v.rule_id for v in result.shift_violations} >= {"P-H5.window"}
+
+
+@pytest.mark.parametrize("days", [5, 6])
+@pytest.mark.parametrize("workload", WORKLOADS)
+@pytest.mark.parametrize("timeline", sorted(TIMELINES))
+def test_b0_planned_by_the_planner_validates_clean_with_its_break(timeline: str, workload: Workload, days: int) -> None:
+    """R-AB: B0 (06:00-12:30 + 15:00-17:00) is illegal as typed, but the plan with its Art. 18 break passes."""
+    crew = _crew(workload, 8, B0, days=days)
+    result, summary = _validate(crew, TIMELINES[timeline], SUMMER)
+    assert result.passed, summary
+    plan = plan_crew(crew, _timeline(TIMELINES[timeline], SUMMER), rules_of(), local_date=SUMMER, tz=DUBAI)
+    if timeline in ("all-low", "all-medium"):
+        assert plan.art18_minutes >= 60  # the break that makes the shift legal is really in the plan

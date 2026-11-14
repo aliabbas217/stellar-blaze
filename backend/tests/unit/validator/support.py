@@ -7,6 +7,7 @@ import dataclasses
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, time
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from stellar_blaze.domain.plans.model import (
     CrewMember,
@@ -33,6 +34,37 @@ L1_EVENING = (ShiftBlock(time(6, 0), time(11, 0)), ShiftBlock(time(15, 30), time
 B0 = (ShiftBlock(time(6, 0), time(12, 30)), ShiftBlock(time(15, 0), time(17, 0)))
 
 EXPERIENCED = CrewMember(days_on_site=30, days_away=0, away_reason="none", experienced=True, juvenile=False)
+
+
+def day_start(local_date: date) -> datetime:
+    """04:00 Asia/Dubai of ``local_date`` as UTC (00:00 UTC)."""
+    return datetime.combine(local_date, time(0, 0), tzinfo=UTC)
+
+
+def in_ban_season(local_date: date) -> bool:
+    return "06-15" <= f"{local_date.month:02d}-{local_date.day:02d}" <= "09-15"
+
+
+def shift_plan(
+    *blocks: tuple[str, str, TickState],
+    shift: tuple[ShiftBlock, ...] = L1,
+    local_date: date = WINTER,
+    inside: TickState = TickState.STOPPED,
+) -> tuple[TickState, ...]:
+    """A plan consistent with ``shift``: ``OFF`` outside it, ``BAN`` in the ban window (in season), ``inside`` else.
+
+    The blocks are painted on top, so a test changes only what it means to break.
+    """
+    out = [TickState.OFF] * TICKS
+    for i in range(TICKS):
+        minute = 240 + 5 * i
+        if any(b.start.hour * 60 + b.start.minute <= minute < b.end.hour * 60 + b.end.minute for b in shift):
+            banned = in_ban_season(local_date) and 12 * 60 + 30 <= minute < 15 * 60
+            out[i] = TickState.BAN if banned else inside
+    for start, end, state in blocks:
+        for i in range(at(start), at(end)):
+            out[i] = state
+    return tuple(out)
 
 
 def at(hhmm: str) -> int:
@@ -68,6 +100,7 @@ def plan_of(
     local_date: date = SUMMER,
     restrictions: tuple[str, ...] = (),
     restricted_headcount: int = 0,
+    start_utc: datetime = START_UTC,
 ) -> CrewPlan:
     """A hand-built plan around ``tick_states`` with consistent minute counters and nothing declared."""
 
@@ -77,7 +110,7 @@ def plan_of(
     return CrewPlan(
         crew_id="crew-t",
         local_date=local_date,
-        start_utc=START_UTC,
+        start_utc=start_utc,
         states=tick_states,
         rule_ids=(),
         status="rule",
@@ -115,11 +148,14 @@ def uniform(zone: Zone) -> ZoneTimeline:
 def crew_of(
     *,
     workload: Workload = "heavy",
-    headcount: int = 20,
+    headcount: int | None = None,
     shift: tuple[ShiftBlock, ...] = L1,
     days_per_week: int = 6,
     members: tuple[CrewMember, ...] | None = None,
 ) -> CrewSpec:
+    """A crew; the headcount is the member count when members are listed, else 20."""
+    if headcount is None:
+        headcount = 20 if members is None else len(members)
     return CrewSpec(
         crew_id="crew-t",
         employer_id="emp-t",
@@ -148,8 +184,9 @@ def member(
     )
 
 
-def rules_of() -> PlannerRules:
-    return planner_rules(released_ruleset(), default_params())
+def rules_of(**params: int) -> PlannerRules:
+    """The released ruleset's rules; keyword arguments override effective tunables (``low_zone_voluntary_rest_min``)."""
+    return planner_rules(released_ruleset(), dataclasses.replace(default_params(), **params))
 
 
 def clauses_of() -> Mapping[str, ClauseRef]:
@@ -170,7 +207,14 @@ def run_validator(
     *,
     rules: PlannerRules | None = None,
     published_shift: tuple[ShiftBlock, ...] | None = None,
+    tz: ZoneInfo | None = None,
 ) -> ValidationResult:
+    """Validate with the clock of the plan's date: a default-clock plan or timeline is moved to ``local_date`` 04:00."""
+    start = day_start(plan.local_date)
+    if plan.start_utc == START_UTC:
+        plan = dataclasses.replace(plan, start_utc=start)
+    if zones.start_utc == START_UTC:
+        zones = dataclasses.replace(zones, start_utc=start)
     return validate_plan(
         plan,
         zones,
@@ -178,6 +222,7 @@ def run_validator(
         rules if rules is not None else rules_of(),
         clauses_of(),
         published_shift=published_shift,
+        tz=tz,
     )
 
 

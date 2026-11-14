@@ -1,15 +1,16 @@
 """The rule-based crew planner: one crew, one local day, 5-minute ticks (ADR 0011 section 2, ADR 0046 decisions 7-8).
 
 Pure and deterministic: no I/O, no clock, no randomness. The planner never moves a shift edge and never adds work
-(P-H10);
-a Low zone or Green level is a bound, not a pace. It must not import ``stellar_blaze.domain.validator``: the validator
-re-implements every definition below independently from the same ``PlannerRules`` and zone timeline.
+(P-H10); a Low zone or Green level is a bound, not a pace. It must not import ``stellar_blaze.domain.validator``: the
+validator re-implements every definition below independently from the same ``PlannerRules`` and zone timeline. It
+implements the protective Art. 18 reading only: it raises ``NotImplementedError`` if a ruleset sets either
+``art18_*_counts_as_break`` switch (both are floors, so no pinned ruleset can).
 
 Definitions
 -----------
 * **Attendance ticks** ``A``: shift ticks outside the ban window. Their state is never ``OFF`` or ``BAN``. A tick
-  outside
-  the shift is ``OFF`` (also inside the ban window: OFF wins), a shift tick inside the ban window in season is ``BAN``.
+  outside the shift is ``OFF`` (also inside the ban window: OFF wins), a shift tick inside the ban window in season
+  is ``BAN``.
 * **Windows**: every 12 consecutive ticks inside the 216-tick grid, sliding by one tick (start index 0..204).
 * **Rolling cap (ADR 0011 section 2, with lookahead)**: ``M(w)`` is the most severe zone among the ticks of ``w`` that
   are in ``A`` and are not Red; work in ``w`` is at most ``cap_minutes(M(w), workload)``. A window with no such tick has
@@ -21,10 +22,9 @@ Definitions
   ``OFF`` ticks outside the ban window (a ban gap and ADOSH rest are never credited). A run is measured in attendance
   ticks (ban ticks and short OFF gaps inside it are not counted). A run longer than ``art18_max_run_h`` gets
   ``art18_break_h`` of ``ART18_BREAK`` in blocks of consecutive attendance ticks, placed greedily at the window of
-  lowest
-  mean ``protective_twl_w_m2`` (NaN ignored; a window with no value ranks last; ties: earliest) such that the side
-  before
-  has at most ``art18_max_run_h``, the side after can still be covered by the fewest further breaks, and neither side is
+  lowest mean ``protective_twl_w_m2`` (NaN ignored; a window with no value at all, a fallback hour, ranks hottest;
+  ties: earliest) such that the side before has at most ``art18_max_run_h``, the side after can still be covered by
+  the fewest further breaks, and neither side is
   empty; repeated on the remainder. If no such window exists the planner raises rather than emit a plan the
   validator would reject.
 
@@ -42,6 +42,10 @@ ticks, Red and zones without a cycle contribute nothing. Every non-work tick cou
 when the zone eases and never extended later. Self-paced cells (no cycle) have no pending rest: a cap-blocked tick is
 simply ``ADOSH_REST``.
 
+``CrewPlan.tick_rules`` holds one ruleset clause id per tick: ``OFF`` ``P-H10``, ``BAN`` ``P-H1``, ``ART18_BREAK``
+``P-H3``, ``STOPPED`` the stop rule, ``ADOSH_REST`` ``P-H7.run`` (cycle or run-limit rest) or ``P-H7.cap60`` (only the
+window cap blocks work), ``WORK`` ``P-H7.run`` in a cell with a cycle and ``P-H7.cap60`` in a self-paced cell.
+
 ``CrewPlan.rule_ids`` is the sorted tuple of the distinct rule ids that fired in the day (``P-H1`` ban, ``P-H3`` Art.
 18, ``P-H7.run`` cycle rest, ``P-H7.cap60`` window-cap rest, ``STOP.red``, ``P-H7.lone`` / ``STOP.no_acclimatised``,
 ``FALLBACK.high``). People rules (``restricted_headcount``, ``restrictions``) never change tick states except through
@@ -55,7 +59,16 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from stellar_blaze.domain.plans.model import CrewMember, CrewPlan, CrewSpec, TickState, Workload, ZoneTimeline
+from stellar_blaze.domain.plans.model import (
+    GRID_END,
+    GRID_START,
+    CrewMember,
+    CrewPlan,
+    CrewSpec,
+    TickState,
+    Workload,
+    ZoneTimeline,
+)
 from stellar_blaze.domain.plans.rules import PlannerRules
 from stellar_blaze.domain.plans.ticks import TICK_MINUTES, day_ticks, in_ban
 from stellar_blaze.domain.risk.levels import Zone
@@ -172,7 +185,7 @@ def _art18_runs(attend: list[bool], ban: list[bool], credit_ticks: int) -> list[
 
 def _window_score(twl: tuple[float, ...], start: int, length: int) -> float:
     values = [v for v in twl[start : start + length] if not isnan(v)]
-    return sum(values) / len(values) if values else float("inf")
+    return sum(values) / len(values) if values else float("-inf")  # no value (fallback hour): assumed hottest
 
 
 def _break_starts(run: list[int], twl: tuple[float, ...], max_run: int, break_ticks: int) -> list[int]:
@@ -276,6 +289,8 @@ def _shift_ticks(crew: CrewSpec, local_date: date, tz: ZoneInfo, start_utc: date
     for blk in crew.shift:
         if blk.start >= blk.end:
             raise ValueError(f"shift block must start before it ends, got {blk.start}-{blk.end}")
+        if blk.start < GRID_START or blk.end > GRID_END:  # ShiftBlock rejects this too; defence in depth
+            raise ValueError(f"shift block {blk.start}-{blk.end} is outside the planning grid {GRID_START}-{GRID_END}")
         spans.append(
             (
                 datetime.combine(local_date, blk.start, tzinfo=tz).astimezone(UTC),
@@ -290,8 +305,11 @@ def plan_crew(crew: CrewSpec, zones: ZoneTimeline, rules: PlannerRules, *, local
     """The rule plan of ``crew`` on ``local_date``: one ``TickState`` per 5-minute tick of the 216-tick day grid.
 
     Raises:
-        ValueError: The timeline is not the day grid of ``local_date`` in ``tz``, a shift block ends before it starts,
-            ``crew.members`` does not match ``crew.headcount``, or no Art. 18 break can be placed.
+        ValueError: The timeline is not the day grid of ``local_date`` in ``tz``, a shift block ends before it starts or
+            lies outside the 04:00-22:00 grid, ``crew.members`` does not match ``crew.headcount``, or no Art. 18 break
+            can be placed.
+        NotImplementedError: A ruleset switch ``art18_ban_gap_counts_as_break`` or ``art18_adosh_rest_counts_as_break``
+            is on: the planner implements the protective reading only (both are floors and cannot be switched on).
     """
     grid = day_ticks(local_date, tz)
     n = int(grid.size)
@@ -320,27 +338,32 @@ def plan_crew(crew: CrewSpec, zones: ZoneTimeline, rules: PlannerRules, *, local
     placed = [0] * len(caps)
     pacer = _Pacer(rules, crew.workload)
     states: list[TickState] = []
+    tick_rules: list[str] = []
     fired: set[str] = set()
 
     for i in range(n):
         zone = zones.zones[i]
         if not on_shift[i]:
             states.append(TickState.OFF)
+            tick_rules.append("P-H10")  # outside the published shift: no added minutes
             pacer.non_work(None)
             continue
         if ban_window[i]:
             states.append(TickState.BAN)
+            tick_rules.append("P-H1")
             fired.add("P-H1")
             pacer.non_work(None)
             continue
         if i in break_at:
             states.append(TickState.ART18_BREAK)
+            tick_rules.append("P-H3")
             fired.add("P-H3")
             pacer.non_work(zone)
             continue
         stop = _stop_rule(zone, people, rules)
         if stop is not None:
             states.append(TickState.STOPPED)
+            tick_rules.append(stop)
             fired.add(stop)
             pacer.non_work(zone)
             continue
@@ -348,12 +371,15 @@ def plan_crew(crew: CrewSpec, zones: ZoneTimeline, rules: PlannerRules, *, local
         cap_ok = _fits(caps, placed, windows)
         if pacer.cycle_allows(zone) and cap_ok:
             states.append(TickState.WORK)
+            tick_rules.append("P-H7.run" if pacer.work_limit(zone) is not None else "P-H7.cap60")
             for w in windows:
                 placed[w] += 1
             pacer.work(zone)
             continue
+        rest_rule = "P-H7.cap60" if pacer.cycle_allows(zone) else "P-H7.run"  # cap60: only the window cap blocks work
         states.append(TickState.ADOSH_REST)
-        fired.add("P-H7.cap60" if pacer.cycle_allows(zone) else "P-H7.run")
+        tick_rules.append(rest_rule)
+        fired.add(rest_rule)
         pacer.non_work(zone)
 
     fallback = zones.source == "fallback" or any(a and f for a, f in zip(attend, zones.fallback, strict=True))
@@ -376,6 +402,7 @@ def plan_crew(crew: CrewSpec, zones: ZoneTimeline, rules: PlannerRules, *, local
         adosh_rest_minutes=minutes(TickState.ADOSH_REST),
         art18_minutes=minutes(TickState.ART18_BREAK),
         stopped_minutes=minutes(TickState.STOPPED),
+        tick_rules=tuple(tick_rules),
     )
 
 

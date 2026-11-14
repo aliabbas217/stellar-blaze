@@ -13,7 +13,6 @@ from zoneinfo import ZoneInfo
 
 from stellar_blaze.domain.plans.model import CrewPlan, TickState
 from stellar_blaze.domain.plans.ticks import TICK_MINUTES
-from stellar_blaze.domain.rules.ruleset import LabourRules
 
 MAX_LINES: Final = 40
 _DAY_START_MINUTE: Final = 4 * 60
@@ -128,16 +127,14 @@ def plan_from_segments(
     *,
     local_date: date,
     tz: ZoneInfo,
-    labour: LabourRules,
 ) -> CrewPlan:
     """The day plan a roster text states: ``work`` is ``WORK``, ``rest`` ``ADOSH_REST``, ``break`` ``ART18_BREAK``.
 
     Ticks that no line covers are ``OFF``. Nothing is rewritten for the ban: a ``work`` typed into the midday ban
-    window stays ``WORK`` so that the validator's ``P-H1`` fires on it. ``labour`` is part of the call contract (Task 10
-    passes the ruleset's labour section) but no ban state is derived from it, because the validator reads the ban
-    window from the same section itself. The plan declares no restrictions: it is a raw typed plan to be validated.
+    window stays ``WORK`` so that the validator's ``P-H1`` fires on it (the validator reads the ban window from the
+    ruleset itself). The plan declares no restrictions and carries the placeholder ``crew_id`` ``"roster-text"``: call
+    ``validator.declare_restrictions`` and ``dataclasses.replace`` before validating a typed plan for a real crew.
     """
-    del labour  # accepted for the call contract; ban ticks are deliberately left as typed (see the docstring)
     states = [TickState.OFF] * _DAY_TICKS
     for segment in segments:
         first = (_minutes(segment.start) - _DAY_START_MINUTE) // TICK_MINUTES

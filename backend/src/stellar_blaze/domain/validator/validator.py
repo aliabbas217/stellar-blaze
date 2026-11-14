@@ -28,9 +28,10 @@ Definitions (the controller's task-6 definitions, settled once for planner and v
 
 import math
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
-from datetime import date, time
+from dataclasses import dataclass, replace
+from datetime import date, time, timedelta
 from typing import Final, Literal
+from zoneinfo import ZoneInfo
 
 from stellar_blaze.domain.plans.model import CrewMember, CrewPlan, CrewSpec, ShiftBlock, TickState, ZoneTimeline
 from stellar_blaze.domain.plans.rules import PlannerRules
@@ -49,6 +50,8 @@ checks). It is documentation only: the partition uses ``Violation.origin``, beca
 
 _DAY_TICKS: Final = 216  # the 04:00-22:00 grid of domain.plans.ticks (a test pins the equality)
 _DAY_START_MINUTE: Final = 4 * 60
+_DAY_END_MINUTE: Final = 22 * 60
+_DEFAULT_TZ: Final = ZoneInfo("Asia/Dubai")
 _WINDOW_TICKS: Final = 12  # 60 minutes
 _ATTENDANCE: Final = frozenset({TickState.WORK, TickState.ADOSH_REST, TickState.STOPPED})
 _HOT: Final = frozenset({Zone.MEDIUM, Zone.HIGH})
@@ -109,6 +112,8 @@ class _Day:
     states: tuple[TickState, ...]
     zones: tuple[Zone, ...]
     ban: tuple[bool, ...]
+    wall: tuple[int, ...]
+    """The local wall-clock minute of the day at the start of each tick (timeline clock and zone)."""
     in_ban_season: bool
     crew: CrewSpec
     rules: PlannerRules
@@ -118,12 +123,8 @@ class _Day:
         return tuple(s is not TickState.OFF and s is not TickState.BAN for s in self.states)
 
 
-def _minute(tick: int) -> int:
-    return _DAY_START_MINUTE + TICK_MINUTES * tick
-
-
-def _label(tick: int) -> str:
-    minute = _minute(tick)
+def _label(day: _Day, tick: int) -> str:
+    minute = day.wall[tick]
     return f"{minute // 60:02d}:{minute % 60:02d}"
 
 
@@ -159,7 +160,9 @@ def _p_h1(day: _Day) -> list[_Finding]:
     if not ticks:
         return []
     return [
-        _Finding("P-H1", _ranges(ticks), f"work in the midday ban window from {_label(ticks[0])} ({len(ticks)} ticks)")
+        _Finding(
+            "P-H1", _ranges(ticks), f"work in the midday ban window from {_label(day, ticks[0])} ({len(ticks)} ticks)"
+        )
     ]
 
 
@@ -181,8 +184,8 @@ def _cap60(day: _Day) -> list[_Finding]:
             bad_ticks.update(window)
             if first is None:
                 first = (
-                    f"{work} min of work in the 60 minutes from {_label(start)}, over the {cap} min cap of the most "
-                    f"severe zone touched ({worst.name})"
+                    f"{work} min of work in the 60 minutes from {_label(day, start)}, over the {cap} min cap of the "
+                    f"most severe zone touched ({worst.name})"
                 )
     if first is None:
         return []
@@ -220,7 +223,7 @@ def _run(day: _Day) -> list[_Finding]:
             _Finding(
                 "P-H7.run",
                 _ranges(too_long),
-                f"work run longer than the cycle's work length from {_label(too_long[0])} "
+                f"work run longer than the cycle's work length from {_label(day, too_long[0])} "
                 f"({day.zones[too_long[0]].name}, {day.crew.workload})",
             )
         )
@@ -229,7 +232,7 @@ def _run(day: _Day) -> list[_Finding]:
             _Finding(
                 "P-H7.run",
                 _ranges(too_soon),
-                f"work resumes at {_label(too_soon[0])} before the full cycle rest has passed",
+                f"work resumes at {_label(day, too_soon[0])} before the full cycle rest has passed",
             )
         )
     return out
@@ -239,12 +242,21 @@ def _stop_red(day: _Day) -> list[_Finding]:
     ticks = _work_ticks(day, zones=frozenset({Zone.RED}))
     if not ticks:
         return []
-    return [_Finding("STOP.red", _ranges(ticks), f"work in a Red tick from {_label(ticks[0])}")]
+    return [_Finding("STOP.red", _ranges(ticks), f"work in a Red tick from {_label(day, ticks[0])}")]
+
+
+def _available_acclimatised(day: _Day) -> int:
+    """How many members can do Medium/High work: everyone when the crew lists none (all acclimatised adults)."""
+    members = day.crew.members
+    if members is None:
+        return day.crew.headcount
+    return sum(1 for m in members if _is_acclimatised(m, day.rules, in_ban_season=day.in_ban_season))
 
 
 def _lone(day: _Day) -> list[_Finding]:
+    """Medium/High work needs at least ``lone_work_min_headcount`` acclimatised members available (V1)."""
     minimum = day.rules.lone_work_min_headcount
-    if day.crew.headcount >= minimum:
+    if _available_acclimatised(day) >= minimum:
         return []
     ticks = _work_ticks(day, zones=_HOT)
     if not ticks:
@@ -253,7 +265,8 @@ def _lone(day: _Day) -> list[_Finding]:
         _Finding(
             "P-H7.lone",
             _ranges(ticks),
-            f"work in Medium/High from {_label(ticks[0])} with a headcount of {day.crew.headcount} (minimum {minimum})",
+            f"work in Medium/High from {_label(day, ticks[0])} with fewer than {minimum} acclimatised members "
+            "available",
         )
     ]
 
@@ -285,6 +298,11 @@ def _reacclimatisation_band(member: CrewMember) -> str:
     return "gt20"
 
 
+def _ramp_key(ramp: Mapping[str, int], day: int) -> str:
+    """The table key of ``day``, clamped to the table's last day (the ruleset validates the keys '1'..'n')."""
+    return str(min(day, max(int(key) for key in ramp)))
+
+
 def _ramp_share(member: CrewMember, rules: PlannerRules) -> int:
     """The share of the full assignment the member may do today (percent), from the acclimatisation tables."""
     table = rules.acclimatisation
@@ -295,7 +313,7 @@ def _ramp_share(member: CrewMember, rules: PlannerRules) -> int:
         shares.append(table.reacclimatisation_pct.get(f"{_reacclimatisation_band(member)}.{day}", 100))
     if not _has_away_period(member) or not member.experienced:
         ramp = table.experienced_ramp_pct if member.experienced else table.new_ramp_pct
-        shares.append(ramp[str(min(day, 5))])
+        shares.append(ramp[_ramp_key(ramp, day)])
     return min(shares)
 
 
@@ -307,7 +325,7 @@ def _is_acclimatised(member: CrewMember, rules: PlannerRules, *, in_ban_season: 
         return False
     if member.experienced:
         return True
-    return table.new_ramp_pct[str(min(max(member.days_on_site, 1), 5))] >= 100
+    return table.new_ramp_pct[_ramp_key(table.new_ramp_pct, max(member.days_on_site, 1))] >= 100
 
 
 def _unacclimatised_work(day: _Day) -> list[_Finding]:
@@ -323,7 +341,7 @@ def _unacclimatised_work(day: _Day) -> list[_Finding]:
         _Finding(
             "P-H7.unacclimatised",
             _ranges(ticks),
-            f"work in Medium/High from {_label(ticks[0])} while the crew has no acclimatised member",
+            f"work in Medium/High from {_label(day, ticks[0])} while the crew has no acclimatised member",
         )
     ]
 
@@ -394,7 +412,7 @@ def _art18(day: _Day) -> list[_Finding]:
         _Finding(
             "P-H3",
             spans,
-            f"attendance run from {_label(spans[0][0])} to {_label(spans[0][1])} is longer than {limit:g} h "
+            f"attendance run from {_label(day, spans[0][0])} to {_label(day, spans[0][1])} is longer than {limit:g} h "
             "without a credited 1 h break",
         )
     ]
@@ -444,14 +462,14 @@ def _juvenile(day: _Day) -> list[_Finding]:
     labour = day.rules.labour
     start, end = (_minutes_of(t) for t in labour.juvenile_window)
     out: list[_Finding] = []
-    outside = [i for i, a in enumerate(day.attendance) if a and not start <= _minute(i) < end]
+    outside = [i for i, a in enumerate(day.attendance) if a and not start <= day.wall[i] < end]
     if outside:
         out.append(
             _Finding(
                 "P-H5.window",
                 _ranges(outside),
                 f"juvenile attendance outside {labour.juvenile_window[0]:%H:%M}-{labour.juvenile_window[1]:%H:%M} "
-                f"from {_label(outside[0])}",
+                f"from {_label(day, outside[0])}",
                 "shift",
             )
         )
@@ -471,31 +489,33 @@ def _juvenile(day: _Day) -> list[_Finding]:
             _Finding(
                 "P-H5.run",
                 spans,
-                f"juvenile attendance run from {_label(spans[0][0])} is longer than {labour.juvenile_max_run_h:g} h",
+                f"juvenile attendance run from {_label(day, spans[0][0])} is longer than "
+                f"{labour.juvenile_max_run_h:g} h",
                 "shift",
             )
         )
     return out
 
 
-def _declarations(day: _Day) -> list[_Finding]:
-    """People rules are declared restrictions: the plan must name the rules that restrict members, and how many."""
-    members = day.crew.members
-    if not members:
-        return []
-    rules = day.rules
-    heavy_days = rules.acclimatisation.heavy_work_after_days
+def _required_restrictions(crew: CrewSpec, rules: PlannerRules, *, in_ban_season: bool) -> dict[str, list[int]]:
+    """The restriction ids that the members require (rule id to member indexes), in a fixed order."""
     required: dict[str, list[int]] = {"P-H8.ramp": [], "P-H8.heavy7": [], "P-H5.hours": [], "P-H7.unacclimatised": []}
-    for index, m in enumerate(members):
-        juvenile_in_season = m.juvenile and day.in_ban_season
+    heavy_days = rules.acclimatisation.heavy_work_after_days
+    for index, m in enumerate(crew.members or ()):
         if _ramp_share(m, rules) < 100:
             required["P-H8.ramp"].append(index)
-        if day.crew.workload == "heavy" and (not m.experienced or _is_returning(m)) and m.days_on_site < heavy_days:
+        if crew.workload == "heavy" and (not m.experienced or _is_returning(m)) and m.days_on_site < heavy_days:
             required["P-H8.heavy7"].append(index)
-        if juvenile_in_season:
+        if m.juvenile and in_ban_season:
             required["P-H5.hours"].append(index)
-        elif not _is_acclimatised(m, rules, in_ban_season=day.in_ban_season):
+        elif not _is_acclimatised(m, rules, in_ban_season=in_ban_season):
             required["P-H7.unacclimatised"].append(index)
+    return required
+
+
+def _declarations(day: _Day) -> list[_Finding]:
+    """People rules are declared restrictions: the plan must name the rules that restrict members, and how many."""
+    required = _required_restrictions(day.crew, day.rules, in_ban_season=day.in_ban_season)
     flagged = {index for indexes in required.values() for index in indexes}
     needed = [rule_id for rule_id, indexes in required.items() if indexes]
     declared = set(day.plan.restrictions)
@@ -508,7 +528,7 @@ def _declarations(day: _Day) -> list[_Finding]:
                 _Finding(
                     rule_id,
                     hot_work if rule_id == "P-H7.unacclimatised" else all_work,
-                    f"the plan does not declare the restriction {rule_id} for {len(required[rule_id])} member(s)",
+                    f"the plan does not declare the restriction {rule_id} for some members",
                 )
             )
     if needed and day.plan.restricted_headcount < len(flagged):
@@ -516,23 +536,85 @@ def _declarations(day: _Day) -> list[_Finding]:
             _Finding(
                 needed[0],
                 all_work,
-                f"restricted_headcount {day.plan.restricted_headcount} is below the {len(flagged)} restricted "
-                "member(s)",
+                "restricted_headcount is below the number of members that the required restrictions cover",
             )
         )
     return out
 
 
-def _in_shift(tick: int, shift: tuple[ShiftBlock, ...]) -> bool:
-    minute = _minute(tick)
+def _check_crew(crew: CrewSpec) -> None:
+    if crew.members is not None and len(crew.members) != crew.headcount:
+        raise ValueError(f"crew {crew.crew_id}: the member list and the headcount disagree")
+
+
+def declare_restrictions(plan: CrewPlan, crew: CrewSpec, rules: PlannerRules) -> CrewPlan:
+    """A copy of ``plan`` that declares the restrictions its crew's members require (for typed rosters, Task 10).
+
+    Uses this module's own derivation of the required restriction ids and of how many members they cover, so that the
+    declaration checks pass by construction while the whole-crew rules (no acclimatised member, lone work, Red, cap,
+    run, Art. 18, ban, hours) still fire on the typed states.
+
+    Raises:
+        ValueError: ``crew.members`` and ``crew.headcount`` disagree.
+    """
+    _check_crew(crew)
+    in_season = _in_season(plan.local_date, rules.labour.ban_season)
+    required = _required_restrictions(crew, rules, in_ban_season=in_season)
+    flagged = {index for indexes in required.values() for index in indexes}
+    return replace(
+        plan,
+        restrictions=tuple(rule_id for rule_id, indexes in required.items() if indexes),
+        restricted_headcount=len(flagged),
+    )
+
+
+def _in_shift(day: _Day, tick: int, shift: tuple[ShiftBlock, ...]) -> bool:
+    minute = day.wall[tick]
     return any(_minutes_of(block.start) <= minute < _minutes_of(block.end) for block in shift)
 
 
-def _no_added_minutes(day: _Day, shift: tuple[ShiftBlock, ...]) -> list[_Finding]:
-    ticks = [i for i in _work_ticks(day) if not _in_shift(i, shift)]
-    if not ticks:
-        return []
-    return [_Finding("P-H10", _ranges(ticks), f"work outside the published shift from {_label(ticks[0])}")]
+def _check_shift_on_grid(shift: tuple[ShiftBlock, ...]) -> None:
+    for block in shift:
+        start, end = _minutes_of(block.start), _minutes_of(block.end)
+        if not _DAY_START_MINUTE <= start < end <= _DAY_END_MINUTE:
+            raise ValueError(f"the published shift block {block.start}-{block.end} is not within the 04:00-22:00 grid")
+
+
+def _shift_consistency(day: _Day, shift: tuple[ShiftBlock, ...]) -> list[_Finding]:
+    """P-H10 with a published shift: no added minutes and a plan that matches the shift tick for tick (V2)."""
+    inside = [_in_shift(day, i, shift) for i in range(_DAY_TICKS)]
+    states = day.states
+    attendance = day.attendance
+    outside_attendance = [i for i in range(_DAY_TICKS) if attendance[i] and not inside[i]]
+    idle_in_shift = [i for i in range(_DAY_TICKS) if inside[i] and not day.ban[i] and states[i] is TickState.OFF]
+    stray_ban = [i for i in range(_DAY_TICKS) if states[i] is TickState.BAN and (not day.ban[i] or not inside[i])]
+    out: list[_Finding] = []
+    if outside_attendance:
+        out.append(
+            _Finding(
+                "P-H10",
+                _ranges(outside_attendance),
+                f"attendance outside the published shift from {_label(day, outside_attendance[0])}",
+            )
+        )
+    if idle_in_shift:
+        out.append(
+            _Finding(
+                "P-H10",
+                _ranges(idle_in_shift),
+                "tick inside the published shift is OFF (neither planned nor in the ban window) from "
+                f"{_label(day, idle_in_shift[0])}",
+            )
+        )
+    if stray_ban:
+        out.append(
+            _Finding(
+                "P-H10",
+                _ranges(stray_ban),
+                f"BAN tick outside the ban window or the published shift from {_label(day, stray_ban[0])}",
+            )
+        )
+    return out
 
 
 # ------------------------------------------------------------------------------------------------- the entry point
@@ -546,11 +628,17 @@ def validate_plan(
     clauses: Mapping[str, ClauseRef],
     *,
     published_shift: tuple[ShiftBlock, ...] | None,
+    tz: ZoneInfo | None = None,
 ) -> ValidationResult:
     """Check ``plan`` against every hard rule on ``zones`` for ``crew``; ``published_shift`` enables ``P-H10``.
 
+    ``tz`` (default Asia/Dubai, the demo site) turns the timeline's clock into local wall time for the ban window, the
+    juvenile window and the shift; the timeline must start at 04:00 local on the plan's date.
+
     Raises:
-        ValueError: The plan or the timeline is not a 216-tick day, or they start at different instants.
+        ValueError: The plan or the timeline is not a 216-tick day, they start at different instants, the timeline
+            does not start at 04:00 local on the plan's date in ``tz``, ``crew.members`` and ``crew.headcount``
+            disagree, or a published shift block is outside the 04:00-22:00 grid.
         MissingClauseError: A rule id that is evaluated has no entry in ``clauses``.
     """
     if len(plan.states) != _DAY_TICKS or len(zones.zones) != _DAY_TICKS:
@@ -560,14 +648,27 @@ def validate_plan(
         )
     if plan.start_utc != zones.start_utc:
         raise ValueError(f"plan starts at {plan.start_utc} but its zone timeline starts at {zones.start_utc}")
+    zone = tz if tz is not None else _DEFAULT_TZ
+    first = zones.start_utc.astimezone(zone)
+    if first.date() != plan.local_date or first.timetz().replace(tzinfo=None) != time(4, 0):
+        raise ValueError(
+            f"the zone timeline starts at {first.isoformat()} but must start at 04:00 local on {plan.local_date} "
+            f"in {zone.key}"
+        )
+    _check_crew(crew)
+    if published_shift is not None:
+        _check_shift_on_grid(published_shift)
     labour = rules.labour
     in_season = _in_season(plan.local_date, labour.ban_season)
     ban_start, ban_end = (_minutes_of(t) for t in labour.ban_window)
+    locals_ = [(zones.start_utc + timedelta(minutes=TICK_MINUTES * i)).astimezone(zone) for i in range(_DAY_TICKS)]
+    wall = tuple(local.hour * 60 + local.minute for local in locals_)
     day = _Day(
         plan=plan,
         states=plan.states,
         zones=zones.zones,
-        ban=tuple(in_season and ban_start <= _minute(i) < ban_end for i in range(_DAY_TICKS)),
+        ban=tuple(in_season and ban_start <= wall[i] < ban_end for i in range(_DAY_TICKS)),
+        wall=wall,
         in_ban_season=in_season,
         crew=crew,
         rules=rules,
@@ -588,7 +689,7 @@ def validate_plan(
     groups.append((("P-H8.ramp", "P-H8.heavy7"), lambda: _declarations(day)))
     if published_shift is not None:
         shift = published_shift
-        groups.append((("P-H10",), lambda: _no_added_minutes(day, shift)))
+        groups.append((("P-H10",), lambda: _shift_consistency(day, shift)))
 
     checked = tuple(rule_id for rule_ids, _ in groups for rule_id in rule_ids)
     missing = [rule_id for rule_id in checked if rule_id not in clauses]

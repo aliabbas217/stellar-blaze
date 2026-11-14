@@ -5,7 +5,7 @@ Every plan here is hand-built (``support.plan_of``); nothing imports the planner
 """
 
 import dataclasses
-from datetime import date
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -19,6 +19,7 @@ from stellar_blaze.domain.validator.validator import (
     MissingClauseError,
     ValidationResult,
     Violation,
+    declare_restrictions,
     validate_plan,
 )
 from tests.unit.validator.support import (
@@ -32,6 +33,7 @@ from tests.unit.validator.support import (
     by_tick,
     clauses_of,
     crew_of,
+    day_start,
     first,
     ids,
     member,
@@ -39,10 +41,12 @@ from tests.unit.validator.support import (
     plan_of,
     rules_of,
     run_validator,
+    shift_plan,
     states,
     uniform,
     with_labour,
     zones_by_tick,
+    zones_of,
 )
 
 pytestmark = pytest.mark.unit
@@ -356,7 +360,7 @@ def test_rule_p_h7_lone_boundary_legal() -> None:
 
 def _one_member_work(solo: object, *, day: date = SUMMER, zone: Zone = MEDIUM) -> ValidationResult:
     """Three ticks of light work in ``zone`` by a crew whose only member is ``solo``, all restrictions declared."""
-    crew = crew_of(workload="light", headcount=20, members=(solo,))  # type: ignore[arg-type]
+    crew = crew_of(workload="light", members=(solo,))  # type: ignore[arg-type]
     plan = plan_of(by_tick((0, 3, W)), local_date=day, restrictions=ALL_DECLARED, restricted_headcount=1)
     return run_validator(plan, uniform(zone), crew)
 
@@ -396,10 +400,41 @@ def test_rule_p_h7_unacclimatised_juvenile_is_not_available_in_the_ban_season_on
     assert "P-H7.unacclimatised" not in ids(_one_member_work(member(juvenile=True), day=WINTER))
 
 
-def test_rule_p_h7_unacclimatised_one_acclimatised_member_is_enough_when_the_rest_is_declared() -> None:
-    crew = crew_of(workload="light", members=(member(), member(experienced=False, days_on_site=1)))
+def test_rule_p_h7_unacclimatised_two_acclimatised_members_are_enough_when_the_rest_is_declared() -> None:
+    crew = crew_of(workload="light", members=(member(), member(), member(experienced=False, days_on_site=1)))
     plan = plan_of(by_tick((0, 3, W)), restrictions=("P-H8.ramp", "P-H7.unacclimatised"), restricted_headcount=1)
     assert run_validator(plan, uniform(MEDIUM), crew).passed
+
+
+def test_rule_p_h7_lone_counts_available_acclimatised_members_not_the_headcount() -> None:
+    """V1: one acclimatised member among new ones is still lone work in Medium/High (minimum 2)."""
+    plan = plan_of(by_tick((0, 3, W)), restrictions=("P-H8.ramp", "P-H7.unacclimatised"), restricted_headcount=1)
+    one = crew_of(workload="light", members=(member(), member(experienced=False, days_on_site=1)))
+    result = run_validator(plan, uniform(MEDIUM), one)
+    violation = only(result, "P-H7.lone")
+    _cited(violation, "P-H7.lone")
+    assert violation.tick_ranges == ((0, 3),)
+    assert ids(result) == {"P-H7.lone"}
+    assert "P-H7.lone" in ids(run_validator(plan, uniform(HIGH), one))
+    assert "P-H7.lone" not in ids(run_validator(plan, uniform(LOW), one))  # Low has no lone-work rule
+    two = crew_of(workload="light", members=(member(), member(), member(experienced=False, days_on_site=1)))
+    assert "P-H7.lone" not in ids(run_validator(plan, uniform(MEDIUM), two))
+
+
+@pytest.mark.parametrize(
+    ("second", "available"),
+    [
+        (member(experienced=False, days_on_site=5), True),  # new at 100 %
+        (member(experienced=False, days_on_site=4), False),
+        (member(days_away=14, away_reason="leave"), True),
+        (member(days_away=15, away_reason="leave"), False),
+        (member(juvenile=True), False),  # not available in the ban season
+    ],
+)
+def test_rule_p_h7_lone_who_counts_as_the_second_member(second: object, available: bool) -> None:
+    crew = crew_of(workload="light", members=(member(), second))  # type: ignore[arg-type]
+    plan = plan_of(by_tick((0, 3, W)), restrictions=ALL_DECLARED, restricted_headcount=2)
+    assert ("P-H7.lone" not in ids(run_validator(plan, uniform(MEDIUM), crew))) is available
 
 
 def test_rule_p_h7_unacclimatised_no_members_means_everyone_is_acclimatised() -> None:
@@ -640,7 +675,7 @@ def test_rule_p_h8_ramp_missing_declaration_fires() -> None:
         (member(days_away=10, away_reason="leave", days_on_site=3), False),  # past the two ramp days
         (member(days_away=25, away_reason="leave", days_on_site=3), True),  # gt20 day 3: 80 %
         (member(days_away=1, away_reason="illness", days_on_site=1), True),  # illness 1-3 d is the 4-5 row
-        (member(days_away=0, away_reason="illness", days_on_site=30), False),
+        (member(days_on_site=30), False),  # no away period on record
     ],
 )
 def test_rule_p_h8_ramp_who_is_flagged(solo: object, flagged: bool) -> None:
@@ -717,36 +752,107 @@ def test_unacclimatised_declaration_names_the_work_it_covers() -> None:
 # --------------------------------------------------------------------------------------------- P-H10 (no added)
 
 
-def test_rule_p_h10_fires_outside_the_published_shift() -> None:
-    plan = plan_of(by_tick((at("10:55"), at("11:05"), W)), local_date=WINTER)
-    result = run_validator(plan, uniform(LOW), crew_of(workload="light"), published_shift=L1)
-    violation = only(result, "P-H10")
-    _cited(violation, "P-H10")
-    assert violation.tick_ranges == ((at("11:00"), at("11:05")),)
+def _p_h10(plan_states: tuple[TickState, ...], *, shift=L1, day: date = WINTER, zones=None):  # type: ignore[no-untyped-def]
+    plan = plan_of(plan_states, local_date=day)
+    result = run_validator(
+        plan,
+        zones if zones is not None else uniform(LOW),
+        crew_of(workload="light", shift=shift),
+        published_shift=shift,
+    )
+    return result, [v for v in result.violations if v.rule_id == "P-H10"]
+
+
+def test_rule_p_h10_fires_for_attendance_outside_the_published_shift() -> None:
+    result, found = _p_h10(shift_plan(("10:55", "11:05", W)))
+    assert len(found) == 1
+    _cited(found[0], "P-H10")
+    assert found[0].origin == "plan"
+    assert found[0].tick_ranges == ((at("11:00"), at("11:05")),)
+    assert "P-H10" in result.checked_rules
+
+
+@pytest.mark.parametrize("kind", [W, R, S, B])
+def test_rule_p_h10_every_attendance_state_outside_the_shift_counts(kind: TickState) -> None:
+    _, found = _p_h10(shift_plan(("11:00", "11:05", kind)))
+    assert [v.tick_ranges for v in found] == [((at("11:00"), at("11:05")),)]
 
 
 def test_rule_p_h10_boundary_legal_and_needs_a_published_shift() -> None:
-    inside = plan_of(states(("06:00", "11:00", W), ("15:00", "18:00", W)), local_date=WINTER)
-    assert "P-H10" not in ids(run_validator(inside, uniform(LOW), crew_of(workload="light"), published_shift=L1))
-    outside = plan_of(by_tick((at("11:00"), at("11:05"), W)), local_date=WINTER)
-    unchecked = run_validator(outside, uniform(LOW), crew_of(workload="light"), published_shift=None)
+    _, found = _p_h10(shift_plan(("06:00", "11:00", W), ("15:00", "18:00", W)))
+    assert found == []
+    typed = plan_of(by_tick((at("11:00"), at("11:05"), W)), local_date=WINTER)
+    unchecked = run_validator(typed, uniform(LOW), crew_of(workload="light"), published_shift=None)
     assert "P-H10" not in unchecked.checked_rules
-    assert "P-H10" not in ids(unchecked)
+    assert "P-H10" not in ids(unchecked)  # try-a-plan: the consistency checks are skipped
 
 
-def test_rule_p_h10_rest_outside_the_shift_is_not_added_work() -> None:
-    plan = plan_of(states(("11:00", "11:30", S), ("06:00", "11:00", W)), local_date=WINTER)
-    result = run_validator(plan, uniform(LOW), crew_of(workload="light"), published_shift=L1)
-    assert "P-H10" not in ids(result)
+def test_rule_p_h10_idle_tick_inside_the_shift_outside_the_ban_window_fires() -> None:
+    _, found = _p_h10(shift_plan(("08:00", "08:05", OFF_)))
+    assert [v.tick_ranges for v in found] == [((at("08:00"), at("08:05")),)]
+    assert "OFF" in found[0].detail
 
 
-def test_rule_p_h10_second_block_and_shifted_blocks() -> None:
+def test_rule_p_h10_a_high_tick_mislabelled_off_cannot_hide_from_the_cap_windows() -> None:
+    """40 min of work, then 20 min of High labelled OFF: the cap windows skip OFF ticks, so only P-H10 catches it."""
+    zones = zones_of(("06:40", "07:00", HIGH), default=LOW)
+    result, found = _p_h10(shift_plan(("06:00", "06:40", W), ("06:40", "07:00", OFF_)), zones=zones)
+    assert [v.tick_ranges for v in found] == [((at("06:40"), at("07:00")),)]
+    assert "P-H7.cap60" not in ids(result)
+
+
+ALL_DAY = (ShiftBlock(time(6, 0), time(18, 0)),)  # spans the ban window
+
+
+def test_rule_p_h10_idle_ticks_in_the_ban_window_inside_a_shift_are_legal() -> None:
+    for gap in (OFF_, BAN):
+        plan_states = shift_plan(("12:30", "15:00", gap), shift=ALL_DAY, local_date=SUMMER)
+        _, found = _p_h10(plan_states, shift=ALL_DAY, day=SUMMER)
+        assert found == [], gap
+
+
+def test_rule_p_h10_ban_tick_outside_the_window_or_the_shift_fires() -> None:
+    _, winter = _p_h10(shift_plan(("08:00", "08:05", BAN)))
+    assert [v.tick_ranges for v in winter] == [((at("08:00"), at("08:05")),)]  # not in the ban season
+    _, outside = _p_h10(shift_plan(("13:00", "13:05", BAN), local_date=SUMMER), day=SUMMER)  # L1 has no shift then
+    assert [v.tick_ranges for v in outside] == [((at("13:00"), at("13:05")),)]
+    before = shift_plan(
+        ("12:25", "12:30", BAN), shift=ALL_DAY, local_date=SUMMER
+    )  # inside the shift, before the window
+    _, early = _p_h10(before, shift=ALL_DAY, day=SUMMER)
+    assert [v.tick_ranges for v in early] == [((at("12:25"), at("12:30")),)]
+
+
+def test_rule_p_h10_shifted_blocks() -> None:
     shifted = (L1[0], ShiftBlock(L1[1].start.replace(minute=30), L1[1].end.replace(minute=30)))
-    plan = plan_of(states(("15:30", "18:30", W)), local_date=WINTER)
-    ok = run_validator(plan, uniform(LOW), crew_of(workload="light"), published_shift=shifted)
-    assert "P-H10" not in ids(ok)
-    bad = run_validator(plan, uniform(LOW), crew_of(workload="light"), published_shift=L1)
-    assert only(bad, "P-H10").tick_ranges == ((at("18:00"), at("18:30")),)
+    plan = shift_plan(shift=shifted)
+    _, ok = _p_h10(plan, shift=shifted)
+    assert ok == []
+    _, bad = _p_h10(plan, shift=L1)
+    ranges = {r for v in bad for r in v.tick_ranges}
+    assert (at("18:00"), at("18:30")) in ranges  # attendance outside L1
+    assert (at("15:00"), at("15:30")) in ranges  # L1 ticks the plan left OFF
+
+
+def _forged_block(start: time, end: time) -> ShiftBlock:
+    """A block the model would refuse: built legal, then forced past ``__post_init__`` (defence in depth)."""
+    block = ShiftBlock(time(6, 0), time(7, 0))
+    object.__setattr__(block, "start", start)
+    object.__setattr__(block, "end", end)
+    return block
+
+
+@pytest.mark.parametrize(
+    ("start", "end"), [(time(3, 0), time(9, 0)), (time(21, 0), time(23, 0)), (time(9, 0), time(9, 0))]
+)
+def test_rule_p_h10_a_shift_block_outside_the_grid_is_an_error(start: time, end: time) -> None:
+    with pytest.raises(ValueError, match=r"04:00-22:00"):
+        run_validator(
+            plan_of(states(), local_date=WINTER),
+            uniform(LOW),
+            crew_of(workload="light"),
+            published_shift=(_forged_block(start, end),),
+        )
 
 
 # ------------------------------------------------------------------------------------ result shape and errors
@@ -772,10 +878,10 @@ def test_checked_rules_listed_when_passing() -> None:
 
 
 def test_checked_rules_add_p_h10_and_the_juvenile_rules_when_they_apply() -> None:
-    crew = crew_of(members=(member(juvenile=True),))
-    result = run_validator(
-        plan_of(states(), restrictions=("P-H5.hours",), restricted_headcount=1), uniform(LOW), crew, published_shift=L1
-    )
+    morning = (ShiftBlock(time(7, 0), time(8, 0)),)
+    crew = crew_of(members=(member(juvenile=True),), shift=morning)
+    plan = plan_of(shift_plan(shift=morning, local_date=SUMMER), restrictions=("P-H5.hours",), restricted_headcount=1)
+    result = run_validator(plan, uniform(LOW), crew, published_shift=morning)
     assert {"P-H10", "P-H5.window", "P-H5.hours", "P-H5.run"} <= set(result.checked_rules)
     assert result.passed
 
@@ -873,10 +979,116 @@ def test_the_grid_constant_is_the_day_grid_of_the_ticks_module() -> None:
 
 def test_the_b0_common_roster_violates_its_own_hours() -> None:
     """B0 (06:00-12:30 + 15:00-17:00, 8.5 h on a 6-day week) breaks the hours rules in its raw roster text."""
-    rules = rules_of()
     segments = parse_roster("06:00-12:30 work\n15:00-17:00 work")
-    plan = plan_from_segments(segments, local_date=SUMMER, tz=ZoneInfo("Asia/Dubai"), labour=rules.labour)
+    plan = plan_from_segments(segments, local_date=SUMMER, tz=ZoneInfo("Asia/Dubai"))
     result = run_validator(plan, uniform(MEDIUM), crew_of(workload="heavy", headcount=20, shift=B0))
     assert {"P-H3", "P-H2.daily", "P-H7.run"} <= ids(result)
     assert "P-H2.weekly" in ids(result)
     assert "P-H1" not in ids(result)
+
+
+# ------------------------------------------------------------------------ declare_restrictions (typed plans, V3)
+
+
+def _typed(text: str, *, day: date = SUMMER):  # type: ignore[no-untyped-def]
+    return plan_from_segments(parse_roster(text), local_date=day, tz=ZoneInfo("Asia/Dubai"))
+
+
+def test_declare_restrictions_lets_a_day_one_crew_validate_apart_from_the_whole_crew_rules() -> None:
+    crew = crew_of(workload="heavy", members=(member(experienced=False, days_on_site=1),) * 3)
+    typed = _typed("06:00-06:45 work", day=WINTER)
+    undeclared = run_validator(typed, uniform(MEDIUM), crew)
+    assert any("declare" in v.detail for v in undeclared.violations)
+    declared = declare_restrictions(typed, crew, rules_of())
+    assert declared.restrictions == ("P-H8.ramp", "P-H8.heavy7", "P-H7.unacclimatised")
+    assert declared.restricted_headcount == 3
+    result = run_validator(declared, uniform(MEDIUM), crew)
+    assert not [v for v in result.violations if "declare" in v.detail]
+    assert ids(result) == {"P-H7.unacclimatised", "P-H7.lone"}  # the real whole-crew violations remain
+    assert declared.crew_id == typed.crew_id
+    assert declared.states == typed.states
+
+
+def test_declare_restrictions_keeps_every_other_rule_firing() -> None:
+    crew = crew_of(workload="heavy", members=(member(), member()))
+    typed = _typed("06:00-12:30 work\n15:00-17:00 work")
+    result = run_validator(declare_restrictions(typed, crew, rules_of()), uniform(MEDIUM), crew)
+    assert {"P-H3", "P-H7.run", "P-H7.cap60", "P-H2.daily"} <= ids(result)
+
+
+def test_declare_restrictions_for_an_all_acclimatised_crew_changes_nothing_and_passes() -> None:
+    crew = crew_of(workload="light", members=(member(), member()))
+    typed = _typed("06:00-08:00 work", day=WINTER)
+    declared = declare_restrictions(typed, crew, rules_of())
+    assert declared.restrictions == ()
+    assert declared.restricted_headcount == 0
+    assert run_validator(declared, uniform(LOW), crew).passed
+    no_members = declare_restrictions(typed, crew_of(workload="light"), rules_of())
+    assert no_members.restrictions == ()
+    assert no_members.restricted_headcount == 0
+
+
+def test_declare_restrictions_replaces_the_declaration_and_counts_each_member_once() -> None:
+    new_returning = member(experienced=False, days_on_site=2, days_away=10, away_reason="leave")
+    crew = crew_of(workload="heavy", members=(new_returning, member(juvenile=True), member()))
+    typed = dataclasses.replace(_typed("06:00-06:30 work"), restrictions=("P-H8.ramp",), restricted_headcount=9)
+    declared = declare_restrictions(typed, crew, rules_of())
+    assert declared.restrictions == ("P-H8.ramp", "P-H8.heavy7", "P-H5.hours", "P-H7.unacclimatised")
+    assert declared.restricted_headcount == 2  # the new returning member (ramp, heavy-7, unacclimatised) and the minor
+
+
+def test_declare_restrictions_rejects_members_that_do_not_match_the_headcount() -> None:
+    crew = dataclasses.replace(crew_of(members=(member(), member())), headcount=3)
+    with pytest.raises(ValueError, match="headcount"):
+        declare_restrictions(_typed("06:00-06:30 work"), crew, rules_of())
+
+
+# ------------------------------------------------------------------------------------- inputs and local time
+
+
+def test_validate_rejects_members_that_do_not_match_the_headcount() -> None:
+    crew = dataclasses.replace(crew_of(members=(member(), member())), headcount=3)
+    with pytest.raises(ValueError, match="headcount"):
+        run_validator(plan_of(states()), uniform(LOW), crew)
+
+
+def test_people_rule_details_carry_no_member_counts() -> None:
+    crew = crew_of(workload="heavy", members=(member(experienced=False, days_on_site=2),) * 4)
+    plan = plan_of(by_tick((0, 3, W)), local_date=WINTER)
+    result = run_validator(plan, uniform(LOW), crew)
+    details = [v.detail for v in result.violations if v.rule_id.startswith(("P-H8", "P-H7.un"))]
+    assert details
+    assert all("some members" in d or d.startswith("restricted_headcount") for d in details)
+    shortfall = next(d for d in details if d.startswith("restricted_headcount"))
+    assert not any(ch.isdigit() for ch in shortfall)
+    assert not any(ch.isdigit() for ch in details[0].replace("P-H8.ramp", "").replace("P-H8.heavy7", ""))
+
+
+def test_the_timeline_must_start_at_04_00_local_on_the_plans_date() -> None:
+    for wrong in (day_start(SUMMER).replace(hour=1), day_start(SUMMER).replace(minute=5), day_start(WINTER)):
+        zones = ZoneTimeline.from_zones(wrong, [LOW] * TICKS)
+        plan = plan_of(states(), start_utc=wrong)
+        with pytest.raises(ValueError, match="04:00"):
+            validate_plan(plan, zones, crew_of(), rules_of(), clauses_of(), published_shift=None)
+
+
+def test_wall_time_comes_from_the_timeline_clock_and_the_zone() -> None:
+    """Madrid in July: the grid starts at 02:00 UTC; the ban window is 10:30-13:00 UTC, tick 102 is 12:30 local."""
+    madrid = ZoneInfo("Europe/Madrid")
+    start = datetime(2026, 7, 1, 2, 0, tzinfo=ZoneInfo("UTC"))
+    zones = ZoneTimeline.from_zones(start, [LOW] * TICKS)
+    plan = plan_of(by_tick((101, 102, W), (102, 103, W)), local_date=SUMMER, start_utc=start)
+    result = validate_plan(
+        plan, zones, crew_of(workload="light"), rules_of(), clauses_of(), published_shift=None, tz=madrid
+    )
+    assert only(result, "P-H1").tick_ranges == ((102, 103),)
+    with pytest.raises(ValueError, match="04:00"):  # the same clock read in Dubai is 06:00
+        validate_plan(plan, zones, crew_of(), rules_of(), clauses_of(), published_shift=None)
+
+
+def test_a_dst_day_in_madrid_validates_with_its_own_zone() -> None:
+    madrid = ZoneInfo("Europe/Madrid")
+    start = datetime(2026, 3, 29, 2, 0, tzinfo=ZoneInfo("UTC"))  # the EU spring-forward day: 04:00 CEST
+    zones = ZoneTimeline.from_zones(start, [LOW] * TICKS)
+    plan = plan_of(states(), local_date=date(2026, 3, 29), start_utc=start)
+    assert validate_plan(plan, zones, crew_of(), rules_of(), clauses_of(), published_shift=None, tz=madrid).passed

@@ -22,7 +22,6 @@ from tests.unit.validator.support import (
     at,
     crew_of,
     ids,
-    rules_of,
     run_validator,
     uniform,
 )
@@ -149,7 +148,7 @@ def test_parse_never_raises_anything_but_the_roster_error(text: str) -> None:
 
 def test_plan_from_segments_maps_states_and_leaves_the_rest_off() -> None:
     segments = parse_roster("06:00-07:00 work\n07:00-07:30 rest\n07:30-08:30 break")
-    plan = plan_from_segments(segments, local_date=SUMMER, tz=DUBAI, labour=rules_of().labour)
+    plan = plan_from_segments(segments, local_date=SUMMER, tz=DUBAI)
     assert len(plan.states) == TICKS
     assert plan.states[at("06:00")] is TickState.WORK
     assert plan.states[at("07:00") - 1] is TickState.WORK
@@ -168,7 +167,7 @@ def test_plan_from_segments_maps_states_and_leaves_the_rest_off() -> None:
 
 def test_plan_from_segments_keeps_work_typed_in_the_ban_window_so_p_h1_fires() -> None:
     segments = parse_roster("12:00-13:00 work")
-    plan = plan_from_segments(segments, local_date=SUMMER, tz=DUBAI, labour=rules_of().labour)
+    plan = plan_from_segments(segments, local_date=SUMMER, tz=DUBAI)
     assert plan.states[at("12:30")] is TickState.WORK
     result = run_validator(plan, uniform(Zone.LOW), crew_of(workload="light"))
     assert "P-H1" in ids(result)
@@ -176,7 +175,7 @@ def test_plan_from_segments_keeps_work_typed_in_the_ban_window_so_p_h1_fires() -
 
 def test_plan_from_segments_ban_window_ticks_nobody_typed_are_not_work() -> None:
     segments = parse_roster("06:00-12:30 work\n15:00-17:00 work")
-    plan = plan_from_segments(segments, local_date=SUMMER, tz=DUBAI, labour=rules_of().labour)
+    plan = plan_from_segments(segments, local_date=SUMMER, tz=DUBAI)
     assert plan.states[at("12:30")] is TickState.OFF
     assert plan.states[at("14:55")] is TickState.OFF
     assert plan.states[at("15:00")] is TickState.WORK

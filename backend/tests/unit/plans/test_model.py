@@ -126,3 +126,81 @@ def test_crew_plan_holds_the_tick_states_and_the_minute_counters() -> None:
     )
     assert plan.states[0] is TickState.WORK
     assert plan.status == "rule"
+
+
+# ---- input-edge checks (Feature B review P1, P2, P3) ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [(time(3, 0), time(9, 0)), (time(22, 0), time(23, 0)), (time(21, 0), time(22, 5)), (time(3, 55), time(5, 0))],
+)
+def test_a_shift_block_outside_the_grid_is_refused(start: time, end: time) -> None:
+    with pytest.raises(ValueError, match="grid"):
+        ShiftBlock(start, end)
+
+
+@pytest.mark.parametrize("start_end", [(time(9, 0), time(8, 0)), (time(9, 0), time(9, 0))])
+def test_a_shift_block_must_start_before_it_ends(start_end: tuple[time, time]) -> None:
+    with pytest.raises(ValueError, match="start before it ends"):
+        ShiftBlock(*start_end)
+
+
+def test_the_grid_edges_are_legal_shift_times() -> None:
+    assert ShiftBlock(time(4, 0), time(22, 0)).end == time(22, 0)
+    assert ShiftBlock(time(4, 0), time(4, 5)).start == time(4, 0)
+
+
+def _crew(*blocks: ShiftBlock) -> CrewSpec:
+    return CrewSpec(crew_id="c", employer_id="e", workload="heavy", headcount=2, shift=blocks, days_per_week=5)
+
+
+def test_crew_shift_blocks_must_be_sorted_and_not_overlap() -> None:
+    first, second = ShiftBlock(time(6, 0), time(11, 0)), ShiftBlock(time(15, 0), time(18, 0))
+    assert _crew(first, second).shift == (first, second)
+    assert _crew(ShiftBlock(time(6, 0), time(11, 0)), ShiftBlock(time(11, 0), time(12, 0))).shift  # touching is legal
+    assert _crew().shift == ()
+    with pytest.raises(ValueError, match="sorted"):
+        _crew(second, first)
+    with pytest.raises(ValueError, match="overlap"):
+        _crew(ShiftBlock(time(6, 0), time(11, 0)), ShiftBlock(time(10, 0), time(12, 0)))
+
+
+@pytest.mark.parametrize(
+    ("days_on_site", "days_away", "reason"),
+    [(-1, 0, "none"), (3, -1, "none"), (3, 2, "none"), (3, 0, "leave"), (3, 0, "illness"), (-1, 5, "leave")],
+)
+def test_an_inconsistent_crew_member_is_refused(days_on_site: int, days_away: int, reason: str) -> None:
+    with pytest.raises(ValueError, match="days_"):
+        CrewMember(days_on_site, days_away, reason, experienced=True, juvenile=False)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(("days_away", "reason"), [(0, "none"), (4, "leave"), (3, "illness")])
+def test_a_consistent_crew_member_is_legal(days_away: int, reason: str) -> None:
+    member = CrewMember(0, days_away, reason, experienced=False, juvenile=True)  # type: ignore[arg-type]
+    assert member.days_away == days_away
+
+
+def _plan(tick_rules: tuple[str, ...]) -> CrewPlan:
+    return CrewPlan(
+        crew_id="c",
+        local_date=START.date(),
+        start_utc=START,
+        states=(TickState.WORK, TickState.OFF),
+        rule_ids=(),
+        status="rule",
+        restricted_headcount=0,
+        restrictions=(),
+        work_minutes=5,
+        adosh_rest_minutes=0,
+        art18_minutes=0,
+        stopped_minutes=0,
+        tick_rules=tick_rules,
+    )
+
+
+def test_tick_rules_are_empty_or_one_per_tick() -> None:
+    assert _plan(()).tick_rules == ()
+    assert _plan(("P-H7.run", "P-H10")).tick_rules == ("P-H7.run", "P-H10")
+    with pytest.raises(ValueError, match="tick_rules"):
+        _plan(("P-H7.run",))
