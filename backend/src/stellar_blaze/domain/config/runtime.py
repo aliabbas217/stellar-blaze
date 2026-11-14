@@ -3,7 +3,7 @@
 ``RuntimeConfig`` holds the ruleset pin, the active model id, the tunables and the flags that are safe to flip live.
 Legal floors are absent from it by construction (``extra="forbid"``), so a payload that tries to set one fails schema
 validation. Each tunable is bounded by the range its ruleset declares, and in production a ruleset pin must not be less
-protective than the ruleset in force today.
+protective than the ruleset in force today: not on a floor, and not on the range end or the default of a tunable.
 """
 
 import hashlib
@@ -150,7 +150,7 @@ def _check_pin(
     if not pinned.ruleset.covers(today):
         return pinned.ruleset, [ConfigViolation("pin-out-of-range", "ruleset_pin", f"{pin} does not cover {today}")]
     in_force = catalog.for_local_date(today).ruleset
-    return pinned.ruleset, [
+    violations = [
         ConfigViolation(
             "floor-violation",
             f"ruleset_pin.{v.path}",
@@ -158,6 +158,54 @@ def _check_pin(
         )
         for v in floor_violations(pinned.ruleset, in_force)
     ]
+    violations.extend(_tunable_violations(pinned.ruleset, in_force))
+    return pinned.ruleset, violations
+
+
+def _tunable_violations(pinned: Ruleset, in_force: Ruleset) -> list[ConfigViolation]:
+    """Where ``pinned`` would let a tunable be less protective than ``in_force`` does (ADR 0044).
+
+    For every tunable ``in_force`` declares, the end of the range that is less protective, and the effective default
+    (what ``resolve_effective`` gives a config that sets nothing), must be at least as protective in ``pinned``, as
+    ``safer`` says: ``higher`` compares ``min`` and the default upwards, ``lower`` compares ``max`` and the default
+    downwards, ``none`` is not compared. A tunable ``in_force`` declares and ``pinned`` does not is a violation at
+    ``ruleset_pin.tunables.<name>``. One violation per failing tunable per check, at ``.min``, ``.max`` or ``.default``.
+    """
+    violations: list[ConfigViolation] = []
+    effective = resolve_effective(RuntimeConfig(), pinned)
+    for name, force in in_force.tunables.items():
+        path = f"ruleset_pin.tunables.{name}"
+        pin_spec = pinned.tunables.get(name)
+        if pin_spec is None:
+            violations.append(
+                ConfigViolation(
+                    "floor-violation",
+                    path,
+                    f"{pinned.meta.id} does not declare tunable {name}, which {in_force.meta.id} does",
+                )
+            )
+            continue
+        if force.safer == "none":
+            continue
+        pin_default = (
+            getattr(effective, name, pin_spec.default) if isinstance(effective, EffectiveParams) else pin_spec.default
+        )
+        higher = force.safer == "higher"
+        checks = (
+            ("min", pin_spec.min, force.min) if higher else ("max", pin_spec.max, force.max),
+            ("default", pin_default, force.default),
+        )
+        for field, pin_value, force_value in checks:
+            if pin_value < force_value if higher else pin_value > force_value:
+                violations.append(
+                    ConfigViolation(
+                        "floor-violation",
+                        f"{path}.{field}",
+                        f"{pinned.meta.id} has {name} {field} {pin_value}, less protective than {force_value} in "
+                        f"{in_force.meta.id} (safer is {force.safer})",
+                    )
+                )
+    return violations
 
 
 def validate_runtime_config(
@@ -166,11 +214,12 @@ def validate_runtime_config(
     """Every reason ``c`` cannot be the active config; an empty list means it can.
 
     The pin must name a loaded ruleset. In prod it must also be released, cover ``today`` (the Asia/Dubai local date)
-    and have no floor less protective than the ruleset in force today (ADR 0010 section 4.3); in dev a pin may be for
-    another date, so back-tests can pin history (each decision still resolves its own date through
-    ``RulesetCatalog.resolve``). The model must be in the registry, and the tunables must resolve against the pinned
-    ruleset, or against the one in force today when there is no pin. A floor violation's path is
-    ``ruleset_pin.<floor path>``.
+    and have no floor, tunable range end or tunable default less protective than the ruleset in force today (ADR 0010
+    section 4.3, ADR 0044); in dev a pin may be for another date, so back-tests can pin history (each decision still
+    resolves its own date through ``RulesetCatalog.resolve``). The model must be in the registry, and the tunables
+    must resolve against the pinned ruleset, or against the one in force today when there is no pin. A floor
+    violation's path is ``ruleset_pin.<floor path>``; a tunable's is ``ruleset_pin.tunables.<name>`` plus ``.min``,
+    ``.max`` or ``.default``.
 
     Raises:
         NoRulesetError: There is no pin and no ruleset is in force today. That is a gap in the catalog, not a config

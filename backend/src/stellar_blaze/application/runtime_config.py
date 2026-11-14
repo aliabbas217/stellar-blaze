@@ -182,6 +182,10 @@ class ConfigService:
     def prod(self) -> bool:
         return self._prod
 
+    def today(self) -> date:
+        """The date this service validates on (the Asia/Dubai date in production); the poller watches it change."""
+        return self._clock()
+
     def validate(self, config: RuntimeConfig) -> list[ConfigViolation]:
         """Every reason ``config`` cannot be the active config; empty when it can.
 
@@ -391,6 +395,14 @@ class ConfigPoller:
     while the status stays ``missing`` (a process that started with its database down has no snapshot, so its status
     does not change when the first poll fails): the line for that poll is the first to say why.
 
+    A snapshot is validated when it loads, and a ruleset's ``effective_to`` passing can make a valid pin invalid with
+    no new activation (ADR 0044 section 3). So on the first poll after the date changes (``ConfigService.today``, the
+    Asia/Dubai date) the poller validates the held snapshot again: if it no longer validates, the snapshot keeps
+    serving, the status is ``stale`` with reason ``rejected-activation``, and ``config_rejected`` is logged once for
+    that date. An activation it refused is read again on the first poll after the date it was refused on, since the
+    pin that failed yesterday may cover today. A new valid activation replaces a snapshot that failed re-validation
+    and clears the status.
+
     A snapshot built from ``SB_RULESET_ID`` / ``SB_MODEL_ID`` (``source="env"``, never in prod) is never replaced:
     those pins are for back-tests and runs without a database (ADR 0010 section 4.6), so the poller does not read the
     database and says so once (``config.db_activations_ignored``).
@@ -407,6 +419,9 @@ class ConfigPoller:
         self._stale_reason: StaleReason | None = None
         self._error: str | None = None
         self._rejected_activation: int | None = None
+        self._rejected_on: date | None = None
+        self._validated_on: date = service.today()  # the held snapshot was validated at start-up, on this date
+        self._refused_snapshot: ConfigSnapshot | None = None  # the held snapshot, if it failed re-validation today
         self._logged: tuple[ConfigStatus, StaleReason | None] | None = None
         self._warned_about_env_pins = False
 
@@ -473,23 +488,29 @@ class ConfigPoller:
         if self._warn_if_env_pinned():
             self._settled()
             return
-        latest = await self._service.latest_activation()
+        today = self._service.today()
         current = self._holder.peek()
+        if today != self._validated_on:
+            if current is not None:
+                self._revalidate(current)
+            self._validated_on = today  # not reached when validation raises, so the next poll tries again
+        latest = await self._service.latest_activation()
         if latest is None or (current is not None and current.version_id == latest.config_version_id):
-            self._settled()  # reachable, and nothing newer than what is served (a file snapshot serves until then)
+            self._settled_unless_refused(current)  # reachable, and nothing newer than what is served
             return
-        if self._rejected_activation == latest.id:
-            self._stale_reason, self._error = "rejected-activation", None  # already refused: do not re-read it
+        if self._rejected_activation == latest.id and self._rejected_on == today:
+            self._stale_reason, self._error = "rejected-activation", None  # already refused today: do not re-read it
             return
         snapshot = await self._service.load_version(latest.config_version_id)
         if snapshot is None:
-            self._rejected_activation = latest.id
+            self._rejected_activation, self._rejected_on = latest.id, today
             self._stale_reason, self._error = "rejected-activation", None
             return
         if self._holder.peek() is not current:
             return  # an activation made through this process swapped meanwhile; the next pass compares again
         self._holder.swap(snapshot)
-        self._rejected_activation = None
+        self._rejected_activation, self._rejected_on = None, None
+        self._refused_snapshot = None
         logger.info(
             "config.loaded",
             config_version=snapshot.version_id,
@@ -498,6 +519,33 @@ class ConfigPoller:
             previous_version=None if current is None else current.version_id,
         )
         self._settled()
+
+    def _revalidate(self, snapshot: ConfigSnapshot) -> None:
+        """Validate the held ``snapshot`` on today's date; remember (and log once) that it no longer validates.
+
+        Raises:
+            NoRulesetError: There is no pin and no ruleset covers today: a gap in the catalog, which ``poll_once`` turns
+                into a ``poll-error`` stale poll.
+        """
+        violations = self._service.validate(snapshot.config)
+        if not violations:
+            self._refused_snapshot = None
+            return
+        self._refused_snapshot = snapshot
+        logger.error(
+            "config_rejected",
+            version_id=snapshot.version_id,
+            sha256=snapshot.sha256,
+            codes=[v.code for v in violations],
+            violations=[f"{v.code} at {v.path}: {v.message}" for v in violations],
+        )
+
+    def _settled_unless_refused(self, current: ConfigSnapshot | None) -> None:
+        """``ok``, unless ``current`` is the snapshot that failed today's re-validation (it serves, but ``stale``)."""
+        if current is not None and current is self._refused_snapshot:
+            self._stale_reason, self._error = "rejected-activation", None
+        else:
+            self._settled()
 
     def _warn_if_env_pinned(self) -> bool:
         """Whether the snapshot is an ``env`` one, which the database must not replace; logs that once."""
