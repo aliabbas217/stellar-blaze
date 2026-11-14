@@ -1,0 +1,701 @@
+{
+  "band_vectors": [
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "green",
+      "name": "band_minimum_exactly_green",
+      "probability": 0.0
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "amber",
+      "name": "band_minimum_exactly_amber",
+      "probability": 0.1
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "green",
+      "name": "band_just_below_amber",
+      "probability": 0.0999999999
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "orange",
+      "name": "band_minimum_exactly_orange",
+      "probability": 0.5
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "amber",
+      "name": "band_just_below_orange",
+      "probability": 0.4999999999
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "red",
+      "name": "band_minimum_exactly_red",
+      "probability": 0.9
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "orange",
+      "name": "band_just_below_red",
+      "probability": 0.8999999999
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "green",
+      "name": "band_ends_of_the_exceedance_range_low",
+      "probability": 0.05
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.5
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": "red",
+      "name": "band_ends_of_the_exceedance_range_high",
+      "probability": 0.95
+    },
+    {
+      "bands": [
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.3
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.3
+        },
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        }
+      ],
+      "expected_level": "orange",
+      "name": "band_equal_minimums_take_the_more_severe",
+      "probability": 0.3
+    },
+    {
+      "bands": [
+        {
+          "level": "green",
+          "min_exceedance_probability": 0.0
+        },
+        {
+          "level": "orange",
+          "min_exceedance_probability": 0.3
+        },
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.3
+        }
+      ],
+      "expected_level": "orange",
+      "name": "band_equal_minimums_in_the_other_order",
+      "probability": 0.3
+    },
+    {
+      "bands": [
+        {
+          "level": "amber",
+          "min_exceedance_probability": 0.1
+        },
+        {
+          "level": "red",
+          "min_exceedance_probability": 0.9
+        }
+      ],
+      "expected_level": null,
+      "name": "band_below_every_minimum_has_no_level",
+      "probability": 0.05
+    }
+  ],
+  "default_bands": [
+    {
+      "level": "green",
+      "min_exceedance_probability": 0.0
+    },
+    {
+      "level": "amber",
+      "min_exceedance_probability": 0.1
+    },
+    {
+      "level": "orange",
+      "min_exceedance_probability": 0.5
+    },
+    {
+      "level": "red",
+      "min_exceedance_probability": 0.9
+    }
+  ],
+  "description": "Parity vectors for the personal-level pipeline (ADR 0049 decision 6): P(WBGT > limit) from three quantiles and the band selection. Generated by stellar_blaze.domain.risk.personal; do not edit by hand.",
+  "exceedance_vectors": [
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 29.0,
+      "name": "triple_a_limit_below_p05",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 30.0,
+      "name": "triple_a_limit_equals_p05",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 31.0,
+      "name": "triple_a_limit_between_p05_and_p50",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 32.0,
+      "name": "triple_a_limit_equals_p50",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 34.0,
+      "name": "triple_a_limit_between_p50_and_p95",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 36.0,
+      "name": "triple_a_limit_equals_p95",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 37.0,
+      "name": "triple_a_limit_above_p95",
+      "p05": 30.0,
+      "p50": 32.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 27.5,
+      "name": "triple_b_limit_below_p05",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 28.5,
+      "name": "triple_b_limit_equals_p05",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 29.75,
+      "name": "triple_b_limit_between_p05_and_p50",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 31.0,
+      "name": "triple_b_limit_equals_p50",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 33.25,
+      "name": "triple_b_limit_between_p50_and_p95",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 35.5,
+      "name": "triple_b_limit_equals_p95",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 36.5,
+      "name": "triple_b_limit_above_p95",
+      "p05": 28.5,
+      "p50": 31.0,
+      "p95": 35.5
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 32.2,
+      "name": "triple_c_limit_below_p05",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 33.2,
+      "name": "triple_c_limit_equals_p05",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 34.5,
+      "name": "triple_c_limit_between_p05_and_p50",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 35.8,
+      "name": "triple_c_limit_equals_p50",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 37.099999999999994,
+      "name": "triple_c_limit_between_p50_and_p95",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 38.4,
+      "name": "triple_c_limit_equals_p95",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 39.4,
+      "name": "triple_c_limit_above_p95",
+      "p05": 33.2,
+      "p50": 35.8,
+      "p95": 38.4
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 25.0,
+      "name": "tied_low_limit_below_p05",
+      "p05": 26.0,
+      "p50": 26.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 26.0,
+      "name": "tied_low_limit_equals_p05",
+      "p05": 26.0,
+      "p50": 26.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 28.0,
+      "name": "tied_low_limit_inside_the_wide_segment",
+      "p05": 26.0,
+      "p50": 26.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 26.0,
+      "name": "tied_low_limit_equals_p50",
+      "p05": 26.0,
+      "p50": 26.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 30.0,
+      "name": "tied_low_limit_equals_p95",
+      "p05": 26.0,
+      "p50": 26.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 31.0,
+      "name": "tied_low_limit_above_p95",
+      "p05": 26.0,
+      "p50": 26.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 25.0,
+      "name": "tied_high_limit_below_p05",
+      "p05": 26.0,
+      "p50": 30.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 26.0,
+      "name": "tied_high_limit_equals_p05",
+      "p05": 26.0,
+      "p50": 30.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 28.0,
+      "name": "tied_high_limit_inside_the_wide_segment",
+      "p05": 26.0,
+      "p50": 30.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 30.0,
+      "name": "tied_high_limit_equals_p50",
+      "p05": 26.0,
+      "p50": 30.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 30.0,
+      "name": "tied_high_limit_equals_p95",
+      "p05": 26.0,
+      "p50": 30.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 31.0,
+      "name": "tied_high_limit_above_p95",
+      "p05": 26.0,
+      "p50": 30.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.5,
+      "limit": 25.0,
+      "name": "all_equal_at_limit_equals_value",
+      "p05": 25.0,
+      "p50": 25.0,
+      "p95": 25.0
+    },
+    {
+      "expected_level": "red",
+      "expected_probability": 0.95,
+      "limit": 24.9,
+      "name": "all_equal_at_limit_below",
+      "p05": 25.0,
+      "p50": 25.0,
+      "p95": 25.0
+    },
+    {
+      "expected_level": "green",
+      "expected_probability": 0.05,
+      "limit": 25.1,
+      "name": "all_equal_at_limit_above",
+      "p05": 25.0,
+      "p50": 25.0,
+      "p95": 25.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 31.0,
+      "name": "unsorted_p95_p05_p50_limit_31",
+      "p05": 36.0,
+      "p50": 30.0,
+      "p95": 32.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 34.0,
+      "name": "unsorted_p95_p05_p50_limit_34",
+      "p05": 36.0,
+      "p50": 30.0,
+      "p95": 32.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 31.0,
+      "name": "unsorted_p50_p95_p05_limit_31",
+      "p05": 32.0,
+      "p50": 36.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 34.0,
+      "name": "unsorted_p50_p95_p05_limit_34",
+      "p05": 32.0,
+      "p50": 36.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 31.0,
+      "name": "unsorted_p95_p50_p05_limit_31",
+      "p05": 36.0,
+      "p50": 32.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 34.0,
+      "name": "unsorted_p95_p50_p05_limit_34",
+      "p05": 36.0,
+      "p50": 32.0,
+      "p95": 30.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 31.0,
+      "name": "unsorted_p50_p05_p95_limit_31",
+      "p05": 32.0,
+      "p50": 30.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 34.0,
+      "name": "unsorted_p50_p05_p95_limit_34",
+      "p05": 32.0,
+      "p50": 30.0,
+      "p95": 36.0
+    },
+    {
+      "expected_level": "orange",
+      "expected_probability": 0.725,
+      "limit": 31.0,
+      "name": "unsorted_p05_p95_p50_limit_31",
+      "p05": 30.0,
+      "p50": 36.0,
+      "p95": 32.0
+    },
+    {
+      "expected_level": "amber",
+      "expected_probability": 0.275,
+      "limit": 34.0,
+      "name": "unsorted_p05_p95_p50_limit_34",
+      "p05": 30.0,
+      "p50": 36.0,
+      "p95": 32.0
+    }
+  ],
+  "format_version": 1,
+  "probability_tolerance": 1e-09
+}
