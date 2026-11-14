@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   GENERAL_CEILING_PER_MIN,
+  LIMIT_WINDOW_MS,
   STOP_RESERVE_PER_MIN,
+  UPSTREAM_WINDOW_MARGIN_MS,
   UPSTREAM_QUOTA_PER_MIN,
   clientKey,
   createRateLimiter,
@@ -13,37 +15,82 @@ import {
 
 /* The token bucket behind the BFF write limit, driven by an injected clock: no timers, no sleeping. */
 
-function limiter(perMinute: number, maxKeys?: number) {
+function limiter(perMinute: number, maxKeys?: number, windowMs?: number) {
   const clock = { now: 1_000_000 };
-  const instance = createRateLimiter({ perMinute, now: () => clock.now, ...(maxKeys === undefined ? {} : { maxKeys }) });
+  const instance = createRateLimiter({
+    perMinute,
+    now: () => clock.now,
+    ...(maxKeys === undefined ? {} : { maxKeys }),
+    ...(windowMs === undefined ? {} : { windowMs }),
+  });
   return { clock, ...instance };
 }
 
+const WINDOW = 60_000;
+
+/** The most admissions in any window of `lengthMs`, closed at both ends, over ascending admission times. */
+function maxInAnyWindow(times: readonly number[], lengthMs: number): number {
+  let best = 0;
+  let from = 0;
+  times.forEach((time, index) => {
+    while ((times[from] ?? Number.POSITIVE_INFINITY) < time - lengthMs) from += 1;
+    best = Math.max(best, index - from + 1);
+  });
+  return best;
+}
+
 describe("createRateLimiter", () => {
-  it("allows a full bucket of writes, then refuses with a Retry-After in whole seconds", () => {
+  it("admits N, then refuses until the oldest admission leaves the window, with a Retry-After in whole seconds", () => {
     const { take, peek } = limiter(3);
 
     expect([take("a"), take("a"), take("a"), take("a")]).toEqual([true, true, true, false]);
-    // 3 per minute refills one token every 20 s.
-    expect(peek("a")).toEqual({ allowed: false, retryAfterSeconds: 20 });
+    expect(peek("a")).toEqual({ allowed: false, retryAfterSeconds: 60 });
   });
 
-  it("refills with the clock: one token after 20 s at 3 per minute, never above the bucket size", () => {
+  it("slides: a slot opens exactly when the oldest admission is one window old, not before, and not all at once", () => {
     const { clock, take, peek } = limiter(3);
-    for (let i = 0; i < 3; i += 1) take("a");
+    const start = clock.now;
+    take("a");
+    clock.now = start + 20_000;
+    take("a");
+    clock.now = start + 40_000;
+    take("a");
 
-    clock.now += 19_000;
-    expect(peek("a").allowed).toBe(false);
-    clock.now += 1_000;
+    clock.now = start + WINDOW - 1;
+    expect(peek("a")).toEqual({ allowed: false, retryAfterSeconds: 1 });
+    expect(take("a")).toBe(false);
+    clock.now = start + WINDOW;
     expect(peek("a").allowed).toBe(true);
     expect(take("a")).toBe(true);
+    // The other two are still inside the window: one slot opened, no more.
     expect(take("a")).toBe(false);
-
-    clock.now += 10 * 60_000;
-    expect([take("a"), take("a"), take("a"), take("a")]).toEqual([true, true, true, false]);
+    clock.now = start + WINDOW + 20_000;
+    expect(take("a")).toBe(true);
+    expect(take("a")).toBe(false);
   });
 
-  it("keeps a bucket per key", () => {
+  it("never admits more than N in any window, however the requests are spaced (checked over 5 minutes of irregular traffic)", () => {
+    for (const limit of [1, 3, 20, 40]) {
+      const { clock, take } = limiter(limit);
+      const admitted: number[] = [];
+      let seed = 12345;
+      const next = () => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      };
+      const end = clock.now + 5 * WINDOW;
+      while (clock.now < end) {
+        // Bursts and pauses: 0 to 3 s between requests, sometimes none at all.
+        clock.now += next() < 0.3 ? 0 : Math.floor(next() * 3000);
+        if (take("a")) admitted.push(clock.now);
+      }
+
+      expect(maxInAnyWindow(admitted, WINDOW - 1), `limit ${String(limit)}`).toBeLessThanOrEqual(limit);
+      expect(admitted.length, `limit ${String(limit)} admits something`).toBeGreaterThan(limit);
+    }
+  });
+
+  it("keeps a counter per key", () => {
     const { take } = limiter(1);
 
     expect([take("a"), take("b"), take("a"), take("b")]).toEqual([true, true, false, false]);
@@ -57,19 +104,31 @@ describe("createRateLimiter", () => {
     expect(peek("a").allowed).toBe(false);
   });
 
-  it("holds at most maxKeys keys: idle buckets go first, then the oldest", () => {
+  it("holds at most maxKeys keys: keys with nothing in the window go first, then the oldest", () => {
     const { clock, take } = limiter(1, 3);
     take("a");
     take("b");
     take("c");
-    // All three are drained and active; a new key must not be refused and memory stays bounded.
+    // All three are active; a new key must not be refused and memory stays bounded.
     expect(take("d")).toBe(true);
-    // The oldest key ("a") was dropped, so it starts full again; "d" is still drained.
+    // The oldest key ("a") was dropped, so it starts empty again; "d" is still counted.
     expect(take("a")).toBe(true);
     expect(take("d")).toBe(false);
 
-    clock.now += 60_000;
+    clock.now += WINDOW;
     expect(take("e")).toBe(true);
+  });
+});
+
+describe("the limits as the BFF builds them: the window is the upstream's plus a margin", () => {
+  it("is 61 s, so two admissions 60 s apart are still counted together", () => {
+    expect(LIMIT_WINDOW_MS).toBe(60_000 + UPSTREAM_WINDOW_MARGIN_MS);
+    const { clock, take } = limiter(1, undefined, LIMIT_WINDOW_MS);
+    expect(take("a")).toBe(true);
+    clock.now += 60_000;
+    expect(take("a")).toBe(false);
+    clock.now += UPSTREAM_WINDOW_MARGIN_MS;
+    expect(take("a")).toBe(true);
   });
 });
 
@@ -119,19 +178,45 @@ describe("trustedProxyHops", () => {
   });
 });
 
-/** The employer quota the contract states: the smallest single-window limit of any employer operation, per minute. */
-function contractQuotaPerMinute(): number {
+interface SpecOperation {
+  operationId: string;
+  security?: unknown[];
+  "x-rate-limit"?: { limit: number; window_seconds: number }[];
+}
+
+function employerOperations(): SpecOperation[] {
   const spec = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../../../openapi/stellar-blaze.openapi.json"), "utf8")) as {
-    paths: Record<string, Record<string, { operationId: string; security?: unknown[]; "x-rate-limit"?: { limit: number; window_seconds: number }[] }>>;
+    paths: Record<string, Record<string, SpecOperation>>;
   };
-  const quotas = Object.values(spec.paths)
+  return Object.values(spec.paths)
     .flatMap((item) => Object.values(item))
-    .filter((operation) => (operation.security?.length ?? 0) > 0 && operation["x-rate-limit"]?.length === 1)
-    .map((operation) => {
-      const [limit] = operation["x-rate-limit"] ?? [];
-      return limit === undefined ? Number.POSITIVE_INFINITY : (limit.limit / limit.window_seconds) * 60;
-    });
-  return Math.min(...quotas);
+    .filter((operation) => (operation.security?.length ?? 0) > 0);
+}
+
+/** The strictest per-minute equivalent of an operation's limits: a limit L per W seconds is L / W * 60 a minute. */
+function strictestPerMinute(operation: SpecOperation): number {
+  const windows = operation["x-rate-limit"] ?? [];
+  if (windows.length === 0) throw new Error(`${operation.operationId} lists no x-rate-limit`);
+  return Math.min(...windows.map((entry) => (entry.limit / entry.window_seconds) * 60));
+}
+
+/**
+ * What the contract allows, per minute, from `x-rate-limit`. `shared` is the strictest of the employer operations that
+ * make up the shared pool (every one except demo-reset), counting every window an operation lists. `reset` is demo-reset's
+ * own: it lists 1 per 60 s AND 10 per 3600 s, strictest 10 an hour, much tighter than the pool. The BFF cannot be held to
+ * it (it keeps no counter for reset besides the general one) and upstream enforces it with its own 429; it is read here
+ * so that a change to it shows up, and so that it is never mistaken for the pool's quota.
+ */
+function contractQuotas(): { shared: number; reset: number } {
+  const operations = employerOperations();
+  const reset = operations.find((operation) => operation.operationId === "reset_demo_site");
+  if (reset === undefined) throw new Error("the contract has no reset_demo_site");
+  const shared = operations.filter((operation) => operation !== reset).map(strictestPerMinute);
+  return { shared: Math.min(...shared), reset: strictestPerMinute(reset) };
+}
+
+function contractQuotaPerMinute(): number {
+  return contractQuotas().shared;
 }
 
 describe("the BFF write limits against the contract's upstream quota", () => {
@@ -180,5 +265,76 @@ describe("the BFF write limits against the contract's upstream quota", () => {
       general: { perClient: 5, global: 5 },
       stop: { perClient: 3, global: 3 },
     });
+  });
+  it("treats demo-reset's own, tighter limit as separate: it is below the pool's quota and enforced upstream", () => {
+    const { shared, reset } = contractQuotas();
+
+    expect(reset).toBeLessThan(shared);
+    expect(reset).toBeCloseTo(10 / 60, 5);
+  });
+
+  /** A token bucket (capacity N, refill N a minute), the structure this limiter replaced, as a reference for the measure. */
+  function tokenBucketAdmissions(perMinute: number, stepMs: number, totalMs: number): number[] {
+    let tokens = perMinute;
+    const admitted: number[] = [];
+    for (let at = 0; at <= totalMs; at += stepMs) {
+      tokens = Math.min(perMinute, tokens + (perMinute / 60_000) * stepMs);
+      if (tokens >= 1) {
+        tokens -= 1;
+        admitted.push(at);
+      }
+    }
+    return admitted;
+  }
+
+  it("the measure is not vacuous: a token bucket driven the same way admits well over its limit in a 60 s window", () => {
+    const admitted = tokenBucketAdmissions(40, 100, 180_000);
+
+    expect(maxInAnyWindow(admitted, 60_000)).toBeGreaterThan(70);
+  });
+
+  it.each([
+    ["the defaults", {}],
+    ["enormous environment values, clamped", HUGE],
+  ])("driven flat out every 100 ms for 3 minutes (%s), general plus stop never admit more than the contract quota in ANY 60 s window", (_name, env) => {
+    const limits = resolveLimits(env);
+    const clock = { now: 0 };
+    const make = (perMinute: number) => createRateLimiter({ perMinute, now: () => clock.now, windowMs: LIMIT_WINDOW_MS });
+    const general = make(limits.general.global);
+    const stop = make(limits.stop.global);
+    const admittedGeneral: number[] = [];
+    const admittedStop: number[] = [];
+    const admittedAll: number[] = [];
+
+    for (clock.now = 0; clock.now <= 180_000; clock.now += 100) {
+      if (general.take("all")) {
+        admittedGeneral.push(clock.now);
+        admittedAll.push(clock.now);
+      }
+      if (stop.take("all")) {
+        admittedStop.push(clock.now);
+        admittedAll.push(clock.now);
+      }
+    }
+    admittedAll.sort((a, b) => a - b);
+
+    const quota = contractQuotaPerMinute();
+    expect(maxInAnyWindow(admittedGeneral, 60_000)).toBeLessThanOrEqual(limits.general.global);
+    expect(maxInAnyWindow(admittedStop, 60_000)).toBeLessThanOrEqual(limits.stop.global);
+    expect(maxInAnyWindow(admittedAll, 60_000)).toBeLessThanOrEqual(quota);
+    // The limits are used, not just respected: flat out, the two classes together reach the quota.
+    expect(maxInAnyWindow(admittedAll, 60_000)).toBe(limits.general.global + limits.stop.global);
+  });
+
+  it("holds for every client counter too: one address driven flat out never exceeds its own limit in any 60 s window", () => {
+    const limits = resolveLimits({});
+    const clock = { now: 0 };
+    const counter = createRateLimiter({ perMinute: limits.stop.perClient, now: () => clock.now, windowMs: LIMIT_WINDOW_MS });
+    const admitted: number[] = [];
+
+    for (clock.now = 0; clock.now <= 180_000; clock.now += 100) if (counter.take("one address")) admitted.push(clock.now);
+
+    expect(maxInAnyWindow(admitted, 60_000)).toBeLessThanOrEqual(limits.stop.perClient);
+    expect(limits.stop.perClient).toBeLessThanOrEqual(limits.stop.global);
   });
 });

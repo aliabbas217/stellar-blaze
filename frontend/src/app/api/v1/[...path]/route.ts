@@ -4,8 +4,8 @@ import { clientKey, limitersFor, trustedProxyHops } from "./rate-limit";
 
 /*
  * INVARIANT: no rate limit on another operation may block the safety path (stop work, unwell call actions). The
- * employer operations share one upstream quota per token and the demo has one shared token, so the buckets below add
- * up to that quota (rate-limit.ts) and Stop work has a reserve nothing else can drain.
+ * employer operations may share one upstream quota per token and the demo has one shared token, so the two limits below
+ * add up to that quota, exactly, in any window (rate-limit.ts), and Stop work has a reserve nothing else can drain.
  *
  * The BFF proxy: the browser calls only same-origin /api/v1/*, and this handler forwards each call to the API at
  * API_ORIGIN (read per request, so the container's runtime env decides, not the build). Web health is
@@ -31,15 +31,15 @@ const API_PREFIX = "/api/v1/";
 /*
  * The limits (rate-limit.ts has the arithmetic). Two classes that add up to the upstream quota of one token:
  *  - "stop": Stop work (create and clear a stop), a reserve of 20 a minute that nothing else draws on. A stop is refused
- *    only by this bucket. A 429 on a stop is a safety failure: the screen must say "Not sent. Tell the crew now."
+ *    only by this limit. A 429 on a stop is a safety failure: the screen must say "Not sent. Tell the crew now."
  *  - "general": every other token-bearing request, the day-plan GET included (it spends the same upstream quota): sign-off,
  *    data requests, demo reset. 40 a minute for everyone together; the BFF refuses these first.
- * Each class has a global bucket and a per-client bucket (the per-client limit never exceeds its global), so one
+ * Each class has a global limit and a per-client limit (the per-client limit never exceeds its global), so one
  * visitor cannot take a whole slice. The environment can only lower the defaults.
  */
 const GLOBAL_KEY = "demo-token";
 
-/** A 429 problem with Retry-After when either bucket is empty; otherwise takes one token from each and returns null. */
+/** A 429 problem with Retry-After when either limit is spent; otherwise records the request against both and returns null. */
 function rateLimited(request: Request, limitClass: LimitClass): Response | null {
   const { perClient, global } = limitersFor(limitClass, process.env);
   const key = clientKey(request.headers, trustedProxyHops(process.env.TRUSTED_PROXY_HOPS));
