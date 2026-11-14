@@ -174,7 +174,8 @@
       "today": "اليوم",
       "alerts": "التنبيهات",
       "unwell": "I feel unwell",
-      "myData": "My data"
+      "myData": "My data",
+      "backToToday": "Back to Today"
     },
     "today": {
       "title": "Today",
@@ -266,6 +267,54 @@
         "primary": "Open Today"
       },
       "saved": "The forecast is not available right now. This is the level the alert gave, saved on this phone."
+    },
+    "unwell": {
+      "title": "I feel unwell",
+      "worksOffline": "Calling works without internet. It needs a phone signal.",
+      "privacy": "Nothing you do on this screen is sent to your employer. Call your supervisor now.",
+      "timer": {
+        "tappedAt": "You tapped at <bdi>{time}</bdi>",
+        "elapsed": "Time since you tapped",
+        "tap": "Tap",
+        "minutes": "{count} min"
+      },
+      "offline": {
+        "title": "Offline",
+        "body": "Calling still works. It does not need internet."
+      },
+      "calls": {
+        "label": "Call for help",
+        "emergency": {
+          "title": "Call 998",
+          "detail": "Ambulance"
+        },
+        "supervisor": {
+          "title": "Call your supervisor",
+          "absent": "Your site's supervisor number appears here once your site adds it",
+          "unknown": "Your site's supervisor number is saved on this phone once you open Today with a connection"
+        },
+        "firstAider": {
+          "title": "Call the site first-aider",
+          "absent": "Your site's first-aider number appears here once your site adds it",
+          "unknown": "Your site's first-aider number is saved on this phone once you open Today with a connection",
+          "askNearby": "Ask the nearest person to call your first aider."
+        },
+        "demo": {
+          "emergency": "Demo: this would call 998 (ambulance)",
+          "supervisor": "Demo: this would call your supervisor",
+          "firstAider": "Demo: this would call the site first-aider",
+          "noCall": "No call is made in the demo.",
+          "synthetic": "Synthetic number"
+        }
+      },
+      "steps": {
+        "heading": "Heat-stroke first aid, in ADOSH's words",
+        "one": "Call emergency contact number and notify supervisor",
+        "two": "Move the sick employee to a cool shaded area",
+        "three": "Cool the employee using methods such as: soaking their clothes with water; spraying, sponging, or showering them with water; and fanning their body.",
+        "source": "Exact text of the ADOSH-SF Technical Guideline, Safety in the Heat v4.0, section 4.5(c).",
+        "reviewed": "Reviewed by an independent clinical consultant, <bdi>{date}</bdi>"
+      }
     }
   },
   "today": {

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { SiteContacts } from "@/features/profile/site-pin";
 import { useProfile } from "@/features/profile/store";
 
 /*
@@ -10,12 +11,17 @@ import { useProfile } from "@/features/profile/store";
  * This hook is for a view that CHOOSES or clears the pin (it imports the whole store). A component that only shows the
  * pin, like the worker header, reads it with `useSitePin` (site-pin.ts), which does not. The object is stable between
  * renders while the pin is unchanged, so it can sit in an effect's dependencies.
+ *
+ * `contacts` are the site's call numbers for the unwell sheet (site data, not personal; kept so the sheet works offline).
+ * `choose` keeps the stored contacts when the same site is chosen again without new ones, and drops them when the site
+ * changes: another site's supervisor number must never be offered for this one.
  */
 
 export interface DeviceSiteApi {
   readonly siteId: string | null;
   readonly crewId: string | null;
-  readonly choose: (siteId: string, crewId: string | null) => void;
+  readonly contacts: SiteContacts | undefined;
+  readonly choose: (siteId: string, crewId: string | null, contacts?: SiteContacts) => void;
   readonly clear: () => void;
 }
 
@@ -24,10 +30,16 @@ export function useDeviceSite(): DeviceSiteApi {
   const chooseSite = useProfile((state) => state.chooseSite);
   const clear = useProfile((state) => state.clearSite);
   const choose = useCallback(
-    (siteId: string, crewId: string | null) => {
-      chooseSite({ siteId, crewId });
+    (siteId: string, crewId: string | null, contacts?: SiteContacts) => {
+      // Read at call time, so the callback stays stable while the pin changes.
+      const current = useProfile.getState().site;
+      const kept = contacts ?? (current?.siteId === siteId ? current.contacts : undefined);
+      chooseSite(kept === undefined ? { siteId, crewId } : { siteId, crewId, contacts: kept });
     },
     [chooseSite],
   );
-  return useMemo(() => ({ siteId: site?.siteId ?? null, crewId: site?.crewId ?? null, choose, clear }), [site, choose, clear]);
+  return useMemo(
+    () => ({ siteId: site?.siteId ?? null, crewId: site?.crewId ?? null, contacts: site?.contacts, choose, clear }),
+    [site, choose, clear],
+  );
 }

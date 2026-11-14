@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe("WorkerDock", () => {
   it("test_dock_has_emergency_link_always: the unwell link is on every worker page, offline too, and is never disabled or in a form", () => {
-    for (const path of ["/en/worker", "/en/worker/alerts", "/en/worker/unwell", "/en/worker/alert"]) {
+    for (const path of ["/en/worker", "/en/worker/alerts", "/en/worker/alert"]) {
       pathname = path;
       vi.spyOn(navigator, "onLine", "get").mockReturnValue(path !== "/en/worker/alerts");
       const { container, unmount } = renderWithIntl(<WorkerDock />);
@@ -37,6 +37,29 @@ describe("WorkerDock", () => {
       expect(link).not.toHaveAttribute("aria-disabled");
       expect(link.closest("form")).toBeNull();
       expect(container.querySelectorAll("[data-emergency]")).toHaveLength(1);
+      unmount();
+    }
+  });
+
+  it("test_dock_shows_back_to_today_here: on the unwell sheet the dock offers Back to Today in place of I feel unwell", () => {
+    pathname = "/en/worker/unwell";
+    const { container } = renderWithIntl(<WorkerDock />);
+    expect(screen.queryByRole("link", { name: /I feel unwell/ })).not.toBeInTheDocument();
+    const back = screen.getByRole("link", { name: "Back to Today" });
+    expect(back).toHaveAttribute("href", "/en/worker");
+    expect(back).not.toHaveAttribute("aria-disabled");
+    expect(back.closest("form")).toBeNull();
+    expect(back.className).toMatch(/min-h-/);
+    // The sheet has its own emergency call: the dock adds no second [data-emergency].
+    expect(container.querySelectorAll("[data-emergency]")).toHaveLength(0);
+  });
+
+  it("the unwell link comes back on the sheet's neighbours, and Back to Today appears only on the sheet", () => {
+    for (const path of ["/en/worker", "/en/worker/alerts", "/en/worker/alert", "/en/worker/unwell-ish"]) {
+      pathname = path;
+      const { unmount } = renderWithIntl(<WorkerDock />);
+      expect(screen.getByRole("link", { name: /I feel unwell/ })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Back to Today" })).not.toBeInTheDocument();
       unmount();
     }
   });

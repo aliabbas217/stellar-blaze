@@ -20,6 +20,21 @@ export function offlineUrl(locale: Locale): string {
 /** Every offline page, one per locale: what the service worker precaches. */
 export const OFFLINE_URLS: readonly string[] = routing.locales.map(offlineUrl);
 
+/** The unwell call sheet of a locale: precached with the offline pages so it opens with no connection (F2 Task 18, safety). */
+export function unwellUrl(locale: Locale): string {
+  return `/${locale}/worker/unwell`;
+}
+
+/** Every unwell sheet, one per locale. */
+export const UNWELL_URLS: readonly string[] = routing.locales.map(unwellUrl);
+
+/**
+ * What the service worker precaches next to the build's static files: the offline pages (the fallback) and the unwell sheet
+ * (a worker in trouble may open it with no signal, before this phone has ever been online on that page). Both are static and
+ * the same for everyone, so caching them is safe (ADR 0004); the runtime-caching allow-list (D2) is untouched.
+ */
+export const PRECACHE_URLS: readonly string[] = [...OFFLINE_URLS, ...UNWELL_URLS];
+
 /** The locale a path starts with: its first segment must be one of the routing locales exactly (they are lower case). */
 function localeOf(pathname: string): Locale | undefined {
   const first = pathname.split("/")[1];

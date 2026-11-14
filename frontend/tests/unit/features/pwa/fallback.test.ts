@@ -1,4 +1,4 @@
-import { OFFLINE_URLS, fallbackUrlFor, offlineFallbacks, offlineUrl } from "@/features/pwa/fallback";
+import { OFFLINE_URLS, PRECACHE_URLS, UNWELL_URLS, fallbackUrlFor, offlineFallbacks, offlineUrl, unwellUrl } from "@/features/pwa/fallback";
 import { routing, type Locale } from "@/i18n/routing";
 
 /*
@@ -42,6 +42,27 @@ describe("OFFLINE_URLS", () => {
   it("has one offline page per routing locale, each once", () => {
     expect([...OFFLINE_URLS].sort()).toEqual(LOCALES.map((locale) => offlineUrl(locale)).sort());
     expect(new Set(OFFLINE_URLS).size).toBe(LOCALES.length);
+  });
+});
+
+describe("the unwell call sheet in the precache (F2 Task 18, safety)", () => {
+  it("test_unwell_precached_for_every_locale: /<locale>/worker/unwell, once each, for every routing locale", () => {
+    expect([...UNWELL_URLS].sort()).toEqual(LOCALES.map((locale) => `/${locale}/worker/unwell`).sort());
+    expect(new Set(UNWELL_URLS).size).toBe(LOCALES.length);
+    for (const locale of LOCALES) {
+      expect(unwellUrl(locale)).toBe(`/${locale}/worker/unwell`);
+      expect(PRECACHE_URLS).toContain(unwellUrl(locale));
+    }
+  });
+
+  it("the precache is the offline pages plus the sheets and nothing else (no personal or employer route)", () => {
+    expect([...PRECACHE_URLS].sort()).toEqual([...OFFLINE_URLS, ...UNWELL_URLS].sort());
+    expect(new Set(PRECACHE_URLS).size).toBe(PRECACHE_URLS.length);
+    for (const url of PRECACHE_URLS) expect(url).not.toMatch(/api|supervisor|day-plan|stop|sign-off/);
+  });
+
+  it("leaves the offline fallback entries alone: still one per locale, only offline pages", () => {
+    expect(offlineFallbacks().map((entry) => entry.url).sort()).toEqual([...OFFLINE_URLS].sort());
   });
 });
 

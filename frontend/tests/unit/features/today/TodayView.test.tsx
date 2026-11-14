@@ -69,6 +69,8 @@ beforeEach(() => {
   useProfile.setState({ site: null, push: null, profile: null });
 });
 
+const DEMO_CONTACTS = { supervisorPhone: "+12025550143", firstAiderPhone: "+12025550144" };
+
 const orange = () => screen.findByRole("heading", { name: "Orange" });
 
 describe("Today: no site yet", () => {
@@ -78,7 +80,10 @@ describe("Today: no site yet", () => {
     expect(await screen.findByRole("heading", { name: "Scan your crew's code" })).toBeInTheDocument();
     await userEvent.setup().click(await screen.findByRole("button", { name: "See the demo yard" }));
 
-    expect(useProfile.getState().site).toEqual({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID });
+    // The pin also takes the site's call numbers (synthetic on the demo site) for the unwell sheet to use offline (F2 Task 18).
+    await waitFor(() => {
+      expect(useProfile.getState().site).toEqual({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID, contacts: DEMO_CONTACTS });
+    });
     expect(await orange()).toBeInTheDocument();
   });
 
@@ -98,7 +103,9 @@ describe("Today: no site yet", () => {
     renderToday();
 
     expect(await orange()).toBeInTheDocument();
-    expect(useProfile.getState().site).toEqual({ siteId: SITE_DEMO, crewId: "crew-a" });
+    await waitFor(() => {
+      expect(useProfile.getState().site).toEqual({ siteId: SITE_DEMO, crewId: "crew-a", contacts: DEMO_CONTACTS });
+    });
   });
 
   it("when the site list cannot be loaded it says so and offers the retry, never a dead button", async () => {

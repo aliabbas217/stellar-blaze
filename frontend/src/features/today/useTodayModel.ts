@@ -13,6 +13,7 @@ import { useDemo } from "@/features/demo/DemoProvider";
 import { useClock } from "@/features/demo/useClock";
 import { useProfile } from "@/features/profile/store";
 import { useDeviceSite } from "@/features/profile/useDeviceSite";
+import { useSiteContactsSync } from "@/features/profile/useSiteContactsSync";
 import { describeToday, type TodayDescription } from "@/features/today/describe";
 import { useSiteToday } from "@/features/today/useSiteToday";
 import { useUrlParam } from "@/lib/url-state";
@@ -73,6 +74,8 @@ export function useTodayModel(): TodayModel {
   const [crewParam] = useUrlParam(CREW_PARAM, parseId, null);
   const pin = useDeviceSite();
   const { site: demoSite, sites, siteStatus } = useDemo();
+  // The pinned site's call numbers go onto the phone, for the unwell sheet to use offline (features/profile/useSiteContactsSync.ts).
+  useSiteContactsSync(sites);
   const queryClient = useQueryClient();
   const pushOff = useProfile((state) => state.push) === null;
 

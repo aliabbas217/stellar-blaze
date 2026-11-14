@@ -15,23 +15,65 @@ import { useSyncExternalStore } from "react";
 /** The localStorage key of the profile store (zustand persist): one JSON value that holds the profile, the push registration and the pin. */
 export const PROFILE_STORAGE_KEY = "sb-profile-v1";
 
-/** Which site, and optionally which crew, this phone is pinned to. Chosen on the phone; the API never hears of it. */
+/**
+ * The site's two call numbers, kept on the phone for the unwell sheet (F2 Task 18). They are the SITE's, the same for every
+ * worker, and not personal data; they are stored here, at pin time, so the sheet can ring offline after one visit. A field is
+ * null when the site has no such number: the sheet then shows a designed row, never an empty `tel:`.
+ */
+export interface SiteContacts {
+  readonly supervisorPhone: string | null;
+  readonly firstAiderPhone: string | null;
+}
+
+/**
+ * Which site, and optionally which crew, this phone is pinned to. Chosen on the phone; the API never hears of it.
+ * `contacts` is absent until the phone has seen the site's record (the sheet then says to open Today once); a pin written
+ * before contacts existed, or with a value of the wrong shape, reads as absent.
+ */
 export interface SitePin {
   readonly siteId: string;
   readonly crewId: string | null;
+  readonly contacts?: SiteContacts;
 }
 
 function isNonEmpty(value: unknown): value is string {
   return typeof value === "string" && value !== "";
 }
 
+/** E.164: a plus, a non-zero first digit, 7 to 15 digits in all. Anything else is never put in a `tel:` link. */
+const E164 = /^\+[1-9]\d{6,14}$/;
+
+/** `value` when it is an E.164 number, else null. */
+export function toE164(value: unknown): string | null {
+  return typeof value === "string" && E164.test(value) ? value : null;
+}
+
+/**
+ * Contacts from a stored or fetched value: both keys must be present (a string or null); a string that is not E.164 reads as
+ * null for that field. A value that is not an object with both keys is "never learned" (undefined), not "the site has none".
+ */
+export function toSiteContacts(value: unknown): SiteContacts | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const { supervisorPhone, firstAiderPhone } = value as Record<string, unknown>;
+  const ok = (field: unknown) => field === null || typeof field === "string";
+  if (!ok(supervisorPhone) || !ok(firstAiderPhone)) return undefined;
+  return { supervisorPhone: toE164(supervisorPhone), firstAiderPhone: toE164(firstAiderPhone) };
+}
+
+/** Whether two sets of contacts hold the same numbers (both absent counts as the same). */
+export function sameContacts(a: SiteContacts | undefined, b: SiteContacts | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.supervisorPhone === b.supervisorPhone && a.firstAiderPhone === b.firstAiderPhone;
+}
+
 /** A stored value is a pin only when it has a site id and a crew id that is a string or null (the store's rule). */
 export function toSitePin(value: unknown): SitePin | null {
   if (typeof value !== "object" || value === null) return null;
-  const { siteId, crewId } = value as Record<string, unknown>;
+  const { siteId, crewId, contacts } = value as Record<string, unknown>;
   if (!isNonEmpty(siteId)) return null;
   if (crewId !== null && !isNonEmpty(crewId)) return null;
-  return { siteId, crewId };
+  const known = toSiteContacts(contacts);
+  return known === undefined ? { siteId, crewId } : { siteId, crewId, contacts: known };
 }
 
 // undefined: the store has not published, read storage. null: published "no pin".
