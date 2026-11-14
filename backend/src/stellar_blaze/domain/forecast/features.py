@@ -178,6 +178,10 @@ def _require(frame: pl.DataFrame, columns: tuple[str, ...], what: str) -> None:
     missing = [name for name in columns if name not in frame.columns]
     if missing:
         raise ValueError(f"{what} lacks the required columns {missing}")
+    dtype = frame.schema["valid_time"]
+    if not (isinstance(dtype, pl.Datetime) and dtype.time_zone == "UTC"):
+        # a naive or a local (Asia/Dubai) column would give local hours, blocks and dates: the GST-for-UTC error
+        raise ValueError(f"{what}: valid_time must be a UTC-aware Datetime (time zone 'UTC'), got {dtype}")
 
 
 def _num(name: str) -> pl.Expr:
@@ -251,14 +255,21 @@ def fit_fold_stats(train_pairs: pl.DataFrame) -> FoldStats:
     lead). The window is +-7 days centred on ``doy``, truncated at the ends and never wrapped, and the mean is over the
     station-hours of the window (row-weighted: a station with more rows weighs more). ``wbgt_obs_c`` counts only where
     ``wbgt_obs_reject == 0`` and it is finite; temperature and dew point use their own non-null truth. Whatever is in
-    ``train_pairs`` is the fold: a held-out cluster must be removed by the caller and then leaves no trace.
+    ``train_pairs`` is the fold: a held-out cluster must be removed by the caller and then leaves no trace (that
+    isolation is the caller's, guarded in Tasks 10 and 11).
+
+    The statistics are computed over all the rows given. The window is centred on ``doy`` inside the same summers as
+    those rows, so for rows of those summers the climatology features are in-sample; the caller decides which rows
+    to pass (Task 10a passes the fit and the calibration rows together, so that September rows never get a null
+    climatology that the fit rows never saw). The key is the gold ``doy``, which is one day later for the same date
+    in the leap year 2024 than in 2025 and 2026 (known and accepted, parked). Pooling is row-weighted.
 
     Args:
         train_pairs: A gold-shaped frame with ``station``, ``model``, ``valid_time``, ``lead_days``, ``obs_t_c``,
             ``obs_td_c``, ``wbgt_obs_c`` and ``wbgt_obs_reject``.
 
     Raises:
-        ValueError: A required column is missing.
+        ValueError: A required column is missing, or ``valid_time`` is not UTC-aware.
     """
     _require(
         train_pairs,
@@ -303,7 +314,7 @@ def history_features(pairs: pl.DataFrame) -> pl.DataFrame:
         ``bias7_wind``; sorted by the keys.
 
     Raises:
-        ValueError: A required column is missing.
+        ValueError: A required column is missing, or ``valid_time`` is not UTC-aware.
     """
     _require(
         pairs,
@@ -393,9 +404,12 @@ def build_features(
         ``raw_td``, ``raw_wind``, ``raw_wbgt``, then the ``y_*`` that the truth columns allow.
 
     Raises:
-        ValueError: A required column is missing, or the set is ``SITE`` and ``history`` is ``None``.
+        ValueError: A required column is missing, ``valid_time`` is not UTC-aware, a row has ``lead_days < 1`` (lead 0
+            is same-day information and never enters features, L2), or the set is ``SITE`` and ``history`` is ``None``.
     """
     _require(pairs, _REQUIRED, "pairs")
+    if pairs.select((pl.col("lead_days") < MODEL_LEADS[0]).any()).item():
+        raise ValueError("pairs has rows with lead_days < 1: lead 0 never enters the features (filter it first, L2)")
     if feature_set is FeatureSet.SITE and history is None:
         raise ValueError("the site feature set needs the station history (history_features); only cold may omit it")
     have = set(pairs.columns)

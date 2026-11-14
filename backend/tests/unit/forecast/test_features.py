@@ -1,6 +1,7 @@
 """The feature builder, the fold statistics and the history features (pre-registration 3.2), on synthetic pairs."""
 
-from datetime import date, timedelta
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
 from statistics import fmean
 from typing import Any
 
@@ -62,6 +63,11 @@ def history(pairs: pl.DataFrame) -> pl.DataFrame:
 
 def ifs_rows(pairs: pl.DataFrame) -> pl.DataFrame:
     return pairs.filter(pl.col("model") == IFS)
+
+
+def model_rows(frame: pl.DataFrame) -> pl.DataFrame:
+    """The rows a loader hands to ``build_features``: lead 0 (same-day information) is filtered out first (L2)."""
+    return frame.filter(pl.col("lead_days") >= 1)
 
 
 def only(frame: pl.DataFrame, **key: object) -> dict[str, Any]:
@@ -133,8 +139,8 @@ def test_hour_block_expression_agrees_with_the_scalar_function() -> None:
 def test_one_row_per_ifs_row_in_order_with_utc_keys(
     pairs: pl.DataFrame, stats: FoldStats, history: pl.DataFrame
 ) -> None:
-    out = build_features(pairs, feature_set=FeatureSet.SITE, stats=stats, history=history)
-    ifs = ifs_rows(pairs)
+    out = build_features(model_rows(pairs), feature_set=FeatureSet.SITE, stats=stats, history=history)
+    ifs = ifs_rows(model_rows(pairs))
     assert out.height == ifs.height
     assert out["station"].to_list() == ifs["station"].to_list()
     assert out["valid_time"].to_list() == ifs["valid_time"].to_list()
@@ -152,7 +158,7 @@ def test_one_row_per_ifs_row_in_order_with_utc_keys(
 
 
 def test_features_and_targets_follow_the_formulas(pairs: pl.DataFrame, stats: FoldStats) -> None:
-    out = build_features(pairs, feature_set=FeatureSet.COLD, stats=stats, history=None)
+    out = build_features(model_rows(pairs), feature_set=FeatureSet.COLD, stats=stats, history=None)
     source = ifs_rows(pairs)
     key = {"station": "OMDB", "lead_days": 2}
     row = only(out.filter(pl.col("valid_date") == date(2025, 5, 20), pl.col("hour_utc") == 9), **key)
@@ -194,7 +200,7 @@ def test_targets_null_when_truth_missing(pairs: pl.DataFrame, stats: FoldStats) 
 def test_rejected_or_nan_wbgt_forecast_is_a_null_feature_and_rows_are_kept(
     pairs: pl.DataFrame, stats: FoldStats
 ) -> None:
-    ifs = ifs_rows(pairs)
+    ifs = ifs_rows(model_rows(pairs))
     flagged = ifs.head(3).with_columns(
         pl.Series("wbgt_fc_reject", [0, 3, 0], dtype=pl.Int8()),
         pl.Series("wbgt_fc_c", [30.0, 31.0, float("nan")], dtype=pl.Float64()),
@@ -213,7 +219,7 @@ def test_gfs_joins_on_the_same_lead(pairs: pl.DataFrame, stats: FoldStats) -> No
         .otherwise(pl.col("fc_t_c"))
         .alias("fc_t_c")
     )
-    out = build_features(shifted, feature_set=FeatureSet.COLD, stats=stats, history=None)
+    out = build_features(model_rows(shifted), feature_set=FeatureSet.COLD, stats=stats, history=None)
     gfs = {
         (r["station"], r["valid_time"], r["lead_days"]): r["fc_t_c"]
         for r in shifted.filter(pl.col("model") == GFS).iter_rows(named=True)
@@ -265,14 +271,14 @@ def test_a_missing_gfs_row_gives_null_gfs_features_and_differences() -> None:
 
 def test_site_needs_history_and_cold_does_not(pairs: pl.DataFrame, stats: FoldStats) -> None:
     with pytest.raises(ValueError, match="history"):
-        build_features(pairs, feature_set=FeatureSet.SITE, stats=stats, history=None)
-    cold = build_features(pairs, feature_set=FeatureSet.COLD, stats=stats, history=None)
+        build_features(model_rows(pairs), feature_set=FeatureSet.SITE, stats=stats, history=None)
+    cold = build_features(model_rows(pairs), feature_set=FeatureSet.COLD, stats=stats, history=None)
     assert not [name for name in cold.columns if name.startswith(("bias7_", "sclim_"))]
 
 
 def test_missing_required_columns_are_named(pairs: pl.DataFrame, stats: FoldStats) -> None:
     with pytest.raises(ValueError, match="fc_sw_wm2"):
-        build_features(pairs.drop("fc_sw_wm2"), feature_set=FeatureSet.COLD, stats=stats, history=None)
+        build_features(model_rows(pairs).drop("fc_sw_wm2"), feature_set=FeatureSet.COLD, stats=stats, history=None)
 
 
 def test_a_serving_frame_without_truth_builds_the_same_features(
@@ -284,8 +290,8 @@ def test_a_serving_frame_without_truth_builds_the_same_features(
         + ["has_joint_obs", "cluster", "summer", "hour_utc", "doy", "wbgt_fc_reject", "grid_lat", "grid_lon"]
     )
     for feature_set in FeatureSet:
-        full = build_features(pairs, feature_set=feature_set, stats=stats, history=history)
-        served = build_features(serving, feature_set=feature_set, stats=stats, history=history)
+        full = build_features(model_rows(pairs), feature_set=feature_set, stats=stats, history=history)
+        served = build_features(model_rows(serving), feature_set=feature_set, stats=stats, history=history)
         assert not [name for name in served.columns if name.startswith("y_")]
         features = list(feature_columns(feature_set))
         assert full.select(features).equals(served.select(features)), feature_set
@@ -297,7 +303,7 @@ def test_a_serving_frame_without_truth_builds_the_same_features(
 def test_an_hour_outside_the_modelled_hours_has_a_null_block_and_no_features(
     pairs: pl.DataFrame, stats: FoldStats
 ) -> None:
-    ifs = ifs_rows(pairs).head(3)
+    ifs = ifs_rows(model_rows(pairs)).head(3)
     odd = ifs.with_columns(
         (
             pl.col("valid_time")
@@ -399,7 +405,7 @@ def test_fold_stats_ignore_wbgt_truth_that_is_rejected(pairs: pl.DataFrame, stat
 
 
 def test_a_cold_feature_row_carries_the_pooled_climatology(pairs: pl.DataFrame, stats: FoldStats) -> None:
-    out = build_features(pairs, feature_set=FeatureSet.COLD, stats=stats, history=None)
+    out = build_features(model_rows(pairs), feature_set=FeatureSet.COLD, stats=stats, history=None)
     row = out.row(5, named=True)
     expected = stats.pooled_climatology.filter((pl.col("hour_utc") == row["hour_utc"]) & (pl.col("doy") == row["doy"]))
     assert row["clim_t"] == expected["clim_t"][0]
@@ -570,7 +576,7 @@ def test_history_needs_the_truth_columns(pairs: pl.DataFrame) -> None:
 def test_site_features_use_the_history_and_the_station_climatology(
     pairs: pl.DataFrame, stats: FoldStats, history: pl.DataFrame
 ) -> None:
-    out = build_features(pairs, feature_set=FeatureSet.SITE, stats=stats, history=history)
+    out = build_features(model_rows(pairs), feature_set=FeatureSet.SITE, stats=stats, history=history)
     row = only(out.filter(pl.col("hour_utc") == 8), station="OMFJ", valid_date=date(2025, 6, 4), lead_days=2)
     expected = only(history, station="OMFJ", valid_date=date(2025, 6, 4), lead_days=2, hour_block="peak")
     assert row["bias7_t"] == expected["bias7_t"]
@@ -580,7 +586,68 @@ def test_site_features_use_the_history_and_the_station_climatology(
     pooled = only(stats.pooled_climatology, hour_utc=8, doy=row["doy"])
     assert row["clim_t"] == pooled["clim_t"]
     assert row["clim_t"] != row["sclim_t"]
-    assert (
-        out.filter(pl.col("lead_days") == 0).select("bias7_t").null_count()["bias7_t"][0]
-        == out.filter(pl.col("lead_days") == 0).height
-    )  # lead 0 has no history (and never enters a fit)
+
+
+def test_build_features_refuses_lead_zero_rows(pairs: pl.DataFrame, stats: FoldStats, history: pl.DataFrame) -> None:
+    """L2 as structure: a forgotten lead-0 filter fails loudly instead of training on same-day information."""
+    assert (pairs["lead_days"] == 0).sum() > 0
+    for feature_set in FeatureSet:
+        with pytest.raises(ValueError, match="lead_days < 1"):
+            build_features(pairs, feature_set=feature_set, stats=stats, history=history)
+    gfs_lead_zero = pairs.filter((pl.col("model") == GFS) & (pl.col("lead_days") == 0))
+    with pytest.raises(ValueError, match="lead_days < 1"):  # even a stray GFS lead-0 row
+        build_features(model_rows(pairs).vstack(gfs_lead_zero), feature_set=FeatureSet.COLD, stats=stats, history=None)
+    build_features(model_rows(pairs), feature_set=FeatureSet.COLD, stats=stats, history=None)  # without it: fine
+
+
+def test_history_and_fold_stats_just_ignore_lead_zero_rows(pairs: pl.DataFrame, stats: FoldStats) -> None:
+    only_modelled = model_rows(pairs)
+    assert history_features(pairs).equals(history_features(only_modelled))
+    again = fit_fold_stats(only_modelled)
+    assert again.pooled_climatology.equals(stats.pooled_climatology)
+    assert again.station_climatology.equals(stats.station_climatology)
+
+
+def test_hours_after_the_modelled_ones_keep_their_utc_date(pairs: pl.DataFrame, stats: FoldStats) -> None:
+    """20:00, 22:00 and 23:00 UTC are 00:00-03:00 GST of the NEXT day, but the row's date is the UTC 9 July."""
+    rows = ifs_rows(model_rows(pairs)).head(3)
+    late = [datetime(2025, 7, 9, hour, tzinfo=UTC) for hour in (20, 22, 23)]
+    odd = rows.with_columns(pl.Series("valid_time", late, dtype=pl.Datetime("us", "UTC")))
+    out = build_features(odd, feature_set=FeatureSet.COLD, stats=stats, history=None)
+    assert out["hour_utc"].to_list() == [20, 22, 23]
+    assert out["valid_date"].to_list() == [date(2025, 7, 9)] * 3
+    assert out["hour_block"].null_count() == 3
+    values = [c for c in feature_columns(FeatureSet.COLD) if c not in ("lead_days", "hour_utc")]
+    assert all(out[c].null_count() == 3 for c in values)
+    assert all(out[c].null_count() == 3 for c in ("raw_t", "raw_wbgt", "y_t", "y_wbgt"))
+
+
+# === the time zone of valid_time ====================================================================================
+
+
+def _as_dubai(frame: pl.DataFrame) -> pl.DataFrame:
+    return frame.with_columns(pl.col("valid_time").dt.convert_time_zone("Asia/Dubai"))  # the same instants, GST clock
+
+
+def _as_naive(frame: pl.DataFrame) -> pl.DataFrame:
+    return frame.with_columns(pl.col("valid_time").dt.replace_time_zone(None))
+
+
+@pytest.mark.parametrize("convert", [_as_dubai, _as_naive], ids=["asia-dubai", "naive"])
+@pytest.mark.parametrize("entry", ["fit_fold_stats", "history_features", "build_features"])
+def test_valid_time_must_be_utc_aware(
+    pairs: pl.DataFrame,
+    stats: FoldStats,
+    history: pl.DataFrame,
+    entry: str,
+    convert: Callable[[pl.DataFrame], pl.DataFrame],
+) -> None:
+    """A GST or naive clock would give GST hours, blocks and dates (a 02:00 UTC row would land in ``peak``)."""
+    frame = convert(model_rows(pairs))
+    calls: dict[str, Callable[[], object]] = {
+        "fit_fold_stats": lambda: fit_fold_stats(frame),
+        "history_features": lambda: history_features(frame),
+        "build_features": lambda: build_features(frame, feature_set=FeatureSet.SITE, stats=stats, history=history),
+    }
+    with pytest.raises(ValueError, match=r"valid_time must be a UTC-aware Datetime.*got Datetime"):
+        calls[entry]()

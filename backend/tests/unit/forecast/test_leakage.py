@@ -23,7 +23,7 @@ from stellar_blaze.domain.forecast.features import (
 )
 from stellar_blaze.domain.forecast.grid import MODELLED_HOURS_UTC
 from tests.fixtures.forecast.synthetic import make_pairs
-from tests.unit.forecast.test_features import FIRST_DAY, reference_climatology
+from tests.unit.forecast.test_features import FIRST_DAY, model_rows, reference_climatology
 
 pytestmark = pytest.mark.unit
 
@@ -47,7 +47,7 @@ def pairs() -> pl.DataFrame:
         summers=(2025,),
         station_bias_c={"OMAA": 1.5, "OMFJ": -1.0},
         stations=("OMAA", "OMDB", "OMFJ"),
-        leads=(0, 1, 2, 3),
+        leads=range(8),
         hours_utc=MODELLED_HOURS_UTC,
         summer_days=range(1, 29),
     )
@@ -75,7 +75,7 @@ def history_of(table: pl.DataFrame, day: date, lead: int) -> pl.DataFrame:
 
 
 @HYPOTHESIS
-@given(offset=st.integers(5, 27), lead=st.sampled_from([1, 2, 3]), amount=st.sampled_from([-20.0, 20.0]))
+@given(offset=st.integers(8, 27), lead=st.sampled_from(range(1, 8)), amount=st.sampled_from([-20.0, 20.0]))
 def test_history_ignores_truth_on_or_after_issue_day(
     pairs: pl.DataFrame, offset: int, lead: int, amount: float
 ) -> None:
@@ -98,7 +98,7 @@ def test_history_ignores_truth_on_or_after_issue_day(
 
 
 @HYPOTHESIS
-@given(offset=st.integers(5, 27), lead=st.sampled_from([1, 2, 3]), amount=st.sampled_from([-20.0, 20.0]))
+@given(offset=st.integers(8, 27), lead=st.sampled_from(range(1, 8)), amount=st.sampled_from([-20.0, 20.0]))
 def test_site_features_ignore_truth_on_or_after_issue_day(
     pairs: pl.DataFrame, stats: FoldStats, offset: int, lead: int, amount: float
 ) -> None:
@@ -108,7 +108,12 @@ def test_site_features_ignore_truth_on_or_after_issue_day(
     columns = list(feature_columns(FeatureSet.SITE))
 
     def built(frame: pl.DataFrame) -> pl.DataFrame:
-        out = build_features(frame, feature_set=FeatureSet.SITE, stats=stats, history=history_features(frame))
+        out = build_features(
+            model_rows(frame),
+            feature_set=FeatureSet.SITE,
+            stats=stats,
+            history=history_features(frame),
+        )
         return out.filter((pl.col("valid_date") == day) & (pl.col("lead_days") == lead)).sort("station", "hour_utc")
 
     base, perturbed = built(pairs), built(future)
@@ -154,8 +159,8 @@ def test_features_do_not_depend_on_any_banned_column(pairs: pl.DataFrame, stats:
     )
     assert scrambled.select("ref_sw_wm2", "obs_t_c").drop_nulls().height > 0  # they hold real values
     columns = list(feature_columns(FeatureSet.COLD))
-    base = build_features(pairs, feature_set=FeatureSet.COLD, stats=stats, history=None)
-    changed = build_features(scrambled, feature_set=FeatureSet.COLD, stats=stats, history=None)
+    base = build_features(model_rows(pairs), feature_set=FeatureSet.COLD, stats=stats, history=None)
+    changed = build_features(model_rows(scrambled), feature_set=FeatureSet.COLD, stats=stats, history=None)
     assert changed.select(columns).equals(base.select(columns))
     assert not changed["y_t"].equals(base["y_t"])  # the scramble did reach the targets, which may read the truth
 
@@ -163,17 +168,18 @@ def test_features_do_not_depend_on_any_banned_column(pairs: pl.DataFrame, stats:
 # === L4 + L6: fold statistics come from the fold's training rows only ===============================================
 
 
-def test_fold_stats_ignore_heldout_rows(pairs: pl.DataFrame) -> None:
+def test_fold_stats_read_only_the_rows_they_are_given(pairs: pl.DataFrame) -> None:
+    """The pure-function contract of ``fit_fold_stats`` (L4, L6): the fold is exactly the rows passed in.
+
+    Removing a held-out cluster from the fold is the caller's job and is guarded where the folds are built (Tasks 10
+    and 11); here we pin that the statistics are the ones of the given rows and of nothing else: the pooled values equal
+    a plain loop over the kept stations, no other station appears, the cluster left in would change them, and so would
+    a kept cluster's truth.
+    """
     held_out = pl.col("cluster") == "fujairah"
     train = pairs.filter(~held_out)
     reference = fit_fold_stats(train)
-
-    # the held-out cluster's truth is replaced by garbage; the fold (which has the cluster removed) cannot see it
-    garbage = shifted(pairs, held_out, 25.0, (*OBS, "wbgt_obs_c")).filter(~held_out)
-    after = fit_fold_stats(garbage)
-    assert after.pooled_climatology.equals(reference.pooled_climatology)
-    assert after.station_climatology.equals(reference.station_climatology)
-    assert "OMFJ" not in reference.station_climatology["station"].to_list()  # no trace of it at all
+    assert set(reference.station_climatology["station"].to_list()) == set(train["station"].to_list())
 
     # the pooled climatology is the one of the remaining stations (a plain loop), not of all three
     for hour, doy in ((6, 140), (11, 150), (9, 128)):
@@ -182,7 +188,7 @@ def test_fold_stats_ignore_heldout_rows(pairs: pl.DataFrame) -> None:
             got = reference.pooled_climatology.filter((pl.col("hour_utc") == hour) & (pl.col("doy") == doy))[column][0]
             assert got == pytest.approx(expected, abs=1e-9)
 
-    # the test can fail: with the cluster left in the fold the statistics differ, and a kept cluster moves them too
+    # sensitivity: with the cluster left in the fold the statistics differ, and a kept cluster moves them too
     assert not fit_fold_stats(pairs).pooled_climatology.equals(reference.pooled_climatology)
     kept = shifted(pairs, pl.col("cluster") == "dubai_sharjah", 25.0, (*OBS, "wbgt_obs_c")).filter(~held_out)
     assert not fit_fold_stats(kept).pooled_climatology.equals(reference.pooled_climatology)
