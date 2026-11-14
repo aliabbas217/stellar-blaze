@@ -16,8 +16,8 @@ export const DATA_MANIFEST = {
     "label": "RECORDED"
   },
   "static/roster_frontier.json": {
-    "sha256": "cc14dabe4b5c44db47988befcdff6ecaf034c675e412c7441823fcd04bd1501f",
-    "bytes": 21014,
+    "sha256": "8d1ff102ff0bc20200cbb1b3a5fbe58b5c8b3dbad3a1c0f7f7c378f0654513cb",
+    "bytes": 20226,
     "source": "docs/research/scripts/roster/legal_sleep_templates.py v2",
     "label": "REAL weather + assumed crew"
   },
