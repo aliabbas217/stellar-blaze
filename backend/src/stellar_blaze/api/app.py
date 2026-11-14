@@ -11,7 +11,8 @@ from fastapi.routing import APIRoute
 from stellar_blaze import __version__
 from stellar_blaze.adapters.db.engine import build_engine
 from stellar_blaze.api.middleware import RequestLogMiddleware
-from stellar_blaze.api.routers import health
+from stellar_blaze.api.openapi import install_openapi
+from stellar_blaze.api.routers import crews, governance, health, plans, push, sites
 from stellar_blaze.application.runtime_config import ConfigPoller, ConfigService, SnapshotHolder
 from stellar_blaze.composition import build_config_service, build_config_store, build_runtime, dubai_today
 from stellar_blaze.config import Settings, get_settings
@@ -114,7 +115,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(CorrelationIdMiddleware, header_name=REQUEST_ID_HEADER)
     install_problem_handlers(app)
 
-    app.include_router(health.router, prefix=API_PREFIX)
+    for router in (health.router, sites.router, crews.router, plans.router, push.router, governance.router):
+        app.include_router(router, prefix=API_PREFIX)
+    install_openapi(app)
 
     configure_tracing(app, settings)
     return app

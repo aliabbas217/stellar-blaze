@@ -23,6 +23,17 @@ PROBLEM_JSON = "application/problem+json"
 REQUEST_ID_HEADER = "X-Request-ID"
 # `type` of the 503 problem for a dependency the API needs and cannot reach (database, active runtime config).
 DEPENDENCY_UNAVAILABLE = "urn:stellar-blaze:problem:dependency-unavailable"
+# Problem types of the v1 contract (ADR 0051 and its amendments). `type` is a URN, stable for the life of the contract.
+NOT_IMPLEMENTED = "urn:stellar-blaze:problem:not-implemented"  # 501, a route whose body is not built yet
+UNAUTHORIZED = "urn:stellar-blaze:problem:unauthorized"  # 401, no or unknown bearer token
+FORBIDDEN_EMPLOYER = "urn:stellar-blaze:problem:forbidden-employer"  # 403, a token of another employer
+INDIVIDUAL_DATA_REFUSED = "urn:stellar-blaze:problem:individual-data-refused"  # 403, ADR 0054
+NOT_FOUND = "urn:stellar-blaze:problem:not-found"  # 404, unknown site, crew or other id
+PLAN_INVALID = "urn:stellar-blaze:problem:plan-invalid"  # 500, the validator rejected the planner's own plan
+ROSTER_INVALID = "urn:stellar-blaze:problem:roster-invalid"  # 422, try-a-plan input that does not parse
+REVIEW_REQUIRED = "urn:stellar-blaze:problem:review-required"  # 409, sign-off without every item acknowledged
+NOT_A_DEMO_SITE = "urn:stellar-blaze:problem:not-a-demo-site"  # 409, reset of a site that is not synthetic
+RATE_LIMITED = "urn:stellar-blaze:problem:rate-limited"  # 429, with a Retry-After header
 
 logger = structlog.stdlib.get_logger(__name__)
 
