@@ -20,4 +20,7 @@ def build_engine(settings: Settings) -> AsyncEngine:
             "timeout": settings.readiness_timeout_s,
         },
         pool_pre_ping=True,
+        # Statement parameters can be a push endpoint and keys or a token hash: an error message or a log line that
+        # carries them leaks a capability. Hidden for every statement in the process.
+        hide_parameters=True,
     )

@@ -7,6 +7,8 @@ import polars as pl
 import pytest
 
 from stellar_blaze.adapters.fakes.corrector import FakeCorrector
+from stellar_blaze.adapters.http.client import UpstreamError
+from stellar_blaze.adapters.sources.replay import ReplaySnapshotError
 from stellar_blaze.domain.plans.model import ZoneTimeline
 from stellar_blaze.domain.risk.levels import AlertLevel, Zone
 from stellar_blaze.domain.rules.ruleset import Ruleset
@@ -178,6 +180,71 @@ async def test_upstream_and_data_errors_are_a_labelled_fallback(error: Exception
 
     assert day.forecast_status == "fallback"
     assert set(day.zones.zones) == {Zone.HIGH}
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        UpstreamError("503", url="https://x.invalid/v1", status=503),
+        UpstreamError("down", url="https://x.invalid/v1", status=None),
+        ReplaySnapshotError("hash mismatch"),
+    ],
+    ids=["upstream-503", "upstream-no-response", "replay-snapshot"],
+)
+async def test_the_real_adapter_errors_are_a_labelled_fallback(error: Exception) -> None:
+    """R1: live sources raise ``UpstreamError`` and replay ``ReplaySnapshotError``; neither may become a 500."""
+
+    class Down:
+        async def previous_runs(self, **_: object) -> pl.DataFrame:
+            raise error
+
+    day = await make_site_day(Down(), mode="live", now=datetime(2026, 7, 1, 1, tzinfo=UTC))  # type: ignore[arg-type]
+
+    assert day.forecast_status == "fallback"
+    assert set(day.zones.zones) == {Zone.HIGH}
+    assert day.identity.model_id is None
+
+
+class _BrokenCorrector(FakeCorrector):
+    def __init__(self, error: Exception, *, in_sample: bool) -> None:
+        super().__init__(0.0)
+        self._error = error
+        self._in_sample = in_sample
+
+    def correct(self, **kwargs: object) -> pl.DataFrame:
+        if not self._in_sample:
+            raise self._error
+        return super().correct(**kwargs)  # type: ignore[arg-type]
+
+    def sample(self, *args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        raise self._error
+
+
+@pytest.mark.parametrize("in_sample", [False, True], ids=["correct", "sample"])
+@pytest.mark.parametrize(
+    "error",
+    [RuntimeError("booster"), FileNotFoundError("model.txt"), TypeError("lightgbm")],
+    ids=lambda e: type(e).__name__,
+)
+async def test_any_corrector_failure_is_a_labelled_fallback(error: Exception, in_sample: bool) -> None:
+    """R1: the corrector is an operational dependency; whatever it raises, the safe day is the protective one."""
+    day = await make_site_day(forecasts_of(day_of(GREEN_DAY)), corrector=_BrokenCorrector(error, in_sample=in_sample))
+
+    assert day.forecast_status == "fallback"
+    assert set(day.zones.zones) == {Zone.HIGH}
+    assert day.identity.model_id is None
+
+
+async def test_a_type_error_in_our_own_code_still_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stellar_blaze.application import site_day as module
+
+    def broken(*_: object, **__: object) -> object:
+        raise TypeError("a bug in the TWL maths")
+
+    monkeypatch.setattr(module, "twl_sample_matrix", broken)
+
+    with pytest.raises(TypeError, match="TWL maths"):
+        await make_site_day(forecasts_of(day_of(GREEN_DAY)))
 
 
 async def test_replay_never_stale() -> None:

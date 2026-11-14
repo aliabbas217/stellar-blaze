@@ -78,6 +78,11 @@ class WebPushChannel:
     def __repr__(self) -> str:
         return f"WebPushChannel(subject={self._subject!r})"  # never the key
 
+    @property
+    def timeout_s(self) -> float:
+        """The timeout every ``webpush_async`` call gets; the dispatch adds a hard deadline of its own on top."""
+        return self._timeout_s
+
     async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
         arguments: dict[str, Any] = {
             "subscription_info": {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}},

@@ -2,7 +2,6 @@
 earlier than the lead window, dedupe, a stop escalated by the next run, the cadence recorded, sign-off never a gate."""
 
 import ast
-import asyncio
 import dataclasses
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
@@ -518,7 +517,12 @@ def module_path(name: str) -> Path | None:
 
 
 def test_the_dispatch_import_graph_has_no_signoff() -> None:
-    """The module and everything first-party it reaches never names a sign-off store, state or module."""
+    """The module and everything first-party it reaches never names a sign-off store, state or module.
+
+    This test IS the proof that sign-off never gates an alert: ``dispatch`` has no sign-off collaborator, so no
+    behavior test could fail by construction (the earlier one was deleted as vacuous). The stop-route tests (a stop is
+    recorded and escalated with or without a sign-off) are in ``tests/unit/api/test_signoff.py``.
+    """
     seen: set[str] = set()
     todo = ["stellar_blaze.application.alerts"]
     while todo:
@@ -537,45 +541,3 @@ def test_the_dispatch_import_graph_has_no_signoff() -> None:
     source = MODULE.read_text(encoding="utf-8").lower()
     assert "plan_signoff" not in source
     assert "plansignoffstore" not in source
-
-
-class BlockingSignoffStore:
-    """A sign-off store whose every call waits forever: whatever read it would hang."""
-
-    async def latest(self, *_: object) -> None:
-        await asyncio.Event().wait()
-
-    async def insert(self, *_: object) -> None:
-        await asyncio.Event().wait()
-
-
-class RefusingSignoffStore:
-    """A sign-off store in the refused state: every call raises."""
-
-    async def latest(self, *_: object) -> None:
-        raise RuntimeError("sign-off refused")
-
-    async def insert(self, *_: object) -> None:
-        raise RuntimeError("sign-off refused")
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("state", ["none", "refused", "in-flight"])
-async def test_sign_off_never_gates_an_alert(state: str) -> None:
-    """With no sign-off, a refused one or one in flight (a blocking store), the same events come out without waiting.
-
-    The dispatch has no sign-off collaborator at all (the import test above is the structural proof, and this test
-    cannot fail by construction while that holds); it pins the behavior: the identical stop scenario, under a hard
-    timeout, gives the identical events in every state, and nothing touches the store that is in that state.
-    """
-    w = await world(AMBER_FROM_10)
-    signoffs = {"none": None, "refused": RefusingSignoffStore(), "in-flight": BlockingSignoffStore()}[state]
-    assert (signoffs is None) == (state == "none")
-    epoch = await w.sites.active_epoch(SITE_ID)
-    w.clock.now = datetime(2026, 7, 1, 7, 20, tzinfo=UTC)
-    await w.stops.start("crew-b", "heat", "lead-b", epoch)
-
-    report = await asyncio.wait_for(w.run(datetime(2026, 7, 1, 7, 25, tzinfo=UTC)), timeout=5)
-
-    assert [(r.crew_id, r.level, r.kind) for r in w.crew_events("crew-b")] == [("crew-b", R, "escalate")]
-    assert report.events_created == len(w.crews) + 1  # the site and every crew; crew-b's is the red one

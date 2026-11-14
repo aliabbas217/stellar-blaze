@@ -26,6 +26,13 @@ class PostgresAlertStore:
             row = (await connection.execute(statement)).mappings().first()
         return None if row is None else AlertRecord.model_validate(dict(row))
 
+    async def exists(self, epoch_id: int, dedupe_key: str) -> bool:
+        statement = (
+            select(AlertEvent.id).where(AlertEvent.epoch_id == epoch_id, AlertEvent.dedupe_key == dedupe_key).limit(1)
+        )
+        async with self._engine.connect() as connection:
+            return (await connection.execute(statement)).first() is not None
+
     async def insert(self, event: AlertEventInput) -> AlertRecord | None:
         statement = (
             insert(AlertEvent)

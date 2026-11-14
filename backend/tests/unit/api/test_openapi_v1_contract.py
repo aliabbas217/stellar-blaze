@@ -831,7 +831,12 @@ def test_rate_limits_are_in_the_contract_on_every_employer_operation(spec: dict[
         if not employer:
             assert "x-rate-limit" not in operation, op_id
             continue
-        expected: list[dict[str, Any]] = [{"limit": 1, "window_seconds": 60}, {"limit": 10, "window_seconds": 3600}]
+        # The reset charges its own windows AND the general bucket (``ResetEmployerDep``); the contract lists all three.
+        expected: list[dict[str, Any]] = [
+            {"limit": 1, "window_seconds": 60},
+            {"limit": 10, "window_seconds": 3600},
+            {"limit": 60, "window_seconds": 60},
+        ]
         if op_id == "create_crew_stop":  # the safety path has its own bucket (ledger R-Q)
             expected = [{"limit": 30, "window_seconds": 60, "bucket": "stop"}]
             assert "has its own bucket" in operation["description"]
@@ -843,7 +848,10 @@ def test_rate_limits_are_in_the_contract_on_every_employer_operation(spec: dict[
             assert f"{item['limit']} per {item['window_seconds']} s" in operation["description"], op_id
 
 
-ALERT_SENTENCE = "push alerts follow within one dispatch interval"
+ALERT_SENTENCE = "push alerts follow within one dispatch interval of the stop when the alert dispatch job is running"
+RESUME_SENTENCE = (
+    "A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it elapsing"
+)
 
 
 @pytest.mark.unit
@@ -859,7 +867,9 @@ def test_stop_and_sign_off_copy_never_claims_delivery(spec: dict[str, Any]) -> N
         schemas(spec)["CrewStop"]["description"],
     ]
     for text in texts:
-        flat = " ".join(text.split()).replace(ALERT_SENTENCE, "")
+        flat = " ".join(text.split()).replace(ALERT_SENTENCE, "").replace(RESUME_SENTENCE, "")
         assert not claim.search(flat), text
     assert "Stop recorded" in stop_texts[0]
     assert " ".join(stop_texts[0].split()).count(ALERT_SENTENCE) == 1
+    assert " ".join(stop_texts[1].split()).count(RESUME_SENTENCE) == 1
+    assert "Resume recorded" in stop_texts[1]

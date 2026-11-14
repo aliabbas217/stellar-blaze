@@ -17,10 +17,11 @@ import datetime as dt
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from pydantic.config import JsonDict
 from pydantic.types import JsonValue
 
+from stellar_blaze.api.push_validation import check_endpoint, check_expiration, check_key
 from stellar_blaze.api.schemas import ResponseModel
 from stellar_blaze.domain.risk.levels import AlertLevel
 from stellar_blaze.domain.scoreboard import WbgtQuantiles
@@ -788,6 +789,11 @@ class PushSubscriptionKeys(ApiRequest):
     p256dh: str = Field(max_length=256, description="The browser's P-256 public key, base64url, exactly as produced.")
     auth: str = Field(max_length=256, description="The browser's auth secret, base64url, exactly as produced.")
 
+    @field_validator("p256dh", "auth")
+    @classmethod
+    def _base64url(cls, value: str) -> str:
+        return check_key(value)  # a ValueError: answered by the 422 handler, adds no schema constraint
+
 
 class PushSubscriptionDetails(ApiRequest):
     model_config = ConfigDict(
@@ -807,13 +813,24 @@ class PushSubscriptionDetails(ApiRequest):
 
     endpoint: str = Field(
         max_length=2048,
-        description="The browser's push endpoint. A per-device address stored for delivery only, never logged.",
+        description="The browser's push endpoint. A per-device address stored for delivery only, never logged. "
+        "It must be an https URL of a public host: no IP address, no internal name, no credentials.",
     )
     expiration_time: float | None = Field(
         alias="expirationTime",
         description="Epoch milliseconds when the browser says the subscription expires, or null.",
     )
     keys: PushSubscriptionKeys = Field(description="The encryption keys of the subscription.")
+
+    @field_validator("endpoint")
+    @classmethod
+    def _public_https(cls, value: str) -> str:
+        return check_endpoint(value)
+
+    @field_validator("expiration_time")
+    @classmethod
+    def _finite_int64(cls, value: float | None) -> float | None:
+        return check_expiration(value)
 
 
 class PushSubscriptionCreate(ApiRequest):

@@ -21,7 +21,6 @@ from zoneinfo import ZoneInfo
 import httpx2
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from stellar_blaze.adapters.compute.lgbm_corrector import LightGbmCorrector
 from stellar_blaze.adapters.config.models import scan_models
 from stellar_blaze.adapters.config.rulesets import load_catalog
 from stellar_blaze.adapters.config.runtime_file import load_runtime_config_file
@@ -358,6 +357,10 @@ class CorrectorProvider:
         with self._lock:
             corrector = self._loaded.get(key)
             if corrector is None:
+                # Imported here, not at module top: it pulls lightgbm and scikit-learn, which `sb-jobs` and the other
+                # entrypoints that never serve a model must not import (the training-packages guard tests).
+                from stellar_blaze.adapters.compute.lgbm_corrector import LightGbmCorrector
+
                 corrector = self._loaded[key] = LightGbmCorrector.load(model)
             return corrector
 

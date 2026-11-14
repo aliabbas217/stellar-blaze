@@ -41,6 +41,7 @@ class RecordingPushChannel:
     that breaks its contract), ``closed`` says ``aclose`` ran."""
 
     name = "recording"
+    timeout_s = 10.0
 
     def __init__(self, results: Mapping[str, DeliveryResult] | None = None, raises: set[str] | None = None) -> None:
         self.results: Mapping[str, DeliveryResult] = results or {}

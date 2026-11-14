@@ -96,6 +96,24 @@ async def check_delete_and_delete_gone_are_idempotent(world: World) -> None:
     assert await world.push.upsert_by_endpoint(sub("https://push.example/a"), epoch) != a
 
 
+async def check_id_for_endpoint_and_the_counts_are_per_epoch(world: World) -> None:
+    epoch = await seeded(world)
+    later = await world.sites.start_epoch(SITE_ID, "demo-token")
+    site_wide = await world.push.upsert_by_endpoint(sub("https://push.example/site"), epoch)
+    crew_a = await world.push.upsert_by_endpoint(sub("https://push.example/a", crew_id="crew-a"), epoch)
+
+    assert await world.push.id_for_endpoint("https://push.example/site", epoch) == site_wide
+    assert await world.push.id_for_endpoint("https://push.example/a", epoch) == crew_a
+    assert await world.push.id_for_endpoint("https://push.example/site", later) is None
+    assert await world.push.id_for_endpoint("https://push.example/none", epoch) is None
+    assert await world.push.count_for_site(SITE_ID, epoch) == 2  # crew-targeted subscriptions count for the site
+    assert await world.push.count_for_crew("crew-a", epoch) == 1
+    assert await world.push.count_for_crew("crew-b", epoch) == 0
+    assert await world.push.count_for_site(SITE_ID, later) == 0
+    await world.push.delete(site_wide)
+    assert await world.push.count_for_site(SITE_ID, epoch) == 1
+
+
 CHECKS: dict[str, Check] = {
     name.removeprefix("check_"): fn for name, fn in sorted(globals().items()) if name.startswith("check_")
 }

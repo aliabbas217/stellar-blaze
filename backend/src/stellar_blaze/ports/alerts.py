@@ -45,6 +45,11 @@ class AlertStore(Protocol):
         """The latest event of this target in this epoch (``crew_id=None``: the site's own events), or ``None``."""
         ...
 
+    async def exists(self, epoch_id: int, dedupe_key: str) -> bool:
+        """Whether an event with this ``(epoch_id, dedupe_key)`` is stored: asked BEFORE sending, so a stored event is
+        never sent again."""
+        ...
+
     async def insert(self, event: AlertEventInput) -> AlertRecord | None:
         """Store the event; ``None`` when its ``(epoch_id, dedupe_key)`` exists already (nothing changed)."""
         ...

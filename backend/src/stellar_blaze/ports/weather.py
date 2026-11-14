@@ -14,6 +14,14 @@ from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.domain.weather.stations import Station
 
 
+class SourceUnavailableError(Exception):
+    """A weather source could not give an answer (an upstream outage or a replay snapshot that cannot be read).
+
+    The port-level base of the adapters' own errors (``UpstreamError``, ``ReplaySnapshotError``): the application layer
+    cannot import adapters, and the protective forecast fallback must catch every real source failure by one name.
+    """
+
+
 class ObservationSource(Protocol):
     """Observed weather at a station: the truth that forecasts are scored against."""
 

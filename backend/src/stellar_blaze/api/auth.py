@@ -69,8 +69,9 @@ def parse_access_tokens(raw: str) -> Mapping[str, Principal]:
     """
     try:
         entries = _Tokens.model_validate(json.loads(raw)).root
-    except (json.JSONDecodeError, ValueError) as error:
-        raise ValueError("SB_ACCESS_TOKENS must be JSON {sha256: {actor, role, employer_id}}") from error
+    except (json.JSONDecodeError, ValueError):
+        # ``from None``: a startup traceback must not echo pydantic's ``input_value=`` of a malformed SB_ACCESS_TOKENS.
+        raise ValueError("SB_ACCESS_TOKENS must be JSON {sha256: {actor, role, employer_id}}") from None
     principals: dict[str, Principal] = {}
     for key, entry in entries.items():
         if len(key) != 64 or key != key.lower() or any(c not in "0123456789abcdef" for c in key):

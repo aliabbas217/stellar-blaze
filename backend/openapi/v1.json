@@ -2489,7 +2489,7 @@
         ],
         "properties": {
           "endpoint": {
-            "description": "The browser's push endpoint. A per-device address stored for delivery only, never logged.",
+            "description": "The browser's push endpoint. A per-device address stored for delivery only, never logged. It must be an https URL of a public host: no IP address, no internal name, no credentials.",
             "maxLength": 2048,
             "title": "Endpoint",
             "type": "string"
@@ -4477,7 +4477,7 @@
     },
     "/api/v1/crews/{crew_id}/stops": {
       "post": {
-        "description": "Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.\n\nStop recorded. It is visible on the next read; push alerts follow within one dispatch interval.\n\nRate limit, per access token: 30 per 60 s. The stop has its own bucket, independent of every other employer operation: no other limit can block it. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.\n\nStop recorded. It is visible on the next read; push alerts follow within one dispatch interval of the stop when\nthe alert dispatch job is running.\n\nIdempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch\nreturns that stop (201, same body, no second row, no second audit row).\n\nKnown edge (not changed): the warning levels cover the working day 06:00 to 20:00 site-local, so a stop recorded\noutside it changes no warning level, and a stop that was never cleared is read again by the next day's runs only\nthrough the stops of that day's window.\n\nRate limit, per access token: 30 per 60 s. The stop has its own bucket, independent of every other employer operation: no other limit can block it. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "create_crew_stop",
         "parameters": [
           {
@@ -4680,7 +4680,7 @@
     },
     "/api/v1/crews/{crew_id}/stops/{stop_id}": {
       "delete": {
-        "description": "Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.\n\nResume recorded. It is visible on the next read; push alerts follow within one dispatch interval.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.\n\nResume recorded. A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it\nelapsing.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "delete_crew_stop",
         "parameters": [
           {
@@ -5258,7 +5258,7 @@
     },
     "/api/v1/push/subscriptions": {
       "post": {
-        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown\n`site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The body holds no worker identifier by\ndesign.",
+        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted\nagainst the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The\nendpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at\nmost 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, \"too many subscriptions\"). The body\nholds no worker identifier by design.\n\nA store failure answers 500 without data: the cause may carry the statement parameters (the endpoint and keys), so\nonly its class name is logged and the exception chain is cut (``from None``).",
         "operationId": "create_push_subscription",
         "requestBody": {
           "content": {
@@ -5887,7 +5887,7 @@
     },
     "/api/v1/sites/{site_id}/demo-reset": {
       "post": {
-        "description": "Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.\n\nA reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events\nand push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not\nepoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic\nanswers `not-a-demo-site` (409).\n\nRate limit, per access token: 1 per 60 s, 10 per 3600 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.\n\nA reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events\nand push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not\nepoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic\nanswers `not-a-demo-site` (409).\n\nRate limit, per access token: 1 per 60 s, 10 per 3600 s, 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "reset_demo_site",
         "parameters": [
           {
@@ -6122,6 +6122,10 @@
           {
             "limit": 10,
             "window_seconds": 3600
+          },
+          {
+            "limit": 60,
+            "window_seconds": 60
           }
         ]
       }

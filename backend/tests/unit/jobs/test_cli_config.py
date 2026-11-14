@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 from typer.testing import CliRunner, Result
 
+from stellar_blaze.adapters.fakes.audit import InMemoryAuditLog
 from stellar_blaze.adapters.fakes.config_store import InMemoryConfigStore
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
@@ -42,6 +43,7 @@ def store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> InMemoryConfigStor
         return fake
 
     monkeypatch.setattr(cli, "build_config_store", build)
+    monkeypatch.setattr(cli, "build_audit_log", lambda _engine, **_kw: InMemoryAuditLog())  # no database is touched
     return fake
 
 

@@ -23,6 +23,15 @@ class InMemoryPushStore:
         )
         return new_id
 
+    async def id_for_endpoint(self, endpoint: str, epoch_id: int) -> str | None:
+        return next((r.id for r in self._rows.values() if r.epoch_id == epoch_id and r.endpoint == endpoint), None)
+
+    async def count_for_site(self, site_id: str, epoch_id: int) -> int:
+        return len(await self.for_site(site_id, epoch_id))
+
+    async def count_for_crew(self, crew_id: str, epoch_id: int) -> int:
+        return len(await self.for_crew(crew_id, epoch_id))
+
     async def delete(self, subscription_id: str) -> None:
         self._rows.pop(subscription_id, None)
 

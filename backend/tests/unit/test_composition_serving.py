@@ -53,7 +53,7 @@ def test_a_model_is_loaded_once_and_reused(monkeypatch: pytest.MonkeyPatch) -> N
         loaded.append(model.manifest.model_id)
         return Loaded()
 
-    monkeypatch.setattr("stellar_blaze.composition.LightGbmCorrector.load", fake_load)
+    monkeypatch.setattr("stellar_blaze.adapters.compute.lgbm_corrector.LightGbmCorrector.load", fake_load)
     model = _model("corrector-20261101-abcdef1-123456")
     provider = CorrectorProvider()
 
@@ -78,7 +78,7 @@ async def test_warm_loads_the_model_in_a_worker_thread_so_a_later_request_loads_
         loaded_in.append(threading.get_ident())
         return Loaded()
 
-    monkeypatch.setattr("stellar_blaze.composition.LightGbmCorrector.load", fake_load)
+    monkeypatch.setattr("stellar_blaze.adapters.compute.lgbm_corrector.LightGbmCorrector.load", fake_load)
     model = _model("corrector-20261101-abcdef1-123456")
     provider = CorrectorProvider()
 

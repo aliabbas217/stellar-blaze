@@ -52,3 +52,16 @@ async def test_a_valid_proposal_and_a_service_without_an_audit_log_write_no_reje
         await service(None).propose(config(model_id="no-such-model"), "ali", REASON)
 
     assert audit.records == []
+
+
+class _DownAuditLog(InMemoryAuditLog):
+    async def append(self, event: object) -> object:  # type: ignore[override]
+        raise TimeoutError("the audit database is unreachable")
+
+
+@pytest.mark.asyncio
+async def test_a_failing_audit_log_never_masks_the_violation(caplog: pytest.LogCaptureFixture) -> None:
+    with pytest.raises(ConfigInvalidError) as raised:
+        await service(_DownAuditLog()).propose(config(model_id="no-such-model"), "ali", REASON)
+
+    assert [v.code for v in raised.value.violations] == ["unknown-model"]  # the ORIGINAL error, not a TimeoutError

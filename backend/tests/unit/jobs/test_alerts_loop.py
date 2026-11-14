@@ -1,5 +1,6 @@
-"""``run_loop``: the cadence follows the interval each cycle reads, it never spins, a failing cycle does not end it,
-and a stop request ends it after the current run."""
+"""``run_loop``: a FIXED-RATE cadence that follows the interval each cycle reads (period = max(60 s, interval x 60),
+measured from the START of a run), a failing cycle does not end it, and a stop request ends it after the current run.
+The clock is injected: a cycle "takes" ``Script.run_seconds`` of it, no real time passes."""
 
 import asyncio
 
@@ -20,9 +21,15 @@ class Script:
         self.waits: list[float] = []
         self.stop = asyncio.Event()
         self.runs = 0
+        self.now = 0.0
+        self.run_seconds = 0.0
+
+    def clock(self) -> float:
+        return self.now
 
     async def cycle(self) -> int | None:
         self.runs += 1
+        self.now += self.run_seconds
         answer = self.answers.pop(0)
         if not self.answers:
             self.stop.set()
@@ -35,7 +42,7 @@ class Script:
 
 
 async def drive(script: Script) -> int:
-    return await run_loop(script.cycle, stop=script.stop, sleep=script.sleep)
+    return await run_loop(script.cycle, stop=script.stop, sleep=script.sleep, clock=script.clock)
 
 
 async def test_the_wait_is_the_interval_each_cycle_read() -> None:
@@ -43,6 +50,20 @@ async def test_the_wait_is_the_interval_each_cycle_read() -> None:
 
     assert await drive(script) == 5
     assert script.waits == [300.0, 120.0, 1800.0, 60.0]  # the last cycle stopped the loop: no wait after it
+
+
+async def test_the_loop_is_fixed_rate_a_slow_run_shortens_the_wait() -> None:
+    """Period 300 s; a run of 100 s waits 200 s (the next run starts 300 s after this one STARTED), a run of 400 s waits
+    nothing (it overran: the next starts at once), and the period never goes below 60 s."""
+    script = Script(5, 5, 5, 1, 1)
+    script.run_seconds = 100.0
+    await drive(script)
+    assert script.waits == [200.0, 200.0, 200.0, 0.0]  # interval 1 -> period 60 s: a 100 s run overruns it
+
+    slow = Script(5, 5, 5)
+    slow.run_seconds = 400.0
+    await drive(slow)
+    assert slow.waits == [0.0, 0.0]
 
 
 async def test_it_never_spins_whatever_the_interval() -> None:

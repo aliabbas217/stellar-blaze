@@ -6,15 +6,19 @@ nothing here logs the request body, and the only identifier that leaves is the s
 
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Path, Response
 
 from stellar_blaze.api.deps import ServicesDep
 from stellar_blaze.api.models import PushSubscriptionCreate, PushSubscriptionCreated
+from stellar_blaze.api.rate_limits import MAX_SUBSCRIPTIONS_PER_CREW, MAX_SUBSCRIPTIONS_PER_SITE
 from stellar_blaze.api.responses import problem_responses
-from stellar_blaze.api.views import not_found, site_or_404
-from stellar_blaze.ports.push import NewSubscription
+from stellar_blaze.api.views import not_found, site_or_404, validation_failed
+from stellar_blaze.errors import DomainProblem
+from stellar_blaze.ports.push import NewSubscription, PushStoreError
 
 router = APIRouter(tags=["push"])
+logger = structlog.stdlib.get_logger(__name__)
 
 
 @router.post(
@@ -26,9 +30,14 @@ router = APIRouter(tags=["push"])
 async def create_push_subscription(payload: PushSubscriptionCreate, services: ServicesDep) -> PushSubscriptionCreated:
     """Register the browser's subscription for site alerts and, optionally, one crew's alerts.
 
-    The endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown
-    `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The body holds no worker identifier by
-    design.
+    The endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted
+    against the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The
+    endpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at
+    most 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, "too many subscriptions"). The body
+    holds no worker identifier by design.
+
+    A store failure answers 500 without data: the cause may carry the statement parameters (the endpoint and keys), so
+    only its class name is logged and the exception chain is cut (``from None``).
     """
     site = await site_or_404(services, payload.site_id)
     if payload.crew_id is not None:
@@ -37,17 +46,37 @@ async def create_push_subscription(payload: PushSubscriptionCreate, services: Se
             raise not_found(f"No crew {payload.crew_id} at site {site.id}.")
     epoch = await services.sites.active_epoch(site.id)
     details = payload.subscription
-    stored = await services.subs.upsert_by_endpoint(
-        NewSubscription(
-            endpoint=details.endpoint,
-            p256dh=details.keys.p256dh,
-            auth=details.keys.auth,
-            expiration_time=None if details.expiration_time is None else int(details.expiration_time),
-            site_id=site.id,
-            crew_id=payload.crew_id,
-        ),
-        epoch,
-    )
+    try:
+        known = await services.subs.id_for_endpoint(details.endpoint, epoch)
+        if known is not None:
+            return PushSubscriptionCreated(id=known)
+        if await services.subs.count_for_site(site.id, epoch) >= MAX_SUBSCRIPTIONS_PER_SITE:
+            raise validation_failed(
+                "site_id", "too many subscriptions for this site", "too-many-subscriptions", where="body"
+            )
+        if (
+            payload.crew_id is not None
+            and await services.subs.count_for_crew(payload.crew_id, epoch) >= MAX_SUBSCRIPTIONS_PER_CREW
+        ):
+            raise validation_failed(
+                "crew_id", "too many subscriptions for this crew", "too-many-subscriptions", where="body"
+            )
+        stored = await services.subs.upsert_by_endpoint(
+            NewSubscription(
+                endpoint=details.endpoint,
+                p256dh=details.keys.p256dh,
+                auth=details.keys.auth,
+                expiration_time=None if details.expiration_time is None else int(details.expiration_time),
+                site_id=site.id,
+                crew_id=payload.crew_id,
+            ),
+            epoch,
+        )
+    except Exception as error:
+        if isinstance(error, DomainProblem):
+            raise
+        logger.error("push.subscription_store_failed", error=type(error).__name__)
+        raise PushStoreError("the subscription store failed") from None
     return PushSubscriptionCreated(id=stored)
 
 

@@ -284,6 +284,17 @@ async def check_epoch_scoped_reads(world: World) -> None:
     assert len(await world.audit.site_entries(SITE_ID, ["data_request.refused"], 50, epoch_id=first)) == 1
 
 
+async def check_alert_exists_answers_by_epoch_and_key(world: World) -> None:
+    epoch = await seeded(world)
+    later = await world.sites.start_epoch(SITE_ID, "demo-token")
+    stored = await world.alerts.insert(alert(world, epoch, key="k-exists"))
+
+    assert stored is not None
+    assert await world.alerts.exists(epoch, "k-exists") is True
+    assert await world.alerts.exists(epoch, "k-other") is False
+    assert await world.alerts.exists(later, "k-exists") is False  # the key is per epoch
+
+
 CHECKS: dict[str, Check] = {
     name.removeprefix("check_"): fn for name, fn in sorted(globals().items()) if name.startswith("check_")
 }

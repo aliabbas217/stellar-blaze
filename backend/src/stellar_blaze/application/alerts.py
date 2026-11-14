@@ -5,33 +5,49 @@ hourly level timeline with the last event of that target in the epoch:
 
 * a MORE severe level creates an event at once (``escalate``; no dwell, however long the milder level held), with
   ``valid_from`` = the first hour of that run of equal levels;
-* a MILDER level creates an event (``deescalate``) only once its run has held ``dwell_minutes`` AND it started after
-  the level it replaces came into force (a milder hour before an already announced future level is not a step down);
+* a MILDER level creates an event (``deescalate``) only once its run has held ``dwell_minutes`` AND it does not end
+  before the level it replaces comes into force (a milder stretch that ENDS before an already announced future level is
+  not a step down; one that spans that start is, and so retracts an announcement the forecast has withdrawn);
 * nothing is created earlier than ``lead_hours`` before ``valid_from``;
 * an hour with no level (``None``) is no information: it never escalates and never de-escalates;
-* an event of the same level as the last one is no event (its ``(epoch, target, level, valid_from)`` dedupe key
-  would also refuse a repeat), EXCEPT when that level is already in force but the last event announced it for a later
-  start: a crew stop turns a crew red now although red was announced from 12:00, and that is an ``escalate`` from the
-  earlier start (otherwise "red now" would reach the crew only at 12:00).
+* an event of the same level as the last one is no event (its dedupe key would also refuse a repeat), EXCEPT when that
+  level is already in force but the last event announced it for a later start: a crew stop turns a crew red now
+  although red was announced from 12:00, and that is an ``escalate`` from the earlier start (otherwise "red now" would
+  reach the crew only at 12:00).
 
 ``dispatch`` is the use case ``sb-jobs alerts dispatch`` runs. The crew level it computes includes the crew's active
 stops of the ACTIVE epoch, through the same helpers ``day_plan`` uses (``stopped_mask``, ``crew_hours``), so a stop
 recorded between two runs is escalated by the NEXT run: one immediate ``red`` crew event, no dwell, no sign-off wait
 (there is no HTTP trigger, ADR 0058 decision 5). Cadence: ``alert_dispatch_interval_minutes`` of the active config is
-stored on every ``alert_event`` row and in the one ``alerts.dispatched`` audit row each run writes, so the decision
-record says how often the job was meant to run.
+stored on every ``alert_event`` row and in the ``alerts.dispatched`` audit row of each run that created, delivered or
+failed something (``job_run`` is the heartbeat), so the decision record says how often the job was meant to run.
+
+Delivery design (the escalation SLA). A stop reaches a crew within ONE DISPATCH PERIOD of being recorded, whatever any
+push service does. ``prepare`` (phase A: every target of a site, database reads only, no call to a push service)
+computes the new events and their recipients; ``deliver`` (phase B, over every prepared site at once) sends them all
+concurrently under one bounded semaphore, ORDERED by severity (escalations before de-escalations, higher level first,
+crew before site: a stop is a red crew escalation, so it is first in the queue), each send under a hard per-delivery
+deadline (the channel's timeout plus a margin) and the whole run under a per-run deadline (``period - margin``): a send
+that times out, or that cannot start before the run deadline, counts as ``failed`` with detail ``deadline``, and the
+event row is still inserted after its own sends. The job loop is fixed-rate (``jobs.alerts``): the next run starts one
+period after the previous one STARTED. ``period = max(60 s, alert_dispatch_interval_minutes x 60)``.
 
 Sign-off never gates an alert (class (d) invariant): this module takes no sign-off store and reads no sign-off state;
-``test_the_dispatch_import_graph_has_no_signoff`` fails if one is ever imported.
+``test_the_dispatch_import_graph_has_no_signoff`` is the proof and fails if one is ever imported.
 
 Delivery bookkeeping is append-only: ``alert_event.delivered/failed`` are fixed at INSERT, so each event is SENT first
 and INSERTED after, with the counts. A crash between the send and the insert means the next run sends the event again
-(at-least-once delivery; a push is idempotent for the reader: the same level again). With a file or env snapshot
-(``version_id is None``) nothing is persisted and nothing is sent (``config_version`` 0).
+(at-least-once delivery; a push is idempotent for the reader: the same level again). The dedupe key includes the id of
+the target's previous event (``none`` for the first): a retry of the same transition stays deduped, while a legitimate
+revisit of an earlier level (red, green, red again) is a new event. The key is also looked up BEFORE sending, so an
+event that is stored already is never sent again. With a file or env snapshot (``version_id is None``) nothing is
+persisted and nothing is sent (``config_version`` 0).
 """
 
 import asyncio
-from collections.abc import Sequence
+import dataclasses
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Final, Literal
@@ -53,13 +69,26 @@ from stellar_blaze.ports.plans import CrewStopStore
 from stellar_blaze.ports.push import PushChannel, PushSubscriptionStore, SubscriptionRecord
 from stellar_blaze.ports.sites import SiteRepository
 
-__all__ = ["DispatchReport", "NewAlert", "dispatch", "plan_alert_events"]
+__all__ = [
+    "DeliveryLimits",
+    "DispatchReport",
+    "NewAlert",
+    "Prepared",
+    "deliver",
+    "dispatch",
+    "period_seconds",
+    "plan_alert_events",
+    "prepare",
+]
 
 logger = structlog.stdlib.get_logger(__name__)
 
 _HOUR: Final = timedelta(hours=1)
 _ORDER: Final = tuple(AlertLevel)  # declared in ascending severity
-_SEND_CONCURRENCY: Final = 16
+SEND_CONCURRENCY: Final = 16
+MIN_PERIOD_S: Final = 60.0
+RUN_MARGIN_S: Final = 10.0  # the run deadline is the period minus this: a run ends before the next one starts
+DELIVERY_MARGIN_S: Final = 2.0  # the per-delivery deadline is the channel's own timeout plus this
 _ACTOR: Final = "alerts-dispatch"
 _ROLE: Final = "system"
 CHANGE_TEMPLATE: Final = "level-change"
@@ -116,7 +145,7 @@ def plan_alert_events(
         if _rank(level) > _rank(current):
             created.append(NewAlert(level, start, "escalate"))
         elif _rank(level) < _rank(current):
-            if (in_force_from is not None and start <= in_force_from) or now < start + dwell:
+            if (in_force_from is not None and end <= in_force_from) or now < start + dwell:
                 continue
             created.append(NewAlert(level, start, "deescalate"))
         elif in_force_from is not None and start < in_force_from and start <= now:
@@ -146,17 +175,55 @@ class DispatchReport:
     events: tuple[AlertRecord, ...] = ()
 
 
+def period_seconds(interval_minutes: int) -> float:
+    """The dispatch period: ``max(60 s, interval x 60)`` (the tunable's own minimum is one minute)."""
+    return max(MIN_PERIOD_S, interval_minutes * 60.0)
+
+
+@dataclass(frozen=True)
+class DeliveryLimits:
+    """Bounds of phase B. ``None`` deadlines are derived: the channel's timeout plus a margin, and the period minus a
+    margin. ``monotonic`` is injectable (a test advances it)."""
+
+    concurrency: int = SEND_CONCURRENCY
+    delivery_deadline_s: float | None = None
+    run_budget_s: float | None = None
+    monotonic: Callable[[], float] = time.monotonic
+
+
 @dataclass(frozen=True)
 class _Target:
     crew_id: str | None
     levels: list[tuple[datetime, AlertLevel | None]]
 
 
-def _dedupe_key(site_id: str, crew_id: str | None, alert: NewAlert) -> str:
-    return f"{site_id}|{crew_id or '-'}|{alert.level.value}|{alert.valid_from:%Y%m%dT%H%M%SZ}"
+@dataclass(frozen=True)
+class _Pending:
+    """One event to send and store, with the recipients resolved in phase A."""
+
+    alert: NewAlert
+    message: OutboundMessage
+    key: str
+    recipients: tuple[SubscriptionRecord, ...]
+    after: int | None  # index of the previous event of the same target in ``Prepared.pending``: stored before this one
 
 
-async def dispatch(
+@dataclass(frozen=True)
+class Prepared:
+    """Phase A's result for one site: what ``deliver`` sends and stores. ``report`` is the zero-event report."""
+
+    report: DispatchReport
+    site_day: SiteDay
+    epoch: int
+    snapshot: ConfigSnapshot
+    pending: tuple[_Pending, ...] = ()
+
+
+def _dedupe_key(site_id: str, crew_id: str | None, alert: NewAlert, predecessor: str) -> str:
+    return f"{site_id}|{crew_id or '-'}|{alert.level.value}|{alert.valid_from:%Y%m%dT%H%M%SZ}|{predecessor}"
+
+
+async def prepare(
     *,
     site_day: SiteDay,
     crews: Sequence[CrewSpec],
@@ -164,27 +231,16 @@ async def dispatch(
     stops: CrewStopStore,
     alerts: AlertStore,
     subs: PushSubscriptionStore,
-    audit: AuditLog,
-    channel: PushChannel | None,
+    channel_configured: bool,
     snapshot: ConfigSnapshot,
     catalog: RulesetCatalog,
     now: datetime,
-) -> DispatchReport:
-    """One dispatch run for the site of ``site_day``: create the events its site and crews need, send them, record them.
+) -> Prepared:
+    """Phase A for the site of ``site_day``: the events its site and crews need now, with their recipients.
 
-    Args:
-        site_day: The site's day (its hourly levels and zone timeline).
-        crews: The site's crews (their stops raise the crew level to red).
-        sites: Resolves the site's active epoch.
-        stops: The crew-lead stops (epoch-scoped).
-        alerts: The append-only event store.
-        subs: The Web Push subscriptions (epoch-scoped).
-        audit: Where the one ``alerts.dispatched`` row goes.
-        channel: The push channel, or ``None`` when push is not configured (events are still created and audited,
-            deliveries count 0).
-        snapshot: The active config snapshot; with no ``version_id`` nothing is persisted and nothing is sent.
-        catalog: The rulesets (the tunables resolve against the one in force on the date).
-        now: The DOMAIN time of the run (a replay clock in replay mode), timezone-aware.
+    Reads the database only (the epoch, the stops, the last event of every target, the subscriptions): it calls no push
+    service, so it is quick however any of them behaves. An event whose dedupe key is stored already is dropped here
+    (it must never be sent again).
 
     Raises:
         ConfigParametersError, NoRulesetError, RulesetIncompleteError, SiteNotFoundError: Deployment or caller faults.
@@ -202,17 +258,17 @@ async def dispatch(
         )
     params = effective_params(snapshot, ruleset)
     site_id = site_day.site.id
-    base = DispatchReport(
+    report = DispatchReport(
         site_id=site_id,
         local_date=local_date,
         config_version=0 if snapshot.version_id is None else snapshot.version_id,
         interval_minutes=params.alert_dispatch_interval_minutes,
-        push_configured=channel is not None,
+        push_configured=channel_configured,
         persisted=snapshot.version_id is not None,
     )
     if snapshot.version_id is None:
         logger.warning("alerts.not_persisted", site_id=site_id, reason="no database config snapshot")
-        return base
+        return Prepared(report, site_day, 0, snapshot)
 
     epoch = await sites.active_epoch(site_id)
     start = site_day.zones.start_utc
@@ -223,17 +279,29 @@ async def dispatch(
         mask = stopped_mask([(s.started_at, s.cleared_at) for s in found], start)
         targets.append(_Target(crew.crew_id, [(h.starts_at, h.level) for h in crew_hours(site_day, mask, start)]))
 
-    created: list[AlertRecord] = []
-    delivered = failed = gone = 0
+    pending: list[_Pending] = []
     for target in targets:
         last = await alerts.last_for_target(site_id, target.crew_id, epoch)
-        for alert in plan_alert_events(
+        base = "none" if last is None else str(last.id)
+        recipients: tuple[SubscriptionRecord, ...] | None = None
+        previous: int | None = None
+        planned = plan_alert_events(
             target.levels,
             last=last,
             now=now,
             dwell_minutes=params.deescalation_dwell_minutes,
             lead_hours=params.alert_lead_hours,
-        ):
+        )
+        for step, alert in enumerate(planned):
+            key = _dedupe_key(site_id, target.crew_id, alert, base if step == 0 else f"{base}.{step}")
+            if await alerts.exists(epoch, key):
+                continue  # stored already (another run, or a crash after the insert): never send it again
+            if recipients is None:
+                recipients = tuple(
+                    await subs.for_site(site_id, epoch)
+                    if target.crew_id is None
+                    else await subs.for_crew(target.crew_id, epoch)
+                )
             message = OutboundMessage(
                 site_id=site_id,
                 audience="site" if target.crew_id is None else "crew",  # type: ignore[arg-type]
@@ -242,117 +310,228 @@ async def dispatch(
                 valid_from=alert.valid_from,
                 template_id=END_TEMPLATE if alert.level is AlertLevel.GREEN else CHANGE_TEMPLATE,
             )
-            results = await _send(channel, subs, message, epoch)
+            pending.append(_Pending(alert, message, key, recipients, previous))
+            previous = len(pending) - 1
+    return Prepared(report, site_day, epoch, snapshot, tuple(pending))
+
+
+def _priority(item: _Pending) -> tuple[int, int, int]:
+    """Send order: escalations first, then the higher level, then crew before site (a stop is a red crew escalation)."""
+    return (0 if item.alert.kind == "escalate" else 1, -_rank(item.alert.level), 0 if item.message.crew_id else 1)
+
+
+async def dispatch(
+    *,
+    site_day: SiteDay,
+    crews: Sequence[CrewSpec],
+    sites: SiteRepository,
+    stops: CrewStopStore,
+    alerts: AlertStore,
+    subs: PushSubscriptionStore,
+    audit: AuditLog,
+    channel: PushChannel | None,
+    snapshot: ConfigSnapshot,
+    catalog: RulesetCatalog,
+    now: datetime,
+    limits: DeliveryLimits | None = None,
+) -> DispatchReport:
+    """One dispatch run for the site of ``site_day``: ``prepare`` then ``deliver`` (see the module docstring).
+
+    Args:
+        site_day: The site's day (its hourly levels and zone timeline).
+        crews: The site's crews (their stops raise the crew level to red).
+        sites: Resolves the site's active epoch.
+        stops: The crew-lead stops (epoch-scoped).
+        alerts: The append-only event store.
+        subs: The Web Push subscriptions (epoch-scoped).
+        audit: Where the ``alerts.dispatched`` row goes (only for a run that created, delivered or failed something).
+        channel: The push channel, or ``None`` when push is not configured (events are still created and audited,
+            deliveries count 0).
+        snapshot: The active config snapshot; with no ``version_id`` nothing is persisted and nothing is sent.
+        catalog: The rulesets (the tunables resolve against the one in force on the date).
+        now: The DOMAIN time of the run (a replay clock in replay mode), timezone-aware.
+        limits: Phase B bounds (defaults: 16 concurrent sends, the channel's timeout plus 2 s per send, the period minus
+            10 s for the run).
+
+    Raises:
+        ConfigParametersError, NoRulesetError, RulesetIncompleteError, SiteNotFoundError: Deployment or caller faults.
+    """
+    prepared = await prepare(
+        site_day=site_day,
+        crews=crews,
+        sites=sites,
+        stops=stops,
+        alerts=alerts,
+        subs=subs,
+        channel_configured=channel is not None,
+        snapshot=snapshot,
+        catalog=catalog,
+        now=now,
+    )
+    [report] = await deliver([prepared], channel=channel, alerts=alerts, subs=subs, audit=audit, limits=limits)
+    return report
+
+
+async def deliver(
+    prepared: Sequence[Prepared],
+    *,
+    channel: PushChannel | None,
+    alerts: AlertStore,
+    subs: PushSubscriptionStore,
+    audit: AuditLog,
+    limits: DeliveryLimits | None = None,
+) -> list[DispatchReport]:
+    """Phase B over every prepared site at once: send the events concurrently (severity first), store each after its own
+    sends, then write the ``alerts.dispatched`` row of each site that created, delivered or failed something.
+
+    One failing insert does not stop the others: every event is stored (or tried) and the first error is raised after.
+    """
+    bounds = limits or DeliveryLimits()
+    mono = bounds.monotonic
+    interval = min((p.report.interval_minutes for p in prepared), default=5)
+    budget = bounds.run_budget_s if bounds.run_budget_s is not None else period_seconds(interval) - RUN_MARGIN_S
+    per_send = bounds.delivery_deadline_s
+    if per_send is None:
+        per_send = (channel.timeout_s if channel is not None else 0.0) + DELIVERY_MARGIN_S
+    run_deadline = mono() + budget
+    gate = asyncio.Semaphore(bounds.concurrency)
+
+    async def send(active: PushChannel, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+        async with gate:
+            remaining = run_deadline - mono()
+            if remaining <= 0:
+                return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
+            try:
+                result = await asyncio.wait_for(active.send_to(sub, message), timeout=min(per_send, remaining))
+            except TimeoutError:
+                logger.error("alerts.send_deadline", subscription_id=sub.id)
+                return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
+            except Exception as error:  # the contract says a result, not an exception: stay alive if one breaks it
+                logger.error("alerts.channel_raised", subscription_id=sub.id, error=type(error).__name__)
+                return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="error:channel_raised")
+        if _is_gone(result):
+            await subs.delete_gone(sub.id)
+        return result
+
+    # (site index, event index) in send order. Tasks are created in this order and the semaphore wakes in FIFO order,
+    # so the most severe event's sends are first in the queue whatever the others do.
+    order = sorted(
+        ((i, j) for i, p in enumerate(prepared) for j in range(len(p.pending))),
+        key=lambda ij: _priority(prepared[ij[0]].pending[ij[1]]),
+    )
+    sends: dict[tuple[int, int], list[asyncio.Task[DeliveryResult]]] = {}
+    for i, j in order:
+        item = prepared[i].pending[j]
+        sends[(i, j)] = (
+            [asyncio.create_task(send(channel, sub, item.message)) for sub in item.recipients]
+            if channel is not None
+            else []
+        )
+    stored: dict[tuple[int, int], asyncio.Future[None]] = {
+        (i, j): asyncio.get_running_loop().create_future() for i, j in order
+    }
+    totals = [[0, 0, 0] for _ in prepared]  # delivered, failed, gone
+    created: list[list[AlertRecord]] = [[] for _ in prepared]
+
+    async def finish(i: int, j: int) -> None:
+        item = prepared[i].pending[j]
+        day, snap = prepared[i].site_day, prepared[i].snapshot
+        try:
+            results = await asyncio.gather(*sends[(i, j)])
+            if item.after is not None:
+                await stored[(i, item.after)]  # one target's events are stored in the order they were planned
             ok = sum(r.status is DeliveryStatus.DELIVERED for r in results)
             bad = sum(r.status is DeliveryStatus.FAILED for r in results)
             record = await alerts.insert(
                 AlertEventInput(
-                    site_id=site_id,
-                    audience=message.audience.value,
-                    crew_id=target.crew_id,
-                    epoch_id=epoch,
-                    level=alert.level,
-                    valid_from=alert.valid_from,
-                    template_id=message.template_id,
-                    kind=alert.kind,
-                    dedupe_key=_dedupe_key(site_id, target.crew_id, alert),
+                    site_id=day.site.id,
+                    audience=item.message.audience.value,
+                    crew_id=item.message.crew_id,
+                    epoch_id=prepared[i].epoch,
+                    level=item.alert.level,
+                    valid_from=item.alert.valid_from,
+                    template_id=item.message.template_id,
+                    kind=item.alert.kind,
+                    dedupe_key=item.key,
                     delivered=ok,
                     failed=bad,
-                    dispatch_interval_minutes=params.alert_dispatch_interval_minutes,
-                    ruleset_id=site_day.identity.ruleset_id,
-                    ruleset_sha256=site_day.identity.ruleset_sha256,
-                    model_id=site_day.identity.model_id,
-                    config_version_id=snapshot.version_id,
-                    config_sha256=snapshot.sha256,
+                    dispatch_interval_minutes=prepared[i].report.interval_minutes,
+                    ruleset_id=day.identity.ruleset_id,
+                    ruleset_sha256=day.identity.ruleset_sha256,
+                    model_id=day.identity.model_id,
+                    config_version_id=snap.version_id or 0,
+                    config_sha256=snap.sha256,
                 )
             )
-            delivered += ok
-            failed += bad
-            gone += sum(_is_gone(r) for r in results)
-            if record is not None:
-                created.append(record)
-            logger.info(
-                "alerts.event",
-                site_id=site_id,
-                crew_id=target.crew_id,
-                alert_level=alert.level.value,
-                kind=alert.kind,
-                delivered=ok,
-                failed=bad,
-                stored=record is not None,
-            )
-
-    detail: dict[str, JsonValue] = {
-        "site_id": site_id,
-        "local_date": local_date.isoformat(),
-        "events_created": len(created),
-        "delivered": delivered,
-        "failed": failed,
-        "interval_minutes": params.alert_dispatch_interval_minutes,
-        "push_configured": channel is not None,
-    }
-    await audit.append(
-        AuditEvent(
-            kind="alerts.dispatched",
-            actor=_ACTOR,
-            actor_role=_ROLE,
-            employer_id=site_day.site.employer_id,
-            site_id=site_id,
-            epoch_id=epoch,
-            outcome="dispatched",
-            detail=detail,
-            ruleset_id=site_day.identity.ruleset_id,
-            ruleset_sha256=site_day.identity.ruleset_sha256,
-            model_id=site_day.identity.model_id,
-            config_version_id=snapshot.version_id,
-            config_sha256=snapshot.sha256,
+        except BaseException as error:
+            stored[(i, j)].set_exception(error)
+            stored[(i, j)].exception()  # mark retrieved: the error itself is re-raised through ``gather`` below
+            raise
+        stored[(i, j)].set_result(None)
+        totals[i][0] += ok
+        totals[i][1] += bad
+        totals[i][2] += sum(_is_gone(r) for r in results)
+        if record is not None:
+            created[i].append(record)
+        logger.info(
+            "alerts.event",
+            site_id=day.site.id,
+            crew_id=item.message.crew_id,
+            alert_level=item.alert.level.value,
+            kind=item.alert.kind,
+            delivered=ok,
+            failed=bad,
+            stored=record is not None,
         )
-    )
-    return DispatchReport(
-        site_id=site_id,
-        local_date=local_date,
-        config_version=snapshot.version_id,
-        interval_minutes=params.alert_dispatch_interval_minutes,
-        push_configured=channel is not None,
-        persisted=True,
-        events_created=len(created),
-        delivered=delivered,
-        failed=failed,
-        gone=gone,
-        events=tuple(created),
+
+    outcomes = await asyncio.gather(*(finish(i, j) for i, j in order), return_exceptions=True)
+    reports: list[DispatchReport] = []
+    for i, p in enumerate(prepared):
+        delivered, failed, gone = totals[i]
+        report = dataclasses.replace(
+            p.report,
+            events_created=len(created[i]),
+            delivered=delivered,
+            failed=failed,
+            gone=gone,
+            events=tuple(created[i]),
+        )
+        reports.append(report)
+        if report.persisted and (report.events_created or delivered or failed):
+            await audit.append(_audit_event(p, report))
+    for outcome in outcomes:
+        if isinstance(outcome, BaseException):
+            raise outcome
+    return reports
+
+
+def _audit_event(prepared: Prepared, report: DispatchReport) -> AuditEvent:
+    day, snap = prepared.site_day, prepared.snapshot
+    detail: dict[str, JsonValue] = {
+        "site_id": report.site_id,
+        "local_date": report.local_date.isoformat(),
+        "events_created": report.events_created,
+        "delivered": report.delivered,
+        "failed": report.failed,
+        "interval_minutes": report.interval_minutes,
+        "push_configured": report.push_configured,
+    }
+    return AuditEvent(
+        kind="alerts.dispatched",
+        actor=_ACTOR,
+        actor_role=_ROLE,
+        employer_id=day.site.employer_id,
+        site_id=report.site_id,
+        epoch_id=prepared.epoch,
+        outcome="dispatched",
+        detail=detail,
+        ruleset_id=day.identity.ruleset_id,
+        ruleset_sha256=day.identity.ruleset_sha256,
+        model_id=day.identity.model_id,
+        config_version_id=snap.version_id,
+        config_sha256=snap.sha256,
     )
 
 
 def _is_gone(result: DeliveryResult) -> bool:
     return result.status is DeliveryStatus.FAILED and (result.detail or "").startswith("gone:")
-
-
-async def _send(
-    channel: PushChannel | None, subs: PushSubscriptionStore, message: OutboundMessage, epoch: int
-) -> list[DeliveryResult]:
-    """Deliver ``message`` to its subscriptions (a crew event to the crew's, a site event to the whole site's).
-
-    A subscription the channel reports gone is deleted here too (idempotent; the Web Push channel already did), so the
-    policy holds for any channel. A channel that raises counts as one failed delivery and never stops the run.
-    """
-    if channel is None:
-        return []
-    recipients: Sequence[SubscriptionRecord] = (
-        await subs.for_site(message.site_id, epoch)
-        if message.crew_id is None
-        else await subs.for_crew(message.crew_id, epoch)
-    )
-    gate = asyncio.Semaphore(_SEND_CONCURRENCY)
-
-    async def one(sub: SubscriptionRecord) -> DeliveryResult:
-        async with gate:
-            try:
-                result = await channel.send_to(sub, message)
-            except Exception as error:  # the contract says a result, not an exception: stay alive if one breaks it
-                logger.error("alerts.channel_raised", subscription_id=sub.id, error=type(error).__name__)
-                return DeliveryResult(channel=channel.name, status=DeliveryStatus.FAILED, detail="error:channel_raised")
-        if _is_gone(result):
-            await subs.delete_gone(sub.id)
-        return result
-
-    return list(await asyncio.gather(*(one(sub) for sub in recipients)))

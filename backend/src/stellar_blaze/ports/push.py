@@ -32,7 +32,24 @@ class SubscriptionRecord(NewSubscription):
     created_at: AwareDatetime
 
 
+class PushStoreError(Exception):
+    """The subscription store failed. Carries no data: the cause may hold statement parameters (an endpoint and keys),
+    so callers raise this ``from None`` and the log names only the class of the cause."""
+
+
 class PushSubscriptionStore(Protocol):
+    async def id_for_endpoint(self, endpoint: str, epoch_id: int) -> str | None:
+        """The id of the subscription with this endpoint in the epoch, or ``None``."""
+        ...
+
+    async def count_for_site(self, site_id: str, epoch_id: int) -> int:
+        """How many subscriptions the site holds in the epoch (crew-targeted ones included)."""
+        ...
+
+    async def count_for_crew(self, crew_id: str, epoch_id: int) -> int:
+        """How many subscriptions name this crew in the epoch."""
+        ...
+
     async def upsert_by_endpoint(self, sub: NewSubscription, epoch_id: int) -> str:
         """Store ``sub`` and return its id; when the epoch already holds this endpoint, return the existing id and
         change nothing (the first row's keys and targets stay)."""
@@ -66,6 +83,11 @@ class PushChannel(Protocol):
 
     @property
     def name(self) -> str: ...
+
+    @property
+    def timeout_s(self) -> float:
+        """The longest one ``send_to`` may take: the dispatch bounds every send by this plus a margin."""
+        ...
 
     async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult: ...
 

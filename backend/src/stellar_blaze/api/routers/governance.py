@@ -5,7 +5,7 @@ from datetime import UTC
 from fastapi import APIRouter
 
 from stellar_blaze.api.auth import EmployerDep, ResetEmployerDep
-from stellar_blaze.api.deps import RuntimeDep, ServicesDep, SnapshotDep
+from stellar_blaze.api.deps import RuntimeDep, ServicesDep
 from stellar_blaze.api.models import DataRequestCreate, DemoReset, TransparencyEntry, TransparencyLog
 from stellar_blaze.api.rate_limits import DEMO_RESET_LIMITS, EMPLOYER_LIMITS, extension
 from stellar_blaze.api.responses import ProblemJSONResponse, problem_responses
@@ -49,7 +49,6 @@ async def create_data_request(
     principal: EmployerDep,
     services: ServicesDep,
     runtime: RuntimeDep,
-    snapshot: SnapshotDep,
 ) -> None:
     """An employer asks for individual worker data. The answer is always the `individual-data-refused` problem (403).
 
@@ -59,7 +58,9 @@ async def create_data_request(
     """
     site = await site_or_404(services, site_id)
     with domain_problems():
-        identity = audit_identity(snapshot, runtime.rulesets, policy_date(runtime.settings, services))
+        # The best-effort identity path `deny_if_foreign` uses: with no config loaded the refusal is still a 403 and
+        # still audited (the declared 503 is kept in the contract, this route no longer produces it).
+        identity = audit_identity(runtime.config.peek(), runtime.rulesets, policy_date(runtime.settings, services))
         # `payload.worker_ref` is validated by the model and read nowhere: it never reaches the audit row or a log.
         await refuse_individual_data(
             principal=principal,
@@ -105,7 +106,7 @@ async def get_site_transparency_log(site_id: SiteIdPath, services: ServicesDep) 
 
 @router.post(
     "/sites/{site_id}/demo-reset",
-    openapi_extra=extension(DEMO_RESET_LIMITS),
+    openapi_extra=extension((*DEMO_RESET_LIMITS, *EMPLOYER_LIMITS)),  # the general bucket is charged too
     summary="Reset a synthetic demo site",
     responses=problem_responses(
         "unauthorized",

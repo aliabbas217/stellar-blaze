@@ -329,24 +329,33 @@ class ConfigService:
     async def _rejected(
         self, actor: str, violations: Sequence[ConfigViolation], version: VersionRecord | None = None
     ) -> None:
-        """Append ``config.rejected`` (violation codes and paths only) when an audit log is wired."""
-        if self._audit is None:
+        """Append ``config.rejected`` (violation codes and paths only) when an audit log is wired.
+
+        Best effort: the caller is about to raise ``ConfigInvalidError`` and that violation message is what the operator
+        needs. An audit log that cannot be written (the database is down) must never replace it with its own error, so a
+        failure is logged with its class name and swallowed here.
+        """
+        audit = self._audit
+        if audit is None:
             return
-        await self._audit.append(
-            AuditEvent(
-                kind="config.rejected",
-                actor=actor,
-                actor_role="operator",
-                outcome="rejected",
-                detail={
-                    "codes": [v.code for v in violations],
-                    "paths": [v.path for v in violations],
-                    "version_id": None if version is None else version.id,
-                },
-                config_version_id=None if version is None else version.id,
-                config_sha256=None if version is None else version.sha256,
+        try:
+            await audit.append(
+                AuditEvent(
+                    kind="config.rejected",
+                    actor=actor,
+                    actor_role="operator",
+                    outcome="rejected",
+                    detail={
+                        "codes": [v.code for v in violations],
+                        "paths": [v.path for v in violations],
+                        "version_id": None if version is None else version.id,
+                    },
+                    config_version_id=None if version is None else version.id,
+                    config_sha256=None if version is None else version.sha256,
+                )
             )
-        )
+        except Exception as error:
+            logger.error("config.rejected_audit_failed", error=type(error).__name__)
 
     # --- loading ------------------------------------------------------------------------------------------------
 

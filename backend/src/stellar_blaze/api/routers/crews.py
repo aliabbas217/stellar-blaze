@@ -293,7 +293,15 @@ async def create_crew_stop(
 ) -> CrewStop:
     """Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.
 
-    Stop recorded. It is visible on the next read; push alerts follow within one dispatch interval.
+    Stop recorded. It is visible on the next read; push alerts follow within one dispatch interval of the stop when
+    the alert dispatch job is running.
+
+    Idempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch
+    returns that stop (201, same body, no second row, no second audit row).
+
+    Known edge (not changed): the warning levels cover the working day 06:00 to 20:00 site-local, so a stop recorded
+    outside it changes no warning level, and a stop that was never cleared is read again by the next day's runs only
+    through the stops of that day's window.
     """
     crew = await crew_or_404(services, crew_id)
     await deny_if_foreign(
@@ -305,6 +313,11 @@ async def create_crew_stop(
         operation="create_crew_stop",
     )
     epoch = await services.sites.active_epoch(crew.site_id)
+    active = await services.stops.active(crew.id, epoch)
+    if active is not None:
+        return CrewStop(
+            id=active.id, crew_id=active.crew_id, started_at=active.started_at, cleared_at=active.cleared_at
+        )
     stop = await services.stops.start(crew.id, payload.reason_code, principal.actor, epoch)  # the stop is written first
     try:
         identity = audit_identity(runtime.config.peek(), runtime.rulesets, policy_date(runtime.settings, services))
@@ -346,7 +359,8 @@ async def delete_crew_stop(
 ) -> Response:
     """Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.
 
-    Resume recorded. It is visible on the next read; push alerts follow within one dispatch interval.
+    Resume recorded. A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it
+    elapsing.
     """
     crew = await crew_or_404(services, crew_id)
     await deny_if_foreign(

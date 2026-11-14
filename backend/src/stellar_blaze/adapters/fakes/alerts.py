@@ -17,6 +17,9 @@ class InMemoryAlertStore:
                 return record
         return None
 
+    async def exists(self, epoch_id: int, dedupe_key: str) -> bool:
+        return any(r.epoch_id == epoch_id and r.dedupe_key == dedupe_key for r in self.records)
+
     async def insert(self, event: AlertEventInput) -> AlertRecord | None:
         if any(r.epoch_id == event.epoch_id and r.dedupe_key == event.dedupe_key for r in self.records):
             return None

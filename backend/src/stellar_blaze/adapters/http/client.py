@@ -16,6 +16,7 @@ from opentelemetry.trace import Span
 
 from stellar_blaze.adapters.http.cache import RawResponseCache
 from stellar_blaze.config import Settings
+from stellar_blaze.ports.weather import SourceUnavailableError
 
 # Statuses that mean "the service could not answer now, ask again": throttling and server-side failures.
 RETRYABLE_STATUSES: Final = frozenset({429, 500, 502, 503, 504})
@@ -33,7 +34,7 @@ _EXCERPT_CHARS: Final = 200
 tracer = trace.get_tracer("stellar_blaze.adapters.http")
 
 
-class UpstreamError(Exception):
+class UpstreamError(SourceUnavailableError):
     """An upstream service did not give a usable answer.
 
     Attributes:

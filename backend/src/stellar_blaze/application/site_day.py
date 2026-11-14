@@ -38,6 +38,7 @@ import httpx2
 import numpy as np
 import polars as pl
 import structlog
+from numpy.typing import NDArray
 
 from stellar_blaze.application.correct_forecast import corrected_forecast
 from stellar_blaze.application.runtime_config import ConfigSnapshot, ruleset_for
@@ -68,12 +69,13 @@ from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.domain.weather.stations import Station, station
 from stellar_blaze.ports.corrector import ForecastCorrector
 from stellar_blaze.ports.sites import SiteRecord
-from stellar_blaze.ports.weather import ObservationSource, WeatherForecastSource
+from stellar_blaze.ports.weather import ObservationSource, SourceUnavailableError, WeatherForecastSource
 
 __all__ = [
     "N_SAMPLES",
     "SAMPLE_SEED",
     "ConfigParametersError",
+    "CorrectorFailedError",
     "SiteDay",
     "SiteHour",
     "SiteIdentity",
@@ -178,9 +180,60 @@ class _Hourly:
     newest_issue: datetime | None
 
 
-# What an unavailable or malformed forecast looks like: an HTTP or I/O failure, a malformed payload or frame
-# (`ValueError` includes pydantic's `ValidationError`), a missing row or key, a Polars data error.
-_DATA_ERRORS: Final = (httpx2.HTTPError, OSError, ValueError, KeyError, pl.exceptions.PolarsError)
+# What an unavailable or malformed forecast looks like: a source that cannot answer (`SourceUnavailableError`: the
+# base of the live `UpstreamError` and the replay `ReplaySnapshotError`), an HTTP or I/O failure, a malformed payload or
+# frame (`ValueError` includes pydantic's `ValidationError`), a missing row or key, a Polars data error.
+_DATA_ERRORS: Final = (
+    SourceUnavailableError,
+    httpx2.HTTPError,
+    OSError,
+    ValueError,
+    KeyError,
+    pl.exceptions.PolarsError,
+)
+
+
+class CorrectorFailedError(SourceUnavailableError):
+    """The corrector (the loaded model) failed with something other than a data error: an operational dependency."""
+
+
+class _GuardedCorrector:
+    """The corrector, with ANY failure of its own calls turned into ``CorrectorFailedError``.
+
+    A model that cannot load, a LightGBM or numpy error inside it: all of them leave the day on the protective fallback
+    (every tick High), which is the safe failure mode, instead of a 500. Only the corrector's calls are guarded: the TWL
+    maths and the rest of this module are our code, and a bug there must still surface.
+    """
+
+    def __init__(self, inner: ForecastCorrector) -> None:
+        self._inner = inner
+
+    @property
+    def model_id(self) -> str | None:
+        return self._inner.model_id
+
+    @property
+    def needs_history_forecasts(self) -> bool:
+        return self._inner.needs_history_forecasts
+
+    def correct(
+        self,
+        *,
+        ifs: pl.DataFrame,
+        gfs: pl.DataFrame,
+        history: pl.DataFrame,
+        history_ifs: pl.DataFrame | None = None,
+    ) -> pl.DataFrame:
+        try:
+            return self._inner.correct(ifs=ifs, gfs=gfs, history=history, history_ifs=history_ifs)
+        except Exception as error:
+            raise CorrectorFailedError(type(error).__name__) from error
+
+    def sample(self, corrected: pl.DataFrame, *, n_samples: int, seed: int) -> NDArray[np.float64]:
+        try:
+            return self._inner.sample(corrected, n_samples=n_samples, seed=seed)
+        except Exception as error:
+            raise CorrectorFailedError(type(error).__name__) from error
 
 
 async def _hourly(
@@ -318,12 +371,13 @@ async def site_day(
             params=params,
             forecasts=forecasts,
             observations=observations,
-            corrector=corrector,
+            corrector=_GuardedCorrector(corrector),
         )
     except _DATA_ERRORS as error:
-        # Only upstream and data faults make the day protective (every on-shift tick High, `forecast_status` fallback).
-        # A TypeError or AttributeError is a programming error and must surface, not be disguised as "no forecast".
-        logger.error("site_day.forecast_unavailable", site_id=site.id, error=type(error).__name__)
+        # Only source, corrector and data faults make the day protective (every on-shift tick High, `forecast_status`
+        # fallback). A TypeError or AttributeError in OUR code is a programming error and must surface.
+        cause = error.__cause__ if isinstance(error, CorrectorFailedError) and error.__cause__ else error
+        logger.error("site_day.forecast_unavailable", site_id=site.id, error=type(cause).__name__)
         hourly = None
 
     if hourly is None:

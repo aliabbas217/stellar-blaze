@@ -70,14 +70,14 @@ def forbidden_employer() -> DomainProblem:
     )
 
 
-def validation_failed(location: str, message: str, kind: str) -> DomainProblem:
+def validation_failed(location: str, message: str, kind: str, *, where: str = "query") -> DomainProblem:
     """The framework's 422 shape (``errors: [{loc, msg, type}]``) for a fault the model validation cannot see."""
     return DomainProblem(
         type_="about:blank",
         title="Unprocessable Entity",
         status=422,
         detail="Request validation failed",
-        errors=[{"loc": ["query", location], "msg": message, "type": kind}],
+        errors=[{"loc": [where, location], "msg": message, "type": kind}],
     )
 
 

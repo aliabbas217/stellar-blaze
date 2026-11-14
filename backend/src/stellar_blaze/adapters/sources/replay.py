@@ -42,11 +42,12 @@ from stellar_blaze.domain.weather.schemas import (
     conform,
 )
 from stellar_blaze.domain.weather.stations import Station
+from stellar_blaze.ports.weather import SourceUnavailableError
 
 SOURCE_NAME = "replay"
 
 
-class ReplaySnapshotError(Exception):
+class ReplaySnapshotError(SourceUnavailableError):
     """A snapshot directory cannot be trusted or read: a missing or malformed file, or a hash that does not match."""
 
 

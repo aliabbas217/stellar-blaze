@@ -8,8 +8,12 @@ active is recorded as skipped, not stacked).
 
 ``run_loop`` is deliberately small and injectable (the cycle, the sleeper, the stop event):
 
-* it never spins: it always waits at least the interval of the last good cycle (or the 5-minute default when no cycle
-  has ever read one), and at least 60 s (the tunable's own minimum is 1 minute);
+* it is FIXED-RATE: ``period = max(60 s, interval x 60)`` (the interval of the last good cycle, or the 5-minute default
+  when no cycle has ever read one) and it waits ``max(0, period - elapsed)`` after a cycle, so a cycle starts one period
+  after the previous one STARTED, however long the run took. The escalation SLA follows: a crew stop is delivered within
+  ONE PERIOD of being recorded (the run that follows it starts at most one period later and escalates it first; every
+  send of that run is bounded, ``application.alerts``). A loop that never waits is impossible: the period is at least
+  60 s and a failing cycle that returns at once still waits the rest of it;
 * a cycle that raises is logged with the exception class name and the loop continues (an unreachable database must
   not end the process that the next cycle would have healed);
 * SIGTERM, SIGINT and KeyboardInterrupt set the stop event: the current run finishes, then the loop returns.
@@ -22,22 +26,24 @@ import asyncio
 import contextlib
 import functools
 import signal
+import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Final, Literal
+from typing import Final, Literal, NoReturn
 from zoneinfo import ZoneInfo
 
 import structlog
 from pydantic import JsonValue
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from stellar_blaze.application.alerts import DispatchReport, dispatch
+from stellar_blaze.application.alerts import DispatchReport, Prepared, deliver, period_seconds, prepare
 from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, ConfigUnavailableError
 from stellar_blaze.application.services import Services
-from stellar_blaze.application.site_day import site_day
+from stellar_blaze.application.site_day import SiteDay, site_day
 from stellar_blaze.composition import Runtime
 from stellar_blaze.config import Settings
+from stellar_blaze.ports.corrector import ForecastCorrector
 from stellar_blaze.ports.push import PushChannel, PushSubscriptionStore
 from stellar_blaze.ports.sites import SiteNotFoundError, SiteRecord
 
@@ -46,7 +52,7 @@ __all__ = ["DEFAULT_INTERVAL_MINUTES", "AlertJob", "DispatchFailedError", "insta
 logger = structlog.stdlib.get_logger(__name__)
 
 DEFAULT_INTERVAL_MINUTES: Final = 5  # the ruleset default of alert_dispatch_interval_minutes, until a cycle reads one
-MIN_WAIT_S: Final = 60.0
+MIN_WAIT_S: Final = 60.0  # the shortest period (application.alerts.MIN_PERIOD_S)
 
 type Sleeper = Callable[[float, asyncio.Event], Awaitable[None]]
 type ServicesBuilder = Callable[[Settings, AsyncEngine], Awaitable[tuple[Services, Callable[[], Awaitable[None]]]]]
@@ -97,16 +103,18 @@ async def run_loop(
     stop: asyncio.Event,
     sleep: Sleeper = wait,
     default_interval_minutes: int = DEFAULT_INTERVAL_MINUTES,
+    clock: Callable[[], float] = time.monotonic,
 ) -> int:
     """Run ``cycle`` until ``stop`` is set, waiting between cycles; return the number of cycles run.
 
     ``cycle`` returns the dispatch interval in minutes that the ACTIVE config says (``None`` when it could not read
-    one: the last known one, else the default, is kept).
+    one: the last known one, else the default, is kept). ``clock`` (monotonic seconds) is injectable.
     """
     interval = default_interval_minutes
     cycles = 0
     while not stop.is_set():
         cycles += 1
+        began = clock()
         try:
             read = await cycle()
         except Exception as error:  # a failing cycle is logged and the next one tries again
@@ -116,9 +124,23 @@ async def run_loop(
             interval = read
         if stop.is_set():
             break
-        await sleep(max(MIN_WAIT_S, interval * 60.0), stop)
+        await sleep(max(0.0, period_seconds(interval) - (clock() - began)), stop)  # fixed-rate
     logger.info("alerts.loop_stopped", cycles=cycles)
     return cycles
+
+
+class _UnavailableCorrector:
+    """Stands in for a corrector that could not be built: every call fails, so ``site_day`` takes the protective
+    fallback day (all High, ``forecast_status="fallback"``, no model id)."""
+
+    model_id: str | None = None
+    needs_history_forecasts = False
+
+    def correct(self, **_: object) -> NoReturn:
+        raise RuntimeError("the corrector is unavailable")
+
+    def sample(self, *_: object, **__: object) -> NoReturn:
+        raise RuntimeError("the corrector is unavailable")
 
 
 @dataclass
@@ -167,23 +189,38 @@ class AlertJob:
             raise ConfigUnavailableError("no active runtime config: run `sb-jobs config seed`")
         return seeded
 
-    async def work(self, local_date: date | None = None, as_of: datetime | None = None) -> Mapping[str, JsonValue]:
-        """One dispatch run over the sites; what ``run_job`` runs. Every site is tried; any failure fails the job after
-        the others were dispatched."""
+    async def site_ids(self) -> list[str]:
+        """The ids of the sites this job dispatches (the ``--site`` filter, or every site)."""
+        return [site.id for site in await self._sites(self.site_id)]
+
+    async def work(
+        self, local_date: date | None = None, as_of: datetime | None = None, site_id: str | None = None
+    ) -> Mapping[str, JsonValue]:
+        """One dispatch run over ``site_id`` (default: the job's filter, else every site); what ``run_job`` runs. Every
+        site is tried; any failure fails the job after the others were dispatched."""
         snapshot = await self.snapshot()
         now = as_of or self.services.clock()
         mode: Literal["replay", "live"] = "replay" if self.settings.forecast_source == "replay" else "live"
-        sites = await self._sites()
-        reports: list[DispatchReport] = []
+        sites = await self._sites(site_id if site_id is not None else self.site_id)
+        prepared: list[Prepared] = []
         failed: list[str] = []
-        for site in sites:
+        for site in sites:  # phase A for every site first: no push service is called until all events are known
             try:
-                reports.append(await self._one(site, snapshot, now, mode, local_date))
+                prepared.append(await self._prepare(site, snapshot, now, mode, local_date))
             except Exception as error:  # one site's fault must not keep the others' alerts back
                 logger.error("alerts.site_failed", site_id=site.id, error=type(error).__name__)
                 failed.append(site.id)
-        if reports:
-            self.interval_minutes = min(r.interval_minutes for r in reports)
+        reports: list[DispatchReport] = []
+        if prepared:
+            self.interval_minutes = min(p.report.interval_minutes for p in prepared)
+            services = self.services
+            try:
+                reports = await deliver(
+                    prepared, channel=self.channel, alerts=services.alerts, subs=services.subs, audit=services.audit
+                )
+            except Exception as error:  # an insert failed: every other event was still sent and stored
+                logger.error("alerts.deliver_failed", error=type(error).__name__)
+                failed.extend(p.report.site_id for p in prepared)
         self.summary = {
             "sites": [r.site_id for r in reports],
             "events_created": sum(r.events_created for r in reports),
@@ -198,22 +235,50 @@ class AlertJob:
             raise DispatchFailedError(failed)
         return self.summary
 
-    async def _sites(self) -> list[SiteRecord]:
-        if self.site_id is None:
+    async def _sites(self, site_id: str | None) -> list[SiteRecord]:
+        if site_id is None:
             return list(await self.services.sites.list_sites())
-        site = await self.services.sites.get_site(self.site_id)
+        site = await self.services.sites.get_site(site_id)
         if site is None:
-            raise SiteNotFoundError(self.site_id)
+            raise SiteNotFoundError(site_id)
         return [site]
 
-    async def _one(
+    async def _day(
+        self,
+        site: SiteRecord,
+        snapshot: ConfigSnapshot,
+        now: datetime,
+        mode: Literal["replay", "live"],
+        local_date: date,
+    ) -> SiteDay:
+        """The day of the site. When the corrector cannot even be built (a missing model directory, a malformed
+        parameter file) the day is the protective fallback: a stop needs no forecast, crews must still be reachable."""
+        services = self.services
+        try:
+            corrector: ForecastCorrector = services.correctors.for_snapshot(snapshot)
+        except Exception as error:
+            logger.error("alerts.corrector_unavailable", site_id=site.id, error=type(error).__name__)
+            corrector = _UnavailableCorrector()
+        return await site_day(
+            site=site,
+            local_date=local_date,
+            snapshot=snapshot,
+            catalog=self.runtime.rulesets,
+            forecasts=services.forecasts,
+            observations=services.observations,
+            corrector=corrector,
+            mode=mode,
+            now=now,
+        )
+
+    async def _prepare(
         self,
         site: SiteRecord,
         snapshot: ConfigSnapshot,
         now: datetime,
         mode: Literal["replay", "live"],
         requested: date | None,
-    ) -> DispatchReport:
+    ) -> Prepared:
         services = self.services
         if requested is not None:
             local_date = requested
@@ -221,27 +286,16 @@ class AlertJob:
             local_date = self.settings.replay_default_date
         else:
             local_date = now.astimezone(ZoneInfo(site.timezone)).date()
-        day = await site_day(
-            site=site,
-            local_date=local_date,
-            snapshot=snapshot,
-            catalog=self.runtime.rulesets,
-            forecasts=services.forecasts,
-            observations=services.observations,
-            corrector=services.correctors.for_snapshot(snapshot),
-            mode=mode,
-            now=now,
-        )
+        day = await self._day(site, snapshot, now, mode, local_date)
         crews = [await services.sites.crew_spec(c.id) for c in await services.sites.list_crews(site.id)]
-        return await dispatch(
+        return await prepare(
             site_day=day,
             crews=crews,
             sites=services.sites,
             stops=services.stops,
             alerts=services.alerts,
             subs=services.subs,
-            audit=services.audit,
-            channel=self.channel,
+            channel_configured=self.channel is not None,
             snapshot=snapshot,
             catalog=self.runtime.rulesets,
             now=now,

@@ -22,6 +22,9 @@ DEMO_RESET_LIMITS: tuple[RateLimit, ...] = (
 # The safety path has its OWN bucket (ADR 0062 / ledger R-Q): no other operation's limit can ever block a stop.
 STOP_BUCKET = "stop"
 STOP_LIMITS: tuple[RateLimit, ...] = (RateLimit(limit=30, window_seconds=60, bucket=STOP_BUCKET),)
+# Stored Web Push subscriptions are bounded (the route is public): per site, and per crew, within one epoch.
+MAX_SUBSCRIPTIONS_PER_SITE = 500
+MAX_SUBSCRIPTIONS_PER_CREW = 200
 EXTENSION = "x-rate-limit"
 KEYING_NOTE = (
     "Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one "

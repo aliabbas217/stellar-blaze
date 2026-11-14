@@ -3,7 +3,7 @@
 import secrets
 from collections.abc import Sequence
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -43,6 +43,25 @@ class PostgresPushStore:
                 PushSubscription.epoch_id == epoch_id, PushSubscription.endpoint == sub.endpoint
             )
             return str((await connection.execute(existing)).scalar_one())
+
+    async def id_for_endpoint(self, endpoint: str, epoch_id: int) -> str | None:
+        statement = select(PushSubscription.id).where(
+            PushSubscription.epoch_id == epoch_id, PushSubscription.endpoint == endpoint
+        )
+        async with self._engine.connect() as connection:
+            found = (await connection.execute(statement)).scalar_one_or_none()
+        return None if found is None else str(found)
+
+    async def count_for_site(self, site_id: str, epoch_id: int) -> int:
+        return await self._count(PushSubscription.site_id == site_id, PushSubscription.epoch_id == epoch_id)
+
+    async def count_for_crew(self, crew_id: str, epoch_id: int) -> int:
+        return await self._count(PushSubscription.crew_id == crew_id, PushSubscription.epoch_id == epoch_id)
+
+    async def _count(self, *conditions: object) -> int:
+        statement = select(func.count()).select_from(PushSubscription).where(*conditions)  # type: ignore[arg-type]
+        async with self._engine.connect() as connection:
+            return int((await connection.execute(statement)).scalar_one())
 
     async def delete(self, subscription_id: str) -> None:
         async with self._engine.begin() as connection:

@@ -47,6 +47,7 @@ import asyncio
 import contextlib
 import datetime as dt
 import json
+import time
 import tomllib
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from enum import StrEnum
@@ -103,6 +104,8 @@ from stellar_blaze.ports.config_store import (
     StoreUnavailableError,
     VersionNotFoundError,
 )
+
+alerts_clock: Callable[[], float] = time.monotonic  # replaced by a test (a frozen clock)
 
 # No rich traceback with locals: the locals of a failing command hold its settings, and so its connection string.
 app = typer.Typer(
@@ -679,8 +682,54 @@ async def _alert_job(settings: Settings, runtime: Runtime, engine: AsyncEngine, 
     )
 
 
-def _lock_key(site: str | None) -> str:
-    return f"alerts-dispatch:{site or 'all'}"
+def _lock_key(site: str) -> str:
+    """One advisory lock per SITE: there is no "all" key, so a run of every site and a run of one site cannot both be
+    working on the same site (a double send)."""
+    return f"alerts-dispatch:{site}"
+
+
+async def _dispatch_sites(
+    settings: Settings,
+    job: AlertJob,
+    site: str | None,
+    local_date: dt.date | None,
+    instant: dt.datetime | None,
+) -> tuple[int, dict[str, JsonValue]]:
+    """Dispatch every site (or ``site``) as its own ``job_run`` under its own lock, concurrently: a hanging push service
+    of one site cannot delay another site's escalation. Returns the worst exit code and the merged summary."""
+    ids = [site] if site is not None else await job.site_ids()
+    summaries: list[Mapping[str, JsonValue]] = []
+
+    async def one(site_id: str) -> int:
+        async def work() -> Mapping[str, JsonValue]:
+            summary = await job.work(local_date, instant, site_id)
+            summaries.append(summary)
+            return summary
+
+        params: dict[str, JsonValue] = {
+            "site": site_id,
+            "date": None if local_date is None else local_date.isoformat(),
+            "as_of": None if instant is None else instant.isoformat(),
+        }
+        return await run_job(settings, "alerts-dispatch", params, work, lock_key=_lock_key(site_id))
+
+    codes = await asyncio.gather(*(one(site_id) for site_id in ids))
+    if not summaries:
+        return max(codes, default=0), {}
+    merged: dict[str, JsonValue] = dict(summaries[0])
+    merged["sites"] = [site_id for summary in summaries for site_id in _as_list(summary["sites"])]
+    for key in ("events_created", "delivered", "failed"):
+        merged[key] = sum(_as_int(summary[key]) for summary in summaries)
+    merged["interval_minutes"] = min(_as_int(summary["interval_minutes"]) for summary in summaries)
+    return max(codes, default=0), merged
+
+
+def _as_int(value: JsonValue) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _as_list(value: JsonValue) -> list[JsonValue]:
+    return value if isinstance(value, list) else []
 
 
 @alerts_app.command("dispatch")
@@ -711,25 +760,13 @@ def alerts_dispatch_command(
         raise typer.BadParameter("needs an offset, for example 2025-07-10T07:40:00Z", param_hint="--as-of")
     settings = _settings()
     runtime = _runtime(settings)
-    params: dict[str, JsonValue] = {
-        "site": site,
-        "date": None if local_date is None else local_date.isoformat(),
-        "as_of": None if instant is None else instant.isoformat(),
-    }
 
     async def go() -> tuple[int, dict[str, JsonValue]]:
         engine = build_engine(settings)
         try:
             job = await _alert_job(settings, runtime, engine, site)
             try:
-                code = await run_job(
-                    settings,
-                    "alerts-dispatch",
-                    params,
-                    lambda: job.work(local_date, instant),
-                    lock_key=_lock_key(site),
-                )
-                return code, job.summary
+                return await _dispatch_sites(settings, job, site, local_date, instant)
             finally:
                 await job.close()
         finally:
@@ -745,9 +782,13 @@ def alerts_dispatch_command(
 
 @alerts_app.command("run")
 def alerts_run_command(site: SiteOption = None) -> None:
-    """Dispatch in a loop: a run, then a wait of ``alert_dispatch_interval_minutes`` of the ACTIVE config (read again
-    every cycle; default 5, range 1 to 30). SIGTERM or Ctrl-C ends it cleanly after the current run; a failing cycle is
-    logged and the loop goes on. Each cycle is a ``job_run`` row like ``alerts dispatch``."""
+    """Dispatch in a FIXED-RATE loop: a run starts every ``max(60 s, alert_dispatch_interval_minutes x 60)`` (the ACTIVE
+    config, read again every cycle; default 5, range 1 to 30), measured from the START of the previous run. Escalation
+    SLA: a crew stop is delivered within one such period of being recorded; every push is bounded by a hard deadline and
+    the run by the period minus 10 s, so a hanging push service cannot delay it. SIGTERM or Ctrl-C ends it cleanly after
+    the current run; a failing cycle is logged and the loop goes on. Each site of each cycle is a ``job_run`` row, like
+    ``alerts dispatch``, under its own per-site lock. The API and this loop are separate processes with their own
+    replay clocks."""
     settings = _settings()
     runtime = _runtime(settings)
 
@@ -760,16 +801,12 @@ def alerts_run_command(site: SiteOption = None) -> None:
             try:
 
                 async def cycle() -> int | None:
-                    await run_job(
-                        settings,
-                        "alerts-dispatch",
-                        {"site": site, "date": None, "as_of": None},
-                        job.work,
-                        lock_key=_lock_key(site),
-                    )
-                    return job.interval_minutes
+                    _, summary = await _dispatch_sites(settings, job, site, None, None)
+                    interval = summary.get("interval_minutes")
+                    return interval if isinstance(interval, int) else None
 
-                await run_loop(cycle, stop=stop, sleep=alerts_sleeper)  # looked up here: a test injects its own
+                # Looked up here: a test injects its own sleeper and monotonic clock.
+                await run_loop(cycle, stop=stop, sleep=alerts_sleeper, clock=alerts_clock)
             finally:
                 await job.close()
         finally:

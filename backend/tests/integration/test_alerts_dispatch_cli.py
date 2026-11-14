@@ -162,8 +162,8 @@ def test_a_stop_between_two_runs_is_escalated_by_the_next_run_and_the_rows_carry
         "SELECT detail, site_id, epoch_id, config_version_id, ruleset_id, model_id FROM audit_event "
         "WHERE kind = 'alerts.dispatched' ORDER BY id",
     )
-    assert len(audited) == 3  # one per run, also the run that created nothing
-    assert [a["detail"]["events_created"] for a in audited] == [summary["events_created"], 1, 0]
+    assert len(audited) == 2  # one per run that created something; the run that created nothing is only a job_run
+    assert [a["detail"]["events_created"] for a in audited] == [summary["events_created"], 1]
     assert {a["detail"]["interval_minutes"] for a in audited} == {5}
     assert {(a["site_id"], a["epoch_id"], a["config_version_id"]) for a in audited} == {
         (SITE, 1, activation["config_version_id"])
@@ -229,6 +229,9 @@ def test_the_loop_waits_the_interval_of_the_active_config_read_again_every_cycle
             stop.set()  # the process is told to stop: it ends after the current run
 
     monkeypatch.setattr(cli, "alerts_sleeper", sleeper)
+    monkeypatch.setattr(
+        cli, "alerts_clock", lambda: 0.0
+    )  # a frozen clock: a run "takes" no time, the wait is the period
 
     result = sb_jobs("alerts", "run", "--site", SITE)
 
@@ -240,5 +243,6 @@ def test_the_loop_waits_the_interval_of_the_active_config_read_again_every_cycle
         loaded,
         "SELECT detail->>'interval_minutes' AS minutes FROM audit_event WHERE kind = 'alerts.dispatched' ORDER BY id",
     )
-    assert [i["minutes"] for i in intervals] == ["5", "2"]
+    # Only a run that created or sent something is audited (job_run is the heartbeat): the second cycle changed nothing.
+    assert [i["minutes"] for i in intervals] == ["5"]
     assert channel.closed  # the process released its channel on the way out
