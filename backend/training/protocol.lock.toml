@@ -13,3 +13,8 @@ gold_sha256 = "8124c86c6f3ff55c40184f85be06b54a9ed289cdba1a625347efe4809544a1db"
 path = "docs/research/2026-11-14-preregistration-amendment-1.md"
 sha256 = "35595fbc7fbeb6b207f468d9b0c81286431e446930fb77f3828cc01c599a7272"
 commit = "9d11442643249894628d7d85d4f3bb6d1d53bda5"
+
+[[amendments]]
+path = "docs/research/2026-11-15-preregistration-amendment-2.md"
+sha256 = "ae0b5d7bff9335617407d3a78448f5abd64284ff5ce8866781c4230eff05c8ad"
+commit = "52b4f336df19205d7718fe0820e28190b0b22b29"
