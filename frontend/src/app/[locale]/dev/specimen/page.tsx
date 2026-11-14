@@ -5,21 +5,20 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { LEVELS, levelIndex, type Level } from "@/components/level/level";
-import { LevelPictogram } from "@/components/level/pictograms";
 import { DraftBadge } from "@/components/shell/DraftBadge";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
-import { ThemeToggle } from "@/components/shell/ThemeToggle";
+import { SunToggle } from "@/components/shell/SunToggle";
 
 /*
- * Dev-only visual specimen for the "Arish Signal" direction (DESIGN.md).
+ * Dev-only visual specimen for the "Qaylula" direction (DESIGN.md).
  * Not part of the product: it returns 404 in production unless SB_SPECIMEN=1.
  *
  * It renders in the language of its route, so /en, /ar, /ur, /hi, /bn and /ne/dev/specimen show the
  * same page in each script with that locale's fonts, direction and line height. Its copy lives in
  * messages (common.specimen.*, levels.*); the non-English text there is machine draft.
- * The four level badges are inline placeholders until LevelBadge exists (Task 10). The shell controls
- * (language, theme, draft badge) are mounted in the header so they can be seen and tried here before
- * the app shell (Task 4) exists.
+ * The level rows are a minimal token-only stand-in (the level word plus a 10 px mark, no plate, no hatch) until
+ * LevelSign exists (Task 4). The shell controls (language, sun toggle, draft badge) are mounted in the header so they
+ * can be seen and tried here. Both themes are drawn side by side from nested [data-theme] subtrees.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,69 +27,49 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 // Full class names, never built by interpolation, so Tailwind's scanner finds them.
-const LEVEL_CLASS = {
-  green: {
-    fill: "bg-level-green",
-    on: "text-on-level-green",
-    pattern: "pattern-level-green",
-    soft: "bg-level-green-soft text-on-level-green-soft",
-  },
-  amber: {
-    fill: "bg-level-amber",
-    on: "text-on-level-amber",
-    pattern: "pattern-level-amber",
-    soft: "bg-level-amber-soft text-on-level-amber-soft",
-  },
-  orange: {
-    fill: "bg-level-orange",
-    on: "text-on-level-orange",
-    pattern: "pattern-level-orange",
-    soft: "bg-level-orange-soft text-on-level-orange-soft",
-  },
-  red: {
-    fill: "bg-level-red",
-    on: "text-on-level-red",
-    pattern: "pattern-level-red",
-    soft: "bg-level-red-soft text-on-level-red-soft",
-  },
-} as const satisfies Record<
-  Level,
-  { fill: string; on: string; pattern: string; soft: string }
->;
+const MARK_CLASS = {
+  green: "bg-lv-green",
+  amber: "bg-lv-amber",
+  orange: "bg-lv-orange",
+  red: "bg-lv-red",
+} as const satisfies Record<Level, string>;
 
-// One shade-band hour: the heat curve of a long outdoor shift, 08:00 to 19:00.
-const BAND: readonly { hour: string; level: Level }[] = [
-  { hour: "08", level: "green" },
-  { hour: "09", level: "green" },
-  { hour: "10", level: "amber" },
-  { hour: "11", level: "amber" },
-  { hour: "12", level: "orange" },
-  { hour: "13", level: "orange" },
-  { hour: "14", level: "red" },
-  { hour: "15", level: "red" },
-  { hour: "16", level: "orange" },
-  { hour: "17", level: "amber" },
-  { hour: "18", level: "green" },
-  { hour: "19", level: "green" },
+// One hour strip: a long outdoor shift, 08:00 to 19:00. The two cells on `bg-slot` show the recessed band.
+const HOURS: readonly { hour: string; slot: boolean }[] = [
+  { hour: "08", slot: false },
+  { hour: "09", slot: false },
+  { hour: "10", slot: false },
+  { hour: "11", slot: false },
+  { hour: "12", slot: false },
+  { hour: "13", slot: true },
+  { hour: "14", slot: true },
+  { hour: "15", slot: false },
+  { hour: "16", slot: false },
+  { hour: "17", slot: false },
+  { hour: "18", slot: false },
+  { hour: "19", slot: false },
 ];
-const NOW_HOUR = "13";
+const NOW_HOUR = "11";
 
 // Token names and sizes are identifiers of the design system, not copy: they stay in code.
 const TYPE_STEPS = [
-  { cls: "text-sm font-body", rem: "0.875", name: "label", numeral: false },
-  { cls: "text-base font-body", rem: "1", name: "body", numeral: false },
-  { cls: "text-lg font-body", rem: "1.25", name: "lead", numeral: false },
-  { cls: "text-xl font-display font-semibold", rem: "1.5625", name: "title", numeral: false },
-  { cls: "text-2xl font-display font-semibold", rem: "1.953", name: "headline", numeral: false },
-  { cls: "text-3xl font-display font-bold", rem: "3.052", name: "display", numeral: true },
-  { cls: "text-4xl font-display font-bold", rem: "4.768", name: "numeral", numeral: true },
+  { cls: "text-xs", px: 12, numeral: false },
+  { cls: "text-sm", px: 14, numeral: false },
+  { cls: "text-base", px: 16, numeral: false },
+  { cls: "text-lg", px: 18, numeral: false },
+  { cls: "text-xl font-medium", px: 22, numeral: false },
+  { cls: "text-2xl font-medium", px: 28, numeral: false },
+  { cls: "text-3xl", px: 36, numeral: false },
+  { cls: "text-4xl tracking-display", px: 48, numeral: true },
+  { cls: "text-5xl tracking-display", px: 64, numeral: true },
+  { cls: "text-6xl font-medium", px: 76, numeral: true },
 ] as const;
 
 function Section({ index, title, children }: { index: string; title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="flex items-baseline gap-3 border-b-2 border-ink pb-2 font-display text-2xl font-semibold uppercase tracking-signage">
-        <span className="tabular-nums text-ink-muted">{index}</span>
+      <h2 className="flex items-baseline gap-3 border-b border-hair pb-2 font-display text-2xl font-medium">
+        <span className="tabular-nums text-ink-3">{index}</span>
         {title}
       </h2>
       {children}
@@ -98,57 +77,34 @@ function Section({ index, title, children }: { index: string; title: string; chi
   );
 }
 
-function LevelBadgePlaceholder({ level }: { level: Level }) {
+/** The level word with its 10 px mark: the whole of a level at this stage. Task 4 replaces it with LevelSign. */
+function LevelRow({ level }: { level: Level }) {
   const t = useTranslations("levels");
-  const c = LEVEL_CLASS[level];
   return (
-    <li className={`${c.fill} ${c.on} ${c.pattern} rounded-sign`}>
-      {/* The plate is solid so text never sits on the hatch; the hatch runs out past its end edge. */}
-      <div className={`${c.fill} me-16 flex items-center gap-4 px-4 py-3`}>
-        <span className="font-display text-3xl font-bold leading-solid tabular-nums">{levelIndex(level)}</span>
-        <LevelPictogram level={level} className="size-10 shrink-0" />
-        <span className="font-display text-2xl font-semibold uppercase tracking-signage">
-          {t(`name.${level}`)}
-        </span>
-      </div>
+    <li className="flex items-center gap-3 border-b border-hair py-3">
+      <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sign ${MARK_CLASS[level]}`} />
+      <span className="font-display text-xl font-medium">{t(`name.${level}`)}</span>
+      <span className="ms-auto tabular-nums text-ink-3">{levelIndex(level)}</span>
     </li>
   );
 }
 
-function ShadeBandPreview() {
-  const t = useTranslations("levels");
+function HourStrip() {
   return (
-    <ol className="grid auto-cols-fr grid-flow-col gap-[var(--shade-cell-gap)]">
-      {BAND.map(({ hour, level }) => {
-        const c = LEVEL_CLASS[level];
+    <ol className="grid auto-cols-fr grid-flow-col border border-hair">
+      {HOURS.map(({ hour, slot }, i) => {
         const isNow = hour === NOW_HOUR;
+        const prev = HOURS[i - 1]?.slot === true;
+        const next = HOURS[i + 1]?.slot === true;
         return (
           <li
             key={hour}
-            aria-label={t("cellLabel", {
-              time: `${hour}:00`,
-              name: t(`name.${level}`),
-              index: levelIndex(level),
-            })}
             aria-current={isNow ? "time" : undefined}
-            className="flex min-w-0 flex-col gap-1"
+            className={`py-3 text-center text-sm tabular-nums ${
+              isNow ? "bg-ink text-ground" : slot ? "bg-slot text-ink-3" : "text-ink-2"
+            } ${slot && !prev ? "border-s border-hair" : ""} ${slot && !next ? "border-e border-hair" : ""}`}
           >
-            <div
-              className={`${c.fill} ${c.on} ${c.pattern} flex min-h-[var(--shade-cell-height)] flex-col justify-center rounded-sign`}
-            >
-              <span
-                className={`${c.fill} px-[var(--shade-plate-padding)] py-1 text-center font-display text-xl font-bold leading-solid tabular-nums`}
-              >
-                {levelIndex(level)}
-              </span>
-            </div>
-            <span
-              className={`rounded-sign py-0.5 text-center font-display text-sm font-semibold leading-solid tabular-nums ${
-                isNow ? "bg-ink text-surface" : "text-ink-muted"
-              }`}
-            >
-              {hour}
-            </span>
+            {hour}
           </li>
         );
       })}
@@ -161,11 +117,11 @@ function TypeScale() {
   return (
     <div className="flex flex-col gap-6">
       {TYPE_STEPS.map((step) => (
-        <div key={step.name} className="flex flex-col gap-1 border-b border-hairline pb-4">
-          <p className="font-body text-sm tabular-nums text-ink-muted">
-            {step.name} · {step.rem}rem · {step.cls.split(" ")[0]}
+        <div key={step.px} className="flex flex-col gap-1 border-b border-hair pb-4">
+          <p className="font-mono text-sm text-ink-3">
+            {step.px} px · {step.cls.split(" ")[0]}
           </p>
-          <p className={step.cls}>{step.numeral ? t("time") : t("phrase")}</p>
+          <p className={`font-display ${step.cls}`}>{step.numeral ? t("time") : t("phrase")}</p>
         </div>
       ))}
     </div>
@@ -186,55 +142,46 @@ function Swatch({
   return (
     <li className="flex flex-col gap-1">
       <div className={`flex h-14 items-center justify-center rounded-sign ${boxClass}`}>{children}</div>
-      <span className="font-body text-sm leading-tight">{label}</span>
-      {sub === undefined ? null : <span className="font-body text-sm leading-tight text-ink-muted">{sub}</span>}
+      <span className="font-mono text-sm leading-tight">{label}</span>
+      {sub === undefined ? null : <span className="font-mono text-sm leading-tight text-ink-2">{sub}</span>}
     </li>
   );
 }
 
-const SAMPLE_MARK = "font-display text-2xl font-bold leading-solid";
+const SAMPLE_MARK = "font-display text-2xl font-medium leading-solid";
 
-function ThemePanel({ theme, title }: { theme: "light" | "dark"; title: string }) {
+function ThemePanel({ theme, title }: { theme: "night" | "sun"; title: string }) {
   return (
     <section
       data-theme={theme}
       aria-label={title}
-      className="flex flex-col gap-4 rounded-sign border-2 border-control bg-surface p-4 text-ink"
+      className="flex flex-col gap-4 rounded-sign border border-edge bg-ground p-4 text-ink"
     >
-      <h3 className="font-display text-xl font-semibold uppercase tracking-signage">{title}</h3>
+      <h3 className="font-display text-xl font-medium">{title}</h3>
       <ul className="grid grid-cols-2 gap-x-3 gap-y-4">
-        <Swatch label="surface" boxClass="border-2 border-control bg-surface" />
-        <Swatch label="surface-raised" boxClass="border border-hairline bg-surface-raised" />
-        <Swatch label="ink" boxClass="border border-hairline bg-surface text-ink">
+        <Swatch label="ground" boxClass="border border-edge bg-ground" />
+        <Swatch label="ground-deep" boxClass="border border-hair bg-ground-deep" />
+        <Swatch label="panel" boxClass="border border-hair bg-panel" />
+        <Swatch label="raised" boxClass="border border-hair bg-raised" />
+        <Swatch label="slot" boxClass="border border-hair bg-slot" />
+        <Swatch label="hair" boxClass="border-2 border-hair bg-ground" />
+        <Swatch label="edge" boxClass="border-2 border-edge bg-ground" />
+        <Swatch label="ink" boxClass="border border-hair bg-ground text-ink">
           <span className={SAMPLE_MARK}>Aa</span>
         </Swatch>
-        <Swatch label="ink-muted" boxClass="border border-hairline bg-surface text-ink-muted">
+        <Swatch label="ink-2" boxClass="border border-hair bg-ground text-ink-2">
           <span className={SAMPLE_MARK}>Aa</span>
         </Swatch>
-        <Swatch label="hairline" boxClass="border-2 border-hairline bg-surface" />
-        <Swatch label="control" boxClass="border-2 border-control bg-surface" />
-        <Swatch label="action" sub="on-action" boxClass="bg-action text-on-action">
+        <Swatch label="ink-3" boxClass="border border-hair bg-ground text-ink-3">
           <span className={SAMPLE_MARK}>Aa</span>
         </Swatch>
-        <Swatch label="focus ring" boxClass="m-1 bg-surface outline-3 outline-offset-2 outline-focus" />
-        <Swatch label="scrim" sub="bg-scrim/50" boxClass="bg-scrim/50" />
+        <Swatch label="signal" sub="on-signal" boxClass="bg-signal text-on-signal">
+          <span className={SAMPLE_MARK}>Aa</span>
+        </Swatch>
+        <Swatch label="focus ring" boxClass="m-1 bg-ground outline-3 outline-offset-2 outline-focus" />
+        <Swatch label="scrim" sub="bg-scrim" boxClass="bg-scrim" />
         {LEVELS.map((level) => (
-          <Swatch
-            key={level}
-            label={`level-${level}`}
-            sub={`on-level-${level}`}
-            boxClass={`${LEVEL_CLASS[level].fill} ${LEVEL_CLASS[level].on}`}
-          >
-            <span className={SAMPLE_MARK}>{levelIndex(level)}</span>
-          </Swatch>
-        ))}
-        {LEVELS.map((level) => (
-          <Swatch
-            key={level}
-            label={`level-${level}-soft`}
-            sub={`on-level-${level}-soft`}
-            boxClass={LEVEL_CLASS[level].soft}
-          >
+          <Swatch key={level} label={`lv-${level}`} boxClass={`${MARK_CLASS[level]} text-ground`}>
             <span className={SAMPLE_MARK}>{levelIndex(level)}</span>
           </Swatch>
         ))}
@@ -256,29 +203,27 @@ export default async function SpecimenPage(props: PageProps<"/[locale]/dev/speci
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 py-8 font-body">
       <header className="flex flex-col gap-3">
-        <p className="font-display text-sm font-semibold uppercase tracking-signage text-ink-muted">
-          {t("kicker", { locale })}
-        </p>
-        <h1 className="font-display text-4xl font-bold uppercase leading-solid tracking-signage">{t("title")}</h1>
-        <p className="text-lg text-ink-muted">{t("lead")}</p>
+        <p className="font-mono text-sm text-ink-3">{t("kicker", { locale })}</p>
+        <h1 className="font-display text-5xl leading-solid tracking-display">{t("title")}</h1>
+        <p className="text-lg text-ink-2">{t("lead")}</p>
         <div className="flex flex-wrap items-center gap-3">
           <LocaleSwitcher />
-          <ThemeToggle />
+          <SunToggle />
           <DraftBadge />
         </div>
       </header>
 
       <Section index="01" title={t("levelsHeading")}>
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col">
           {LEVELS.map((level) => (
-            <LevelBadgePlaceholder key={level} level={level} />
+            <LevelRow key={level} level={level} />
           ))}
         </ul>
       </Section>
 
       <Section index="02" title={t("bandHeading")}>
-        <ShadeBandPreview />
-        <p className="text-sm text-ink-muted">{t("bandNote")}</p>
+        <HourStrip />
+        <p className="text-sm text-ink-2">{t("bandNote")}</p>
       </Section>
 
       <Section index="03" title={t("typeHeading")}>
@@ -286,8 +231,8 @@ export default async function SpecimenPage(props: PageProps<"/[locale]/dev/speci
       </Section>
 
       <Section index="04" title={t("tokensHeading")}>
-        <ThemePanel theme="light" title={t("lightTheme")} />
-        <ThemePanel theme="dark" title={t("darkTheme")} />
+        <ThemePanel theme="night" title={t("nightTheme")} />
+        <ThemePanel theme="sun" title={t("sunTheme")} />
       </Section>
     </main>
   );

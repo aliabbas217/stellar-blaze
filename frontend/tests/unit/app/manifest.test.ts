@@ -7,7 +7,8 @@ import { APPLE_TOUCH_ICON, MANIFEST_COLORS, manifestFor, type ManifestTranslator
 import { dirFor } from "@/i18n/direction";
 import type { Messages } from "@/i18n/request";
 import { routing, type Locale } from "@/i18n/routing";
-import { loadTokens, oklchToHex, themeHex } from "../../utils/colour";
+import { THEME_COLORS } from "@/lib/sun/theme-colors";
+import { themeHex } from "../../utils/colour";
 
 /*
  * The per-locale web app manifest. Installability needs the icons and display mode right; the locale review
@@ -40,16 +41,16 @@ async function translatorFor(locale: Locale): Promise<ManifestTranslator> {
 // ---------- the colours: the manifest holds sRGB hex, tokens.css holds OKLCH; they must stay the same colour ----------
 
 describe("MANIFEST_COLORS", () => {
-  const { primitives } = loadTokens();
-
-  it("is the light --surface (sand-50) token, for the manifest and the light browser chrome", () => {
-    expect(MANIFEST_COLORS.light).toBe(themeHex().light["surface"]);
-    expect(MANIFEST_COLORS.light).toBe(oklchToHex(primitives["ref-sand-50"] ?? ""));
+  it("is the night --ground token, for the manifest and the default browser chrome", () => {
+    expect(MANIFEST_COLORS.night).toBe(themeHex().night["ground"]);
   });
 
-  it("is the dark --surface (sand-950) token, for the dark browser chrome", () => {
-    expect(MANIFEST_COLORS.dark).toBe(themeHex().dark["surface"]);
-    expect(MANIFEST_COLORS.dark).toBe(oklchToHex(primitives["ref-sand-950"] ?? ""));
+  it("is the sun --ground token, for the browser chrome while sun mode is on", () => {
+    expect(MANIFEST_COLORS.sun).toBe(themeHex().sun["ground"]);
+  });
+
+  it("is the one set of colours the theme script and the sun toggle write to the theme-color meta", () => {
+    expect(MANIFEST_COLORS).toBe(THEME_COLORS);
   });
 });
 
@@ -65,8 +66,8 @@ describe("manifestFor", () => {
     expect(manifest.id).toBe("/worker");
     expect(manifest.display).toBe("standalone");
     expect(manifest.orientation).toBe("portrait");
-    expect(manifest.theme_color).toBe(MANIFEST_COLORS.light);
-    expect(manifest.background_color).toBe(MANIFEST_COLORS.light);
+    expect(manifest.theme_color).toBe(MANIFEST_COLORS.night);
+    expect(manifest.background_color).toBe(MANIFEST_COLORS.night);
   });
 
   it("takes the name and the description from the locale's own messages", async () => {
@@ -147,11 +148,15 @@ describe("the icon files", () => {
     expect(png.bitDepth).toBe(8);
   });
 
-  it.each(icons.map((icon) => icon.src))("%s is full-bleed sand-50, so a maskable crop shows no transparent corner", (src) => {
+  // The F1 artwork (amber drop on sand-50). Qaylula has no sand: the icons keep their name and size and are redrawn on the
+  // night ground in a later task (parked in the Task 1 report); until then this pins the files as they are.
+  const ICON_BACKGROUND_F1 = "#fbf6ee";
+
+  it.each(icons.map((icon) => icon.src))("%s is full-bleed, so a maskable crop shows no transparent corner", (src) => {
     const { topLeft, colorType } = readPng(path.join(frontendRoot, "public", src));
     const [r = -1, g = -1, b = -1, a = 255] = topLeft;
     const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-    expect(hex).toBe(MANIFEST_COLORS.light);
+    expect(hex).toBe(ICON_BACKGROUND_F1);
     expect(colorType === 2 || a === 255).toBe(true);
   });
 });

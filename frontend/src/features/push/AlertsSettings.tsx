@@ -31,8 +31,8 @@ const noopSubscribe = () => () => undefined;
  */
 const BUTTON_BASE = "min-h-12 rounded-sign px-4 font-body text-base disabled:opacity-50";
 const BUTTON_VARIANTS = {
-  primary: "bg-action text-on-action",
-  secondary: "border-2 border-control bg-surface text-ink",
+  primary: "bg-ink text-ground",
+  secondary: "border border-edge bg-ground text-ink",
 } as const;
 
 function ActionButton({
@@ -396,7 +396,7 @@ function DebugPanel({ subscription }: { subscription: PushSubscriptionJSON | nul
         onFocus={(event) => {
           event.currentTarget.select();
         }}
-        className="w-full rounded-sign border-2 border-control bg-surface p-3 text-sm text-ink"
+        className="w-full rounded-sign border border-edge bg-ground p-3 text-sm text-ink"
       />
       <div className="flex flex-wrap gap-3">
         <ActionButton

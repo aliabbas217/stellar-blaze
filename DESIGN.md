@@ -1,355 +1,332 @@
 ---
-version: alpha
-name: Arish Signal
+version: v2-final
+name: Qaylula (design phase 2026-11-12, promoted to the repo root 2026-11-14)
 description: >-
-  Visual identity for Stellar Blaze, a heat-stress safety app for outdoor workers in the UAE.
-  Gulf shade meets industrial signage. Light-theme semantic values; the dark theme is described
-  in the Colors section and lives in frontend/src/styles/tokens.css.
+  Visual identity for Stellar Blaze v2: a dark instrument and operations console for heat-stress safety in the UAE,
+  merging direction A (Isotherm) and C (Watch), with direction B's landing narrative. Heat colour lives only on data.
+  The signature is the legal midday break drawn into time itself. Replaces the v1 "Arish Signal" direction
+  (docs/design/DESIGN.md, kept unchanged as the rejected baseline). This is the state implemented on the F2 branch;
+  the values here are the values of frontend/src/styles/tokens.css, and a unit test fails if they differ.
 colors:
-  primary: "oklch(0.5 0.08 205)"
-  on-primary: "oklch(1 0 0)"
-  surface: "oklch(0.975 0.012 80)"
-  surface-raised: "oklch(0.95 0.02 80)"
-  ink: "oklch(0.17 0.015 60)"
-  ink-muted: "oklch(0.42 0.035 65)"
-  hairline: "oklch(0.83 0.04 76)"
-  control: "oklch(0.6 0.045 70)"
-  focus: "oklch(0.42 0.07 208)"
-  scrim: "oklch(0.17 0.015 60)"
-  level-green: "oklch(0.52 0.13 150)"
-  on-level-green: "oklch(1 0 0)"
-  level-green-soft: "oklch(0.93 0.05 150)"
-  on-level-green-soft: "oklch(0.38 0.1 150)"
-  level-amber: "oklch(0.82 0.16 85)"
-  on-level-amber: "oklch(0.17 0.015 60)"
-  level-amber-soft: "oklch(0.95 0.06 90)"
-  on-level-amber-soft: "oklch(0.45 0.09 75)"
-  level-orange: "oklch(0.7 0.17 50)"
-  on-level-orange: "oklch(0.17 0.015 60)"
-  level-orange-soft: "oklch(0.93 0.04 55)"
-  on-level-orange-soft: "oklch(0.45 0.12 45)"
-  level-red: "oklch(0.5 0.19 27)"
-  on-level-red: "oklch(1 0 0)"
-  level-red-soft: "oklch(0.93 0.035 27)"
-  on-level-red-soft: "oklch(0.42 0.16 27)"
+  primary: "{colors.signal}"
+  ground: "oklch(0.17 0.014 245)"
+  ground-deep: "oklch(0.145 0.014 245)"
+  panel: "oklch(0.205 0.014 245)"
+  raised: "oklch(0.24 0.014 245)"
+  slot: "oklch(0.125 0.012 245)"
+  hair: "oklch(0.3 0.012 245)"
+  edge: "oklch(0.51 0.012 245)"
+  ink: "oklch(0.95 0.005 245)"
+  ink-2: "oklch(0.78 0.01 245)"
+  ink-3: "oklch(0.64 0.012 245)"
+  signal: "oklch(0.84 0.075 200)"
+  on-signal: "oklch(0.145 0.014 245)"
+  lv-green: "oklch(0.72 0.14 150)"
+  lv-amber: "oklch(0.83 0.14 85)"
+  lv-orange: "oklch(0.73 0.15 52)"
+  lv-red: "oklch(0.66 0.19 27)"
+  sun-ground: "oklch(0.985 0.002 245)"
+  sun-ink: "oklch(0.18 0.012 245)"
+  sun-signal: "oklch(0.45 0.09 215)"
 typography:
-  # lineHeight is quoted on purpose: @google/design.md 0.4.0 silently drops an unquoted numeric lineHeight.
-  # headline and title have none: they inherit the locale line height (1.5, 1.8 for ar, 2.1 for ur).
-  numeral:
-    fontFamily: Barlow Condensed
-    fontSize: 4.768rem
-    fontWeight: 700
-    lineHeight: "1"
   display:
-    fontFamily: Barlow Condensed
-    fontSize: 3.052rem
-    fontWeight: 700
-    lineHeight: "1"
-  headline:
-    fontFamily: Barlow Condensed
-    fontSize: 1.953rem
-    fontWeight: 600
-    letterSpacing: 0.025em
-  title:
-    fontFamily: Barlow Condensed
-    fontSize: 1.5625rem
-    fontWeight: 600
-    letterSpacing: 0.025em
-  lead:
-    fontFamily: Noto Sans
-    fontSize: 1.25rem
+    fontFamily: Archivo
+    fontSize: 3rem
     fontWeight: 400
-    lineHeight: "1.5"
+    letterSpacing: -0.02em
+  level:
+    fontFamily: Archivo
+    fontSize: 4.75rem
+    fontWeight: 500
+  title:
+    fontFamily: Archivo
+    fontSize: 1.375rem
+    fontWeight: 500
   body:
-    fontFamily: Noto Sans
+    fontFamily: Archivo
     fontSize: 1rem
     fontWeight: 400
     lineHeight: "1.5"
   label:
-    fontFamily: Noto Sans
+    fontFamily: Archivo
     fontSize: 0.875rem
     fontWeight: 500
-    lineHeight: "1.5"
+  wordmark:
+    fontFamily: Archivo
+    fontSize: 0.875rem
+    fontWeight: 600
+    letterSpacing: 0.16em
+  body-ar:
+    fontFamily: Noto Sans Arabic
+    fontSize: 1rem
+  body-ur:
+    fontFamily: Noto Nastaliq Urdu
+    fontSize: 1rem
+    lineHeight: "2.5"
+  body-deva:
+    fontFamily: Noto Sans Devanagari
+    fontSize: 1rem
+  body-bn:
+    fontFamily: Noto Sans Bengali
+    fontSize: 1rem
+  code:
+    fontFamily: IBM Plex Mono
+    fontSize: 0.875rem
+    fontWeight: 400
 rounded:
-  sign: 2px
+  r: 2px
 spacing:
   "1": 4px
   "2": 8px
   "3": 12px
   "4": 16px
+  "5": 20px
   "6": 24px
   "8": 32px
+  "10": 40px
   "12": 48px
   "16": 64px
   "24": 96px
 components:
   page:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.ground}"
     textColor: "{colors.ink}"
     typography: "{typography.body}"
-  card:
-    backgroundColor: "{colors.surface-raised}"
+  ground-deep:
+    backgroundColor: "{colors.ground-deep}"
+    textColor: "{colors.ink-2}"
+  panel:
+    backgroundColor: "{colors.panel}"
     textColor: "{colors.ink}"
+    rounded: "{rounded.r}"
+  panel-raised:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.r}"
+  slot:
+    backgroundColor: "{colors.slot}"
+    textColor: "{colors.ink-3}"
+  rule:
+    backgroundColor: "{colors.hair}"
+    height: 1px
+  edge-control:
+    backgroundColor: "{colors.edge}"
+    height: 44px
+    rounded: "{rounded.r}"
+  text-secondary:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink-2}"
     typography: "{typography.body}"
-    rounded: "{rounded.sign}"
-    padding: 16px
-  caption:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink-muted}"
+  text-label:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink-3}"
     typography: "{typography.label}"
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.ground}"
     typography: "{typography.title}"
-    rounded: "{rounded.sign}"
-    height: 48px
-    padding: 12px
-  level-green-badge:
-    backgroundColor: "{colors.level-green}"
-    textColor: "{colors.on-level-green}"
+    rounded: "{rounded.r}"
+    height: 44px
+  button-field:
+    backgroundColor: "{colors.signal}"
+    textColor: "{colors.on-signal}"
     typography: "{typography.title}"
-    rounded: "{rounded.sign}"
-    padding: 12px
-  level-amber-badge:
-    backgroundColor: "{colors.level-amber}"
-    textColor: "{colors.on-level-amber}"
+    rounded: "{rounded.r}"
+    height: 52px
+  level-mark-green:
+    backgroundColor: "{colors.lv-green}"
+    rounded: "{rounded.r}"
+    height: 10px
+    width: 10px
+  level-mark-amber:
+    backgroundColor: "{colors.lv-amber}"
+    rounded: "{rounded.r}"
+    height: 10px
+    width: 10px
+  level-mark-orange:
+    backgroundColor: "{colors.lv-orange}"
+    rounded: "{rounded.r}"
+    height: 10px
+    width: 10px
+  level-mark-red:
+    backgroundColor: "{colors.lv-red}"
+    rounded: "{rounded.r}"
+    height: 10px
+    width: 10px
+  sun-page:
+    backgroundColor: "{colors.sun-ground}"
+    textColor: "{colors.sun-ink}"
+    typography: "{typography.body}"
+  sun-button-field:
+    backgroundColor: "{colors.sun-signal}"
+    textColor: "{colors.sun-ground}"
     typography: "{typography.title}"
-    rounded: "{rounded.sign}"
-    padding: 12px
-  level-orange-badge:
-    backgroundColor: "{colors.level-orange}"
-    textColor: "{colors.on-level-orange}"
-    typography: "{typography.title}"
-    rounded: "{rounded.sign}"
-    padding: 12px
-  level-red-badge:
-    backgroundColor: "{colors.level-red}"
-    textColor: "{colors.on-level-red}"
-    typography: "{typography.title}"
-    rounded: "{rounded.sign}"
-    padding: 12px
-  level-green-chip:
-    backgroundColor: "{colors.level-green-soft}"
-    textColor: "{colors.on-level-green-soft}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sign}"
-    padding: 8px
-  level-amber-chip:
-    backgroundColor: "{colors.level-amber-soft}"
-    textColor: "{colors.on-level-amber-soft}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sign}"
-    padding: 8px
-  level-orange-chip:
-    backgroundColor: "{colors.level-orange-soft}"
-    textColor: "{colors.on-level-orange-soft}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sign}"
-    padding: 8px
-  level-red-chip:
-    backgroundColor: "{colors.level-red-soft}"
-    textColor: "{colors.on-level-red-soft}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sign}"
-    padding: 8px
-  rule-hairline:
-    backgroundColor: "{colors.hairline}"
-    height: 1px
-  rule-control:
-    backgroundColor: "{colors.control}"
-    height: 2px
-  focus-ring:
-    backgroundColor: "{colors.focus}"
-    size: 3px
-  overlay-scrim:
-    backgroundColor: "{colors.scrim}"
+    rounded: "{rounded.r}"
+    height: 52px
 ---
 
-## Overview
+# Qaylula: v2-final design direction
 
-**Arish Signal.** The *arish* is the palm-frond canopy of the Gulf: a roof of slats that throws a hard-edged, striped
-shadow, and the first thing a worker looks for at noon. Industrial safety signage supplies the other half: hazard
-hatching, big plain numerals, flat shapes with cut corners. The product is a sign you can read in glare, with gloves on,
-in a second language.
+**Status.** Design phase, 12 Nov 2026; Ali chose "dark, from A and C, with B's landing story" on 12 Nov. Promoted to the
+repo root on 14 Nov 2026 for plan F2, replacing the F1 "Arish Signal" tokens in code (`frontend/src/styles/tokens.css`).
+Inputs: `docs/design/v2/critique/diagnosis.md` (why v1 read as a toy), `docs/design/v2/research/references.md` (25
+measured references), `research/friction.md`, `ux/v2-journeys.md`, `critique/directions-critique.md` (independent
+critique of A/B/C) and `critique/inner-screens-gap.md` (why the inner screens were weak). The prototype that drew these
+values is `docs/design/v2/prototype/`; where it and this file differ, this file is the contract (the changes are listed
+at the end).
 
-**Three adjectives.** Unmistakable at arm's length. Calm under pressure. Field-tough.
+## 1. Direction procedure
 
-**Signature element: the shade band.** Each forecast hour is a cell. The diagonal hatch in the cell encodes the level:
-none for green, sparse for amber, medium for orange, dense cross-hatch for red, like shade slats or hazard tape. Every
-cell also carries the level numeral, so the band reads without colour, in sunlight glare, and in print.
+**Domain codes.**
 
-**What it is not.** Not SaaS. No indigo, no Inter, no soft glass cards, no gradient hero, no drop shadows, no rounded
-pills. The only saturated colours in the product are the four level fills, so colour always means a level.
-
-**Source of truth.** The values above are the normative light-theme set. `frontend/src/styles/tokens.css` implements
-them (and the dark theme) as CSS variables; `frontend/src/styles/globals.css` names them for Tailwind. Components use
-only the semantic names below, never a raw value.
-
-## Colors
-
-All colours are authored in OKLCH, and every value is inside the sRGB gamut. The ramps are tinted, not grey: the
-neutral is *sand* (hue 60 to 80), the single action hue is *falaj* (the teal of the aflaj irrigation channels, hue 205),
-and the four level hues are the traffic-signal set (green 150, amber 85, orange 50, red 27).
-
-| DESIGN.md name | CSS variable | Tailwind classes | Light role |
-|---|---|---|---|
-| `surface`, `surface-raised` | `--surface`, `--surface-raised` | `bg-surface`, `bg-surface-raised` | page, and one tonal step up |
-| `ink`, `ink-muted` | `--ink`, `--ink-muted` | `text-ink`, `text-ink-muted` | text |
-| `hairline` | `--hairline` | `border-hairline`, `bg-hairline` | decorative divider, 1 px, and the neutral wash behind a selected or highlighted row |
-| `control` | `--control` | `border-control` | the edge of an input or toggle, 2 px |
-| `primary`, `on-primary` | `--action`, `--on-action` | `bg-action`, `text-on-action` | the one action colour (`primary` is the linter's name for it) |
-| `focus` | `--focus` | `outline-focus` | focus ring, 3 px, 2 px offset |
-| `scrim` | `--scrim` | `bg-scrim` | the veil behind a sheet or dialog; always used with an opacity (`bg-scrim/50`) |
-| `level-{l}`, `on-level-{l}` | `--level-{l}`, `--on-level-{l}` | `bg-level-{l}`, `text-on-level-{l}` | level fill and the text on it |
-| `level-{l}-soft`, `on-level-{l}-soft` | `--level-{l}-soft`, `--on-level-{l}-soft` | `bg-level-{l}-soft`, `text-on-level-{l}-soft` | quiet tint for chips and rows |
-
-where `{l}` is `green`, `amber`, `orange` or `red`. Primitives (`--ref-sand-50` and so on) exist only in `tokens.css`
-and are referenced only by the semantic tier.
-
-### Contrast (WCAG 2.2, measured on the 8-bit sRGB values a browser renders)
-
-| Pair | Light | Dark |
+| Axis | Convention | Decision |
 |---|---|---|
-| `ink` on `surface` | 17.80 | 17.80 |
-| `ink-muted` on `surface` / on `surface-raised` | 7.94 / 7.37 | 11.28 / 9.74 |
-| `control` edge against `surface` / `surface-raised` (needs 3.0) | 3.69 / 3.43 | 4.82 / 4.16 |
-| `on-primary` on `primary` | 5.79 | 10.58 |
-| `focus` against `surface` | 7.67 | 10.58 |
-| `on-level-green` on `level-green` | 5.18 | 5.18 |
-| `on-level-amber` on `level-amber` | 10.82 | 10.82 |
-| `on-level-orange` on `level-orange` | 6.78 | 6.78 |
-| `on-level-red` on `level-red` | 6.63 | 6.63 |
-| `on-level-{green,amber,orange,red}-soft` on its soft fill | 7.97 / 6.55 / 6.35 / 7.44 | 12.40 / 12.68 / 12.84 / 12.95 |
-| level fill against `surface` (graphic edge, needs 3.0) | 4.81 / 1.65 / 2.63 / 6.16 | 3.70 / 10.82 / 6.78 / **2.89** |
+| Heat fields | Rainbow ramps that hump in lightness (references §6, P3) | **BREAK**: one perceptual ramp, monotonic lightness, colour only on data |
+| Danger | Filled coloured signs (v1) | **BREAK**: word + position on a thin scale + a small mark (NWS HeatRisk, R08) |
+| Dark ops consoles | Mono everywhere, chips on every row, neon (direction C's failure) | **BREAK**: one sans with tabular figures; mono only for codes; tags only where the tag is the information |
+| Time | Hour strips and scrubbers (Windy R01) | **HONOR**, and make it the spine of every screen |
+| Legibility outdoors | Positive polarity in sun (v1 R2 evidence) | **HONOR** via sun mode (§6), without giving up the dark identity |
 
-Two things in that table are known and deliberate, not silent. The bold value, the red fill's edge on the dark page,
-sits a hair under 3:1 and is open for the human gate. The amber and orange fills also have a low edge contrast against
-the light page. Neither breaks WCAG 1.4.1 or 1.4.11 because the level is never carried by the fill alone (see Do's and
-Don'ts), but they are the first things to revisit if a token value changes.
+**Three adjectives.** *Exact · calm · on-the-clock.* (Exact: real data and provenance on every number. Calm: dark,
+quiet chrome; nothing moves unless time moves. On-the-clock: every screen answers "what now, and until when".)
 
-The text pairs, the `control` and `focus` edges, and the DESIGN.md-to-CSS parity are pinned by
-`frontend/tests/unit/styles/tokens.test.ts`, and `pnpm design:lint` fails on any linter warning (the stock CLI exits 0
-on a contrast warning). Edit a value in `tokens.css` and this file together, or the tests fail.
+**Named movement.** *Instrument modernism over a Gulf night*: the restraint of scientific instruments and
+ops consoles (nullschool, Windy, flight-ops strips) on a blue-black ground tinted toward the night sky over the Gulf.
 
-### Dark theme
+**Why "Qaylula".** *Qaylula* (قيلولة) is the midday rest. The UAE's midday break (12:30 to 15:00, 15 June to
+15 September) is the one heat rule every outdoor worker in the country already knows. It becomes the identity.
 
-Selected by `[data-theme="dark"]` on any element, and by the system preference when no override is set. Same semantic
-names, swapped values: `surface` is sand-950 and `surface-raised` sand-900; `ink` is sand-50 and `ink-muted` sand-300;
-`hairline` is sand-700 and `control` is sand-500, the same primitive as in light, because sand-600 fell to 2.99 on a
-raised dark surface; `scrim` is sand-950 in light and pure black in dark, so the veil always darkens; `primary`
-becomes the light falaj (`oklch(0.8 0.08 198)`) with sand-950 text; `focus` is the same light falaj. The level fills and their
-on-colours do not change. The soft tints become a dark tint of the same hue (`oklch(0.3 0.05 h)`) with sand-50 text.
+## 2. Signature element: the qaylula slot on the time spine
 
-### The hatch
+Every operational screen draws time as a **spine** (the landing's hour scrubber, the season ribbon, the worker's shift
+spine, the supervisor's crew strips, the HSE week calendar, the plan strip). Where the midday break is in force, it is
+**cut into the spine as a recessed slot**: a band one step *below* the ground (`--slot`), framed by two 1 px rules,
+labelled "Midday break" once. It is the only shape in the system that goes below the ground, so it reads as "work
+stops here" without a sign, a hatch or a colour. Outside 15 Jun to 15 Sep the slot is not drawn on worker screens and
+is a dashed labelled outline on desktop screens (journeys §0.2, P1). First fold: the landing scrubber; completion
+moment: the worker's spine at the end of the story. The window and the dates come from the API, never from a literal.
 
-The hatch colour is the cell's own `on-level-{l}` colour at 35 percent, mixed in OKLCH, so it follows the level and the
-theme. At that strength the hatch line against the fill is only 1.9 to 2.1:1, and the on-colour over a hatch line
-drops to 3.5:1 for orange and red. **Text and numerals therefore never sit directly on a hatch.** They sit on a solid
-plate of the level fill, and the hatch runs past the plate's edge (a badge) or above and below it (a band cell).
+Second signature: **isotherm contours**. Every heat field (the 3D terrain, the season ribbon's daily peaks) carries
+thin contour lines at each 1 °C, the convention of weather charts, so heat reads as measured, not decorated.
 
-## Typography
+## 3. Colour
 
-Two families per locale: **Barlow Condensed** (600 and 700, SIL OFL, signage-derived) for numerals and headings, and
-one **Noto** family per script for everything else. Barlow Condensed covers Latin and digits only, so in every other
-script a heading falls through to the locale body family.
+- Night ground hue 245, chroma 0.014 (tinted, never pure grey). Panels are one tonal step up, the slot one step down.
+  Separation by 1 px hairlines and tonal steps; no shadows, no glass, no glow.
+- **One UI colour, `--signal`** (pale cyan, hue 200): live, selected, "needs you", focus. It sits outside the heat
+  ramp's hues, so it never reads as heat. The desk primary button is `ink` on `ground`; the field primary button is
+  `signal` on `on-signal`.
+- **Heat** = `RAMP_DARK` on night, `RAMP_LIGHT` in sun (prototype/assets/heat.js): OKLCH, lightness monotonic, hue
+  unwrapped (no green/cyan sweep), safe in greyscale and for colour-vision deficiency by lightness. Data only.
+- **Level marks** (green, amber, orange, red) appear only as the thin scale segment and a 10 px mark beside the word.
+  Never a filled plate, never a hatch.
+- **Data series** that are not heat use `viz-truth` (ink), `viz-raw` (ink-3), `viz-ours` (signal) and `viz-grid`
+  (hair). `focus` is the signal colour; `scrim` is the ground-deep family at 72 % (night) or 50 % (sun) opacity.
+  They are tokens but not DESIGN.md colours: an alias or an alpha cannot be a flat colour here.
 
-| Locale | Script | Body family | Direction |
+Contrast (8-bit sRGB, computed from tokens.css by `frontend/scripts/contrast.mjs`; its output is kept in
+`docs/design/f2/gate/tokens/contrast.txt`):
+
+| Pair | Night (ground / panel) | Sun (ground / panel) | Floor |
 |---|---|---|---|
-| en | Latin | Noto Sans | ltr |
-| ar | Arabic | Noto Sans Arabic | rtl |
-| ur | Arabic (Nastaliq) | Noto Nastaliq Urdu, fallback Noto Naskh Arabic | rtl |
-| hi, ne | Devanagari | Noto Sans Devanagari | ltr |
-| bn | Bengali | Noto Sans Bengali | ltr |
+| ink | 16.57 / 15.50 | 18.01 / 16.48 | 4.5 |
+| ink-2 | 9.55 / 8.93 | 9.59 / 8.78 | 4.5 |
+| ink-3 (labels) | 5.69 / 5.32 | 6.28 / 5.75 | 4.5 |
+| signal | 12.05 / 11.27 | 6.78 / 6.21 | 4.5 |
+| edge (control boundaries) | 3.34 / 3.13 | 3.48 / 3.18 | 3.0 |
+| level marks green / amber / orange / red | 8.18 / 11.21 / 7.62 / 5.63 on ground | 4.38 / 3.32 / 4.03 / 5.82 on ground | 3.0 (graphic) |
 
-Digits are always Western (`0-9`) in every locale, for times, temperatures and level numerals.
+## 4. Typography
 
-Scale (major-third steps, with a jump for display; rem, so browser text zoom works). No text is smaller than 14 px.
+- **Archivo** for everything Latin, with `font-variant-numeric: tabular-nums` (verified: "1111" and "0000" render at
+  the same width), served by next/font as one variable file with the `wdth` axis. Display 400 weight, tight tracking
+  (as the A landing); UI 500; never condensed widths for text.
+- **IBM Plex Mono only for codes**: station codes, coordinates, SHA-256, commands. Target ≤ 10 % of the text nodes on a
+  screen (C was 74 %).
+- Scale: 12 · 14 · 16 · 18 · 22 · 28 · 36 · 48 · 64 · 76 px (the prototype's 13 px step is dropped: critique fix 10).
+  **12 px floor**, 14 px for labels and code (C had 114 elements under 12 px). Worker and supervisor phone screens: every
+  time label and level label is 16 px or larger. Worker: body 18, actions 22 weight 500, level word 76.
+- Scripts: Noto Sans Arabic (ar), Noto Nastaliq Urdu with Naskh fallback, line height 2.5 for ur (friction §7:
+  Nastaliq content area 2.5 em; no fixed height on Arabic-script text), Noto Sans Devanagari (hi, ne), Noto Sans
+  Bengali (bn). Tracking is zero in every language except English: spaced Arabic-script text breaks its joins.
 
-| Token | Size | Tailwind | Family | Use |
+## 5. Layout and density per role (one system, five densities)
+
+| Role | Device | Theme | Density | Layout |
 |---|---|---|---|---|
-| `numeral` | 4.768rem | `text-4xl` | Barlow Condensed 700 | the one big number on a screen |
-| `display` | 3.052rem | `text-3xl` | Barlow Condensed 700 | level numeral in a badge |
-| `headline` | 1.953rem | `text-2xl` | Barlow Condensed 600 | screen heading |
-| `title` | 1.5625rem | `text-xl` | Barlow Condensed 600 | section heading, button label |
-| `lead` | 1.25rem | `text-lg` | Noto body | the sentence that matters |
-| `body` | 1rem | `text-base` | Noto body | running text |
-| `label` | 0.875rem | `text-sm`, `text-xs` | Noto body | captions, hour labels |
+| Worker | Phone, outdoors | Night; **sun mode while the sun is up** | Glance: 1 hero, 1 action, ≤ 12 text elements in the fold | One column, 440 px max, dock with "I feel unwell" + 3 tabs |
+| Supervisor | Phone or tablet on site | Night; sun mode as worker | Exception-first: crew strips, 3-second status | Strips across the day; relay full-screen |
+| HSE | Desktop | Night | Analytical: calendar + table | 12 columns, 88 rem max |
+| Judge | Desktop (works on phone) | Night | Story: one chapter per screen, dense where evidence is | Landing hero + stepper |
+| Admin | Desktop | Night | Dense table + history | 12 columns |
 
-Line height is 1.5 for body text, 1.8 under `:lang(ar)` and 2.1 under `:lang(ur)` (Nastaliq clips at 1.5). The text
-steps set no line height of their own, so headings and titles inherit the locale value. Only `numeral` and `display`
-set `1` (`leading-solid`), because they hold Western digits; never put `leading-solid` on text that can be Arabic-script
-or Indic. Text containers never get a fixed height; use `min-height`.
+Inner-screen rules (from `critique/inner-screens-gap.md`): one hero object from real data owning ≥ 35 % of the fold;
+one primary action; a time spine; a linking transition. Targets are 44 px on every control (`--target`), 52 px for the
+primary action on field surfaces (`--target-field`).
 
-Tracking (0.025em on `headline` and `title`, class `tracking-signage`) is for uppercase Latin only. It resolves to 0 in
-every non-English language: browsers drop or break the joins of spaced Arabic-script text, and typographers report
-that spacing cuts the joined top bar of Devanagari and Bengali (the Indic part is a precaution, not a confirmed browser
-behaviour).
+## 6. Sun mode (decision)
 
-## Layout
+- **Evidence.** Positive polarity (dark on light) is more legible in bright surroundings (v1 DESIGN.md R2, Piepenbrock
+  et al. 2014; *Applied Ergonomics* 2017). Ali wants the product dark. A light-sensor switch is not available: the
+  `AmbientLightSensor` API is behind `#enable-experimental-web-platform-features` in Chrome and Chrome for Android and
+  absent in Safari, Firefox and Samsung Internet (MDN browser-compat-data 8.1.8, 2026-11-02).
+- **Decision.** Worker and supervisor phone surfaces switch to `[data-theme="sun"]` when the **sun is above the horizon
+  at the site** (solar elevation from the site coordinates and the device clock, computed on the device; no sensor,
+  no permission; `Site` carries no coordinates, so the UAE centroid 24.4 N, 54.4 E is used), and whenever
+  `prefers-contrast: more`. In replay mode (the default) the replayed moment is daytime by construction, so the field
+  routes start in sun mode. One tap on the sun/night control overrides until the next local midnight. HSE, judge and
+  admin are night only. Sun mode keeps every structure (spine, slot, scale); only the tokens change, so the product
+  still reads as one.
+- **Sun overrides.** Every colour token is re-declared under `[data-theme="sun"]`, so none can keep its night value
+  inside a sun subtree: `ground-deep`, `ground`, `panel`, `raised`, `slot`, `hair`, `edge`, `ink`, `ink-2`, `ink-3`,
+  `signal`, `on-signal`, `focus`, `scrim`, `lv-green`, `lv-amber`, `lv-orange`, `lv-red`, `viz-truth`, `viz-raw`,
+  `viz-ours`, `viz-grid`. Scales (type, space, radius, motion) do not change. A unit test reads this list.
 
-A 4 px grid. The allowed spacing steps are the Tailwind steps 1, 2, 3, 4, 6, 8, 12, 16 and 24 (4, 8, 12, 16, 24, 32,
-48, 64, 96 px). Mobile first, designed at 390 px wide, one column. A 16 px page gutter.
+## 7. Motion
 
-On the worker route group every interactive target is at least 44 px square (gloved hands; this is design judgement
-above the WCAG 2.2 floor of 24 px). Layout uses logical properties only (`ms-*`, `pe-*`, `text-start`, `start-0`) so
-the screen mirrors for Arabic and Urdu, and the shade band flows in the reading direction.
+One vocabulary: 150-240 ms, `cubic-bezier(0.2, 0, 0, 1)`, opacity and transform only. Cross-document View
+Transitions (`@view-transition { navigation: auto }`) with shared names `wordmark`, `spine`, `level`. The landing
+plays the day (the only autoplay); the scoreboard ticks once on arrival; everything else moves only on input.
+`prefers-reduced-motion`: no animation, final frames, same layout.
 
-The shade band is one row of equal cells with a 2 px gap, one cell per forecast hour, each at least 4.5 rem tall, with
-the hour label under the cell (not on it). The current hour's label is inverted (`ink` on `surface`).
+## 8. 3D (ADR 0037)
 
-## Elevation & Depth
+The landing's IFS WBGT terrain from A (unlit, contours, sea dimmed), with C's console panels below the hero instead of
+voxel columns. Budget and fallback per ADR 0037. No WebGL on worker, supervisor, HSE or admin routes.
 
-There are no shadows. Depth is a 1 px hairline plus a tonal step: `surface-raised` sits one step off `surface`, and a
-card is `surface-raised` with a `hairline` edge. Interactive controls are drawn with a 2 px `control` edge. The focus
-ring is 3 px `focus` with a 2 px offset and appears on every `:focus-visible` element.
+## 9. Iconography
 
-Motion is limited to a 150 ms opacity change on a state change, and is 0 ms under `prefers-reduced-motion`.
+ISO 7010 grammar: solid silhouettes on a 24 grid, no faces, no emoji, ≤ 4 per screen, always with words and audio.
+Custom glyphs are labelled untested until a comprehension test reaches ≥ 85 % correct with ≤ 5 % critical confusion
+(ANSI criterion; friction §6). "I feel unwell" uses a plain medical cross, not a phone-with-cross.
 
-## Shapes
+## 10. Do's and don'ts
 
-Cut-sign corners: a single 2 px radius (`rounded-sign`) on everything, including the shadcn components, whose own
-radius classes are remapped to it. 2 px rules. Pictograms are drawn on a 24 unit grid with a 2 unit stroke, mitred
-joins and square caps, so they read as signage rather than as a friendly icon set.
+- Do give every number its provenance (proof chip or source line); don't put a tag on every row.
+- Do draw time; don't write "until 17:00" without drawing it.
+- Don't use a level hue in chrome or a heat hue in UI. Don't fill a level. Don't hatch.
+- Don't use mono for prose or for numbers. Don't go below 12 px.
+- Don't write a fake-looking real number: pending results say "scored 12 Nov" or show the pending state.
+- Copy tells: verb + number ("Rest 40 min in shade every hour"); explanations go behind "Why?" or into the proof drawer.
 
-| Level | Pictogram | Hatch |
-|---|---|---|
-| green | sun with a check | none |
-| amber | water drop | sparse, 135 degrees, 12 px pitch |
-| orange | shade canopy | medium, 135 degrees, 7 px pitch |
-| red | raised hand | dense cross-hatch, 135 and 45 degrees, 6 px pitch |
+## 11. Clone-distance gate
 
-The pictogram set has not been tested with workers. Test it with native speakers before a pilot and claim nothing
-about comprehension until then.
+| Check | Result |
+|---|---|
+| Accent not indigo / purple gradient | PASS: pale cyan signal, outside the heat hues |
+| Base font not Inter by default | PASS: Archivo, chosen for tabular figures and the width axis on the wordmark |
+| Radius has a point of view | PASS: 2 px everywhere |
+| Depth fork chosen | PASS: borders + tonal steps + one recessed slot; no shadows |
+| ≥ 3 tokens match Linear / Stripe / Vercel / Geist | PASS: 0 (ground is blue-tinted night, not #08090a; no Geist; no gradient) |
+| Signature present | PASS: the qaylula slot on every time spine + isotherm contours |
 
-## Components
+## 12. Changes from the prototype's tokens.css and DESIGN.md (F2 Task 1)
 
-- **Level badge** (`level-*-badge`): solid level fill, `on-level-*` text, a pictogram, the numeral in `display`, the
-  level name in `title`. The hatch fills the badge and a solid plate carries the content.
-- **Level chip** (`level-*-chip`): the soft tint with its ink, for rows and secondary mentions. Never the only
-  carrier of the level; it keeps the numeral or the name.
-- **Primary button** (`button-primary`): `primary` fill, `on-primary` text, 48 px tall, `title` type. One per screen.
-- **Shade band**: described under Layout; each cell is a level fill with the pattern, a solid numeral plate, and an
-  accessible name that gives the hour, the level name and the numeral.
-- **Card**: `surface-raised`, hairline edge, 16 px padding, 2 px radius.
-- **shadcn/ui components** (`src/components/ui`, on Base UI): their palette, radii and overlay names are mapped onto
-  these tokens in one adapter block in `frontend/src/styles/globals.css`. `destructive` is `ink`, not red (red is the
-  level scale and nothing else), the neutral fills (`secondary`, `muted`) are `surface-raised`, the highlighted row of a
-  select is `hairline`, and `black` is the `scrim`. Buttons and select triggers are at least 48 px tall and grow with
-  their text; no component fixes the height of text.
-
-## Do's and Don'ts
-
-- Do show every level with colour, hatch, pictogram, numeral and text. Never colour alone (WCAG 1.4.1).
-- Don't put text or numerals directly on a hatch. Put them on a solid plate.
-- Do use logical properties only: `ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`, `text-start`, `text-end`. Don't use
-  `ml-*`, `mr-*`, `pl-*`, `pr-*`, `left-*`, `right-*`, `text-left`, `text-right`, `rounded-l-*`, `rounded-r-*`.
-- Do render times, temperatures and numerals with Western digits in every locale.
-- Don't apply letter-spacing to Arabic-script text (or Devanagari and Bengali). Use `tracking-signage`, not `tracking-wide`.
-- Don't put `leading-solid` on anything but digits and Latin display words.
-- Don't put a hex or OKLCH literal in a component, and don't read a `--ref-*` primitive from one. Use the semantic names.
-- Don't use `dark:` variants in components. The theme swap happens in the tokens; a component has one set of classes.
-- Don't add a drop shadow, a gradient background, a second corner radius or a second accent colour.
-- Don't use a level colour for anything that is not a level. Teal (`primary`) is the only other saturated colour.
-- Do keep targets at least 44 px on the worker routes, and never give text a fixed height.
-- Do keep the focus ring visible; never remove an outline without replacing it.
-- Don't invent safety-action wording in a component. Action text comes from the reviewed message templates.
+| Change | Why |
+|---|---|
+| `--t-13` and the 13 px step are removed; label and code are 14 px | critique fix 10: one fewer size, 12 px floor, 14 px labels |
+| Night `edge` contrast is 3.34 / 3.13, not 3.2 / 3.0 | the v2 table was computed by hand; `scripts/contrast.mjs` computes the rendered 8-bit values and a test compares |
+| `--target-worker` is `--target-field` | the same value serves the supervisor's phone and tablet screens |
+| Every colour token is declared in the sun block, including `focus` and the `viz-*` set; `focus` and `viz-*` reference primitives, not other tokens | a `var()` to another semantic token resolves where it is declared, so inside a nested sun subtree it kept the night value |
+| `--leading-ur` is 2.5 (F1 had 2.1) | Nastaliq content area, friction §7 |
+| `primary` and component entries for every colour were added to this file | the design.md linter fails the F1 gate on orphaned tokens and on a missing `primary` (14 warnings on the v2 file) |

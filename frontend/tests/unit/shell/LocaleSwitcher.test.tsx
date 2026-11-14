@@ -65,8 +65,8 @@ describe("LocaleSwitcher", () => {
     expect(assign).toHaveBeenCalledWith("/ur/worker?site=site-demo-mussafah#band");
   });
 
-  it("is at least 44 px tall by construction (min-h-12, never a fixed height)", () => {
+  it("is at least 44 px tall by construction (min-h-(--target), never a fixed height)", () => {
     renderWithIntl(<LocaleSwitcher />);
-    expect(screen.getByRole("combobox")).toHaveClass("min-h-12");
+    expect(screen.getByRole("combobox")).toHaveClass("min-h-(--target)");
   });
 });

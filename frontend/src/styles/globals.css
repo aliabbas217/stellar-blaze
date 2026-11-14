@@ -4,13 +4,12 @@
 @import "./tokens.css";
 
 /*
- * Tailwind vocabulary for Arish Signal. Values live in tokens.css; this file only
- * names them. The default palette, type scale, radii, shadows, blurs, tracking, line
- * heights and font families are cleared so a class that is not in the design system
- * generates nothing instead of drifting in from Tailwind's defaults. Fonts, tracking and
- * line height come back as the explicit utilities further down (font-display, font-body,
- * tracking-signage, leading-solid). Left open on purpose: --animate-* and --ease-*, which
- * the shadcn components and tw-animate-css need.
+ * Tailwind vocabulary for Qaylula. Values live in tokens.css; this file only names them. The default palette, type
+ * scale, radii, shadows, blurs, tracking, line heights and font families are cleared so a class that is not in the
+ * design system generates nothing instead of drifting in from Tailwind's defaults. Fonts, tracking and line height
+ * come back as the explicit utilities further down (font-display, font-body, font-mono, tracking-display,
+ * tracking-wordmark, leading-solid). Left open on purpose: --animate-* and --ease-*, which the shadcn components and
+ * tw-animate-css need.
  */
 @theme {
   --color-*: initial;
@@ -23,65 +22,65 @@
   --tracking-*: initial;
   --leading-*: initial;
   --font-*: initial;
-  --spacing: var(--space-1);
+  --spacing: var(--s-1);
+
+  /* Every transition the shadcn components declare lands on the design's 150 ms and curve. */
+  --default-transition-duration: var(--dur-1);
+  --default-transition-timing-function: var(--ease);
 }
 
 /*
- * `inline` makes each utility read the semantic variable directly, so a utility
- * follows the [data-theme] of its nearest ancestor instead of freezing the :root
- * value. Never give a key here the same name as a tokens.css variable.
+ * `inline` makes each utility read the semantic variable directly, so a utility follows the [data-theme] of its
+ * nearest ancestor instead of freezing the :root value. Never give a key here the same name as a tokens.css variable.
  */
 @theme inline {
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
+  --color-ground: var(--ground);
+  --color-ground-deep: var(--ground-deep);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-slot: var(--slot);
+  --color-hair: var(--hair);
+  --color-edge: var(--edge);
   --color-ink: var(--ink);
-  --color-ink-muted: var(--ink-muted);
-  --color-hairline: var(--hairline);
-  --color-control: var(--control);
-  --color-action: var(--action);
-  --color-on-action: var(--on-action);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-signal: var(--signal);
+  --color-on-signal: var(--on-signal);
   --color-focus: var(--focus);
   --color-scrim: var(--scrim);
 
-  --color-level-green: var(--level-green);
-  --color-on-level-green: var(--on-level-green);
-  --color-level-green-soft: var(--level-green-soft);
-  --color-on-level-green-soft: var(--on-level-green-soft);
+  /* Level marks: a 10 px mark beside the word and the thin scale segment. Never a fill, never chrome. */
+  --color-lv-green: var(--lv-green);
+  --color-lv-amber: var(--lv-amber);
+  --color-lv-orange: var(--lv-orange);
+  --color-lv-red: var(--lv-red);
 
-  --color-level-amber: var(--level-amber);
-  --color-on-level-amber: var(--on-level-amber);
-  --color-level-amber-soft: var(--level-amber-soft);
-  --color-on-level-amber-soft: var(--on-level-amber-soft);
+  --color-viz-truth: var(--viz-truth);
+  --color-viz-raw: var(--viz-raw);
+  --color-viz-ours: var(--viz-ours);
+  --color-viz-grid: var(--viz-grid);
 
-  --color-level-orange: var(--level-orange);
-  --color-on-level-orange: var(--on-level-orange);
-  --color-level-orange-soft: var(--level-orange-soft);
-  --color-on-level-orange-soft: var(--on-level-orange-soft);
-
-  --color-level-red: var(--level-red);
-  --color-on-level-red: var(--on-level-red);
-  --color-level-red-soft: var(--level-red-soft);
-  --color-on-level-red-soft: var(--on-level-red-soft);
-
-  /* No text below 14 px: the smallest two steps are the same size. */
-  --text-xs: var(--size-label);
-  --text-sm: var(--size-label);
-  --text-base: var(--size-body);
-  --text-lg: var(--size-lead);
-  --text-xl: var(--size-title);
-  --text-2xl: var(--size-headline);
-  --text-3xl: var(--size-display);
-  --text-4xl: var(--size-numeral);
+  /* The type scale of tokens.css (12, 14, 16, 18, 22, 28, 36, 48, 64, 76 px) under Tailwind's step names. */
+  --text-xs: var(--t-12);
+  --text-sm: var(--t-14);
+  --text-base: var(--t-16);
+  --text-lg: var(--t-18);
+  --text-xl: var(--t-22);
+  --text-2xl: var(--t-28);
+  --text-3xl: var(--t-36);
+  --text-4xl: var(--t-48);
+  --text-5xl: var(--t-64);
+  --text-6xl: var(--t-76);
 
   /* One corner radius everywhere; components built for other radii (shadcn) still land on it. */
-  --radius-xs: var(--radius-sign);
-  --radius-sm: var(--radius-sign);
-  --radius-md: var(--radius-sign);
-  --radius-lg: var(--radius-sign);
-  --radius-xl: var(--radius-sign);
-  --radius-2xl: var(--radius-sign);
-  --radius-3xl: var(--radius-sign);
-  --radius-4xl: var(--radius-sign);
+  --radius-xs: var(--r);
+  --radius-sm: var(--r);
+  --radius-md: var(--r);
+  --radius-lg: var(--r);
+  --radius-xl: var(--r);
+  --radius-2xl: var(--r);
+  --radius-3xl: var(--r);
+  --radius-4xl: var(--r);
 }
 
 /*
@@ -89,8 +88,8 @@
  *
  * src/components/ui is generated by `shadcn add` (style base-nova, Base UI, rtl: true) and then
  * edited as owned code. Its classes are written against shadcn's own palette (bg-primary,
- * border-input, ring-ring, bg-black/10 ...), so every one of those names is mapped here onto an
- * Arish Signal semantic token. The default shadcn palette is not kept.
+ * border-input, ring-ring, bg-black/10 ...), so every one of those names is mapped here onto a
+ * Qaylula semantic token. The default shadcn palette is not kept.
  *
  * Two layers, on purpose:
  *  1. Plain variables (--background, --primary, ...). Some components read them directly
@@ -101,10 +100,12 @@
  *  2. Tailwind colour names (--color-primary ...) read those variables.
  *
  * Choices that are not obvious:
- *  - destructive is ink, not red. Red is the level-red scale and nothing else; an invalid
- *    field must say so in words and an icon, never in a level colour (DESIGN.md, Do's and Don'ts).
- *  - secondary, muted and card/popover use the tonal step surface-raised; accent (the highlighted
- *    row in a select) uses hairline so it differs from the popover it sits in.
+ *  - primary is ink on ground (the desk primary button); the field primary is signal and is written explicitly
+ *    where it is used. Level colours are never chrome (DESIGN.md, Do's and Don'ts).
+ *  - destructive is ink, not red. An invalid field must say so in words and an icon, never in a level colour.
+ *  - secondary, muted and card are the panel (one tonal step up); popover is raised (one more); accent (the
+ *    highlighted row in a select) uses hair so it differs from the popover it sits in.
+ *  - muted-foreground is ink-2: ink-3 is for labels at 14 px and above on ground or panel only.
  *  - black is the scrim: bg-black/N in generated overlays darkens in both themes.
  *  - dark: variants are inert on purpose. The theme swap happens in tokens.css, so the `dark`
  *    variant is bound to a .dark ancestor that never exists; the dark: classes that the
@@ -112,30 +113,30 @@
  *
  * The generated files also carry a few local edits where the shadcn defaults break a DESIGN.md rule
  * (fixed heights that clip Nastaliq, line height 1, targets under 44 px, a hard-coded English
- * label). Each is marked "Local edit (vs shadcn base-nova)" in its file; `grep -rn "Local edit" src/components/ui`
+ * label, transition-all). Each is marked "Local edit (vs shadcn base-nova)" in its file; `grep -rn "Local edit" src/components/ui`
  * lists them, and they must be re-applied after a `shadcn add --overwrite`.
  */
 @custom-variant dark (&:is(.dark *));
 
 :root,
 [data-theme] {
-  --background: var(--surface);
+  --background: var(--ground);
   --foreground: var(--ink);
-  --card: var(--surface-raised);
+  --card: var(--panel);
   --card-foreground: var(--ink);
-  --popover: var(--surface-raised);
+  --popover: var(--raised);
   --popover-foreground: var(--ink);
-  --primary: var(--action);
-  --primary-foreground: var(--on-action);
-  --secondary: var(--surface-raised);
+  --primary: var(--ink);
+  --primary-foreground: var(--ground);
+  --secondary: var(--panel);
   --secondary-foreground: var(--ink);
-  --muted: var(--surface-raised);
-  --muted-foreground: var(--ink-muted);
-  --accent: var(--hairline);
+  --muted: var(--panel);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--hair);
   --accent-foreground: var(--ink);
   --destructive: var(--ink);
-  --border: var(--hairline);
-  --input: var(--control);
+  --border: var(--hair);
+  --input: var(--edge);
   --ring: var(--focus);
 }
 
@@ -161,33 +162,8 @@
   --color-black: var(--scrim);
 }
 
-/* Level hatch: none / sparse / medium / dense cross-hatch. Pair with bg-level-* and text-on-level-*. */
-@utility pattern-level-green {
-  background-image: var(--pattern-level-green);
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-@utility pattern-level-amber {
-  background-image: var(--pattern-level-amber);
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-@utility pattern-level-orange {
-  background-image: var(--pattern-level-orange);
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-@utility pattern-level-red {
-  background-image: var(--pattern-level-red);
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
 /*
- * Font families come from next/font (src/app/fonts.ts) as --font-display and --font-body.
+ * Font families come from next/font (src/app/fonts.ts) as --font-display, --font-body and --font-mono.
  * They are utilities, not @theme keys, because `@theme inline { --font-display: var(--font-display) }`
  * would be emitted on :root as a self-reference and invalidate the font.
  * Display falls through to the body family so Arabic-script and Indic headings still render.
@@ -207,13 +183,18 @@
     var(--font-body-fallback);
 }
 
-/* shadcn/ui names its heading face "heading"; here that is the signage display face. */
+/* IBM Plex Mono: codes, coordinates, hashes and identifiers only (at most 10 % of the text on a screen). */
+@utility font-mono {
+  font-family: var(--font-mono, var(--font-mono-fallback)), var(--font-mono-fallback);
+}
+
+/* shadcn/ui names its heading face "heading"; here that is the display face. */
 @utility font-heading {
   @apply font-display;
 }
 
 @utility rounded-sign {
-  border-radius: var(--radius-sign);
+  border-radius: var(--r);
 }
 
 /* line-height: 1 for Western digits and Latin display words. Everything else inherits the locale line height. */
@@ -221,26 +202,30 @@
   line-height: var(--leading-solid);
 }
 
-/* Letter-spacing for uppercase Latin headings; zero in every other language (see tokens.css). */
-@utility tracking-signage {
-  letter-spacing: var(--tracking-signage);
+/* Letter-spacing for the display size and the wordmark; zero in every other language (see tokens.css). */
+@utility tracking-display {
+  letter-spacing: var(--tracking-display);
 }
 
-/* The only motion in F1: opacity on a state change, 0 ms under reduced motion. */
-@utility transition-state {
-  transition-property: opacity;
-  transition-duration: var(--duration-state);
-  transition-timing-function: ease-out;
+@utility tracking-wordmark {
+  letter-spacing: var(--tracking-wordmark);
 }
 
 @layer base {
+  /* English body text is Archivo, the same family as the display face (one font file serves both). */
+  :root:lang(en) {
+    --font-body: var(--font-display);
+  }
+
   html {
-    background-color: var(--surface);
+    background-color: var(--ground);
     color: var(--ink);
     font-family:
       var(--font-body, var(--font-body-fallback)), var(--font-body-secondary, var(--font-body-fallback)),
       var(--font-body-fallback);
     line-height: var(--leading-body);
+    /* Archivo has tabular figures: every number lines up, which is what a time spine is. */
+    font-variant-numeric: tabular-nums;
     -webkit-text-size-adjust: 100%;
   }
 
@@ -256,7 +241,18 @@
   *,
   ::before,
   ::after {
-    border-color: var(--hairline);
+    border-color: var(--hair);
+  }
+
+  /* No 300 ms tap delay and no double-tap zoom on controls. */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
   }
 
   :focus-visible {

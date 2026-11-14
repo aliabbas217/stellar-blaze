@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { THEME_COLORS } from "@/lib/sun/theme-colors";
 import { dirFor } from "@/i18n/direction";
 import type { Locale } from "@/i18n/routing";
 
@@ -13,18 +14,20 @@ import type { Locale } from "@/i18n/routing";
 
 /**
  * Colours of the manifest and of the browser chrome (<meta name="theme-color">), as sRGB hex: a manifest cannot
- * hold oklch(). They are the `--surface` token of each theme (sand-50 and sand-950 in src/styles/tokens.css);
- * tests/unit/app/manifest.test.ts recomputes them from tokens.css and fails if either drifts.
+ * hold oklch(). They are the `--ground` token of each theme (night and sun in src/styles/tokens.css), kept in
+ * src/lib/sun/theme-colors.ts so the theme script and the sun toggle can use them too;
+ * tests/unit/app/manifest.test.ts recomputes them from tokens.css and fails if either drifts. The installed app is
+ * night: the manifest has one theme_color and night is the default.
  */
-export const MANIFEST_COLORS = { light: "#fbf6ee", dark: "#140e09" } as const;
+export const MANIFEST_COLORS = THEME_COLORS;
 
 /** The only message keys the manifest reads, from the `common` namespace. */
 export type ManifestTranslator = (key: "appName" | "appDescription") => string;
 
 /*
- * Icons are the amber water drop (src/components/level/pictograms.tsx) on sand-50, full-bleed. The maskable one
- * keeps the drop inside the central 80% circle that Android crops to. The design phase may replace the artwork;
- * the three files keep their names and sizes.
+ * Icons are the amber water drop (src/components/level/pictograms.tsx) on sand-50, full-bleed: F1 artwork, still to
+ * be redrawn for Qaylula (parked in the Task 1 report). The maskable one keeps the drop inside the central 80%
+ * circle that Android crops to. The three files keep their names and sizes when the artwork is replaced.
  */
 const ICONS = [
   { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
@@ -52,8 +55,8 @@ export function manifestFor(locale: Locale, t: ManifestTranslator): MetadataRout
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    theme_color: MANIFEST_COLORS.light,
-    background_color: MANIFEST_COLORS.light,
+    theme_color: MANIFEST_COLORS.night,
+    background_color: MANIFEST_COLORS.night,
     icons: [...ICONS],
   };
 }

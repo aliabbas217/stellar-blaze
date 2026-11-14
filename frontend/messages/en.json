@@ -7,15 +7,15 @@
     "appDescription": "Heat-stress safety for outdoor workers in the UAE.",
     "specimen": {
       "kicker": "Stellar Blaze · design specimen · {locale}",
-      "title": "Arish Signal",
-      "lead": "Gulf shade meets industrial signage. Unmistakable at arm's length, calm under pressure, field-tough.",
+      "title": "Qaylula",
+      "lead": "A dark instrument for the heat of the day. Heat colour lives only on data; the midday break is cut into time itself.",
       "levelsHeading": "Levels",
-      "bandHeading": "Shade band",
-      "bandNote": "Hatch density encodes the level: none, sparse, medium, dense cross-hatch. Each cell also carries the level numeral, and the current hour is inverted.",
+      "bandHeading": "Time spine",
+      "bandNote": "The recessed band is the midday break, the only shape below the ground. Level is a word and a small mark, never a filled plate. The current hour is inverted.",
       "typeHeading": "Type",
       "tokensHeading": "Tokens, both themes",
-      "lightTheme": "Light",
-      "darkTheme": "Dark",
+      "sunTheme": "Sun",
+      "nightTheme": "Night",
       "phrase": "Today's heat level",
       "time": "13:05"
     }
@@ -32,11 +32,10 @@
       "bn": "বাংলা",
       "ne": "नेपाली"
     },
-    "theme": {
-      "current": "Theme: {mode}",
-      "system": "System",
-      "light": "Light",
-      "dark": "Dark"
+    "sun": {
+      "current": "Sun mode: {state}",
+      "on": "on",
+      "off": "off"
     },
     "draftTranslation": "Draft translation",
     "draftTranslationNote": "This translation is a machine draft. A native speaker has not reviewed it yet.",

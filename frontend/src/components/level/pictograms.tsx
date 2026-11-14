@@ -4,7 +4,7 @@ import type { Level } from "./level";
 /*
  * One pictogram per level, drawn on a 24 unit grid with a 2 unit stroke, mitred
  * joins and square caps so they read as cut signage, not as a friendly icon set.
- * They inherit currentColor, so a pictogram on a level fill takes text-on-level-*.
+ * They inherit currentColor. F1 artwork: Task 4 replaces it with the Qaylula pictogram set.
  * They are decorative: the level numeral and its name always sit next to them.
  *
  * Whether workers read these four shapes as intended is untested. Check them with

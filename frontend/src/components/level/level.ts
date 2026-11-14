@@ -1,9 +1,9 @@
 /**
  * Heat-risk level vocabulary shared by every screen.
  *
- * The four names are also the suffixes of the design tokens (`bg-level-amber`,
- * `pattern-level-red`, ...) and the keys of the push payload `level` field, so
- * they must not be renamed without changing the backend ruleset.
+ * The four names are also the suffixes of the design tokens (`bg-lv-amber`, `--lv-red`, ...) and the
+ * keys of the push payload `level` field, so they must not be renamed without changing the backend
+ * ruleset.
  */
 export const LEVELS = ["green", "amber", "orange", "red"] as const;
 

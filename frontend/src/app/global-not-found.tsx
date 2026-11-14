@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { fontClassFor } from "@/app/fonts";
 import { titleWithAppName } from "@/app/titles";
-import { themeScript } from "@/components/shell/theme-script";
+import { sunScript } from "@/components/shell/theme-script";
 import { buttonVariants } from "@/components/ui/button";
 import { getCookieLocale } from "@/i18n/cookie-locale";
 import { dirFor } from "@/i18n/direction";
@@ -33,12 +33,12 @@ export default async function GlobalNotFound() {
   return (
     <html lang={locale} dir={dirFor(locale)} className={fontClassFor(locale)} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: sunScript }} />
       </head>
       <body className="flex min-h-dvh flex-col">
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-start gap-6 px-4 py-12">
-          <h1 className="font-display text-3xl font-bold tracking-signage">{t("title")}</h1>
-          <p className="text-lg text-ink-muted">{t("body")}</p>
+          <h1 className="font-display text-3xl font-normal tracking-display">{t("title")}</h1>
+          <p className="text-lg text-ink-2">{t("body")}</p>
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- full load on purpose (outside the locale layout); the rule mistakes app/[locale]/page.tsx for "/" */}
           <a href="/" className={buttonVariants()}>
             {t("home")}

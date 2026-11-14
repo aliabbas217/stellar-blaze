@@ -11,7 +11,7 @@ export function DraftBadge() {
   if (status === "source" || status === "reviewed") return null;
 
   return (
-    <div className="inline-flex w-fit items-center rounded-sign border border-hairline bg-surface-raised px-2 py-1 font-body text-sm text-ink-muted">
+    <div className="inline-flex w-fit items-center rounded-sign border border-hair bg-panel px-2 py-1 font-body text-sm text-ink-2">
       <p>{t("draftTranslation")}</p>
       {/* A separate paragraph, so a screen reader pauses between the label and the note without punctuation in code. */}
       <p className="sr-only">{t("draftTranslationNote")}</p>
