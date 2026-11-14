@@ -95,10 +95,14 @@ def test_dev_loader_filters_before_collect(
     assert len(plans) == 1
     plan = plans[0]
     assert "Parquet SCAN" in plan
-    assert 'col("summer").is_in([[2024, 2025]])' in plan
-    assert "2026" not in plan
+    # Only the SELECTION line: the plan also names the tmp path, and "pytest-<N>" may one day hold "2026".
+    selections = [line for line in plan.splitlines() if line.startswith("SELECTION:")]
+    assert len(selections) == 1, plan
+    selection = selections[0]
+    assert 'col("summer").is_in([[2024, 2025]])' in selection
+    assert "2026" not in selection
     for column in ("lead_days", "hour_utc", "model"):
-        assert f'col("{column}").is_in(' in plan
+        assert f'col("{column}").is_in(' in selection
 
 
 def test_dev_loader_rejects_hash_mismatch(

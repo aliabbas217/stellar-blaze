@@ -6,8 +6,10 @@ another, and what were the bytes of a file at a commit. ``GitReader`` names them
 repository.
 """
 
+import os
 import shutil
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final, Protocol
 
@@ -15,6 +17,28 @@ __all__ = ["GitError", "GitReader", "SubprocessGit"]
 
 _TIMEOUT_SECONDS: Final = 60
 _NOT_A_VALID_OBJECT: Final = 128  # git's exit code for a fatal error, such as an unknown commit name
+
+
+_REPOSITORY_SELECTING_VARIABLES: Final = frozenset(
+    {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+    }
+)
+"""Variables that make git act on another repository than ``cwd`` (a git hook sets some of them)."""
+
+
+def _child_environment(base: Mapping[str, str]) -> dict[str, str]:
+    """``base`` without any repository-selecting variable, and with the C locale so git's messages are stable."""
+    env = {name: value for name, value in base.items() if name.upper() not in _REPOSITORY_SELECTING_VARIABLES}
+    env["LC_ALL"] = "C"
+    return env
 
 
 class GitError(RuntimeError):
@@ -64,7 +88,11 @@ class SubprocessGit:
         self._root = repo_root
 
     def _run(self, *args: str, ok: tuple[int, ...] = (0,)) -> subprocess.CompletedProcess[bytes]:
-        """Run ``git <args>``; an exit code outside ``ok`` raises ``GitError`` with git's message."""
+        """Run ``git <args>`` in the repository root; an exit code outside ``ok`` raises ``GitError`` (git's message).
+
+        The environment keeps the caller's (``GIT_CONFIG_*`` and the like) but drops every variable that selects the
+        repository, so a ``GIT_DIR`` inherited from a hook cannot point the gate at another repository.
+        """
         # The executable is the one shutil.which resolved, the arguments are a fixed list (no shell), and the commit
         # and path arguments come from the committed lock and are checked by _refuse_option where they are free text.
         result = subprocess.run(  # noqa: S603
@@ -72,6 +100,7 @@ class SubprocessGit:
             check=False,
             capture_output=True,
             cwd=self._root,
+            env=_child_environment(os.environ),
             timeout=_TIMEOUT_SECONDS,
         )
         if result.returncode not in ok:

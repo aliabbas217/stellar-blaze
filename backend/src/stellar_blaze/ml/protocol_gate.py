@@ -7,17 +7,22 @@ listing every condition that failed (not the first). The token is the only thing
 A ``GateToken`` can only be made by ``open_gate``: its constructor needs a module-private sentinel, so
 ``GateToken(part=..., head=..., lock=...)`` from anywhere else raises ``TypeError``, and so does ``dataclasses.replace``
 on a real token (``replace`` calls the constructor without the sentinel). Copying and pickling a token are refused for
-the same reason. Python cannot stop a caller who reaches into this module's private names; the guard is against
-accidents and against code that "just builds a token to get the data", and every use of a token is visible in review.
+the same reason. The class is ``final`` (a subclass raises at class creation), has ``__slots__`` (no ``__dict__`` to
+write into) and is frozen. Python cannot stop a caller in the same process who reaches into this module's private names
+(``_SENTINEL``) or calls ``object.__setattr__``: that is out of scope. The structural guard is that the only code that
+may call ``open_gate`` or ``load_test_pairs`` is listed and checked by ``tests/unit/ml/test_holdout_reachability.py``.
 
 Reasons start with a stable code, then ``: ``, then the message. Codes: ``lock-missing``, ``lock-invalid``,
-``protocol-hash-mismatch``, ``commit-not-ancestor``, ``commit-content-mismatch``, ``tree-dirty``, ``git-error``,
-``model-id-missing``, ``model-not-found``, ``model-integrity``, ``freeze-missing``, ``freeze-hash-mismatch`` and
-``result-exists``.
+``protocol-hash-mismatch``, ``commit-not-ancestor``, ``commit-content-mismatch``, ``amendment-hash-mismatch``,
+``amendment-not-ancestor``, ``amendment-content-mismatch``, ``tree-dirty``, ``git-error``, ``model-id-missing``,
+``model-not-found``, ``model-integrity``, ``gold-sha-missing``, ``freeze-missing``, ``freeze-hash-mismatch``,
+``result-exists`` (from ``open_gate``) and ``head-changed``, ``tree-dirty`` (from ``GateToken.recheck``).
 
 The lock (``backend/training/protocol.lock.toml``) holds ``protocol_path`` (relative to the repository root),
-``protocol_sha256`` and ``protocol_commit``; ``model_id`` and the ``freeze_*`` keys are absent until they exist (TOML
-cannot hold a null, so an absent key means ``None``).
+``protocol_sha256`` and ``protocol_commit``, optional ``[[amendments]]`` (``path``, ``sha256``, ``commit``: each is
+checked like the protocol itself), ``gold_sha256`` (the one gold file the evaluation may read), and ``model_id`` and the
+``freeze_*`` keys; all optional keys are absent until they exist (TOML cannot hold a null, so an absent key means
+``None``, or no amendments).
 """
 
 import hashlib
@@ -25,7 +30,7 @@ import tomllib
 from dataclasses import InitVar, dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Annotated, Final, NoReturn
+from typing import Annotated, Final, NoReturn, final
 
 import structlog
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, field_validator
@@ -39,6 +44,7 @@ __all__ = [
     "GateRefusedError",
     "GateToken",
     "Part",
+    "ProtocolAmendment",
     "ProtocolLock",
     "load_lock",
     "open_gate",
@@ -90,6 +96,24 @@ def _relative_posix(value: str) -> str:
     return value
 
 
+_Commit = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
+
+
+class ProtocolAmendment(BaseModel):
+    """One amendment of the pre-registration (``[[amendments]]`` in the lock): a committed file and its hash."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    path: str
+    sha256: Sha256
+    commit: _Commit
+
+    @field_validator("path")
+    @classmethod
+    def _inside_the_repository(cls, value: str) -> str:
+        return _relative_posix(value)
+
+
 class ProtocolLock(BaseModel):
     """``training/protocol.lock.toml``: what the pre-registration is, where it was committed, what is being tested."""
 
@@ -97,7 +121,9 @@ class ProtocolLock(BaseModel):
 
     protocol_path: str
     protocol_sha256: Sha256
-    protocol_commit: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
+    protocol_commit: _Commit
+    amendments: tuple[ProtocolAmendment, ...] = ()
+    gold_sha256: Sha256 | None = None
     model_id: Annotated[str, StringConstraints(pattern=MODEL_ID)] | None = None
     freeze_path: str | None = None
     freeze_sha256: Sha256 | None = None
@@ -124,14 +150,29 @@ def load_lock(path: Path) -> ProtocolLock:
 _SENTINEL: Final = object()
 
 
-@dataclass(frozen=True)
+@final
+@dataclass(frozen=True, slots=True)
 class GateToken:
-    """Proof that ``open_gate`` opened the gate for ``part`` at commit ``head``; only ``open_gate`` makes one."""
+    """Proof that ``open_gate`` opened the gate for ``part`` at commit ``head``; only ``open_gate`` makes one.
+
+    Final, frozen, slotted and unconstructible outside ``open_gate`` (see the module docstring for what that does and
+    does not guarantee). The job that holds a token calls ``recheck`` immediately before it writes any output, and
+    writes with exclusive create (``open(path, "xb")``), so that a second run that raced past the once-only check
+    fails instead of overwriting.
+    """
 
     part: Part
     head: str
     lock: ProtocolLock
     _key: InitVar[object] = None
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Refuse every subclass: a subclass is a way around the constructor check.
+
+        Raises:
+            TypeError: Always.
+        """
+        raise TypeError("GateToken is final and cannot be subclassed")
 
     def __post_init__(self, _key: object) -> None:
         """Refuse a construction that did not come through ``open_gate``.
@@ -146,6 +187,29 @@ class GateToken:
         """Refuse ``copy``, ``deepcopy`` and ``pickle``: they rebuild an object without running the constructor."""
         raise TypeError("a GateToken cannot be copied or pickled; call open_gate")
 
+    def recheck(self, git: GitReader) -> None:
+        """Confirm the repository is still what the gate saw: HEAD unchanged and the working tree clean.
+
+        Call it immediately before writing outputs.
+
+        Raises:
+            GateRefusedError: HEAD moved (``head-changed``) or the tree is dirty (``tree-dirty``), or git failed.
+        """
+        reasons: list[str] = []
+        try:
+            current = git.head()
+            if current != self.head:
+                reasons.append(f"head-changed: HEAD was {self.head} when the gate opened and is {current} now")
+        except GitError as exc:
+            reasons.append(f"head-changed: cannot read HEAD: {exc}")
+        try:
+            if not git.is_clean():
+                reasons.append("tree-dirty: the working tree has modified, staged or untracked files")
+        except GitError as exc:
+            reasons.append(f"tree-dirty: cannot read the working tree status: {exc}")
+        if reasons:
+            raise GateRefusedError(tuple(reasons))
+
 
 def _issue_token(part: Part, head: str, lock: ProtocolLock) -> GateToken:
     return GateToken(part=part, head=head, lock=lock, _key=_SENTINEL)
@@ -155,31 +219,64 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _check_protocol(repo_root: Path, lock: ProtocolLock, git: GitReader, head: str | None) -> list[str]:
+def _check_document(
+    repo_root: Path,
+    *,
+    path: str,
+    sha256: str,
+    commit: str,
+    git: GitReader,
+    head: str | None,
+    codes: tuple[str, str, str],
+) -> list[str]:
+    """Check a committed document against the lock.
+
+    Its working-tree bytes hash to ``sha256``, ``commit`` is an ancestor of HEAD, and the bytes at ``commit`` hash to
+    ``sha256`` too. ``codes`` are the (hash, ancestor, content) reason codes.
+    """
+    hash_code, ancestor_code, content_code = codes
     reasons: list[str] = []
-    protocol = repo_root / lock.protocol_path
-    if not protocol.is_file():
-        reasons.append(f"protocol-hash-mismatch: {lock.protocol_path} does not exist in {repo_root}")
-    elif (actual := _sha256(protocol.read_bytes())) != lock.protocol_sha256:
-        reasons.append(
-            f"protocol-hash-mismatch: {lock.protocol_path} has sha256 {actual}, the lock says {lock.protocol_sha256}"
-        )
+    document = repo_root / path
+    if not document.is_file():
+        reasons.append(f"{hash_code}: {path} does not exist in {repo_root}")
+    elif (actual := _sha256(document.read_bytes())) != sha256:
+        reasons.append(f"{hash_code}: {path} has sha256 {actual}, the lock says {sha256}")
     if head is not None:
         try:
-            if not git.is_ancestor(lock.protocol_commit, head):
-                reasons.append(f"commit-not-ancestor: {lock.protocol_commit} is not an ancestor of HEAD {head}")
+            if not git.is_ancestor(commit, head):
+                reasons.append(f"{ancestor_code}: {commit} ({path}) is not an ancestor of HEAD {head}")
         except GitError as exc:
-            reasons.append(f"commit-not-ancestor: {exc}")
+            reasons.append(f"{ancestor_code}: {path}: {exc}")
     try:
-        committed = _sha256(git.show(lock.protocol_commit, lock.protocol_path))
+        committed = _sha256(git.show(commit, path))
     except GitError as exc:
-        reasons.append(f"commit-content-mismatch: cannot read {lock.protocol_path} at {lock.protocol_commit}: {exc}")
+        reasons.append(f"{content_code}: cannot read {path} at {commit}: {exc}")
     else:
-        if committed != lock.protocol_sha256:
-            reasons.append(
-                f"commit-content-mismatch: {lock.protocol_path} at {lock.protocol_commit} has sha256 {committed}, "
-                f"the lock says {lock.protocol_sha256}"
-            )
+        if committed != sha256:
+            reasons.append(f"{content_code}: {path} at {commit} has sha256 {committed}, the lock says {sha256}")
+    return reasons
+
+
+def _check_protocol(repo_root: Path, lock: ProtocolLock, git: GitReader, head: str | None) -> list[str]:
+    reasons = _check_document(
+        repo_root,
+        path=lock.protocol_path,
+        sha256=lock.protocol_sha256,
+        commit=lock.protocol_commit,
+        git=git,
+        head=head,
+        codes=("protocol-hash-mismatch", "commit-not-ancestor", "commit-content-mismatch"),
+    )
+    for amendment in lock.amendments:
+        reasons += _check_document(
+            repo_root,
+            path=amendment.path,
+            sha256=amendment.sha256,
+            commit=amendment.commit,
+            git=git,
+            head=head,
+            codes=("amendment-hash-mismatch", "amendment-not-ancestor", "amendment-content-mismatch"),
+        )
     return reasons
 
 
@@ -277,6 +374,8 @@ def open_gate(
         reasons.append(f"tree-dirty: cannot read the working tree status: {exc}")
     if lock is not None:
         reasons += _check_model(lock, models_dir)
+        if lock.gold_sha256 is None:
+            reasons.append("gold-sha-missing: the lock has no gold_sha256 (the one gold file the evaluation may read)")
         if part in _FREEZE_PARTS:
             reasons += _check_freeze(repo_root, lock, git, head)
     result = results_dir / RESULT_FILES[part]

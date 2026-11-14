@@ -54,6 +54,7 @@ def test_flag_defaults_and_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     assert defaults.model_id is None
 
     monkeypatch.setenv("SB_FORECAST_SOURCE", "replay")
+    monkeypatch.setenv("SB_REPLAY_SNAPSHOT_ID", "demo-2026")  # required with replay (test_composition_replay.py)
     assert Settings(_env_file=None).forecast_source == "replay"
 
     monkeypatch.setenv("SB_FORECAST_SOURCE", "bogus")

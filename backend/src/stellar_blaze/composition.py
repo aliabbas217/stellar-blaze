@@ -29,6 +29,7 @@ from stellar_blaze.adapters.http.pacer import RequestPacer
 from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
+from stellar_blaze.adapters.sources.replay import ReplayForecastSource, ReplayObservationSource
 from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, SnapshotHolder
 from stellar_blaze.config import ForecastSourceKind, Settings
 from stellar_blaze.domain.config.models import ModelRegistry
@@ -70,10 +71,21 @@ def _open_meteo(
     )
 
 
+def _replay_dir(settings: Settings) -> Path:
+    """The snapshot directory ``Settings`` names (``Settings`` guarantees the id is set when the source is replay)."""
+    if settings.replay_snapshot_id is None:
+        raise CompositionError("the replay source needs SB_REPLAY_SNAPSHOT_ID")
+    return settings.replay_dir / settings.replay_snapshot_id
+
+
+def _replay(settings: Settings, client: httpx2.AsyncClient, cache: RawResponseCache | None) -> WeatherForecastSource:
+    """The replay source: it reads a verified snapshot from disk, so the HTTP client and cache are not used."""
+    return ReplayForecastSource(_replay_dir(settings))
+
+
 # Read-only on purpose: a fake can never be registered into the production path, only passed to build_forecast_source.
-# B3 registers "replay" here.
 FORECAST_SOURCES: Final[Mapping[ForecastSourceKind, ForecastSourceFactory]] = MappingProxyType(
-    {"open_meteo": _open_meteo}
+    {"open_meteo": _open_meteo, "replay": _replay}
 )
 
 
@@ -235,12 +247,24 @@ def build_sources(
     responses is a snapshot of the day they were fetched; start from a fresh ``data_dir`` for a clean rebuild. Call this
     inside the event loop that will use the sources, and await ``Sources.close`` when done.
 
+    With ``forecast_source == "replay"`` the observations are the snapshot's too: ``observations`` holds only ``"iem"``,
+    a ``ReplayObservationSource``, so the job code that asks for ``sources.observations["iem"]`` is unchanged and
+    nothing reaches the network. (``Sources.observations`` has no ``"ghcnh"`` then: the snapshot carries no audit
+    values.)
+
     Raises:
         UnknownAdapterError: ``settings.forecast_source`` names a kind nobody registered in ``registry``.
+        ReplaySnapshotError: A replay snapshot is missing a file or a file's hash differs from its manifest.
     """
     client = build_async_client(settings)
     cache = RawResponseCache(settings.data_dir / "bronze" / "http")
     forecasts = build_forecast_source(settings, client, cache, registry)
+    if settings.forecast_source == "replay":
+        return Sources(
+            observations={"iem": ReplayObservationSource(_replay_dir(settings))},
+            forecasts=forecasts,
+            close=client.aclose,
+        )
     iem = IemMetarSource(client, settings.iem_asos_url, cache, pacer=RequestPacer(settings.iem_request_interval_s))
     ghcnh = GhcnhParquetSource(client, settings.ghcnh_base_url, cache)
     return Sources(

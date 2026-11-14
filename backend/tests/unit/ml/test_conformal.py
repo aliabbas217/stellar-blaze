@@ -25,9 +25,11 @@ from stellar_blaze.domain.forecast.features import Target
 from stellar_blaze.domain.forecast.grid import F64, HOUR_BLOCKS, LEVELS, PAIRS, HourBlock
 from stellar_blaze.ml import _mapie
 from stellar_blaze.ml.conformal import (
+    CalibrationWindow,
     ConformalOffsets,
     apply_offsets,
     calibration_mask,
+    fit_mask,
     fit_symmetric_offsets,
     stratum_key,
 )
@@ -498,6 +500,58 @@ class TestCalibrationMask:
             calibration_mask(rows.with_columns(pl.col("valid_date").cast(pl.String())), "september")
         with pytest.raises(ValueError, match="window"):
             calibration_mask(rows, "october")  # type: ignore[arg-type]
+
+
+class TestFitMask:
+    """R27: fit rows are 15 May-31 August of their own summer and never calibration rows (pre-registration 2.3, L7)."""
+
+    @pytest.mark.parametrize("window", ["september", "weeks_4_8_12_16"])
+    @pytest.mark.parametrize("year", [2024, 2025])
+    def test_fit_set_lies_inside_the_training_period_and_is_disjoint_from_calibration(
+        self, window: CalibrationWindow, year: int
+    ) -> None:
+        rows = season(year)
+        fit = fit_mask(rows, window)
+        calibration = calibration_mask(rows, window)
+        assert fit.dtype == pl.Boolean
+        assert len(fit) == rows.height
+        assert not (fit & calibration).any(), "a row is never both a fit row and a calibration row (L7)"
+        fitted: list[date] = rows.filter(fit)["valid_date"].to_list()
+        assert min(fitted) >= date(year, 5, 15)
+        assert max(fitted) <= date(year, 8, 31)
+        # nothing in the period is lost except the calibration rows that fall inside it
+        in_period = rows["valid_date"].is_between(date(year, 5, 15), date(year, 8, 31))
+        assert fit.sum() == (in_period & ~calibration).sum()
+
+    def test_september_window_fits_on_all_of_the_period(self) -> None:
+        rows = season(2025)
+        assert fit_mask(rows, "september").sum() == 109  # 15 May to 31 August is 17 + 30 + 31 + 31 = 109 days
+
+    def test_weeks_window_removes_its_28_days_from_the_fit_set_and_leaves_september_unused(self) -> None:
+        rows = season(2025)
+        fit = fit_mask(rows, "weeks_4_8_12_16")
+        calibration = calibration_mask(rows, "weeks_4_8_12_16")
+        assert fit.sum() == 109 - 25  # 25 of the 28 calibration days lie inside 15 May-31 Aug
+        september = rows["valid_date"].dt.month() == 9
+        assert not (fit & september).any(), "September never trains"
+        unused = ~fit & ~calibration
+        assert (unused & september).sum() == 27  # 30 September days, 3 of them calibration days (1-3 September)
+
+    def test_each_rows_own_summer_year_decides(self) -> None:
+        rows = pl.DataFrame(
+            {"valid_date": [date(2025, 6, 1), date(2025, 6, 1), None], "summer": [2025, 2024, 2025]},
+            schema={"valid_date": pl.Date, "summer": pl.Int16},
+        )
+        assert fit_mask(rows, "september").to_list() == [True, False, False]
+
+    def test_bad_inputs_raise(self) -> None:
+        rows = season(2025)
+        with pytest.raises(ValueError, match="summer"):
+            fit_mask(rows.drop("summer"), "september")
+        with pytest.raises(ValueError, match="valid_date"):
+            fit_mask(rows.drop("valid_date"), "september")
+        with pytest.raises(ValueError, match="window"):
+            fit_mask(rows, "october")  # type: ignore[arg-type]
 
 
 def test_domain_names_are_reexported_unchanged() -> None:

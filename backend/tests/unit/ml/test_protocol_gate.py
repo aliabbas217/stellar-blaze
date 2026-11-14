@@ -8,11 +8,13 @@ import copy
 import dataclasses
 import hashlib
 import pickle
+import re
 import shutil
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,6 +25,7 @@ from stellar_blaze.ml.protocol_gate import (
     GateRefusedError,
     GateToken,
     Part,
+    ProtocolAmendment,
     ProtocolLock,
     load_lock,
     open_gate,
@@ -38,6 +41,7 @@ FREEZE_PATH = "docs/research/freeze.md"
 PROTOCOL_BYTES = b"# Pre-registration\nline two\n"
 FREEZE_BYTES = b"# Freeze addendum\n"
 PROTOCOL_COMMIT = "a" * 40
+GOLD_SHA = "7" * 64  # the lock's default pin; loader tests pin the real digest of their synthetic file
 HEAD = "b" * 40
 
 
@@ -93,19 +97,40 @@ class World:
     models_dir: Path
     git: FakeGit
 
-    def write_lock(self, **changes: str | None) -> None:
-        """Rewrite the lock; a ``None`` value drops the key (TOML has no null)."""
+    def write_lock(self, *, amendments: Sequence[tuple[str, str, str]] = (), **changes: str | None) -> None:
+        """Rewrite the lock; ``None`` drops a key (TOML has no null); ``amendments`` are (path, sha, commit) triples."""
         values: dict[str, str | None] = {
             "protocol_path": PROTOCOL_PATH,
             "protocol_sha256": sha(PROTOCOL_BYTES),
             "protocol_commit": PROTOCOL_COMMIT,
+            "gold_sha256": GOLD_SHA,
             "model_id": MODEL_ID,
             "freeze_path": FREEZE_PATH,
             "freeze_sha256": sha(FREEZE_BYTES),
         }
         values.update(changes)
         lines = [f'{key} = "{value}"' for key, value in values.items() if value is not None]
+        for path, digest, commit in amendments:
+            lines += ["", "[[amendments]]", f'path = "{path}"', f'sha256 = "{digest}"', f'commit = "{commit}"']
         self.lock_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def add_amendment(
+        self,
+        name: str,
+        data: bytes,
+        commit: str,
+        *,
+        tree_bytes: bytes | None = None,
+        committed_bytes: bytes | None = None,
+        is_ancestor: bool = True,
+    ) -> tuple[str, str, str]:
+        """Create an amendment file and its git facts; the optional arguments break one of its three checks."""
+        path = f"docs/research/{name}.md"
+        (self.repo_root / path).write_bytes(data if tree_bytes is None else tree_bytes)
+        self.git.files[(commit, path)] = data if committed_bytes is None else committed_bytes
+        if is_ancestor:
+            self.git.ancestors.add((commit, HEAD))
+        return path, sha(data), commit
 
     def gate(
         self, part: Part = Part.FORECAST, *, amendment: str | None = None, git: GitReader | None = None
@@ -192,6 +217,22 @@ def _freeze_not_committed_as_locked(w: World) -> None:
     w.git.files[(HEAD, FREEZE_PATH)] = FREEZE_BYTES + b"other\n"
 
 
+def _no_gold_sha(w: World) -> None:
+    w.write_lock(gold_sha256=None)
+
+
+def _amendment_edited(w: World) -> None:
+    w.write_lock(amendments=[w.add_amendment("amend-1", b"one\n", "c" * 40, tree_bytes=b"one edited\n")])
+
+
+def _amendment_not_an_ancestor(w: World) -> None:
+    w.write_lock(amendments=[w.add_amendment("amend-1", b"one\n", "c" * 40, is_ancestor=False)])
+
+
+def _amendment_committed_differently(w: World) -> None:
+    w.write_lock(amendments=[w.add_amendment("amend-1", b"one\n", "c" * 40, committed_bytes=b"other\n")])
+
+
 def _prior_result(part: Part) -> Callable[[World], None]:
     def mutate(w: World) -> None:
         w.results_dir.mkdir(parents=True)
@@ -210,6 +251,12 @@ _REFUSALS: list[tuple[str, Part, Callable[[World], None]]] = [
     ("model-id-missing", Part.FORECAST, _no_model_id),
     ("model-not-found", Part.FORECAST, _unknown_model_id),
     ("model-integrity", Part.FORECAST, _unverifiable_models),
+    ("gold-sha-missing", Part.FORECAST, _no_gold_sha),
+    ("gold-sha-missing", Part.WARNINGS, _no_gold_sha),
+    ("gold-sha-missing", Part.PLANS, _no_gold_sha),
+    ("amendment-hash-mismatch", Part.FORECAST, _amendment_edited),
+    ("amendment-not-ancestor", Part.FORECAST, _amendment_not_an_ancestor),
+    ("amendment-content-mismatch", Part.FORECAST, _amendment_committed_differently),
     ("freeze-missing", Part.WARNINGS, _no_freeze),
     ("freeze-missing", Part.PLANS, _no_freeze),
     ("freeze-hash-mismatch", Part.WARNINGS, _freeze_edited),
@@ -238,6 +285,28 @@ def test_gate_opens_when_all_hold(part: Part, world: World) -> None:
     assert token.part is part
     assert token.lock == load_lock(world.lock_path)
     assert token.lock.model_id == MODEL_ID
+
+
+def test_gate_opens_with_good_amendments(world: World) -> None:
+    good = [
+        world.add_amendment("amend-1", b"one\n", "c" * 40),
+        world.add_amendment("amend-2", b"two\n", "d" * 40),
+    ]
+    world.write_lock(amendments=good)
+    token = world.gate(Part.FORECAST)
+    assert [a.path for a in token.lock.amendments] == [path for path, _, _ in good]
+    assert all(isinstance(a, ProtocolAmendment) for a in token.lock.amendments)
+
+
+def test_gate_reports_only_the_bad_amendment(world: World) -> None:
+    good = world.add_amendment("amend-1", b"one\n", "c" * 40)
+    bad = world.add_amendment("amend-2", b"two\n", "d" * 40, tree_bytes=b"two edited\n", is_ancestor=False)
+    world.write_lock(amendments=[good, bad])
+    with pytest.raises(GateRefusedError) as refused:
+        world.gate(Part.FORECAST)
+    assert codes(refused) == ["amendment-hash-mismatch", "amendment-not-ancestor"]
+    assert all(bad[0] in reason for reason in refused.value.reasons)
+    assert not any(good[0] in reason for reason in refused.value.reasons)
 
 
 def test_gate_lists_every_failure_not_the_first(world: World) -> None:
@@ -326,13 +395,20 @@ def test_a_git_failure_closes_the_gate_with_the_codes_of_the_check(method: str, 
     assert f"{method} failed" in refused.value.reasons[0]
 
 
-def test_the_real_lock_file_parses() -> None:
-    real = Path(__file__).resolve().parents[3] / "training" / "protocol.lock.toml"
-    lock = load_lock(real)
-    assert lock.model_id is None
-    assert lock.freeze_path is None
-    assert lock.freeze_sha256 is None
-    assert lock.protocol_path.startswith("docs/research/")
+REAL_LOCK = Path(__file__).resolve().parents[3] / "training" / "protocol.lock.toml"
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def test_the_real_lock_file_is_consistent_with_the_committed_documents() -> None:
+    """Whatever the lock holds today, its hashes match the files in this tree (a lock edit cannot drift silently)."""
+    lock = load_lock(REAL_LOCK)
+    assert re.fullmatch(r"[0-9a-f]{40}", lock.protocol_commit)
+    assert sha((REPO_ROOT / lock.protocol_path).read_bytes()) == lock.protocol_sha256
+    for amendment in lock.amendments:
+        assert re.fullmatch(r"[0-9a-f]{40}", amendment.commit)
+        assert sha((REPO_ROOT / amendment.path).read_bytes()) == amendment.sha256, amendment.path
+    if lock.freeze_path is not None:
+        assert sha((REPO_ROOT / lock.freeze_path).read_bytes()) == lock.freeze_sha256
 
 
 @pytest.mark.parametrize("bad", ["../outside.md", "/etc/passwd", "C:/x.md", "a\\b.md", ""])
@@ -360,6 +436,40 @@ def test_gate_token_is_unforgeable_by_replace_copy_and_pickle(world: World) -> N
         token.part = Part.PLANS  # type: ignore[misc]
 
 
+def test_gate_token_is_final_and_has_no_dict_to_write_into(world: World) -> None:
+    token = world.gate(Part.FORECAST)
+    with pytest.raises(TypeError, match="final"):
+        type("Forged", (GateToken,), {})
+    assert not hasattr(token, "__dict__")
+    with pytest.raises(TypeError):
+        vars(token)
+    with pytest.raises(AttributeError):
+        token.__dict__["part"] = Part.PLANS
+    with pytest.raises(AttributeError):
+        token.extra = "x"  # type: ignore[attr-defined]
+
+
+def test_the_loader_wants_exactly_a_gate_token_not_something_that_claims_to_be_one(
+    world: World, tmp_path: Path
+) -> None:
+    """``MagicMock(spec=GateToken)`` passes ``isinstance`` (it forges ``__class__``); the loader checks ``type``."""
+    path, digest = _pinned_gold(world, tmp_path)
+    impostor = MagicMock(spec=GateToken)
+    impostor.part = Part.FORECAST
+    assert isinstance(impostor, GateToken)
+    with pytest.raises(TypeError, match="MagicMock"):
+        load_test_pairs(path, token=impostor, expected_sha256=digest)
+
+
+def test_a_retargeted_token_is_still_judged_by_its_live_part(world: World, tmp_path: Path) -> None:
+    """After ``object.__setattr__`` (same-process abuse, out of scope) the loader still judges the live part."""
+    path, digest = _pinned_gold(world, tmp_path)
+    token = world.gate(Part.FORECAST)
+    object.__setattr__(token, "part", Part.PLANS)
+    with pytest.raises(HoldoutViolationError, match=re.escape("the gate token is for part 'plans', not 'forecast'")):
+        load_test_pairs(path, token=token, expected_sha256=digest)
+
+
 def test_gate_token_equality_and_repr_are_the_dataclass_defaults(world: World) -> None:
     first, second = world.gate(Part.FORECAST), world.gate(Part.FORECAST)
     assert first == second
@@ -368,7 +478,8 @@ def test_gate_token_equality_and_repr_are_the_dataclass_defaults(world: World) -
     assert HEAD in repr(first)
 
 
-def _small_gold(tmp_path: Path) -> tuple[Path, str]:
+def _pinned_gold(world: World, tmp_path: Path) -> tuple[Path, str]:
+    """A small synthetic gold file with 2024-2026 and a lock that pins its hash."""
     frame = make_pairs(
         seed=3,
         summers=(2024, 2025, 2026),
@@ -380,31 +491,91 @@ def _small_gold(tmp_path: Path) -> tuple[Path, str]:
     )
     path = tmp_path / "pairs.parquet"
     frame.write_parquet(path)
-    return path, sha(path.read_bytes())
+    digest = sha(path.read_bytes())
+    world.write_lock(gold_sha256=digest)
+    return path, digest
 
 
 def test_a_real_token_unlocks_2026_for_its_own_part_only(world: World, tmp_path: Path) -> None:
-    path, digest = _small_gold(tmp_path)
+    path, digest = _pinned_gold(world, tmp_path)
     token = world.gate(Part.FORECAST)
     result = load_test_pairs(path, token=token, expected_sha256=digest)
     assert set(result["summer"].unique()) == {2024, 2025, TEST_SUMMER}
     assert 0 not in set(result["lead_days"].unique())
     assert set(result["hour_utc"].unique()) == {2, 9}
-    with pytest.raises(HoldoutViolationError, match="warnings"):
+    with pytest.raises(HoldoutViolationError, match=re.escape("the gate token is for part 'forecast', not 'warnings'")):
         load_test_pairs(path, token=token, part=Part.WARNINGS, expected_sha256=digest)
     warnings_token = world.gate(Part.WARNINGS)
     assert (
         load_test_pairs(path, token=warnings_token, part=Part.WARNINGS, expected_sha256=digest).height == result.height
     )
-    with pytest.raises(HoldoutViolationError, match="forecast"):
+    with pytest.raises(HoldoutViolationError, match=re.escape("the gate token is for part 'warnings', not 'forecast'")):
         load_test_pairs(path, token=warnings_token, expected_sha256=digest)
 
 
-def test_the_test_loader_checks_the_hash_after_the_token(world: World, tmp_path: Path) -> None:
-    path, digest = _small_gold(tmp_path)
+def test_the_test_loader_refuses_an_expected_hash_that_is_not_the_locks(world: World, tmp_path: Path) -> None:
+    path, digest = _pinned_gold(world, tmp_path)
     token = world.gate(Part.FORECAST)
-    with pytest.raises(ValueError, match=digest):
-        load_test_pairs(path, token=token, expected_sha256="0" * 64)
+    wrong = "0" * 64
+    with pytest.raises(
+        HoldoutViolationError, match=re.escape(f"expected_sha256 {wrong} is not the lock's gold_sha256 {digest}")
+    ):
+        load_test_pairs(path, token=token, expected_sha256=wrong)
+
+
+def test_the_test_loader_refuses_a_file_that_is_not_the_pinned_one(world: World, tmp_path: Path) -> None:
+    path, digest = _pinned_gold(world, tmp_path)
+    token = world.gate(Part.FORECAST)
+    path.write_bytes(path.read_bytes() + b"tampered")
+    with pytest.raises(HoldoutViolationError, match=f"the lock's gold_sha256 is {digest}"):
+        load_test_pairs(path, token=token, expected_sha256=digest)
+
+
+def test_the_test_loader_refuses_a_digest_the_lock_does_not_pin(world: World, tmp_path: Path) -> None:
+    """The caller's digest and the file agree with each other but not with the lock (a lock pinned to another file)."""
+    path, digest = _pinned_gold(world, tmp_path)
+    world.write_lock(gold_sha256="1" * 64)
+    token = world.gate(Part.FORECAST)
+    with pytest.raises(HoldoutViolationError, match=re.escape(f"expected_sha256 {digest} is not the lock's")):
+        load_test_pairs(path, token=token, expected_sha256=digest)
+
+
+# --- recheck ---------------------------------------------------------------------------------------------------
+
+
+def test_recheck_passes_when_nothing_moved(world: World) -> None:
+    world.gate(Part.FORECAST).recheck(world.git)
+
+
+def test_recheck_refuses_a_moved_head(world: World) -> None:
+    token = world.gate(Part.FORECAST)
+    world.git.head_id = "c" * 40
+    with pytest.raises(GateRefusedError) as refused:
+        token.recheck(world.git)
+    assert codes(refused) == ["head-changed"]
+    assert HEAD in refused.value.reasons[0]
+    assert "c" * 40 in refused.value.reasons[0]
+
+
+def test_recheck_refuses_a_dirty_tree(world: World) -> None:
+    token = world.gate(Part.FORECAST)
+    world.git.clean = False
+    with pytest.raises(GateRefusedError) as refused:
+        token.recheck(world.git)
+    assert codes(refused) == ["tree-dirty"]
+
+
+def test_recheck_lists_both_and_treats_git_failure_as_a_refusal(world: World) -> None:
+    token = world.gate(Part.FORECAST)
+    world.git.head_id = "c" * 40
+    world.git.clean = False
+    with pytest.raises(GateRefusedError) as refused:
+        token.recheck(world.git)
+    assert codes(refused) == ["head-changed", "tree-dirty"]
+    world.git.errors = {"head", "is_clean"}
+    with pytest.raises(GateRefusedError) as failed:
+        token.recheck(world.git)
+    assert codes(failed) == ["head-changed", "tree-dirty"]
 
 
 # --- SubprocessGit on a throwaway repository -------------------------------------------------------------------
@@ -431,6 +602,7 @@ def isolated_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(empty))
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(empty))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("LC_ALL", "C")  # git's messages in English, whatever the host locale
     repo = tmp_path / "throwaway-repo"
     repo.mkdir()
     return repo
@@ -499,6 +671,28 @@ def test_subprocess_git_against_a_throwaway_repository(isolated_git: Path) -> No
         reader.show(first, "untracked.txt")  # not yet committed at the first commit
     with pytest.raises(GitError):
         reader.show("f" * 40, "a.txt")
+
+
+@pytest.mark.skipif(_GIT is None, reason="the git executable is not installed")
+def test_subprocess_git_ignores_repository_selecting_variables(
+    isolated_git: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A hook's ``GIT_DIR``/``GIT_WORK_TREE``/``GIT_INDEX_FILE`` must not point the gate at another repository."""
+    target, other = isolated_git, tmp_path / "other-repo"
+    other.mkdir()
+    heads: dict[str, str] = {}
+    for name, repo in (("target", target), ("other", other)):
+        _run_git(repo, "init", "--quiet", "--initial-branch=main")
+        (repo / "f.txt").write_bytes(f"{name}\n".encode())
+        heads[name] = _commit(repo, name)
+    (other / "dirty.txt").write_bytes(b"untracked in the other repository\n")
+    monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(other))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(other / ".git" / "index"))
+    reader = SubprocessGit(target)
+    assert reader.head() == heads["target"] != heads["other"]
+    assert reader.is_clean() is True  # the other repository is dirty
+    assert reader.show(heads["target"], "f.txt") == b"target\n"
 
 
 def test_subprocess_git_outside_a_repository_raises_git_error(
