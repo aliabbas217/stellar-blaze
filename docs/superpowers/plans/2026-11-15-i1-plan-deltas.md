@@ -67,9 +67,19 @@
 - The stop-to-phone bound (about 90 s) is computed from the documented deadlines, never measured on a phone.
 
 
-## 4. Validation (see the last commit message of the branch for the final list)
+## 4. Validation (run on 2026-11-16 at the branch HEAD; nothing ran against Azure or Render)
 
-Filled in at the end of the lane.
+| What | Result |
+|---|---|
+| Bicep: `bicep lint` and `bicep build` of `bootstrap.bicep` and `main.bicep` (0.49.2); `build-params` for bootstrap and for main in both phases and with `API_MIN_REPLICAS` 0 and 1 | clean; the only warning is the accepted `use-recent-api-versions` on `diagnosticSettings@2021-05-01-preview`; no BCP081 for `Microsoft.App` 2026-07-01, `DBforPostgreSQL` 2026-10-01, `ContainerRegistry` 2025-11-01 |
+| `check-template.sh` (C1-C13, B1-B5), `check-db-tls.sh --template` (T1-T3), `check-workflow.sh` (W1-W9) | all PASS; each check has a mutation test that fails without it |
+| Bash tests with a fake `az` (`CI=true bash infra/scripts/tests/run.sh`) | 244 passed, including the review-focus gates (the active revision runs the image just built, migrate-first with a stale-execution guard, the zero-replica rules, restart order) |
+| Pester (`run-ps-tests.ps1`) and PSScriptAnalyzer 1.25.0 | 292 passed, 0 analyzer findings (plus 89 Pester tests of `validate-local.ps1`) |
+| `infra/scripts/validate-local.ps1` (pinned, checksum-verified tools) | 9 passed, 0 failed, 1 skipped (the rehearsal, run separately), 1 warned (the report-only trivy image scan): Bicep, PSRule for Azure 1.47.0, Checkov 3.4.5, actionlint 1.7.12, `act` 0.2.97 dry run, hadolint 2.15.1, ShellCheck 0.11.0, PSScriptAnalyzer, the test suites; 22 findings accepted with reasons (section 5) |
+| Production rehearsal `bash infra/local/rehearse.sh` on this branch (older backend, process-start clock) | 13 passed, 2 skipped (R6: the backend predates the epoch clock; R8: a dispatch exceeds 45 s at 0.25 vCPU) |
+| Same rehearsal on an export with B3's backend (b731bd4, epoch clock), this branch's frontend and infra | 14 passed, 1 skipped (R8): includes R5 reset through the proxy, R6 an api restart does not rewind the clock, R7 the cadence activation is idempotent, TLS-only Postgres with a run-time CA, `verify-full`, plaintext refused, wrong CA, wrong host name and missing root fail closed, `ssl=require` connects (so it is forbidden), forged `X-Forwarded-For` evades the limiter only without the proxy |
+| Render rehearsal `bash infra/render/rehearse-render.sh` | ALL CHECKS PASSED: the real `render.yaml` commands against the real images; plaintext refused, wrong CA, wrong host, bad certificate values all fail closed |
+| Independent reviews | two at feature level (1 CRITICAL, 7 IMPORTANT, all fixed), a second pair after the cheap-mode round (0 CRITICAL, 8 IMPORTANT, all fixed; the remaining MINOR items are fixed or listed in section 6) |
 
 ## 5. Accepted findings of the offline validators (each with a reason in `infra/validate/accepted-risks.json`)
 
