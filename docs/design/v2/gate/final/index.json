@@ -1,0 +1,401 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/index.html?still&h=14",
+  "when": "2026-11-12T01:01:53.129Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\index\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\index\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 80
+          },
+          {
+            "px": 13,
+            "n": 69
+          },
+          {
+            "px": 14,
+            "n": 114
+          },
+          {
+            "px": 16,
+            "n": 30
+          },
+          {
+            "px": 18,
+            "n": 3
+          },
+          {
+            "px": 22,
+            "n": 4
+          },
+          {
+            "px": 35,
+            "n": 8
+          },
+          {
+            "px": 46,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 4
+          },
+          {
+            "px": 64,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 10,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 38
+          },
+          {
+            "v": "1px",
+            "n": 4
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [
+          {
+            "px": 9,
+            "n": 8
+          },
+          {
+            "px": 6,
+            "n": 5
+          },
+          {
+            "px": 7,
+            "n": 4
+          },
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 326,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 21,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Stellar Blaze · Heat-stress forecasts for UAE outdoor crews",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\index\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 59.1
+        },
+        "squint": {
+          "masses": 5,
+          "competitors": 1,
+          "dominance": 0.834,
+          "top": [
+            {
+              "cells": 408,
+              "weight": 189.74,
+              "cx": 0.662,
+              "cy": 0.318,
+              "bbox": [
+                0.458,
+                0.179,
+                0.847,
+                0.522
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 20.69,
+              "cx": 0.086,
+              "cy": 0.356,
+              "bbox": [
+                0.028,
+                0.343,
+                0.153,
+                0.373
+              ]
+            },
+            {
+              "cells": 21,
+              "weight": 13.34,
+              "cx": 0.904,
+              "cy": 0.97,
+              "bbox": [
+                0.861,
+                0.955,
+                0.944,
+                0.985
+              ]
+            },
+            {
+              "cells": 5,
+              "weight": 2.28,
+              "cx": 0.221,
+              "cy": 0.224,
+              "bbox": [
+                0.194,
+                0.224,
+                0.25,
+                0.224
+              ]
+            },
+            {
+              "cells": 3,
+              "weight": 1.4,
+              "cx": 0.11,
+              "cy": 0.224,
+              "bbox": [
+                0.097,
+                0.224,
+                0.125,
+                0.224
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.122,
+        "centroid": {
+          "x": 0.582,
+          "y": 0.41
+        },
+        "colourfulness": 58.8,
+        "luminanceSpread": 0.466,
+        "chromaProxy": 0.214,
+        "hierarchyByHueOnly": false,
+        "inkPct": 31.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\index\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\index\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 70
+          },
+          {
+            "px": 13,
+            "n": 62
+          },
+          {
+            "px": 14,
+            "n": 113
+          },
+          {
+            "px": 16,
+            "n": 30
+          },
+          {
+            "px": 18,
+            "n": 3
+          },
+          {
+            "px": 22,
+            "n": 4
+          },
+          {
+            "px": 28,
+            "n": 8
+          },
+          {
+            "px": 36,
+            "n": 4
+          },
+          {
+            "px": 48,
+            "n": 1
+          },
+          {
+            "px": 64,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 10,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 38
+          },
+          {
+            "v": "1px",
+            "n": 2
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [
+          {
+            "px": 9,
+            "n": 8
+          },
+          {
+            "px": 7,
+            "n": 4
+          },
+          {
+            "px": 6,
+            "n": 3
+          },
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 114,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 18,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Stellar Blaze · Heat-stress forecasts for UAE outdoor crews",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\index\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 64.4
+        },
+        "squint": {
+          "masses": 3,
+          "competitors": 1,
+          "dominance": 0.769,
+          "top": [
+            {
+              "cells": 568,
+              "weight": 488.33,
+              "cx": 0.494,
+              "cy": 0.683,
+              "bbox": [
+                0.042,
+                0.645,
+                0.944,
+                0.72
+              ]
+            },
+            {
+              "cells": 170,
+              "weight": 144.69,
+              "cx": 0.771,
+              "cy": 0.944,
+              "bbox": [
+                0.597,
+                0.916,
+                0.944,
+                0.972
+              ]
+            },
+            {
+              "cells": 3,
+              "weight": 2.08,
+              "cx": 0.5,
+              "cy": 0.308,
+              "bbox": [
+                0.5,
+                0.299,
+                0.5,
+                0.318
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.122,
+        "centroid": {
+          "x": 0.5,
+          "y": 0.622
+        },
+        "colourfulness": 9,
+        "luminanceSpread": 0.899,
+        "chromaProxy": 0.024,
+        "hierarchyByHueOnly": false,
+        "inkPct": 33.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

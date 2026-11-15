@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Today · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@500&family=Noto+Sans+Devanagari:wght@500&family=Noto+Sans+Bengali:wght@500&family=Noto+Sans+Arabic:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* worker route is sun-first: positive polarity (v1 R2 evidence) */
+  --ground: oklch(0.985 0.002 255);
+  --panel: oklch(0.955 0.004 255);
+  --ink: oklch(0.18 0.012 255);
+  --ink-2: oklch(0.38 0.012 255);
+  --ink-3: oklch(0.5 0.012 255);
+  --hair: oklch(0.86 0.006 255);
+  --hair-strong: oklch(0.7 0.008 255);
+  --focus: oklch(0.45 0.12 250);
+  --lv-green: oklch(0.58 0.12 150);
+  --lv-amber: oklch(0.78 0.14 82);
+  --lv-orange: oklch(0.66 0.17 48);
+  --lv-red: oklch(0.53 0.19 27);
+  --sans: "Archivo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --outer: oklch(0.155 0.012 255);
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; }
+html { background: var(--outer); }
+body { background: var(--outer); color: var(--ink); font: 400 18px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+.mono { font-family: var(--mono); font-size: 13px; letter-spacing: 0.02em; }
+.num { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button { font: inherit; color: inherit; }
+
+.phone { max-width: 430px; margin: 0 auto; min-height: 100svh; background: var(--ground); position: relative; padding-bottom: 150px; }
+@media (min-width: 700px) { .phone { margin: 32px auto; min-height: 0; border: 1px solid oklch(0.3 0.012 255); } .page-note { display: block !important; } }
+.page-note { display: none; position: fixed; inset-inline-start: 40px; top: 40px; max-width: 300px; color: oklch(0.74 0.01 255); font: 400 14px/1.5 var(--sans); }
+.page-note b { display: block; color: oklch(0.94 0.005 255); font-weight: 500; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; font-variation-settings: "wdth" 118; margin-bottom: 14px; }
+
+header { padding: 18px 20px 14px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--hair); }
+header .site { font-weight: 600; font-size: 17px; }
+header .crew { color: var(--ink-2); font-size: 15px; }
+header .when { text-align: end; color: var(--ink-2); }
+.langs { display: flex; gap: 4px; padding: 10px 16px; overflow-x: auto; border-bottom: 1px solid var(--hair); scrollbar-width: none; }
+.langs button { flex: none; min-height: 40px; min-width: 44px; padding: 0 12px; border: 1px solid transparent; background: none; border-radius: 2px; color: var(--ink-2); font-size: 16px; cursor: pointer; }
+.langs button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.langs [lang="ur"] { font-family: "Noto Nastaliq Urdu", serif; font-size: 15px; line-height: 1; }
+.langs [lang="hi"], .langs [lang="ne"] { font-family: "Noto Sans Devanagari", sans-serif; }
+.langs [lang="bn"] { font-family: "Noto Sans Bengali", sans-serif; }
+.langs [lang="ar"] { font-family: "Noto Sans Arabic", sans-serif; }
+
+.level { padding: 22px 20px 20px; }
+.level .k { color: var(--ink-3); text-transform: uppercase; }
+.level .word { display: flex; align-items: baseline; gap: 14px; margin-top: 6px; }
+.level .word strong { font: 500 76px/0.95 var(--sans); letter-spacing: -0.03em; }
+.level .word span { font-size: 22px; color: var(--ink-2); }
+.scale { margin-top: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+.scale div { position: relative; padding-top: 12px; color: var(--ink-3); font-size: 13px; }
+.scale div::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--hair); }
+.scale div.on { color: var(--ink); font-weight: 600; }
+.scale div.on::before { height: 8px; top: -2px; background: var(--c); }
+.scale div:nth-child(1) { --c: var(--lv-green); } .scale div:nth-child(2) { --c: var(--lv-amber); }
+.scale div:nth-child(3) { --c: var(--lv-orange); } .scale div:nth-child(4) { --c: var(--lv-red); }
+.facts { margin-top: 18px; border-top: 1px solid var(--hair); }
+.facts p { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.facts p span:first-child { color: var(--ink-2); }
+.facts b { font-weight: 600; }
+
+.todo { padding: 8px 20px 4px; }
+.todo-h { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
+.todo-h h2 { font: 600 20px/1.2 var(--sans); }
+.listen { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--hair-strong); border-radius: 2px; background: var(--ground); cursor: pointer; font-size: 16px; }
+.todo ol { list-style: none; padding: 0; }
+.todo li { display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid var(--hair); font-size: 22px; font-weight: 500; line-height: 1.3; letter-spacing: -0.005em; }
+.todo li svg { width: 36px; height: 36px; color: var(--ink); }
+.draft { color: var(--ink-3); padding: 10px 0 0; border-top: 1px solid var(--hair); font-size: 13px; }
+
+.curve { padding: 22px 20px 8px; }
+.curve h2 { font: 600 16px/1.2 var(--sans); }
+.curve .cap { color: var(--ink-3); margin-top: 4px; }
+.curve svg { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
+.foot { padding: 14px 20px 0; color: var(--ink-3); font-size: 13px; line-height: 1.5; }
+
+.dock { position: fixed; inset-inline: 0; bottom: 0; z-index: 4; }
+.dock-in { max-width: 430px; margin: 0 auto; background: var(--ground); border-top: 1px solid var(--hair-strong); padding: 10px 16px calc(6px + env(safe-area-inset-bottom)); }
+@media (min-width: 700px) { .dock { position: sticky; } }
+.unwell { width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--ink); color: var(--ground); border: 0; border-radius: 2px; font-size: 19px; font-weight: 600; cursor: pointer; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 6px; }
+.tabs a { min-height: 48px; display: grid; place-items: center; text-decoration: none; color: var(--ink-3); font-size: 15px; border-top: 2px solid transparent; }
+.tabs a[aria-current] { color: var(--ink); font-weight: 600; border-top-color: var(--ink); }
+</style>
+</head>
+<body>
+<p class="page-note"><b>Stellar Blaze</b>Worker Today, the phone screen a crew member opens from the alert or the home-screen icon. Light by default for direct sun. Shown here at phone width.</p>
+<div class="phone">
+  <header>
+    <div><p class="site">Mussafah M-14 yard</p><p class="crew">Crew B · concrete pour</p></div>
+    <p class="when mono num">Thu 3 Sep<br>11:10</p>
+  </header>
+  <nav class="langs" aria-label="Language">
+    <button aria-pressed="true" lang="en">EN</button><button lang="ur">اردو</button><button lang="hi">हिन्दी</button><button lang="bn">বাংলা</button><button lang="ne">नेपाली</button><button lang="ar">العربية</button>
+  </nav>
+
+  <main>
+    <section class="level" aria-labelledby="lv">
+      <p class="k mono">Heat level now</p>
+      <p class="word" id="lv"><strong>Red</strong><span>until 17:00</span></p>
+      <div class="scale" role="img" aria-label="Level 4 of 4, Red">
+        <div>Green</div><div>Amber</div><div>Orange</div><div class="on">Red</div>
+      </div>
+      <div class="facts">
+        <p><span>Midday break, by law</span><b class="num">12:30 to 15:00</b></p>
+        <p><span>Then</span><b class="num">Orange, 17:00 to 19:00</b></p>
+      </div>
+    </section>
+
+    <section class="todo" aria-labelledby="todo">
+      <div class="todo-h"><h2 id="todo">What to do now</h2>
+        <button class="listen" type="button"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none"/></svg>Listen</button></div>
+      <ol>
+        <li><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M1 11 16 3l15 8v2.5H1z" fill="currentColor"/><rect x="3" y="13" width="2.6" height="17" fill="currentColor"/><rect x="26.4" y="13" width="2.6" height="17" fill="currentColor"/><circle cx="14" cy="16.6" r="2.7" fill="currentColor"/><path d="M11.6 20.2h4.8v5.2h4.6l1.2 4.6h-2.7l-.8-2.6h-7.1z" fill="currentColor"/></svg><span>Work 20 minutes, rest 40 minutes in shade</span></li>
+        <li><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 5h16l-2.2 23H10.2z" fill="currentColor"/><path d="M10.6 11h10.8l-.3 3H10.9z" fill="var(--ground)"/></svg><span>Drink 1.2 litres of water or more every hour</span></li>
+        <li><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="7" r="3.2" fill="currentColor"/><circle cx="22" cy="7" r="3.2" fill="currentColor"/><path d="M6 12h8v9h-1.6v8h-4.8v-8H6zM18 12h8v9h-1.6v8h-4.8v-8H18z" fill="currentColor"/></svg><span>Never work alone</span></li>
+      </ol>
+      <p class="draft">Draft wording, awaiting clinical review.</p>
+    </section>
+
+    <section class="curve" aria-labelledby="cv">
+      <h2 id="cv">Heat through the day</h2>
+      <p class="cap mono">WBGT in sun, °C · forecast</p>
+      <svg id="chart" viewBox="0 0 390 186" role="img" aria-label="Forecast heat by hour, 06:00 to 19:00"></svg>
+    </section>
+    <p class="foot">Design still: the level is a design state; at build it comes from the site policy (ADOSH zones). Curve: ECMWF IFS day-1 forecast WBGT at OMAA, 3 Sep 2026.</p>
+  </main>
+
+  <div class="dock"><div class="dock-in">
+    <button class="unwell" type="button"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z" fill="currentColor"/></svg>I feel unwell</button>
+    <nav class="tabs" aria-label="Sections"><a href="#" aria-current="page">Today</a><a href="#">Alerts</a><a href="#">My data</a></nav>
+  </div></div>
+</div>
+
+<script type="module">
+import { loadJSON, RAMP_LIGHT, css } from '../_shared/heat.js';
+const s = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const day = s.wbgt_c_by_local_hour[s.days.indexOf('2026-09-03')];
+const H0 = 6, H1 = 19, W = 390, Hh = 170, L = 26, R = 6, T = 22, B = 26;
+const x = (h) => L + (h - H0) / (H1 - H0 + 1) * (W - L - R);
+const bw = (W - L - R) / (H1 - H0 + 1) - 3;
+const y = (v) => T + (1 - (v - 24) / (40 - 24)) * (Hh - T - B);
+let g = '';
+for (const v of [26, 30, 34, 38]) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--hair)"/><text x="0" y="${y(v) + 4}" font-family="IBM Plex Mono" font-size="11" fill="var(--ink-3)">${v}</text>`;
+// midday break bracket
+g += `<rect x="${x(12.5)}" y="${T - 14}" width="${x(15) - x(12.5)}" height="${Hh - B - T + 14}" fill="var(--panel)"/><line x1="${x(12.5)}" x2="${x(15)}" y1="${Hh - B + 18}" y2="${Hh - B + 18}" stroke="var(--ink-2)"/><text x="${(x(12.5) + x(15)) / 2}" y="${Hh - B + 31}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5" fill="var(--ink-2)">BREAK</text>`;
+for (let h = H0; h <= H1; h++) { const v = day[h];
+  g += `<rect x="${x(h) + 1.5}" y="${y(v)}" width="${bw}" height="${Hh - B - y(v)}" fill="${css(RAMP_LIGHT(v))}"/>`;
+  if ((h - H0) % 3 === 0 && (h < 12 || h > 15)) g += `<text x="${x(h) + 1.5}" y="${Hh - 8}" font-family="IBM Plex Mono" font-size="11" fill="var(--ink-3)">${String(h).padStart(2, '0')}</text>`; }
+const peakH = day.indexOf(Math.max(...day.slice(H0, H1 + 1)));
+g += `<text x="${x(peakH) + bw / 2 + 1.5}" y="${y(day[peakH]) - 6}" text-anchor="middle" font-family="IBM Plex Mono" font-size="11.5" fill="var(--ink)">${day[peakH].toFixed(1)}</text>`;
+const now = 11 + 10 / 60; g += `<line x1="${x(now)}" x2="${x(now)}" y1="${T - 14}" y2="${Hh - B + 4}" stroke="var(--ink)" stroke-width="1.5"/><text x="${x(now) - 4}" y="${T - 4}" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="var(--ink)">NOW</text>`;
+g += `<line x1="${L}" x2="${W - R}" y1="${Hh - B}" y2="${Hh - B}" stroke="var(--hair-strong)"/>`;
+document.getElementById('chart').innerHTML = g;
+for (const b of document.querySelectorAll('.langs button')) b.onclick = () => { for (const o of document.querySelectorAll('.langs button')) o.setAttribute('aria-pressed', o === b); };
+</script>
+</body>
+</html>

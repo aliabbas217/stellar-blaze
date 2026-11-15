@@ -1,0 +1,70 @@
+/* Watch: operations-console direction. Tokens first; every page references the semantic tier only. */
+:root {
+  /* primitives: graphite, hue 250, chroma held near zero so the heat ramp is the only colour on data */
+  --g-150: oklch(0.165 0.006 250);
+  --g-200: oklch(0.2 0.006 250);
+  --g-235: oklch(0.235 0.006 250);
+  --g-265: oklch(0.265 0.006 250);
+  --g-320: oklch(0.32 0.006 250);
+  --g-400: oklch(0.4 0.006 250);
+  --g-640: oklch(0.66 0.008 250);
+  --g-780: oklch(0.78 0.006 250);
+  --g-940: oklch(0.94 0.004 250);
+  /* the one UI signal: pale ATC cyan. Hue 200 sits outside every hue the heat ramps use (285 to 100 via red). */
+  --cyan-840: oklch(0.84 0.075 200);
+  --cyan-520: oklch(0.5 0.085 215);
+
+  /* semantic (dark console) */
+  --ground: var(--g-200);
+  --panel: var(--g-235);
+  --panel-2: var(--g-265);
+  --hair: var(--g-320);
+  --hair-2: var(--g-400);
+  --ink: var(--g-940);
+  --ink-2: var(--g-780);
+  --ink-3: var(--g-640);
+  --signal: var(--cyan-840);
+  --signal-ink: var(--g-150);
+
+  --sans: "Chivo", system-ui, sans-serif;
+  --mono: "Chivo Mono", ui-monospace, monospace;
+  /* scale ratio 1.125 from 12 */
+  --t-11: 10.7px; --t-12: 12px; --t-13: 13.5px; --t-15: 15.2px; --t-17: 17.1px; --t-19: 19.2px; --t-22: 21.6px; --t-24: 24.3px;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-6: 24px; --s-8: 32px; --s-12: 48px; --s-16: 64px;
+  --r: 2px;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--ground); }
+body { color: var(--ink); font: 400 var(--t-13)/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* top bar, shared by the console screens */
+.top { display: flex; align-items: center; gap: var(--s-6); height: 44px; padding: 0 var(--s-4); border-bottom: 1px solid var(--hair); background: var(--ground); }
+.mark { display: flex; align-items: center; gap: var(--s-3); text-decoration: none; white-space: nowrap; }
+.mark b { font: 600 var(--t-13)/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
+.mark span { color: var(--ink-3); font-size: var(--t-12); }
+.clock { display: flex; align-items: center; gap: var(--s-2); font: 500 var(--t-12)/1 var(--mono); letter-spacing: 0.04em; white-space: nowrap; }
+.clock i { width: 8px; height: 8px; background: var(--signal); display: inline-block; }
+.clock .paused { color: var(--ink-3); }
+.top nav { margin-inline-start: auto; display: flex; gap: var(--s-1); }
+.top nav a { text-decoration: none; color: var(--ink-2); font-size: var(--t-12); padding: var(--s-2) var(--s-3); border-radius: var(--r); }
+.top nav a:hover { color: var(--ink); background: var(--panel); }
+.top nav a[aria-current] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--signal); border-radius: 0; }
+
+/* panels */
+.panel { background: var(--panel); border: 1px solid var(--hair); border-radius: var(--r); min-width: 0; }
+.ph { display: flex; align-items: center; gap: var(--s-2); height: 32px; padding: 0 var(--s-3); border-bottom: 1px solid var(--hair); }
+.ph h2, .ph h3 { font: 500 var(--t-11)/1 var(--sans); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); }
+.ph .meta { margin-inline-start: auto; font: 400 var(--t-11)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
+.tag { display: inline-block; font: 500 10px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); border: 1px solid var(--hair-2); border-radius: var(--r); padding: 3px 4px 2px; white-space: nowrap; }
+.tag.on { color: var(--signal-ink); background: var(--signal); border-color: var(--signal); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); min-height: 36px; padding: 0 var(--s-4); border-radius: var(--r); font: 500 var(--t-13)/1 var(--sans); text-decoration: none; cursor: pointer; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); transition: transform 120ms var(--ease-out); }
+.btn:active { transform: scale(0.98); }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--hair-2); }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }

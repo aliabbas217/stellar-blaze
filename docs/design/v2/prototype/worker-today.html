@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Today · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&family=Noto+Nastaliq+Urdu:wght@500;600&family=Noto+Sans+Devanagari:wght@500&family=Noto+Sans+Bengali:wght@500&family=Noto+Sans+Arabic:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+.top { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hair); }
+.top .site { font-weight: 600; font-size: var(--t-16); line-height: 1.2; }
+.top .crew { color: var(--ink-3); font-size: var(--t-13); }
+.top .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.langs { padding: 2px var(--s-3); border-bottom: 1px solid var(--hair); }
+.langs a { flex: none; display: inline-grid; place-items: center; min-height: var(--target); min-width: var(--target); padding: 0 10px; border: 1px solid transparent; border-radius: var(--r); color: var(--ink-2); font-size: var(--t-16); text-decoration: none; line-height: 1.2; }
+.langs a[aria-current] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.now { padding: var(--s-3) var(--s-4) 0; view-transition-name: level; }
+.now .k { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.now .k svg { width: 16px; height: 16px; flex: none; }
+html[data-state="stale"] .now .k, html[data-state="offline"] .now .k, html[data-state="fallback"] .now .k { font-size: var(--t-16); color: var(--ink-2); }
+html[data-state="fallback"] .now .level-word strong { font-size: var(--t-48); }
+.now .level-word strong { font-size: var(--t-76); }
+.now .level-word span { font-size: var(--t-22); color: var(--ink-2); }
+.now .scale { margin-top: var(--s-3); }
+/* stale (journeys P6): never drawn as live; dashed scale marker, no hatch */
+html[data-state="stale"] .now .level-word strong { color: var(--ink-2); }
+html[data-state="stale"] .scale > span[aria-current]::before { background: repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 10px); }
+.hero { display: grid; grid-template-columns: 1fr; padding: var(--s-2) var(--s-2) 0; view-transition-name: spine; }
+.hero svg { direction: ltr; }
+.hero svg .r-label { font-size: 15px; font-weight: 600; fill: var(--ink); }
+.hero svg .r-tick { font-size: calc(16px * var(--k, 1)); font-weight: 500; fill: var(--ink-2); }
+/* arm's length in glare: every time and ladder label renders at >= 16 px (--k = viewBox units per CSS px, set after draw) */
+.hero svg .wp { font: 500 calc(16px * var(--k, 1)) var(--sans); fill: var(--ink); }
+.hero svg .wp2 { font: 400 calc(16px * var(--k, 1)) var(--sans); fill: var(--ink-2); }
+.now .scale > span { font-size: var(--t-16); }
+.phone #basis a, .phone .banner a { display: inline-flex; align-items: center; min-height: 44px; }
+.why { align-items: center; }
+.why .proof { min-height: 44px; font-size: var(--t-14); padding: 0 var(--s-3); }
+.hero svg .ur { font-family: "Noto Nastaliq Urdu", serif; font-weight: 600; font-size: 16px; }
+.act { padding: 0 var(--s-4) var(--s-4); display: grid; gap: var(--s-2); }
+.act .lead { font-size: var(--t-22); font-weight: 500; line-height: 1.25; display: grid; grid-template-columns: 40px 1fr; gap: var(--s-3); align-items: center; }
+.listen { width: 100%; min-height: 56px; font-size: var(--t-18); }
+.todo { padding: 0 var(--s-4); }
+.todo h2 { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; padding: var(--s-4) 0 var(--s-2); border-top: 1px solid var(--hair); }
+.todo ol { list-style: none; padding: 0; }
+.todo li { display: grid; grid-template-columns: 40px 1fr; gap: var(--s-3); align-items: center; padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-22); font-weight: 500; line-height: 1.25; }
+.basis { padding: var(--s-3) 0 0; font-size: var(--t-18); color: var(--ink-2); }
+.basis a { color: var(--ink); font-weight: 500; }
+.why { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-3) 0; font-size: var(--t-13); color: var(--ink-3); }
+.banner { margin: var(--s-3) var(--s-4) 0; font-size: var(--t-16); }
+.notice > svg { width: 20px; height: 20px; flex: none; margin-top: 3px; }
+.sk-hero { height: 340px; margin: var(--s-3) var(--s-4); }
+.empty p { font-size: var(--t-18); }
+.reqid { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-3); font-size: var(--t-13) !important; }
+.draft { margin-top: 2px; }
+/* Urdu (FR §8): Nastaliq, line height >= 2.5, weight >= 600 on action text, no fixed heights on Urdu text */
+html[lang="ur"] body { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif; }
+html[lang="ur"] [lang="ur"] { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif; line-height: 2.5; font-weight: 600; }
+html[lang="ur"] .now .level-word strong[lang="ur"] { font-size: 3.25rem; letter-spacing: 0; }
+html[lang="ur"] .now .k { justify-content: space-between; }
+html[lang="ur"] [lang="en"] { font-family: var(--sans); unicode-bidi: isolate; }
+html[lang="ur"] :is(p, h2, h3, li, a.btn)[lang="en"], html[lang="ur"] :is(p, li) > span[lang="en"]:only-child { unicode-bidi: plaintext; }
+html[lang="ur"] .now .level-word { align-items: center; }
+bdi.t { unicode-bidi: isolate; direction: ltr; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+.dock .unwell { view-transition-name: unwell; } /* morphs into the Call hero on worker-unwell */
+</style>
+</head>
+<body class="phone-page">
+<div class="phone">
+  <header class="top">
+    <div><p class="site" lang="en">Mussafah M-14 yard</p><p class="crew" lang="en">Crew B · concrete pour</p></div>
+    <p class="clock"><bdi class="t" id="clock">11:10</bdi></p>
+    <button class="sun-toggle" type="button" data-sun-toggle></button>
+  </header>
+  <nav class="langs" aria-label="Language" data-t-aria="shell.language" id="langs"></nav>
+
+  <main>
+    <!-- partial: personal level not computable (U10) -->
+    <div class="notice banner" data-when="partial"><p><strong data-t="today.hero.personalUnavailable">Your own level is not available right now, so the site level is shown.</strong> <a href="worker-join.html?state=sheet" lang="en">Make it mine</a></p></div>
+    <!-- loading -->
+    <div data-when="loading" aria-busy="true"><div class="now"><p class="k">Heat level now</p><p class="skel" style="height:72px;width:60%;margin-top:6px">.</p></div><div class="skel sk-hero">.</div></div>
+
+    <!-- error: nothing cached and the request failed; the site rules still show (never a dead end) -->
+    <section class="act" data-when="error" style="padding-top:var(--s-6)">
+      <div class="empty"><h3 data-t="states.error.detail">We could not load this. Check your connection and try again.</h3><p class="muted" lang="en">Until it loads, follow the site rules: midday break 12:30 to 15:00, rest in shade every hour, drink water.</p><button class="btn primary lg" type="button" data-t="states.retry">Try again</button><p class="reqid"><span lang="en">Request ID</span> <span class="mono">req_7f3a91c2</span></p></div>
+    </section>
+
+    <!-- empty: no site on this phone yet (journeys §10 W2 E) -->
+    <section class="act" data-when="empty" style="padding-top:var(--s-6)">
+      <div class="empty" lang="en"><h3>Scan your crew's code</h3><p class="muted">Point your camera at the poster on site, or open the link in your crew's group. No account, nothing to type.</p><a class="btn primary lg" href="worker-today.html">See the demo yard</a></div>
+    </section>
+
+    <!-- no shift today -->
+    <section class="act" data-when="noshift" style="padding-top:var(--s-6)">
+      <div class="empty" lang="en"><h3>No shift for Crew B today</h3><p class="muted">Tomorrow 06:00 to 18:00. Forecast for tomorrow arrives at 18:00 tonight.</p><a class="btn primary lg" href="worker-alerts.html">Get a warning when it arrives</a></div>
+    </section>
+
+    <div data-when="ideal personal partial stale offline fallback offseason">
+      <section class="now" aria-labelledby="lv">
+        <p class="k" id="kicker"></p>
+        <p class="level-word" id="lv"><strong id="lvword">Orange</strong><span id="lvuntil" lang="en">until 17:00</span></p>
+        <div class="scale" id="scale" role="img" aria-label="Level 3 of 4, Orange"><span data-t="levels.name.green">Green</span><span data-t="levels.name.amber">Amber</span><span data-t="levels.name.orange">Orange</span><span data-t="levels.name.red">Red</span></div>
+      </section>
+
+      <section class="hero ribbon" id="spine" aria-label="Your shift today"></section>
+
+      <section class="act">
+        <p class="lead"><svg class="pict" data-icon="shade"></svg><span id="lead" lang="en">Work 20 min, rest 40 min in shade</span></p>
+        <button class="btn signal listen" type="button"><span lang="en">Listen</span></button>
+      </section>
+
+      <section class="todo" aria-labelledby="todo">
+        <h2 id="todo" lang="en">Also now</h2>
+        <ol>
+          <li><svg class="pict" data-icon="water"></svg><span lang="en">Drink 1.2 litres of water every hour</span></li>
+          <li><svg class="pict" data-icon="buddy"></svg><span lang="en">Never work alone</span></li>
+        </ol>
+        <p class="basis" id="basis"></p>
+        <p class="why"><span lang="en">Draft wording, awaiting clinical review</span><button type="button" class="proof" lang="en" id="whybtn">Why Orange?</button></p>
+      </section>
+    </div>
+  </main>
+
+  <div class="dock"><div class="dock-in">
+    <a class="unwell" href="worker-unwell.html" id="unwell"><span id="cross"></span><span lang="en">I feel unwell</span></a>
+    <nav class="tabs" aria-label="Sections"><a href="worker-today.html" aria-current="page" data-t="worker.nav.today">Today</a><a href="worker-alerts.html" data-t="worker.nav.alerts">Alerts</a><a href="worker-data.html" lang="en">My data</a></nav>
+  </div></div>
+</div>
+<script type="module">
+import { boot, spine, ICON, q, STATE } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+import { crewById, status, plan, levelOf, fmt as hm } from './assets/crews.js';
+
+// Urdu strings come only from frontend/messages/ur.json (machine draft, review_status "machine-draft").
+// Anything without a key stays English and is marked lang="en"; no Urdu is invented here (v1 rule, HANDOFF Q6).
+const UR = {
+  'levels.label': 'گرمی کی سطح', 'levels.name.green': 'سبز', 'levels.name.amber': 'امبر', 'levels.name.orange': 'نارنجی', 'levels.name.red': 'سرخ',
+  'today.hero.site': 'سائٹ کی سطح، جو اس سائٹ پر سب کے لیے ایک ہی ہے۔', 'today.hero.personal': 'آپ کی اپنی سطح، اسی فون پر نکالی گئی۔',
+  'today.hero.personalUnavailable': 'آپ کی اپنی سطح ابھی دستیاب نہیں، اس لیے سائٹ کی سطح دکھائی گئی ہے۔',
+  'states.stale.detail': 'یہ معلومات پرانی ہو سکتی ہیں۔ آن لائن واپس آنے پر سطحیں تازہ ہو جاتی ہیں۔', 'states.offline': 'آپ آف لائن ہیں',
+  'states.retry': 'دوبارہ کوشش کریں', 'states.error.detail': 'ہم اسے لوڈ نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔',
+  'worker.nav.today': 'آج', 'worker.nav.alerts': 'الرٹس', 'shell.language': 'زبان', 'shell.draftTranslation': 'مسودہ ترجمہ',
+  'today.band.now': 'اب',
+};
+const LANG = q.get('lang') === 'ur' ? 'ur' : 'en';
+const RTL = LANG === 'ur';
+const html = document.documentElement;
+html.lang = LANG; html.dir = RTL ? 'rtl' : 'ltr'; html.dataset.state = STATE;
+const tr = (k, en) => (RTL && UR[k]) ? { text: UR[k], lang: 'ur' } : { text: en, lang: 'en' };
+for (const el of document.querySelectorAll('[data-t]')) { const t = tr(el.dataset.t, el.textContent); el.textContent = t.text; el.lang = t.lang; }
+for (const el of document.querySelectorAll('[data-t-aria]')) el.setAttribute('aria-label', tr(el.dataset.tAria, el.getAttribute('aria-label')).text);
+
+// language chips: endonyms, no flags; en and ur are built in this prototype
+const link = (l) => { const u = new URL(location.href); u.searchParams.set('lang', l); return u.pathname.split('/').pop() + u.search; };
+document.getElementById('langs').innerHTML = [['en', 'EN'], ['ur', 'اردو'], ['hi', 'हिन्दी'], ['bn', 'বাংলা'], ['ne', 'नेपाली'], ['ar', 'العربية']]
+  .map(([l, n]) => ['en', 'ur'].includes(l) ? `<a lang="${l}" href="${link(l)}" ${l === LANG ? 'aria-current="true"' : ''}>${n}</a>` : `<a lang="${l}" role="link" aria-disabled="true" title="Prototype: English and Urdu only">${n}</a>`).join('');
+
+// scenario per state. Levels are a DESIGN STATE (policy B3 scores them; nothing here is computed); WBGT values are real.
+// Level, run end and the plan come from assets/crews.js (the same proxy bands and rule plan as the supervisor screens,
+// ADR 0011 §2), so worker and supervisor cannot drift. Levels: Green Low, Amber Medium 45/15, Orange High 20/40, Red stop.
+const SERIES = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const dayOf = (d) => SERIES.wbgt_c_by_local_hour[SERIES.days.indexOf(d)];
+const CREW = crewById('B'), NOW = 11 + 10 / 60, LVK = ['green', 'amber', 'orange', 'red'], LVN = ['Green', 'Amber', 'Orange', 'Red'];
+const LEAD = ['Work at your own pace, drink water', 'Work 45 min, rest 15 min in shade', 'Work 20 min, rest 40 min in shade', 'Stop work. Go to shade'];
+const CYC = ['your own pace', 'work 45, rest 15', 'work 20, rest 40', 'no work'];
+const D3 = dayOf('2026-09-03'), ST3 = status(CREW, D3, NOW), BL3 = plan(CREW, D3);
+const cur = BL3.find((b) => NOW >= b.from && NOW < b.to), nxt = BL3.find((b) => b.from >= cur.to - 1e-6 && (b.k === 'work' || b.k === 'rest'));
+const nowWp = cur.k === 'art18' ? [NOW, `Now · on break until ${hm(cur.to)}`, `Then ${CYC[nxt.lv]} from ${hm(nxt.from)}`]
+  : [NOW, `Now · ${cur.k === 'rest' ? 'rest in shade' : 'work'}`, ''];
+const D24 = dayOf('2026-09-24'), ST24 = status(CREW, D24, NOW);
+const SC = {
+  base: { date: '2026-09-03', utc: [2026, 8, 3, 7, 10], ban: [12.5, 15], lv: LVK[ST3.lv], until: `until ${hm(ST3.until)}`, lead: LEAD[ST3.lv], kick: 'Site level now', L: 292, basis: 'today.hero.site',
+    wps: () => [nowWp, [13.75, '', 'Midday break, by law'], [15, 'Back to work 15:00', `${LVN[ST3.lv]} to ${hm(ST3.until)}, ${CYC[ST3.lv]}`], [18, 'Shift ends 18:00', '']] },
+  // personal: a worker new to the heat. ADOSH Table 1 (Medium and High zones): "No unacclimatised person to work".
+  personal: { until: 'until 18:00', kick: 'Your level now', basis: 'today.hero.personal', lead: 'New to this heat: no work for you until 18:00',
+    wps: () => [[NOW, 'Now · rest in shade', 'You are new to this heat'], [13.75, '', 'Midday break, by law'], [15, 'Still no work for you', 'Amber or Orange until 18:00'], [18, 'Shift ends 18:00', '']] },
+  partial: { basis: 'today.hero.personalUnavailable', L: 250 },
+  stale: { kick: 'Last known level · updated 06:00, 5 h ago' },
+  offline: { kick: 'Offline · updated 09:40, 1 h 30 min ago' },
+  fallback: { lv: null, values: false, kick: 'Forecast expired · last one Wed 2 Sep 18:00', lead: 'Rest in shade every hour, drink water',
+    wps: () => [[NOW, 'Now', ''], [12.5, 'Break in 1 h 20 min', '12:30 to 15:00, by law'], [15, 'Back to work 15:00', ''], [18, 'Shift ends 18:00', '']] },
+  offseason: { date: '2026-09-24', utc: [2026, 8, 24, 7, 10], ban: null, lv: LVK[ST24.lv], until: `until ${hm(ST24.until)}`, lead: LEAD[ST24.lv],
+    wps: (d) => [[NOW, `Now · WBGT ${d[11].toFixed(1)} °C`, ''], [12.75, '', 'No midday break by law after 15 Sep'], [ST24.until, `${LVN[ST24.lv]} ends ${hm(ST24.until)}`, `Then ${LVN[levelOf(D24[ST24.until], 'heavy')]}`], [18, 'Shift ends 18:00', '']] },
+};
+const sc = { ...SC.base, ...(SC[STATE] || {}) };
+const LV = LVK, NAME = { green: 'Green', amber: 'Amber', orange: 'Orange', red: 'Red' };
+const BASIS_EN = { 'today.hero.site': 'Site level, the same for everyone at this site.', 'today.hero.personal': 'Your own level, worked out on this phone.', 'today.hero.personalUnavailable': 'Site level, the same for everyone at this site.' };
+
+boot({ surface: 'field', at: new Date(Date.UTC(...sc.utc)), states: ['ideal', 'personal', 'partial', 'loading', 'empty', 'error', 'stale', 'offline', 'fallback', 'offseason', 'noshift'] });
+document.querySelector('.proto .menu')?.insertAdjacentHTML('beforeend', `<p>Language</p><div><a href="${link('en')}">en</a><a href="${link('ur')}">ur (RTL)</a></div>`);
+
+const CLOCK = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 5v5.4l3.6 2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+// kicker, level word, scale
+const kick = document.getElementById('kicker');
+const kt = RTL ? tr('levels.label', sc.kick) : { text: sc.kick, lang: 'en' };
+kick.innerHTML = (['stale', 'offline', 'fallback'].includes(STATE) ? CLOCK : '') + `<span lang="${kt.lang}">${kt.text}</span>` + (RTL ? `<span class="tag draft" lang="ur">${UR['shell.draftTranslation']}</span>` : '');
+const word = document.getElementById('lvword'), until = document.getElementById('lvuntil'), scale = document.getElementById('scale');
+if (sc.lv) {
+  const t = tr(`levels.name.${sc.lv}`, NAME[sc.lv]); word.textContent = t.text; word.lang = t.lang;
+  until.textContent = STATE === 'stale' ? 'at 06:00' : sc.until;
+  scale.children[LV.indexOf(sc.lv)].setAttribute('aria-current', 'true');
+  scale.setAttribute('aria-label', `${STATE === 'stale' ? 'Last known level' : 'Level'} ${LV.indexOf(sc.lv) + 1} of 4, ${NAME[sc.lv]}`);
+} else { word.textContent = 'Site rules'; word.lang = 'en'; until.textContent = ''; scale.setAttribute('aria-label', 'No level: the forecast has expired'); }
+if (sc.lead) document.getElementById('lead').textContent = sc.lead;
+const why = document.getElementById('whybtn');
+why.textContent = sc.lv ? `Why ${NAME[sc.lv]}?` : 'Why site rules?';
+why.dataset.proof = JSON.stringify({ what: sc.lv ? `${NAME[sc.lv]}, ${sc.until}, Crew B (heavy work)` : 'Fallback plan: the forecast has expired', protocol: 'Level from the site policy: ADOSH TWL zones on the corrected forecast (Green Low, Amber Medium, Orange High: work 20, rest 40; Red: all work stops, ADR 0011 §2.6). Design state until policy B3 scores it', script: 'backend policy B3', file: `replay day ${sc.date}`, label: 'Real weather, assumed crew. Level proxy: IFS WBGT against heavy-work bands (Amber from 30 °C, Orange from 34, Red from 39), assets/crews.js' });
+const b = tr(sc.basis === 'today.hero.personalUnavailable' ? 'today.hero.site' : sc.basis, BASIS_EN[sc.basis]);
+document.getElementById('basis').innerHTML = `<span lang="${b.lang}">${b.text}</span>${sc.basis !== 'today.hero.personal' ? ` <a href="worker-join.html?state=sheet" lang="en">Make it mine</a>` : ''}`;
+
+for (const s of document.querySelectorAll('[data-clock]')) s.outerHTML = CLOCK;
+for (const s of document.querySelectorAll('[data-icon]')) s.outerHTML = ICON[s.dataset.icon].replace('<svg', '<svg class="pict"');
+document.querySelector('.listen').insertAdjacentHTML('afterbegin', ICON.speaker);
+document.getElementById('cross').outerHTML = ICON.cross;
+
+// RTL: mirror the spine's geometry (labels move to the inline start); clock digits are never mirrored
+function mirror(svg) {
+  const W = svg.viewBox.baseVal.width;
+  for (const n of svg.querySelectorAll('rect,line,text')) {
+    if (n.tagName === 'text') { n.setAttribute('x', W - +n.getAttribute('x')); const a = n.getAttribute('text-anchor') || 'start'; n.setAttribute('text-anchor', a === 'start' ? 'end' : a === 'end' ? 'start' : 'middle'); }
+    else if (n.tagName === 'rect') n.setAttribute('x', W - +n.getAttribute('x') - +n.getAttribute('width'));
+    else { n.setAttribute('x1', W - +n.getAttribute('x1')); n.setAttribute('x2', W - +n.getAttribute('x2')); }
+  }
+}
+
+const el = document.getElementById('spine');
+if (el && !el.closest('[hidden]')) {
+  const day = dayOf(sc.date);
+  const now = 11 + 10 / 60, L = RTL ? 240 : sc.L;
+  const wps = sc.wps(day, now);
+  const aria = 'Shift 06:00 to 18:00. ' + wps.map((w) => `${w[1]}${w[2] ? ', ' + w[2] : ''}`).join('. ') + (sc.ban ? '' : '. No midday break by law on this date.');
+  spine(el, { values: sc.values === false ? null : day, from: 6, to: 18, now, ban: sc.ban, orientation: 'v', width: 400, length: L, bandX: 64, band: 46, aria, tickStep: 2 });
+  const svg = el.querySelector('svg'), pos = (t) => 18 + (t - 6) / 12 * (L - 36);
+  svg.style.setProperty('--k', Math.max(1, 400 / Math.max(1, svg.getBoundingClientRect().width)).toFixed(3));
+  svg.querySelectorAll('.r-label').forEach((n) => n.remove());
+  svg.querySelectorAll('.r-tick').forEach((n) => { if (n.getAttribute('x') > 100) n.remove(); });
+  const T = (cls, x, y, text) => { const ur = RTL && text === 'Now' ? UR['today.band.now'] : null; return `<text class="${cls}${ur ? ' ur' : ''}" x="${x}" y="${y}">${ur || text}</text>`; };
+  const wp = (t, a, b2) => (a ? `<line x1="122" x2="138" y1="${pos(t)}" y2="${pos(t)}" stroke="var(--ink)" stroke-width="1"/>` + T('wp', 146, pos(t) + 5, a) : '') + (b2 ? T('wp2', 146, pos(t) + (a ? 25 : 5), b2) : '');
+  svg.insertAdjacentHTML('beforeend', wps.map(([t, a, b2]) => (RTL && a.startsWith('Now') ? wp(t, 'Now', b2) + (a.length > 3 ? T('wp', 178, pos(t) + 5, a.replace(/^Now\s·\s/, '· ')) : '') : wp(t, a, b2))).join(''));
+  if (RTL) mirror(svg);
+}
+</script>
+</body>
+</html>

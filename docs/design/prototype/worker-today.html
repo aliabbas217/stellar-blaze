@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="worker">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Today · Worker · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+</head>
+<body data-states="ideal,loading,empty,error,partial,fallback" data-langs="en,ur">
+<a class="skip-link" href="#main" data-t-ur="مواد پر جائیں">Skip to content</a>
+
+<main id="main" class="worker stack stack-6">
+  <header class="worker-top">
+    <div>
+      <p class="t-label t-muted" data-t-ur="سائٹ">Site</p>
+      <p class="t-title" lang="en">Musaffah demo yard</p>
+    </div>
+    <span class="stamp stamp--quiet" data-t-ur="مسودہ ترجمہ">Placeholder</span>
+  </header>
+
+  <!-- IDEAL -->
+  <section data-state="ideal partial" class="stack stack-6" aria-labelledby="now-h">
+    <h1 id="now-h" class="sr-only" data-t-ur="آج کی گرمی کی سطح">Today's heat level</h1>
+
+    <div data-state="partial" class="banner" role="status">
+      <svg class="ico"><use href="#i-offline"/></svg>
+      <div class="stack stack-1">
+        <p><strong data-t-ur="آخری اپ ڈیٹ 09:40">Last updated 09:40</strong></p>
+        <p class="t-label" data-t-ur="یہ معلومات پرانی ہو سکتی ہیں۔ آن لائن واپس آنے پر سطحیں تازہ ہو جاتی ہیں۔">This may be out of date. Levels refresh when you are back online.</p>
+      </div>
+    </div>
+
+    <article class="sign lv-red" aria-labelledby="sign-name">
+      <div class="sign__plate sign__plate--wide">
+        <div class="sign__num">
+          <svg class="ico sign__picto"><use href="#i-red"/></svg>
+          <span class="t-numeral">4</span>
+        </div>
+        <p class="sign__name" id="sign-name" data-t-ur="سرخ">Red</p>
+        <p class="sign__when t-num" data-t-ur="17:00 تک">Until 17:00</p>
+      </div>
+    </article>
+
+    <p class="t-label" data-state="ideal" data-t-ur="آپ کی اپنی سطح، اسی فون پر نکالی گئی۔">Your own level, worked out on this phone.</p>
+    <p class="t-label" data-state="partial" data-t-ur="آپ کی اپنی سطح ابھی دستیاب نہیں، اس لیے سائٹ کی سطح دکھائی گئی ہے۔">Your own level is not available right now, so this is the site level.</p>
+
+    <section aria-labelledby="do-h" class="stack stack-3">
+      <div class="spread">
+        <h2 id="do-h" class="panel-title" data-t-ur="ابھی کیا کریں">What to do now</h2>
+        <button class="btn btn--sm" type="button"><svg class="ico"><use href="#i-speaker"/></svg><span data-t-ur="سنیں">Listen</span></button>
+      </div>
+      <ol class="actions-list">
+        <li><span class="actions-list__picto"><svg class="ico"><use href="#i-orange"/></svg></span><span class="t-lead" data-t-ur="اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Work 20 minutes, rest 40 minutes in shade</span></li>
+        <li><span class="actions-list__picto"><svg class="ico"><use href="#i-water"/></svg></span><span class="t-lead" data-t-ur="اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Drink 1.2 litres of water or more every hour</span></li>
+        <li><span class="actions-list__picto"><svg class="ico"><use href="#i-crew"/></svg></span><span class="t-lead" data-t-ur="اس سطح کے لیے عمل کی عبارت جائزے کی منتظر ہے۔">Never work alone</span></li>
+      </ol>
+      <p class="cluster"><span class="stamp stamp--quiet" data-t-ur="مسودہ">Draft template</span><span class="t-label t-muted" data-t-ur="حتمی عبارت جائزہ شدہ ٹیمپلیٹ سے آئے گی۔">ADOSH Table 1, High zone, heavy work. Final wording comes from the reviewed templates.</span></p>
+    </section>
+
+    <section aria-labelledby="band-h" class="stack stack-3">
+      <h2 id="band-h" class="panel-title" data-t-ur="گھنٹے کے حساب سے گرمی کی سطح">Heat level by hour</h2>
+      <div class="band-scroll">
+        <ol class="band" aria-describedby="band-note">
+          <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+          <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+          <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+          <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+          <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+          <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+          <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+          <li aria-label="13:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">13</span></li>
+          <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+          <li aria-label="15:00, Red, level 4, now" aria-current="time"><div class="cell lv-red"><b>4</b></div><span class="hr">15</span></li>
+          <li aria-label="16:00, Red, level 4"><div class="cell lv-red"><b>4</b></div><span class="hr">16</span></li>
+          <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+          <li aria-label="18:00, no data" data-state="partial"><div class="cell lv-none"><b>?</b></div><span class="hr">18</span></li>
+          <li aria-label="18:00, Amber, level 2" data-state="ideal"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+          <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+        </ol>
+      </div>
+      <p id="band-note" class="t-label t-muted" data-t-ur="ڈیش والی لکیر: دوپہر کا وقفہ 12:30 سے 15:00۔ الٹا گھنٹہ: اب۔">Dashed outline: midday break 12:30 to 15:00. Dark hour: now.</p>
+    </section>
+
+    <p class="t-label t-muted measure" data-t-ur="ایپ بند ہونے پر آپ کو صرف سائٹ اور ٹیم کی وارننگز ملتی ہیں۔ آپ کا ذاتی خطرہ ایپ کھولنے یا وارننگ پر ٹیپ کرنے پر نظر آتا ہے۔ یہ اسی فون پر نکالا جاتا ہے اور سرور کو کبھی نہیں بھیجا جاتا۔">When the app is closed you get site and crew warnings only. Your own level shows when you open the app or tap a warning. It is worked out on this phone and never sent to the server.</p>
+    <p class="t-label t-muted t-num" lang="en">Levels: policy ⟨version⟩, config ⟨version⟩</p>
+  </section>
+
+  <!-- FALLBACK: no fresh forecast -->
+  <section data-state="fallback" class="stack stack-6" aria-labelledby="fb-h">
+    <div class="banner" role="status">
+      <svg class="ico"><use href="#i-offline"/></svg>
+      <p><strong id="fb-h" data-t-ur="تازہ پیش گوئی نہیں ہے">No fresh forecast.</strong> <span data-t-ur="سائٹ کے قواعد پر عمل کریں۔">Follow the site rules until it is back.</span></p>
+    </div>
+    <article class="sign lv-orange" aria-label="Site rules, level 3 Orange, until a fresh forecast arrives">
+      <div class="sign__plate sign__plate--wide">
+        <div class="sign__num"><svg class="ico sign__picto"><use href="#i-orange"/></svg><span class="t-numeral">3</span></div>
+        <p class="sign__name" data-t-ur="سائٹ کے قواعد">Site rules</p>
+        <p class="sign__when">Until a fresh forecast arrives</p>
+      </div>
+    </article>
+    <ol class="stack stack-3">
+      <li class="cluster cluster-4"><svg class="ico" width="32" height="32"><use href="#i-orange"/></svg><span class="t-lead">⟨Fallback action 1 from the reviewed template⟩</span></li>
+      <li class="cluster cluster-4"><svg class="ico" width="32" height="32"><use href="#i-today"/></svg><span class="t-lead">No outdoor work 12:30 to 15:00</span></li>
+    </ol>
+    <p class="t-label t-muted measure">The fallback is never less protective than the midday ban. Your supervisor has a printed crew card for today.</p>
+  </section>
+
+  <!-- LOADING: same dimensions as ideal (no layout shift) -->
+  <section data-state="loading" class="stack stack-6" aria-busy="true" aria-label="Loading today's levels">
+    <div class="skel" style="block-size: 7.5rem"></div>
+    <div class="skel" style="block-size: 1.5rem; inline-size: 70%"></div>
+    <div class="stack stack-3">
+      <div class="skel" style="block-size: 2rem; inline-size: 50%"></div>
+      <div class="skel" style="block-size: 2rem"></div>
+      <div class="skel" style="block-size: 2rem"></div>
+      <div class="skel" style="block-size: 2rem"></div>
+    </div>
+    <div class="skel" style="block-size: 6rem"></div>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY: no profile on this phone -->
+  <section data-state="empty" class="empty" aria-labelledby="empty-h">
+    <div class="cluster" aria-hidden="true">
+      <span class="sign lv-green sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-green"/></svg><b class="t-title">1</b></span></span>
+      <span class="sign lv-amber sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-amber"/></svg><b class="t-title">2</b></span></span>
+      <span class="sign lv-orange sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-orange"/></svg><b class="t-title">3</b></span></span>
+      <span class="sign lv-red sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title">4</b></span></span>
+    </div>
+    <h1 id="empty-h" class="t-headline" data-t-ur="اپنا حرارتی پروفائل بنائیں">Set up your heat profile</h1>
+    <p class="t-lead measure" data-t-ur="ایک بار بنا لیں تاکہ ہم آپ کی اپنی گرمی کی حد نکال سکیں۔ اس میں تقریباً ایک منٹ لگتا ہے۔">Set up once so we can work out your own heat limit. It takes about a minute, and it stays on this phone.</p>
+    <a class="btn btn--primary btn--block" href="worker-setup.html" data-t-ur="ابھی ترتیب دیں">Set up now</a>
+    <a class="link" href="?state=partial" data-t-ur="ترتیب کے بغیر آج کی سائٹ کی سطح دیکھیں">See today's site level without setup</a>
+  </section>
+
+  <!-- ERROR -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="err-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h1 id="err-h" class="t-headline" data-t-ur="کچھ غلط ہو گیا">Today's levels did not load</h1>
+    <p class="measure" data-t-ur="ہم اسے لوڈ نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔">Check your connection and try again. If you feel unwell, the button below still works without a connection.</p>
+    <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg><span data-t-ur="دوبارہ کوشش کریں">Try again</span></button>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+</main>
+
+<div class="worker-dock">
+<a class="unwell-fab" href="worker-unwell.html"><svg class="ico"><use href="#i-unwell"/></svg><span data-t-ur="طبیعت خراب ہے">I feel unwell</span></a>
+<nav class="bottom-bar" aria-label="Worker" data-aria-ur="کارکن">
+  <a href="worker-today.html" aria-current="page"><svg class="ico"><use href="#i-today"/></svg><span data-t-ur="آج">Today</span></a>
+  <a href="worker-alerts.html"><svg class="ico"><use href="#i-bell"/></svg><span data-t-ur="الرٹس">Alerts</span></a>
+  <a href="worker-data.html"><svg class="ico"><use href="#i-eye"/></svg><span data-t-ur="میرا ڈیٹا">My data</span></a>
+</nav>
+</div>
+<script src="assets/proto.js"></script>
+</body>
+</html>

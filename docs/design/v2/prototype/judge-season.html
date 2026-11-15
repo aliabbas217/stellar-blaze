@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Season scoreboard · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.facts { color: var(--ink-3); font-size: var(--t-14); }
+.hero-rb { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--s-6); align-items: end; view-transition-name: spine; }
+.tally { display: grid; gap: var(--s-4); padding-bottom: 58px; }
+.tally div { display: grid; gap: 2px; border-top: 1px solid var(--edge); padding-top: var(--s-2); }
+.tally strong { font: 400 var(--t-36)/1 var(--sans); letter-spacing: -0.02em; }
+.tally strong small { font-size: var(--t-16); color: var(--ink-3); margin-inline-start: 4px; letter-spacing: 0; }
+.tally span { color: var(--ink-2); font-size: var(--t-13); }
+.tally .date { font-size: var(--t-14); color: var(--ink); font-weight: 500; border: 0; padding: 0; }
+.ctl { display: flex; gap: var(--s-3); align-items: center; margin-top: var(--s-2); flex-wrap: wrap; }
+.verdict { margin-top: var(--s-8); padding: var(--s-6); background: var(--panel); border: 1px solid var(--hair); border-inline-start: 3px solid var(--ink-2); border-radius: var(--r); display: grid; gap: var(--s-2); }
+.verdict h2 { font: 500 var(--t-14)/1.3 var(--sans); color: var(--ink-3); }
+.verdict p.say { font: 400 var(--t-22)/1.35 var(--sans); max-width: 60ch; color: var(--ink-2); }
+.verdict p.say .pend { font-size: var(--t-22); }
+.verdict p.small { color: var(--ink-3); font-size: var(--t-14); max-width: 72ch; }
+.sb td.pol { font-weight: 500; }
+.sb td.pol small { display: block; font-weight: 400; color: var(--ink-3); font-size: var(--t-13); }
+.sb th.n, .sb td.n { text-align: end; }
+.sb td.pr { text-align: end; width: 1%; }
+.defs { margin-top: var(--s-3); color: var(--ink-3); font-size: var(--t-13); max-width: 90ch; }
+.limits { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); color: var(--ink-3); font-size: var(--t-13); margin-top: var(--s-8); padding-top: var(--s-4); border-top: 1px solid var(--hair); }
+.sk { height: 300px; }
+@media (max-width: 900px) { .hero-rb { grid-template-columns: 1fr; } .tally { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: 0; gap: var(--s-3); } .tally .date { grid-column: 1 / -1; } .tally strong { font-size: var(--t-22); } }
+@media (max-width: 760px) {
+  .sb thead { display: none; }
+  .sb, .sb tbody, .sb tr, .sb td { display: block; width: auto; }
+  .sb tr { padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); display: grid; grid-template-columns: 1fr auto; gap: 4px var(--s-3); }
+  .sb tr.ours { padding-inline: var(--s-3); background: color-mix(in oklch, var(--signal) 8%, transparent); box-shadow: inset 2px 0 0 var(--signal); }
+  .sb tr.ours td { background: none; box-shadow: none !important; }
+  .sb td { border: 0; padding: 0; text-align: start !important; }
+  .sb td.pol { grid-column: 1; }
+  .sb td.pr { grid-column: 2; grid-row: 1; }
+  .sb td.n { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: var(--s-3); font-size: var(--t-13); }
+  .sb td.n::before { content: attr(data-l); color: var(--ink-3); }
+  .verdict { padding: var(--s-4); } .verdict p.say { font-size: var(--t-18); }
+}
+</style>
+</head>
+<body class="j-has-story">
+<a class="skip" href="#warnings">Skip to the scores</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Summer 2026, replayed honestly</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html" aria-current="page">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="j-page" id="main">
+  <div class="j-head">
+    <h1 class="j-h1">Summer 2026, replayed honestly</h1>
+    <p class="j-lede">Abu Dhabi airport, 15 May to 30 Sep 2026. Four ways to warn a crew, each judged on the forecast it had the evening before, against what the station's thermometers then recorded.</p>
+    <p class="facts">Forecast as issued the evening before · Scored against station thermometers · A summer the model never trained on</p>
+  </div>
+
+  <div data-when="loading"><div class="skel sk">.</div><div class="skel" style="height:220px;margin-top:var(--s-8)">.</div></div>
+
+  <section aria-labelledby="h-rb" data-when="ideal playing partial apidown empty error">
+    <h2 class="sr-only" id="h-rb">The season, daily peak forecast</h2>
+    <div class="hero-rb">
+      <figure><div class="j-chart" id="ribbon" style="min-height:380px"></div></figure>
+      <div class="tally" aria-live="polite">
+        <p class="date" id="t-date">Through 30 Sep, final</p>
+        <div><strong id="t-days">139<small>of 139</small></strong><span>days the forecast peak crossed 26.6 °C</span></div>
+        <div><strong id="t-hours">1,624</strong><span>working hours forecast above the limit</span></div>
+        <div><strong id="t-ban">279</strong><span>of those inside the midday break</span></div>
+      </div>
+    </div>
+    <div class="ctl"><button class="btn" type="button" id="play">Play the season</button><span class="j-src" id="play-note">Plays 139 days in 8 seconds. The forecast counts above are real; the scores below fill from the scoring run.</span></div>
+  </section>
+
+  <section class="verdict" aria-labelledby="h-v" data-when="ideal playing partial apidown">
+    <h2 id="h-v">What the season showed</h2>
+    <p class="say">Not yet written. The outcome sentence is picked from the pre-registered outcome table after the single scoring run.</p>
+    <p class="small">It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change. <a href="judge-proof.html?n=outcome">Read the outcome table</a></p>
+  </section>
+
+  <div class="notice signal" style="margin-top:var(--s-6)" data-when="apidown"><strong>Served from the static result file.</strong> The scoreboard needs no live API, so it reads the same with the API stopped.</div>
+
+  <section class="j-sec" id="warnings" aria-labelledby="h-w" data-when="ideal playing partial apidown">
+    <h2 id="h-w">Warnings</h2>
+    <p class="sub">Who was warned the evening before, and how often a warning was a false alarm. Worker-hours on an assumed crew of 20.</p>
+    <div id="w-pend"></div>
+    <table class="tbl sb">
+      <thead><tr><th>Policy</th><th class="n">Danger hours nobody was warned about<br>95 % interval</th><th class="n">False-alarm hours</th><th class="n">POD · FAR · CSI</th><th><span class="sr-only">Proof</span></th></tr></thead>
+      <tbody id="w-body"></tbody>
+    </table>
+    <p class="defs">POD: share of danger hours that were warned. FAR: share of warnings that were false alarms. CSI: both combined. Danger hour: the station was in the ADOSH High zone. Stellar Blaze warns when the calibrated chance of the High zone passes a threshold set on 2024 and 2025 only.</p>
+  </section>
+
+  <section class="j-sec" aria-labelledby="h-pl" data-when="ideal playing apidown">
+    <h2 id="h-pl">Plans</h2>
+    <p class="sub">Each shift plan checked by the independent validator against what the station recorded.</p>
+    <div id="p-pend"></div>
+    <table class="tbl sb">
+      <thead><tr><th>Plan</th><th class="n">Rule-violation minutes per worker-season<br>95 % interval</th><th class="n">High-zone heavy minutes cycled 20/40</th><th class="n">Missed protection</th><th><span class="sr-only">Proof</span></th></tr></thead>
+      <tbody id="p-body"></tbody>
+    </table>
+    <p class="defs">Rest minutes added are a simulated cost on an assumed crew mix. We report rule-violation minutes, never illness prevented.</p>
+  </section>
+  <section class="j-sec" data-when="partial"><div class="notice"><strong>The Plans row is not on this page.</strong> It is in the written report for this build, section 4, with the same measures and intervals.</div></section>
+
+
+  <section class="j-sec" data-when="empty"><div class="empty"><h3>The scoring run has not written its file yet</h3><p class="muted">Results appear after the single pre-registered run on 12 Nov 2026. Until then, the protocol says exactly what will be measured and how the outcome sentence is chosen.</p><a class="btn primary" href="judge-proof.html?n=outcome">Read the protocol</a><a href="judge-validator.html">Meanwhile, try a plan against the rules</a></div></section>
+  <section class="j-sec" data-when="error"><div class="empty"><h3>The scoreboard file could not be read</h3><p class="muted">The same numbers are in the static chart and the written report. Nothing on this page is guessed in the meantime.</p><div class="ctl"><a class="btn primary" href="judge-season.html">Try again</a><a class="btn" href="judge-season.html?state=apidown">Show the static chart</a></div><p class="faint" style="font-size:var(--t-13)">Request ID <span class="mono">req-7f3a2c</span></p></div></section>
+
+  <p class="limits"><span>Airport station, not a worksite.</span><span>Crew of 20 is an assumed schedule.</span><span>Truth is station temperature, humidity and wind plus modelled sunshine.</span><span>Thermal work limit aligned with ADOSH zones, not certified.</span></p>
+</main>
+<nav class="j-story" id="story" aria-label="Story"></nav>
+
+<script type="module">
+import { boot, q } from './assets/kit.js';
+import { reducedMotion } from './assets/heat.js';
+import { loadData, sha256, seasonFacts, seasonRibbon, storyNav, PENDING, pendingBanner, LIMIT, nf, dayLabel } from './assets/judge.js';
+boot({ surface: 'desk', states: ['ideal', 'playing', 'loading', 'empty', 'error', 'partial', 'apidown'] });
+const STATE = q.get('state') || 'ideal';
+storyNav(document.getElementById('story'), 'scoreboard');
+const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+
+const proof = (what, file, script) => `<button class="proof" type="button" data-proof='${JSON.stringify({ what, script, file, label: 'Pending: written once by the scoring run, 12 Nov 2026' }).replace(/'/g, '&#39;')}'>Proof</button>`;
+const W = [['Midday break only', '12:30 to 15:00, 15 Jun to 15 Sep'], ['Fixed 32 °C rule', 'stop when the forecast passes 32 °C'], ['ADOSH zones on the raw forecast', "the regulator's zones, no correction"], ['Stellar Blaze', 'corrected forecast, hourly levels']];
+document.getElementById('w-body').innerHTML = W.map(([p, d], i) => `<tr${i === 3 ? ' class="ours"' : ''}><td class="pol">${p}<small>${d}</small></td><td class="n" data-l="Danger hours unwarned">${PENDING}</td><td class="n" data-l="False-alarm hours">${PENDING}</td><td class="n" data-l="POD · FAR · CSI">${PENDING}</td><td class="pr">${proof(`${p}: warnings, summer 2026`, 'policy_scoreboard.json', 'backend/eval/policy_scoreboard.py')}</td></tr>`).join('');
+document.getElementById('w-pend').innerHTML = pendingBanner('Warnings, summer 2026: danger hours unwarned, false alarms, POD, FAR, CSI');
+document.getElementById('p-pend').innerHTML = pendingBanner('Plans, summer 2026: rule-violation minutes, cycled minutes, missed protection', 'plan_scoreboard.json', 'backend/eval/plan_scoreboard.py');
+const P = [['Naive schedule', 'work through, no rule'], ['Midday break only', 'the legal minimum'], ['Rule plan on the raw forecast', 'ADOSH cycles from the raw forecast'], ['Rule plan on our corrected forecast', 'the protective quantile']];
+document.getElementById('p-body').innerHTML = P.map(([p, d], i) => `<tr${i === 3 ? ' class="ours"' : ''}><td class="pol">${p}<small>${d}</small></td><td class="n" data-l="Rule-violation minutes">${PENDING}</td><td class="n" data-l="Heavy minutes cycled 20/40">${PENDING}</td><td class="n" data-l="Missed protection">${PENDING}</td><td class="pr">${proof(`${p}: plans, summer 2026`, 'plan_scoreboard.json', 'backend/eval/plan_scoreboard.py')}</td></tr>`).join('');
+
+if (STATE !== 'loading') {
+  const season = await loadData('omaa_2026_ifs_d1_wbgt_hourly.json'), S = season.json, f = seasonFacts(S);
+  const el = document.getElementById('ribbon'), N = S.days.length;
+  // running tally from the forecast file (real counts, not scores)
+  const cum = []; { let d = 0, o = 0, b = 0; S.days.forEach((_, i) => { if (f.peaks[i] > LIMIT) d++; for (let h = 6; h < 19; h++) { const v = S.wbgt_c_by_local_hour[i][h]; if (v > LIMIT) { o++; if (i >= f.i0 && i <= f.i1 && h >= 12 && h <= 14) b++; } } cum.push([d, o, b]); }); }
+  let upto = STATE === 'playing' ? S.days.indexOf('2026-08-02') : N - 1;
+  const draw = () => {
+    seasonRibbon(el, S, f, { upto, height: innerWidth < 640 ? 260 : 380 });
+    const [d, o, b] = cum[upto];
+    document.getElementById('t-date').textContent = upto === N - 1 ? 'Through 30 Sep, final' : `Through ${dayLabel(S.days[upto], true)}`;
+    document.getElementById('t-days').innerHTML = `${d}<small>of ${upto + 1}</small>`;
+    document.getElementById('t-hours').textContent = nf(o); document.getElementById('t-ban').textContent = nf(b);
+  };
+  draw(); addEventListener('resize', draw);
+  // Play: never autoplays; reduced motion lands on the final frame
+  const btn = document.getElementById('play'); let raf = 0, playing = false;
+  const stop = () => { playing = false; cancelAnimationFrame(raf); btn.textContent = upto === N - 1 ? 'Play the season' : 'Resume'; };
+  btn.onclick = () => {
+    if (playing) return stop();
+    if (reducedMotion()) { upto = N - 1; draw(); return; }
+    if (upto === N - 1) upto = 0;
+    playing = true; btn.textContent = 'Pause'; let last = performance.now(), acc = upto;
+    const step = (now) => { acc += (now - last) / 1000 * (N / 8); last = now; const u = Math.min(N - 1, Math.floor(acc)); if (u !== upto) { upto = u; draw(); }
+      if (upto < N - 1 && playing) raf = requestAnimationFrame(step); else stop(); };
+    raf = requestAnimationFrame(step);
+  };
+  if (STATE === 'playing') btn.textContent = 'Resume';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1377 @@
+{
+  "url": "http://127.0.0.1:8765/supervisor-relay.html",
+  "when": "2026-11-11T12:07:10.566Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 17
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 7
+          },
+          {
+            "px": 31,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 5,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Arabic",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 25
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          },
+          {
+            "sel": "a",
+            "w": 16,
+            "h": 16,
+            "text": "ur"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          }
+        ],
+        "smallTargetCount": 13,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crew A · Crew relay · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 43.1
+        },
+        "squint": {
+          "masses": 11,
+          "competitors": 1,
+          "dominance": 0.381,
+          "top": [
+            {
+              "cells": 34,
+              "weight": 21.19,
+              "cx": 0.944,
+              "cy": 0.761,
+              "bbox": [
+                0.944,
+                0.607,
+                0.944,
+                0.916
+              ]
+            },
+            {
+              "cells": 10,
+              "weight": 6.33,
+              "cx": 0.042,
+              "cy": 0.65,
+              "bbox": [
+                0.042,
+                0.607,
+                0.042,
+                0.692
+              ]
+            },
+            {
+              "cells": 8,
+              "weight": 5,
+              "cx": 0.042,
+              "cy": 0.79,
+              "bbox": [
+                0.042,
+                0.757,
+                0.042,
+                0.822
+              ]
+            },
+            {
+              "cells": 6,
+              "weight": 4.03,
+              "cx": 0.59,
+              "cy": 0.106,
+              "bbox": [
+                0.569,
+                0.103,
+                0.611,
+                0.112
+              ]
+            },
+            {
+              "cells": 6,
+              "weight": 3.8,
+              "cx": 0.291,
+              "cy": 0.07,
+              "bbox": [
+                0.278,
+                0.065,
+                0.306,
+                0.075
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.181,
+        "centroid": {
+          "x": 0.472,
+          "y": 0.679
+        },
+        "colourfulness": 82.8,
+        "luminanceSpread": 0.577,
+        "chromaProxy": 0.263,
+        "hierarchyByHueOnly": false,
+        "inkPct": 45.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 17
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 7
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Arabic",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 25
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          },
+          {
+            "sel": "a",
+            "w": 16,
+            "h": 16,
+            "text": "ur"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          }
+        ],
+        "smallTargetCount": 13,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crew A · Crew relay · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 49.1
+        },
+        "squint": {
+          "masses": 4,
+          "competitors": 1,
+          "dominance": 0.958,
+          "top": [
+            {
+              "cells": 537,
+              "weight": 310.81,
+              "cx": 0.505,
+              "cy": 0.478,
+              "bbox": [
+                0.153,
+                0.4,
+                0.833,
+                0.563
+              ]
+            },
+            {
+              "cells": 10,
+              "weight": 5.72,
+              "cx": 0.944,
+              "cy": 0.406,
+              "bbox": [
+                0.944,
+                0.35,
+                0.944,
+                0.463
+              ]
+            },
+            {
+              "cells": 9,
+              "weight": 5.12,
+              "cx": 0.042,
+              "cy": 0.588,
+              "bbox": [
+                0.042,
+                0.537,
+                0.042,
+                0.637
+              ]
+            },
+            {
+              "cells": 5,
+              "weight": 2.9,
+              "cx": 0.253,
+              "cy": 0.505,
+              "bbox": [
+                0.236,
+                0.5,
+                0.264,
+                0.512
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.027,
+        "centroid": {
+          "x": 0.477,
+          "y": 0.485
+        },
+        "colourfulness": 78.8,
+        "luminanceSpread": 0.577,
+        "chromaProxy": 0.249,
+        "hierarchyByHueOnly": false,
+        "inkPct": 46.7,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 17
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 7
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Arabic",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 25
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          },
+          {
+            "sel": "a",
+            "w": 16,
+            "h": 16,
+            "text": "ur"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          }
+        ],
+        "smallTargetCount": 13,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crew A · Crew relay · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 51.2
+        },
+        "squint": {
+          "masses": 13,
+          "competitors": 1,
+          "dominance": 0.803,
+          "top": [
+            {
+              "cells": 329,
+              "weight": 176.55,
+              "cx": 0.526,
+              "cy": 0.329,
+              "bbox": [
+                0.083,
+                0.224,
+                0.903,
+                0.403
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 13.31,
+              "cx": 0.132,
+              "cy": 0.307,
+              "bbox": [
+                0.083,
+                0.269,
+                0.181,
+                0.358
+              ]
+            },
+            {
+              "cells": 10,
+              "weight": 5.33,
+              "cx": 0.132,
+              "cy": 0.69,
+              "bbox": [
+                0.083,
+                0.687,
+                0.181,
+                0.701
+              ]
+            },
+            {
+              "cells": 7,
+              "weight": 3.42,
+              "cx": 0.181,
+              "cy": 0.343,
+              "bbox": [
+                0.167,
+                0.328,
+                0.194,
+                0.358
+              ]
+            },
+            {
+              "cells": 6,
+              "weight": 2.98,
+              "cx": 0.646,
+              "cy": 0.214,
+              "bbox": [
+                0.625,
+                0.209,
+                0.667,
+                0.224
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.169,
+        "centroid": {
+          "x": 0.454,
+          "y": 0.337
+        },
+        "colourfulness": 61.3,
+        "luminanceSpread": 0.498,
+        "chromaProxy": 0.201,
+        "hierarchyByHueOnly": false,
+        "inkPct": 33.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 17
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 7
+          },
+          {
+            "px": 31,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 5,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Arabic",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 25
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          },
+          {
+            "sel": "a",
+            "w": 16,
+            "h": 16,
+            "text": "ur"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          }
+        ],
+        "smallTargetCount": 13,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crew A · Crew relay · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 43.1
+        },
+        "squint": {
+          "masses": 51,
+          "competitors": 3,
+          "dominance": 0.099,
+          "top": [
+            {
+              "cells": 52,
+              "weight": 36.6,
+              "cx": 0.201,
+              "cy": 0.759,
+              "bbox": [
+                0.139,
+                0.72,
+                0.25,
+                0.804
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 32.55,
+              "cx": 0.356,
+              "cy": 0.767,
+              "bbox": [
+                0.319,
+                0.72,
+                0.403,
+                0.813
+              ]
+            },
+            {
+              "cells": 49,
+              "weight": 27.35,
+              "cx": 0.941,
+              "cy": 0.764,
+              "bbox": [
+                0.917,
+                0.598,
+                0.944,
+                0.925
+              ]
+            },
+            {
+              "cells": 40,
+              "weight": 23.04,
+              "cx": 0.043,
+              "cy": 0.758,
+              "bbox": [
+                0.042,
+                0.598,
+                0.056,
+                0.916
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 22.11,
+              "cx": 0.501,
+              "cy": 0.695,
+              "bbox": [
+                0.444,
+                0.682,
+                0.556,
+                0.71
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.124,
+        "centroid": {
+          "x": 0.457,
+          "y": 0.616
+        },
+        "colourfulness": 82.8,
+        "luminanceSpread": 0.583,
+        "chromaProxy": 0.263,
+        "hierarchyByHueOnly": false,
+        "inkPct": 56.6,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.099)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 10% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 17
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 7
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Arabic",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 25
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          },
+          {
+            "sel": "a",
+            "w": 16,
+            "h": 16,
+            "text": "ur"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          }
+        ],
+        "smallTargetCount": 13,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crew A · Crew relay · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 49.2
+        },
+        "squint": {
+          "masses": 40,
+          "competitors": 2,
+          "dominance": 0.16,
+          "top": [
+            {
+              "cells": 84,
+              "weight": 40.24,
+              "cx": 0.907,
+              "cy": 0.553,
+              "bbox": [
+                0.819,
+                0.325,
+                0.944,
+                0.637
+              ]
+            },
+            {
+              "cells": 62,
+              "weight": 28.95,
+              "cx": 0.155,
+              "cy": 0.364,
+              "bbox": [
+                0.069,
+                0.325,
+                0.236,
+                0.425
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 22.92,
+              "cx": 0.253,
+              "cy": 0.478,
+              "bbox": [
+                0.208,
+                0.438,
+                0.292,
+                0.525
+              ]
+            },
+            {
+              "cells": 37,
+              "weight": 18.43,
+              "cx": 0.047,
+              "cy": 0.494,
+              "bbox": [
+                0.042,
+                0.325,
+                0.083,
+                0.637
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 14.32,
+              "cx": 0.398,
+              "cy": 0.598,
+              "bbox": [
+                0.319,
+                0.575,
+                0.458,
+                0.637
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.04,
+        "centroid": {
+          "x": 0.463,
+          "y": 0.486
+        },
+        "colourfulness": 78.8,
+        "luminanceSpread": 0.478,
+        "chromaProxy": 0.249,
+        "hierarchyByHueOnly": false,
+        "inkPct": 48.2,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 16% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 17
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 6
+          },
+          {
+            "px": 31,
+            "n": 7
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Arabic",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 25
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          },
+          {
+            "sel": "a",
+            "w": 16,
+            "h": 16,
+            "text": "ur"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          }
+        ],
+        "smallTargetCount": 13,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crew A · Crew relay · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-relay\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 51.7
+        },
+        "squint": {
+          "masses": 18,
+          "competitors": 1,
+          "dominance": 0.313,
+          "top": [
+            {
+              "cells": 133,
+              "weight": 61.42,
+              "cx": 0.483,
+              "cy": 0.388,
+              "bbox": [
+                0.083,
+                0.328,
+                0.903,
+                0.403
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 24.64,
+              "cx": 0.242,
+              "cy": 0.307,
+              "bbox": [
+                0.181,
+                0.224,
+                0.292,
+                0.373
+              ]
+            },
+            {
+              "cells": 46,
+              "weight": 20.6,
+              "cx": 0.841,
+              "cy": 0.308,
+              "bbox": [
+                0.778,
+                0.239,
+                0.903,
+                0.358
+              ]
+            },
+            {
+              "cells": 24,
+              "weight": 15.34,
+              "cx": 0.132,
+              "cy": 0.701,
+              "bbox": [
+                0.083,
+                0.687,
+                0.181,
+                0.716
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 14.74,
+              "cx": 0.742,
+              "cy": 0.231,
+              "bbox": [
+                0.681,
+                0.209,
+                0.806,
+                0.269
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.138,
+        "centroid": {
+          "x": 0.44,
+          "y": 0.376
+        },
+        "colourfulness": 61,
+        "luminanceSpread": 0.456,
+        "chromaProxy": 0.2,
+        "hierarchyByHueOnly": false,
+        "inkPct": 42.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": false,
+    "blockers": [
+      {
+        "rule": "touch-target",
+        "detail": "light@390: 13 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@768: 13 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@1440: 13 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@390: 13 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@768: 13 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@1440: 13 interactive target(s) under 24px"
+      }
+    ]
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

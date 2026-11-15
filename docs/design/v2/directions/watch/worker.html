@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stellar Blaze · Watch · Crew phone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&text=%D8%A7%D8%B1%D8%AF%D9%88&family=Noto+Sans+Arabic:wght@500&text=%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9&family=Noto+Sans+Devanagari:wght@500&text=%E0%A4%B9%E0%A4%BF%E0%A4%A8%E0%A5%8D%E0%A4%A6%E0%A5%80%E0%A4%A8%E0%A5%87%E0%A4%AA%E0%A4%BE%E0%A4%B2%E0%A5%80&family=Noto+Sans+Bengali:wght@500&text=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="watch.css">
+<style>
+/* worker: positive polarity for direct sun; same graphite hue, inverted */
+:root {
+  --ground: oklch(0.975 0.002 250);
+  --surround: oklch(0.93 0.003 250);
+  --panel: oklch(1 0 0);
+  --hair: oklch(0.86 0.004 250);
+  --hair-2: oklch(0.72 0.006 250);
+  --ink: oklch(0.2 0.006 250);
+  --ink-2: oklch(0.36 0.006 250);
+  --ink-3: oklch(0.47 0.008 250);
+  --signal: var(--cyan-520);
+  --lv-green: oklch(0.58 0.12 150); --lv-amber: oklch(0.76 0.14 80); --lv-orange: oklch(0.66 0.16 50); --lv-red: oklch(0.54 0.19 27);
+  --w-15: 15px; --w-16: 16px; --w-18: 18px; --w-20: 20.25px; --w-23: 22.8px; --w-64: 64px;
+  color-scheme: light;
+}
+html { background: var(--surround); }
+body { background: var(--surround); color: var(--ink); font-size: var(--w-18); line-height: 1.4; }
+.ctx { max-width: 430px; margin: 0 auto; padding: var(--s-4) var(--s-2) var(--s-2); display: flex; justify-content: space-between; font: 400 var(--t-12)/1 var(--mono); color: var(--ink-3); }
+.ctx a { color: var(--ink-2); }
+.phone { max-width: 430px; margin: 0 auto var(--s-8); background: var(--ground); border: 1px solid var(--hair); min-height: 100svh; display: flex; flex-direction: column; }
+
+.status { display: flex; justify-content: space-between; gap: var(--s-3); align-items: center; padding: 10px var(--s-4); background: var(--g-200); color: var(--g-940); font: 500 var(--t-13)/1.2 var(--mono); letter-spacing: 0.02em; }
+.status span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status time { white-space: nowrap; }
+.sub { padding: var(--s-3) var(--s-4) 0; font-size: var(--w-16); color: var(--ink-2); }
+.lang { display: flex; margin: var(--s-3) var(--s-4) 0; border: 1px solid var(--hair-2); border-radius: var(--r); }
+.lang button { flex: 1; min-height: 44px; background: transparent; border: 0; border-inline-start: 1px solid var(--hair); font-size: 15px; cursor: pointer; color: var(--ink-2); }
+.lang button:first-child { border-inline-start: 0; }
+.lang button[aria-pressed="true"] { color: var(--ink); font-weight: 600; box-shadow: inset 0 -3px 0 var(--signal); }
+.lang [lang="ur"] { font-family: "Noto Nastaliq Urdu", serif; font-size: 14px; line-height: 1; }
+.lang [lang="ar"] { font-family: "Noto Sans Arabic", sans-serif; }
+.lang [lang="hi"], .lang [lang="ne"] { font-family: "Noto Sans Devanagari", sans-serif; }
+.lang [lang="bn"] { font-family: "Noto Sans Bengali", sans-serif; }
+
+.sec { padding: var(--s-6) var(--s-4) 0; }
+.lbl { font: 500 var(--t-12)/1 var(--sans); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+.level { display: flex; align-items: baseline; gap: var(--s-3); margin-top: var(--s-2); }
+.level b { font: 600 var(--w-64)/1 var(--sans); letter-spacing: -0.02em; }
+.level i { width: 14px; height: 14px; background: var(--lv-red); align-self: center; margin-top: 6px; }
+.until { margin-top: var(--s-2); font-size: var(--w-20); }
+.until .num, .break .num { font-family: var(--sans); font-variant-numeric: tabular-nums; font-weight: 500; }
+.until span { color: var(--ink-2); }
+.scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: var(--s-4); }
+.scale li { list-style: none; padding-top: 10px; border-top: 3px solid var(--hair); font-size: var(--w-15); color: var(--ink-3); position: relative; }
+.scale li[data-l="Green"] { border-top-color: var(--lv-green); } .scale li[data-l="Amber"] { border-top-color: var(--lv-amber); }
+.scale li[data-l="Orange"] { border-top-color: var(--lv-orange); } .scale li[data-l="Red"] { border-top-color: var(--lv-red); }
+.scale li { border-top-width: 2px; }
+.scale li[aria-current] { color: var(--ink); font-weight: 600; }
+.scale li[aria-current] { border-top-width: 6px; padding-top: 6px; }
+.scale { align-items: start; }
+
+.break { display: grid; grid-template-columns: 1fr; gap: 2px var(--s-3); margin: var(--s-6) var(--s-4) 0; padding: var(--s-3) 0; border-block: 1px solid var(--hair); align-items: baseline; }
+.break b { font-weight: 500; font-size: var(--w-16); color: var(--ink-2); }
+.break .num { font-size: var(--w-20); font-weight: 500; }
+.break small { font-size: var(--w-16); color: var(--ink-2); }
+.break .num { font-size: var(--w-23); }
+
+.day { position: relative; margin-top: var(--s-3); }
+.day .cells { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 2px; height: 36px; }
+.day .cells i { display: block; }
+.day .hrs { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); margin-bottom: 6px; font: 400 var(--t-12)/1 var(--mono); color: var(--ink-3); }
+.day .hrs span:not(:nth-child(3n+1)) { visibility: hidden; }
+.day { padding-bottom: 28px; }
+.day .now { position: absolute; top: 14px; height: 56px; width: 2px; background: var(--ink); }
+.day .now::after { content: "now"; position: absolute; top: 60px; left: -14px; font: 500 var(--t-13)/1 var(--mono); }
+.day .brk { position: absolute; top: 60px; height: 8px; border: 1.5px solid var(--ink-2); border-top: 0; }
+.day .brk::after { content: "break"; position: absolute; top: 12px; left: 0; right: 0; text-align: center; font: 400 var(--t-13)/1 var(--mono); color: var(--ink-2); }
+.dayread { display: flex; justify-content: space-between; margin-top: var(--s-4); font: 400 var(--w-15)/1.3 var(--mono); color: var(--ink-2); }
+.dayread b { color: var(--ink); font-weight: 500; }
+
+.acts { list-style: none; margin-top: var(--s-3); border-top: 1px solid var(--hair); }
+.acts li { display: grid; grid-template-columns: 28px 1fr; gap: var(--s-4); align-items: center; padding: var(--s-4) 0; border-bottom: 1px solid var(--hair); font-size: var(--w-18); line-height: 1.35; }
+.acts svg { width: 28px; height: 28px; color: var(--ink); }
+.draft { margin-top: var(--s-2); font-size: var(--t-13); color: var(--ink-3); }
+.listen { margin: var(--s-4) var(--s-4) 0; display: flex; gap: var(--s-3); justify-content: center; align-items: center; min-height: 52px; border: 1px solid var(--ink); border-radius: var(--r); background: transparent; font: 500 var(--w-18)/1 var(--sans); cursor: pointer; width: calc(100% - 32px); }
+.listen svg { width: 22px; height: 22px; }
+.foot { padding: var(--s-6) var(--s-4) var(--s-6); font-size: var(--t-13); color: var(--ink-3); line-height: 1.5; }
+
+.dock { position: sticky; bottom: 0; margin-top: auto; background: var(--ground); border-top: 1px solid var(--hair); padding: var(--s-3) var(--s-4) 0; }
+.unwell { display: flex; align-items: center; justify-content: center; gap: var(--s-3); width: 100%; min-height: 56px; border: 0; border-radius: var(--r); background: var(--ink); color: var(--ground); font: 600 var(--w-20)/1 var(--sans); cursor: pointer; }
+.unwell svg { width: 24px; height: 24px; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: var(--s-2); }
+.tabs a { min-height: 52px; display: grid; place-items: center; text-decoration: none; font-size: var(--w-16); color: var(--ink-2); }
+.tabs a[aria-current] { color: var(--ink); font-weight: 600; box-shadow: inset 0 3px 0 var(--signal); }
+/* desktop preview: the column is shown whole, so the dock sits at its end; on a phone it stays pinned */
+@media (min-width: 501px) { .dock { position: static; } .phone { min-height: 0; } }
+@media (max-width: 500px) { .ctx { display: none; } .phone { border: 0; margin: 0; } body { background: var(--ground); } }
+</style>
+</head>
+<body>
+<p class="ctx"><a href="index.html">Console</a><span>Crew phone · 390 design width</span></p>
+<div class="phone">
+  <header class="status" aria-label="Site and time"><span>MUSSAFAH M-14 YARD</span><time class="num">THU 3 SEP · 11:10</time></header>
+  <p class="sub">Crew B · concrete pour</p>
+  <div class="lang" role="group" aria-label="Language">
+    <button aria-pressed="true" lang="en">EN</button><button aria-pressed="false" lang="ur">اردو</button><button aria-pressed="false" lang="hi">हिन्दी</button><button aria-pressed="false" lang="bn">বাংলা</button><button aria-pressed="false" lang="ne">नेपाली</button><button aria-pressed="false" lang="ar">العربية</button>
+  </div>
+
+  <main>
+    <section class="sec" aria-labelledby="hl">
+      <h1 class="lbl" id="hl">Heat level now</h1>
+      <p class="level"><b>Red</b><i aria-hidden="true"></i><span class="sr">level 4 of 4</span></p>
+      <p class="until">Until <span class="num" style="color:var(--ink)">17:00</span><span>, then Orange to </span><span class="num" style="color:var(--ink)">19:00</span></p>
+      <ol class="scale" aria-label="Heat level scale">
+        <li data-l="Green">Green</li><li data-l="Amber">Amber</li><li data-l="Orange">Orange</li><li data-l="Red" aria-current="true">Red</li>
+      </ol>
+    </section>
+
+    <div class="break"><b>Midday break by law</b><span class="num">12:30 to 15:00</span><small>Starts in 1 h 20 min. Stop work and go to shade.</small></div>
+
+    <section class="sec" aria-labelledby="hd" style="padding-top:var(--s-6)">
+      <h2 class="lbl" id="hd">Today, 06:00 to 19:00</h2>
+      <div class="day" id="day" style="margin-top:var(--s-3)">
+        <div class="hrs" id="hrs"></div>
+        <div class="cells" id="cells" role="img" aria-label="Hourly heat today"></div>
+        <div class="now" id="now"></div>
+        <div class="brk" id="brk" aria-hidden="true"></div>
+      </div>
+      <p class="dayread"><span>now <b id="nowv">.</b></span><span>hottest <b id="pk">.</b></span></p>
+    </section>
+
+    <section class="sec" aria-labelledby="ha">
+      <h2 class="lbl" id="ha">Do this now</h2>
+      <ul class="acts">
+        <li><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M2 9 14 3l12 6v2H2z" fill="currentColor"/><circle cx="14" cy="14.5" r="2.4" fill="currentColor"/><path d="M11 18.5h6l1.5 5.5H16l-1-3.5-1 0-1 3.5H9.5z" fill="currentColor"/><rect x="4" y="11" width="2" height="15" fill="currentColor"/><rect x="22" y="11" width="2" height="15" fill="currentColor"/></svg><span>Work 20 minutes, rest 40 minutes in shade</span></li>
+        <li><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M7 11h14l-2 16H9z" fill="currentColor"/><path d="M14 1c2 2.7 3.2 4.4 3.2 5.6a3.2 3.2 0 0 1-6.4 0C10.8 5.4 12 3.7 14 1z" fill="currentColor"/></svg><span>Drink 1.2 litres of water or more every hour</span></li>
+        <li><svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="9" cy="5" r="3" fill="currentColor"/><path d="M5 10h8l1 9h-2l-.5 8h-5L6 19H4z" fill="currentColor"/><circle cx="19.5" cy="5" r="3" fill="currentColor"/><path d="M15.5 10h8l1 9h-2l-.5 8h-5l-.5-8h-2z" fill="currentColor"/></svg><span>Never work alone</span></li>
+      </ul>
+      <p class="draft">Draft wording, awaiting clinical review.</p>
+    </section>
+
+    <button class="listen" type="button"><svg viewBox="0 0 22 22" aria-hidden="true"><path d="M2 8h4l6-5v16l-6-5H2z" fill="currentColor"/><path d="M15 7.5a5 5 0 0 1 0 7M17.5 5a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.8" fill="none"/></svg>Listen</button>
+
+    <p class="foot">Design still: the level is a design state; at build it comes from the site policy (ADOSH zones). Curve: ECMWF IFS day-1 forecast WBGT at OMAA, 3 Sep 2026.</p>
+  </main>
+
+  <div class="dock">
+    <button class="unwell" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" fill="currentColor"/><path d="M9.5 5h5v4.5H19v5h-4.5V19h-5v-4.5H5v-5h4.5z" fill="var(--ink)"/></svg>I feel unwell</button>
+    <nav class="tabs" aria-label="Sections"><a href="#" aria-current="page">Today</a><a href="#">Alerts</a><a href="#">My data</a></nav>
+  </div>
+</div>
+
+<script type="module">
+import { loadJSON, RAMP_LIGHT, css } from '../_shared/heat.js';
+const season = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const DAY = season.wbgt_c_by_local_hour[season.days.indexOf('2026-09-03')];
+const H0 = 6, H1 = 19, N = H1 - H0 + 1, NOW = 11 + 10 / 60;
+const seg = DAY.slice(H0, H1 + 1);
+document.getElementById('cells').innerHTML = seg.map((v, i) => `<i style="background:${css(RAMP_LIGHT(v))}" title="${String(H0 + i).padStart(2, '0')}:00 ${v.toFixed(1)} °C"></i>`).join('');
+document.getElementById('hrs').innerHTML = seg.map((_, i) => `<span>${String(H0 + i).padStart(2, '0')}</span>`).join('');
+const pos = (t) => `${(t - H0) / N * 100}%`;
+document.getElementById('now').style.left = pos(NOW);
+const b = document.getElementById('brk'); b.style.left = pos(12.5); b.style.width = `${2.5 / N * 100}%`;
+const pk = Math.max(...seg), pkH = H0 + seg.indexOf(pk);
+document.getElementById('nowv').textContent = `${DAY[11].toFixed(1)} °C`;
+document.getElementById('pk').textContent = `${pk.toFixed(1)} °C at ${String(pkH).padStart(2, '0')}:00`;
+document.getElementById('cells').setAttribute('aria-label', `Hourly WBGT 06:00 to 19:00, hottest ${pk.toFixed(1)} degrees at ${pkH}:00`);
+</script>
+</body>
+</html>

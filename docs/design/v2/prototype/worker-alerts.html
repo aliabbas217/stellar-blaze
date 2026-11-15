@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Warnings · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+/* W6. Hero = the next 24 h spine with the moments a warning would reach this phone. Permission is asked only from a tap. */
+.top { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hair); }
+.top .site { font-weight: 600; font-size: var(--t-16); line-height: 1.2; }
+.top .crew { color: var(--ink-3); font-size: var(--t-13); }
+.top .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.status { padding: var(--s-4) var(--s-4) 0; }
+.status .k { font-size: var(--t-16); color: var(--ink-2); font-weight: 500; }
+.status .word { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+.status .word strong { font-size: var(--t-48); font-weight: 500; letter-spacing: -0.03em; line-height: 1; }
+.status .word span { font-size: var(--t-18); color: var(--ink-2); }
+.hero { padding: var(--s-2) var(--s-2) 0; view-transition-name: spine; }
+.hero svg .r-tick { font-size: 13px; }
+.hero svg .r-label { font-size: 14px; font-weight: 600; fill: var(--ink); }
+.hero svg .wp { font: 500 16px var(--sans); fill: var(--ink); }
+.hero svg .wp2 { font: 400 14px var(--sans); fill: var(--ink-2); }
+.hero svg .mk-on { fill: var(--signal); }
+.hero svg .mk-off { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 2 2; }
+.hero svg .day { font: 500 13px var(--sans); fill: var(--ink-3); }
+.hero svg .daysep { stroke: var(--edge); stroke-dasharray: 4 3; }
+.act { padding: var(--s-4); display: grid; gap: var(--s-2); }
+.act .btn { min-height: 56px; font-size: var(--t-22); font-weight: 500; width: 100%; }
+.act .btn[aria-busy="true"] { opacity: 0.8; cursor: progress; }
+.spin { width: 18px; height: 18px; border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; border-inline-end-color: currentColor; opacity: 0.6; } ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+.line { font-size: var(--t-18); color: var(--ink-2); }
+.steps { list-style: none; padding: 0 var(--s-4); display: grid; gap: 0; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 36px 1fr 36px; gap: var(--s-3); align-items: center; padding: var(--s-2) 0; border-top: 1px solid var(--hair); font-size: var(--t-18); font-weight: 500; line-height: 1.3; counter-increment: s; }
+.steps li::before { content: counter(s); display: grid; place-items: center; width: 36px; height: 36px; border: 2px solid var(--ink); border-radius: var(--r); font-size: var(--t-18); font-weight: 600; }
+.steps li svg { width: 32px; height: 32px; color: var(--ink); }
+.steps-h { padding: var(--s-3) var(--s-4) var(--s-2); font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.reqid { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-3); font-size: var(--t-13); }
+.foot { padding: var(--s-2) var(--s-4) var(--s-4); font-size: var(--t-14); color: var(--ink-3); }
+.dock .unwell { view-transition-name: unwell; } /* morphs into the Call hero on worker-unwell */
+</style>
+</head>
+<body class="phone-page">
+<div class="phone">
+  <header class="top">
+    <div><p class="site">Mussafah M-14 yard</p><p class="crew">Crew B · concrete pour</p></div>
+    <p class="clock">11:10</p>
+    <button class="sun-toggle" type="button" data-sun-toggle></button>
+  </header>
+
+  <main>
+    <section class="status" aria-live="polite">
+      <p class="k">Warnings on this phone</p>
+      <p class="word"><strong id="word">Off</strong></p>
+      <p class="line" id="sub"></p>
+    </section>
+
+    <section class="hero ribbon" id="spine" aria-label="The next 24 hours and when a warning would reach you"></section>
+
+    <!-- off / busy -->
+    <section class="act" data-when="ideal loading">
+      <button class="btn signal" type="button" id="enable" data-when="ideal"><span>Turn on warnings</span></button>
+      <button class="btn signal" type="button" aria-busy="true" aria-disabled="true" data-when="loading"><span class="spin" aria-hidden="true"></span><span>Turn on warnings</span></button>
+      <p class="line">Your phone will ask. Tap Allow.</p>
+    </section>
+    <!-- on: install is offered once, after Allow (captured beforeinstallprompt) -->
+    <section class="act" data-when="on">
+      <button class="btn primary" type="button">Add to Home Screen</button>
+      <button class="btn" type="button" style="font-size:var(--t-18);min-height:48px">Turn off warnings</button>
+      <p class="line">Opens faster and keeps today's plan when you have no signal.</p>
+    </section>
+    <!-- denied (U4) -->
+    <div data-when="denied">
+      <p class="steps-h">To allow them again</p>
+      <ol class="steps">
+        <li>Open your browser's menu<svg data-g="menu"></svg></li>
+        <li>Site settings, then Notifications<svg data-g="bell"></svg></li>
+        <li>Allow, then come back here<svg data-g="check"></svg></li>
+      </ol>
+      <section class="act" style="padding-top:var(--s-2)"><button class="btn primary" type="button">Check again</button><p class="line">Until then your supervisor tells you, and Today still works when you open it.</p></section>
+    </div>
+    <!-- iOS Safari, not installed (U5): WebKit needs the Home Screen app, and permission from a tap inside it -->
+    <div data-when="ios">
+      <p class="steps-h">On iPhone, warnings work only from the Home Screen</p>
+      <ol class="steps">
+        <li>Tap Share in Safari<svg data-g="share"></svg></li>
+        <li>Add to Home Screen<svg data-g="add"></svg></li>
+        <li>Open it from the new icon, turn on warnings<svg data-g="check"></svg></li>
+      </ol>
+      <section class="act" style="padding-top:var(--s-2)"><button class="btn signal" type="button"><span data-speaker></span><span>Listen to the steps</span></button></section>
+    </div>
+    <!-- unsupported -->
+    <section class="act" data-when="unsupported">
+      <p class="line">This browser cannot receive warnings. Your supervisor tells you, and Today shows the levels when you open it.</p>
+      <a class="btn primary" href="worker-today.html">Open Today</a>
+    </section>
+    <!-- error -->
+    <section class="act" data-when="error">
+      <p class="line">We could not turn warnings on. Try again in a moment.</p>
+      <button class="btn primary" type="button">Try again</button>
+      <p class="reqid">Request ID <span class="mono">req_19c04be7</span></p>
+    </section>
+
+    <p class="foot">The server gets only a pseudonymous subscription for your site and crew, never your name or profile. <a href="worker-data.html">My data</a></p>
+  </main>
+
+  <div class="dock"><div class="dock-in">
+    <a class="unwell" href="worker-unwell.html"><span id="cross"></span>I feel unwell</a>
+    <nav class="tabs" aria-label="Sections"><a href="worker-today.html">Today</a><a href="worker-alerts.html" aria-current="page">Alerts</a><a href="worker-data.html">My data</a></nav>
+  </div></div>
+</div>
+<script type="module">
+import { boot, spine, ICON, STATE } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+boot({ surface: 'field', at: new Date(Date.UTC(2026, 8, 3, 7, 10)), states: ['ideal', 'on', 'loading', 'denied', 'ios', 'unsupported', 'error'] });
+document.getElementById('cross').outerHTML = ICON.cross;
+for (const s of document.querySelectorAll('[data-speaker]')) s.outerHTML = ICON.speaker;
+// OS glyphs the worker must find on their own screen (not ISO 7010; drawn here until the kit has them)
+const G = {
+  menu: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7" r="3" fill="currentColor"/><circle cx="16" cy="16" r="3" fill="currentColor"/><circle cx="16" cy="25" r="3" fill="currentColor"/></svg>',
+  bell: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3a2 2 0 0 1 2 2v1.3c4 .9 6.5 4.3 6.5 8.7v6l3 3.5v1.5h-23V24.5l3-3.5v-6c0-4.4 2.5-7.8 6.5-8.7V5a2 2 0 0 1 2-2zM12.5 28h7a3.5 3.5 0 0 1-7 0z" fill="currentColor"/></svg>',
+  check: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m4 17 3-3 6 6L25 8l3 3-15 15z" fill="currentColor"/></svg>',
+  share: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l6 6-2 2-2.6-2.6V20h-2.8V7.4L12 10l-2-2z" fill="currentColor"/><path d="M8 13h4v2.6H10.6v11.8h10.8V15.6H20V13h4v17H8z" fill="currentColor"/></svg>',
+  add: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h22v22H5zm2.6 2.6v16.8h16.8V7.6z" fill="currentColor"/><path d="M14.6 10h2.8v4.6H22v2.8h-4.6V22h-2.8v-4.6H10v-2.8h4.6z" fill="currentColor"/></svg>',
+};
+for (const s of document.querySelectorAll('[data-g]')) s.outerHTML = G[s.dataset.g];
+
+const S = {
+  ideal: ['Off', 'Get a warning when your site or crew level changes.'],
+  loading: ['Off', 'Waiting for your answer…'],
+  on: ['On', 'For Mussafah M-14 yard, Crew B.'],
+  denied: ['Blocked', 'You blocked warnings for this app.'],
+  ios: ['Off', 'Add the app to your Home Screen first.'],
+  unsupported: ['Not here', 'This browser cannot receive warnings.'],
+  error: ['Off', 'Not turned on.'],
+}[STATE] || ['Off', ''];
+document.getElementById('word').textContent = S[0];
+document.getElementById('sub').textContent = S[1];
+document.getElementById('enable')?.addEventListener('click', () => { const u = new URL(location.href); u.searchParams.set('state', 'loading'); location.assign(u); });
+
+// next 24 h: Thu 11:10 to Fri 11:10 (real IFS day-1 WBGT for 3 and 4 Sep). Level change times are a design state (B3 pending).
+const el = document.getElementById('spine');
+const s = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const i = s.days.indexOf('2026-09-03');
+const values = [...s.wbgt_c_by_local_hour[i], ...s.wbgt_c_by_local_hour[i + 1]];
+const from = 11, to = 35, L = ['ios', 'denied'].includes(STATE) ? 236 : 318, now = 11 + 10 / 60, on = STATE === 'on';
+spine(el, { values, from, to, now, ban: [12.5, 15], orientation: 'v', width: 400, length: L, bandX: 64, band: 40, tickStep: 3,
+  aria: 'Next 24 hours. Now 11:10, Orange. A warning would reach you at 17:00 when Orange ends. Midday break 12:30 to 15:00. Friday levels arrive at 18:00 tonight; a warning comes if they change.' });
+const svg = el.querySelector('svg'), pos = (t) => 18 + (t - from) / (to - from) * (L - 36);
+svg.querySelectorAll('.r-label').forEach((n) => n.remove());
+for (const n of svg.querySelectorAll('.r-tick')) {
+  if (n.getAttribute('x') > 100) { n.remove(); continue; }
+  const [h, m] = n.textContent.split(':').map(Number); n.textContent = `${String(h % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+const mk = (t, a, b) => { const y = pos(t); return `<rect class="${on ? 'mk-on' : 'mk-off'}" x="${120}" y="${y - 6}" width="12" height="12" transform="rotate(45 126 ${y})"/>${a ? `<text class="wp" x="146" y="${y + 5}">${a}</text>` : ''}${b ? `<text class="wp2" x="146" y="${y + 23}">${b}</text>` : ''}`; };
+const plain = (t, a, b) => { const y = pos(t); return `<line x1="114" x2="136" y1="${y}" y2="${y}" stroke="var(--ink)"/><text class="wp" x="146" y="${y + 5}">${a}</text>${b ? `<text class="wp2" x="146" y="${y + 23}">${b}</text>` : ''}`; };
+let o = plain(now, 'Now · Orange', '');
+o += `<text class="wp2" x="146" y="${pos(13.75) + 5}">Midday break, by law</text>`;
+o += mk(17, on ? '17:00 · warning: Orange ends' : '17:00 · would warn: Orange ends', '');
+o += `<line x1="118" x2="134" y1="${pos(18)}" y2="${pos(18)}" stroke="var(--ink-3)"/><text class="wp2" x="146" y="${pos(18) + 16}">18:00 · Friday forecast arrives</text>`;
+o += `<line class="daysep" x1="40" x2="400" y1="${pos(24)}" y2="${pos(24)}"/><text class="day" x="146" y="${pos(24) + 18}">Friday 4 Sep</text>`;
+o += plain(30, 'Shift starts 06:00', '');
+svg.insertAdjacentHTML('beforeend', o);
+</script>
+</body>
+</html>

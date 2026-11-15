@@ -1,0 +1,3716 @@
+{
+  "evaluation_set": "dev_2025",
+  "evaluation_label": "DEV 2025, LOCO out-of-fold: not the result",
+  "station": "OMAA",
+  "season_start": "2025-07-01",
+  "season_end": "2025-07-10",
+  "working_hours_utc": "06:00-14:59 UTC (10:00-18:59 GST)",
+  "n_days": 10,
+  "ruleset_id": "ae-heat-2026.1",
+  "ruleset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "theta_protect": 0.15,
+  "theta_balanced": 0.35,
+  "margin_w_m2": 7,
+  "withdrawal_limits": false,
+  "assumed_crew_size": 20,
+  "assumed_crew_label": "assumed crew of 20",
+  "leads": [
+    {
+      "lead_days": 1,
+      "label": "about 24 hours ahead",
+      "headline": true,
+      "report_only": false,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 26.57,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 25.07,
+              "hi": 28.07
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.31,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.25,
+              "hi": 0.37
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.31,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.26,
+              "hi": 0.36
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 531.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 501.4,
+              "hi": 561.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 18.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 16.98,
+              "hi": 19.98
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.27,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.77,
+              "hi": 13.77
+            }
+          },
+          "pod": {
+            "value": 0.52,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.46,
+              "hi": 0.58
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.394,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.344,
+              "hi": 0.444
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 369.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 339.6,
+              "hi": 399.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 245.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 215.4,
+              "hi": 275.4
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 11.17,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 9.67,
+              "hi": 12.67
+            }
+          },
+          "false_alarm_hours": {
+            "value": 21.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 19.98,
+              "hi": 22.98
+            }
+          },
+          "pod": {
+            "value": 0.71,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.65,
+              "hi": 0.77
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.456,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.406,
+              "hi": 0.506
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 223.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 193.4,
+              "hi": 253.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 429.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 399.6,
+              "hi": 459.6
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 3.46,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.96,
+              "hi": 4.96
+            }
+          },
+          "false_alarm_hours": {
+            "value": 31.07,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 29.57,
+              "hi": 32.57
+            }
+          },
+          "pod": {
+            "value": 0.91,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.85,
+              "hi": 0.97
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.504,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.454,
+              "hi": 0.554
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 69.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 39.2,
+              "hi": 99.2
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 621.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 591.4,
+              "hi": 651.4
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 7.7,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 6.2,
+              "hi": 9.2
+            }
+          },
+          "false_alarm_hours": {
+            "value": 13.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.7,
+              "hi": 14.7
+            }
+          },
+          "pod": {
+            "value": 0.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.74,
+              "hi": 0.86
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.596,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.546,
+              "hi": 0.646
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 154,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 124,
+              "hi": 184
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 264,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 234,
+              "hi": 294
+            }
+          }
+        }
+      ]
+    },
+    {
+      "lead_days": 2,
+      "label": "issued by 18:00 GST the evening before",
+      "headline": false,
+      "report_only": false,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 27.72,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 26.22,
+              "hi": 29.22
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.28,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.22,
+              "hi": 0.34
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.28,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.23,
+              "hi": 0.33
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 554.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 524.4,
+              "hi": 584.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 19.64,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 18.14,
+              "hi": 21.14
+            }
+          },
+          "false_alarm_hours": {
+            "value": 11.56,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.06,
+              "hi": 13.06
+            }
+          },
+          "pod": {
+            "value": 0.49,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.43,
+              "hi": 0.55
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.377,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.327,
+              "hi": 0.427
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 392.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 362.8,
+              "hi": 422.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 231.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 201.2,
+              "hi": 261.2
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 12.32,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.82,
+              "hi": 13.82
+            }
+          },
+          "false_alarm_hours": {
+            "value": 20.57,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 19.07,
+              "hi": 22.07
+            }
+          },
+          "pod": {
+            "value": 0.68,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.62,
+              "hi": 0.74
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.443,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.393,
+              "hi": 0.493
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 246.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 216.4,
+              "hi": 276.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 411.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 381.4,
+              "hi": 441.4
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 4.62,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 3.12,
+              "hi": 6.12
+            }
+          },
+          "false_alarm_hours": {
+            "value": 30.04,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 28.54,
+              "hi": 31.54
+            }
+          },
+          "pod": {
+            "value": 0.88,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.82,
+              "hi": 0.94
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.494,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.444,
+              "hi": 0.544
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 92.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 62.4,
+              "hi": 122.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 600.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 570.8,
+              "hi": 630.8
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 8.85,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 7.35,
+              "hi": 10.35
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.71,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.21,
+              "hi": 14.21
+            }
+          },
+          "pod": {
+            "value": 0.77,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.71,
+              "hi": 0.83
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.579,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.529,
+              "hi": 0.629
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 177,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 147,
+              "hi": 207
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 254.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 224.2,
+              "hi": 284.2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "lead_days": 3,
+      "label": "3 days ahead",
+      "headline": false,
+      "report_only": false,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 28.88,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 27.38,
+              "hi": 30.38
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.25,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.19,
+              "hi": 0.31
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.25,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.2,
+              "hi": 0.3
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 577.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 547.6,
+              "hi": 607.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 20.79,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 19.29,
+              "hi": 22.29
+            }
+          },
+          "false_alarm_hours": {
+            "value": 10.85,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 9.35,
+              "hi": 12.35
+            }
+          },
+          "pod": {
+            "value": 0.46,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.4,
+              "hi": 0.52
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.359,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.309,
+              "hi": 0.409
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 415.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 385.8,
+              "hi": 445.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 217,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 187,
+              "hi": 247
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 13.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.98,
+              "hi": 14.98
+            }
+          },
+          "false_alarm_hours": {
+            "value": 19.66,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 18.16,
+              "hi": 21.16
+            }
+          },
+          "pod": {
+            "value": 0.65,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.59,
+              "hi": 0.71
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.43,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.48
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 269.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 239.6,
+              "hi": 299.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 393.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 363.2,
+              "hi": 423.2
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 5.77,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 4.27,
+              "hi": 7.27
+            }
+          },
+          "false_alarm_hours": {
+            "value": 29.02,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 27.52,
+              "hi": 30.52
+            }
+          },
+          "pod": {
+            "value": 0.85,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.79,
+              "hi": 0.91
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.485,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.435,
+              "hi": 0.535
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 115.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 85.4,
+              "hi": 145.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 580.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 550.4,
+              "hi": 610.4
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 10.01,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 8.51,
+              "hi": 11.51
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.21,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.71,
+              "hi": 13.71
+            }
+          },
+          "pod": {
+            "value": 0.74,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.68,
+              "hi": 0.8
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.562,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.512,
+              "hi": 0.612
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 200.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 170.2,
+              "hi": 230.2
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 244.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 214.2,
+              "hi": 274.2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "lead_days": 5,
+      "label": "5 days ahead",
+      "headline": false,
+      "report_only": true,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 31.19,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 29.69,
+              "hi": 32.69
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.19,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.13,
+              "hi": 0.25
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.19,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.14,
+              "hi": 0.24
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 623.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 593.8,
+              "hi": 653.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 23.1,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 21.6,
+              "hi": 24.6
+            }
+          },
+          "false_alarm_hours": {
+            "value": 9.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 7.94,
+              "hi": 10.94
+            }
+          },
+          "pod": {
+            "value": 0.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.34,
+              "hi": 0.46
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.321,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.271,
+              "hi": 0.371
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 462,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 432,
+              "hi": 492
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 188.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 158.8,
+              "hi": 218.8
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 15.79,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 14.29,
+              "hi": 17.29
+            }
+          },
+          "false_alarm_hours": {
+            "value": 17.85,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 16.35,
+              "hi": 19.35
+            }
+          },
+          "pod": {
+            "value": 0.59,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.53,
+              "hi": 0.65
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.403,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.353,
+              "hi": 0.453
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 315.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 285.8,
+              "hi": 345.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 357,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 327,
+              "hi": 387
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 8.08,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 6.58,
+              "hi": 9.58
+            }
+          },
+          "false_alarm_hours": {
+            "value": 26.97,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 25.47,
+              "hi": 28.47
+            }
+          },
+          "pod": {
+            "value": 0.79,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.73,
+              "hi": 0.85
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.465,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.415,
+              "hi": 0.515
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 161.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 131.6,
+              "hi": 191.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 539.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 509.4,
+              "hi": 569.4
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 12.32,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.82,
+              "hi": 13.82
+            }
+          },
+          "false_alarm_hours": {
+            "value": 11.22,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 9.72,
+              "hi": 12.72
+            }
+          },
+          "pod": {
+            "value": 0.68,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.62,
+              "hi": 0.74
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.527,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.477,
+              "hi": 0.577
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 246.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 216.4,
+              "hi": 276.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 224.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 194.4,
+              "hi": 254.4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "lead_days": 7,
+      "label": "7 days ahead",
+      "headline": false,
+      "report_only": true,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 33.49,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 31.99,
+              "hi": 34.99
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.13,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.07,
+              "hi": 0.19
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.13,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.08,
+              "hi": 0.18
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 669.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 639.8,
+              "hi": 699.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 25.41,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 23.91,
+              "hi": 26.91
+            }
+          },
+          "false_alarm_hours": {
+            "value": 8.02,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 6.52,
+              "hi": 9.52
+            }
+          },
+          "pod": {
+            "value": 0.34,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.28,
+              "hi": 0.4
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.281,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.231,
+              "hi": 0.331
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 508.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 478.2,
+              "hi": 538.2
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 160.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 130.4,
+              "hi": 190.4
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 18.1,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 16.6,
+              "hi": 19.6
+            }
+          },
+          "false_alarm_hours": {
+            "value": 16.03,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 14.53,
+              "hi": 17.53
+            }
+          },
+          "pod": {
+            "value": 0.53,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.47,
+              "hi": 0.59
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.374,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.324,
+              "hi": 0.424
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 362,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 332,
+              "hi": 392
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 320.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 290.6,
+              "hi": 350.6
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 10.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 8.9,
+              "hi": 11.9
+            }
+          },
+          "false_alarm_hours": {
+            "value": 24.92,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 23.42,
+              "hi": 26.42
+            }
+          },
+          "pod": {
+            "value": 0.73,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.67,
+              "hi": 0.79
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.443,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.393,
+              "hi": 0.493
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 208,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 178,
+              "hi": 238
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 498.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 468.4,
+              "hi": 528.4
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 14.63,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 13.13,
+              "hi": 16.13
+            }
+          },
+          "false_alarm_hours": {
+            "value": 10.23,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 8.73,
+              "hi": 11.73
+            }
+          },
+          "pod": {
+            "value": 0.62,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.56,
+              "hi": 0.68
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.49,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.44,
+              "hi": 0.54
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 292.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 262.6,
+              "hi": 322.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 204.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 174.6,
+              "hi": 234.6
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "sensitivity": [
+    {
+      "margin_w_m2": 7,
+      "withdrawal_limits": false,
+      "headline": true,
+      "lead_days": 1,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 26.57,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 25.07,
+              "hi": 28.07
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.31,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.25,
+              "hi": 0.37
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.31,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.26,
+              "hi": 0.36
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 531.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 501.4,
+              "hi": 561.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 18.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 16.98,
+              "hi": 19.98
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.27,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.77,
+              "hi": 13.77
+            }
+          },
+          "pod": {
+            "value": 0.52,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.46,
+              "hi": 0.58
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.394,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.344,
+              "hi": 0.444
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 369.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 339.6,
+              "hi": 399.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 245.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 215.4,
+              "hi": 275.4
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 11.17,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 9.67,
+              "hi": 12.67
+            }
+          },
+          "false_alarm_hours": {
+            "value": 21.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 19.98,
+              "hi": 22.98
+            }
+          },
+          "pod": {
+            "value": 0.71,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.65,
+              "hi": 0.77
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.456,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.406,
+              "hi": 0.506
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 223.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 193.4,
+              "hi": 253.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 429.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 399.6,
+              "hi": 459.6
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 3.46,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.96,
+              "hi": 4.96
+            }
+          },
+          "false_alarm_hours": {
+            "value": 31.07,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 29.57,
+              "hi": 32.57
+            }
+          },
+          "pod": {
+            "value": 0.91,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.85,
+              "hi": 0.97
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.504,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.454,
+              "hi": 0.554
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 69.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 39.2,
+              "hi": 99.2
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 621.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 591.4,
+              "hi": 651.4
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 7.7,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 6.2,
+              "hi": 9.2
+            }
+          },
+          "false_alarm_hours": {
+            "value": 13.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.7,
+              "hi": 14.7
+            }
+          },
+          "pod": {
+            "value": 0.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.74,
+              "hi": 0.86
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.596,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.546,
+              "hi": 0.646
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 154,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 124,
+              "hi": 184
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 264,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 234,
+              "hi": 294
+            }
+          }
+        }
+      ]
+    },
+    {
+      "margin_w_m2": 7,
+      "withdrawal_limits": true,
+      "headline": false,
+      "lead_days": 1,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 25.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 24.3,
+              "hi": 27.3
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.33,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.27,
+              "hi": 0.39
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.33,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.28,
+              "hi": 0.38
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 516,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 486,
+              "hi": 546
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 17.71,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 16.21,
+              "hi": 19.21
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.74,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.24,
+              "hi": 14.24
+            }
+          },
+          "pod": {
+            "value": 0.54,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.48,
+              "hi": 0.6
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.406,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.356,
+              "hi": 0.456
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 354.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 324.2,
+              "hi": 384.2
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 254.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 224.8,
+              "hi": 284.8
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 10.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 8.9,
+              "hi": 11.9
+            }
+          },
+          "false_alarm_hours": {
+            "value": 22.08,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 20.58,
+              "hi": 23.58
+            }
+          },
+          "pod": {
+            "value": 0.73,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.67,
+              "hi": 0.79
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.464,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.414,
+              "hi": 0.514
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 208,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 178,
+              "hi": 238
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 441.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 411.6,
+              "hi": 471.6
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 2.69,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.19,
+              "hi": 4.19
+            }
+          },
+          "false_alarm_hours": {
+            "value": 31.75,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 30.25,
+              "hi": 33.25
+            }
+          },
+          "pod": {
+            "value": 0.93,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.87,
+              "hi": 0.99
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.51,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.46,
+              "hi": 0.56
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 53.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 23.8,
+              "hi": 83.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 635,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 605,
+              "hi": 665
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 6.93,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 5.43,
+              "hi": 8.43
+            }
+          },
+          "false_alarm_hours": {
+            "value": 13.53,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 12.03,
+              "hi": 15.03
+            }
+          },
+          "pod": {
+            "value": 0.82,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.76,
+              "hi": 0.88
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.607,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.557,
+              "hi": 0.657
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 138.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 108.6,
+              "hi": 168.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 270.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 240.6,
+              "hi": 300.6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "margin_w_m2": 0,
+      "withdrawal_limits": false,
+      "headline": false,
+      "lead_days": 1,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 27.33,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 25.83,
+              "hi": 28.83
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.29,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.23,
+              "hi": 0.35
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.29,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.34
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 546.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 516.6,
+              "hi": 576.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 19.25,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 17.75,
+              "hi": 20.75
+            }
+          },
+          "false_alarm_hours": {
+            "value": 11.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.3,
+              "hi": 13.3
+            }
+          },
+          "pod": {
+            "value": 0.5,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.44,
+              "hi": 0.56
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.383,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.333,
+              "hi": 0.433
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 385,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 355,
+              "hi": 415
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 236,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 206,
+              "hi": 266
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 11.94,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.44,
+              "hi": 13.44
+            }
+          },
+          "false_alarm_hours": {
+            "value": 20.87,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 19.37,
+              "hi": 22.37
+            }
+          },
+          "pod": {
+            "value": 0.69,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.63,
+              "hi": 0.75
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.447,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.397,
+              "hi": 0.497
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 238.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 208.8,
+              "hi": 268.8
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 417.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 387.4,
+              "hi": 447.4
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 4.23,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.73,
+              "hi": 5.73
+            }
+          },
+          "false_alarm_hours": {
+            "value": 30.39,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 28.89,
+              "hi": 31.89
+            }
+          },
+          "pod": {
+            "value": 0.89,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.83,
+              "hi": 0.95
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.497,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.447,
+              "hi": 0.547
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 84.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 54.6,
+              "hi": 114.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 607.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 577.8,
+              "hi": 637.8
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 8.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 6.97,
+              "hi": 9.97
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.87,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.37,
+              "hi": 14.37
+            }
+          },
+          "pod": {
+            "value": 0.78,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.72,
+              "hi": 0.84
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.585,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.535,
+              "hi": 0.635
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 169.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 139.4,
+              "hi": 199.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 257.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 227.4,
+              "hi": 287.4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "margin_w_m2": 0,
+      "withdrawal_limits": true,
+      "headline": false,
+      "lead_days": 1,
+      "truth_danger_hours": {
+        "value": 38.5,
+        "n": 90,
+        "anchor": "#72-warnings-row",
+        "ci": null
+      },
+      "rows": [
+        {
+          "policy": "P0",
+          "label": "Ban only",
+          "rule": "Warns only inside the midday ban.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 26.57,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 25.07,
+              "hi": 28.07
+            }
+          },
+          "false_alarm_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -1.5,
+              "hi": 1.5
+            }
+          },
+          "pod": {
+            "value": 0.31,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.25,
+              "hi": 0.37
+            }
+          },
+          "far": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.06,
+              "hi": 0.06
+            }
+          },
+          "csi": {
+            "value": 0.31,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.26,
+              "hi": 0.36
+            }
+          },
+          "alerts_per_shift": {
+            "value": 0,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -0.3,
+              "hi": 0.3
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 531.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 501.4,
+              "hi": 561.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 0,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -30,
+              "hi": 30
+            }
+          }
+        },
+        {
+          "policy": "P1",
+          "label": "Raw WBGT 32",
+          "rule": "Warns when the raw forecast WBGT is 32 or more.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 18.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 16.98,
+              "hi": 19.98
+            }
+          },
+          "false_alarm_hours": {
+            "value": 12.27,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 10.77,
+              "hi": 13.77
+            }
+          },
+          "pod": {
+            "value": 0.52,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.46,
+              "hi": 0.58
+            }
+          },
+          "far": {
+            "value": 0.38,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.32,
+              "hi": 0.44
+            }
+          },
+          "csi": {
+            "value": 0.394,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.344,
+              "hi": 0.444
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.2,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.9,
+              "hi": 1.5
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 369.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 339.6,
+              "hi": 399.6
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 245.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 215.4,
+              "hi": 275.4
+            }
+          }
+        },
+        {
+          "policy": "P2",
+          "label": "Zones on raw forecast",
+          "rule": "Warns when the raw forecast zone is High or Red.",
+          "theta": null,
+          "missed_danger_hours": {
+            "value": 11.17,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 9.67,
+              "hi": 12.67
+            }
+          },
+          "false_alarm_hours": {
+            "value": 21.48,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 19.98,
+              "hi": 22.98
+            }
+          },
+          "pod": {
+            "value": 0.71,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.65,
+              "hi": 0.77
+            }
+          },
+          "far": {
+            "value": 0.44,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.38,
+              "hi": 0.5
+            }
+          },
+          "csi": {
+            "value": 0.456,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.406,
+              "hi": 0.506
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.8,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.5,
+              "hi": 2.1
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 223.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 193.4,
+              "hi": 253.4
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 429.6,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 399.6,
+              "hi": 459.6
+            }
+          }
+        },
+        {
+          "policy": "P3_protect",
+          "label": "Stellar Blaze, protective",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.15,
+          "missed_danger_hours": {
+            "value": 3.46,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.96,
+              "hi": 4.96
+            }
+          },
+          "false_alarm_hours": {
+            "value": 31.07,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 29.57,
+              "hi": 32.57
+            }
+          },
+          "pod": {
+            "value": 0.91,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.85,
+              "hi": 0.97
+            }
+          },
+          "far": {
+            "value": 0.47,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.41,
+              "hi": 0.53
+            }
+          },
+          "csi": {
+            "value": 0.504,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.454,
+              "hi": 0.554
+            }
+          },
+          "alerts_per_shift": {
+            "value": 2.6,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 2.3,
+              "hi": 2.9
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 69.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 39.2,
+              "hi": 99.2
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 621.4,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 591.4,
+              "hi": 651.4
+            }
+          }
+        },
+        {
+          "policy": "P3_balanced",
+          "label": "Stellar Blaze, balanced",
+          "rule": "Warns when P(High) is at least theta.",
+          "theta": 0.35,
+          "missed_danger_hours": {
+            "value": 7.7,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 6.2,
+              "hi": 9.2
+            }
+          },
+          "false_alarm_hours": {
+            "value": 13.2,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 11.7,
+              "hi": 14.7
+            }
+          },
+          "pod": {
+            "value": 0.8,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.74,
+              "hi": 0.86
+            }
+          },
+          "far": {
+            "value": 0.3,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.24,
+              "hi": 0.36
+            }
+          },
+          "csi": {
+            "value": 0.596,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.546,
+              "hi": 0.646
+            }
+          },
+          "alerts_per_shift": {
+            "value": 1.9,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 1.6,
+              "hi": 2.2
+            }
+          },
+          "missed_danger_crew_hours": {
+            "value": 154,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 124,
+              "hi": 184
+            }
+          },
+          "false_alarm_crew_hours": {
+            "value": 264,
+            "n": 90,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 234,
+              "hi": 294
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "verdicts": [
+    {
+      "id": "H4",
+      "primary": true,
+      "statement": "SYNTHETIC H4: P3 at theta_protect misses fewer danger hours than P1 (shape fixture, not a result).",
+      "outcome": "supported",
+      "comparisons": [
+        {
+          "metric": "missed_danger_hours",
+          "subject": "P3_protect",
+          "baseline": "P1",
+          "difference": {
+            "value": -9.4,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": -11.75,
+              "hi": -7.05
+            }
+          }
+        }
+      ],
+      "text": "SYNTHETIC H4: P3 at theta_protect misses fewer danger hours than P1 (shape fixture, not a result). Supported on made-up numbers."
+    },
+    {
+      "id": "H5",
+      "primary": false,
+      "statement": "SYNTHETIC H5: P3 at theta_balanced has a higher CSI than P2 (shape fixture, not a result).",
+      "outcome": "supported",
+      "comparisons": [
+        {
+          "metric": "csi",
+          "subject": "P3_balanced",
+          "baseline": "P2",
+          "difference": {
+            "value": 0.08,
+            "n": 10,
+            "anchor": "#72-warnings-row",
+            "ci": {
+              "lo": 0.06,
+              "hi": 0.1
+            }
+          }
+        }
+      ],
+      "text": "SYNTHETIC H5: P3 at theta_balanced has a higher CSI than P2 (shape fixture, not a result). Supported on made-up numbers."
+    }
+  ],
+  "provenance": {
+    "protocol_path": "docs/protocol/synthetic-shape-fixture.md",
+    "protocol_anchor": "#synthetic-shape-fixture",
+    "script": "tests.fixtures.eval.synthetic",
+    "function": "build_synthetic_eval",
+    "git_sha": "0000000000000000000000000000000000000000",
+    "data_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "model_id": "synthetic-shape-fixture",
+    "label": "SIMULATED",
+    "generated_at": "2026-11-14T00:00:00Z"
+  }
+}

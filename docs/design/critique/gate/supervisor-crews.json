@@ -1,0 +1,1433 @@
+{
+  "url": "http://127.0.0.1:8765/supervisor-crews.html",
+  "when": "2026-11-11T12:06:18.978Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 128
+          },
+          {
+            "px": 16,
+            "n": 33
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          },
+          {
+            "sel": "a",
+            "w": 84,
+            "h": 19,
+            "text": "Crews today"
+          }
+        ],
+        "smallTargetCount": 10,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 64.5
+        },
+        "squint": {
+          "masses": 58,
+          "competitors": 2,
+          "dominance": 0.187,
+          "top": [
+            {
+              "cells": 92,
+              "weight": 54.42,
+              "cx": 0.465,
+              "cy": 0.684,
+              "bbox": [
+                0.347,
+                0.645,
+                0.583,
+                0.72
+              ]
+            },
+            {
+              "cells": 94,
+              "weight": 53.58,
+              "cx": 0.173,
+              "cy": 0.683,
+              "bbox": [
+                0.042,
+                0.645,
+                0.306,
+                0.71
+              ]
+            },
+            {
+              "cells": 72,
+              "weight": 20.26,
+              "cx": 0.493,
+              "cy": 0.486,
+              "bbox": [
+                0,
+                0.486,
+                0.986,
+                0.486
+              ]
+            },
+            {
+              "cells": 38,
+              "weight": 17.68,
+              "cx": 0.246,
+              "cy": 0.067,
+              "bbox": [
+                0.181,
+                0.056,
+                0.306,
+                0.084
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 11.07,
+              "cx": 0.094,
+              "cy": 0.186,
+              "bbox": [
+                0.042,
+                0.168,
+                0.139,
+                0.206
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.131,
+        "centroid": {
+          "x": 0.37,
+          "y": 0.483
+        },
+        "colourfulness": 10.8,
+        "luminanceSpread": 0.306,
+        "chromaProxy": 0.027,
+        "hierarchyByHueOnly": false,
+        "inkPct": 23.4,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 19% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 128
+          },
+          {
+            "px": 16,
+            "n": 33
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          },
+          {
+            "sel": "a",
+            "w": 84,
+            "h": 19,
+            "text": "Crews today"
+          }
+        ],
+        "smallTargetCount": 10,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 45.8
+        },
+        "squint": {
+          "masses": 35,
+          "competitors": 1,
+          "dominance": 0.268,
+          "top": [
+            {
+              "cells": 144,
+              "weight": 55.6,
+              "cx": 0.568,
+              "cy": 0.901,
+              "bbox": [
+                0.25,
+                0.875,
+                0.847,
+                0.938
+              ]
+            },
+            {
+              "cells": 40,
+              "weight": 18.93,
+              "cx": 0.416,
+              "cy": 0.802,
+              "bbox": [
+                0.375,
+                0.775,
+                0.458,
+                0.838
+              ]
+            },
+            {
+              "cells": 41,
+              "weight": 18.91,
+              "cx": 0.101,
+              "cy": 0.553,
+              "bbox": [
+                0.056,
+                0.525,
+                0.139,
+                0.588
+              ]
+            },
+            {
+              "cells": 41,
+              "weight": 14.69,
+              "cx": 0.558,
+              "cy": 0.553,
+              "bbox": [
+                0.514,
+                0.525,
+                0.597,
+                0.588
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 13.4,
+              "cx": 0.253,
+              "cy": 0.317,
+              "bbox": [
+                0.194,
+                0.3,
+                0.306,
+                0.338
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.129,
+        "centroid": {
+          "x": 0.39,
+          "y": 0.567
+        },
+        "colourfulness": 33.2,
+        "luminanceSpread": 0.353,
+        "chromaProxy": 0.107,
+        "hierarchyByHueOnly": false,
+        "inkPct": 26.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 132
+          },
+          {
+            "px": 16,
+            "n": 29
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 451,
+            "n": 1
+          },
+          {
+            "px": 17,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          },
+          {
+            "sel": "a",
+            "w": 84,
+            "h": 19,
+            "text": "Crews today"
+          }
+        ],
+        "smallTargetCount": 10,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 39.4
+        },
+        "squint": {
+          "masses": 25,
+          "competitors": 5,
+          "dominance": 0.124,
+          "top": [
+            {
+              "cells": 53,
+              "weight": 17.81,
+              "cx": 0.506,
+              "cy": 0.875,
+              "bbox": [
+                0.319,
+                0.866,
+                0.667,
+                0.896
+              ]
+            },
+            {
+              "cells": 57,
+              "weight": 17.78,
+              "cx": 0.506,
+              "cy": 0.476,
+              "bbox": [
+                0.319,
+                0.463,
+                0.667,
+                0.507
+              ]
+            },
+            {
+              "cells": 53,
+              "weight": 17.73,
+              "cx": 0.507,
+              "cy": 0.773,
+              "bbox": [
+                0.319,
+                0.761,
+                0.667,
+                0.806
+              ]
+            },
+            {
+              "cells": 52,
+              "weight": 17,
+              "cx": 0.505,
+              "cy": 0.575,
+              "bbox": [
+                0.319,
+                0.567,
+                0.667,
+                0.597
+              ]
+            },
+            {
+              "cells": 46,
+              "weight": 14.94,
+              "cx": 0.499,
+              "cy": 0.678,
+              "bbox": [
+                0.319,
+                0.672,
+                0.667,
+                0.701
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.107,
+        "centroid": {
+          "x": 0.412,
+          "y": 0.561
+        },
+        "colourfulness": 32.6,
+        "luminanceSpread": 0.273,
+        "chromaProxy": 0.104,
+        "hierarchyByHueOnly": false,
+        "inkPct": 24.5,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "5 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.124)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 12% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 128
+          },
+          {
+            "px": 16,
+            "n": 33
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          },
+          {
+            "sel": "a",
+            "w": 84,
+            "h": 19,
+            "text": "Crews today"
+          }
+        ],
+        "smallTargetCount": 10,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 64.1
+        },
+        "squint": {
+          "masses": 51,
+          "competitors": 2,
+          "dominance": 0.166,
+          "top": [
+            {
+              "cells": 90,
+              "weight": 60.76,
+              "cx": 0.466,
+              "cy": 0.684,
+              "bbox": [
+                0.347,
+                0.645,
+                0.583,
+                0.72
+              ]
+            },
+            {
+              "cells": 90,
+              "weight": 60.06,
+              "cx": 0.172,
+              "cy": 0.682,
+              "bbox": [
+                0.042,
+                0.645,
+                0.306,
+                0.701
+              ]
+            },
+            {
+              "cells": 72,
+              "weight": 24.58,
+              "cx": 0.493,
+              "cy": 0.486,
+              "bbox": [
+                0,
+                0.486,
+                0.986,
+                0.486
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 18.21,
+              "cx": 0.247,
+              "cy": 0.066,
+              "bbox": [
+                0.181,
+                0.056,
+                0.306,
+                0.075
+              ]
+            },
+            {
+              "cells": 24,
+              "weight": 13.22,
+              "cx": 0.094,
+              "cy": 0.187,
+              "bbox": [
+                0.042,
+                0.178,
+                0.139,
+                0.206
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.126,
+        "centroid": {
+          "x": 0.385,
+          "y": 0.449
+        },
+        "colourfulness": 9.9,
+        "luminanceSpread": 0.458,
+        "chromaProxy": 0.026,
+        "hierarchyByHueOnly": false,
+        "inkPct": 34.9,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 17% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 128
+          },
+          {
+            "px": 16,
+            "n": 33
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          },
+          {
+            "sel": "a",
+            "w": 84,
+            "h": 19,
+            "text": "Crews today"
+          }
+        ],
+        "smallTargetCount": 10,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 45.9
+        },
+        "squint": {
+          "masses": 39,
+          "competitors": 1,
+          "dominance": 0.383,
+          "top": [
+            {
+              "cells": 202,
+              "weight": 93.59,
+              "cx": 0.496,
+              "cy": 0.9,
+              "bbox": [
+                0.069,
+                0.863,
+                0.917,
+                0.938
+              ]
+            },
+            {
+              "cells": 40,
+              "weight": 19.37,
+              "cx": 0.557,
+              "cy": 0.553,
+              "bbox": [
+                0.514,
+                0.525,
+                0.597,
+                0.588
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 16.08,
+              "cx": 0.425,
+              "cy": 0.802,
+              "bbox": [
+                0.375,
+                0.775,
+                0.514,
+                0.838
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 15.49,
+              "cx": 0.253,
+              "cy": 0.317,
+              "bbox": [
+                0.194,
+                0.3,
+                0.306,
+                0.338
+              ]
+            },
+            {
+              "cells": 21,
+              "weight": 13.59,
+              "cx": 0.104,
+              "cy": 0.316,
+              "bbox": [
+                0.042,
+                0.3,
+                0.167,
+                0.325
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.116,
+        "centroid": {
+          "x": 0.416,
+          "y": 0.58
+        },
+        "colourfulness": 32.6,
+        "luminanceSpread": 0.424,
+        "chromaProxy": 0.108,
+        "hierarchyByHueOnly": false,
+        "inkPct": 51.2,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 132
+          },
+          {
+            "px": 16,
+            "n": 29
+          },
+          {
+            "px": 20,
+            "n": 2
+          },
+          {
+            "px": 25,
+            "n": 10
+          },
+          {
+            "px": 31,
+            "n": 3
+          },
+          {
+            "px": 49,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 451,
+            "n": 1
+          },
+          {
+            "px": 17,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 70,
+            "h": 19,
+            "text": "Supervisor"
+          },
+          {
+            "sel": "a",
+            "w": 84,
+            "h": 19,
+            "text": "Crews today"
+          }
+        ],
+        "smallTargetCount": 10,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Supervisor · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\supervisor-crews\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 39.5
+        },
+        "squint": {
+          "masses": 26,
+          "competitors": 5,
+          "dominance": 0.127,
+          "top": [
+            {
+              "cells": 52,
+              "weight": 22.86,
+              "cx": 0.505,
+              "cy": 0.575,
+              "bbox": [
+                0.333,
+                0.567,
+                0.667,
+                0.597
+              ]
+            },
+            {
+              "cells": 56,
+              "weight": 22.36,
+              "cx": 0.503,
+              "cy": 0.773,
+              "bbox": [
+                0.333,
+                0.761,
+                0.667,
+                0.806
+              ]
+            },
+            {
+              "cells": 49,
+              "weight": 22.02,
+              "cx": 0.509,
+              "cy": 0.678,
+              "bbox": [
+                0.333,
+                0.672,
+                0.667,
+                0.701
+              ]
+            },
+            {
+              "cells": 52,
+              "weight": 21.71,
+              "cx": 0.502,
+              "cy": 0.875,
+              "bbox": [
+                0.333,
+                0.866,
+                0.667,
+                0.896
+              ]
+            },
+            {
+              "cells": 52,
+              "weight": 20.78,
+              "cx": 0.505,
+              "cy": 0.476,
+              "bbox": [
+                0.333,
+                0.463,
+                0.667,
+                0.507
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.091,
+        "centroid": {
+          "x": 0.437,
+          "y": 0.565
+        },
+        "colourfulness": 31.9,
+        "luminanceSpread": 0.382,
+        "chromaProxy": 0.104,
+        "hierarchyByHueOnly": false,
+        "inkPct": 50.8,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "5 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.127)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 13% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": false,
+    "blockers": [
+      {
+        "rule": "touch-target",
+        "detail": "light@390: 10 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@768: 10 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@1440: 10 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@390: 10 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@768: 10 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@1440: 10 interactive target(s) under 24px"
+      }
+    ]
+  },
+  "composition": [
+    {
+      "at": "light@1440",
+      "id": "everything-shouts",
+      "severity": "major",
+      "detail": "5 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.124)."
+    },
+    {
+      "at": "light@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 12% of visual weight (corpus p05 19%) — nothing leads the eye"
+    },
+    {
+      "at": "dark@1440",
+      "id": "everything-shouts",
+      "severity": "major",
+      "detail": "5 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.127)."
+    },
+    {
+      "at": "dark@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 13% of visual weight (corpus p05 19%) — nothing leads the eye"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

@@ -1,0 +1,987 @@
+{
+  "url": "http://127.0.0.1:8765/replay-frontier.html",
+  "when": "2026-11-11T12:19:56.699Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 92
+          },
+          {
+            "px": 16,
+            "n": 25
+          },
+          {
+            "px": 20,
+            "n": 3
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 3
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 51.6
+        },
+        "squint": {
+          "masses": 33,
+          "competitors": 4,
+          "dominance": 0.09,
+          "top": [
+            {
+              "cells": 73,
+              "weight": 42.27,
+              "cx": 0.163,
+              "cy": 0.668,
+              "bbox": [
+                0.042,
+                0.645,
+                0.292,
+                0.692
+              ]
+            },
+            {
+              "cells": 63,
+              "weight": 39.5,
+              "cx": 0.658,
+              "cy": 0.67,
+              "bbox": [
+                0.542,
+                0.645,
+                0.764,
+                0.701
+              ]
+            },
+            {
+              "cells": 64,
+              "weight": 38.16,
+              "cx": 0.471,
+              "cy": 0.752,
+              "bbox": [
+                0.347,
+                0.729,
+                0.583,
+                0.776
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 29.82,
+              "cx": 0.248,
+              "cy": 0.085,
+              "bbox": [
+                0.194,
+                0.065,
+                0.306,
+                0.103
+              ]
+            },
+            {
+              "cells": 44,
+              "weight": 27.68,
+              "cx": 0.569,
+              "cy": 0.501,
+              "bbox": [
+                0.5,
+                0.477,
+                0.639,
+                0.523
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.126,
+        "centroid": {
+          "x": 0.393,
+          "y": 0.566
+        },
+        "colourfulness": 11,
+        "luminanceSpread": 0.591,
+        "chromaProxy": 0.028,
+        "hierarchyByHueOnly": false,
+        "inkPct": 33,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "4 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.09)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 9% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 91
+          },
+          {
+            "px": 16,
+            "n": 25
+          },
+          {
+            "px": 20,
+            "n": 3
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 3
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 61.6
+        },
+        "squint": {
+          "masses": 47,
+          "competitors": 2,
+          "dominance": 0.209,
+          "top": [
+            {
+              "cells": 94,
+              "weight": 42.48,
+              "cx": 0.368,
+              "cy": 0.3,
+              "bbox": [
+                0.153,
+                0.287,
+                0.597,
+                0.313
+              ]
+            },
+            {
+              "cells": 58,
+              "weight": 30.33,
+              "cx": 0.421,
+              "cy": 0.244,
+              "bbox": [
+                0.264,
+                0.225,
+                0.583,
+                0.263
+              ]
+            },
+            {
+              "cells": 39,
+              "weight": 18.42,
+              "cx": 0.699,
+              "cy": 0.242,
+              "bbox": [
+                0.611,
+                0.225,
+                0.792,
+                0.263
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 18.18,
+              "cx": 0.134,
+              "cy": 0.242,
+              "bbox": [
+                0.042,
+                0.225,
+                0.236,
+                0.263
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 11.27,
+              "cx": 0.873,
+              "cy": 0.243,
+              "bbox": [
+                0.819,
+                0.225,
+                0.931,
+                0.263
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.17,
+        "centroid": {
+          "x": 0.412,
+          "y": 0.354
+        },
+        "colourfulness": 8.2,
+        "luminanceSpread": 0.32,
+        "chromaProxy": 0.018,
+        "hierarchyByHueOnly": false,
+        "inkPct": 29.7,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 91
+          },
+          {
+            "px": 16,
+            "n": 25
+          },
+          {
+            "px": 20,
+            "n": 3
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 3
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 63.6
+        },
+        "squint": {
+          "masses": 29,
+          "competitors": 1,
+          "dominance": 0.498,
+          "top": [
+            {
+              "cells": 160,
+              "weight": 42.93,
+              "cx": 0.456,
+              "cy": 0.159,
+              "bbox": [
+                0.069,
+                0.134,
+                0.861,
+                0.239
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 5.81,
+              "cx": 0.334,
+              "cy": 0.964,
+              "bbox": [
+                0.194,
+                0.955,
+                0.5,
+                0.985
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 5.15,
+              "cx": 0.236,
+              "cy": 0.284,
+              "bbox": [
+                0.069,
+                0.284,
+                0.431,
+                0.284
+              ]
+            },
+            {
+              "cells": 16,
+              "weight": 4.37,
+              "cx": 0.165,
+              "cy": 0.329,
+              "bbox": [
+                0.069,
+                0.328,
+                0.264,
+                0.343
+              ]
+            },
+            {
+              "cells": 12,
+              "weight": 3.41,
+              "cx": 0.165,
+              "cy": 0.007,
+              "bbox": [
+                0.139,
+                0,
+                0.208,
+                0.015
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.177,
+        "centroid": {
+          "x": 0.366,
+          "y": 0.385
+        },
+        "colourfulness": 6.6,
+        "luminanceSpread": 0.138,
+        "chromaProxy": 0.011,
+        "hierarchyByHueOnly": false,
+        "inkPct": 23,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 92
+          },
+          {
+            "px": 16,
+            "n": 25
+          },
+          {
+            "px": 20,
+            "n": 3
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 3
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 51.2
+        },
+        "squint": {
+          "masses": 31,
+          "competitors": 4,
+          "dominance": 0.114,
+          "top": [
+            {
+              "cells": 86,
+              "weight": 59.96,
+              "cx": 0.422,
+              "cy": 0.752,
+              "bbox": [
+                0.236,
+                0.729,
+                0.583,
+                0.766
+              ]
+            },
+            {
+              "cells": 78,
+              "weight": 54.46,
+              "cx": 0.629,
+              "cy": 0.503,
+              "bbox": [
+                0.5,
+                0.477,
+                0.75,
+                0.533
+              ]
+            },
+            {
+              "cells": 69,
+              "weight": 47.2,
+              "cx": 0.167,
+              "cy": 0.668,
+              "bbox": [
+                0.042,
+                0.645,
+                0.292,
+                0.682
+              ]
+            },
+            {
+              "cells": 62,
+              "weight": 44.15,
+              "cx": 0.657,
+              "cy": 0.67,
+              "bbox": [
+                0.542,
+                0.645,
+                0.764,
+                0.701
+              ]
+            },
+            {
+              "cells": 46,
+              "weight": 31.37,
+              "cx": 0.123,
+              "cy": 0.752,
+              "bbox": [
+                0.042,
+                0.729,
+                0.194,
+                0.766
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.102,
+        "centroid": {
+          "x": 0.405,
+          "y": 0.537
+        },
+        "colourfulness": 10.2,
+        "luminanceSpread": 0.698,
+        "chromaProxy": 0.027,
+        "hierarchyByHueOnly": false,
+        "inkPct": 47.9,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "4 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.114)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 11% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 91
+          },
+          {
+            "px": 16,
+            "n": 25
+          },
+          {
+            "px": 20,
+            "n": 3
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 3
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 61.8
+        },
+        "squint": {
+          "masses": 53,
+          "competitors": 1,
+          "dominance": 0.196,
+          "top": [
+            {
+              "cells": 91,
+              "weight": 50.28,
+              "cx": 0.369,
+              "cy": 0.3,
+              "bbox": [
+                0.153,
+                0.287,
+                0.597,
+                0.313
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 34.57,
+              "cx": 0.422,
+              "cy": 0.244,
+              "bbox": [
+                0.264,
+                0.225,
+                0.583,
+                0.263
+              ]
+            },
+            {
+              "cells": 34,
+              "weight": 20.36,
+              "cx": 0.697,
+              "cy": 0.242,
+              "bbox": [
+                0.611,
+                0.225,
+                0.792,
+                0.263
+              ]
+            },
+            {
+              "cells": 19,
+              "weight": 13.05,
+              "cx": 0.875,
+              "cy": 0.243,
+              "bbox": [
+                0.819,
+                0.225,
+                0.931,
+                0.25
+              ]
+            },
+            {
+              "cells": 21,
+              "weight": 12.99,
+              "cx": 0.177,
+              "cy": 0.243,
+              "bbox": [
+                0.111,
+                0.225,
+                0.236,
+                0.25
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.163,
+        "centroid": {
+          "x": 0.416,
+          "y": 0.36
+        },
+        "colourfulness": 7.8,
+        "luminanceSpread": 0.449,
+        "chromaProxy": 0.018,
+        "hierarchyByHueOnly": false,
+        "inkPct": 32.7,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 91
+          },
+          {
+            "px": 16,
+            "n": 25
+          },
+          {
+            "px": 20,
+            "n": 3
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 49,
+            "n": 3
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-frontier\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 65
+        },
+        "squint": {
+          "masses": 28,
+          "competitors": 1,
+          "dominance": 0.452,
+          "top": [
+            {
+              "cells": 152,
+              "weight": 53.76,
+              "cx": 0.459,
+              "cy": 0.16,
+              "bbox": [
+                0.069,
+                0.134,
+                0.861,
+                0.224
+              ]
+            },
+            {
+              "cells": 76,
+              "weight": 16.7,
+              "cx": 0.281,
+              "cy": 0.966,
+              "bbox": [
+                0.083,
+                0.94,
+                0.514,
+                0.985
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 7.06,
+              "cx": 0.242,
+              "cy": 0.284,
+              "bbox": [
+                0.083,
+                0.284,
+                0.431,
+                0.284
+              ]
+            },
+            {
+              "cells": 15,
+              "weight": 5.63,
+              "cx": 0.164,
+              "cy": 0.329,
+              "bbox": [
+                0.069,
+                0.328,
+                0.25,
+                0.343
+              ]
+            },
+            {
+              "cells": 14,
+              "weight": 4.68,
+              "cx": 0.163,
+              "cy": 0.007,
+              "bbox": [
+                0.111,
+                0,
+                0.208,
+                0.015
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.149,
+        "centroid": {
+          "x": 0.376,
+          "y": 0.418
+        },
+        "colourfulness": 5.8,
+        "luminanceSpread": 0.231,
+        "chromaProxy": 0.01,
+        "hierarchyByHueOnly": false,
+        "inkPct": 28.2,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

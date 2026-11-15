@@ -1,0 +1,29 @@
+# dependencies
+/node_modules
+.pnpm-debug.log*
+
+# next.js build output and generated types
+/.next/
+/out/
+next-env.d.ts
+
+# test output
+/coverage
+/playwright-report/
+/test-results/
+/.lighthouseci/
+
+# typescript
+*.tsbuildinfo
+
+# env files with local values (committed templates such as .env.example stay tracked)
+.env*.local
+# The real-phone push spike's VAPID keys (scripts/send-test-push.ts); also covered by the line above, named on purpose
+.env.spike.local
+
+# misc
+.DS_Store
+*.pem
+
+# Vitest local reporter output
+.vitest/

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's next · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* proposed shared: proto.css defines .stack-2/3/6/8 only, so an undefined .stack-1/.stack-4 inherits the parent's --stack */
+  .stack-1 { --stack: var(--space-1); }
+  .stack-4 { --stack: var(--space-4); }
+
+  .group { display: grid; gap: var(--space-4); }
+  .steps { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
+  @media (min-width: 64rem) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .step { display: grid; gap: var(--space-4); align-content: start; }
+  .step h3 { font-family: var(--font-display); font-weight: 600; font-size: var(--size-title); letter-spacing: var(--tracking-signage); }
+  .step .kv { grid-template-columns: 7.5rem minmax(0, 1fr); }
+  @media (max-width: 29.99rem) { .step .kv { grid-template-columns: minmax(0, 1fr); } }
+  .meaning { display: grid; gap: var(--space-3); grid-template-columns: 1fr; }
+  @media (min-width: 64rem) { .meaning { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .meaning li { display: grid; gap: var(--space-2); justify-items: start; align-content: start; }
+</style>
+</head>
+<body data-states="ideal">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html">Try a plan</a></li>
+    <li><a href="replay-frontier.html">Frontier</a></li>
+    <li><a href="replay-climate.html">Warmer summer</a></li>
+    <li><a href="replay-governance.html">Governance</a></li>
+    <li><a href="replay-faults.html">Break things</a></li>
+    <li><a href="replay-next.html" aria-current="step">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-3">
+    <h1 class="t-display">What's next</h1>
+    <p class="t-lead measure">Seven next steps, grouped by how far each one is from real. Each says what exists today and what would trigger it. Nothing on this page is claimed as done.</p>
+    <ul class="meaning" aria-label="What the stamps mean">
+      <li><span class="stamp">Exists</span><span class="t-label t-muted">The part we can show is built and tested. The next step is configuration, not invention.</span></li>
+      <li><span class="stamp">Designed</span><span class="t-label t-muted">Specified in a decision record. Building it is ours to do, and it is not built.</span></li>
+      <li><span class="stamp">Needs pilot</span><span class="t-label t-muted">Cannot move without a partner: a site, devices or a regulator.</span></li>
+    </ul>
+  </header>
+
+  <section class="group" aria-labelledby="g-exists">
+    <h2 id="g-exists" class="t-headline">Exists</h2>
+    <div class="steps">
+      <article class="card step" aria-labelledby="s3">
+        <div class="spread"><h3 id="s3">Production forecast data path</h3><span class="stamp">Exists</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>Run production forecasts on ECMWF open data, which allows commercial use (CC BY 4.0).</dd>
+          <dt>Exists now</dt><dd>Probe scripts and the forecast-source port. Probed on 11 Nov: an open archive on AWS holds the past days we need.</dd>
+          <dt>Trigger</dt><dd>Any commercial pilot. The free tier we use today is non-commercial.</dd>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="g-designed">
+    <h2 id="g-designed" class="t-headline">Designed</h2>
+    <div class="steps">
+      <article class="card step" aria-labelledby="s2">
+        <div class="spread"><h3 id="s2">Regulator view</h3><span class="stamp">Designed</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>A view for the regulator of hours by site and zone: High-zone hours, plans signed, stops. Small groups are hidden.</dd>
+          <dt>Exists now</dt><dd>The aggregation rules: groups under 10 (health) or 5 (exposure) are hidden, and every employer sees only its own crews.</dd>
+          <dt>Trigger</dt><dd>Interest from the Abu Dhabi regulator and a data-sharing agreement. The workplace code of practice already asks sites to keep incident records.</dd>
+        </dl>
+      </article>
+      <article class="card step" aria-labelledby="s5">
+        <div class="spread"><h3 id="s5">Self-hosted language model for personal data</h3><span class="stamp">Designed</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>Run a language model on our own servers for anything that touches personal data, for example Arabic and Urdu questions from supervisors.</dd>
+          <dt>Exists now</dt><dd>The routing rule: personal data never leaves our infrastructure. A compliance drafter that sees aggregates only.</dd>
+          <dt>Trigger</dt><dd>A pilot needs Arabic or Urdu supervisor Q and A, and a GPU inside the UAE (parked).</dd>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="g-pilot">
+    <h2 id="g-pilot" class="t-headline">Needs a pilot</h2>
+    <div class="steps">
+      <article class="card step" aria-labelledby="s1">
+        <div class="spread"><h3 id="s1">Consented wearable signal</h3><span class="stamp">Needs pilot</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>A per-worker adapter for consented wearable data. Personal strain is worked out on the phone.</dd>
+          <dt>Exists now</dt><dd>The observation port, with real station adapters, an in-memory one and contract tests.</dd>
+          <dt>Trigger</dt><dd>A pilot employer with consented devices, and a freedom-to-operate check against a wearable-strain patent.</dd>
+        </dl>
+      </article>
+      <article class="card step" aria-labelledby="s6">
+        <div class="spread"><h3 id="s6">Pilot with ADPHC as regulator partner</h3><span class="stamp">Needs pilot</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>One site group near the airport cluster, one summer. Four weeks in shadow mode first: warnings logged, not acted on. Then live. Outcomes come from incident records and site clinic visits, small groups hidden.</dd>
+          <dt>Exists now</dt><dd>A pilot one-pager.</dd>
+          <dt>Trigger</dt><dd>A contractor HSE lead says yes, and the health department's research route is confirmed.</dd>
+        </dl>
+        <p class="cluster"><span class="stamp stamp--quiet">Proposed partner</span><span class="t-label"><strong>ADPHC has not been contacted.</strong></span></p>
+      </article>
+      <article class="card step" aria-labelledby="s7">
+        <div class="spread"><h3 id="s7">Validation away from the airport</h3><span class="stamp">Needs pilot</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>Check the forecast and the zones against on-site globe and wet-bulb sensors at a real worksite.</dd>
+          <dt>Exists now</dt><dd>Nothing. Today's claim stops at held-out airport stations.</dd>
+          <dt>Trigger</dt><dd>The pilot site installs a sensor.</dd>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="g-rejected">
+    <h2 id="g-rejected" class="t-headline">Rejected for now</h2>
+    <div class="steps">
+      <article class="card step" aria-labelledby="s4">
+        <div class="spread"><h3 id="s4">Sub-seasonal outlook, weeks 2 to 4</h3><span class="stamp">Rejected for now</span></div>
+        <dl class="kv">
+          <dt>Next step</dt><dd>An outlook for weeks 2 to 4, to plan rosters further ahead.</dd>
+          <dt>Why not now</dt><dd>No open archive lets us back-test it, and week-to-week heat anomalies carry almost no memory beyond the first week.</dd>
+          <dt>Exists now</dt><dd>Nothing, by design.</dd>
+          <dt>Trigger</dt><dd>An open extended-range hindcast archive that can be back-tested.</dd>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <div class="cluster cluster-4">
+    <a class="btn btn--primary" href="replay-season.html">Back to the scoreboard</a>
+    <a class="link" href="replay-faults.html">Back to break things</a>
+  </div>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>Nothing here is built beyond what its row says exists.</li>
+    <li>ADPHC has not been contacted.</li>
+    <li>Status stamps are our own reading of how far each step is from real.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+</body>
+</html>

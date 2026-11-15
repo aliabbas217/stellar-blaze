@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My data · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+/* W5. Hero = the access log as a vertical timeline (who, when, what), with the refused employer request. */
+.top { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hair); }
+.top .site { font-weight: 600; font-size: var(--t-16); line-height: 1.2; }
+.top .crew { color: var(--ink-3); font-size: var(--t-13); }
+.top .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.head { padding: var(--s-4) var(--s-4) var(--s-2); }
+.head .k { font-size: var(--t-16); color: var(--ink-2); font-weight: 500; }
+.head h1 { font-size: var(--t-28); font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
+.log { list-style: none; padding: 0 var(--s-4); view-transition-name: spine; }
+.log li { display: grid; grid-template-columns: 52px 18px 1fr; column-gap: var(--s-2); position: relative; }
+.log li::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: calc(52px + var(--s-2) + 8px); width: 2px; background: var(--hair); }
+.log li:first-child::before { inset-block-start: 14px; }
+.log li:last-child::before { inset-block-end: auto; height: 14px; }
+.log .when { padding-top: 4px; font-size: var(--t-14); color: var(--ink-3); line-height: 1.3; }
+.log .when b { display: block; color: var(--ink-2); font-weight: 500; font-size: var(--t-16); }
+.log .mark { position: relative; z-index: 1; width: 12px; height: 12px; margin: 9px 3px 0; background: var(--ground); border: 2px solid var(--ink-2); border-radius: 1px; }
+.log .what { padding: 0 0 var(--s-3); font-size: var(--t-18); line-height: 1.35; }
+.log .what strong { display: block; font-weight: 600; }
+.log .what small { display: block; font-size: var(--t-16); color: var(--ink-2); margin-top: 2px; }
+.log li.refused .mark { background: var(--signal); border-color: var(--signal); transform: rotate(45deg); }
+.log li.refused .what { padding: var(--s-2) var(--s-3); margin-bottom: var(--s-3); border: 1px solid var(--signal); border-radius: var(--r); }
+.log li.refused .tag { margin-top: var(--s-2); border-color: var(--signal); color: var(--signal); font-size: var(--t-13); font-weight: 600; }
+.log .none { color: var(--ink-2); }
+.act { padding: var(--s-2) var(--s-4) var(--s-4); display: grid; gap: var(--s-2); }
+.act .btn { min-height: 56px; font-size: var(--t-22); font-weight: 500; width: 100%; }
+.line { font-size: var(--t-16); color: var(--ink-2); }
+.held { padding: 0 var(--s-4) var(--s-4); }
+.held h2 { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; padding: var(--s-3) 0 var(--s-2); border-top: 1px solid var(--hair); }
+.held dl { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-4); font-size: var(--t-18); }
+.held dt { color: var(--ink-2); }
+.held dd { font-weight: 500; }
+.held dd small { display: block; font-size: var(--t-14); font-weight: 400; color: var(--ink-3); }
+.notice { margin: 0 var(--s-4) var(--s-3); font-size: var(--t-16); }
+.reqid { color: var(--ink-3); font-size: var(--t-13); margin-top: var(--s-1); }
+dialog.confirm { margin: auto auto 0; width: min(440px, 100vw); max-width: 100vw; border: 0; border-top: 1px solid var(--edge); background: var(--panel); color: var(--ink); padding: var(--s-6) var(--s-4) calc(var(--s-6) + env(safe-area-inset-bottom)); }
+dialog.confirm::backdrop { background: var(--scrim); }
+dialog.confirm[open] { animation: sheet-in var(--dur-2) var(--ease); }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } }
+dialog.confirm h2 { font-size: var(--t-28); font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; }
+dialog.confirm ul { margin: var(--s-3) 0; padding-inline-start: 1.1em; font-size: var(--t-18); display: grid; gap: var(--s-1); }
+dialog.confirm p { font-size: var(--t-18); color: var(--ink); font-weight: 500; }
+dialog.confirm .row { display: grid; gap: var(--s-2); margin-top: var(--s-4); }
+dialog.confirm .btn { min-height: 56px; font-size: var(--t-22); }
+.skel-row { height: 64px; margin: 0 var(--s-4) var(--s-3); }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+.dock .unwell { view-transition-name: unwell; } /* morphs into the Call hero on worker-unwell */
+</style>
+</head>
+<body class="phone-page">
+<div class="phone">
+  <header class="top">
+    <div><p class="site">Mussafah M-14 yard</p><p class="crew">Crew B · concrete pour</p></div>
+    <p class="clock">11:10</p>
+    <button class="sun-toggle" type="button" data-sun-toggle></button>
+  </header>
+
+  <main>
+    <!-- data present -->
+    <div data-when="ideal loading empty error confirm">
+      <section class="head"><p class="k">My data</p><h1>Who used or asked for it</h1></section>
+
+      <div data-when="loading" aria-busy="true"><div class="skel skel-row">.</div><div class="skel skel-row">.</div><div class="skel skel-row">.</div><div class="skel skel-row">.</div></div>
+      <div class="notice" data-when="error"><p><strong>We could not load who asked.</strong> What is on this phone is still listed below. <button class="btn" type="button">Try again</button></p><p class="reqid">Request ID <span class="mono">req_5d20aa31</span></p></div>
+
+      <ol class="log" aria-label="Access log, newest first" data-when="ideal empty confirm">
+        <li><p class="when"><b>3 Sep</b>09:40</p><span class="mark" aria-hidden="true"></span><p class="what"><strong>Warning service</strong>Sent "Orange from 10:00". Level and crew code only.</p></li>
+        <li class="refused" data-when="ideal confirm"><p class="when"><b>2 Sep</b>16:05</p><span class="mark" aria-hidden="true"></span><div class="what"><strong>Employer account</strong>Asked for your own heat record, for an incident review.<small>One worker's record cannot be sent: there is no way to do it.</small><span class="tag">Refused</span></div></li>
+        <li data-when="empty"><p class="when"><b>Since</b>1 Sep</p><span class="mark" aria-hidden="true"></span><p class="what none">Nobody has asked for your data.</p></li>
+        <li><p class="when"><b>1 Sep</b>06:13</p><span class="mark" aria-hidden="true"></span><p class="what"><strong>You</strong>Turned on warnings.</p></li>
+        <li><p class="when"><b>1 Sep</b>06:12</p><span class="mark" aria-hidden="true"></span><p class="what"><strong>You</strong>Joined Crew B with the site code.</p></li>
+      </ol>
+
+      <section class="act">
+        <button class="btn" type="button" id="remove">Remove my data</button>
+        <p class="line">Deletes your answers and turns off warnings. You can join again at any time.</p>
+      </section>
+
+      <section class="held" aria-labelledby="held-h">
+        <h2 id="held-h">On this phone only</h2>
+        <dl>
+          <dt>Work</dt><dd>Heavy<small>Protective default, not answered</small></dd>
+          <dt>Time in this heat</dt><dd>New<small>Protective default, not answered</small></dd>
+          <dt>Language</dt><dd>English</dd>
+          <dt>Offline copy</dt><dd>Protected<small>The phone will not clear it when storage is low</small></dd>
+        </dl>
+        <h2 style="margin-top:var(--s-4)">On our server</h2>
+        <dl><dt>Warnings</dt><dd>A pseudonymous subscription for Crew B<small>Not linked to your name, phone number or answers</small></dd></dl>
+      </section>
+    </div>
+
+    <!-- removed (online) and removed while offline (unsubscribe queued) -->
+    <section data-when="removed offline">
+      <div class="head"><p class="k">My data</p><h1>Removed from this phone</h1></div>
+      <ol class="log" aria-label="What happened">
+        <li><p class="when"><b>3 Sep</b>11:12</p><span class="mark" aria-hidden="true"></span><p class="what"><strong>You removed your data</strong>Answers deleted. Offline copy cleared.</p></li>
+        <li data-when="removed"><p class="when"><b>3 Sep</b>11:12</p><span class="mark" aria-hidden="true"></span><p class="what"><strong>Warnings off</strong>The subscription on our server is deleted.</p></li>
+        <li data-when="offline"><p class="when"><b>Waiting</b>no signal</p><span class="mark" aria-hidden="true"></span><p class="what"><strong>Warnings stop when you are back online</strong>Your phone may get one more warning before then.</p></li>
+      </ol>
+      <section class="act"><a class="btn primary" href="worker-today.html">Back to Today</a><p class="line">Today still shows the site level for Mussafah M-14 yard.</p></section>
+    </section>
+  </main>
+
+  <dialog class="confirm" id="confirm" aria-labelledby="c-h">
+    <h2 id="c-h">Remove your data from this phone?</h2>
+    <ul><li>Your answers are deleted.</li><li>Warnings stop. The server subscription is deleted.</li></ul>
+    <p>This also removes the list of who asked for your data from this phone.</p>
+    <div class="row"><a class="btn primary" href="worker-data.html?state=removed">Remove</a><button class="btn" type="button" data-close autofocus>Keep my data</button></div>
+  </dialog>
+
+  <div class="dock"><div class="dock-in">
+    <a class="unwell" href="worker-unwell.html"><span id="cross"></span>I feel unwell</a>
+    <nav class="tabs" aria-label="Sections"><a href="worker-today.html">Today</a><a href="worker-alerts.html">Alerts</a><a href="worker-data.html" aria-current="page">My data</a></nav>
+  </div></div>
+</div>
+<script type="module">
+import { boot, ICON, STATE } from './assets/kit.js';
+boot({ surface: 'field', at: new Date(Date.UTC(2026, 8, 3, 7, 10)), states: ['ideal', 'loading', 'empty', 'error', 'confirm', 'removed', 'offline'] });
+document.getElementById('cross').outerHTML = ICON.cross;
+const dlg = document.getElementById('confirm');
+document.getElementById('remove').onclick = () => dlg.showModal();
+dlg.querySelector('[data-close]').onclick = () => dlg.close();
+dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+if (STATE === 'confirm') dlg.showModal();
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar Blaze · Watch · New site</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="watch.css">
+<style>
+.wrap { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: var(--s-2); padding: var(--s-2); max-width: 1280px; margin: 0 auto; }
+.flow { display: flex; flex-direction: column; gap: var(--s-2); }
+.step { display: grid; grid-template-columns: 56px minmax(0, 1fr); }
+.step > .n { padding: var(--s-3) 0 0 var(--s-3); font: 500 var(--t-12)/1 var(--mono); color: var(--ink-3); border-inline-end: 1px solid var(--hair); }
+.step.live > .n { color: var(--signal); box-shadow: inset 3px 0 0 var(--signal); }
+.step > .c { padding: var(--s-3) var(--s-4) var(--s-4); min-width: 0; }
+.step h2 { font: 500 var(--t-11)/1 var(--sans); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; }
+.title { padding: var(--s-6) var(--s-4) var(--s-3); }
+.title h1 { font: 500 var(--t-22)/1.2 var(--sans); }
+.title p { margin-top: var(--s-2); color: var(--ink-2); max-width: 60ch; }
+
+.cmd { margin-top: var(--s-3); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-2); }
+.line { display: flex; gap: var(--s-3); align-items: center; min-height: 48px; padding: 0 var(--s-3); background: var(--g-150); border: 1px solid var(--hair-2); border-radius: var(--r); font: 400 var(--t-15)/1.4 var(--mono); }
+.line .p { color: var(--ink-3); }
+.line .caret { display: inline-block; width: 8px; height: 18px; background: var(--ink); vertical-align: -3px; margin-inline-start: 2px; }
+.mic { width: 48px; height: 48px; border-radius: var(--r); border: 1px solid var(--hair-2); background: var(--panel-2); display: grid; place-items: center; cursor: pointer; }
+.mic svg { width: 20px; height: 20px; }
+.dclass { margin-top: var(--s-3); display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; font-size: var(--t-12); color: var(--ink-2); }
+
+.parse { margin-top: var(--s-3); border-top: 1px solid var(--hair); }
+.row { display: grid; grid-template-columns: 132px minmax(0, 1fr) 150px; gap: var(--s-4); padding: 10px 0; border-bottom: 1px solid var(--hair); align-items: baseline; }
+.row .k { font: 400 var(--t-12)/1.3 var(--sans); color: var(--ink-3); }
+.row .v { font-size: var(--t-15); line-height: 1.35; }
+.row .v small { display: block; margin-top: 2px; font-size: var(--t-12); color: var(--ink-3); }
+.row .s { justify-self: end; }
+.row .num { font-size: var(--t-13); }
+.row.attn .k { color: var(--ink); }
+
+.q { font: 500 var(--t-19)/1.3 var(--sans); margin-top: var(--s-3); }
+.chips { display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
+.chip { min-height: 40px; min-width: 88px; padding: 0 var(--s-4); border: 1px solid var(--hair-2); border-radius: var(--r); background: transparent; font: 500 var(--t-15)/1 var(--mono); cursor: pointer; }
+.chip.other { font-family: var(--sans); }
+.chip:hover { border-color: var(--ink-2); }
+.roster { display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
+.note { margin-top: var(--s-3); font-size: var(--t-12); color: var(--ink-2); max-width: 62ch; }
+.actions { display: flex; gap: var(--s-2); padding: var(--s-3) var(--s-4); justify-content: flex-end; align-items: center; }
+.actions .hint { margin-inline-end: auto; font: 400 var(--t-11)/1.4 var(--mono); color: var(--ink-3); }
+
+/* side */
+.side { display: flex; flex-direction: column; gap: var(--s-2); }
+.map svg { display: block; width: 100%; height: auto; }
+.map .cap { display: flex; justify-content: space-between; padding: var(--s-2) var(--s-3); border-top: 1px solid var(--hair); font: 400 var(--t-11)/1.4 var(--mono); color: var(--ink-3); }
+.map .cap b { color: var(--ink); font-weight: 500; }
+.rules dl { display: grid; grid-template-columns: 1fr auto; padding: 0 var(--s-3); }
+.rules dt, .rules dd { padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: var(--t-12); }
+.rules dt { color: var(--ink-3); }
+.rules dd { text-align: end; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.rules dl > :nth-last-child(-n+2) { border-bottom: 0; }
+
+@media (max-width: 1000px) {
+  .wrap { grid-template-columns: 1fr; }
+  .top nav, .mark span { display: none; }
+  .clock { margin-inline-start: auto; font-size: var(--t-11); }
+  .step { grid-template-columns: 1fr; }
+  .step > .n { border-inline-end: 0; padding: var(--s-3) var(--s-4) 0; }
+  .step.live > .n { box-shadow: none; }
+  .row { grid-template-columns: 1fr auto; gap: 4px var(--s-3); }
+  .row .k { grid-column: 1; } .row .s { grid-column: 2; grid-row: 1; }
+  .row .v { grid-column: 1 / -1; }
+  .line { font-size: var(--t-13); padding: var(--s-2) var(--s-3); }
+  .actions { flex-wrap: wrap; } .actions .hint { flex-basis: 100%; }
+  .actions .btn { flex: 1; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="mark" href="index.html"><b>Stellar Blaze</b><span>Heat-stress forecasting · UAE outdoor work</span></a>
+  <p class="clock"><span>NEW SITE · WED 11 NOV 2026</span></p>
+  <nav aria-label="Main"><a href="index.html">Console</a><a href="index.html#score">Scoreboard</a><a href="worker.html">Crew phone</a><a href="setup.html" aria-current="page">Set up a site</a></nav>
+</header>
+
+<main class="wrap">
+  <div class="flow">
+    <div class="title"><h1>Set up a site in one sentence</h1><p>Say or type what the site is. The assistant fills in the rest and shows where every value came from.</p></div>
+
+    <section class="panel step" aria-labelledby="s1">
+      <p class="n">01</p>
+      <div class="c">
+        <h2 id="s1">Your sentence</h2>
+        <div class="cmd">
+          <p class="line" aria-label="Your sentence"><span class="p">›</span><span>Two crews, 40 workers, Mussafah, concrete work this week<span class="caret" aria-hidden="true"></span></span></p>
+          <button class="mic" type="button" aria-label="Dictate the sentence"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="1" width="6" height="11" rx="3" fill="currentColor"/><path d="M4 9a6 6 0 0 0 12 0" stroke="currentColor" stroke-width="1.8" fill="none"/><rect x="9.1" y="15" width="1.8" height="3" fill="currentColor"/><rect x="6" y="17.5" width="8" height="1.8" fill="currentColor"/></svg></button>
+        </div>
+        <p class="dclass"><span class="tag">Private · own server</span>Read by our own AI on our own server, never sent to another company, deleted once you confirm. Use crew letters, not names. Prefer a form? Fill it in by hand.</p>
+      </div>
+    </section>
+
+    <section class="panel step" aria-labelledby="s2">
+      <p class="n">02</p>
+      <div class="c">
+        <h2 id="s2">What the assistant read <span class="mono" style="letter-spacing:0;text-transform:none;color:var(--ink-3);font-weight:400">7 fields · source on each</span></h2>
+        <div class="parse" role="table" aria-label="Parsed site">
+          <div class="row" role="row"><span class="k" role="rowheader">Site</span><span class="v" role="cell">Mussafah <span class="num mono">24.36 N 54.50 E</span><small>Located on the map. Drag the pin to fix.</small></span><span class="s" role="cell"><span class="tag">Sentence · map</span></span></div>
+          <div class="row" role="row"><span class="k" role="rowheader">Crews</span><span class="v" role="cell"><span class="num mono">2</span></span><span class="s" role="cell"><span class="tag">Sentence</span></span></div>
+          <div class="row attn" role="row"><span class="k" role="rowheader">Workers</span><span class="v" role="cell"><span class="num mono">40</span>, split <span class="num mono">20 / 20</span><small>Even split assumed. Confirm or change.</small></span><span class="s" role="cell"><span class="tag on">Assumed · confirm</span></span></div>
+          <div class="row" role="row"><span class="k" role="rowheader">Work</span><span class="v" role="cell">Concrete pour → heavy work</span><span class="s" role="cell"><span class="tag">Inferred</span></span></div>
+          <div class="row" role="row"><span class="k" role="rowheader">Dates</span><span class="v" role="cell">Wed 11 to Sun 15 Nov 2026<small>From “this week”; today is Wed 11 Nov. Editable.</small></span><span class="s" role="cell"><span class="tag">Inferred · edit</span></span></div>
+          <div class="row" role="row"><span class="k" role="rowheader">Midday ban</span><span class="v" role="cell">Not in force<small>The ban runs 15 Jun to 15 Sep.</small></span><span class="s" role="cell"><span class="tag">Ruleset</span></span></div>
+          <div class="row" role="row"><span class="k" role="rowheader">Acclimatisation</span><span class="v" role="cell">Everyone counted as new, not acclimatised<small>Protective default (NIOSH). Mark experienced workers with one tap per crew.</small></span><span class="s" role="cell"><span class="tag">Default · change</span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel step live" aria-labelledby="s3">
+      <p class="n">03</p>
+      <div class="c">
+        <h2 id="s3">One question <span class="tag on">Needs you</span></h2>
+        <p class="q">When does the shift start?</p>
+        <div class="chips" role="group" aria-label="Shift start"><button class="chip" type="button">06:00</button><button class="chip" type="button">07:00</button><button class="chip other" type="button">Other</button></div>
+      </div>
+    </section>
+
+    <section class="panel step" aria-labelledby="s4">
+      <p class="n">04</p>
+      <div class="c">
+        <h2 id="s4">Roster <span class="tag">Names stay on device</span></h2>
+        <p class="q" style="font-size:var(--t-15)">Add the roster: a CSV from your HR system</p>
+        <div class="roster"><button class="btn ghost" type="button">Upload CSV</button></div>
+        <p class="note">Names are removed on this device before upload; only crew letter, trade and start date are sent.</p>
+      </div>
+    </section>
+
+    <div class="panel actions"><span class="hint">Nothing is saved until you create the site.</span><button class="btn ghost" type="button">Edit</button><button class="btn" type="button">Create site</button></div>
+  </div>
+
+  <aside class="side">
+    <section class="panel map" aria-labelledby="hmap">
+      <div class="ph"><h2 id="hmap">Location</h2><span class="meta">drag the pin to fix</span></div>
+      <svg id="loc" viewBox="0 0 400 300" role="img" aria-label="Map of Abu Dhabi with a pin at Mussafah, 24.36 N 54.50 E"></svg>
+      <p class="cap"><span>Pin <b>24.36 N 54.50 E</b></span><span>coast: Natural Earth 10 m</span></p>
+    </section>
+    <section class="panel rules" aria-labelledby="hr">
+      <div class="ph"><h2 id="hr">Rules this site will use</h2></div>
+      <dl>
+        <dt>Heavy-work limit, NIOSH (415 W)</dt><dd>26.6 °C WBGT</dd>
+        <dt>Midday ban, UAE</dt><dd>15 Jun to 15 Sep</dd>
+        <dt>Ban hours</dt><dd>12:30 to 15:00</dd>
+        <dt>Heat levels</dt><dd>ADOSH zones</dd>
+        <dt>Forecast</dt><dd>IFS 0.25° day-1</dd>
+      </dl>
+    </section>
+  </aside>
+</main>
+
+<script type="module">
+import { loadJSON, clipCoast } from '../_shared/heat.js';
+const coast = await loadJSON('coast.json');
+const B = [54.18, 24.14, 54.86, 24.62], K = Math.cos(24.4 * Math.PI / 180);
+const W = 400, Ht = 300, sx = W / ((B[2] - B[0]) * K), sy = Ht / (B[3] - B[1]), s = Math.max(sx, sy);
+const cx = (B[0] + B[2]) / 2, cy = (B[1] + B[3]) / 2;
+const P = (lo, la) => [(W / 2 + (lo - cx) * K * s).toFixed(1), (Ht / 2 - (la - cy) * s).toFixed(1)];
+// coastline strokes only: the Natural Earth rings are too coarse here to fill land reliably (a sea point at 24.55 N tests inside)
+const land = `<path d="${coast.rings.filter((r) => r.c === 'ARE').map((r) => `M${r.r.map(([lo, la]) => P(lo, la).join(',')).join('L')}Z`).join('')}" fill="none" stroke="oklch(0.86 0.006 250)" stroke-width="1.2"/>`;
+let grid = '', labels = '';
+const lab = (x, y, t) => `<text x="${x}" y="${y}" font-size="10" fill="oklch(0.78 0.006 250)" font-family="Chivo Mono" paint-order="stroke" stroke="oklch(0.17 0.006 250)" stroke-width="3">${t}</text>`;
+for (let lo = 54.2; lo <= 54.85; lo += 0.1) { const [x] = P(lo, 0); grid += `<line x1="${x}" x2="${x}" y1="0" y2="${Ht}" stroke="oklch(0.4 0.006 250)" stroke-opacity="0.6"/>`; if (+x < W - 44) labels += lab(+x + 3, Ht - 6, `${lo.toFixed(1)} E`); }
+for (let la = 24.2; la <= 24.62; la += 0.1) { const [, y] = P(0, la); grid += `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="oklch(0.4 0.006 250)" stroke-opacity="0.6"/>`; if (+y > 16 && +y < Ht - 20) labels += lab(4, +y - 4, `${la.toFixed(1)} N`); }
+const [px, py] = P(54.50, 24.36), [ax, ay] = P(54.6511, 24.433);
+const pin = `<g><circle cx="${px}" cy="${py}" r="14" fill="none" stroke="oklch(0.84 0.075 200)" stroke-width="1.5"/><line x1="${px - 22}" x2="${px + 22}" y1="${py}" y2="${py}" stroke="oklch(0.84 0.075 200)"/><line x1="${px}" x2="${px}" y1="${py - 22}" y2="${py + 22}" stroke="oklch(0.84 0.075 200)"/><rect x="${px - 3}" y="${py - 3}" width="6" height="6" fill="oklch(0.84 0.075 200)"/>
+  <text x="${+px + 20}" y="${+py + 28}" font-size="12" fill="oklch(0.94 0.004 250)" font-family="Chivo" paint-order="stroke" stroke="oklch(0.165 0.006 250)" stroke-width="3">Mussafah</text></g>
+  <rect x="${ax - 3}" y="${ay - 3}" width="6" height="6" fill="oklch(0.94 0.004 250)"/><text x="${+ax + 8}" y="${+ay + 4}" font-size="10.5" fill="oklch(0.78 0.006 250)" font-family="Chivo Mono">OMAA</text>`;
+document.getElementById('loc').innerHTML = `<rect width="${W}" height="${Ht}" fill="oklch(0.165 0.006 250)"/>${land}${grid}${labels}${pin}`;
+</script>
+</body>
+</html>

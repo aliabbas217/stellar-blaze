@@ -1,0 +1,1378 @@
+{
+  "url": "http://127.0.0.1:8765/worker-today.html",
+  "when": "2026-11-11T12:10:38.824Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 45
+          },
+          {
+            "px": 16,
+            "n": 10
+          },
+          {
+            "px": 20,
+            "n": 6
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 32,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 66,
+            "h": 16,
+            "text": "fallback"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          }
+        ],
+        "smallTargetCount": 11,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Worker · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": [
+          {
+            "id": "target-size",
+            "impact": "serious",
+            "nodes": 1,
+            "sample": "Target has insufficient size because it is partially obscured (smallest space is 97.3px by 18.3px, should be at least 24px by 24px)"
+          }
+        ]
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 45.5
+        },
+        "squint": {
+          "masses": 10,
+          "competitors": 1,
+          "dominance": 0.748,
+          "top": [
+            {
+              "cells": 272,
+              "weight": 248.84,
+              "cx": 0.16,
+              "cy": 0.939,
+              "bbox": [
+                0,
+                0.888,
+                0.319,
+                0.991
+              ]
+            },
+            {
+              "cells": 70,
+              "weight": 44,
+              "cx": 0.493,
+              "cy": 0.44,
+              "bbox": [
+                0.042,
+                0.439,
+                0.944,
+                0.458
+              ]
+            },
+            {
+              "cells": 11,
+              "weight": 8.3,
+              "cx": 0.249,
+              "cy": 0.142,
+              "bbox": [
+                0.194,
+                0.14,
+                0.306,
+                0.15
+              ]
+            },
+            {
+              "cells": 7,
+              "weight": 5.18,
+              "cx": 0.611,
+              "cy": 0.142,
+              "bbox": [
+                0.583,
+                0.14,
+                0.639,
+                0.15
+              ]
+            },
+            {
+              "cells": 8,
+              "weight": 5.01,
+              "cx": 0.042,
+              "cy": 0.509,
+              "bbox": [
+                0.042,
+                0.477,
+                0.042,
+                0.542
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.118,
+        "centroid": {
+          "x": 0.427,
+          "y": 0.593
+        },
+        "colourfulness": 70.2,
+        "luminanceSpread": 0.6,
+        "chromaProxy": 0.229,
+        "hierarchyByHueOnly": false,
+        "inkPct": 40.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 45
+          },
+          {
+            "px": 16,
+            "n": 10
+          },
+          {
+            "px": 20,
+            "n": 6
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 32,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 66,
+            "h": 16,
+            "text": "fallback"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          }
+        ],
+        "smallTargetCount": 11,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Worker · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 68
+        },
+        "squint": {
+          "masses": 7,
+          "competitors": 1,
+          "dominance": 0.72,
+          "top": [
+            {
+              "cells": 445,
+              "weight": 250.27,
+              "cx": 0.51,
+              "cy": 0.271,
+              "bbox": [
+                0.208,
+                0.2,
+                0.778,
+                0.338
+              ]
+            },
+            {
+              "cells": 88,
+              "weight": 77.13,
+              "cx": 0.285,
+              "cy": 0.955,
+              "bbox": [
+                0.194,
+                0.912,
+                0.375,
+                0.988
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 11.09,
+              "cx": 0.537,
+              "cy": 0.913,
+              "bbox": [
+                0.403,
+                0.912,
+                0.667,
+                0.912
+              ]
+            },
+            {
+              "cells": 4,
+              "weight": 2.5,
+              "cx": 0.758,
+              "cy": 0.912,
+              "bbox": [
+                0.736,
+                0.912,
+                0.778,
+                0.912
+              ]
+            },
+            {
+              "cells": 4,
+              "weight": 2.43,
+              "cx": 0.852,
+              "cy": 0.013,
+              "bbox": [
+                0.833,
+                0.013,
+                0.875,
+                0.013
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.061,
+        "centroid": {
+          "x": 0.451,
+          "y": 0.464
+        },
+        "colourfulness": 49.3,
+        "luminanceSpread": 0.577,
+        "chromaProxy": 0.165,
+        "hierarchyByHueOnly": false,
+        "inkPct": 25.6,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 45
+          },
+          {
+            "px": 16,
+            "n": 10
+          },
+          {
+            "px": 20,
+            "n": 6
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 32,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 66,
+            "h": 16,
+            "text": "fallback"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          }
+        ],
+        "smallTargetCount": 11,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Worker · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 81.6
+        },
+        "squint": {
+          "masses": 21,
+          "competitors": 1,
+          "dominance": 0.487,
+          "top": [
+            {
+              "cells": 166,
+              "weight": 78.03,
+              "cx": 0.497,
+              "cy": 0.147,
+              "bbox": [
+                0.333,
+                0.104,
+                0.653,
+                0.194
+              ]
+            },
+            {
+              "cells": 101,
+              "weight": 35.91,
+              "cx": 0.492,
+              "cy": 0.574,
+              "bbox": [
+                0.347,
+                0.522,
+                0.653,
+                0.612
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 23.77,
+              "cx": 0.382,
+              "cy": 0.967,
+              "bbox": [
+                0.333,
+                0.94,
+                0.431,
+                0.985
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 3.18,
+              "cx": 0.477,
+              "cy": 0.328,
+              "bbox": [
+                0.347,
+                0.328,
+                0.611,
+                0.328
+              ]
+            },
+            {
+              "cells": 13,
+              "weight": 2.69,
+              "cx": 0.485,
+              "cy": 0,
+              "bbox": [
+                0.403,
+                0,
+                0.569,
+                0
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.106,
+        "centroid": {
+          "x": 0.466,
+          "y": 0.4
+        },
+        "colourfulness": 33.7,
+        "luminanceSpread": 0.303,
+        "chromaProxy": 0.112,
+        "hierarchyByHueOnly": false,
+        "inkPct": 14.6,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 45
+          },
+          {
+            "px": 16,
+            "n": 10
+          },
+          {
+            "px": 20,
+            "n": 6
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 32,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 66,
+            "h": 16,
+            "text": "fallback"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          }
+        ],
+        "smallTargetCount": 11,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Worker · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": [
+          {
+            "id": "target-size",
+            "impact": "serious",
+            "nodes": 1,
+            "sample": "Target has insufficient size because it is partially obscured (smallest space is 97.3px by 18.3px, should be at least 24px by 24px)"
+          }
+        ]
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 45.5
+        },
+        "squint": {
+          "masses": 10,
+          "competitors": 1,
+          "dominance": 0.748,
+          "top": [
+            {
+              "cells": 272,
+              "weight": 248.84,
+              "cx": 0.16,
+              "cy": 0.939,
+              "bbox": [
+                0,
+                0.888,
+                0.319,
+                0.991
+              ]
+            },
+            {
+              "cells": 70,
+              "weight": 44,
+              "cx": 0.493,
+              "cy": 0.44,
+              "bbox": [
+                0.042,
+                0.439,
+                0.944,
+                0.458
+              ]
+            },
+            {
+              "cells": 11,
+              "weight": 8.3,
+              "cx": 0.249,
+              "cy": 0.142,
+              "bbox": [
+                0.194,
+                0.14,
+                0.306,
+                0.15
+              ]
+            },
+            {
+              "cells": 7,
+              "weight": 5.18,
+              "cx": 0.611,
+              "cy": 0.142,
+              "bbox": [
+                0.583,
+                0.14,
+                0.639,
+                0.15
+              ]
+            },
+            {
+              "cells": 8,
+              "weight": 5.01,
+              "cx": 0.042,
+              "cy": 0.509,
+              "bbox": [
+                0.042,
+                0.477,
+                0.042,
+                0.542
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.118,
+        "centroid": {
+          "x": 0.427,
+          "y": 0.593
+        },
+        "colourfulness": 70.2,
+        "luminanceSpread": 0.6,
+        "chromaProxy": 0.229,
+        "hierarchyByHueOnly": false,
+        "inkPct": 40.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 45
+          },
+          {
+            "px": 16,
+            "n": 10
+          },
+          {
+            "px": 20,
+            "n": 6
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 32,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 66,
+            "h": 16,
+            "text": "fallback"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          }
+        ],
+        "smallTargetCount": 11,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Worker · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 68
+        },
+        "squint": {
+          "masses": 7,
+          "competitors": 1,
+          "dominance": 0.72,
+          "top": [
+            {
+              "cells": 445,
+              "weight": 250.27,
+              "cx": 0.51,
+              "cy": 0.271,
+              "bbox": [
+                0.208,
+                0.2,
+                0.778,
+                0.338
+              ]
+            },
+            {
+              "cells": 88,
+              "weight": 77.13,
+              "cx": 0.285,
+              "cy": 0.955,
+              "bbox": [
+                0.194,
+                0.912,
+                0.375,
+                0.988
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 11.09,
+              "cx": 0.537,
+              "cy": 0.913,
+              "bbox": [
+                0.403,
+                0.912,
+                0.667,
+                0.912
+              ]
+            },
+            {
+              "cells": 4,
+              "weight": 2.5,
+              "cx": 0.758,
+              "cy": 0.912,
+              "bbox": [
+                0.736,
+                0.912,
+                0.778,
+                0.912
+              ]
+            },
+            {
+              "cells": 4,
+              "weight": 2.43,
+              "cx": 0.852,
+              "cy": 0.013,
+              "bbox": [
+                0.833,
+                0.013,
+                0.875,
+                0.013
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.061,
+        "centroid": {
+          "x": 0.451,
+          "y": 0.464
+        },
+        "colourfulness": 49.3,
+        "luminanceSpread": 0.577,
+        "chromaProxy": 0.165,
+        "hierarchyByHueOnly": false,
+        "inkPct": 25.6,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 45
+          },
+          {
+            "px": 16,
+            "n": 10
+          },
+          {
+            "px": 20,
+            "n": 6
+          },
+          {
+            "px": 25,
+            "n": 5
+          },
+          {
+            "px": 31,
+            "n": 4
+          },
+          {
+            "px": 32,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "partial"
+          },
+          {
+            "sel": "a",
+            "w": 66,
+            "h": 16,
+            "text": "fallback"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          },
+          {
+            "sel": "a",
+            "w": 24,
+            "h": 16,
+            "text": "en"
+          }
+        ],
+        "smallTargetCount": 11,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Today · Worker · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\worker-today\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 81.6
+        },
+        "squint": {
+          "masses": 21,
+          "competitors": 1,
+          "dominance": 0.487,
+          "top": [
+            {
+              "cells": 166,
+              "weight": 78.03,
+              "cx": 0.497,
+              "cy": 0.147,
+              "bbox": [
+                0.333,
+                0.104,
+                0.653,
+                0.194
+              ]
+            },
+            {
+              "cells": 101,
+              "weight": 35.91,
+              "cx": 0.492,
+              "cy": 0.574,
+              "bbox": [
+                0.347,
+                0.522,
+                0.653,
+                0.612
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 23.77,
+              "cx": 0.382,
+              "cy": 0.967,
+              "bbox": [
+                0.333,
+                0.94,
+                0.431,
+                0.985
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 3.18,
+              "cx": 0.477,
+              "cy": 0.328,
+              "bbox": [
+                0.347,
+                0.328,
+                0.611,
+                0.328
+              ]
+            },
+            {
+              "cells": 13,
+              "weight": 2.69,
+              "cx": 0.485,
+              "cy": 0,
+              "bbox": [
+                0.403,
+                0,
+                0.569,
+                0
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.106,
+        "centroid": {
+          "x": 0.466,
+          "y": 0.4
+        },
+        "colourfulness": 33.7,
+        "luminanceSpread": 0.303,
+        "chromaProxy": 0.112,
+        "hierarchyByHueOnly": false,
+        "inkPct": 14.6,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": false,
+    "blockers": [
+      {
+        "rule": "a11y",
+        "detail": "light@390: target-size (serious) ×1 — Target has insufficient size because it is partially obscured (smallest space is 97.3px by 18.3px, should be at least 24px by 24px)"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@390: 11 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@768: 11 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@1440: 11 interactive target(s) under 24px"
+      },
+      {
+        "rule": "a11y",
+        "detail": "dark@390: target-size (serious) ×1 — Target has insufficient size because it is partially obscured (smallest space is 97.3px by 18.3px, should be at least 24px by 24px)"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@390: 11 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@768: 11 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@1440: 11 interactive target(s) under 24px"
+      }
+    ]
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

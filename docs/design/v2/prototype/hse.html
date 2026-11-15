@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HSE week · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+.wordmark { view-transition-name: wordmark; }
+main.wrap { padding-block: var(--s-6) var(--s-16); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+
+/* header: where, when, the one sentence, the one action */
+.head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-4) var(--s-8); align-items: end; }
+.head .where { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); align-items: center; color: var(--ink-3); font-size: var(--t-14); }
+.head h1 { font: 400 var(--t-36)/1.1 var(--sans); letter-spacing: -0.02em; margin-top: var(--s-2); }
+.head .lead { font-size: var(--t-18); color: var(--ink-2); margin-top: var(--s-2); max-width: 72ch; }
+.head .lead strong { color: var(--ink); font-weight: 500; }
+.act { display: grid; justify-items: end; gap: var(--s-2); }
+.act .faint { font-size: var(--t-13); max-width: 32ch; text-align: end; }
+.week-pick { display: inline-flex; align-items: center; gap: var(--s-2); }
+.week-pick select { min-height: 36px; padding: 0 var(--s-2); background: var(--panel); border: 1px solid var(--edge); border-radius: var(--r); font-size: var(--t-14); }
+@media (max-width: 760px) { .head { grid-template-columns: 1fr; } .act { justify-items: start; } .act .faint { text-align: start; } .head h1 { font-size: var(--t-28); } }
+
+/* the hero: crews x days heat calendar */
+.cal-wrap { overflow-x: auto; border: 1px solid var(--hair); border-radius: var(--r); background: var(--ground); view-transition-name: spine; }
+.cal { display: grid; grid-template-columns: 200px repeat(7, minmax(112px, 1fr)) 104px; min-width: 1060px; }
+.cal > * { border-bottom: 1px solid var(--hair); }
+.cal .ch { padding: var(--s-3) var(--s-3) var(--s-2); font-size: var(--t-13); color: var(--ink-3); font-weight: 500; background: var(--panel); }
+.cal .c { background: var(--ground); }
+.cal .ch b { display: block; color: var(--ink); font-size: var(--t-14); font-weight: 600; }
+.cal .ch.n, .cal .tot { text-align: end; }
+.cal .rh { position: sticky; left: 0; z-index: 2; padding: var(--s-3); background: var(--ground); border-right: 1px solid var(--hair); display: grid; align-content: center; gap: 2px; }
+.cal .rh b { font-size: var(--t-14); font-weight: 600; }
+.cal .rh span { font-size: var(--t-13); color: var(--ink-3); line-height: 1.35; }
+.cal .c { padding: var(--s-2) var(--s-2) var(--s-2); display: grid; grid-template-rows: auto 1fr; gap: 6px; border-left: 1px solid var(--hair); min-height: 84px; }
+.cal .c .v { font-size: var(--t-22); font-weight: 500; line-height: 1; letter-spacing: -0.01em; }
+.cal .c .v small { font-size: var(--t-13); color: var(--ink-3); font-weight: 400; margin-inline-start: 2px; }
+.cal .c .v.zero { color: var(--ink-3); }
+.cal .c svg { width: 100%; height: 34px; overflow: visible; }
+.cal .c.rest { grid-template-rows: 1fr; place-items: center; color: var(--ink-3); font-size: var(--t-13); }
+.cal .c.hidden { margin: 6px; border: 1px dashed var(--edge); border-radius: var(--r); place-content: center; text-align: center; color: var(--ink-2); font-size: var(--t-13); line-height: 1.35; min-height: 72px; background: var(--ground); }
+.cal .tot { padding: var(--s-3); font-size: var(--t-18); font-weight: 500; border-left: 1px solid var(--hair); display: grid; align-content: center; }
+.cal .tot small { display: block; font-size: var(--t-12); color: var(--ink-3); font-weight: 400; line-height: 1.3; }
+.cal .tot { line-height: 1.1; }
+.cal .tot.hidden { font-size: var(--t-13); color: var(--ink-2); font-weight: 400; }
+.cal .wx .c { min-height: 76px; }
+.cal .row { display: contents; }
+.cal .row:hover > .c:not(.hidden), .cal .row:hover > .rh { background: var(--panel); }
+.cal .sum > * { background: var(--ground); border-bottom: 0; }
+.cal .sum .c { min-height: 0; padding-block: var(--s-3); }
+.cal .sum .c .v { font-size: var(--t-16); }
+.cal svg .slot { fill: var(--slot); }
+.cal svg .slot-rule { stroke: var(--edge); stroke-width: 1; }
+.cal svg .slot-off { fill: none; stroke: var(--edge); stroke-width: 1; stroke-dasharray: 3 3; }
+.cal svg .worked { fill: var(--raised); }
+.cal svg .base { stroke: var(--hair); stroke-width: 1; }
+.cal svg .tk { font: 400 12px var(--sans); fill: var(--ink-3); }
+
+/* key under the hero */
+.key { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-8); align-items: center; font-size: var(--t-13); color: var(--ink-3); }
+.key .it { display: inline-flex; align-items: center; gap: var(--s-2); }
+.key .ramp { width: 160px; height: 10px; border-radius: 1px; }
+.key .sw { width: 22px; height: 12px; border-radius: 1px; }
+.key .sw.slot { background: var(--slot); border-block: 1px solid var(--edge); }
+.key .sw.off { border: 1px dashed var(--edge); }
+.key .sw.wk { background: var(--raised); }
+.key .sw.hid { border: 1px dashed var(--edge); background: var(--ground); }
+.key .src { margin-inline-start: auto; display: inline-flex; gap: var(--s-2); align-items: center; }
+
+/* figures below the hero */
+.figs { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); border-top: 1px solid var(--hair); }
+.figs-note { grid-column: 1 / -1; font-size: var(--t-13); color: var(--ink-3); padding: var(--s-2) 0 0; border-top: 1px solid var(--hair); }
+.fig { padding: var(--s-4) var(--s-6) var(--s-4) 0; display: grid; gap: var(--s-2); align-content: start; }
+.fig + .fig { padding-inline-start: var(--s-6); border-inline-start: 1px solid var(--hair); }
+.fig .big { font-size: var(--t-36); font-weight: 400; letter-spacing: -0.02em; line-height: 1; }
+.fig .big small { font-size: var(--t-16); color: var(--ink-2); margin-inline-start: 4px; }
+.fig .big.word { font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; line-height: 1.2; }
+.fig .big.hid { font-size: var(--t-18); font-weight: 500; color: var(--ink-2); }
+.fig p { font-size: var(--t-14); color: var(--ink-2); }
+.fig .faint { font-size: var(--t-13); }
+@media (max-width: 1000px) { .figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fig:nth-child(3) { padding-inline-start: 0; border-inline-start: 0; } }
+@media (max-width: 1000px) { .figs { --n: 2 !important; } }
+@media (max-width: 560px) { .figs { grid-template-columns: 1fr; } .fig + .fig { padding-inline-start: 0; border-inline-start: 0; border-top: 1px solid var(--hair); } }
+
+/* lower band */
+.lower { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--s-6); align-items: start; }
+@media (max-width: 1000px) { .lower { grid-template-columns: minmax(0, 1fr); } }
+.cant ul { list-style: none; padding: 0; display: grid; }
+.cant li { padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.cant li:last-child { border-bottom: 0; }
+.cant li b { font-weight: 600; }
+.sup-rules { font-size: var(--t-14); color: var(--ink-2); display: grid; gap: var(--s-2); }
+
+/* refused (H3) */
+.refused { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0; }
+.refused > div { padding: var(--s-6); }
+.refused > div + div { border-inline-start: 1px solid var(--hair); }
+.refused h2 { font: 500 var(--t-28)/1.15 var(--sans); letter-spacing: -0.01em; }
+.refused .status { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.refused pre { margin-top: var(--s-4); padding: var(--s-4); background: var(--ground-deep); border: 1px solid var(--hair); border-radius: var(--r); font: 400 var(--t-13)/1.6 var(--mono); color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.refused .tbl td { vertical-align: top; }
+@media (max-width: 900px) { .refused { grid-template-columns: 1fr; } .refused > div + div { border-inline-start: 0; border-top: 1px solid var(--hair); } }
+
+/* export drawer content */
+.xp { padding: var(--s-4); display: grid; gap: var(--s-4); }
+.xp ol { padding-inline-start: 1.2em; display: grid; gap: var(--s-2); font-size: var(--t-14); color: var(--ink-2); }
+.xp pre { padding: var(--s-3); background: var(--ground-deep); border: 1px solid var(--hair); border-radius: var(--r); font: 400 var(--t-12)/1.6 var(--mono); color: var(--ink-2); overflow-x: auto; max-height: 260px; }
+.why-off { font-size: var(--t-13); color: var(--ink-2); max-width: 36ch; text-align: end; }
+@media (max-width: 760px) { .why-off { text-align: start; } }
+.sk-cal { height: 560px; }
+@media (max-width: 760px) {
+  main.wrap { gap: var(--s-4); padding-top: var(--s-4); }
+  .head h1 { font-size: var(--t-22); margin-top: var(--s-1); }
+  .head .lead { font-size: var(--t-16); }
+  #fresh { display: none; }
+  .act { grid-template-columns: auto 1fr; align-items: center; gap: var(--s-3); }
+  .act .btn.lg { min-height: var(--target); padding: 0 var(--s-4); font-size: var(--t-14); }
+  .cal { grid-template-columns: 112px repeat(7, 112px) 84px; min-width: 0; }
+  .cal .rh { padding: var(--s-2); }
+  .cal .rh span .x { display: none; }
+  .sk-cal { height: 420px; }
+}
+.empty .row-btns { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">HSE · Employer A (assumed)</span>
+  <nav aria-label="Sections"><a href="hse.html" aria-current="page">HSE week</a><a href="admin.html">Runtime config</a><a href="judge-governance.html">Governance story</a></nav>
+</header>
+
+<main class="wrap" id="main">
+  <!-- header: site, week, one sentence, Export -->
+  <section class="head" aria-labelledby="h1">
+    <div>
+      <form class="where" method="get" action="hse.html" id="filters">
+        <span>Mussafah M-14 yard</span>
+        <label class="week-pick"><span class="sr-only">Week</span>
+          <select name="week" id="week">
+            <option value="2026-08-31">Week of 31 Aug 2026 (replay)</option>
+            <option value="2026-09-21">Week of 21 Sep 2026 (break over)</option>
+            <option value="2026-11-09">Week of 9 Nov 2026 (this week)</option>
+          </select>
+        </label>
+        <span id="fresh">Forecast: ECMWF IFS, issued the day before, station <span class="mono">OMAA</span></span>
+      </form>
+      <h1 id="h1">HSE week</h1>
+      <p class="lead" id="lead" data-when="ideal partial stale offseason exporting exporterror refused"></p>
+    </div>
+    <div class="act">
+      <button class="btn primary lg" type="button" id="export" data-when="ideal partial stale offseason refused">Export report</button>
+      <button class="btn primary lg" type="button" aria-disabled="true" aria-busy="true" data-when="exporting">Building the report</button>
+      <button class="btn primary lg" type="button" aria-disabled="true" aria-describedby="xoff" data-when="exporterror error">Export report</button>
+      <p class="why-off" id="xoff" data-when="exporterror error">Export is off: the API is not answering. Request id <span class="mono">req_5c1e09a2</span>. Try again in a minute.</p>
+      <p class="faint" data-when="ideal partial stale offseason exporting refused">Aggregates only. No names. Small groups hidden.</p>
+    </div>
+  </section>
+
+  <!-- stale -->
+  <div class="notice" role="status" data-when="stale"><div><strong>Latest plan data: Fri 4 Sep, 18:00.</strong> Sat 5 and Sun 6 Sep have not arrived yet, so their cells show the forecast only. The page updates when they do.</div></div>
+  <!-- partial -->
+  <div class="notice" role="status" data-when="partial"><div><strong>Two crews are hidden this week.</strong> Crew C had fewer than 5 workers, so its hours are hidden; Crew D is hidden with it so that C cannot be worked out from the totals. Hidden is never shown as 0.</div></div>
+
+  <!-- H3: data request refused -->
+  <section class="panel refused" data-when="refused" aria-labelledby="ref-h" role="alert">
+    <div>
+      <p class="status">403 · Request refused</p>
+      <h2 id="ref-h">Employers have no route to individual data</h2>
+      <p class="muted" style="margin-top:var(--s-3)">Someone asked for one worker's heat risk. The service refused it and wrote an audit row. The worker sees the same row in My data.</p>
+      <p style="margin-top:var(--s-4);display:flex;gap:var(--s-4);flex-wrap:wrap"><a href="judge-governance.html">See it as a story</a><a href="worker-data.html">What the worker sees</a></p>
+      <pre aria-label="Problem response">{
+  "type": "/problems/no-individual-route",
+  "title": "Employers have no route to individual data",
+  "status": 403,
+  "request_id": "req_8b41d7f0"
+}</pre>
+    </div>
+    <div>
+      <p class="label">Audit row, append only</p>
+      <table class="tbl" style="margin-top:var(--s-2)">
+        <caption class="sr-only">Audit row for the refused request</caption>
+        <tbody>
+          <tr><th scope="row">When</th><td>Thu 3 Sep 2026, 16:05</td></tr>
+          <tr><th scope="row">Actor</th><td>HSE officer, Employer A (assumed)</td></tr>
+          <tr><th scope="row">Asked for</th><td>Individual heat risk for one worker</td></tr>
+          <tr><th scope="row">Purpose given</th><td>Inspection preparation</td></tr>
+          <tr><th scope="row">Outcome</th><td><strong>Refused</strong>. No data left the service.</td></tr>
+          <tr><th scope="row">Request id</th><td class="mono">req_8b41d7f0</td></tr>
+        </tbody>
+      </table>
+      <p class="faint" style="margin-top:var(--s-3);font-size:var(--t-13)">There is no such button in the product. This state shows what happens when the request is crafted by hand.</p>
+    </div>
+  </section>
+
+  <!-- loading -->
+  <div data-when="loading" aria-busy="true"><p class="sr-only" role="status">Loading the week</p><div class="skel sk-cal">.</div></div>
+
+  <!-- error -->
+  <section class="empty" data-when="error" role="alert">
+    <h3>The week did not load</h3>
+    <p class="muted">The API did not answer. Your week and site are kept in the address, so Try again picks up where you were.</p>
+    <div class="row-btns"><button class="btn" type="button" onclick="location.reload()">Try again</button><span class="faint" style="font-size:var(--t-13)">Request id <span class="mono">req_5c1e09a2</span></span></div>
+  </section>
+
+  <!-- empty: no data this week -->
+  <section class="empty" data-when="empty">
+    <h3>No plans or forecasts recorded for Mussafah M-14 yard, 9 to 15 Nov</h3>
+    <p class="muted" style="max-width:66ch">Numbers appear once the forecast has refreshed for the site and a supervisor has crews on it. The season data in this prototype runs 15 May to 30 Sep 2026. Midday break by law: not in force until 15 Jun.</p>
+    <div class="row-btns"><a class="btn signal" href="hse.html?week=2026-08-31">Open the replay week</a><a href="supervisor-setup.html">Set up crews for this site</a></div>
+    <details><summary>How data gets here</summary><p class="muted" style="max-width:66ch;margin-top:var(--s-2)">The forecast refreshes on a schedule and sets the heat for every hour. Supervisors sign a plan for each crew. This page counts hours, plans and stops for the site and week. It never receives names or symptoms.</p></details>
+  </section>
+
+  <!-- the hero calendar -->
+  <section data-when="ideal partial stale offseason exporting exporterror refused" aria-labelledby="cal-h" style="display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s-3)">
+    <h2 id="cal-h" class="sr-only">Working hours at WBGT 32 °C or more, by crew and day</h2>
+    <div class="cal-wrap" tabindex="0" aria-label="Heat calendar, scrolls sideways on small screens"><div class="cal" id="cal" role="table"></div></div>
+    <div class="key" id="key"></div>
+  </section>
+
+  <section class="figs" id="figs" data-when="ideal partial stale offseason exporting exporterror refused" aria-label="This week in figures"></section>
+
+  <div class="lower" data-when="ideal partial stale offseason exporting exporterror refused">
+    <section class="panel cant" aria-labelledby="cant-h">
+      <div class="panel-h"><h2 id="cant-h">What you cannot see here</h2><a href="hse.html?state=refused" style="font-size:var(--t-13)">What if someone asks for one worker?</a></div>
+      <div class="panel-b"><ul>
+        <li><b>Worker names.</b> Counts never carry a name. The roster's name column is dropped in the supervisor's browser.</li>
+        <li><b>Symptoms.</b> "I feel unwell" goes to a first-aider and never reaches this page.</li>
+        <li><b>Any worker's personal risk.</b> It is worked out on the worker's phone and stays there.</li>
+      </ul></div>
+    </section>
+    <section class="panel" aria-labelledby="sup-h">
+      <div class="panel-h"><h2 id="sup-h">Small groups are hidden</h2></div>
+      <div class="panel-b sup-rules">
+        <p>Fewer than <strong>5</strong> workers hides exposure counts: hours, plans signed, deviations.</p>
+        <p>Fewer than <strong>10</strong> workers hides health counts: stops.</p>
+        <p>When one crew is hidden, a second is hidden with it so the first cannot be worked out from the totals.</p>
+        <p><button type="button" class="proof" data-proof='{"what":"Small-group hiding: 5 workers for exposure counts, 10 for health counts, plus complementary hiding","protocol":"ADR 0011 §7.6. Which count uses which threshold is our reading (HANDOFF Q3), to be confirmed in B3","script":"backend reporting (aggregation)","file":"not a scored number","sha":"not hashed: rule, not data","label":"Rule as read from the ADR; awaiting confirmation"}'>Where these rules come from</button></p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<dialog class="drawer" id="xp" aria-labelledby="xp-h">
+  <div class="panel-h"><h2 id="xp-h">Export report</h2><button class="btn" type="button" data-close>Close</button></div>
+  <div class="xp">
+    <p class="muted">One CSV for this site and week. Aggregates only, with small groups hidden the same way as on screen.</p>
+    <ol><li>Header: site, week, forecast source, config version, generated time.</li><li>One row per crew and day: hours at WBGT 32 °C or more outside the midday break.</li><li>Hidden cells read "fewer than 5", never 0.</li></ol>
+    <pre id="xp-pre" aria-label="File preview"></pre>
+    <div style="display:flex;gap:var(--s-3);flex-wrap:wrap"><a class="btn primary" id="xp-dl" download>Download CSV</a><button class="btn" type="button" data-close>Cancel</button></div>
+  </div>
+</dialog>
+
+<script type="module">
+import { boot, q, STATE, fmt } from './assets/kit.js';
+import { loadJSON, RAMP_DARK, css } from './assets/heat.js';
+
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error', 'partial', 'stale', 'offseason', 'exporting', 'exporterror', 'refused'] });
+
+// ---- week from the URL (filters live in the URL); 'offseason' state = the week after the break ended ----
+const week = STATE === 'offseason' ? '2026-09-21' : STATE === 'empty' ? '2026-11-09' : (q.get('week') || '2026-08-31');
+const sel = document.getElementById('week');
+sel.value = week;
+sel.onchange = () => { const u = new URL(location.href); u.searchParams.set('week', sel.value); u.searchParams.delete('state'); location.href = u.pathname.split('/').pop() + u.search; };
+if (week === '2026-11-09' && STATE === 'ideal') { const u = new URL(location.href); u.searchParams.set('state', 'empty'); location.replace(u.pathname.split('/').pop() + u.search); }
+
+// ---- the season file (real IFS day-1 WBGT at OMAA); crews below are assumptions, labelled as such ----
+const S = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const i0 = S.days.indexOf(week);
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const days = i0 < 0 ? [] : S.days.slice(i0, i0 + 7).map((iso, k) => { const d = new Date(iso + 'T00:00:00Z'); return { iso, d, label: `${DOW[d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`, wbgt: S.wbgt_c_by_local_hour[i0 + k] }; });
+// midday break: 12:30 to 15:00, 15 Jun to 15 Sep inclusive (ruleset floor P-H1)
+const inSeason = (iso) => iso >= '2026-06-15' && iso <= '2026-09-15';
+const BAN = [12.5, 15], LIM = 32, H0 = 6, H1 = 20;
+const partial = STATE === 'partial';
+const CREWS = [
+  { id: 'A', what: 'Steel fixing', n: 12, from: 6, to: 17 },
+  { id: 'B', what: 'Concrete pour', n: 9, from: 6, to: 18 },
+  { id: 'C', what: 'Scaffolding', n: partial ? 4 : 6, from: 7, to: 16 },
+  { id: 'D', what: 'Finishing', n: 7, from: 8, to: 17 },
+];
+// complementary suppression: any crew under k hides itself and the next-smallest crew
+const K_EXP = 5;
+const under = CREWS.filter((c) => c.n < K_EXP);
+const hidden = new Set(under.map((c) => c.id));
+if (under.length === 1) hidden.add(CREWS.filter((c) => !hidden.has(c.id)).sort((a, b) => a.n - b.n)[0].id);
+const workDay = (d) => d.d.getUTCDay() !== 0; // assumed: crews work Mon to Sat
+// hours at WBGT >= 32 inside the shift and outside the break, in half-hour steps
+function exposure(c, day) {
+  let h = 0; const ban = inSeason(day.iso);
+  for (let t = c.from; t < c.to; t += 0.5) { if (ban && t >= BAN[0] && t < BAN[1]) continue; if (day.wbgt[Math.floor(t)] >= LIM) h += 0.5; }
+  return h;
+}
+const nf = (x) => (Number.isInteger(x) ? String(x) : x.toFixed(1));
+
+// ---- one cell's hour strip: 06:00 to 20:00, heat colour only on hours that count ----
+const W = 140, X = (t) => 2 + (t - H0) / (H1 - H0) * (W - 4);
+function strip(day, crew) {
+  const ban = inSeason(day.iso);
+  let s = `<line class="base" x1="${X(H0)}" x2="${X(H1)}" y1="33" y2="33"/>`;
+  const by = 8, bh = 22;
+  // slot first, so hour bars sit inside the recess
+  if (ban) s += `<rect class="slot" x="${X(BAN[0])}" y="${by - 5}" width="${X(BAN[1]) - X(BAN[0])}" height="${bh + 10}"/><line class="slot-rule" x1="${X(BAN[0])}" x2="${X(BAN[0])}" y1="${by - 5}" y2="${by + bh + 5}"/><line class="slot-rule" x1="${X(BAN[1])}" x2="${X(BAN[1])}" y1="${by - 5}" y2="${by + bh + 5}"/>`;
+  else s += `<rect class="slot-off" x="${X(BAN[0])}" y="${by - 5}" width="${X(BAN[1]) - X(BAN[0])}" height="${bh + 10}"/>`;
+  for (let t = H0; t < H1; t += 0.5) {
+    const v = day.wbgt[Math.floor(t)];
+    const inBan = ban && t >= BAN[0] && t < BAN[1];
+    if (inBan) continue;
+    let fill = null;
+    if (!crew) fill = css(RAMP_DARK(v));
+    else if (t >= crew.from && t < crew.to) fill = v >= LIM ? css(RAMP_DARK(v)) : null;
+    if (crew && t >= crew.from && t < crew.to && !fill) s += `<rect class="worked" x="${X(t) + 0.4}" y="${by + 7}" width="${X(t + 0.5) - X(t) - 0.8}" height="${bh - 7}"/>`;
+    if (fill) s += `<rect x="${X(t) + 0.4}" y="${by}" width="${X(t + 0.5) - X(t) - 0.8}" height="${bh}" fill="${fill}"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} 36" preserveAspectRatio="none" aria-hidden="true">${s}</svg>`;
+}
+
+function render() {
+  const cal = document.getElementById('cal');
+  if (!cal || !days.length) return;
+  const season = inSeason(days[0].iso) || inSeason(days[days.length - 1].iso);
+  let h = `<div class="row" role="row"><div class="ch rh" role="columnheader">Crew<span style="font-weight:400">Assumed crews</span></div>`;
+  h += days.map((d) => `<div class="ch" role="columnheader"><b>${d.label}</b>06 to 20</div>`).join('') + `<div class="ch n" role="columnheader"><b>Week</b>hours</div></div>`;
+  // site forecast row: the week spine, every hour in heat colour
+  h += `<div class="row wx" role="row"><div class="rh" role="rowheader"><b>Site forecast</b><span>WBGT in sun, daily peak</span></div>`;
+  h += days.map((d) => { const mx = Math.max(...d.wbgt.slice(H0, H1)); return `<div class="c" role="cell" aria-label="${d.label}: peak ${mx.toFixed(1)} °C"><span class="v">${mx.toFixed(1)}<small>°C</small></span>${strip(d, null)}</div>`; }).join('');
+  const wkMax = Math.max(...days.flatMap((d) => d.wbgt.slice(H0, H1)));
+  h += `<div class="tot" role="cell">${wkMax.toFixed(1)}<small>°C peak</small></div></div>`;
+  // crew rows
+  const dayTot = days.map(() => 0); let all = 0;
+  for (const c of CREWS) {
+    const hid = hidden.has(c.id), why = c.n < K_EXP ? `fewer than ${K_EXP} workers` : 'hidden with Crew C';
+    h += `<div class="row" role="row"><div class="rh" role="rowheader"><b>Crew ${c.id}</b><span><span class="x">${c.what} · </span>${hid && c.n < K_EXP ? `fewer than ${K_EXP}` : c.n} workers<br>${fmt(c.from)} to ${fmt(c.to)}</span></div>`;
+    let wk = 0;
+    days.forEach((d, k) => {
+      if (!workDay(d)) { h += `<div class="c rest" role="cell">Rest day</div>`; return; }
+      const e = exposure(c, d); wk += e; dayTot[k] += e;
+      if (hid) { h += `<div class="c hidden" role="cell">${c.n < K_EXP ? `Fewer than ${K_EXP}<br>workers` : 'Hidden<br>with Crew C'}</div>`; return; }
+      h += `<div class="c" role="cell" aria-label="Crew ${c.id}, ${d.label}: ${nf(e)} hours at WBGT 32 °C or more outside the break"><span class="v${e === 0 ? ' zero' : ''}">${nf(e)}<small>h</small></span>${strip(d, c)}</div>`;
+    });
+    all += wk;
+    h += hid ? `<div class="tot hidden" role="cell">${c.n < K_EXP ? `Fewer than ${K_EXP}` : 'Hidden'}</div></div>` : `<div class="tot" role="cell">${nf(wk)}<small>h</small></div></div>`;
+  }
+  h += `<div class="row sum" role="row"><div class="rh" role="rowheader"><b>All crews</b><span>crew-hours</span></div>`;
+  h += days.map((d, k) => `<div class="c" role="cell"><span class="v${workDay(d) ? '' : ' zero'}">${workDay(d) ? nf(dayTot[k]) : 'Rest'}</span></div>`).join('') + `<div class="tot" role="cell">${nf(all)}<small>h</small></div></div>`;
+  cal.innerHTML = h;
+
+  // key: ramp, slot, hidden, provenance
+  const stops = Array.from({ length: 11 }, (_, i) => css(RAMP_DARK(30 + i))).join(',');
+  document.getElementById('key').innerHTML = `
+    <span class="it"><span class="faint">30</span><span class="ramp" style="background:linear-gradient(90deg,${stops})"></span><span class="faint">40 °C WBGT</span></span>
+    <span class="it"><span class="sw wk"></span>Worked, under 32 °C</span>
+    <span class="it"><span class="sw ${season ? 'slot' : 'off'}"></span>${season ? 'Midday break 12:30 to 15:00, by law' : 'Midday break by law: not in force until 15 Jun'}</span>
+    <span class="it"><span class="sw hid"></span>Hidden: too few workers</span>
+    <span class="src">Real weather, assumed crews <button type="button" class="proof" data-proof='${JSON.stringify({ what: 'Hours of each crew shift with forecast WBGT at or above 32 °C, outside the midday break, in half-hour steps', protocol: 'Proxy until B3 zones each hour with the ADOSH TWL (Table 1): the fixed WBGT 32 °C rule from the scoreboard baselines. Crew sizes, shifts and the Mon to Sat week are assumed.', script: 'prototype/hse.html (exposure)', file: 'data/omaa_2026_ifs_d1_wbgt_hourly.json', sha: 'not hashed: prototype data file', label: 'Real weather (ECMWF IFS day-1 at OMAA, fetched 11 Nov 2026), assumed crews' }).replace(/'/g, '&#39;')}'>Why 32 °C?</button></span>`;
+
+  // lead sentence + figures
+  let peak = { v: -1 }; days.forEach((d) => d.wbgt.forEach((v, hr) => { if (hr >= H0 && hr < H1 && v > peak.v) peak = { v, d, hr }; }));
+  const peakInBan = inSeason(peak.d.iso) && peak.hr + 0.5 >= BAN[0] && peak.hr < BAN[1];
+  const shown = CREWS.filter((c) => !hidden.has(c.id));
+  const shownH = shown.reduce((a, c) => a + days.filter(workDay).reduce((b, d) => b + exposure(c, d), 0), 0);
+  const lead = document.getElementById('lead');
+  lead.innerHTML = `<strong>${nf(all)} crew-hours of work at WBGT 32 °C or more${season ? ', outside the midday break' : ''}.</strong> Hottest hour ${peak.d.label}, ${fmt(peak.hr)}: ${peak.v.toFixed(1)} °C${peakInBan ? ', inside the break' : ''}.`;
+  // plans signed and stops have no data until a pilot: one quiet line under the tiles, not two placeholder tiles
+  const stopsTile = partial ? `<div class="fig"><p class="label">Stops</p><p class="big hid">Hidden: fewer than 10</p><p>Stops are health counts; fewer than 10 workers on site hides them.</p></div>` : '';
+  document.getElementById('figs').innerHTML = `
+    <div class="fig"><p class="label">Hours at WBGT 32 °C or more</p><p class="big">${nf(all)}<small>crew-hours</small></p><p>${hidden.size ? `${nf(shownH)} from crews you can see; the rest from hidden crews, total only.` : `${CREWS.length} crews, ${days.filter(workDay).length} working days.`}</p></div>
+    <div class="fig"><p class="label">Midday break</p>${season ? `<p class="big word">In force, 12:30 to 15:00</p><p>Every day of this week. Hours inside it are not counted as worked.</p>` : `<p class="big word">Midday break not in force</p><p>It ended 15 Sep and returns 15 Jun. Every shift hour counts this week.</p>`}</div>
+    ${stopsTile}
+    <p class="figs-note">Plans signed before shift and stops are counted once crews use the product; the prototype has none. Unsigned days use the rule plan, and alerts and stops never wait for a signature.</p>`;
+  document.getElementById('figs').style.setProperty('--n', partial ? 3 : 2);
+
+  // export file: built from exactly what is on screen
+  const rows = [['crew', ...days.map((d) => d.iso), 'week_hours']];
+  for (const c of CREWS) {
+    const hid = hidden.has(c.id);
+    rows.push([`Crew ${c.id}`, ...days.map((d) => (!workDay(d) ? 'rest day' : hid ? `fewer than ${K_EXP}` : nf(exposure(c, d)))), hid ? `fewer than ${K_EXP}` : nf(days.filter(workDay).reduce((b, d) => b + exposure(c, d), 0))]);
+  }
+  const csv = [`# Stellar Blaze HSE report. Aggregates only.`, `# site: Mussafah M-14 yard (assumed crews)`, `# week: ${days[0].iso} to ${days[6].iso}`, `# measure: hours at WBGT >= 32 C outside the midday break (proxy until ADOSH TWL zones, B3)`, `# forecast: ${S.source}`, `# config version: written by the API at export`, ...rows.map((r) => r.join(','))].join('\n');
+  document.getElementById('xp-pre').textContent = csv;
+  const dl = document.getElementById('xp-dl'); dl.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); dl.download = `hse-week-${days[0].iso}.csv`;
+}
+render();
+
+if (STATE === 'stale') document.getElementById('fresh').innerHTML = 'Latest plan data: Fri 4 Sep, 18:00';
+
+// export drawer
+const xp = document.getElementById('xp');
+document.getElementById('export').onclick = () => xp.showModal();
+xp.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => xp.close()));
+xp.addEventListener('click', (e) => { if (e.target === xp) xp.close(); });
+</script>
+</body>
+</html>

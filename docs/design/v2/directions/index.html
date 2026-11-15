@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three directions · Stellar Blaze v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --ground: oklch(0.97 0.002 255); --ink: oklch(0.2 0.01 255); --ink-2: oklch(0.42 0.01 255); --hair: oklch(0.86 0.005 255); }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 400 16px/1.55 "Archivo", system-ui, sans-serif; padding: 48px clamp(16px, 4vw, 56px) 96px; }
+h1 { font-size: 34px; font-weight: 400; letter-spacing: -0.02em; }
+.intro { max-width: 70ch; color: var(--ink-2); margin-top: 12px; }
+section { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--ink); }
+h2 { font-size: 24px; font-weight: 600; }
+h2 span { font-weight: 400; color: var(--ink-2); }
+.what { max-width: 75ch; margin-top: 8px; color: var(--ink-2); }
+.links { margin-top: 10px; display: flex; gap: 18px; flex-wrap: wrap; }
+.links a { color: var(--ink); }
+.shots { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; margin-top: 20px; align-items: start; }
+.shots img { width: 100%; height: auto; display: block; border: 1px solid var(--hair); }
+.shots figcaption { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+@media (max-width: 800px) { .shots { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>Stellar Blaze v2: three directions to choose from</h1>
+<p class="intro">Same content, three looks. Each has a front page for judges (with a moving 3D picture made only from real forecast data), the worker's phone screen and a one-sentence site setup. Pick one, or say which parts of each you like. Open a direction's links to see it live; the screenshots below are fixed at 2 pm on 3 Sep 2026.</p>
+
+<section>
+  <h2>A. Isotherm <span>the scientific instrument</span></h2>
+  <p class="what">Dark and quiet, like a weather scientist's screen. A 3D landscape of the UAE where height and colour show the heat, hour by hour, with thin contour lines. Workers get a white, calm screen with one big word.</p>
+  <p class="links"><a href="isotherm/index.html">Front page</a><a href="isotherm/worker.html">Worker</a><a href="isotherm/setup.html">Site setup</a><a href="isotherm/description.md">Description</a></p>
+  <div class="shots">
+    <figure><img src="isotherm/shots/landing-1440.png" alt="Isotherm front page at desktop width"><figcaption>Front page, desktop</figcaption></figure>
+    <figure><img src="isotherm/shots/worker-390.png" alt="Isotherm worker screen on a phone"><figcaption>Worker, phone</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>B. Almanac <span>the newspaper investigation</span></h2>
+  <p class="what">Light and editorial, like a serious newspaper's climate story. The whole summer drawn as a 3D range of ridges, one per day, with a confident serif headline. Workers get a plain sentence first.</p>
+  <p class="links"><a href="almanac/index.html">Front page</a><a href="almanac/worker.html">Worker</a><a href="almanac/setup.html">Site setup</a><a href="almanac/description.md">Description</a></p>
+  <div class="shots">
+    <figure><img src="almanac/shots/landing-1440.png" alt="Almanac front page at desktop width"><figcaption>Front page, desktop</figcaption></figure>
+    <figure><img src="almanac/shots/worker-390.png" alt="Almanac worker screen on a phone"><figcaption>Worker, phone</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>C. Watch <span>the operations room</span></h2>
+  <p class="what">Dark graphite, like an airline operations centre. A tilted 3D map built from columns, one per forecast square, surrounded by calm live panels. Workers get a light screen with the same precise, instrument-like numbers.</p>
+  <p class="links"><a href="watch/index.html">Front page</a><a href="watch/worker.html">Worker</a><a href="watch/setup.html">Site setup</a><a href="watch/description.md">Description</a></p>
+  <div class="shots">
+    <figure><img src="watch/shots/landing-1440.png" alt="Watch front page at desktop width"><figcaption>Front page, desktop</figcaption></figure>
+    <figure><img src="watch/shots/worker-390.png" alt="Watch worker screen on a phone"><figcaption>Worker, phone</figcaption></figure>
+  </div>
+</section>
+</body>
+</html>

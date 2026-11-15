@@ -1,0 +1,354 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/supervisor-setup.html",
+  "when": "2026-11-12T01:04:57.993Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-setup\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-setup\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 1
+          },
+          {
+            "px": 13,
+            "n": 42
+          },
+          {
+            "px": 14,
+            "n": 32
+          },
+          {
+            "px": 16,
+            "n": 6
+          },
+          {
+            "px": 18,
+            "n": 9
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 36,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "New site · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-setup\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 70.5
+        },
+        "squint": {
+          "masses": 11,
+          "competitors": 1,
+          "dominance": 0.89,
+          "top": [
+            {
+              "cells": 380,
+              "weight": 209.14,
+              "cx": 0.744,
+              "cy": 0.207,
+              "bbox": [
+                0.597,
+                0.075,
+                0.889,
+                0.328
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 8.64,
+              "cx": 0.267,
+              "cy": 0.075,
+              "bbox": [
+                0.097,
+                0.075,
+                0.431,
+                0.075
+              ]
+            },
+            {
+              "cells": 12,
+              "weight": 8.23,
+              "cx": 0.188,
+              "cy": 0.211,
+              "bbox": [
+                0.167,
+                0.194,
+                0.208,
+                0.224
+              ]
+            },
+            {
+              "cells": 8,
+              "weight": 1.81,
+              "cx": 0.314,
+              "cy": 0.493,
+              "bbox": [
+                0.264,
+                0.493,
+                0.361,
+                0.493
+              ]
+            },
+            {
+              "cells": 4,
+              "weight": 1.4,
+              "cx": 0.703,
+              "cy": 0.41,
+              "bbox": [
+                0.694,
+                0.403,
+                0.708,
+                0.418
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.292,
+        "centroid": {
+          "x": 0.649,
+          "y": 0.249
+        },
+        "colourfulness": 49.7,
+        "luminanceSpread": 0.528,
+        "chromaProxy": 0.189,
+        "hierarchyByHueOnly": false,
+        "inkPct": 21.8,
+        "findings": [
+          {
+            "id": "unbalanced",
+            "severity": "minor",
+            "detail": "ink centroid 0.292 from centre at (0.649, 0.249); corpus p95 is 0.264"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-setup\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-setup\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 1
+          },
+          {
+            "px": 13,
+            "n": 34
+          },
+          {
+            "px": 14,
+            "n": 28
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 17,
+            "n": 4
+          },
+          {
+            "px": 18,
+            "n": 9
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 28,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 26
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 58,
+            "n": 1
+          },
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 3,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "New site · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-setup\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 44.1
+        },
+        "squint": {
+          "masses": 3,
+          "competitors": 1,
+          "dominance": 0.583,
+          "top": [
+            {
+              "cells": 460,
+              "weight": 256.07,
+              "cx": 0.62,
+              "cy": 0.917,
+              "bbox": [
+                0.236,
+                0.804,
+                0.931,
+                0.991
+              ]
+            },
+            {
+              "cells": 131,
+              "weight": 105.09,
+              "cx": 0.417,
+              "cy": 0.553,
+              "bbox": [
+                0.319,
+                0.514,
+                0.514,
+                0.589
+              ]
+            },
+            {
+              "cells": 168,
+              "weight": 77.81,
+              "cx": 0.132,
+              "cy": 0.855,
+              "bbox": [
+                0.042,
+                0.804,
+                0.222,
+                0.907
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.239,
+        "centroid": {
+          "x": 0.46,
+          "y": 0.736
+        },
+        "colourfulness": 72.9,
+        "luminanceSpread": 0.528,
+        "chromaProxy": 0.253,
+        "hierarchyByHueOnly": false,
+        "inkPct": 37.8,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [
+    {
+      "at": "dark@1440",
+      "id": "unbalanced",
+      "severity": "minor",
+      "detail": "ink centroid 0.292 from centre at (0.649, 0.249); corpus p95 is 0.264"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

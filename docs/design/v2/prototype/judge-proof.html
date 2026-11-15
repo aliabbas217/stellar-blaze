@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proof sheet · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.sheet { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--s-12); align-items: start; }
+.num { display: grid; gap: var(--s-2); padding-bottom: var(--s-6); border-bottom: 1px solid var(--edge); }
+.num strong { font: 300 clamp(3.5rem, 7vw, 6rem)/0.95 var(--sans); letter-spacing: -0.035em; }
+.num strong small { font-size: 0.36em; color: var(--ink-3); letter-spacing: 0; margin-inline-start: 8px; }
+.num p { color: var(--ink-2); font-size: var(--t-18); max-width: 52ch; }
+.num .lab { color: var(--ink); font-size: var(--t-14); font-weight: 500; }
+dl.prov { display: grid; grid-template-columns: 150px minmax(0, 1fr); }
+dl.prov dt, dl.prov dd { padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); }
+dl.prov dt { color: var(--ink-3); font-size: var(--t-14); }
+dl.prov dd { font-size: var(--t-16); overflow-wrap: anywhere; min-width: 0; }
+.sheet > * { min-width: 0; }
+dl.prov dd .mono { font-size: var(--t-13); }
+pre.code { margin-top: var(--s-2); padding: var(--s-3); background: var(--ground-deep); border: 1px solid var(--hair); border-radius: var(--r); font: 400 var(--t-13)/1.55 var(--mono); color: var(--ink-2); overflow-x: auto; white-space: pre; }
+.check { display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; margin-top: var(--s-6); }
+.check output { color: var(--ink-2); font-size: var(--t-14); }
+.check output b { color: var(--ink); }
+/* provenance timeline: the time spine of a number */
+.chain { list-style: none; padding: 0; position: relative; }
+.chain::before { content: ""; position: absolute; inset-block: 10px 10px; inset-inline-start: 7px; width: 2px; background: var(--edge); }
+.chain li { position: relative; padding: 0 0 var(--s-8) var(--s-8); display: grid; gap: 2px; }
+.chain li::before { content: ""; position: absolute; inset-inline-start: 2px; top: 5px; width: 12px; height: 12px; background: var(--ink); border-radius: 1px; }
+.chain li.pending::before { background: var(--ground); border: 1px dashed var(--ink-3); }
+.chain li.slot::before { background: var(--slot); border: 1px solid var(--edge); }
+.chain time { color: var(--ink-3); font-size: var(--t-13); }
+.chain b { font-weight: 600; }
+.chain span { color: var(--ink-2); font-size: var(--t-14); }
+.other { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: var(--t-14); color: var(--ink-3); }
+.other a { color: var(--ink-2); }
+.other a[aria-current] { color: var(--ink); font-weight: 600; text-decoration: none; }
+@media (max-width: 900px) { .sheet { grid-template-columns: 1fr; gap: var(--s-8); } dl.prov { grid-template-columns: 1fr; } dl.prov dt { border-bottom: 0; padding-bottom: 0; } }
+</style>
+</head>
+<body class="j-has-story">
+<a class="skip" href="judge-season.html">Skip to the scoreboard</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Where one number comes from</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html" aria-current="page">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="j-page">
+  <div class="j-head">
+    <p class="crumb">Proof sheet · <span class="other" id="others" style="display:inline-flex"></span></p>
+  </div>
+
+  <div data-when="loading" class="sheet"><div class="skel" style="height:480px">.</div><div class="skel" style="height:380px">.</div></div>
+
+  <div class="sheet" data-when="ideal">
+    <section aria-labelledby="h-num">
+      <div class="num">
+        <p class="lab" id="lab">Real forecast, not station truth</p>
+        <h1 class="sr-only" id="h-num">Proof sheet</h1>
+        <strong id="big">1,624<small>of 1,807</small></strong>
+        <p id="what">working-hour forecasts above the 26.6 °C heavy-work limit at Abu Dhabi airport, 15 May to 30 Sep 2026.</p>
+      </div>
+      <dl class="prov" id="prov"></dl>
+      <div class="check" id="check-row"><button class="btn primary" type="button" id="check">Recount it in this browser</button><output id="out" aria-live="polite"></output></div>
+    </section>
+    <aside aria-labelledby="h-chain">
+      <h2 class="label" id="h-chain" style="margin-bottom:var(--s-4)">The number's timeline</h2>
+      <ol class="chain" id="chain"></ol>
+    </aside>
+  </div>
+
+  <section class="j-sec" data-when="empty"><div class="empty"><h3>No provenance recorded for this number. It is not shown as a result.</h3><p class="muted">Every number on this site carries a protocol line, a script, a file and a fingerprint. One without them is left out, never estimated.</p><a class="btn primary" href="judge-proof.html">See a number that has its proof</a></div></section>
+  <section class="j-sec" data-when="error"><div class="empty"><h3>The file behind this number could not be read</h3><p class="muted">The fingerprint cannot be checked until it loads, so the number is not shown.</p><a class="btn primary" href="judge-proof.html">Try again</a><p class="faint" style="font-size:var(--t-13)">Request ID <span class="mono">req-b1c77e</span></p></div></section>
+</main>
+<nav class="j-story" id="story" aria-label="Story"></nav>
+
+<script type="module">
+import { boot, q } from './assets/kit.js';
+import { loadData, sha256, seasonFacts, storyNav, nf, LIMIT } from './assets/judge.js';
+const N = { hours: 'Hot working hours', break: 'Hours the break covers', outcome: 'Outcome sentence', unwarned: 'Danger hours unwarned (ours)' };
+const id = q.get('n') || 'hours';
+const known = id in N;
+const state = q.get('state') || (known ? 'ideal' : 'empty');
+if (!q.get('state') && !known) { const u = new URL(location.href); u.searchParams.set('state', 'empty'); history.replaceState(null, '', u); }
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error'] });
+for (const el of document.querySelectorAll('[data-when]')) el.hidden = !el.dataset.when.split(' ').includes(state);
+storyNav(document.getElementById('story'), 'proof');
+const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+document.getElementById('others').innerHTML = Object.entries(N).map(([k, v]) => `<a href="judge-proof.html?n=${k}" ${k === id ? 'aria-current="page"' : ''}>${v}</a>`).join('');
+
+const COUNT = `// assets/judge.js, seasonFacts(): the exact code that drew the landing
+for (const [i, row] of hours.entries())        // 139 days
+  for (let h = 6; h < 19; h++) {                // 06:00 to 18:59
+    n++;
+    if (row[h] > 26.6) {
+      over++;
+      if (inBreakDates(i) && h >= 12 && h <= 14) inBreak++;
+    }
+  }`;
+const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+const chain = (items) => items.map(([cls, t, b, s]) => `<li class="${cls}"><time>${t}</time><b>${b}</b><span>${s}</span></li>`).join('');
+
+if (state === 'ideal') {
+  if (id === 'hours' || id === 'break') {
+    const season = await loadData('omaa_2026_ifs_d1_wbgt_hourly.json'), f = seasonFacts(season.json);
+    const sha = await sha256(season.buf);
+    const brk = id === 'break';
+    document.getElementById('big').innerHTML = brk ? `${nf(f.inBan)}<small>of ${nf(f.over)}</small>` : `${nf(f.over)}<small>of ${nf(f.n)}</small>`;
+    document.getElementById('what').textContent = brk ? 'hot working hours that fall inside the legal midday break, counting the 12:00 hour in full, which flatters the break.' : 'working-hour forecasts above the 26.6 °C heavy-work limit at Abu Dhabi airport, 15 May to 30 Sep 2026.';
+    document.getElementById('prov').innerHTML =
+      row('Protocol line', brk ? 'Hours 12, 13 and 14 on 15 Jun to 15 Sep, among the hours above 26.6 °C. The break itself runs 12:30 to 15:00.' : 'Hours 06:00 to 18:59, 13 per day, 15 May to 30 Sep 2026, where the day-1 forecast WBGT in sun is above 26.6 °C (NIOSH, heavy work, 415 W).') +
+      row('Script', `<span class="mono">assets/judge.js</span> seasonFacts()<pre class="code">${COUNT}</pre>`) +
+      row('File', `<span class="mono">data/omaa_2026_ifs_d1_wbgt_hourly.json</span><br><span class="faint" style="font-size:var(--t-14)">${nf(season.bytes)} bytes · ${season.json.days.length} days × 24 hours · ${season.json.source}</span>`) +
+      row('SHA-256', `<span class="mono">${sha || 'needs a secure context to compute'}</span><br><span class="faint" style="font-size:var(--t-14)">Computed now, in this browser, from the bytes the page drew</span>`) +
+      row('Physics', season.json.physics) +
+      row('Label', 'Real forecast, not station truth. The truth-scored numbers come from the scoring run.');
+    document.getElementById('chain').innerHTML = chain([
+      ['', '14 May to 29 Sep 2026, 18:00 each evening', 'Forecast issued', 'ECMWF IFS 0.25°, the run a site manager would have had the evening before'],
+      ['slot', '15 Jun to 15 Sep, 12:30 to 15:00', 'Midday break in force', 'The window the second number counts'],
+      ['', '11 Nov 2026', 'Fetched and frozen', 'Open-Meteo Previous Runs archive; never edited after the fetch'],
+      ['', '12 Nov 2026', 'Counted', 'This page recounts it on every load'],
+      ['pending', '12 Nov 2026', 'Not a scored result', 'No station truth is involved in this number']]);
+    document.getElementById('check').onclick = () => { const g = seasonFacts(season.json);
+      document.getElementById('out').innerHTML = `Recounted now: <b>${nf(g.over)} of ${nf(g.n)}</b>, <b>${nf(g.inBan)}</b> in the break. ${g.over === f.over && g.inBan === f.inBan ? 'Matches the number above.' : 'Does not match: report this.'}`; };
+  } else {
+    // scored numbers: pending until the exporter writes its provenance block
+    const outcome = id === 'outcome';
+    document.getElementById('lab').textContent = 'Pending: written once by the scoring run';
+    document.getElementById('big').innerHTML = '<span class="pend" style="font-size:var(--t-36)"><i style="width:28px;height:28px"></i>pending</span>';
+    document.getElementById('what').textContent = outcome ? 'The sentence that says what the season showed, chosen from the pre-registered outcome table, the same way whether we won or lost.' : 'Danger hours nobody was warned about under Stellar Blaze, worker-hours, with a 95 % interval.';
+    document.getElementById('prov').innerHTML =
+      row('Protocol line', outcome ? 'The pre-registered outcome table: one sentence for each possible result, including the ones where we lose, fixed before scoring.' : 'Worker-hours where the station was in the ADOSH High zone and the evening-before policy gave no warning, with the 95 % interval method fixed in the protocol.') +
+      row('Script', '<span class="mono">backend/eval/policy_scoreboard.py</span>') +
+      row('File', '<span class="mono">policy_scoreboard.json</span>') +
+      row('SHA-256', 'Written by the scoring run with the file') +
+      row('Label', 'Real weather, scored against station thermometers, assumed crew of 20');
+    document.getElementById('chain').innerHTML = chain([
+      ['', '14 May to 29 Sep 2026', 'Forecasts issued', 'The evening before each day'],
+      ['', '12 Nov 2026', 'Protocol committed', 'Measures, demo day rule, threshold'],
+      ['pending', '12 Nov 2026', 'Single scoring run', 'Writes the file, its fingerprint and this sheet'],
+      ['pending', 'after the run', 'Shown on the scoreboard', 'Unchanged whatever the result']]);
+    document.getElementById('check-row').innerHTML = '<a class="btn primary" href="judge-season.html">Back to the scoreboard</a>';
+  }
+}
+</script>
+</body>
+</html>

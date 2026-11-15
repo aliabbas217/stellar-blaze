@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Governance refusal · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.desk { max-width: var(--content-max); margin-inline: auto; padding: var(--s-4) clamp(16px, 3vw, 40px) var(--s-12); }
+.ev-tabs { display: flex; flex-wrap: wrap; gap: 0 var(--s-1); margin-bottom: var(--s-4); font-size: var(--t-13); }
+.ev-tabs span { color: var(--ink-3); display: inline-flex; align-items: center; min-height: 32px; margin-inline-end: var(--s-2); }
+.ev-tabs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--s-2); color: var(--ink-3); text-decoration: none; border-bottom: 2px solid transparent; }
+.ev-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.head { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.eyebrow { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.head h1 { max-width: 36ch; }
+.stepnav { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-12); padding-top: var(--s-4); border-top: 1px solid var(--hair); }
+.stepnav a:not(.btn) { color: var(--ink-2); font-size: var(--t-14); }
+.notes { margin-top: var(--s-6); padding-left: var(--s-4); color: var(--ink-3); font-size: var(--t-13); display: grid; gap: var(--s-1); max-width: 90ch; }
+.tag.rec { border-color: var(--ink-2); color: var(--ink); font-weight: 600; letter-spacing: 0.06em; }
+.banner { margin-bottom: var(--s-4); }
+
+/* hero: the time sequence, a small spine of events */
+.seq { view-transition-name: spine; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: 0; list-style: none; padding: 0; }
+.ev { position: relative; padding: 0 var(--s-4) 0 0; }
+.ev::before { content: ""; position: absolute; top: 9px; inset-inline: 0; height: 2px; background: var(--edge); }
+.ev:last-child::before { inset-inline-end: 50%; }
+.ev .node { display: block; position: relative; width: 20px; height: 20px; border-radius: 1px; background: var(--ground); border: 2px solid var(--ink); }
+.ev.done .node { background: var(--ink); }
+.ev.refuse .node { background: var(--signal); border-color: var(--signal); }
+.ev.wait .node { border-style: dashed; border-color: var(--edge); }
+.ev .t { display: flex; flex-wrap: wrap; gap: 0 var(--s-2); align-items: baseline; margin: var(--s-3) 0 var(--s-2); }
+.ev .t b { white-space: nowrap; }
+.ev .t b { font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.ev .t span { font-size: var(--t-13); color: var(--ink-3); }
+.ev .t b time { font-weight: 400; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-inline-start: 4px; }
+.ev h3 { font: 600 var(--t-16)/1.3 var(--sans); margin-bottom: var(--s-3); }
+.card { background: var(--panel); border: 1px solid var(--hair); border-radius: var(--r); padding: var(--s-4); display: grid; gap: var(--s-3); min-height: 300px; align-content: start; }
+.card > * { min-width: 0; }
+.ev.wait .card { background: transparent; border-style: dashed; border-color: var(--edge); color: var(--ink-3); }
+.req-line { font-family: var(--mono); font-size: var(--t-13); overflow-wrap: anywhere; }
+.req-line .m { color: var(--ink); font-weight: 600; margin-inline-end: 6px; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.field select { min-height: var(--target); padding: 0 var(--s-2); background: var(--ground-deep); border: 1px solid var(--edge); border-radius: var(--r); }
+.field .hint { font-size: var(--t-13); color: var(--ink-3); }
+.status { display: flex; align-items: baseline; gap: var(--s-3); }
+.status strong { font: 500 var(--t-48)/1 var(--sans); letter-spacing: -0.02em; }
+.status span { font-size: var(--t-18); }
+pre.problem { margin: 0; font-family: var(--mono); font-size: var(--t-13); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-2); }
+pre.problem .k { color: var(--ink); }
+.ct { font-family: var(--mono); font-size: var(--t-12); color: var(--ink-3); }
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s-1) var(--s-3); font-size: var(--t-14); }
+dl.kv dt { color: var(--ink-3); }
+dl.kv dd { overflow-wrap: anywhere; }
+.phone-row { border: 1px solid var(--edge); border-radius: var(--r); padding: var(--s-3); display: grid; gap: var(--s-2); background: var(--ground); }
+.phone-row .who { font-size: var(--t-13); color: var(--ink-3); display: flex; justify-content: space-between; }
+.phone-row p.big { font-size: var(--t-18); font-weight: 500; line-height: 1.3; }
+.phone-row .new { color: var(--signal); font-weight: 600; }
+.audit-list { display: grid; gap: var(--s-2); }
+.audit-list .phone-row + .phone-row { opacity: 0.8; }
+.send { width: 100%; }
+@media (max-width: 1000px) {
+  .seq { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .ev { padding: 0 0 var(--s-6) 36px; }
+  .ev::before { top: 0; bottom: 0; inset-inline: 9px auto; width: 2px; height: auto; }
+  .ev:last-child::before { bottom: auto; height: 10px; }
+  .ev .node { position: absolute; inset-inline-start: 0; top: 0; }
+  .ev .t { margin-top: 0; }
+  .card { min-height: 0; }
+}
+.proves { margin-top: var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+.proves code { overflow-wrap: anywhere; min-width: 0; }
+.proves h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.proves ul { list-style: none; padding: 0; display: grid; }
+.proves li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.proves li span { color: var(--ink-2); }
+@media (max-width: 760px) { .proves li { grid-template-columns: 1fr; gap: var(--s-1); } }
+.after { margin-top: var(--s-6); display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Evidence you can try</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="desk" id="main">
+  <nav class="ev-tabs" aria-label="Evidence"><span>Try it yourself</span><a href="judge-validator.html">Try a plan</a><a href="judge-frontier.html">Roster frontier</a><a href="judge-climate.html">Warmer summer</a><a href="judge-governance.html" aria-current="page">Governance</a><a href="judge-faults.html">Break things</a></nav>
+  <header class="head">
+    <p class="eyebrow">Governance refusal · simulated session in the browser</p>
+    <h1 class="j-h2">An employer asks for one worker's heat risk. The system refuses, and the worker sees that it was asked.</h1>
+  </header>
+
+  <div class="notice" data-when="recorded" role="status" style="margin-bottom:var(--s-4)"><span class="tag rec">RECORDED</span><p><strong>The API is not reachable.</strong> This is the recorded run: the same request, the same answer, the same audit row.</p></div>
+  <div class="notice" data-when="error" role="alert" style="margin-bottom:var(--s-4)"><p><strong>The console could not reach the API.</strong> Nothing was sent, so nothing was recorded. <a href="?state=recorded">Show the recorded run</a> · request id <span class="mono">req_e02b61d9</span></p></div>
+
+  <ol class="seq" aria-label="What happens, in time order" id="seq">
+    <!-- 1 the request -->
+    <li class="ev done">
+      <span class="node" aria-hidden="true"></span>
+      <p class="t"><b id="t1">Now</b><span>Employer console</span></p>
+      <div class="card">
+        <h3>The request</h3>
+        <p class="req-line"><span class="m">GET</span>/v1/workers/w_3k9q/heat-risk</p>
+        <p class="faint" style="font-size:var(--t-13)">Signed in as an employer account (HSE role) for Mussafah M-14 yard.</p>
+        <div class="field"><label for="purpose">Purpose</label><select id="purpose"><option>Safety check</option><option>Attendance and pay</option><option>Performance review</option></select><span class="hint">Every purpose gets the same answer.</span></div>
+        <button class="btn primary lg send" type="button" id="send">Send the employer's request</button>
+      </div>
+    </li>
+    <!-- 2 the answer -->
+    <li class="ev" id="ev2">
+      <span class="node" aria-hidden="true"></span>
+      <p class="t"><b id="t2">Next</b><span>API</span></p>
+      <div class="card">
+        <div data-when="empty error"><h3>The answer</h3><p>Nothing sent yet.</p></div>
+        <div data-when="loading" aria-busy="true"><h3>The answer</h3><p class="skel" style="height:48px;width:50%">.</p><p class="skel" style="height:140px;margin-top:8px">.</p><p class="sr-only" role="status">Waiting for the API</p></div>
+        <div data-when="ideal recorded" style="display:grid;gap:var(--s-3)">
+          <p class="status" tabindex="-1" id="s403"><strong>403</strong><span>Forbidden</span></p>
+          <p class="ct">content-type: application/problem+json</p>
+          <pre class="problem" tabindex="0" aria-label="Problem body" id="body"></pre>
+        </div>
+      </div>
+    </li>
+    <!-- 3 the audit row -->
+    <li class="ev" id="ev3">
+      <span class="node" aria-hidden="true"></span>
+      <p class="t"><b id="t3">Then</b><span>Audit log</span></p>
+      <div class="card">
+        <div data-when="empty error loading"><h3>The audit row</h3><p>Nothing recorded.</p></div>
+        <div data-when="ideal recorded"><h3>The audit row</h3>
+          <dl class="kv" id="audit"></dl>
+        </div>
+      </div>
+    </li>
+    <!-- 4 the worker -->
+    <li class="ev" id="ev4">
+      <span class="node" aria-hidden="true"></span>
+      <p class="t"><b id="t4">Then</b><span>Worker's phone, My data</span></p>
+      <div class="card">
+        <h3>Who asked for your data</h3>
+        <div data-when="empty error loading"><p>Nobody has asked for your data.</p><p style="font-size:var(--t-13)">If an employer asks, it is refused and shown here.</p></div>
+        <div data-when="ideal recorded" class="audit-list" id="rows"></div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="after" data-when="ideal recorded"><a class="btn" href="judge-faults.html">Next: break things</a><span class="faint" style="font-size:var(--t-13)">Each Send again is refused and adds a row with its time.</span></div>
+
+  <section class="proves" aria-labelledby="pv-h">
+    <h2 id="pv-h">What proves it in the build (test names as designed; they land with the governance build)</h2>
+    <ul>
+      <li><code class="mono">test_employer_has_no_route_to_individual_risk</code><span>Every employer-role request for one worker's risk gets a 403 problem, whatever the purpose.</span></li>
+      <li><code class="mono">test_refusal_writes_audit_row</code><span>Each refusal appends an audit row the worker can see.</span></li>
+      <li><code class="mono">test_individual_data_never_reaches_supervisor_or_employer_views</code><span>Supervisor and employer views carry no individual data.</span></li>
+      <li><code class="mono">import contract: sb.employer must not import sb.health</code><span>Employer code has no path to health data at all.</span></li>
+    </ul>
+  </section>
+
+  <ul class="notes">
+    <li>Simulated session: this page answers in the browser. The worker id, account and request id are placeholders; the time is your clock when you press Send.</li>
+    <li>Individual heat level is worked out on the worker's phone and is not stored on the server. The problem shape follows the API's RFC 9457 errors (backend errors.py).</li>
+  </ul>
+  <nav class="stepnav" aria-label="Story"><a href="judge-climate.html">Back: warmer summer</a><a href="index.html">All views</a></nav>
+</main>
+
+<script type="module">
+import { boot } from './assets/kit.js';
+{ const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn'); menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); }; }
+boot({ surface: 'desk', defaultState: 'ideal', states: ['empty', 'loading', 'ideal', 'recorded', 'error'] });
+const { STATE } = await import('./assets/kit.js'); // read after boot: defaultState may have set it
+const $ = (id) => document.getElementById(id);
+const setView = (s) => { for (const el of document.querySelectorAll('[data-when]')) el.hidden = !el.dataset.when.split(/\s+/).includes(s); };
+const clock = (d) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Dubai' });
+const rid = () => `req_${(crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)).replace(/-/g, '').slice(0, 8)}`;
+const rows = [];
+function mark(state) {
+  const on = state === 'ideal' || state === 'recorded', busy = state === 'loading';
+  $('ev2').className = `ev ${on ? 'refuse' : busy ? '' : 'wait'}`;
+  $('ev3').className = `ev ${on ? 'done' : 'wait'}`;
+  $('ev4').className = `ev ${on ? 'done' : 'wait'}`;
+}
+function fill(when, id, recorded) {
+  const t = recorded ? 'Recorded' : clock(when), purpose = $('purpose').value;
+  // the spine carries the time of each event (simulated session: your clock when the request was sent)
+  const stamp = (id, label) => { $(id).innerHTML = `${label} <time>${recorded ? 'recorded run' : t}</time>`; };
+  stamp('t1', 'Sent'); stamp('t2', 'Refused'); stamp('t3', 'Written'); stamp('t4', 'Shown');
+  $('body').innerHTML = `{
+  <span class="k">"type"</span>: "urn:stellar-blaze:problem:employer-no-individual-route",
+  <span class="k">"title"</span>: "Employers have no route to individual data",
+  <span class="k">"status"</span>: 403,
+  <span class="k">"detail"</span>: "Individual heat risk is worked out on the worker's phone. No employer role has an endpoint that returns it, for any purpose.",
+  <span class="k">"instance"</span>: "/v1/workers/w_3k9q/heat-risk",
+  <span class="k">"request_id"</span>: "${id}"
+}`;
+  $('audit').innerHTML = `<dt>Event</dt><dd class="mono">data_request.refused</dd><dt>When</dt><dd>${t}</dd><dt>Who</dt><dd>Employer account, HSE role</dd><dt>Asked for</dt><dd>Individual heat risk</dd><dt>Purpose</dt><dd>${purpose}</dd><dt>Outcome</dt><dd>Refused, 403</dd><dt>Request</dt><dd class="mono">${id}</dd>`;
+  rows.unshift(`<div class="phone-row"><p class="who"><span${rows.length === 0 ? '' : ''}><span class="new">New</span> · Refused</span><span>${t}</span></p><p class="big">An employer asked for your heat risk. It was refused.</p></div>`);
+  $('rows').innerHTML = rows.map((r, i) => (i ? r.replace('<span class="new">New</span> · ', '') : r)).join('');
+}
+function send() {
+  const btn = $('send'); btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Sending…';
+  setView('loading'); mark('loading');
+  setTimeout(() => {
+    setView('ideal'); mark('ideal'); fill(new Date(), rid(), false);
+    btn.removeAttribute('aria-busy'); btn.textContent = 'Send again';
+    $('s403').focus();
+  }, 650);
+}
+$('send').addEventListener('click', send);
+mark(STATE);
+if (STATE === 'ideal') { fill(new Date(), rid(), false); $('send').textContent = 'Send again'; } // pre-run: the four steps are filled at first paint
+if (STATE === 'recorded') { fill(new Date(), 'req_rec_0001', true); const b = $('send'); b.setAttribute('aria-disabled', 'true'); b.textContent = 'API not reachable'; b.removeEventListener('click', send); }
+if (STATE === 'loading') { $('send').setAttribute('aria-busy', 'true'); $('send').textContent = 'Sending…'; }
+</script>
+</body>
+</html>

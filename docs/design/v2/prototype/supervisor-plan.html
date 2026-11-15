@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crew plan · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/supervisor.css">
+<style>
+.sup { padding-bottom: 120px; }
+.now { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-4); padding: var(--s-4) var(--s-4) var(--s-2); view-transition-name: level; }
+.now .level-word strong { font-size: var(--t-48); }
+.now .level-word span { font-size: var(--t-18); color: var(--ink-2); }
+.now .status { font-size: var(--t-13); color: var(--ink-2); text-align: end; max-width: 15ch; }
+.plan { padding: var(--s-2) var(--s-2) 0 var(--s-4); view-transition-name: spine; }
+.plan svg { width: 100%; height: auto; overflow: visible; }
+.plan .tick { font: 400 12px var(--sans); fill: var(--ink-3); } /* drawn at rendered width: 12 px is 12 px */
+.plan .lab { font: 500 12px var(--sans); fill: var(--ink-3); }
+.plan .lab-i { font: 600 13px var(--sans); fill: var(--ink); }
+.plan .blk.hot .hit { stroke: var(--signal); stroke-width: 3; }
+/* the blocks as rows: the chart blocks are 4-22 px wide, so every action lives here at >= 44 px (WCAG 2.5.8) */
+.blocks { list-style: none; padding: 0; margin-top: var(--s-2); border-top: 1px solid var(--hair); }
+.blocks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 var(--s-3); border-bottom: 1px solid var(--hair); padding-inline: var(--s-2); }
+.blocks li.hot, .blocks li:focus-within { background: color-mix(in oklch, var(--signal) 10%, transparent); box-shadow: inset 2px 0 0 var(--signal); }
+.blocks .bk { min-height: 44px; display: flex; align-items: center; gap: var(--s-3); background: none; border: 0; padding: 0; text-align: start; font-size: var(--t-16); color: var(--ink); width: 100%; }
+.blocks .bk .t { min-width: 7.2em; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.blocks .bk .chev { margin-inline-start: auto; color: var(--ink-3); transition: transform var(--dur-1) var(--ease); }
+.blocks .bk[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.blocks li.past .bk, .blocks li.past .bk .t { color: var(--ink-3); }
+.blocks .sw { width: 16px; height: 12px; flex: none; border: 1px solid var(--ink); }
+.blocks .sw.work { background: var(--ink); } .blocks .sw.rest, .blocks .sw.stop { background: var(--ground); } .blocks .sw.stop { border-style: dashed; }
+.blocks .sw.art18 { background: var(--raised); border-style: double; border-width: 3px; } .blocks .sw.ban { background: var(--slot); border-color: var(--edge); }
+.blocks .c { grid-column: 1 / -1; font-size: var(--t-13); color: var(--ink-3); padding: 0 0 var(--s-2) calc(16px + var(--s-3)); }
+.blocks .ack { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 44px; cursor: pointer; font-size: var(--t-14); color: var(--ink-2); }
+.blocks .ack input { width: 24px; height: 24px; margin: 0; accent-color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); padding: var(--s-2) var(--s-4) 0; font-size: var(--t-13); color: var(--ink-2); }
+.legend i { display: inline-block; width: 18px; height: 10px; margin-inline-end: 6px; vertical-align: -1px; border: 1px solid var(--ink); }
+.legend .w { background: var(--ink); } .legend .r { background: var(--ground); } .legend .a { background: var(--raised); border-style: double; border-width: 3px; height: 12px; } .legend .b { background: var(--slot); border-color: var(--edge); } .legend .s { background: var(--ground); border-style: dashed; }
+.next { padding: var(--s-4); display: grid; gap: var(--s-1); }
+.next .line { font-size: var(--t-22); font-weight: 500; line-height: 1.25; }
+.clauses { list-style: none; padding: 0; }
+.clauses li { display: grid; grid-template-columns: 7.5em 1fr; gap: var(--s-1) var(--s-3); padding: var(--s-2) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.clauses li[aria-current] { background: color-mix(in oklch, var(--signal) 10%, transparent); border-inline-start: 2px solid var(--signal); padding-inline-start: var(--s-2); }
+.clauses .t { color: var(--ink-2); }
+.clauses .c { grid-column: 2; color: var(--ink-3); font-size: var(--t-13); }
+details.why > summary { min-height: var(--target); display: flex; align-items: center; cursor: pointer; font-weight: 500; }
+.sign h2 { font: 600 var(--t-18)/1.3 var(--sans); }
+.acks { list-style: none; padding: 0; margin-top: var(--s-2); color: var(--ink-2); font-size: var(--t-14); }
+.sign .msg { min-height: 1.5em; margin-top: var(--s-2); font-size: var(--t-14); }
+.sign .msg.err { color: var(--ink); font-weight: 600; }
+.sign .btn.primary { width: 100%; margin-top: var(--s-2); }
+.stopbar { position: fixed; inset-inline: 0; bottom: 0; z-index: 20; }
+.stopbar > div { max-width: 760px; margin-inline: auto; background: var(--ground); border-top: 1px solid var(--edge); padding: var(--s-3) var(--s-4) calc(var(--s-3) + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: var(--s-3); }
+.stopbar p { font-size: var(--t-13); color: var(--ink-3); flex: 1; }
+.stop { min-height: 56px; padding: 0 var(--s-6); border: 2px solid var(--ink); background: var(--ground); color: var(--ink); font-size: var(--t-18); font-weight: 600; border-radius: var(--r); display: inline-flex; align-items: center; gap: var(--s-2); }
+.stop:hover { background: var(--raised); }
+.stop[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.banner { margin: var(--s-3) var(--s-4) 0; }
+.fail { margin: var(--s-3) var(--s-4) 0; }
+.sk { margin: var(--s-3) var(--s-4); }
+.signed-row { display: flex; gap: var(--s-3); align-items: center; padding: var(--s-3) 0; font-size: var(--t-16); }
+</style>
+</head>
+<body class="sup-page">
+<div class="sup">
+  <div id="top"></div>
+  <main>
+    <div class="notice banner" data-when="stale"><strong>Forecast from 06:00, 5 h old.</strong> This is the rule plan, never less protective than the midday ban. Crews see the same plan.</div>
+    <div class="notice banner" data-when="unsigned"><strong>Not signed at shift start.</strong> Crews see the rule plan, labelled "unsigned fallback". Alerts and Stop work do not wait for you.</div>
+
+    <div data-when="loading"><div class="now"><p class="skel" style="height:52px;width:50%">.</p></div><div class="skel sk" style="height:180px">.</div><div class="skel sk" style="height:120px">.</div></div>
+
+    <section class="sec" data-when="empty"><div class="empty"><h3>Add today's tasks to get a plan</h3><p class="muted">Rest and breaks are placed around the tasks. The level above does not need them, and alerts already run.</p><a class="btn primary lg" href="supervisor-setup.html">Use the common roster</a><a href="supervisor-roster.html">Import tasks (CSV)</a></div></section>
+
+    <section class="sec" data-when="error"><div class="empty"><h3>The plan did not load</h3><p class="muted">Crews see the rule plan meanwhile. Alerts and Stop work are not affected.</p><button class="btn primary lg" type="button" onclick="location.reload()">Try again</button><p class="reqid">Request ID 4be1-09ac</p></div></section>
+
+    <div data-when="ideal stale unsigned signed validator stopped stopoffline">
+      <section class="now" aria-labelledby="lv">
+        <div><p class="k">Crew level now</p><p class="level-word" id="lv"><strong></strong><span></span></p></div>
+        <p class="status" id="pstatus"></p>
+      </section>
+      <div class="fail notice" data-when="validator" role="alert"><div><strong>This plan failed the rule check and is not shown.</strong> <span id="vfail"></span> Crews see the site-rules fallback, never less protective than the midday ban. Sign-off is off until a plan passes. <span class="reqid">Request ID 91d0-5c7e</span></div></div>
+      <section class="plan" id="plan" aria-label="Plan for today against the heat"></section>
+      <p class="legend" data-when="ideal stale unsigned signed stopped stopoffline"><span><i class="w"></i>Work</span><span><i class="r"></i>Rest in shade</span><span><i class="a"></i>Art. 18 break</span><span><i class="b"></i>Midday break</span><span id="lgstop" hidden><i class="s"></i>Stop work (Red)</span></p>
+      <section class="next" data-when="ideal stale unsigned signed stopped stopoffline" aria-labelledby="nx"><p class="k" id="nx">Now and next</p><p class="line" id="nowline"></p><p class="muted" id="nextline"></p></section>
+      <section class="sec" data-when="ideal stale unsigned signed stopped stopoffline" aria-labelledby="bl">
+        <p class="k" id="bl">Every block, and why it is there</p>
+        <ul class="blocks" id="blocks"></ul>
+        <p class="provline" style="margin-top:var(--s-3)">Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder. Rest and stops are paid working time. Replay: real IFS forecast at OMAA, Thu 3 Sep 2026; crew assumed. <span id="bands"></span> Wording not clinically reviewed.</p>
+      </section>
+
+      <section class="sec sign" data-when="ideal stale unsigned" aria-labelledby="sg">
+        <h2 id="sg">Sign off today's plan</h2>
+        <p class="muted" style="font-size:var(--t-14)">Medium and High zone work needs a tick per item: tick each one in the block list above. Signing never delays an alert or a stop.</p>
+        <form id="signform" novalidate><ul class="acks" id="acks"></ul><p class="msg" id="msg" aria-live="polite"></p><button class="btn primary lg" type="submit">Sign off</button></form>
+      </section>
+      <section class="sec" data-when="signed stopped stopoffline"><p class="signed-row"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l5 5L20 6" stroke="currentColor" stroke-width="2.5" fill="none"/></svg>Signed 11:12 by the site supervisor. Crews see this plan.</p><a class="btn primary lg" style="width:100%" id="relay2" href="supervisor-relay.html?crew=B">Relay to crew</a></section>
+
+    </div>
+  </main>
+  <div class="stopbar" data-when="ideal stale unsigned signed validator stopped stopoffline"><div><p id="stopnote">Stops Crew B now. No approval needed.</p><button class="stop" id="stop" type="button" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg><span>Stop work</span></button></div></div>
+  <div class="toast" id="toast" role="status" hidden><span id="toastmsg"></span><button class="btn" id="undo" type="button">Undo <span id="undo-n">10</span></button></div>
+</div>
+<script type="module">
+import { boot, q, STATE } from './assets/kit.js';
+import { RAMP_DARK, RAMP_LIGHT, css } from './assets/heat.js';
+import { REPLAY, SITE, LEVELS, BANDS_TEXT, crewById, replayDay, topbar, fmt, plan, validate, ackItems, status, CLAUSE, levelOf, onShift } from './assets/crews.js';
+const crew = crewById(q.get('crew') || 'B');
+document.getElementById('top').innerHTML = topbar({ back: { href: 'supervisor-crews.html', label: 'Crews today' }, title: `Crew ${crew.id} plan`, sub: `${crew.task} · ${crew.n} people · ${crew.workload} work` });
+document.title = `Crew ${crew.id} plan · Stellar Blaze`;
+boot({ surface: 'field', at: REPLAY.at, states: ['ideal', 'loading', 'empty', 'error', 'validator', 'unsigned', 'stale', 'signed', 'stopped', 'stopoffline'] });
+
+const day = await replayDay();
+const st = status(crew, day);
+let blocks = plan(crew, day);
+if (STATE === 'validator') { // a hand-edited plan that drops the 12:00 rest: shown only to prove the validator blocks it
+  blocks = blocks.map((b) => (b.k === 'rest' && Math.abs(b.from - 12 - 1 / 3) < 1e-6 ? { ...b, k: 'work' } : b));
+  const merged = []; for (const b of blocks) { const l = merged.at(-1); if (l && l.k === b.k && l.lv === b.lv) l.to = b.to; else merged.push({ ...b }); } blocks = merged;
+  document.getElementById('vfail').textContent = (validate(crew, day, blocks)[0] || '') + '.';
+}
+const lvw = document.querySelector('#lv strong'), lvs = document.querySelector('#lv span');
+lvw.textContent = LEVELS[st.lv]; lvs.textContent = st.working ? `until ${fmt(st.until)}` : `from ${fmt(st.start)}`;
+const signed = ['signed', 'stopped', 'stopoffline'].includes(STATE);
+document.getElementById('pstatus').textContent = STATE === 'validator' ? 'Plan blocked by the rule check' : signed ? 'Signed 11:12' : 'Unsigned. Crews see the rule plan';
+document.getElementById('stopnote').textContent = `Stops Crew ${crew.id} now. No approval needed.`;
+document.getElementById('relay2').href = `supervisor-relay.html?crew=${crew.id}`;
+
+const NAME = { work: 'Work', rest: 'Rest in shade', art18: 'Art. 18 break', ban: 'Midday break', stop: 'Stop work (Red)' };
+const shown = blocks.filter((b) => b.k !== 'off');
+const cur = shown.find((b) => REPLAY.now >= b.from && REPLAY.now < b.to);
+if (cur) {
+  const i = shown.indexOf(cur), n1 = shown[i + 1], n2 = shown[i + 2];
+  document.getElementById('nowline').textContent = `${NAME[cur.k]} until ${fmt(cur.to)}`;
+  document.getElementById('nextline').textContent = [n1, n2].filter(Boolean).map((b) => `${NAME[b.k]} ${fmt(b.from)} to ${fmt(b.to)}`).join(', then ').replace(/then ([A-Z])/g, (m, c) => `then ${c.toLowerCase()}`).replace('then art.', 'then Art.') + '.';
+} else {
+  document.getElementById('nowline').textContent = `Off shift. Back at ${fmt(st.start)}`;
+  const n1 = shown.find((b) => b.from >= REPLAY.now); document.getElementById('nextline').textContent = n1 ? `${NAME[n1.k]} ${fmt(n1.from)} to ${fmt(n1.to)}.` : '';
+}
+// clauses
+document.getElementById('bands').textContent = BANDS_TEXT;
+if (shown.some((b) => b.k === 'stop')) document.getElementById('lgstop').hidden = false;
+// block rows (the chart's blocks are too narrow to touch): kind, time, clause, and the per-item acknowledgement
+const items = ackItems(blocks).filter((it) => it.to > REPLAY.now);
+const signable = ['ideal', 'stale', 'unsigned'].includes(STATE);
+const ackAt = new Map(); // first upcoming block of each acknowledgement item carries its tick
+items.forEach((it, n) => { const i = shown.findIndex((b) => (b.k === 'work' || b.k === 'rest') && b.lv === it.lv && b.from >= it.from - 1e-6 && b.to > REPLAY.now); if (i >= 0) ackAt.set(i, { n, it }); });
+const bl = document.getElementById('blocks');
+const CHEV = '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="2.5" fill="none"/></svg>';
+bl.innerHTML = shown.map((b, i) => { const a = signable && ackAt.get(i);
+  return `<li data-i="${i}" class="${b.to <= REPLAY.now ? 'past' : ''}"><button class="bk" type="button" aria-expanded="false" aria-controls="c${i}"><i class="sw ${b.k}" aria-hidden="true"></i><span class="t">${fmt(b.from)} to ${fmt(b.to)}</span><span>${NAME[b.k]}</span>${CHEV}</button>${a ? `<label class="ack"><input type="checkbox" name="ack" form="signform" value="${a.n}" aria-label="Acknowledge: ${a.it.text}"><span>Acknowledge</span></label>` : '<span></span>'}<p class="c" id="c${i}" hidden>${CLAUSE[b.k](b.lv)}${a ? `. Tick covers ${a.it.text}.` : ''}</p></li>`; }).join('');
+const hotBlock = (i, on) => { document.querySelector(`#plan .blk[data-i="${i}"]`)?.classList.toggle('hot', on); bl.querySelector(`li[data-i="${i}"]`)?.classList.toggle('hot', on); };
+bl.querySelectorAll('li').forEach((li) => {
+  const i = li.dataset.i, btn = li.querySelector('.bk');
+  li.addEventListener('mouseenter', () => hotBlock(i, true)); li.addEventListener('mouseleave', () => hotBlock(i, false));
+  li.addEventListener('focusin', () => hotBlock(i, true)); li.addEventListener('focusout', () => hotBlock(i, false));
+  btn.addEventListener('click', () => { const open = btn.getAttribute('aria-expanded') !== 'true'; btn.setAttribute('aria-expanded', open); li.querySelector('.c').hidden = !open; });
+});
+
+// hero: plan strip against the heat
+const el = document.getElementById('plan');
+function draw() {
+  const cs = getComputedStyle(el), W = Math.round(el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) || 360, from = 6, to = 18, R = 6, L0 = 0;
+  const x = (t) => L0 + (t - from) / (to - from) * (W - L0 - R);
+  const ramp = document.documentElement.dataset.theme === 'sun' ? RAMP_LIGHT : RAMP_DARK;
+  const cy0 = 30, cy1 = 176, vmin = 26, vmax = 40, y = (v) => cy1 - (v - vmin) / (vmax - vmin) * (cy1 - cy0);
+  const bandY = 184, bandH = 14, rowY = 208, rowH = 84, axisY = rowY + rowH + 22;
+  let s = '';
+  // midday slot through curve and row
+  const a = x(SITE.ban[0]), b = x(SITE.ban[1]);
+  s += `<rect x="${a}" y="${cy0 - 8}" width="${b - a}" height="${rowY + rowH + 6 - cy0 + 8}" fill="var(--slot)" /><line x1="${a}" x2="${a}" y1="${cy0 - 8}" y2="${rowY + rowH + 6}" stroke="var(--edge)"/><line x1="${b}" x2="${b}" y1="${cy0 - 8}" y2="${rowY + rowH + 6}" stroke="var(--edge)"/>`;
+  s += `<text class="lab" x="${(a + b) / 2}" y="${cy0 - 14}" text-anchor="middle">Midday break</text>`;
+  // heat curve: hourly WBGT as cells (ramp) + the curve line
+  for (let h = from; h < to; h++) { const a0 = Math.max(h, h >= SITE.ban[0] && h < SITE.ban[1] ? SITE.ban[1] : h), b0 = h < SITE.ban[0] && h + 1 > SITE.ban[0] ? SITE.ban[0] : h + 1; if (b0 > a0) s += `<rect x="${x(a0) + 0.5}" y="${bandY}" width="${x(b0) - x(a0) - 1}" height="${bandH}" fill="${css(ramp(day[h]))}"/>`; }
+  const pts = []; for (let h = from; h <= to; h++) pts.push(`${x(h).toFixed(1)},${y(day[Math.min(h, 23)]).toFixed(1)}`);
+  for (const g of [30, 35]) s += `<line x1="${x(from)}" x2="${x(to)}" y1="${y(g)}" y2="${y(g)}" stroke="var(--hair)" stroke-dasharray="2 3"/><text class="tick" x="${x(to)}" y="${y(g) - 4}" text-anchor="end">${g} °C</text>`;
+  s += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--ink-2)" stroke-width="1.5"/>`;
+  const pk = day.slice(from, to).reduce((m, v, i) => (v > day[m] ? from + i : m), from);
+  s += `<circle cx="${x(pk)}" cy="${y(day[pk])}" r="3" fill="var(--ink)"/><text class="lab-i" x="${x(pk) + 8}" y="${y(day[pk]) + 4}">${day[pk].toFixed(1)} °C at ${fmt(pk)}</text>`;
+  // plan blocks
+  if (STATE !== 'validator') {
+    shown.forEach((bk, i) => {
+      if (bk.k === 'ban') return;
+      const bx = x(bk.from) + 0.5, bw = Math.max(1, x(bk.to) - x(bk.from) - 1);
+      let r = '';
+      if (bk.k === 'work') r = `<rect x="${bx}" y="${rowY}" width="${bw}" height="${rowH}" fill="var(--ink)"/>`;
+      else if (bk.k === 'rest') r = `<rect x="${bx + 0.5}" y="${rowY + 0.5}" width="${bw - 1}" height="${rowH - 1}" fill="var(--ground)" stroke="var(--ink)"/>`;
+      else if (bk.k === 'stop') r = `<rect x="${bx + 0.5}" y="${rowY + 0.5}" width="${bw - 1}" height="${rowH - 1}" fill="var(--ground)" stroke="var(--ink)" stroke-dasharray="4 3"/>${bw > 36 ? `<text class="lab-i" x="${bx + bw / 2}" y="${rowY + rowH / 2 + 4}" text-anchor="middle">Stop</text>` : ''}`;
+      else r = `<rect x="${bx + 0.5}" y="${rowY + 0.5}" width="${bw - 1}" height="${rowH - 1}" fill="var(--raised)" stroke="var(--ink)" stroke-width="1"/><rect x="${bx + 3.5}" y="${rowY + 3.5}" width="${bw - 7}" height="${rowH - 7}" fill="none" stroke="var(--ink)"/>${bw > 40 ? `<text class="lab-i" x="${bx + bw / 2}" y="${rowY + rowH / 2 + 4}" text-anchor="middle">Art. 18</text>` : ''}`;
+      s += `<g class="blk" data-i="${i}">${r}<rect class="hit" x="${bx}" y="${rowY - 2}" width="${bw}" height="${rowH + 4}" fill="transparent"/></g>`;
+    });
+  } else {
+    s += `<rect x="${x(from)}" y="${rowY}" width="${x(to) - x(from)}" height="${rowH}" fill="none" stroke="var(--edge)" stroke-dasharray="4 4"/><text class="lab-i" x="${x(8.6)}" y="${rowY + rowH / 2 + 5}" text-anchor="middle">Plan not shown</text>`;
+  }
+  const n = x(REPLAY.now);
+  s += `<line x1="${n}" x2="${n}" y1="${cy0 - 8}" y2="${rowY + rowH + 6}" stroke="var(--signal)" stroke-width="2"/><text class="lab-i" x="${n - 5}" y="${cy0 - 14}" text-anchor="end">Now</text>`;
+  for (let h = from; h <= to; h += 2) s += `<text class="tick" x="${x(h)}" y="${axisY}" text-anchor="${h === from ? 'start' : h === to ? 'end' : 'middle'}">${fmt(h)}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${axisY + 6}" width="${W}" height="${axisY + 6}" role="group" aria-label="Plan for Crew ${crew.id}, 06:00 to 18:00, against the WBGT forecast. Peak ${day[pk].toFixed(1)} °C at ${fmt(pk)}.">${s}</svg>`;
+  // pointer only: hovering a block lights its row (the rows carry the actions)
+  el.querySelectorAll('.blk').forEach((g) => { g.addEventListener('mouseenter', () => hotBlock(g.dataset.i, true)); g.addEventListener('mouseleave', () => hotBlock(g.dataset.i, false)); });
+}
+if (!el.closest('[hidden]')) { draw(); new ResizeObserver(() => draw()).observe(el); }
+
+// sign-off with per-item acknowledgement (ADR 0011 §7.1); never pre-disabled
+document.getElementById('acks').innerHTML = `<li>${items.length} ${items.length === 1 ? 'item needs' : 'items need'} a tick: ${items.map((it) => `${fmt(it.from)} to ${fmt(it.to)}`).join(', ')}.</li>`;
+document.getElementById('signform').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const left = [...document.querySelectorAll('input[name=ack]')].filter((c) => !c.checked);
+  const msg = document.getElementById('msg');
+  if (left.length) { msg.className = 'msg err'; msg.textContent = `Tick ${left.length} more ${left.length === 1 ? 'item' : 'items'} to sign.`; left[0].focus(); return; }
+  const u = new URL(location.href); u.searchParams.set('state', 'signed'); location.assign(u);
+});
+
+// Stop work: one tap, no dialog, 10 s undo toast; offline = recorded here, not shown as sent
+const stop = document.getElementById('stop'), toast = document.getElementById('toast'), tmsg = document.getElementById('toastmsg'), undo = document.getElementById('undo'), un = document.getElementById('undo-n');
+let timer = null;
+function stopNow() {
+  const off = STATE === 'stopoffline';
+  stop.setAttribute('aria-pressed', 'true'); stop.querySelector('span').textContent = 'Work stopped';
+  tmsg.innerHTML = off ? `<strong>Not sent: no signal.</strong> Tell Crew ${crew.id} now. <a href="supervisor-relay.html?crew=${crew.id}" style="color:inherit">Relay</a>` : `Crew ${crew.id} stopped 11:10. Crew alerted; audit row written.`;
+  toast.hidden = false; undo.hidden = false;
+  let n = 10; un.textContent = n; clearInterval(timer);
+  timer = setInterval(() => { n -= 1; un.textContent = n; if (n <= 0) { clearInterval(timer); undo.hidden = true; } }, 1000);
+}
+stop.addEventListener('click', () => (stop.getAttribute('aria-pressed') === 'true' ? null : stopNow()));
+undo.addEventListener('click', () => { clearInterval(timer); toast.hidden = true; stop.setAttribute('aria-pressed', 'false'); stop.querySelector('span').textContent = 'Stop work'; });
+if (STATE === 'stopped' || STATE === 'stopoffline') stopNow();
+</script>
+</body>
+</html>

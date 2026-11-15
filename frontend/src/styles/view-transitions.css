@@ -1,0 +1,12 @@
+/*
+ * View transitions (F2 Task 3). The shared elements are named in the shells with React's <ViewTransition> (`wordmark`,
+ * `spine`, `level`, `unwell`); this file only switches the browser's animation off under `prefers-reduced-motion`, which
+ * the global reduced-motion rule cannot reach because the transition pseudo-elements are not part of the DOM.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

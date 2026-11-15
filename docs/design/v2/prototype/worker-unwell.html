@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>I feel unwell · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&family=Noto+Nastaliq+Urdu:wght@500&family=Noto+Sans+Devanagari:wght@500&family=Noto+Sans+Bengali:wght@500&family=Noto+Sans+Arabic:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+/* W4. Hero = one large Call button + the time since the tap. Works offline: tel: needs no data (v1 F-W4).
+   No analytics on this route (journeys P3). */
+.top { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hair); }
+.top .site { font-weight: 600; font-size: var(--t-16); line-height: 1.2; }
+.top .crew { color: var(--ink-3); font-size: var(--t-13); }
+.top .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.langs { padding: 2px var(--s-3); border-bottom: 1px solid var(--hair); }
+.call-hero { padding: var(--s-4) var(--s-4) 0; display: grid; gap: var(--s-3); view-transition-name: unwell; }
+.since { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+.since .k { font-size: var(--t-16); color: var(--ink-2); font-weight: 500; }
+.since .k bdi { color: var(--ink); }
+.timer { font-size: var(--t-64); font-weight: 500; letter-spacing: -0.03em; line-height: 1; }
+.ruler { view-transition-name: spine; }
+.ruler svg { width: 100%; height: auto; overflow: visible; }
+.ruler .tk { font: 400 13px var(--sans); fill: var(--ink-3); }
+.ruler .base { fill: var(--hair); }
+.ruler .fill { fill: var(--ink); }
+.ruler .goal { stroke: var(--edge); stroke-dasharray: 3 3; }
+.call { display: grid; grid-template-columns: 48px 1fr; align-items: center; gap: var(--s-3); min-height: 104px; padding: var(--s-3) var(--s-6); border-radius: var(--r); background: var(--signal); color: var(--on-signal); text-decoration: none; }
+.call svg { width: 44px; height: 44px; }
+.call b { display: block; font-size: var(--t-28); font-weight: 600; line-height: 1.15; }
+.call small { display: block; font-size: var(--t-16); font-weight: 500; }
+.call:active { transform: scale(0.99); }
+.call2 { min-height: 56px; font-size: var(--t-22); width: 100%; }
+.note { font-size: var(--t-16); color: var(--ink-2); }
+.steps { padding: var(--s-6) var(--s-4) 0; }
+.steps h2 { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; padding-bottom: var(--s-2); border-bottom: 1px solid var(--hair); }
+.steps ol { list-style: none; padding: 0; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 40px 1fr; gap: var(--s-3); align-items: start; padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-22); font-weight: 500; line-height: 1.3; counter-increment: s; }
+.steps li::before { content: counter(s); display: grid; place-items: center; width: 36px; height: 36px; border: 2px solid var(--ink); border-radius: var(--r); font-size: var(--t-18); font-weight: 600; }
+.steps li.p { grid-template-columns: 40px 1fr 40px; }
+.steps li .pict { margin-top: 2px; }
+.steps li span small { display: block; font-size: var(--t-16); font-weight: 400; color: var(--ink-2); margin-top: var(--s-1); }
+.cite { display: grid; gap: var(--s-2); padding: var(--s-3) 0 var(--s-4); font-size: var(--t-14); color: var(--ink-3); }
+.cite .row { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.priv { font-size: var(--t-18); font-weight: 500; color: var(--ink); }
+.banner { margin: var(--s-3) var(--s-4) 0; font-size: var(--t-16); }
+.notice > svg { width: 20px; height: 20px; flex: none; margin-top: 3px; }
+.notice .btn { margin-top: var(--s-2); }
+.dock .unwell[aria-current] { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+</style>
+</head>
+<body class="phone-page">
+<div class="phone">
+  <header class="top">
+    <div><p class="site">Mussafah M-14 yard</p><p class="crew">Crew B · concrete pour</p></div>
+    <p class="clock">11:10</p>
+    <button class="sun-toggle" type="button" data-sun-toggle></button>
+  </header>
+  <nav class="langs" aria-label="Language">
+    <button aria-pressed="true" lang="en">EN</button><button lang="ur">اردو</button><button lang="hi">हिन्दी</button><button lang="bn">বাংলা</button><button lang="ne">नेपाली</button><button lang="ar">العربية</button>
+  </nav>
+
+  <main>
+    <h1 class="sr-only">I feel unwell</h1>
+    <div class="notice banner" data-when="offline"><svg data-clock></svg><p><strong>Offline.</strong> Calling still works. It does not need internet.</p></div>
+
+    <section class="call-hero" aria-labelledby="since-k">
+      <div class="since">
+        <p class="k" id="since-k">You tapped at <bdi>11:10</bdi></p>
+        <p class="timer" id="timer" role="timer" aria-live="off">0:00</p>
+      </div>
+      <div class="ruler" id="ruler" aria-hidden="true"></div>
+
+      <a class="call" href="tel:" data-note="site.first_aider_phone from the site setup; empty in the prototype" data-when="ideal offline queued reviewed" aria-describedby="nonet">
+        <span data-handset></span><span><b>Call first aider</b><small>Site first aider, Mussafah M-14</small></span>
+      </a>
+      <a class="call" href="tel:998" data-when="empty" aria-describedby="nonet">
+        <span data-handset></span><span><b>Call 998</b><small>Ambulance</small></span>
+      </a>
+      <a class="btn call2" href="tel:998" data-when="ideal offline queued reviewed"><span data-handset-s></span>Call 998 · Ambulance</a>
+      <div class="notice" data-when="empty"><p><strong>Ask the nearest person to call your first aider.</strong> No first aider number is set for this site.</p></div>
+      <p class="note" id="nonet">Calling works without internet.</p>
+    <!-- queued: only if a "tell my first aider" message is decided (HANDOFF decision 2, journeys O5). Until then W4 is tel: only. -->
+    <div class="notice" data-when="queued" role="status"><svg data-clock></svg><div><p><strong>Message to your first aider not sent yet.</strong> We will try again while this screen is open. Calling is faster.</p><button class="btn" type="button">Try again now</button></div></div>
+    </section>
+
+    <section class="steps" aria-labelledby="steps-h">
+      <h2 id="steps-h">Heat-stroke first aid, in ADOSH's words</h2>
+      <ol>
+        <li>Call emergency contact number and notify supervisor</li>
+        <li class="p"><span>Move the sick employee to a cool shaded area</span><svg data-icon="shade"></svg></li>
+        <li><span>Cool the employee<small>using methods such as: soaking their clothes with water; spraying, sponging, or showering them with water; and fanning their body.</small></span></li>
+      </ol>
+      <div class="cite">
+        <p>Exact text of ADOSH-SF Technical Guideline "Safety in the Heat" v4.0 (under CoP 11.0), §4.5(c).</p>
+        <p class="row"><span class="tag" data-when="ideal empty offline queued">Not clinically reviewed</span><span class="tag" data-when="reviewed">Reviewed by an independent clinical consultant, [review date]</span><span>Draft wording</span></p>
+        <p class="priv">Your supervisor does not see this screen.</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="dock"><div class="dock-in">
+    <a class="unwell" href="worker-unwell.html" aria-current="page"><span id="cross"></span>I feel unwell</a>
+    <nav class="tabs" aria-label="Sections"><a href="worker-today.html">Today</a><a href="worker-alerts.html">Alerts</a><a href="worker-data.html">My data</a></nav>
+  </div></div>
+</div>
+<script type="module">
+import { boot, ICON, q, STATE } from './assets/kit.js';
+boot({ surface: 'field', at: new Date(Date.UTC(2026, 8, 3, 7, 10)), states: ['ideal', 'empty', 'offline', 'queued', 'reviewed'] });
+
+// ISO 7010 E004-style handset (custom, untested; DESIGN.md §9). Not in the kit yet.
+const HANDSET = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8.6 3.5 13 8.2l-2.6 3.7c1.6 3.6 4.2 6.3 7.7 7.9l3.7-2.6 4.7 4.4-2.4 5.4c-.5 1.1-1.7 1.6-2.9 1.3C12.2 26 6 19.8 3.7 10.8 3.4 9.6 3.9 8.4 5 7.9z" fill="currentColor"/></svg>';
+for (const s of document.querySelectorAll('[data-handset]')) s.outerHTML = HANDSET;
+for (const s of document.querySelectorAll('[data-handset-s]')) s.outerHTML = HANDSET.replace('<svg', '<svg width="22" height="22"');
+const CLOCK = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 5v5.4l3.6 2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+for (const s of document.querySelectorAll('[data-clock]')) s.outerHTML = CLOCK;
+for (const s of document.querySelectorAll('[data-icon]')) s.outerHTML = ICON[s.dataset.icon].replace('<svg', '<svg class="pict"');
+document.getElementById('cross').outerHTML = ICON.cross;
+
+// elapsed time since the tap: kept on the phone only (sessionStorage), never sent. ?elapsed=<s> seeds it for the prototype.
+const KEY = 'sb-unwell-t0';
+let t0;
+try { t0 = +sessionStorage.getItem(KEY) || 0; } catch { t0 = 0; }
+if (q.get('elapsed')) t0 = Date.now() - +q.get('elapsed') * 1000;
+if (!t0) t0 = Date.now();
+try { sessionStorage.setItem(KEY, String(t0)); } catch {}
+const timer = document.getElementById('timer'), ruler = document.getElementById('ruler');
+const W = 358, H = 40, x = (m) => 6 + m / 10 * (W - 12);
+function draw() {
+  const s = Math.max(0, Math.floor((Date.now() - t0) / 1000));
+  timer.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const m = Math.min(10, s / 60);
+  let o = `<rect class="base" x="${x(0)}" y="6" width="${x(10) - x(0)}" height="6"/><rect class="fill" x="${x(0)}" y="4" width="${Math.max(2, x(m) - x(0))}" height="10"/>`;
+  for (let i = 0; i <= 10; i += 2) o += `<line x1="${x(i)}" x2="${x(i)}" y1="14" y2="20" stroke="var(--edge)"/><text class="tk" x="${x(i)}" y="36" text-anchor="${i === 0 ? 'start' : i === 10 ? 'end' : 'middle'}">${i === 0 ? 'Tap' : i + ' min'}</text>`;
+  ruler.innerHTML = `<svg viewBox="0 0 ${W} ${H}">${o}</svg>`;
+}
+draw(); setInterval(draw, 1000);
+</script>
+</body>
+</html>

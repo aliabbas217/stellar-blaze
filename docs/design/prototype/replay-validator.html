@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Try a plan · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* proposed shared: proto.css defines .stack-2/3/6/8 only, so an undefined .stack-1/.stack-4 inherits the parent's --stack */
+  .stack-1 { --stack: var(--space-1); }
+  .stack-4 { --stack: var(--space-4); }
+  .bench { display: grid; gap: var(--space-8); grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 64rem) { .bench { grid-template-columns: minmax(0, 28rem) minmax(0, 1fr); } }
+
+  /* proposed shared: three template tiles that stay readable on a phone */
+  .tiles--wide { grid-template-columns: 1fr; }
+  @media (min-width: 30rem) and (max-width: 63.99rem) { .tiles--wide { grid-template-columns: repeat(3, 1fr); } }
+  .tiles--wide .tile span { grid-template-columns: auto 1fr; justify-items: start; text-align: start; align-items: center; column-gap: var(--space-3); min-block-size: 0; }
+  .tiles--wide .tile svg { grid-row: span 2; }
+  @media (min-width: 30rem) and (max-width: 63.99rem) {
+    .tiles--wide .tile span { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    .tiles--wide .tile svg { grid-row: auto; }
+  }
+  .tile b { font-weight: 600; }
+
+  /* proposed shared: time-run editor */
+  .runs { display: grid; gap: var(--space-2); }
+  .runs__grid { display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-3); align-items: center; }
+  .runs__name { font-weight: 600; }
+
+  /* proposed shared: validator result row, a violation reads as an ink-framed card, not a red one */
+  .viol { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--space-4); padding: var(--space-4);
+          border: var(--rule-hairline) solid var(--hairline); border-inline-start: var(--space-2) solid var(--ink);
+          border-radius: var(--radius-sign); background: var(--surface-raised); }
+  @media (max-width: 29.99rem) { .viol { grid-template-columns: 1fr; gap: var(--space-2); } }
+  .viol__clause { font-weight: 400; }
+  .checked { display: grid; gap: var(--space-2); }
+  .checked li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-4); padding-block: var(--space-2); border-block-end: var(--rule-hairline) solid var(--hairline); }
+  .checked li:last-child { border-block-end: 0; }
+  .checked .t-num { text-align: end; font-weight: 600; }
+  .sumline { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html" aria-current="step">Try a plan</a></li>
+    <li><a href="replay-frontier.html">Frontier</a></li>
+    <li><a href="replay-climate.html">Warmer summer</a></li>
+    <li><a href="replay-governance.html">Governance</a></li>
+    <li><a href="replay-faults.html">Break things</a></li>
+    <li><a href="replay-next.html">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-3">
+    <h1 class="t-display">Try a plan</h1>
+    <p class="t-lead measure">Pick a roster or change the times. A separate checker reads the plan against the rules and lists every violation with the clause that sets it.</p>
+    <p class="cluster">
+      <span class="stamp">Independent validator · shares no code with the planners</span>
+      <span class="stamp stamp--quiet">Prototype logic</span>
+    </p>
+  </header>
+
+  <div class="bench">
+    <!-- the plan -->
+    <form id="plan" class="stack stack-6" novalidate aria-labelledby="plan-h">
+      <h2 id="plan-h" class="panel-title">The plan</h2>
+
+      <fieldset class="field">
+        <legend>Start from a template</legend>
+        <div class="tiles tiles--wide" style="margin-block-start: var(--space-2)">
+          <label class="tile"><input type="radio" name="tpl" value="common" checked><span><svg class="ico"><use href="#i-today"/></svg><b>Common roster</b><small class="t-label t-muted">06:00 to 12:30 and 15:00 to 17:00</small></span></label>
+          <label class="tile"><input type="radio" name="tpl" value="rule"><span><svg class="ico"><use href="#i-proof"/></svg><b>Our rule plan</b><small class="t-label t-muted">Short runs, ADOSH rest between</small></span></label>
+          <label class="tile"><input type="radio" name="tpl" value="naive"><span><svg class="ico"><use href="#i-warn"/></svg><b>Naive schedule</b><small class="t-label t-muted">06:00 to 17:00, straight through</small></span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="runs">
+        <legend class="t-body" style="font-weight: 600">Work runs on the day</legend>
+        <p class="t-label t-muted">Times are 24 hour, hh:mm, in steps of 5 minutes. Leave a run empty to drop it. Zones come from the pre-registered day, ⟨demo_date⟩.</p>
+        <div class="runs__grid">
+          <span aria-hidden="true"></span><span class="t-label t-muted" aria-hidden="true">Start</span><span class="t-label t-muted" aria-hidden="true">End</span>
+          <span class="runs__name">Run 1</span><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r1s" aria-label="Run 1 start"><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r1e" aria-label="Run 1 end">
+          <span class="runs__name">Run 2</span><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r2s" aria-label="Run 2 start"><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r2e" aria-label="Run 2 end">
+          <span class="runs__name">Run 3</span><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r3s" aria-label="Run 3 start"><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r3e" aria-label="Run 3 end">
+          <span class="runs__name">Run 4</span><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r4s" aria-label="Run 4 start"><input class="input t-num" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm" maxlength="5" id="r4e" aria-label="Run 4 end">
+        </div>
+        <p class="err" id="run-err" role="alert" hidden></p>
+      </fieldset>
+
+      <div class="stack stack-3">
+        <button class="btn btn--primary btn--block" type="submit" id="validate" aria-describedby="proto-note">Validate</button>
+        <p id="proto-note" class="t-label t-muted">Prototype: this page re-implements five of the validator's rules in the browser so the times are editable. The product calls the validator service and shows the same fields.</p>
+      </div>
+    </form>
+
+    <!-- the result -->
+    <div class="stack stack-6" aria-live="polite">
+      <section data-state="ideal empty" class="stack stack-6" id="result" aria-labelledby="result-h">
+        <!-- filled by the script: summary, violation rows or the empty result, the Checked list -->
+      </section>
+
+      <section data-state="loading" class="stack stack-4" aria-busy="true" aria-label="Checking the plan">
+        <div class="skel" style="block-size: var(--space-12); max-inline-size: 60%"></div>
+        <div class="skel" style="block-size: 7.5rem"></div>
+        <div class="skel" style="block-size: 7.5rem"></div>
+        <div class="skel" style="block-size: 7.5rem"></div>
+        <p class="sr-only" role="status">Checking the plan</p>
+      </section>
+
+      <section data-state="error" class="error" role="alert" aria-labelledby="x-h">
+        <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+        <h2 id="x-h" class="t-headline">The validator did not answer</h2>
+        <p class="measure">Your times are kept. Try again, or open a result that was recorded for the common roster.</p>
+        <div class="cluster cluster-4">
+          <button class="btn btn--primary" type="button" id="retry"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+          <a class="link" href="?state=ideal">Show a recorded result</a>
+        </div>
+        <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+      </section>
+    </div>
+  </div>
+
+  <div class="cluster cluster-4">
+    <a class="btn btn--primary" href="replay-frontier.html">See the roster frontier</a>
+    <a class="link" href="replay-day.html">Back to the day</a>
+  </div>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>Rules are read protectively from the Labour Law, the midday ban and the ADOSH tables. Counsel review is pending.</li>
+    <li>Crew of 20 is an assumed schedule.</li>
+    <li>Zones come from station truth on the pre-registered day. TWL aligned with ADOSH zones, not certified.</li>
+    <li>Weekly hours assume 6 working days a week.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Prototype validator: five rules over a 5-minute tick grid, so the times are editable.
+     The zone timeline is the illustrative one used by the day chart. The product calls the validator service. */
+  (() => {
+    const T = 288;                                     /* 5-minute ticks in a day */
+    const zoneAt = (t) => { const m = t * 5; return m >= 780 && m < 1020 ? 2 : (m >= 660 && m < 780) || (m >= 1020 && m < 1140) ? 1 : 0; };
+    const TEMPLATES = {
+      common: { name: "Common roster", runs: [["06:00", "12:30"], ["15:00", "17:00"], ["", ""], ["", ""]] },
+      rule:   { name: "Our rule plan", runs: [["06:00", "11:00"], ["12:00", "12:30"], ["15:00", "15:20"], ["16:00", "16:20"]] },
+      naive:  { name: "Naive schedule", runs: [["06:00", "17:00"], ["", ""], ["", ""], ["", ""]] },
+    };
+    const RULES = {
+      ban:   { id: "P-H1",  cite: "Midday ban MR 44/2022 Art. 3", rule: "no outdoor work 12:30 to 15:00, 15 Jun to 15 Sep", reason: "Work is scheduled inside the ban window." },
+      art18: { id: "P-H3",  cite: "UAE Labour Law Art. 18", rule: "no more than 5 consecutive hours without a 1 hour break", reason: "More than 5 hours of work since the last break of 1 hour or more. Time inside the ban and ADOSH rest do not count as that break." },
+      hours: { id: "P-H2",  cite: "UAE Labour Law Art. 17 and 19", rule: "normal hours 8 h a day and 48 h a week", reason: "More than 8 hours of work in the day. At 6 working days a week that passes 48 hours." },
+      added: { id: "P-H10", cite: "Product rule, no added minutes", rule: "a plan never schedules more work than the published shift", reason: "More work than the published shift, 06:00 to 12:30 and 15:00 to 17:00." },
+      capM:  { id: "P-H7",  cite: "ADOSH Table 1, Medium zone, heavy work", rule: "45 work / 15 rest", reason: "More than 45 minutes of work in a 60 minute window while the zone is Medium." },
+      capH:  { id: "P-H7",  cite: "ADOSH Table 1, High zone, heavy work", rule: "20 work / 40 rest", reason: "More than 20 minutes of work in a 60 minute window while the zone is High." },
+    };
+    const $ = (id) => document.getElementById(id);
+    const form = $("plan"), result = $("result"), btn = $("validate"), err = $("run-err");
+    const ids = [["r1s", "r1e"], ["r2s", "r2e"], ["r3s", "r3e"], ["r4s", "r4e"]];
+    const hm = (tick) => { const m = tick * 5; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+    const TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+    const mins = (v) => { const [h, m] = v.split(":").map(Number); return h * 60 + m; };
+    const spell = (m) => `${Math.floor(m / 60)} h${m % 60 ? " " + (m % 60) + " min" : ""}`;
+    let planName = TEMPLATES.common.name;
+
+    const setState = (s) => {
+      document.querySelectorAll("[data-state]").forEach((el) => el.classList.toggle("is-shown", el.dataset.state.split(/\s+/).includes(s)));
+      document.body.dataset.current = s;
+    };
+    const fill = (key) => {
+      TEMPLATES[key].runs.forEach(([a, b], i) => { $(ids[i][0]).value = a; $(ids[i][1]).value = b; });
+      planName = TEMPLATES[key].name;
+      clearErr();
+    };
+    const clearErr = () => { err.hidden = true; err.textContent = ""; document.querySelectorAll(".input").forEach((i) => i.removeAttribute("aria-invalid")); };
+    const fail = (msg, els) => { err.hidden = false; err.textContent = msg; els.forEach((e) => e.setAttribute("aria-invalid", "true")); els[0].focus(); };
+
+    /* read the four rows; return [[startMin, endMin], ...] or null after showing the reason */
+    const readRuns = () => {
+      clearErr();
+      const runs = [];
+      for (let i = 0; i < 4; i++) {
+        const a = $(ids[i][0]), b = $(ids[i][1]);
+        if (!a.value && !b.value) continue;
+        if (!a.value || !b.value) { fail(`Run ${i + 1} needs both a start and an end.`, [!a.value ? a : b]); return null; }
+        const bad = [a, b].find((x) => !TIME.test(x.value.trim()) || mins(x.value.trim()) % 5);
+        if (bad) { fail(`Run ${i + 1}: write the time as hh:mm in steps of 5 minutes, for example 06:00.`, [bad]); return null; }
+        const s = mins(a.value.trim()), e = mins(b.value.trim());
+        if (e <= s) { fail(`Run ${i + 1} ends before it starts.`, [b]); return null; }
+        runs.push([s, e, i]);
+      }
+      runs.sort((x, y) => x[0] - y[0]);
+      for (let i = 1; i < runs.length; i++) if (runs[i][0] < runs[i - 1][1]) { fail(`Run ${runs[i][2] + 1} starts before run ${runs[i - 1][2] + 1} ends.`, [$(ids[runs[i][2]][0])]); return null; }
+      if (!runs.length) { fail("Enter at least one run to check.", [$(ids[0][0])]); return null; }
+      return runs;
+    };
+
+    const check = (runs) => {
+      const work = new Array(T).fill(false);
+      runs.forEach(([s, e]) => { for (let t = s / 5; t < e / 5; t++) work[t] = true; });
+      const f = { ban: [], art18: [], hours: [], added: [], capM: [], capH: [] };
+      let acc = 0, gap = 0, cum = 0;
+      for (let t = 0; t < T; t++) {
+        const m = t * 5, banned = m >= 750 && m < 900;
+        if (work[t]) {
+          if (banned) f.ban.push(t);
+          if (gap >= 12) acc = 0;                    /* a non-ban gap of 1 h credits a break; ban time never does */
+          gap = 0; acc++; cum++;
+          if (acc > 60) f.art18.push(t);
+          if (cum > 96) f.hours.push(t);
+          if (cum > 102) f.added.push(t);
+          let cnt = 0, sev = 0;
+          for (let k = Math.max(0, t - 11); k <= t; k++) if (work[k]) { cnt++; sev = Math.max(sev, zoneAt(k)); }
+          if (sev === 1 && cnt > 9) f.capM.push(t);
+          if (sev === 2 && cnt > 4) f.capH.push(t);
+        } else if (!banned) gap++;
+      }
+      return { f, total: cum * 5 };
+    };
+    const groups = (a) => { const out = []; a.forEach((t) => { const l = out[out.length - 1]; if (l && t === l[1] + 1) l[1] = t; else out.push([t, t]); }); return out; };
+    const fmt = ([a, b]) => `ticks ${a} to ${b} (${hm(a)} to ${hm(b + 1)})`;
+
+    const render = (runs) => {
+      const { f, total } = check(runs);
+      const rows = Object.keys(f).filter((k) => f[k].length).map((k) => ({ k, g: groups(f[k]) })).sort((x, y) => x.g[0][0] - y.g[0][0]);
+      const count = (k) => groups(f[k]).length;
+      const checked = [
+        ["Midday ban", count("ban")],
+        ["Rolling 60 minute work caps, ADOSH Table 1", groups(f.capM.concat(f.capH)).length],
+        ["Art. 18, 5 hours without a 1 hour break", count("art18")],
+        ["Hours, 8 h a day and 48 h a week", count("hours")],
+        ["No added minutes against the published shift", count("added")],
+      ];
+      const head = rows.length
+        ? `<div class="sumline"><h2 id="result-h" class="t-headline" tabindex="-1">${rows.reduce((a, r) => a + r.g.length, 0)} violations across ${new Set(rows.map((r) => RULES[r.k].id)).size} ${new Set(rows.map((r) => RULES[r.k].id)).size === 1 ? "rule" : "rules"}</h2><span class="t-label t-muted">${planName}: ${spell(total)} of work in ${runs.length} ${runs.length === 1 ? "run" : "runs"}</span></div>`
+        : `<div class="empty"><svg class="ico empty__picto" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><use href="#i-proof"/></svg><h2 id="result-h" class="t-headline" tabindex="-1">No violations against the rules checked</h2><p class="measure">${planName}: ${spell(total)} of work in ${runs.length} ${runs.length === 1 ? "run" : "runs"}. This is a statement about the rules listed below, not a certificate.</p><div class="cluster cluster-4"><button class="btn btn--primary" type="button" data-pick="common">Check the common roster</button><button class="btn" type="button" data-pick="naive">Check the naive schedule</button></div></div>`;
+      const list = rows.length ? `<ol class="stack stack-3" aria-label="Violations">${rows.map(({ k, g }) => `
+        <li class="viol"><p class="t-mono"><span class="t-muted t-label">Rule</span><br>${RULES[k].id}</p>
+          <div class="stack stack-2"><p class="viol__clause"><strong>${RULES[k].cite}</strong>: ${RULES[k].rule}</p><p>${RULES[k].reason}</p><p class="t-label t-num">${g.map(fmt).join(" and ")}</p></div></li>`).join("")}</ol>` : "";
+      result.innerHTML = `${head}${list}
+        <section class="stack stack-3" aria-labelledby="chk-h"><h3 id="chk-h" class="t-title">Checked</h3>
+          <ul class="checked">${checked.map(([n, c]) => `<li><span>${n}</span><span class="t-num">${c ? c + (c === 1 ? " range violated" : " ranges violated") : "No violation"}</span></li>`).join("")}</ul>
+          <p class="t-label t-muted measure">Also checked by the product on crew data, not run in this demo: lone work, acclimatisation, juveniles, allowed task family. The demo crew is assumed, so there is nothing to read from them here.</p></section>`;
+    };
+
+    const run = (focus) => {
+      const runs = readRuns();
+      if (!runs) return;
+      setState("ideal");
+      btn.setAttribute("aria-busy", "true");
+      result.setAttribute("aria-busy", "true");
+      setTimeout(() => {
+        render(runs);
+        btn.removeAttribute("aria-busy");
+        result.removeAttribute("aria-busy");
+        if (focus) $("result-h")?.focus();
+      }, 450);
+    };
+
+    form.addEventListener("submit", (e) => { e.preventDefault(); run(true); });
+    $("retry")?.addEventListener("click", () => run(true));
+    form.addEventListener("change", (e) => { if (e.target.name === "tpl") { fill(e.target.value); } });
+    form.addEventListener("input", (e) => {
+      if (e.target.matches(".input")) { form.querySelectorAll('input[name="tpl"]').forEach((r) => (r.checked = false)); planName = "Your edited plan"; clearErr(); }
+    });
+    result.addEventListener("click", (e) => {
+      const pick = e.target.closest("[data-pick]");
+      if (!pick) return;
+      form.querySelector(`input[name="tpl"][value="${pick.dataset.pick}"]`).checked = true;
+      fill(pick.dataset.pick);
+      run(true);
+    });
+
+    /* initial state from ?state= (proto.js already toggled the sections) */
+    const cur = document.body.dataset.current;
+    if (cur === "empty") form.querySelector('input[value="rule"]').checked = true;
+    fill(cur === "empty" ? "rule" : "common");
+    if (cur === "loading") btn.setAttribute("aria-busy", "true");
+    if (cur === "ideal" || cur === "empty") render(readRuns());
+  })();
+</script>
+</body>
+</html>

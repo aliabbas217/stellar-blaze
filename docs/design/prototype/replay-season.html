@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summer 2026 scoreboard · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  .policies { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
+  @media (min-width: 48rem) { .policies { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 64rem) { .policies { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .policy { display: grid; gap: var(--space-4); align-content: start; }
+  .policy h3 { font-family: var(--font-display); font-weight: 600; font-size: var(--size-title); letter-spacing: var(--tracking-signage); }
+  .row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); }
+  .metrics { display: grid; grid-template-columns: repeat(3, auto); gap: var(--space-1) var(--space-4); font-size: var(--size-label); justify-content: start; }
+  .metrics dt { color: inherit; opacity: 1; font-weight: 600; }
+  .scrub { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-4); align-items: center; }
+  .scrub input[type="range"] { inline-size: 100%; accent-color: var(--action); min-block-size: var(--space-6); }
+  @media (max-width: 47.99rem) { .scrub { grid-template-columns: minmax(0, 1fr) auto; } .scrub input[type="range"] { grid-column: 1 / -1; grid-row: 2; } }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error,partial">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html" aria-current="step">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html">Try a plan</a></li>
+    <li><a href="replay-frontier.html">Frontier</a></li>
+    <li><a href="replay-climate.html">Warmer summer</a></li>
+    <li><a href="replay-governance.html">Governance</a></li>
+    <li><a href="replay-faults.html">Break things</a></li>
+    <li><a href="replay-next.html">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-3">
+    <h1 class="t-display">Summer 2026, replayed honestly</h1>
+    <p class="t-lead measure">Abu Dhabi International airport station (OMAA), 15 May to 30 Sep 2026. Four warning policies, each judged on the forecast it had the evening before, against what the station's thermometers then recorded.</p>
+    <p class="cluster">
+      <span class="stamp">Forecast as issued 18:00 the evening before</span>
+      <span class="stamp">Scored against station thermometers</span>
+      <span class="stamp">Summer never seen in training</span>
+      <span class="stamp stamp--quiet">Placeholder numbers</span>
+    </p>
+  </header>
+
+  <section data-state="ideal partial" class="verdict" aria-labelledby="verdict-h">
+    <p class="t-label">What the season showed</p>
+    <p id="verdict-h" class="t-headline measure">⟨Outcome sentence from the pre-registered outcome table, written the same way whether we won or lost⟩</p>
+    <p class="t-label t-muted measure">If our policy loses to the regulator's own zones, this sentence says so and the screen does not change.</p>
+  </section>
+
+  <!-- IDEAL + PARTIAL share the ribbon and the Warnings row -->
+  <section data-state="ideal partial" class="stack stack-4" aria-labelledby="ribbon-h">
+    <div class="spread">
+      <h2 id="ribbon-h" class="panel-title">The season, one cell per day</h2>
+      <p class="t-label t-muted">Hatch density: hours the station was in the ADOSH High zone that day. Underlined days: midday ban in force.</p>
+    </div>
+    <div class="ribbon" id="ribbon" role="img" aria-label="Season ribbon, 15 May to 30 September 2026" aria-describedby="ribbon-alt"></div>
+    <div class="ribbon-axis" aria-hidden="true"><span>15 May</span><span>15 Jun, ban starts</span><span>Jul</span><span>Aug</span><span>15 Sep, ban ends</span><span>30 Sep</span></div>
+    <p id="ribbon-alt" class="sr-only">Ribbon of 139 days. Illustrative pattern only; the per-day table is available from the proof chip.</p>
+    <p class="t-label"><span class="stamp stamp--quiet">Placeholder</span> Illustrative pattern, not 2026 data.</p>
+    <div class="scrub">
+      <button class="btn" type="button" id="play" aria-pressed="false"><svg class="ico"><use href="#i-play"/></svg><span>Play the season</span></button>
+      <label class="sr-only" for="day">Replay date</label>
+      <input type="range" id="day" min="0" max="138" value="138" aria-valuetext="30 September 2026">
+      <output for="day" id="day-out" class="t-label t-num">30 Sep 2026 · final</output>
+    </div>
+  </section>
+
+  <section data-state="ideal partial" class="stack stack-6" aria-labelledby="warn-h">
+    <div class="row-head">
+      <h2 id="warn-h" class="t-headline">Warnings</h2>
+      <p class="t-muted">Who was warned the evening before, and how often a warning was a false alarm. POD: share of danger hours warned. FAR: share of warnings that were false alarms. CSI: both combined.</p>
+    </div>
+    <div class="policies">
+      <article class="card policy" aria-labelledby="p0">
+        <h3 id="p0">Midday ban only</h3>
+        <div class="counter counter--danger">
+          <p class="counter__label">Danger hours nobody warned about</p>
+          <p class="counter__value"><span class="t-mega slot">###</span><span class="slot-key">P0_unwarned_h</span></p>
+          <p class="counter__ci">worker-hours · 95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Unwarned danger worker-hours, ban only" data-label="REAL WEATHER · ASSUMED CREW"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <div class="counter">
+          <p class="counter__label">False-alarm hours</p>
+          <p class="counter__value"><span class="t-display slot">###</span><span class="slot-key">P0_alarm_h</span></p>
+          <p class="counter__ci">worker-hours <button class="proof" type="button" data-metric="Alarm worker-hours, ban only"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <dl class="metrics"><dt>POD</dt><dt>FAR</dt><dt>CSI</dt><dd class="slot">#.##</dd><dd class="slot">#.##</dd><dd class="slot">#.##</dd></dl>
+      </article>
+
+      <article class="card policy" aria-labelledby="p1">
+        <h3 id="p1">WBGT 32 or more</h3>
+        <div class="counter counter--danger">
+          <p class="counter__label">Danger hours nobody warned about</p>
+          <p class="counter__value"><span class="t-mega slot">###</span><span class="slot-key">P1_unwarned_h</span></p>
+          <p class="counter__ci">worker-hours · 95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Unwarned danger worker-hours, WBGT 32"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <div class="counter">
+          <p class="counter__label">False-alarm hours</p>
+          <p class="counter__value"><span class="t-display slot">###</span><span class="slot-key">P1_alarm_h</span></p>
+          <p class="counter__ci">worker-hours <button class="proof" type="button" data-metric="Alarm worker-hours, WBGT 32"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <dl class="metrics"><dt>POD</dt><dt>FAR</dt><dt>CSI</dt><dd class="slot">#.##</dd><dd class="slot">#.##</dd><dd class="slot">#.##</dd></dl>
+      </article>
+
+      <article class="card policy" aria-labelledby="p2">
+        <h3 id="p2">ADOSH zones on the raw forecast</h3>
+        <div class="counter counter--danger">
+          <p class="counter__label">Danger hours nobody warned about</p>
+          <p class="counter__value"><span class="t-mega slot">###</span><span class="slot-key">P2_unwarned_h</span></p>
+          <p class="counter__ci">worker-hours · 95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Unwarned danger worker-hours, ADOSH on raw"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <div class="counter">
+          <p class="counter__label">False-alarm hours</p>
+          <p class="counter__value"><span class="t-display slot">###</span><span class="slot-key">P2_alarm_h</span></p>
+          <p class="counter__ci">worker-hours <button class="proof" type="button" data-metric="Alarm worker-hours, ADOSH on raw"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <dl class="metrics"><dt>POD</dt><dt>FAR</dt><dt>CSI</dt><dd class="slot">#.##</dd><dd class="slot">#.##</dd><dd class="slot">#.##</dd></dl>
+      </article>
+
+      <article class="card card--ours policy" aria-labelledby="p3">
+        <h3 id="p3">Stellar Blaze</h3>
+        <div class="counter counter--danger">
+          <p class="counter__label">Danger hours nobody warned about</p>
+          <p class="counter__value"><span class="t-mega slot">###</span><span class="slot-key">P3_unwarned_h</span></p>
+          <p class="counter__ci">worker-hours · 95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Unwarned danger worker-hours, Stellar Blaze"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <div class="counter">
+          <p class="counter__label">False-alarm hours</p>
+          <p class="counter__value"><span class="t-display slot">###</span><span class="slot-key">P3_alarm_h</span></p>
+          <p class="counter__ci">worker-hours <button class="proof" type="button" data-metric="Alarm worker-hours, Stellar Blaze"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+        </div>
+        <dl class="metrics"><dt>POD</dt><dt>FAR</dt><dt>CSI</dt><dd class="slot">#.##</dd><dd class="slot">#.##</dd><dd class="slot">#.##</dd></dl>
+        <p class="t-label">Warns when the calibrated chance of the High zone passes a threshold set on 2024 and 2025 only.</p>
+      </article>
+    </div>
+  </section>
+
+  <section data-state="ideal" class="stack stack-6" aria-labelledby="plans-h">
+    <div class="row-head">
+      <h2 id="plans-h" class="t-headline">Plans</h2>
+      <p class="t-muted">Each shift plan checked by the independent validator against what the station recorded.</p>
+    </div>
+    <div class="policies">
+      <article class="card policy"><h3>Naive schedule</h3>
+        <div class="counter"><p class="counter__label">Rule-violation minutes per worker-season</p><p class="counter__value"><span class="t-numeral slot">###</span><span class="slot-key">plan_violation_min_a</span></p><p class="counter__ci">95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Rule-violation minutes, naive schedule"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p></div>
+        <dl class="kv t-label"><dt>High-zone heavy minutes cycled 20/40</dt><dd><span class="slot">###</span> <span class="slot-key">plan_high_cycled_a</span></dd><dt>Missed protection</dt><dd><span class="slot">###</span> <span class="slot-key">plan_missed_a</span></dd><dt>Rest minutes added</dt><dd><span class="slot">###</span> <span class="slot-key">plan_rest_added_a</span></dd></dl>
+      </article>
+      <article class="card policy"><h3>Midday ban only</h3>
+        <div class="counter"><p class="counter__label">Rule-violation minutes per worker-season</p><p class="counter__value"><span class="t-numeral slot">###</span><span class="slot-key">plan_violation_min_b</span></p><p class="counter__ci">95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Rule-violation minutes, ban only"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p></div>
+        <dl class="kv t-label"><dt>High-zone heavy minutes cycled 20/40</dt><dd><span class="slot">###</span> <span class="slot-key">plan_high_cycled_b</span></dd><dt>Missed protection</dt><dd><span class="slot">###</span> <span class="slot-key">plan_missed_b</span></dd><dt>Rest minutes added</dt><dd><span class="slot">###</span> <span class="slot-key">plan_rest_added_b</span></dd></dl>
+      </article>
+      <article class="card policy"><h3>Rule plan on the raw forecast</h3>
+        <div class="counter"><p class="counter__label">Rule-violation minutes per worker-season</p><p class="counter__value"><span class="t-numeral slot">###</span><span class="slot-key">plan_violation_min_c</span></p><p class="counter__ci">95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Rule-violation minutes, rule plan on raw"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p></div>
+        <dl class="kv t-label"><dt>High-zone heavy minutes cycled 20/40</dt><dd><span class="slot">###</span> <span class="slot-key">plan_high_cycled_c</span></dd><dt>Missed protection</dt><dd><span class="slot">###</span> <span class="slot-key">plan_missed_c</span></dd><dt>Rest minutes added</dt><dd><span class="slot">###</span> <span class="slot-key">plan_rest_added_c</span></dd></dl>
+      </article>
+      <article class="card card--ours policy"><h3>Rule plan on our corrected forecast</h3>
+        <div class="counter"><p class="counter__label">Rule-violation minutes per worker-season</p><p class="counter__value"><span class="t-numeral slot">###</span><span class="slot-key">plan_violation_min_d</span></p><p class="counter__ci">95 % interval ⟨lo⟩ to ⟨hi⟩ <button class="proof" type="button" data-metric="Rule-violation minutes, rule plan on corrected quantile"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p></div>
+        <dl class="kv t-label"><dt>High-zone heavy minutes cycled 20/40</dt><dd><span class="slot">###</span> <span class="slot-key">plan_high_cycled_d</span></dd><dt>Missed protection</dt><dd><span class="slot">###</span> <span class="slot-key">plan_missed_d</span></dd><dt>Rest minutes added</dt><dd><span class="slot">###</span> <span class="slot-key">plan_rest_added_d</span></dd></dl>
+      </article>
+    </div>
+    <p class="cluster"><span class="stamp">Simulated productivity</span><span class="t-label t-muted">Rest minutes added are a simulated cost on an assumed crew mix. We report rule-violation minutes, never "illness prevented".</span></p>
+  </section>
+
+  <section data-state="partial" class="banner" role="status">
+    <svg class="ico"><use href="#i-info"/></svg>
+    <p>The Plans row is in the written report for this build. <a class="link" href="#">Open the report, section ⟨n⟩</a></p>
+  </section>
+
+  <div data-state="ideal partial" class="cluster cluster-4">
+    <a class="btn btn--primary" href="replay-day.html">See the pre-registered day</a>
+    <a class="link" href="#">Read the protocol, committed before scoring</a>
+  </div>
+
+  <!-- LOADING -->
+  <section data-state="loading" class="stack stack-6" aria-busy="true" aria-label="Loading the scoreboard">
+    <div class="skel" style="block-size: var(--ribbon-cell-height)"></div>
+    <div class="policies">
+      <div class="skel" style="block-size: 20rem"></div><div class="skel" style="block-size: 20rem"></div>
+      <div class="skel" style="block-size: 20rem"></div><div class="skel" style="block-size: 20rem"></div>
+    </div>
+  </section>
+
+  <!-- EMPTY: the single scoring run has not happened yet -->
+  <section data-state="empty" class="empty" aria-labelledby="e-h">
+    <svg class="ico empty__picto"><use href="#i-proof"/></svg>
+    <h2 id="e-h" class="t-headline">Results appear after the single pre-registered scoring run</h2>
+    <p class="measure">The metrics, the demo day and the threshold were fixed and committed before 2026 was scored. The run happens once, so the numbers cannot be tuned after the fact.</p>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="#">Read the protocol</a>
+      <a class="link" href="replay-validator.html">Meanwhile, try a plan against the rules</a>
+    </div>
+  </section>
+
+  <!-- ERROR -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="x-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h2 id="x-h" class="t-headline">The scoreboard did not load</h2>
+    <p class="measure">The result file could not be read. The same numbers are in the static chart and the report.</p>
+    <div class="cluster cluster-4">
+      <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+      <a class="link" href="#">Show the static chart</a>
+    </div>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>Airport station, not a worksite.</li>
+    <li>Crew of 20 is an assumed schedule.</li>
+    <li>Truth is station temperature, humidity and wind plus modelled sunshine.</li>
+    <li>TWL aligned with ADOSH zones, not certified.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Season ribbon: ILLUSTRATIVE pattern (deterministic), not data. The real ribbon reads demo_day / per-day JSON. */
+  (() => {
+    const ribbon = document.getElementById("ribbon");
+    if (!ribbon) return;
+    const start = new Date(Date.UTC(2026, 4, 15));
+    const lv = ["lv-green", "lv-amber", "lv-orange", "lv-red"];
+    const cells = [];
+    for (let d = 0; d < 139; d++) {
+      const date = new Date(start.getTime() + d * 864e5);
+      const season = Math.sin((d / 138) * Math.PI); // illustrative bell over the summer
+      const wobble = ((d * 37) % 11) / 11 - 0.5;
+      const idx = Math.max(0, Math.min(3, Math.round(season * 3 + wobble)));
+      const i = document.createElement("i");
+      i.className = lv[idx];
+      const m = date.getUTCMonth(), day = date.getUTCDate();
+      const ban = (m > 5 || (m === 5 && day >= 15)) && (m < 8 || (m === 8 && day <= 15));
+      if (ban) i.classList.add("is-ban");
+      ribbon.append(i);
+      cells.push(i);
+    }
+    const range = document.getElementById("day");
+    const out = document.getElementById("day-out");
+    const fmt = (d) => new Date(start.getTime() + d * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+    const show = (d) => {
+      cells.forEach((c, k) => (c.style.opacity = k <= d ? "1" : "0.15"));
+      out.textContent = fmt(d) + (d === 138 ? " · final" : "");
+      range.setAttribute("aria-valuetext", fmt(d));
+    };
+    range.addEventListener("input", () => show(+range.value));
+    const play = document.getElementById("play");
+    let timer = null;
+    const stop = () => { clearInterval(timer); timer = null; play.setAttribute("aria-pressed", "false"); play.querySelector("span").textContent = "Play the season"; play.querySelector("use").setAttribute("href", "#i-play"); };
+    play.addEventListener("click", () => {
+      if (timer) return stop();
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) { range.value = 138; show(138); return; }
+      let d = 0; range.value = 0; show(0);
+      play.setAttribute("aria-pressed", "true"); play.querySelector("span").textContent = "Pause"; play.querySelector("use").setAttribute("href", "#i-pause");
+      timer = setInterval(() => { d++; range.value = d; show(d); if (d >= 138) stop(); }, 108); // about 15 s
+    });
+  })();
+</script>
+</body>
+</html>

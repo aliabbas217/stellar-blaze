@@ -1,0 +1,155 @@
+{
+  "recorded_at": "2026-11-15T05:19:18.416Z",
+  "source": "msw-mock",
+  "request": {
+    "site_id": "site-demo-mussafah",
+    "date": "2026-09-03",
+    "crew": {
+      "workload": "heavy",
+      "headcount": 20,
+      "acclimatised": false,
+      "days_per_week": 6
+    },
+    "segments": [
+      {
+        "start": "06:00",
+        "end": "12:30",
+        "state": "work"
+      },
+      {
+        "start": "15:00",
+        "end": "17:00",
+        "state": "work"
+      }
+    ]
+  },
+  "response": {
+    "banner_code": "plan.floor_banner",
+    "validator": {
+      "passed": false,
+      "violations": [
+        {
+          "rule_id": "P-H3",
+          "clause": "Labour Art. 18: a break of one hour after five hours of work.",
+          "source_id": "ae-labour-art-18",
+          "ranges": [
+            {
+              "starts_at": "2026-09-03T02:00:00Z",
+              "ends_at": "2026-09-03T08:30:00Z"
+            }
+          ],
+          "detail": "6.5 hours of attendance without a one-hour break."
+        },
+        {
+          "rule_id": "P-H2.daily",
+          "clause": "",
+          "source_id": "",
+          "ranges": [
+            {
+              "starts_at": "2026-09-03T02:00:00Z",
+              "ends_at": "2026-09-03T08:30:00Z"
+            },
+            {
+              "starts_at": "2026-09-03T11:00:00Z",
+              "ends_at": "2026-09-03T13:00:00Z"
+            }
+          ],
+          "detail": "8.5 hours of attendance in the day."
+        }
+      ],
+      "checked_rules": [
+        "P-H1",
+        "P-H2.daily",
+        "P-H3",
+        "P-H7.cap60",
+        "P-H7.run"
+      ]
+    },
+    "zone_hours": [
+      {
+        "starts_at": "2026-09-03T02:00:00Z",
+        "zone": "low",
+        "level": "green"
+      },
+      {
+        "starts_at": "2026-09-03T03:00:00Z",
+        "zone": "low",
+        "level": "green"
+      },
+      {
+        "starts_at": "2026-09-03T04:00:00Z",
+        "zone": "medium",
+        "level": "amber"
+      },
+      {
+        "starts_at": "2026-09-03T05:00:00Z",
+        "zone": "medium",
+        "level": "amber"
+      },
+      {
+        "starts_at": "2026-09-03T06:00:00Z",
+        "zone": "high",
+        "level": "orange"
+      },
+      {
+        "starts_at": "2026-09-03T07:00:00Z",
+        "zone": "high",
+        "level": "orange"
+      },
+      {
+        "starts_at": "2026-09-03T08:00:00Z",
+        "zone": "high",
+        "level": "orange"
+      },
+      {
+        "starts_at": "2026-09-03T09:00:00Z",
+        "zone": "high",
+        "level": "orange"
+      },
+      {
+        "starts_at": "2026-09-03T10:00:00Z",
+        "zone": "red",
+        "level": "red"
+      },
+      {
+        "starts_at": "2026-09-03T11:00:00Z",
+        "zone": "high",
+        "level": "orange"
+      },
+      {
+        "starts_at": "2026-09-03T12:00:00Z",
+        "zone": "high",
+        "level": "orange"
+      },
+      {
+        "starts_at": "2026-09-03T13:00:00Z",
+        "zone": "medium",
+        "level": "amber"
+      },
+      {
+        "starts_at": "2026-09-03T14:00:00Z",
+        "zone": "medium",
+        "level": "amber"
+      },
+      {
+        "starts_at": "2026-09-03T15:00:00Z",
+        "zone": "medium",
+        "level": "amber"
+      }
+    ],
+    "forecast_status": "fresh",
+    "ban_window": {
+      "start": "12:30",
+      "end": "15:00",
+      "season_start": "06-15",
+      "season_end": "09-15",
+      "timezone": "Asia/Dubai",
+      "active_on_date": true,
+      "starts_at": "2026-09-03T08:30:00Z",
+      "ends_at": "2026-09-03T11:00:00Z"
+    },
+    "policy_version": "mock-0",
+    "config_version": 1,
+    "model_id": "mock"
+  }
+}

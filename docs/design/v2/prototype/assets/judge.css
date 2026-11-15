@@ -1,0 +1,82 @@
+/* Judge surfaces (landing + judge-season/day/proof/next): shared page CSS on top of tokens.css + base.css.
+   Owned by the landing builder; reads tokens only. */
+.skip { position: absolute; inset-inline-start: 8px; top: -60px; z-index: 100; padding: 10px 14px; background: var(--ink); color: var(--ground); font-weight: 600; border-radius: var(--r); text-decoration: none; }
+.skip:focus { top: 8px; }
+.bar .wordmark { view-transition-name: wordmark; display: inline-flex; align-items: center; min-height: var(--target); }
+.bar .menu-btn { display: none; }
+@media (max-width: 900px) {
+  .bar { gap: var(--s-3); }
+  .bar .menu-btn { display: inline-flex; margin-inline-start: auto; }
+  .bar.open nav { display: grid; position: absolute; top: 100%; inset-inline: 0; background: var(--ground); border-bottom: 1px solid var(--edge); padding: var(--s-2) var(--s-4) var(--s-4); }
+  .bar.open nav a { border-bottom: 1px solid var(--hair); }
+}
+
+/* type: display step for judge pages (DESIGN.md §4: 400 weight, tight tracking) */
+.j-h1 { font: 400 clamp(var(--t-36), 3.2vw, var(--t-48))/1.06 var(--sans); letter-spacing: -0.02em; text-wrap: balance; }
+.j-h2 { font: 400 clamp(var(--t-28), 2.4vw, var(--t-36))/1.12 var(--sans); letter-spacing: -0.015em; text-wrap: balance; }
+.j-lede { color: var(--ink-2); font-size: var(--t-18); line-height: 1.5; max-width: 52ch; }
+.j-src { color: var(--ink-3); font-size: var(--t-13); line-height: 1.5; max-width: 72ch; }
+
+/* charts: text sizes in real px (charts are drawn at their rendered width, never scaled) */
+.j-chart svg { display: block; overflow: visible; max-width: 100%; }
+.j-tick { font: 400 12px var(--sans); fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+.j-lab { font: 400 13px var(--sans); fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.j-slot { fill: var(--slot); }
+.j-slot-rule { stroke: var(--edge); stroke-width: 1; }
+.j-slot-lab { font: 500 12px var(--sans); fill: var(--ink-3); }
+.j-tip { position: fixed; z-index: 80; pointer-events: none; padding: 8px 10px; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); font-size: var(--t-13); line-height: 1.45; color: var(--ink-2); max-width: 260px; }
+.j-tip b { color: var(--ink); font-weight: 600; }
+.j-legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); font-size: var(--t-13); color: var(--ink-2); }
+.j-legend span { display: inline-flex; align-items: center; gap: var(--s-2); }
+.j-legend .sw { width: 22px; height: 0; border-top: 2px dashed var(--viz-raw); }
+.j-legend .sw.pend { width: 14px; height: 14px; border: 1px dashed var(--edge); }
+.j-legend .sw.slot { width: 22px; height: 10px; background: var(--slot); border-inline: 1px solid var(--edge); }
+.j-legend .sw.lim { border-top: 1px dashed var(--ink-2); }
+
+/* pending: quiet text in the cell, the reason once per table in .j-pending (no per-cell glyph: it read as a checkbox) */
+span.pend { display: inline-flex; align-items: center; color: var(--ink-3); font-size: var(--t-13); white-space: nowrap; }
+span.pend i { display: none; }
+.j-pending { align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: var(--s-3); }
+.j-pending p { max-width: 70ch; }
+.j-legend .later { color: var(--ink-3); }
+
+/* honest numbers */
+.j-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-6); }
+.j-nums div { display: grid; gap: var(--s-1); align-content: start; border-top: 1px solid var(--edge); padding-top: var(--s-3); }
+.j-nums strong { font: 400 var(--t-48)/1 var(--sans); letter-spacing: -0.02em; }
+.j-nums strong small { font-size: var(--t-22); color: var(--ink-3); margin-inline-start: 4px; letter-spacing: 0; }
+.j-nums span { color: var(--ink-2); font-size: var(--t-14); max-width: 32ch; }
+@media (max-width: 760px) { .j-nums { grid-template-columns: 1fr; gap: var(--s-4); } .j-nums strong { font-size: var(--t-36); } }
+
+/* story footer (inner judge pages) */
+.j-story { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-6); padding: var(--s-4) clamp(16px, 3vw, 40px); border-top: 1px solid var(--edge); background: var(--ground); position: sticky; bottom: 0; z-index: 15; }
+.j-chap { font-size: var(--t-14); color: var(--ink-3); white-space: nowrap; }
+.j-chap b { color: var(--ink); font-weight: 600; }
+.j-dots { list-style: none; padding: 0; display: flex; gap: 3px; justify-content: center; }
+.j-dots a { display: grid; align-items: end; min-height: var(--target); min-width: 44px; text-decoration: none; color: var(--ink-3); font-size: var(--t-13); padding-bottom: 6px; position: relative; }
+.j-dots a::before { content: ""; position: absolute; inset: auto 0 0 0; height: 3px; background: var(--hair); }
+.j-dots a[aria-current]::before { background: var(--ink); height: 5px; }
+.j-dots a[aria-current] { color: var(--ink); font-weight: 600; }
+.j-dots a span { padding-inline: 8px; white-space: nowrap; }
+.j-pn { display: flex; gap: var(--s-2); }
+@media (max-width: 1100px) { .j-dots a span { display: none; } .j-dots a { min-width: 28px; } }
+@media (max-width: 760px) {
+  .j-story { grid-template-columns: 1fr auto; position: fixed; inset-inline: 0; bottom: 0; padding: var(--s-2) var(--s-4) calc(var(--s-2) + env(safe-area-inset-bottom)); gap: var(--s-2); }
+  .j-dots { display: none; }
+  .j-chap { font-size: var(--t-13); white-space: normal; }
+  .j-pn .btn:not(.primary) { display: none; }
+  body.j-has-story { padding-bottom: 72px; }
+}
+.j-page { min-height: calc(100svh - 140px); max-width: var(--content-max); margin-inline: auto; padding: var(--s-8) clamp(16px, 3vw, 40px) var(--s-16); }
+.j-head { display: grid; gap: var(--s-3); margin-bottom: var(--s-6); }
+.j-head .crumb { color: var(--ink-3); font-size: var(--t-14); }
+.j-head .crumb a { color: var(--ink-2); }
+.j-sec { padding-top: var(--s-12); }
+.j-sec > h2 { font: 500 var(--t-22)/1.25 var(--sans); margin-bottom: var(--s-2); }
+.j-sec > .sub { color: var(--ink-2); max-width: 70ch; margin-bottom: var(--s-4); }
+details.j-alt { margin-top: var(--s-3); }
+details.j-alt > summary { cursor: pointer; display: inline-flex; align-items: center; min-height: var(--target); color: var(--ink-2); font-size: var(--t-14); }
+details.j-alt[open] > summary { margin-bottom: var(--s-2); }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+/* keep the kit's prototype control clear of the story bars */
+body.j-has-story .proto, body:has(.stepper) .proto { bottom: 84px; }

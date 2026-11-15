@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roster import · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/supervisor.css">
+<style>
+.head { padding: var(--s-4) var(--s-4) var(--s-2); }
+.head .focal { font-size: var(--t-28); }
+.file { display: flex; gap: var(--s-2); align-items: baseline; margin-top: var(--s-2); font-size: var(--t-14); color: var(--ink-2); }
+.pats { padding: var(--s-2) var(--s-2) 0 var(--s-4); view-transition-name: spine; }
+.pats svg { width: 100%; height: auto; overflow: visible; }
+.pats .pl { font: 600 15px var(--sans); fill: var(--ink); }
+.pats .ps { font: 400 13px var(--sans); fill: var(--ink-3); }
+.pats .tick { font: 400 12px var(--sans); fill: var(--ink-3); }
+.pats .sl { font: 500 12px var(--sans); fill: var(--ink-3); }
+.tblwrap { margin: var(--s-4) var(--s-4) 0; overflow-x: auto; border: 1px solid var(--hair); border-radius: var(--r); }
+.tbl { font-size: var(--t-14); }
+.tbl td, .tbl th { padding: var(--s-2); }
+.tbl td:nth-child(4) { min-width: 7.5em; }
+.tbl th.gone, .tbl td.gone { color: var(--ink-3); background: var(--slot); }
+.tbl th.gone s { text-decoration-thickness: 2px; }
+.tbl th.gone small { display: block; font-weight: 400; font-size: var(--t-12); color: var(--ink-2); text-decoration: none; }
+.bar-x { display: block; height: 10px; width: 3.5em; background: var(--hair); position: relative; }
+.bar-x::after { content: ""; position: absolute; inset: 4px -4px auto; height: 2px; background: var(--ink-3); }
+.more { padding: var(--s-2) var(--s-4) 0; font-size: var(--t-13); color: var(--ink-3); }
+.keep { padding: var(--s-3) var(--s-4) 0; font-size: var(--t-14); color: var(--ink-2); }
+.raw { margin: var(--s-4); padding: var(--s-3); border: 1px solid var(--edge); border-radius: var(--r); background: var(--panel); overflow-x: auto; white-space: pre; }
+.colpick { padding: 0 var(--s-4); }
+.banner { margin: var(--s-3) var(--s-4) 0; }
+.askcol { margin: var(--s-4); padding: var(--s-4); border: 1px solid var(--signal); border-radius: var(--r); }
+.askcol p { font-size: var(--t-18); font-weight: 500; }
+</style>
+</head>
+<body class="sup-page">
+<div class="sup">
+  <div id="top"></div>
+  <main>
+    <div data-when="loading"><div class="head"><p class="k">Reading the file on this phone</p><p class="skel" style="height:34px;width:80%;margin-top:8px">.</p></div><div class="skel" style="height:190px;margin:16px">.</div><div class="skel" style="height:220px;margin:16px">.</div></div>
+
+    <section class="sec" data-when="empty"><div class="empty"><h3>This file has no rows</h3><p class="muted">roster-sep.csv has a header line and nothing under it. Export the roster again from your HR system, or set crews up by hand.</p><button class="btn primary lg" type="button">Pick another file</button><a href="supervisor-setup.html">Set up crews by hand</a></div></section>
+
+    <div data-when="error">
+      <div class="notice banner" role="alert"><div><strong>We could not split this file into columns.</strong> It may use a different separator or encoding. Here are the first rows as they are; tap the column that holds start times.</div></div>
+      <pre class="raw mono" aria-label="First rows of the file, raw">Name;Crew;Trade;Start;End;Joined
+███;A;Rebar;06:00;11:00;2026-08-20
+███;A;Rebar;06:00;11:00;2026-06-02
+███;B;Concrete;06:00;18:00;2026-08-29</pre>
+      <div class="colpick"><p class="k">Which column holds start times?</p><div class="chipset" style="margin-top:var(--s-2)"><button type="button">Column 4</button><button type="button">Column 5</button><button type="button">Column 6</button></div><p class="reqid" style="margin-top:var(--s-3)">Parsed on this phone; nothing was uploaded.</p></div>
+    </div>
+
+    <div data-when="ideal partial">
+      <section class="head" aria-labelledby="sum">
+        <p class="k">Roster preview</p>
+        <h1 class="focal" id="sum">40 rows, 2 crews, 3 shift patterns</h1>
+        <p class="file"><span class="mono">roster-sep.csv</span><span>sample file, synthetic</span></p>
+      </section>
+      <section class="pats" id="pats" aria-label="Shift patterns found, on today's clock"></section>
+      <div class="askcol" data-when="partial" role="group" aria-labelledby="aq"><p id="aq">One column I could not match: “Badge no.”</p><p class="muted" style="font-size:var(--t-14)">Badge numbers identify people, so the safe choice is to drop it.</p><div class="chipset" style="margin-top:var(--s-3)"><button type="button" aria-pressed="true">Drop it</button><button type="button">It is the crew</button><button type="button">It is the trade</button></div></div>
+      <div class="tblwrap"><table class="tbl" aria-label="First 6 rows of the roster">
+        <thead><tr><th class="gone" scope="col"><s>Name</s><small>removed on this device</small></th><th scope="col">Crew</th><th scope="col">Trade</th><th scope="col">Shift</th><th scope="col">Started</th></tr></thead>
+        <tbody id="rows"></tbody></table></div>
+      <p class="more">34 more rows. Every name cell is dropped before anything is sent.</p>
+      <p class="keep">Sent when you confirm: crew letter, trade, shift and start date. No names, no badge numbers, no row-level file.</p>
+      <div class="act-row"><button class="btn primary lg" type="button" onclick="location.href='supervisor-qr.html'">Use this roster</button><button class="btn lg" type="button">Pick another file</button></div>
+    </div>
+  </main>
+</div>
+<script type="module">
+import { boot } from './assets/kit.js';
+import { RAMP_DARK, RAMP_LIGHT, css } from './assets/heat.js';
+import { REPLAY, SITE, topbar, fmt, replayDay } from './assets/crews.js';
+document.getElementById('top').innerHTML = topbar({ back: { href: 'supervisor-setup.html', label: 'New site' }, title: 'Add the roster', sub: 'CSV from your HR system' });
+boot({ surface: 'field', at: REPLAY.at, states: ['ideal', 'loading', 'empty', 'error', 'partial'] });
+
+// synthetic sample (labelled): crew, trade, shift, start date; names are never read past the column split
+const P = [{ s: [[6, 18]], n: 14, crew: 'B', trade: 'Concrete' }, { s: [[6, 11], [15, 18]], n: 20, crew: 'A', trade: 'Rebar' }, { s: [[7, 16]], n: 6, crew: 'B', trade: 'Survey' }];
+const R = [['A', 'Rebar', 1, '20 Aug 2026'], ['A', 'Rebar', 1, '2 Jun 2026'], ['B', 'Concrete', 0, '29 Aug 2026'], ['B', 'Concrete', 0, '14 Mar 2026'], ['B', 'Survey', 2, '1 Sep 2026'], ['A', 'Rebar', 1, '11 May 2026']];
+const sh = (p) => P[p].s.map(([a, b]) => `${fmt(a)} to ${fmt(b)}`).join(', ');
+document.getElementById('rows').innerHTML = R.map(([c, t, p, d]) => `<tr><td class="gone"><span class="bar-x" aria-hidden="true"></span><span class="sr-only">Name removed</span></td><td>${c}</td><td>${t}</td><td>${sh(p)}</td><td>${d}</td></tr>`).join('');
+
+const el = document.getElementById('pats');
+const day = await replayDay();
+function draw() {
+  const W = Math.round(el.clientWidth) || 360, from = 6, to = 18, top = 26, rh = 70, bh = 18, R0 = 6;
+  const x = (t) => (t - from) / (to - from) * (W - R0);
+  const ramp = document.documentElement.dataset.theme === 'sun' ? RAMP_LIGHT : RAMP_DARK;
+  let s = '';
+  const a = x(SITE.ban[0]), b = x(SITE.ban[1]), y1 = top + P.length * rh;
+  s += `<rect x="${a}" y="${top - 6}" width="${b - a}" height="${y1 - top + 6}" fill="var(--slot)"/><line x1="${a}" x2="${a}" y1="${top - 6}" y2="${y1}" stroke="var(--edge)"/><line x1="${b}" x2="${b}" y1="${top - 6}" y2="${y1}" stroke="var(--edge)"/><text class="sl" x="${(a + b) / 2}" y="${top - 12}" text-anchor="middle">Midday break</text>`;
+  P.forEach((p, i) => {
+    const y = top + i * rh;
+    s += `<text class="pl" x="0" y="${y + 16}">${p.n} people · Crew ${p.crew}</text><text class="ps" x="0" y="${y + 34}">${sh(i)}</text>`;
+    for (const [s0, e0] of p.s) for (let h = s0; h < e0; h++) { if (h >= 12.5 && h < 15) continue; const h1 = h === 12 ? 12.5 : h + 1; s += `<rect x="${x(h) + 0.5}" y="${y + 42}" width="${x(h1) - x(h) - 1}" height="${bh}" fill="${css(ramp(day[h]))}"/>`; }
+  });
+  for (let h = from; h <= to; h += 3) s += `<text class="tick" x="${x(h)}" y="${y1 + 16}" text-anchor="${h === from ? 'start' : h === to ? 'end' : 'middle'}">${fmt(h)}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${y1 + 22}" width="${W}" height="${y1 + 22}" role="img" aria-label="Three shift patterns: ${P.map((p, i) => `${p.n} people ${sh(i)}`).join('; ')}. Colour is the replay day's heat.">${s}</svg>`;
+}
+if (!el.closest('[hidden]')) { draw(); new ResizeObserver(() => draw()).observe(el); }
+</script>
+</body>
+</html>

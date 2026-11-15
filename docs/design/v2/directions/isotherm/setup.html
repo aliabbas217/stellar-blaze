@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New site · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ground: oklch(0.155 0.012 255);
+  --panel: oklch(0.19 0.012 255);
+  --ink: oklch(0.94 0.005 255);
+  --ink-2: oklch(0.76 0.01 255);
+  --ink-3: oklch(0.62 0.012 255);
+  --hair: oklch(0.3 0.012 255);
+  --hair-strong: oklch(0.45 0.012 255);
+  --focus: oklch(0.86 0.12 85);
+  --sans: "Archivo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --gutter: clamp(16px, 3vw, 40px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--ground); }
+body { color: var(--ink); font: 400 16px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.mono { font-family: var(--mono); font-size: 12px; letter-spacing: 0.03em; }
+.num { font-variant-numeric: tabular-nums; }
+.bar { display: flex; align-items: center; gap: 24px; padding: 20px var(--gutter); border-bottom: 1px solid var(--hair); }
+.mark b { font: 600 15px/1 var(--sans); font-variation-settings: "wdth" 118; letter-spacing: 0.14em; text-transform: uppercase; }
+.bar .crumb { color: var(--ink-3); }
+.bar .who { margin-inline-start: auto; color: var(--ink-2); font-size: 14px; }
+
+main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 64px; padding: 56px var(--gutter) 96px; max-width: 1360px; }
+.k { color: var(--ink-3); text-transform: uppercase; }
+h1 { font: 400 40px/1.1 var(--sans); letter-spacing: -0.02em; margin-top: 12px; }
+.say { margin-top: 28px; display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: stretch; }
+.say .field { border: 1px solid var(--hair-strong); border-radius: 2px; padding: 18px 20px; font-size: 22px; line-height: 1.35; background: var(--panel); min-height: 64px; }
+.say .field::after { content: ""; display: inline-block; width: 2px; height: 1.1em; background: var(--ink); vertical-align: -0.15em; margin-inline-start: 2px; }
+.icon-btn { width: 64px; border: 1px solid var(--hair-strong); border-radius: 2px; background: transparent; display: grid; place-items: center; }
+.read { padding: 0 22px; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); border-radius: 2px; font-weight: 500; }
+.class { margin-top: 12px; color: var(--ink-3); display: flex; gap: 10px; align-items: center; }
+.class i { font-style: normal; border: 1px solid var(--hair-strong); padding: 3px 7px; border-radius: 2px; color: var(--ink-2); }
+
+h2 { font: 500 20px/1.2 var(--sans); margin-top: 52px; }
+.understood { margin-top: 16px; border-top: 1px solid var(--hair-strong); }
+.row { display: grid; grid-template-columns: 150px 1fr 190px; gap: 20px; padding: 15px 0; border-bottom: 1px solid var(--hair); align-items: baseline; }
+.row dt { color: var(--ink-3); }
+.row dd { font-size: 17px; }
+.row dd small { display: block; color: var(--ink-3); font-size: 14px; margin-top: 2px; }
+.row .src { justify-self: end; color: var(--ink-3); text-transform: uppercase; }
+.row .src.confirm { color: var(--ink); border-bottom: 1px solid var(--focus); }
+.ask { margin-top: 28px; padding: 22px 24px; border: 1px solid var(--hair-strong); border-radius: 2px; background: var(--panel); }
+.ask p { font-size: 19px; }
+.chips { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.chips button { min-height: 44px; min-width: 88px; padding: 0 16px; border: 1px solid var(--hair-strong); border-radius: 2px; background: transparent; font-family: var(--mono); font-size: 15px; }
+.roster { margin-top: 14px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; padding: 18px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.roster p:first-child { font-size: 17px; }
+.roster .note { color: var(--ink-3); font-size: 14px; margin-top: 2px; }
+.ghost { min-height: 44px; padding: 0 16px; border: 1px solid var(--hair-strong); border-radius: 2px; background: transparent; }
+.actions { display: flex; gap: 12px; margin-top: 32px; }
+.primary { min-height: 48px; padding: 0 24px; border: 1px solid var(--ink); background: var(--ink); color: var(--ground); border-radius: 2px; font-weight: 500; }
+
+aside { border-inline-start: 1px solid var(--hair); padding-inline-start: 40px; }
+aside canvas { width: 100%; aspect-ratio: 1.1; display: block; margin-top: 16px; }
+aside dl { display: grid; grid-template-columns: 1fr auto; margin-top: 12px; }
+aside dt, aside dd { padding: 10px 0; border-bottom: 1px solid var(--hair); }
+aside dt { color: var(--ink-3); }
+aside dd { text-align: end; }
+aside .note { color: var(--ink-3); font-size: 13px; margin-top: 14px; line-height: 1.5; }
+
+@media (max-width: 960px) {
+  main { grid-template-columns: 1fr; gap: 40px; padding-top: 32px; }
+  aside { border: 0; padding: 0; }
+  h1 { font-size: 30px; }
+  .say { grid-template-columns: 1fr auto; }
+  .say .field { grid-column: 1 / -1; font-size: 19px; }
+  .say .icon-btn { width: auto; min-height: 48px; }
+  .read { min-height: 48px; }
+  .row { grid-template-columns: 1fr auto; gap: 4px 12px; }
+  .row dd { grid-column: 1 / -1; grid-row: 2; }
+  .row .src { grid-row: 1; grid-column: 2; }
+  .bar .who, .bar .crumb { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar"><span class="mark"><b>Stellar Blaze</b></span><span class="crumb mono">Sites / New</span><span class="who">HSE · Al Noor Contracting</span></header>
+<main>
+  <div>
+    <p class="k mono">New site</p>
+    <h1>Describe the site in one sentence.</h1>
+    <div class="say">
+      <div class="field" role="textbox" aria-label="Site description">Two crews, 40 workers, Mussafah, concrete work this week</div>
+      <button class="icon-btn" type="button" aria-label="Speak instead"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+      <button class="read" type="button">Read it</button>
+    </div>
+    <p class="class mono"><i>Private: our own server</i>Read by our own AI on our own server, never sent to another company, deleted once you confirm. Use crew letters, not names. Prefer a form? Fill it in by hand.</p>
+
+    <h2>What I understood</h2>
+    <dl class="understood">
+      <div class="row"><dt class="mono">Site</dt><dd>Mussafah<small class="num">24.36 N 54.50 E · drag the pin to fix</small></dd><span class="src mono">From your sentence</span></div>
+      <div class="row"><dt class="mono">Crews</dt><dd class="num">2</dd><span class="src mono">From your sentence</span></div>
+      <div class="row"><dt class="mono">Workers</dt><dd class="num">40, split 20 and 20</dd><span class="src mono confirm">Assumed · confirm</span></div>
+      <div class="row"><dt class="mono">Work</dt><dd>Concrete pour<small>Heavy work for the heat limits</small></dd><span class="src mono">Inferred</span></div>
+      <div class="row"><dt class="mono">Dates</dt><dd class="num">Wed 11 to Sun 15 Nov 2026</dd><span class="src mono">Inferred from “this week”</span></div>
+      <div class="row"><dt class="mono">Midday ban</dt><dd>Not in force<small>The ban runs 15 Jun to 15 Sep</small></dd><span class="src mono">From the ruleset</span></div>
+      <div class="row"><dt class="mono">Acclimatisation</dt><dd>Everyone counted as new, not acclimatised<small>Protective default (NIOSH). Mark experienced workers with one tap per crew</small></dd><span class="src mono confirm">Default · change</span></div>
+    </dl>
+
+    <div class="ask" role="group" aria-labelledby="q">
+      <p id="q">One thing I need: when does the shift start?</p>
+      <div class="chips"><button type="button">06:00</button><button type="button">07:00</button><button type="button">Other</button></div>
+    </div>
+
+    <div class="roster">
+      <div><p>Add the roster: a CSV from your HR system</p><p class="note">Names are removed on this device before upload; only crew letter, trade and start date are sent.</p></div>
+      <button class="ghost" type="button">Add roster</button>
+    </div>
+
+    <div class="actions"><button class="primary" type="button">Create site</button><button class="ghost" type="button">Edit details</button></div>
+  </div>
+
+  <aside aria-label="Location">
+    <p class="k mono">Location</p>
+    <canvas id="map" aria-label="Map of the UAE coast with a pin at Mussafah" role="img"></canvas>
+    <dl class="num">
+      <dt class="mono">Forecast cell</dt><dd class="mono">IFS 0.25°, 24.25 N 54.50 E</dd>
+      <dt class="mono">Nearest station</dt><dd class="mono">OMAD Al Bateen</dd>
+      <dt class="mono">Rules</dt><dd class="mono">ADOSH, UAE federal</dd>
+    </dl>
+    <p class="note">Nothing is saved until you press Create site. Every value above can be changed later, and each change is logged.</p>
+  </aside>
+</main>
+<script type="module">
+import { loadJSON, clipCoast, STATIONS } from '../_shared/heat.js';
+const coast = await loadJSON('coast.json');
+await document.fonts.ready;
+const c = document.getElementById('map'), r = c.getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+c.width = r.width * dpr; c.height = r.height * dpr; const g = c.getContext('2d'); g.scale(dpr, dpr);
+const box = [53.6, 23.7, 55.6, 25.0], kx = Math.cos(24.4 * Math.PI / 180);
+const s = Math.min(r.width / ((box[2] - box[0]) * kx), r.height / (box[3] - box[1]));
+const X = (lo) => (lo - box[0]) * kx * s, Y = (la) => (box[3] - la) * s;
+const css = getComputedStyle(document.documentElement);
+// graticule
+g.strokeStyle = css.getPropertyValue('--hair'); g.lineWidth = 1;
+for (let lo = 53.75; lo < box[2]; lo += 0.25) { g.beginPath(); g.moveTo(X(lo), 0); g.lineTo(X(lo), r.height); g.stroke(); }
+for (let la = 23.75; la < box[3]; la += 0.25) { g.beginPath(); g.moveTo(0, Y(la)); g.lineTo(r.width, Y(la)); g.stroke(); }
+g.strokeStyle = css.getPropertyValue('--ink-2'); g.lineWidth = 1.2;
+for (const l of clipCoast(coast, [box[0] - 0.5, box[1] - 0.5, box[2] + 0.5, box[3] + 0.5])) { g.beginPath(); l.forEach(([lo, la], i) => g[i ? 'lineTo' : 'moveTo'](X(lo), Y(la))); g.stroke(); }
+// forecast cell outline
+g.strokeStyle = css.getPropertyValue('--ink-3'); g.setLineDash([3, 3]); g.strokeRect(X(54.375), Y(24.375), X(54.625) - X(54.375), Y(24.125) - Y(24.375)); g.setLineDash([]);
+g.font = '11px "IBM Plex Mono"'; g.fillStyle = css.getPropertyValue('--ink-3');
+for (const [k, dx] of [['OMAA', 6], ['OMAD', -40]]) { const [la, lo] = STATIONS[k]; g.fillRect(X(lo) - 2, Y(la) - 2, 4, 4); g.fillText(k, X(lo) + dx, Y(la) - 6); }
+const px = X(54.5), py = Y(24.36); g.fillStyle = css.getPropertyValue('--ink');
+g.beginPath(); g.arc(px, py, 5, 0, 7); g.fill(); g.strokeStyle = css.getPropertyValue('--ink'); g.beginPath(); g.arc(px, py, 12, 0, 7); g.stroke();
+g.font = '500 12px "IBM Plex Mono"'; g.fillText('MUSSAFAH', px + 16, py + 4);
+</script>
+</body>
+</html>

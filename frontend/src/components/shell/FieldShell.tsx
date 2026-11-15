@@ -1,0 +1,101 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState, ViewTransition, type ReactNode } from "react";
+import { FieldHeadingContext, type FieldHeadingSlot } from "@/components/shell/FieldHeading";
+import { FieldLink } from "@/components/shell/FieldLink";
+import { LanguageChips } from "@/components/shell/LanguageChips";
+import { SunToggle } from "@/components/shell/SunToggle";
+import { useRouteTheme } from "@/components/shell/useRouteTheme";
+import { setTheme } from "@/lib/sun/route-theme";
+import "@/styles/view-transitions.css";
+
+/**
+ * The shell of the phone surfaces (worker and supervisor): a header with the site and crew, the clock and the sun toggle,
+ * the six language chips, the page, and an optional dock. It is a presentational composition, so it imports no feature:
+ * the layout that mounts it passes what to show (the pinned site, the demo clock, the worker dock), and a page can name the
+ * crew through `useFieldCrewLabel` (FieldHeading.tsx).
+ *
+ * The page renders its own <main> (this shell owns none), and the dock is `position: fixed`, so the page gets bottom
+ * padding to scroll clear of it. Re-applies the theme on every client navigation (see useRouteTheme), and puts night back
+ * when the shell unmounts: sun mode belongs to field routes only, so a client-side link out of one (the wordmark, the
+ * landing page) must not leave it on a night-only page. This replaces a guard that used to sit in the locale layout and
+ * shipped its code to every route, the landing page included.
+ */
+export function FieldShell({
+  siteName,
+  crewLabel,
+  clock,
+  dock,
+  children,
+}: {
+  /**
+   * The site's name, or null when none is known yet (an honest line is shown, never a blank). Omitted: the header names no
+   * site at all, for a sheet that must not look anything up (the unwell sheet).
+   */
+  siteName?: string | null;
+  crewLabel?: string | null;
+  /** The time to show, already formatted (a node, so the caller can put a Suspense boundary around what reads the URL). Omitted: none is shown. */
+  clock?: ReactNode;
+  dock?: ReactNode;
+  children: ReactNode;
+}) {
+  const t = useTranslations();
+  useRouteTheme("route");
+  const [reportedCrew, setReportedCrew] = useState<string | null>(null);
+  const [reportedSite, setReportedSite] = useState<string | null>(null);
+  const slot = useMemo<FieldHeadingSlot>(() => ({ setCrewLabel: setReportedCrew, setSiteLabel: setReportedSite }), []);
+  const crew = crewLabel != null && crewLabel !== "" ? crewLabel : reportedCrew;
+  // What the page says wins: it knows which site its own data is about.
+  const site = reportedSite ?? siteName;
+
+  // Unmount only: the shell that mounts next (another field route) applies its own theme in the same commit, so night never paints.
+  useEffect(
+    () => () => {
+      setTheme("night");
+    },
+    [],
+  );
+
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-110 flex-col bg-ground sm:my-6 sm:min-h-0 sm:border sm:border-hair">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hair px-4 py-2">
+        <ViewTransition name="wordmark" share="morph" default="none">
+          <FieldLink
+            href="/"
+            className="hidden min-h-(--target) items-center font-display text-sm font-semibold uppercase tracking-wordmark text-ink no-underline sm:inline-flex sm:basis-full"
+          >
+            {t("common.appName")}
+          </FieldLink>
+        </ViewTransition>
+        {/* From sm up the wordmark takes its own line (basis-full above): beside it the name had about 90 px and a long word ("Mussafah") was cut. */}
+        <div className="min-w-0 flex-1">
+          {site === undefined ? null : (
+            // Two lines at most, then cut. The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a
+            // rule for every element of the page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
+            <p {...(site === null ? {} : { title: site })} className="line-clamp-2 font-body text-base leading-tight font-semibold text-ink">
+              {site === null ? t("shell.field.noSite") : <bdi className="leading-[inherit]">{site}</bdi>}
+            </p>
+          )}
+          {crew === null ? null : (
+            <p className="truncate font-body text-sm leading-tight text-ink-3">
+              <bdi className="leading-[inherit]">{crew}</bdi>
+            </p>
+          )}
+        </div>
+        {clock === undefined ? null : (
+          <p data-time-label="" className="font-display text-xl font-medium text-ink">
+            <span className="sr-only">{t("shell.field.clockLabel")} </span>
+            <bdi dir="ltr">{clock}</bdi>
+          </p>
+        )}
+        <SunToggle />
+      </header>
+      <LanguageChips />
+      <FieldHeadingContext.Provider value={slot}>
+        <div className={dock === undefined ? "flex flex-1 flex-col" : "flex flex-1 flex-col pb-44"}>{children}</div>
+      </FieldHeadingContext.Provider>
+      {dock}
+    </div>
+  );
+}

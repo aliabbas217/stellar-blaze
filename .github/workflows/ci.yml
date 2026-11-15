@@ -162,3 +162,59 @@ jobs:
           docker logs "$container"
           echo "the API did not answer /api/v1/health/live within 30 s" >&2
           exit 1
+
+  frontend:
+    runs-on: ubuntu-24.04
+    # Raised from 15 for the browser install, e2e (54 s on a laptop) and Lighthouse (77 s).
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # package_json_file defaults to the repo-root package.json; this repo keeps it under frontend/.
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      # Regenerates src/api/schema.d.ts from the OpenAPI source and fails when it differs from the committed file.
+      - run: pnpm api:check
+      - run: pnpm test
+      - run: pnpm build
+      # Reads the build output: 174,080 B gzip of first-load script per route, 199,680 B for /worker and /worker/alerts only (architect, F2 W3.1).
+      - run: pnpm bundle:check
+      # The full Chromium (not the headless shell): the push tests need a browser that honours a notification permission grant.
+      - run: pnpm exec playwright install --with-deps chromium
+      # Starts the mock API and the standalone production server itself (webServer in playwright.config.ts).
+      - run: pnpm e2e
+      - run: pnpm design:lint
+      # Starts the same stack (scripts/serve-stack.mjs), then audits /en/worker and /en/worker/alerts against the budgets in lighthouserc.json.
+      # @lhci/cli is a devDependency, so its whole tree comes from the lockfile (exact pins, minimumReleaseAge), not from `pnpm dlx`.
+      - run: pnpm exec lhci autorun
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: frontend-reports
+          # A re-run of the workflow uploads under the same name; without this it fails on the artifact the first attempt left.
+          overwrite: true
+          # .lighthouseci is a hidden folder: it is only uploaded with include-hidden-files.
+          path: |
+            frontend/playwright-report/
+            frontend/.lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # infra: the I1 plan adds this job (Task 5; docs/superpowers/plans/2026-11-11-i1-azure-infra.md): ubuntu-24.04, every PR
+  # and push, no Azure login. It checks out, installs Bicep (az bicep install --version v0.49.2), builds and lints both
+  # entry points (infra/bicep/bootstrap.bicep and main.bicep), runs build-params with a dummy environment, shellcheck on
+  # infra/scripts, bash infra/scripts/tests/run.sh, check-db-tls.sh --template on main.bicep, and actionlint v1.7.12 on
+  # .github/workflows/*.yml. It is NOT defined yet: infra/ does not exist on this branch. Do not edit the backend or
+  # frontend jobs from the I1 plan, and add the job here, as a sibling, when infra/ lands.

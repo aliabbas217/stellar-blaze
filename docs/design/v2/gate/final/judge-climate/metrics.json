@@ -1,0 +1,363 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/judge-climate.html",
+  "when": "2026-11-12T01:02:11.838Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-climate\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-climate\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 18
+          },
+          {
+            "px": 13,
+            "n": 28
+          },
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 5
+          },
+          {
+            "px": 18,
+            "n": 2
+          },
+          {
+            "px": 35,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 17
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Warmer summer · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-climate\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 56.9
+        },
+        "squint": {
+          "masses": 25,
+          "competitors": 2,
+          "dominance": 0.313,
+          "top": [
+            {
+              "cells": 127,
+              "weight": 45.01,
+              "cx": 0.549,
+              "cy": 0.352,
+              "bbox": [
+                0.083,
+                0.343,
+                0.931,
+                0.373
+              ]
+            },
+            {
+              "cells": 54,
+              "weight": 37.88,
+              "cx": 0.837,
+              "cy": 0.583,
+              "bbox": [
+                0.722,
+                0.567,
+                0.958,
+                0.597
+              ]
+            },
+            {
+              "cells": 102,
+              "weight": 30.51,
+              "cx": 0.255,
+              "cy": 0.142,
+              "bbox": [
+                0.042,
+                0.119,
+                0.514,
+                0.179
+              ]
+            },
+            {
+              "cells": 10,
+              "weight": 2.48,
+              "cx": 0.117,
+              "cy": 0.224,
+              "bbox": [
+                0.056,
+                0.224,
+                0.181,
+                0.224
+              ]
+            },
+            {
+              "cells": 15,
+              "weight": 2.13,
+              "cx": 0.341,
+              "cy": 0.607,
+              "bbox": [
+                0.278,
+                0.597,
+                0.403,
+                0.612
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.101,
+        "centroid": {
+          "x": 0.487,
+          "y": 0.4
+        },
+        "colourfulness": 22.8,
+        "luminanceSpread": 0.249,
+        "chromaProxy": 0.081,
+        "hierarchyByHueOnly": false,
+        "inkPct": 21.4,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-climate\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-climate\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 13
+          },
+          {
+            "px": 13,
+            "n": 27
+          },
+          {
+            "px": 14,
+            "n": 26
+          },
+          {
+            "px": 16,
+            "n": 5
+          },
+          {
+            "px": 18,
+            "n": 2
+          },
+          {
+            "px": 28,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 18
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 114,
+            "n": 1
+          },
+          {
+            "px": 129,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 4,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Warmer summer · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-climate\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 49.5
+        },
+        "squint": {
+          "masses": 47,
+          "competitors": 2,
+          "dominance": 0.105,
+          "top": [
+            {
+              "cells": 78,
+              "weight": 33.39,
+              "cx": 0.58,
+              "cy": 0.483,
+              "bbox": [
+                0.361,
+                0.467,
+                0.819,
+                0.505
+              ]
+            },
+            {
+              "cells": 51,
+              "weight": 23.58,
+              "cx": 0.167,
+              "cy": 0.429,
+              "bbox": [
+                0.042,
+                0.411,
+                0.292,
+                0.439
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 14.79,
+              "cx": 0.13,
+              "cy": 0.538,
+              "bbox": [
+                0.042,
+                0.523,
+                0.208,
+                0.551
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 14.47,
+              "cx": 0.61,
+              "cy": 0.595,
+              "bbox": [
+                0.472,
+                0.589,
+                0.722,
+                0.598
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 14.1,
+              "cx": 0.426,
+              "cy": 0.539,
+              "bbox": [
+                0.347,
+                0.523,
+                0.5,
+                0.551
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.106,
+        "centroid": {
+          "x": 0.399,
+          "y": 0.532
+        },
+        "colourfulness": 13.2,
+        "luminanceSpread": 0.435,
+        "chromaProxy": 0.041,
+        "hierarchyByHueOnly": false,
+        "inkPct": 26.2,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 11% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

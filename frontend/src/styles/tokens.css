@@ -1,0 +1,213 @@
+/*
+ * Qaylula design tokens (design phase v2-final), the single source of every colour, space, radius,
+ * font size and duration in the app. /DESIGN.md carries the rationale and the same values.
+ *
+ * Three tiers:
+ *   1. Primitives   --ref-*           raw values, referenced ONLY by tier 2.
+ *   2. Semantic     --ground, --ink, --signal, --lv-amber, ...
+ *                                     role names. Night is the default and lives on :root; sun mode (the
+ *                                     high-contrast light theme of the worker and supervisor phone screens)
+ *                                     re-declares every one of them under [data-theme="sun"]. Components use
+ *                                     these through the Tailwind names mapped in globals.css, never a --ref-*.
+ *   3. Theme        :root, [data-theme="night"] and [data-theme="sun"] themselves, plus the theme-independent
+ *                                     scales (type, space, radius, targets, motion).
+ *
+ * Rules that keep the theme swap correct:
+ *   - A semantic token references a primitive, never another semantic token. A var() is resolved where it is
+ *     declared, so a semantic-to-semantic alias (the old `--focus: var(--signal)`) goes stale inside a nested
+ *     [data-theme] subtree, which is exactly how the specimen shows both themes side by side.
+ *   - The night values sit on `:root, [data-theme="night"]` so a nested night subtree still works on a page that
+ *     is in sun mode. The sun block comes after it (equal specificity, later wins) and overrides every colour.
+ *   - There is no system-preference switch: night is the default whatever prefers-color-scheme says; sun is chosen
+ *     by src/components/shell/theme-script.ts (field routes only) and the one-tap override in SunToggle.
+ *   - Names here must not equal a Tailwind theme key (--color-*, --text-*, --radius-*, --font-*, --spacing) or a
+ *     next/font variable. A self-referencing `--x: var(--x)` is emitted by `@theme inline` and silently breaks it.
+ *
+ * tests/unit/styles/tokens.test.ts fails if DESIGN.md disagrees with this file, if the sun block overrides anything
+ * other than the set DESIGN.md documents, or if a contrast pair drops below its floor. scripts/contrast.mjs prints
+ * the table of DESIGN.md section 3 from these values.
+ *
+ * Heat colour is NOT here: it lives in the heat ramps (Task 5) and is used on data only.
+ */
+
+/* ---------- Tier 1: primitives ---------- */
+:root {
+  /* night: hue 245 tint, "Gulf night" */
+  --ref-night-0: oklch(0.145 0.014 245);
+  --ref-night-1: oklch(0.17 0.014 245);
+  --ref-night-2: oklch(0.205 0.014 245);
+  --ref-night-3: oklch(0.24 0.014 245);
+  --ref-night-slot: oklch(0.125 0.012 245);
+  --ref-night-hair: oklch(0.3 0.012 245);
+  --ref-night-edge: oklch(0.51 0.012 245);
+  --ref-mist-3: oklch(0.64 0.012 245);
+  --ref-mist-2: oklch(0.78 0.01 245);
+  --ref-mist-1: oklch(0.95 0.005 245);
+  --ref-signal-night: oklch(0.84 0.075 200);
+  --ref-scrim-night: oklch(0.1 0.01 245 / 0.72);
+
+  /* sun */
+  --ref-sun-1: oklch(0.985 0.002 245);
+  --ref-sun-2: oklch(0.955 0.004 245);
+  --ref-sun-3: oklch(0.93 0.005 245);
+  --ref-sun-slot: oklch(0.925 0.006 245);
+  --ref-sun-hair: oklch(0.86 0.006 245);
+  --ref-sun-edge: oklch(0.62 0.01 245);
+  --ref-ink-3: oklch(0.48 0.012 245);
+  --ref-ink-2: oklch(0.38 0.012 245);
+  --ref-ink-1: oklch(0.18 0.012 245);
+  --ref-signal-sun: oklch(0.45 0.09 215);
+  --ref-scrim-sun: oklch(0.2 0.01 245 / 0.5);
+
+  /* level marks: small marks only, always beside the word */
+  --ref-level-green-night: oklch(0.72 0.14 150);
+  --ref-level-amber-night: oklch(0.83 0.14 85);
+  --ref-level-orange-night: oklch(0.73 0.15 52);
+  --ref-level-red-night: oklch(0.66 0.19 27);
+  --ref-level-green-sun: oklch(0.55 0.13 150);
+  --ref-level-amber-sun: oklch(0.64 0.14 72);
+  --ref-level-orange-sun: oklch(0.6 0.16 48);
+  --ref-level-red-sun: oklch(0.52 0.19 27);
+}
+
+/* ---------- Tier 2: semantic, night (the default) ---------- */
+:root,
+[data-theme="night"] {
+  color-scheme: dark;
+
+  --ground-deep: var(--ref-night-0);
+  --ground: var(--ref-night-1);
+  --panel: var(--ref-night-2);
+  --raised: var(--ref-night-3);
+  --slot: var(--ref-night-slot); /* the qaylula slot: recessed, one step below the ground */
+  --hair: var(--ref-night-hair);
+  --edge: var(--ref-night-edge); /* control boundaries, at least 3:1 */
+  --ink: var(--ref-mist-1);
+  --ink-2: var(--ref-mist-2);
+  --ink-3: var(--ref-mist-3);
+  --signal: var(--ref-signal-night); /* live, selected, needs you. Never heat. */
+  --on-signal: var(--ref-night-0);
+  --focus: var(--ref-signal-night);
+  --scrim: var(--ref-scrim-night);
+
+  --lv-green: var(--ref-level-green-night);
+  --lv-amber: var(--ref-level-amber-night);
+  --lv-orange: var(--ref-level-orange-night);
+  --lv-red: var(--ref-level-red-night);
+
+  /* data viz, non-heat series */
+  --viz-truth: var(--ref-mist-1);
+  --viz-raw: var(--ref-mist-3);
+  --viz-ours: var(--ref-signal-night);
+  --viz-grid: var(--ref-night-hair);
+}
+
+/* ---------- Tier 2: semantic, sun (overrides every colour above) ---------- */
+[data-theme="sun"] {
+  color-scheme: light;
+
+  --ground-deep: var(--ref-sun-2);
+  --ground: var(--ref-sun-1);
+  --panel: var(--ref-sun-2);
+  --raised: var(--ref-sun-3);
+  --slot: var(--ref-sun-slot);
+  --hair: var(--ref-sun-hair);
+  --edge: var(--ref-sun-edge);
+  --ink: var(--ref-ink-1);
+  --ink-2: var(--ref-ink-2);
+  --ink-3: var(--ref-ink-3);
+  --signal: var(--ref-signal-sun);
+  --on-signal: var(--ref-sun-1);
+  --focus: var(--ref-signal-sun);
+  --scrim: var(--ref-scrim-sun);
+
+  --lv-green: var(--ref-level-green-sun);
+  --lv-amber: var(--ref-level-amber-sun);
+  --lv-orange: var(--ref-level-orange-sun);
+  --lv-red: var(--ref-level-red-sun);
+
+  --viz-truth: var(--ref-ink-1);
+  --viz-raw: var(--ref-ink-3);
+  --viz-ours: var(--ref-signal-sun);
+  --viz-grid: var(--ref-sun-hair);
+}
+
+/* ---------- Tier 2: semantic, non-colour (theme independent) ---------- */
+:root {
+  /* type scale: the prototype's 13 px step is dropped (12 px is the floor, 14 the smallest comfortable label) */
+  --t-12: 0.75rem;
+  --t-14: 0.875rem;
+  --t-16: 1rem;
+  --t-18: 1.125rem;
+  --t-22: 1.375rem;
+  --t-28: 1.75rem;
+  --t-36: 2.25rem;
+  --t-48: 3rem;
+  --t-64: 4rem;
+  --t-76: 4.75rem;
+
+  /* space: the 4 px atom */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-24: 96px;
+
+  /* shape: one corner radius everywhere, no shadows */
+  --r: 2px;
+
+  /* targets: 44 px on every control, 52 px for the primary action on field surfaces */
+  --target: 44px;
+  --target-field: 52px;
+
+  --content-max: 88rem;
+  --measure: 66ch;
+
+  /* focus ring */
+  --focus-width: 3px;
+  --focus-offset: 2px;
+
+  /* line height: Arabic-script text needs more room than Latin; Nastaliq the most (content area 2.5 em) */
+  --leading-solid: 1; /* Western digits and Latin display words only, never text that can be Arabic-script or Indic */
+  --leading-body: 1.5;
+  --leading-ar: 1.8;
+  --leading-ur: 2.5;
+
+  /* font fallbacks; the loaded family arrives through next/font as --font-display / --font-body / --font-mono */
+  --font-display-fallback: system-ui, sans-serif;
+  --font-body-fallback: system-ui, sans-serif;
+  --font-mono-fallback: ui-monospace, monospace;
+
+  /* motion: 150 to 240 ms, opacity and transform only, switched off for reduced motion */
+  --dur-1: 150ms;
+  --dur-2: 240ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/*
+ * Letter-spacing (tracking): Latin only. Arabic-script text is cursive and browsers drop or break joins when it is
+ * spaced, and Devanagari and Bengali lose their joined top bar. Any non-English language therefore gets zero. The
+ * rules are mutually exclusive, so a nested lang="ar" span inside an English page still resets to zero.
+ */
+:lang(en) {
+  --tracking-display: -0.02em;
+  --tracking-wordmark: 0.16em;
+}
+
+:not(:lang(en)) {
+  --tracking-display: 0em;
+  --tracking-wordmark: 0em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+  }
+}

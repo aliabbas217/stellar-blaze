@@ -1,0 +1,397 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/hse.html",
+  "when": "2026-11-12T01:01:38.761Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\hse\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\hse\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 5
+          },
+          {
+            "px": 13,
+            "n": 71
+          },
+          {
+            "px": 14,
+            "n": 61
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 18,
+            "n": 10
+          },
+          {
+            "px": 22,
+            "n": 32
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 28,
+            "n": 1
+          },
+          {
+            "px": 36,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 9,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 30
+          },
+          {
+            "v": "1px",
+            "n": 4
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 42
+          },
+          {
+            "px": 7,
+            "n": 3
+          },
+          {
+            "px": 619,
+            "n": 1
+          },
+          {
+            "px": 17,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 47,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\hse\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 60.8
+        },
+        "squint": {
+          "masses": 42,
+          "competitors": 1,
+          "dominance": 0.216,
+          "top": [
+            {
+              "cells": 30,
+              "weight": 16.78,
+              "cx": 0.904,
+              "cy": 0.11,
+              "bbox": [
+                0.861,
+                0.09,
+                0.958,
+                0.134
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 7.07,
+              "cx": 0.274,
+              "cy": 0.836,
+              "bbox": [
+                0.056,
+                0.836,
+                0.5,
+                0.836
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 6.81,
+              "cx": 0.241,
+              "cy": 0.135,
+              "bbox": [
+                0.042,
+                0.134,
+                0.444,
+                0.149
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 5.48,
+              "cx": 0.219,
+              "cy": 0.91,
+              "bbox": [
+                0.056,
+                0.91,
+                0.389,
+                0.91
+              ]
+            },
+            {
+              "cells": 19,
+              "weight": 3.13,
+              "cx": 0.234,
+              "cy": 0.866,
+              "bbox": [
+                0.111,
+                0.866,
+                0.347,
+                0.881
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.059,
+        "centroid": {
+          "x": 0.471,
+          "y": 0.449
+        },
+        "colourfulness": 15.3,
+        "luminanceSpread": 0.197,
+        "chromaProxy": 0.051,
+        "hierarchyByHueOnly": false,
+        "inkPct": 21.5,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\hse\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\hse\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 5
+          },
+          {
+            "px": 13,
+            "n": 67
+          },
+          {
+            "px": 14,
+            "n": 60
+          },
+          {
+            "px": 16,
+            "n": 20
+          },
+          {
+            "px": 18,
+            "n": 8
+          },
+          {
+            "px": 22,
+            "n": 33
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 28,
+            "n": 1
+          },
+          {
+            "px": 36,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 9,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 30
+          },
+          {
+            "v": "1px",
+            "n": 4
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 42
+          },
+          {
+            "px": 7,
+            "n": 3
+          },
+          {
+            "px": 87,
+            "n": 1
+          },
+          {
+            "px": 17,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 47,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "HSE week · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\hse\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 61.4
+        },
+        "squint": {
+          "masses": 53,
+          "competitors": 1,
+          "dominance": 0.416,
+          "top": [
+            {
+              "cells": 176,
+              "weight": 147.66,
+              "cx": 0.186,
+              "cy": 0.491,
+              "bbox": [
+                0.042,
+                0.458,
+                0.333,
+                0.523
+              ]
+            },
+            {
+              "cells": 57,
+              "weight": 25.09,
+              "cx": 0.27,
+              "cy": 0.363,
+              "bbox": [
+                0.042,
+                0.355,
+                0.486,
+                0.374
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 12.95,
+              "cx": 0.159,
+              "cy": 0.697,
+              "bbox": [
+                0.069,
+                0.692,
+                0.264,
+                0.701
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 11.45,
+              "cx": 0.456,
+              "cy": 0.596,
+              "bbox": [
+                0.361,
+                0.589,
+                0.542,
+                0.607
+              ]
+            },
+            {
+              "cells": 19,
+              "weight": 8.71,
+              "cx": 0.223,
+              "cy": 0.267,
+              "bbox": [
+                0.167,
+                0.262,
+                0.278,
+                0.28
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.136,
+        "centroid": {
+          "x": 0.364,
+          "y": 0.509
+        },
+        "colourfulness": 17.9,
+        "luminanceSpread": 0.423,
+        "chromaProxy": 0.061,
+        "hierarchyByHueOnly": false,
+        "inkPct": 25.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}
