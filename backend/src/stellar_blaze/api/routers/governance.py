@@ -157,6 +157,9 @@ async def reset_demo_site(
             status=409,
             detail=f"Site {site.id} is not synthetic.",
         ) from error
+    # The new epoch is the replay clock's new time base: re-anchor this process now, not after the cache interval. (The
+    # alerts worker follows at its next cycle; the reset's own transaction is already committed.)
+    await services.refresh_clock(force=True)
     return DemoReset(
         site_id=site.id,
         epoch_id=new_epoch,

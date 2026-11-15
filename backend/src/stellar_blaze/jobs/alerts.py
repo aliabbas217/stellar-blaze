@@ -24,7 +24,12 @@ active is recorded as skipped, not stacked).
 * SIGTERM, SIGINT and KeyboardInterrupt set the stop event: the current run finishes, then the loop returns.
 
 The domain clock (``Services.clock``: the replay clock in replay mode) is the "now" of a run, so a replay demo escalates
-on the replay day; the wall clock stamps audit rows and ``job_run`` (``application.replay_clock``).
+on the replay day; the wall clock stamps audit rows and ``job_run`` (``application.replay_clock``). In replay mode that
+clock is the replay anchor plus the wall time since the current demo epoch started, read from the ``site_epoch`` row, so
+this loop and the API agree on replay time whenever either was started, a restart of either changes nothing, and a demo
+reset re-anchors the loop at its next cycle (each cycle refreshes the cached epoch start first). With that row
+unreadable the cycle fails closed (``ReplayClockUnavailableError``: no invented time) and the loop tries again next
+cycle.
 """
 
 import asyncio
@@ -184,8 +189,9 @@ class _UnavailableCorrector:
 
 @dataclass
 class AlertJob:
-    """One process's dispatch: its services, channel and config service, built once (the replay clock must keep running
-    across the cycles of ``alerts run``). ``interval_minutes`` and ``summary`` describe the latest run."""
+    """One process's dispatch: its services, channel and config service, built once (its replay clock keeps the
+    cached epoch start across the cycles of ``alerts run``). ``interval_minutes`` and ``summary`` describe the latest
+    run."""
 
     settings: Settings
     runtime: Runtime
@@ -240,6 +246,10 @@ class AlertJob:
         """One dispatch run over ``site_id`` (default: the job's filter, else every site); what ``run_job`` runs. Every
         site is tried; any failure fails the job after the others were dispatched."""
         began = self.clock()  # the start of the cycle: the run deadline of phase B is anchored here
+        # Replay mode: the domain clock counts from the epoch row in Postgres, cached a few seconds; refresh at the
+        # entry of the cycle, as the API does per request. With the epoch unreadable the clock raises below and the
+        # cycle fails closed (an explicit `as_of` never reads it).
+        await self.services.refresh_clock()
         snapshot = await self.snapshot()
         now = as_of or self.services.clock()
         mode: Literal["replay", "live"] = "replay" if self.settings.forecast_source == "replay" else "live"

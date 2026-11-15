@@ -808,8 +808,11 @@ def alerts_run_command(site: SiteOption = None) -> None:
     bounded by a hard deadline and the run by the period minus 10 s counted from the START of the cycle, so a hanging
     weather source or push service cannot delay it. SIGTERM or Ctrl-C ends it cleanly after
     the current run; a failing cycle is logged and the loop goes on. Each site of each cycle is a ``job_run`` row, like
-    ``alerts dispatch``, under its own per-site lock. The API and this loop are separate processes with their own
-    replay clocks."""
+    ``alerts dispatch``, under its own per-site lock. In replay mode the API and this loop agree on replay time through
+    the ``site_epoch`` row in Postgres (replay anchor + real time since the current epoch started): a restart of either
+    changes nothing, and a demo reset re-anchors both (the API at once, this loop at its next cycle). The window is
+    about 7 h 20 min per epoch (replay time passes 17:30 Dubai), after which a reset is needed. With that row
+    unreadable the cycle fails and the loop tries again."""
     settings = _settings()
     runtime = _runtime(settings)
 

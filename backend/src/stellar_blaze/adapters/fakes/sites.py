@@ -1,7 +1,8 @@
 """An in-memory site repository, epoch store and fixture store (the fake of ``ports.sites``)."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from stellar_blaze.adapters.fakes.audit import InMemoryAuditLog
 from stellar_blaze.domain.plans.model import CrewMember, CrewSpec
@@ -31,12 +32,17 @@ def _members(crew: CrewFixture) -> list[CrewMember]:
 
 
 class InMemorySiteStore:
-    """``SiteRepository``, ``EpochStore`` and ``SiteFixtureStore`` over dicts. ``audit`` is where an epoch's
-    ``demo_reset`` row goes (Postgres appends it in the epoch's own transaction); a store built without one refuses
-    every call that would produce an audit event instead of silently dropping it."""
+    """``SiteRepository``, ``EpochStore``, ``SiteFixtureStore`` and ``ReplayEpochSource`` over dicts. ``audit`` is where
+    an epoch's ``demo_reset`` row goes (Postgres appends it in the epoch's own transaction); a store built without one
+    refuses every call that would produce an audit event instead of silently dropping it. ``clock`` is the WALL clock
+    that stamps each epoch's start (as the Postgres store does), so a test's manual clock is the replay clock's base."""
 
-    def __init__(self, audit: InMemoryAuditLog | None = None) -> None:
+    def __init__(
+        self, audit: InMemoryAuditLog | None = None, *, clock: Callable[[], datetime] = lambda: datetime.now(UTC)
+    ) -> None:
         self._audit = audit
+        self._clock = clock
+        self._epoch_started: dict[int, datetime] = {}
         self._sites: dict[str, SiteRecord] = {}
         self._crews: dict[str, _Crew] = {}
         self._epochs: dict[str, list[int]] = {}
@@ -111,8 +117,18 @@ class InMemorySiteStore:
             raise RuntimeError("this InMemorySiteStore has no audit log: build it with one to record audit events")
         return self._audit
 
+    async def current_epoch_start(self) -> datetime | None:
+        starts = [
+            self._epoch_started[epoch]
+            for site_id, epochs in self._epochs.items()
+            if self._sites[site_id].synthetic
+            for epoch in epochs
+        ]
+        return max(starts, default=None)
+
     def _allocate_epoch(self, site_id: str) -> int:
         epoch = self._next_epoch
         self._next_epoch += 1
+        self._epoch_started[epoch] = self._clock()
         self._epochs.setdefault(site_id, []).append(epoch)
         return epoch

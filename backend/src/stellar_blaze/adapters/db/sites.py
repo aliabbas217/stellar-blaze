@@ -5,7 +5,7 @@
 """
 
 from collections.abc import Callable, Sequence
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 
 from pydantic import JsonValue
 from sqlalchemy import RowMapping, delete, func, insert, select
@@ -91,8 +91,12 @@ def _crew(row: RowMapping, member_count: int) -> CrewRecord:
 
 
 class PostgresSiteStore:
-    """``SiteRepository``, ``EpochStore`` and ``SiteFixtureStore`` over ``site``, ``crew``, ``crew_member`` and
-    ``site_epoch``."""
+    """``SiteRepository``, ``EpochStore``, ``SiteFixtureStore`` and ``ReplayEpochSource`` over ``site``, ``crew``,
+    ``crew_member`` and ``site_epoch``.
+
+    ``clock`` is the application's WALL clock. It stamps the audit rows and each epoch's ``started_at`` (written
+    explicitly, never the server's ``now()``): the replay clock reads ``anchor + (wall now - started_at)``, so the
+    stored start and the wall clock it is subtracted from must share one time base."""
 
     def __init__(self, engine: AsyncEngine, *, clock: Callable[[], datetime] = utc_now) -> None:
         self._engine = engine
@@ -149,6 +153,18 @@ class PostgresSiteStore:
             raise SiteNotFoundError(site_id)
         return int(epoch)
 
+    # --- ReplayEpochSource --------------------------------------------------------------------------------------
+
+    async def current_epoch_start(self) -> datetime | None:
+        statement = (
+            select(func.max(SiteEpoch.started_at))
+            .join(SiteRow, SiteRow.id == SiteEpoch.site_id)
+            .where(SiteRow.synthetic.is_(True))
+        )
+        async with self._engine.connect() as connection:
+            started = (await connection.execute(statement)).scalar_one()
+        return None if started is None else started.astimezone(UTC)
+
     # --- EpochStore ---------------------------------------------------------------------------------------------
 
     async def start_epoch(self, site_id: str, actor: str, *, audit: EpochAudit | None = None) -> int:
@@ -166,7 +182,9 @@ class PostgresSiteStore:
             ).scalar_one()
             new = (
                 await connection.execute(
-                    insert(SiteEpoch).values(site_id=site_id, started_by=actor).returning(SiteEpoch.epoch_id)
+                    insert(SiteEpoch)
+                    .values(site_id=site_id, started_at=self._clock(), started_by=actor)
+                    .returning(SiteEpoch.epoch_id)
                 )
             ).scalar_one()
             if audit is not None:
@@ -198,7 +216,9 @@ class PostgresSiteStore:
                 await connection.execute(select(func.count()).where(SiteEpoch.site_id == site.id))
             ).scalar_one()
             if not has_epoch:
-                await connection.execute(insert(SiteEpoch).values(site_id=site.id, started_by=actor))
+                await connection.execute(
+                    insert(SiteEpoch).values(site_id=site.id, started_at=self._clock(), started_by=actor)
+                )
             for crew in fixture.crews:
                 await _upsert_crew(connection, site, crew)
             for event in audit_events:

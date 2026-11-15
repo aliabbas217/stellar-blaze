@@ -103,3 +103,6 @@ Any of: the 16 Nov gate result; the post-registration requirements mention tools
 
 ## Links
 [Research](../research/2026-11-11-agentic-voice-layer.md) · [ADR 0002](0002-infra-minimalism-and-ports.md) · [ADR 0004](0004-tiered-alert-delivery.md) · [ADR 0010 §8](0010-runtime-tunable-configuration.md) · [ADR 0015](0015-cut-llm-copilot-and-shift-drafter.md) · [ADR 0029](0029-reject-litellm.md) · [ADR 0031](0031-defer-azure-extras.md) · [ADR 0034](0034-demo-strategy.md)
+
+## Amendments
+- **2026-11-15 (demo scope deferred; decision text unchanged).** [ADR 0071](0071-defer-voice-site-setup-demo-beat.md) defers the §7 demo scope (tiers A and B). This ADR stays Proposed and D1 to D4 stay open; nothing in it was built.

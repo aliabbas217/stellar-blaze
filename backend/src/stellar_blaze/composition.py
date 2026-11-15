@@ -11,7 +11,7 @@ production registry below is read-only.
 import asyncio
 import threading
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 from types import MappingProxyType
@@ -40,7 +40,7 @@ from stellar_blaze.adapters.sources.ghcnh import GhcnhParquetSource
 from stellar_blaze.adapters.sources.iem import IemMetarSource
 from stellar_blaze.adapters.sources.open_meteo import OpenMeteoPreviousRunsSource
 from stellar_blaze.adapters.sources.replay import ReplayForecastSource, ReplayObservationSource
-from stellar_blaze.application.replay_clock import domain_clock
+from stellar_blaze.application.replay_clock import EpochReplayClock, domain_clock
 from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, SnapshotHolder
 from stellar_blaze.application.services import Services, utc_now
 from stellar_blaze.config import ForecastSourceKind, Settings
@@ -375,21 +375,25 @@ async def build_api_services(
     snapshot the settings name (``build_sources``: forecasts and observations from the same files, no network).
 
     Two clocks (``application.replay_clock``): ``wall`` is the real time (a test injects one) and stamps the audit
-    rows and feeds the rate limiter; the DOMAIN clock (``domain_clock``) is ``wall`` outside replay mode, and in replay
-    mode a ``ReplayClock`` that starts on the replay day. The domain clock stamps crew stops and sign-offs and is the
-    ``now`` of the use cases.
+    rows, the epoch starts and feeds the rate limiter; the DOMAIN clock (``domain_clock``) is ``wall`` outside replay
+    mode, and in replay mode an ``EpochReplayClock``: the replay anchor plus the wall time elapsed since the start of
+    the current demo epoch, read from the ``site_epoch`` row in Postgres. So every process that calls this builder (the
+    API and ``sb-jobs alerts``) agrees on replay time, a restart changes nothing, and a demo reset re-anchors all of
+    them. The domain clock stamps crew stops and sign-offs and is the ``now`` of the use cases; whoever reads it first
+    awaits ``Services.refresh_clock`` (the epoch start is cached a few seconds).
 
     Raises:
         UnknownAdapterError, ReplaySnapshotError: As ``build_sources``.
     """
     sources = build_sources(settings)
+    sites = build_site_store(engine, clock=wall)
     clock = domain_clock(
         source=settings.forecast_source,
         replay_now=settings.replay_now,
         replay_default_date=settings.replay_default_date,
         wall=wall,
+        epoch_source=sites,
     )
-    sites = build_site_store(engine, clock=wall)
     services = Services(
         sites=sites,
         epochs=sites,
@@ -405,6 +409,8 @@ async def build_api_services(
         clock=clock,
         wall_clock=wall,
     )
+    if isinstance(clock, EpochReplayClock):
+        services = replace(services, refresh_clock=clock.refresh)
     return services, sources.close
 
 

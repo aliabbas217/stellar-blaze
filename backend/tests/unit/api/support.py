@@ -18,7 +18,7 @@ from stellar_blaze.adapters.fakes.plans import InMemoryCrewStopStore, InMemoryDa
 from stellar_blaze.adapters.fakes.push import InMemoryPushStore
 from stellar_blaze.adapters.fakes.sites import InMemorySiteStore
 from stellar_blaze.api.app import create_app
-from stellar_blaze.application.replay_clock import ReplayClock
+from stellar_blaze.application.replay_clock import EpochReplayClock
 from stellar_blaze.application.runtime_config import ConfigSnapshot
 from stellar_blaze.application.services import Services
 from stellar_blaze.composition import load_site_fixture
@@ -94,13 +94,14 @@ async def build_world(
 ) -> World:
     """The fakes and the services over them. ``clock`` is the settable WALL clock (audit, plan rows, the limiter).
 
-    With ``replay_anchor`` the domain clock (stops, sign-offs, "now" of the use cases) is a ``ReplayClock`` that starts
-    at the anchor and follows ``clock``; without it the domain clock is ``clock`` itself.
+    With ``replay_anchor`` the domain clock (stops, sign-offs, "now" of the use cases) is an ``EpochReplayClock`` over
+    the fake site store: it reads the anchor at the start of the current epoch (the wall time of the fixture load, then
+    of each demo reset) and follows ``clock``; without it the domain clock is ``clock`` itself.
     """
     clock = clock or Clock()
-    domain: Callable[[], datetime] = clock if replay_anchor is None else ReplayClock(replay_anchor, clock)
     audit = InMemoryAuditLog(clock)
-    sites = InMemorySiteStore(audit)
+    sites = InMemorySiteStore(audit, clock=clock)  # an epoch starts at the injected wall clock, like Postgres
+    domain: Callable[[], datetime] = clock if replay_anchor is None else EpochReplayClock(replay_anchor, clock, sites)
     await sites.upsert_fixture(load_site_fixture(BACKEND_DIR / "fixtures" / "demo_site.toml"), "test")
     stops = InMemoryCrewStopStore(domain)
     plans = InMemoryDayPlanStore(clock)
@@ -121,6 +122,8 @@ async def build_world(
         clock=domain,
         wall_clock=clock,
     )
+    if isinstance(domain, EpochReplayClock):  # what composition.build_api_services does; other modes keep the no-op
+        services = replace(services, refresh_clock=domain.refresh)
     api_settings = settings.model_copy(update={"access_tokens": SecretStr(TOKENS)})
     return World(services, clock, audit, stops, signoffs, plans, sites, api_settings)
 
