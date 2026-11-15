@@ -445,6 +445,16 @@ def test_gate_reports_only_the_bad_amendment(world: World) -> None:
     assert not any(good[0] in reason for reason in refused.value.reasons)
 
 
+@pytest.mark.parametrize("part", [Part.WARNINGS, Part.PLANS])
+def test_gate_refuses_a_freeze_the_lock_pins_with_another_hash(part: Part, world: World) -> None:
+    """The freeze file is untouched but the lock pins another hash: the working tree and HEAD both disagree with it."""
+    world.write_lock(freeze_sha256="1" * 64)
+    with pytest.raises(GateRefusedError) as refused:
+        world.gate(part)
+    assert codes(refused) == ["freeze-hash-mismatch", "freeze-hash-mismatch"]
+    assert all("1" * 64 in reason for reason in refused.value.reasons)
+
+
 def test_gate_lists_every_failure_not_the_first(world: World) -> None:
     _edit_the_working_tree_protocol(world)
     _no_ancestry(world)
@@ -648,7 +658,9 @@ REAL_PROTOCOL: Final = "docs/research/2026-11-12-preregistration-2026-evaluation
 REAL_AMENDMENTS: Final = (
     "docs/research/2026-11-14-preregistration-amendment-1.md",
     "docs/research/2026-11-15-preregistration-amendment-2.md",
+    "docs/research/2026-11-15-preregistration-amendment-3.md",
 )
+REAL_FREEZE: Final = "docs/research/2026-11-15-preregistration-freeze.md"
 
 
 REAL_MODEL_ID: Final = "corrector-20261114-d327987-6edafa"
@@ -664,19 +676,26 @@ def test_the_real_lock_pins_the_released_model_and_its_manifest() -> None:
     assert sha_lf(manifest.read_bytes()) == lock.model_manifest_sha256  # the gate also needs a clean tree
 
 
-def test_the_real_lock_lists_the_preregistration_and_exactly_the_two_amendments() -> None:
+def test_the_real_lock_lists_the_preregistration_and_exactly_the_three_amendments_and_the_freeze() -> None:
     lock = load_lock(REAL_LOCK)
 
     assert lock.protocol_path == REAL_PROTOCOL
     assert tuple(amendment.path for amendment in lock.amendments) == REAL_AMENDMENTS  # in this order, none else
-    for path, pinned in [(lock.protocol_path, lock.protocol_sha256), *((a.path, a.sha256) for a in lock.amendments)]:
+    assert lock.freeze_path == REAL_FREEZE
+    assert lock.freeze_sha256 is not None
+    pinned_documents = [
+        (lock.protocol_path, lock.protocol_sha256),
+        *((a.path, a.sha256) for a in lock.amendments),
+        (REAL_FREEZE, lock.freeze_sha256),
+    ]
+    for path, pinned in pinned_documents:
         assert sha((REPO_ROOT / path).read_bytes()) == pinned, (
             path
         )  # the committed working-tree bytes are the pinned ones
 
 
 def _copy_of_the_real_repository_files(tmp_path: Path, *, edited: str | None = None) -> tuple[Path, Path, FakeGit]:
-    """The real lock and the three documents it pins, copied under ``tmp_path``, with a fake git that vouches for them.
+    """The real lock and the protocol and amendments it pins, copied under ``tmp_path``, with a fake git that vouches.
 
     ``edited`` is the path of one document whose COPY gets an extra byte (git still holds the pinned bytes).
     """
