@@ -1,92 +1,201 @@
-# The whole demo stack on one machine: the same images and the same environment contract as the Azure deploy
-# (infra/bicep/main.bicep), minus TLS to the database (the database is on a private compose network, so SB_DATABASE_URL has
-# no `ssl` here; ADR 0042 applies to managed databases) and minus the public ingress. This is the ADR 0001 "floor": the demo
-# can run from this file when no hosted deployment exists, and it is how the deploy's HTTP smoke test is validated offline.
+# A PRODUCTION REHEARSAL on one machine (the architect ruled it a MUST; LocalStack was rejected). It runs the real api and
+# web images and exercises everything about the Azure deploy (infra/bicep/main.bicep) that does not need Azure:
+#   - the database accepts TLS only (hostssl in pg_hba.conf, like Azure's require_secure_transport) with a server
+#     certificate from a CA generated at run time, and every api/alerts/migrate connection verifies it: `ssl=verify-full`
+#     plus PGSSLROOTCERT (ADR 0042);
+#   - the order db -> migrate (schema, seed, then `site load`) -> api and alerts -> web -> proxy, gated on health;
+#   - the readiness probe, the replay variables shared by api and alerts (one YAML anchor), the same environment contract;
+#   - a proxy in front of web that APPENDS to X-Forwarded-For like the Container Apps ingress, so TRUSTED_PROXY_HOPS=1
+#     means the same thing here as there, and web and api publish no port.
 #
-# Needs two values in the environment or in infra/local/.env (git-ignored), see infra/README.md "Run the stack locally":
-#   DEMO_EMPLOYER_TOKEN  a throwaway string
-#   SB_ACCESS_TOKENS     {"<sha256 of that string>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}}
+# NOT rehearsed: Azure itself (identities, registry pulls, Key Vault or secret refs, ingress TLS, the Bicep). The api is
+# reached by web over plain http (API_ORIGIN=http://api:8000): compose has no internal TLS, and in Azure the internal FQDN
+# is the open item recorded in the plan deltas.
 #
-#   docker compose -f infra/local/compose.yaml up -d --build
-#   bash infra/scripts/smoke-http.sh http://127.0.0.1:3000
-#   docker compose -f infra/local/compose.yaml down -v
+# Do not run this file by hand: infra/local/rehearse.sh generates the secrets, the CA and the server certificate into a
+# scratch directory (SB_REHEARSAL_DIR, never inside the repository), passes them in an env file, runs the checks and tears
+# everything down. The variables it needs (a missing one stops compose with the message):
+#   SB_REHEARSAL_DIR    scratch directory holding db/ (server.crt, server.key, pg_hba.conf), ca/ (ca.crt) and, optionally,
+#                       vapid.env (SB_VAPID_PRIVATE_KEY and SB_VAPID_SUBJECT, for alerts only)
+#   PG_PASSWORD         the database password (a 64-character hex string)
+#   DEMO_EMPLOYER_TOKEN the demo employer token the BFF holds
+#   SB_ACCESS_TOKENS    {"<sha256 of that token>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}}
+# Optional: VAPID_PUBLIC_KEY (web), SB_PROXY_PORT (the loopback port of the proxy, default 8080), SB_API_IMAGE and
+# SB_WEB_IMAGE (the image tags to build and run).
 name: sb-local
 
-x-api-env: &api-env
+# What api, alerts and migrate share: prod-like settings, the TLS-verified database URL and the replay clock. The replay
+# values must be identical on api and alerts (separate processes, separate clocks, started together: backend/README.md
+# "Alerts and the demo replay clock"), which is why they are one anchor and not copied.
+x-sb-env: &sb-env
   SB_ENV: prod
   SB_LOG_FORMAT: json
   SB_LOG_LEVEL: INFO
   SB_GIT_SHA: local
-  SB_DATABASE_URL: postgresql+asyncpg://sb:sb@db:5432/stellar_blaze
+  # verify-full: the certificate must chain to PGSSLROOTCERT and name this host. `ssl=require` is encryption without
+  # authentication and is forbidden (ADR 0042); rehearse.sh proves both behaviours.
+  SB_DATABASE_URL: postgresql+asyncpg://sbadmin:${PG_PASSWORD:?run infra/local/rehearse.sh, it generates PG_PASSWORD}@db:5432/stellar_blaze?ssl=verify-full
+  PGSSLROOTCERT: /tls/ca.crt
   SB_FORECAST_SOURCE: replay
   SB_REPLAY_SNAPSHOT_ID: demo-omaa-2026
   SB_REPLAY_DEFAULT_DATE: "2026-06-14"
   SB_REPLAY_NOW: "2026-06-14T10:10:00+04:00"
 
+x-api-image: &api-image ${SB_API_IMAGE:-stellar-blaze-api:i1}
+
+x-ca-mount: &ca-mount
+  type: bind
+  source: ${SB_REHEARSAL_DIR:?run infra/local/rehearse.sh, it creates SB_REHEARSAL_DIR}/ca
+  target: /tls
+  read_only: true
+
 services:
+  # TLS-only Postgres. The wrapper copies the mounted key to a path the postgres user owns with mode 600 (a bind mount
+  # from Windows cannot hold 600, and Postgres refuses a key that is group- or world-readable), then starts the normal
+  # entrypoint. Data lives on tmpfs: a rehearsal leaves nothing behind.
   db:
     image: postgres:18.6
+    entrypoint: ["/bin/sh", "/db-entrypoint.sh"]
     environment:
-      POSTGRES_USER: sb
-      POSTGRES_PASSWORD: sb
+      POSTGRES_USER: sbadmin
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?run infra/local/rehearse.sh, it generates PG_PASSWORD}
       POSTGRES_DB: stellar_blaze
+    volumes:
+      - type: bind
+        source: ./db-entrypoint.sh
+        target: /db-entrypoint.sh
+        read_only: true
+      - type: bind
+        source: ${SB_REHEARSAL_DIR:?run infra/local/rehearse.sh, it creates SB_REHEARSAL_DIR}/db
+        target: /db-src
+        read_only: true
+    tmpfs:
+      - /var/lib/postgresql
+    networks:
+      default:
+        # A second name that is NOT in the server certificate: rehearse.sh connects through it to prove that
+        # verify-full checks the host name (check N3). Nothing else uses it.
+        aliases:
+          - db-alt
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sb -d stellar_blaze"]
+      # Over TCP on purpose: while the image initializes it runs a temporary server that listens on the socket only, and a
+      # socket probe would report healthy before the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U sbadmin -d stellar_blaze"]
       interval: 2s
       timeout: 3s
-      retries: 30
+      retries: 40
+      start_period: 5s
 
-  # The migrate job of the Azure deploy: schema, config seed, synthetic demo site. Must finish before api and alerts start.
+  # The migrate job of the Azure deploy: schema, config seed, then the synthetic demo site. It must finish before api and
+  # alerts start (service_completed_successfully), and a failure here stops the whole stack: the rehearsal's version of
+  # "the old revision keeps serving".
   migrate:
-    build: ../../backend
-    image: stellar-blaze-api:local
+    image: *api-image
+    pull_policy: never
     restart: "no"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      <<: *api-env
+      <<: *sb-env
+    volumes:
+      - *ca-mount
     command:
       - /bin/sh
       - -c
-      - sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor deploy:local --reason "load the synthetic demo site (local compose)"
+      - 'sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor "deploy:local" --reason "load the synthetic demo site (rehearsal)"'
 
+  # Internal only: no published port. web reaches it at http://api:8000 on the compose network.
   api:
-    image: stellar-blaze-api:local
+    build: ../../backend
+    image: *api-image
     depends_on:
       migrate:
         condition: service_completed_successfully
     environment:
-      <<: *api-env
-      SB_ACCESS_TOKENS: ${SB_ACCESS_TOKENS:?set SB_ACCESS_TOKENS, see infra/README.md}
-    ports:
-      - "127.0.0.1:8000:8000"
+      <<: *sb-env
+      SB_ACCESS_TOKENS: ${SB_ACCESS_TOKENS:?run infra/local/rehearse.sh, it generates SB_ACCESS_TOKENS}
+    volumes:
+      - *ca-mount
+    healthcheck:
+      # The image has python, not curl. urlopen raises on a non-2xx answer, so a 503 (database or config) is unhealthy.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
 
-  # The alerts worker: a separate process with its own replay clock. Same SB_REPLAY_* values as api, started with it.
+  # The alerts worker: a separate long-running process with its own replay clock, the same SB_REPLAY_* values as api (the
+  # anchor above) and no SB_ACCESS_TOKENS. Compose has no `args`: `entrypoint` and `command` are the equivalents of the
+  # explicit `command` and `args` the Container Apps deploy sets (the image CMD is never relied on). The VAPID pair comes
+  # from an optional env file so that it is either both set or both absent: an empty SB_VAPID_SUBJECT is a startup error.
   alerts:
-    image: stellar-blaze-api:local
+    image: *api-image
+    pull_policy: never
     depends_on:
       migrate:
         condition: service_completed_successfully
+    entrypoint: ["sb-jobs"]
+    command: ["alerts", "run"]
     environment:
-      <<: *api-env
-    command: ["sb-jobs", "alerts", "run"]
+      <<: *sb-env
+    env_file:
+      - path: ${SB_REHEARSAL_DIR:?run infra/local/rehearse.sh, it creates SB_REHEARSAL_DIR}/vapid.env
+        required: false
+    volumes:
+      - *ca-mount
 
+  # Internal only. NEXT_PUBLIC_SB_DEMO is empty, which is demo mode, the safe default (frontend/Dockerfile).
   web:
     build:
       context: ../../frontend
       args:
         APP_VERSION: local
-        # Empty is demo mode, the safe default (frontend/Dockerfile).
         NEXT_PUBLIC_SB_DEMO: ""
+    image: ${SB_WEB_IMAGE:-stellar-blaze-web:i1}
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     environment:
       API_ORIGIN: http://api:8000
       APP_VERSION: local
-      DEMO_EMPLOYER_TOKEN: ${DEMO_EMPLOYER_TOKEN:?set DEMO_EMPLOYER_TOKEN, see infra/README.md}
+      DEMO_EMPLOYER_TOKEN: ${DEMO_EMPLOYER_TOKEN:?run infra/local/rehearse.sh, it generates DEMO_EMPLOYER_TOKEN}
+      # One proxy in front, as in Container Apps: the per-client rate limit keys on the rightmost X-Forwarded-For entry.
       TRUSTED_PROXY_HOPS: "1"
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  # Stands for the Container Apps ingress: it appends the client address to X-Forwarded-For and sets Host and the
+  # protocol, and it is the only published port, on loopback. nginx 1.30.6 is the current stable line (looked up
+  # 2026-11-15 with `docker buildx imagetools inspect nginx:1.30.6-alpine`); the digest is the multi-arch index.
+  proxy:
+    image: nginx:1.30.6-alpine@sha256:901e593c95dc85f5a729f5765516321366ef4ac401821431d408897e95287d0a
+    depends_on:
+      web:
+        condition: service_healthy
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${SB_PROXY_PORT:-8080}:8080"
+    volumes:
+      - type: bind
+        source: ./proxy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 3s

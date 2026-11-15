@@ -9,6 +9,10 @@
 #   nob1ms       list-skus has no Standard_B1ms
 #   noreg        Microsoft.Consumption is NotRegistered
 #   noowner      the role assignment list is empty
+#   tls_require  the stored sb-database-url secret ends ssl=require (check-db-tls --deployed)
+#   tls_noenv    the deployed containers have no PGSSLROOTCERT entry
+#   tls_alerts   only the alerts app has the weak secret
+# The stored secret below is a made-up URL; the tests assert that no script ever prints it.
 set -euo pipefail
 
 scenario="${STUB_SCENARIO:-ok}"
@@ -64,6 +68,21 @@ case "$joined" in
   "role assignment list "*)
     if [ "$scenario" != "noowner" ]; then
       printf 'Owner\n'
+    fi
+    ;;
+  "containerapp secret list "* | "containerapp job secret list "*)
+    app="$(flag_value -n)"
+    if [ "$scenario" = "tls_require" ] || { [ "$scenario" = "tls_alerts" ] && [ "$app" = "alerts" ]; }; then
+      printf 'postgresql+asyncpg://sbadmin:STUBPASSWORD@stub.postgres.database.azure.com:5432/stellar_blaze?ssl=require\n'
+    else
+      printf 'postgresql+asyncpg://sbadmin:STUBPASSWORD@stub.postgres.database.azure.com:5432/stellar_blaze?ssl=verify-full\n'
+    fi
+    ;;
+  "containerapp show "* | "containerapp job show "*)
+    if [ "$scenario" = "tls_noenv" ]; then
+      printf '\n'
+    else
+      printf '/etc/ssl/certs/ca-certificates.crt\n'
     fi
     ;;
   "bicep build "*)

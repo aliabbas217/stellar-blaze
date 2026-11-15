@@ -16,11 +16,16 @@ trap 'rm -rf "$work"' EXIT
 bin="$work/bin"
 mkdir -p "$bin"
 
-for tool in az curl; do
+for tool in az curl docker; do
   printf '#!/usr/bin/env bash\nexec bash "%s/%s" "$@"\n' "$stubs_dir" "$tool" >"$bin/$tool"
   chmod +x "$bin/$tool"
 done
+real_path="$PATH" # without the stubs: the few tests that need the real docker use it
 export PATH="$bin:$PATH"
+
+# shellcheck source=infra/scripts/lib.sh
+. "$scripts_dir/lib.sh"
+repo_bicep_dir="$(cd "$scripts_dir/../bicep" && pwd)"
 
 # ---- helpers ------------------------------------------------------------------------------------
 
@@ -221,6 +226,357 @@ test_curl_stub_scenarios() {
   assert_rc 22
 }
 
+test_docker_stub_records_arguments() {
+  STUB_DOCKER_LOG="$work/docker.log" STUB_SCENARIO=ok run_cmd docker run --rm image:tag
+  assert_rc 0
+  [ "$(cat "$work/docker.log")" = "$(printf 'run\n--rm\nimage:tag')" ] || fail "the docker stub did not record its arguments"
+  STUB_SCENARIO=dockerfail run_cmd docker run x
+  assert_rc 1
+}
+
+test_az_stub_serves_the_container_app_queries() {
+  STUB_SCENARIO=ok run_cmd az containerapp show -n api -g rg --query q -o tsv
+  assert_rc 0
+  assert_out_has "/etc/ssl/certs/ca-certificates.crt"
+  STUB_SCENARIO=tls_noenv run_cmd az containerapp job show -n job-migrate -g rg --query q -o tsv
+  assert_rc 0
+  [ -z "$out" ] || fail "tls_noenv should answer with an empty value"
+}
+
+# ---- lib.sh: find_bicep, find_python ------------------------------------------------------------
+
+test_find_bicep_prefers_bicep_bin() {
+  BICEP_BIN="/somewhere/bicep" lib_run "find_bicep"
+  assert_rc 0
+  assert_out_has "/somewhere/bicep"
+}
+
+test_find_bicep_fails_when_there_is_none() {
+  local restricted="$bin:/usr/bin:/bin"
+  if PATH="$restricted" command -v bicep >/dev/null 2>&1; then
+    printf 'skip %s (bicep found on the restricted PATH)\n' "${FUNCNAME[0]}"
+    return 0
+  fi
+  PATH="$restricted" HOME="$work/no-home" lib_run "find_bicep"
+  assert_rc 1
+  [ -z "$out" ] || fail "find_bicep printed something although there is no bicep"
+}
+
+test_find_python_returns_an_interpreter() {
+  # shellcheck disable=SC2016  # the single-quoted program is meant to expand in the child bash
+  lib_run 'p="$(find_python)"; "$p" -c "import sys; print(sys.version_info[0])"'
+  assert_rc 0
+  assert_out_has "3"
+}
+
+# ---- check-template.sh and check-db-tls.sh --template: they evaluate the real template with bicep ----
+
+# bicep_ready: 0 when bicep and python can be found. Otherwise the test is skipped, except in CI where that is a failure.
+bicep_ready() {
+  if find_bicep >/dev/null 2>&1 && find_python >/dev/null 2>&1; then
+    return 0
+  fi
+  if [ -n "${CI:-}" ]; then
+    fail "bicep and python are required in CI (install bicep, see infra/README.md)"
+  fi
+  printf 'skip %s (bicep or python not found)\n' "$current_test"
+  return 1
+}
+
+# mutant <name> <file under infra/bicep> <sed expression>: print the path of main.bicep in a copy of infra/bicep whose
+# <file> was changed by the sed expression. Fails when the expression no longer changes anything, so a test can never pass
+# vacuously because the template was reworded.
+mutant() {
+  local name="$1" rel="$2" expr="$3" dir="$work/mutants/$1"
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  cp -r "$repo_bicep_dir" "$dir/bicep"
+  sed -i -e "$expr" "$dir/bicep/$rel"
+  if cmp -s "$repo_bicep_dir/$rel" "$dir/bicep/$rel"; then
+    fail "mutation '$name' did not change $rel: update the sed expression"
+  fi
+  printf '%s\n' "$dir/bicep/main.bicep"
+}
+
+# expect_c_fail <name> <check id> <file> <sed expression> <text that must be in the output>
+expect_c_fail() {
+  local name="$1" id="$2" rel="$3" expr="$4" text="$5" template
+  template="$(mutant "$name" "$rel" "$expr")"
+  run_cmd bash "$scripts_dir/check-template.sh" --only "$id" "$template"
+  assert_rc 1
+  assert_out_has "FAIL $id"
+  assert_out_has "$text"
+}
+
+test_check_template_passes_on_the_repo_template() {
+  bicep_ready || return 0
+  run_cmd bash "$scripts_dir/check-template.sh" "$repo_bicep_dir/main.bicep"
+  assert_rc 0
+  local id
+  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10; do
+    assert_out_has "PASS $id "
+  done
+  assert_out_lacks "FAIL"
+  [ ! -e "$repo_bicep_dir/main.snapshot.json" ] || fail "check-template.sh wrote a snapshot into the repository"
+}
+
+test_check_template_rejects_bad_usage() {
+  run_cmd bash "$scripts_dir/check-template.sh"
+  assert_rc 1
+  assert_err_has "usage"
+  run_cmd bash "$scripts_dir/check-template.sh" "$work/does-not-exist.bicep"
+  assert_rc 1
+  assert_err_has "no such template"
+}
+
+test_check_template_c1_fails_when_an_output_leaks_a_secret() {
+  bicep_ready || return 0
+  # shellcheck disable=SC2016  # `$a` is a sed address (the last line), not a shell variable
+  expect_c_fail c1 C1 main.bicep '$a\
+output leaked string = pgAdminPassword' "leaked"
+}
+
+test_check_template_c2_fails_on_a_dedicated_workload_profile() {
+  bicep_ready || return 0
+  expect_c_fail c2 C2 modules/environment.bicep \
+    "s/^    workloadProfiles: \[\$/&\n      { name: 'D4', workloadProfileType: 'D4' }/" "not exactly Consumption"
+}
+
+test_check_template_c3_fails_on_an_external_api() {
+  bicep_ready || return 0
+  expect_c_fail c3-api C3 main.bicep 's/externalIngress: false/externalIngress: true/' "api: ingress external is True"
+}
+
+test_check_template_c3_fails_on_two_replicas() {
+  bicep_ready || return 0
+  expect_c_fail c3-scale C3 modules/container-app.bicep 's/^param maxReplicas int = 1/param maxReplicas int = 2/' "replicas are 1..2"
+}
+
+test_check_template_c3_fails_on_allow_insecure() {
+  bicep_ready || return 0
+  expect_c_fail c3-insecure C3 modules/container-app.bicep 's/allowInsecure: false/allowInsecure: true/' "allowInsecure is True"
+}
+
+test_check_template_c3_fails_on_multiple_revisions() {
+  bicep_ready || return 0
+  expect_c_fail c3-revisions C3 modules/container-app.bicep "s/activeRevisionsMode: 'Single'/activeRevisionsMode: 'Multiple'/" "revision mode is not Single"
+}
+
+test_check_template_c4_fails_when_a_pin_is_emitted_empty() {
+  bicep_ready || return 0
+  expect_c_fail c4 C4 main.bicep \
+    "s/empty(rulesetId) ? \[\] : \[{ name: 'SB_RULESET_ID', value: rulesetId }\]/[{ name: 'SB_RULESET_ID', value: rulesetId }]/" \
+    "SB_RULESET_ID"
+}
+
+test_check_template_c5_fails_when_the_job_runs_alembic() {
+  bicep_ready || return 0
+  expect_c_fail c5 C5 main.bicep "s/sb-jobs db upgrade && /alembic upgrade head \&\& /" "alembic upgrade head"
+}
+
+test_check_template_c6_fails_when_the_worker_args_are_missing() {
+  bicep_ready || return 0
+  expect_c_fail c6 C6 main.bicep "s/args: \['alerts', 'run'\]/args: []/" "command and args must both be set"
+}
+
+test_check_template_c7_fails_when_the_api_gets_the_vapid_key() {
+  bicep_ready || return 0
+  expect_c_fail c7 C7 main.bicep \
+    "s/^var apiEnv = concat(coreEnv, runtimeEnv,/var apiEnv = concat(coreEnv, runtimeEnv, [{ name: 'SB_VAPID_PRIVATE_KEY', secretRef: 'sb-database-url' }],/" \
+    "api: has SB_VAPID_PRIVATE_KEY"
+}
+
+test_check_template_c7_fails_when_the_subject_is_sent_without_the_key() {
+  bicep_ready || return 0
+  expect_c_fail c7-subject C7 main.bicep \
+    "s/^  runtimeEnv,\$/  runtimeEnv,\n  [{ name: 'SB_VAPID_SUBJECT', value: vapidSubject }],/" \
+    "novapid/alerts"
+}
+
+test_check_template_c8_fails_when_the_replay_settings_differ() {
+  bicep_ready || return 0
+  expect_c_fail c8 C8 main.bicep "s/^  runtimeEnv,\$/  [{ name: 'SB_FORECAST_SOURCE', value: 'open_meteo' }],/" "SB_FORECAST_SOURCE"
+}
+
+test_check_template_c9_fails_when_a_secret_is_an_env_value() {
+  bicep_ready || return 0
+  expect_c_fail c9-leak C9 main.bicep \
+    "s/^  { name: 'SB_LOG_LEVEL', value: 'INFO' }\$/&\n  { name: 'LEAK', value: pgAdminPassword }/" \
+    "carries a secret value"
+}
+
+test_check_template_c9_fails_on_a_dangling_secret_ref() {
+  bicep_ready || return 0
+  expect_c_fail c9-ref C9 main.bicep "s/secretRef: 'sb-access-tokens'/secretRef: 'sb-access-tokenz'/" "unknown secret sb-access-tokenz"
+}
+
+test_check_template_c10_fails_when_phase_1_creates_the_api() {
+  bicep_ready || return 0
+  expect_c_fail c10-phase1 C10 main.bicep "s/^module api 'modules\/container-app.bicep' = if (deployApps) {/module api 'modules\/container-app.bicep' = {/" \
+    "phase1 creates apps"
+}
+
+test_check_template_c10_fails_when_a_placeholder_api_gets_the_worker() {
+  bicep_ready || return 0
+  expect_c_fail c10-alerts C10 main.bicep "s/^var deployAlerts = deployApps && !apiIsPlaceholder/var deployAlerts = deployApps/" \
+    "placeholder creates"
+}
+
+test_check_db_tls_template_passes_on_the_repo_template() {
+  bicep_ready || return 0
+  run_cmd bash "$scripts_dir/check-db-tls.sh" --template "$repo_bicep_dir/main.bicep"
+  assert_rc 0
+  assert_out_has "PASS T1"
+  assert_out_has "PASS T2"
+  assert_out_has "PASS T3"
+  assert_out_lacks "FAIL"
+}
+
+test_check_db_tls_template_fails_on_ssl_require() {
+  bicep_ready || return 0
+  local template
+  template="$(mutant tls-require main.bicep 's/ssl=verify-full/ssl=require/')"
+  run_cmd bash "$scripts_dir/check-db-tls.sh" --template "$template"
+  assert_rc 1
+  assert_out_has "FAIL T1"
+  assert_out_has "FAIL T2"
+}
+
+test_check_db_tls_template_fails_on_sslmode() {
+  bicep_ready || return 0
+  local template
+  template="$(mutant tls-sslmode main.bicep 's/?ssl=verify-full/?sslmode=verify-full/')"
+  run_cmd bash "$scripts_dir/check-db-tls.sh" --template "$template"
+  assert_rc 1
+  assert_out_has "FAIL T2"
+}
+
+test_check_db_tls_template_fails_without_pgsslrootcert() {
+  bicep_ready || return 0
+  local template
+  template="$(mutant tls-noroot main.bicep "/^  { name: 'PGSSLROOTCERT', value: pgSslRootCert }\$/d")"
+  run_cmd bash "$scripts_dir/check-db-tls.sh" --template "$template"
+  assert_rc 1
+  assert_out_has "FAIL T3"
+  assert_out_has "api: PGSSLROOTCERT"
+  assert_out_has "alerts: PGSSLROOTCERT"
+  assert_out_has "job-migrate: PGSSLROOTCERT"
+  assert_out_has "PASS T1"
+}
+
+test_check_db_tls_template_fails_when_only_the_job_loses_pgsslrootcert() {
+  bicep_ready || return 0
+  # api and alerts share coreEnv with the job; give the job a list without the last entry (PGSSLROOTCERT).
+  local template
+  template="$(mutant tls-jobroot main.bicep "s/^    env: apiIsPlaceholder ? \[\] : coreEnv\$/    env: apiIsPlaceholder ? [] : take(coreEnv, 5)/")"
+  run_cmd bash "$scripts_dir/check-db-tls.sh" --template "$template"
+  assert_rc 1
+  assert_out_has "FAIL T3"
+  assert_out_has "job-migrate: PGSSLROOTCERT"
+  assert_out_lacks "api: PGSSLROOTCERT"
+}
+
+# ---- check-db-tls.sh --deployed / --image -------------------------------------------------------
+
+stub_url_marker="STUBPASSWORD"
+
+assert_no_url_anywhere() {
+  case "$out$err" in
+    *"$stub_url_marker"* | *"postgresql+asyncpg"*) fail "the database URL (or its password) reached the output" ;;
+    *) ;;
+  esac
+}
+
+test_check_db_tls_deployed_passes_when_everything_verifies() {
+  STUB_SCENARIO=ok run_cmd bash "$scripts_dir/check-db-tls.sh" --deployed rg-test
+  assert_rc 0
+  assert_out_has "PASS T4 api "
+  assert_out_has "PASS T4 alerts "
+  assert_out_has "PASS T4 job-migrate "
+  assert_out_has "PASS T5 api "
+  assert_out_has "PASS T5 alerts "
+  assert_out_has "PASS T5 job-migrate "
+  assert_out_lacks "FAIL"
+  assert_no_url_anywhere
+}
+
+test_check_db_tls_deployed_fails_when_the_secret_lacks_verify_full() {
+  STUB_SCENARIO=tls_require run_cmd bash "$scripts_dir/check-db-tls.sh" --deployed rg-test
+  assert_rc 1
+  assert_out_has "FAIL T4 api"
+  assert_out_has "FAIL T4 alerts"
+  assert_out_has "FAIL T4 job-migrate"
+  assert_out_has "PASS T5 api"
+  assert_no_url_anywhere
+}
+
+test_check_db_tls_deployed_names_the_one_weak_container() {
+  STUB_SCENARIO=tls_alerts run_cmd bash "$scripts_dir/check-db-tls.sh" --deployed rg-test
+  assert_rc 1
+  assert_out_has "FAIL T4 alerts"
+  assert_out_has "PASS T4 api"
+  assert_out_has "PASS T4 job-migrate"
+  assert_no_url_anywhere
+}
+
+test_check_db_tls_deployed_fails_without_the_root_cert_env() {
+  STUB_SCENARIO=tls_noenv run_cmd bash "$scripts_dir/check-db-tls.sh" --deployed rg-test
+  assert_rc 1
+  assert_out_has "FAIL T5 api"
+  assert_out_has "FAIL T5 alerts"
+  assert_out_has "FAIL T5 job-migrate"
+  assert_out_has "PASS T4 api"
+}
+
+test_check_db_tls_deployed_keeps_the_url_out_of_a_shell_trace() {
+  STUB_SCENARIO=tls_require run_cmd bash -x "$scripts_dir/check-db-tls.sh" --deployed rg-test
+  assert_rc 1
+  assert_no_url_anywhere
+}
+
+test_check_db_tls_image_runs_the_ca_check_in_the_image() {
+  STUB_DOCKER_LOG="$work/docker.log" STUB_SCENARIO=ok run_cmd bash "$scripts_dir/check-db-tls.sh" --image reg.example/sb-api:abc
+  assert_rc 0
+  assert_out_has "PASS T6 reg.example/sb-api:abc"
+  local logged want
+  logged="$(cat "$work/docker.log")"
+  for want in run --rm "--pull" never "PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt" "--entrypoint" python \
+    "reg.example/sb-api:abc" "-c" "DigiCert Global Root G2" "Microsoft RSA Root Certificate Authority 2017" \
+    "load_verify_locations(cafile=path)" "get_ca_certs()"; do
+    case "$logged" in *"$want"*) ;; *) fail "docker was not given: $want" ;; esac
+  done
+}
+
+test_check_db_tls_image_fails_when_the_ca_check_fails() {
+  STUB_SCENARIO=dockerfail run_cmd bash "$scripts_dir/check-db-tls.sh" --image reg.example/sb-api:abc
+  assert_rc 1
+  assert_out_has "FAIL T6"
+  assert_out_has "missing root CA"
+}
+
+test_check_db_tls_image_against_a_real_image() {
+  local image="stellar-blaze-api:i1"
+  if ! PATH="$real_path" docker image inspect "$image" >/dev/null 2>&1; then
+    printf 'skip %s (docker or %s not available)\n' "${FUNCNAME[0]}" "$image"
+    return 0
+  fi
+  PATH="$real_path" run_cmd bash "$scripts_dir/check-db-tls.sh" --image "$image"
+  assert_rc 0
+  assert_out_has "PASS T6 $image"
+  PATH="$real_path" run_cmd bash "$scripts_dir/check-db-tls.sh" --image "stellar-blaze-api:no-such-tag-for-the-test"
+  assert_rc 1
+  assert_out_has "FAIL T6"
+}
+
+test_check_db_tls_rejects_bad_usage() {
+  run_cmd bash "$scripts_dir/check-db-tls.sh"
+  assert_rc 1
+  assert_err_has "usage"
+  run_cmd bash "$scripts_dir/check-db-tls.sh" --bogus x
+  assert_rc 1
+  assert_err_has "usage"
+}
+
 # ---- runner -------------------------------------------------------------------------------------
 
 tests=(
@@ -242,12 +598,58 @@ tests=(
   test_bicep_build_prefers_bicep_bin
   test_bicep_build_falls_back_to_az
   test_curl_stub_scenarios
+  test_docker_stub_records_arguments
+  test_az_stub_serves_the_container_app_queries
+  test_find_bicep_prefers_bicep_bin
+  test_find_bicep_fails_when_there_is_none
+  test_find_python_returns_an_interpreter
+  test_check_template_passes_on_the_repo_template
+  test_check_template_rejects_bad_usage
+  test_check_template_c1_fails_when_an_output_leaks_a_secret
+  test_check_template_c2_fails_on_a_dedicated_workload_profile
+  test_check_template_c3_fails_on_an_external_api
+  test_check_template_c3_fails_on_two_replicas
+  test_check_template_c3_fails_on_allow_insecure
+  test_check_template_c3_fails_on_multiple_revisions
+  test_check_template_c4_fails_when_a_pin_is_emitted_empty
+  test_check_template_c5_fails_when_the_job_runs_alembic
+  test_check_template_c6_fails_when_the_worker_args_are_missing
+  test_check_template_c7_fails_when_the_api_gets_the_vapid_key
+  test_check_template_c7_fails_when_the_subject_is_sent_without_the_key
+  test_check_template_c8_fails_when_the_replay_settings_differ
+  test_check_template_c9_fails_when_a_secret_is_an_env_value
+  test_check_template_c9_fails_on_a_dangling_secret_ref
+  test_check_template_c10_fails_when_phase_1_creates_the_api
+  test_check_template_c10_fails_when_a_placeholder_api_gets_the_worker
+  test_check_db_tls_template_passes_on_the_repo_template
+  test_check_db_tls_template_fails_on_ssl_require
+  test_check_db_tls_template_fails_on_sslmode
+  test_check_db_tls_template_fails_without_pgsslrootcert
+  test_check_db_tls_template_fails_when_only_the_job_loses_pgsslrootcert
+  test_check_db_tls_deployed_passes_when_everything_verifies
+  test_check_db_tls_deployed_fails_when_the_secret_lacks_verify_full
+  test_check_db_tls_deployed_names_the_one_weak_container
+  test_check_db_tls_deployed_fails_without_the_root_cert_env
+  test_check_db_tls_deployed_keeps_the_url_out_of_a_shell_trace
+  test_check_db_tls_image_runs_the_ca_check_in_the_image
+  test_check_db_tls_image_fails_when_the_ca_check_fails
+  test_check_db_tls_image_against_a_real_image
+  test_check_db_tls_rejects_bad_usage
 )
 
+# An optional argument selects the tests whose name contains it (for example: bash run.sh check_db_tls_deployed).
+filter="${1:-}"
+ran=0
 for current_test in "${tests[@]}"; do
+  case "$current_test" in *"$filter"*) ;; *) continue ;; esac
   out=""
   err=""
   "$current_test"
   printf 'ok %s\n' "${current_test#test_}"
+  ran=$((ran + 1))
 done
-printf 'all %s tests passed\n' "${#tests[@]}"
+if [ "$ran" -eq 0 ]; then
+  printf 'no test matches "%s"\n' "$filter" >&2
+  exit 1
+fi
+printf 'all %s tests passed\n' "$ran"
