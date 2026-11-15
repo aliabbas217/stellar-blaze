@@ -60,7 +60,7 @@ W, R, B, S, OFF_, BAN = (
     TickState.BAN,
 )
 LOW, MEDIUM, HIGH, RED = Zone.LOW, Zone.MEDIUM, Zone.HIGH, Zone.RED
-ALL_DECLARED = ("P-H8.ramp", "P-H8.heavy7", "P-H5.hours", "P-H7.unacclimatised")
+ALL_DECLARED = ("P-H8.ramp", "P-H8.heavy7", "P-H5.ban_season", "P-H7.unacclimatised")
 
 
 def _cited(violation: Violation, rule_id: str) -> None:
@@ -581,7 +581,7 @@ def test_rule_p_h2_attendance_is_work_adosh_rest_and_stopped(kind: TickState, co
 
 def _juvenile(plan_states: tuple[TickState, ...], *, day: date = WINTER) -> ValidationResult:
     crew = crew_of(workload="light", members=(member(juvenile=True), member()))
-    plan = plan_of(plan_states, local_date=day, restrictions=("P-H5.hours",), restricted_headcount=1)
+    plan = plan_of(plan_states, local_date=day, restrictions=("P-H5.ban_season",), restricted_headcount=1)
     return run_validator(plan, uniform(LOW), crew)
 
 
@@ -627,13 +627,22 @@ def test_rule_p_h5_declared_restriction_is_required_in_the_ban_season() -> None:
     crew = crew_of(workload="light", members=(member(juvenile=True), member()))
     plan = plan_of(by_tick((at("07:00"), at("08:00"), S)), local_date=SUMMER)
     missing = run_validator(plan, uniform(LOW), crew)
-    assert "P-H5.hours" in ids(missing)
+    assert "P-H5.ban_season" in ids(missing)
+    _cited(first(missing, "P-H5.ban_season"), "P-H5.ban_season")
+    assert "P-H5.hours" not in ids(missing)  # the 6-hour rule is a different rule (architect ruling R-AC)
     declared = plan_of(
+        by_tick((at("07:00"), at("08:00"), S)),
+        local_date=SUMMER,
+        restrictions=("P-H5.ban_season",),
+        restricted_headcount=1,
+    )
+    assert "P-H5.ban_season" not in ids(run_validator(declared, uniform(LOW), crew))
+    wrong_id = plan_of(
         by_tick((at("07:00"), at("08:00"), S)), local_date=SUMMER, restrictions=("P-H5.hours",), restricted_headcount=1
     )
-    assert "P-H5.hours" not in ids(run_validator(declared, uniform(LOW), crew))
+    assert "P-H5.ban_season" in ids(run_validator(wrong_id, uniform(LOW), crew))  # the old id no longer declares it
     winter = plan_of(by_tick((at("07:00"), at("08:00"), S)), local_date=WINTER)
-    assert "P-H5.hours" not in ids(run_validator(winter, uniform(LOW), crew))
+    assert "P-H5.ban_season" not in ids(run_validator(winter, uniform(LOW), crew))
 
 
 def test_rule_p_h5_is_not_evaluated_without_a_juvenile() -> None:
@@ -880,9 +889,11 @@ def test_checked_rules_listed_when_passing() -> None:
 def test_checked_rules_add_p_h10_and_the_juvenile_rules_when_they_apply() -> None:
     morning = (ShiftBlock(time(7, 0), time(8, 0)),)
     crew = crew_of(members=(member(juvenile=True),), shift=morning)
-    plan = plan_of(shift_plan(shift=morning, local_date=SUMMER), restrictions=("P-H5.hours",), restricted_headcount=1)
+    plan = plan_of(
+        shift_plan(shift=morning, local_date=SUMMER), restrictions=("P-H5.ban_season",), restricted_headcount=1
+    )
     result = run_validator(plan, uniform(LOW), crew, published_shift=morning)
-    assert {"P-H10", "P-H5.window", "P-H5.hours", "P-H5.run"} <= set(result.checked_rules)
+    assert {"P-H10", "P-H5.window", "P-H5.hours", "P-H5.run", "P-H5.ban_season"} <= set(result.checked_rules)
     assert result.passed
 
 
@@ -905,21 +916,22 @@ def _six_hours_five() -> tuple[TickState, ...]:
     return by_tick((at("07:00"), at("10:00"), S), (at("10:00"), at("11:00"), B), (at("11:00"), at("11:00") + 37, S))
 
 
-def test_a_missing_juvenile_declaration_is_plan_origin_although_its_id_is_a_shift_rule() -> None:
-    """R-Z: the partition follows ``origin``. A shift-origin P-H5.hours and a plan-origin one can coexist."""
+def test_a_missing_ban_season_declaration_is_plan_origin_and_the_hours_rule_stays_shift_origin() -> None:
+    """R-Z, R-AC: the partition follows ``origin``. The missing juvenile declaration has its own rule id,
+    ``P-H5.ban_season`` (plan origin, not a shift rule); ``P-H5.hours`` is the real 6-hour rule, always shift origin."""
     crew = crew_of(workload="light", members=(member(juvenile=True), member()))
     undeclared = plan_of(by_tick((at("07:00"), at("08:00"), S)), local_date=SUMMER)
     result = run_validator(undeclared, uniform(LOW), crew)
-    missing = first(result, "P-H5.hours")
+    missing = first(result, "P-H5.ban_season")
     assert missing.origin == "plan"
-    assert "P-H5.hours" in SHIFT_RULES
+    assert "P-H5.ban_season" not in SHIFT_RULES
     assert missing in result.plan_violations
     assert result.shift_violations == ()
-    # the same id, from the shift itself (73 ticks = 6 h 05 min), with the declaration present
+    # the hours rule from the shift itself (73 ticks = 6 h 05 min), with the declaration present
     declared = plan_of(
         _six_hours_five(),
         local_date=SUMMER,
-        restrictions=("P-H5.hours",),
+        restrictions=("P-H5.ban_season",),
         restricted_headcount=1,
     )
     over = run_validator(declared, uniform(LOW), crew)
@@ -927,11 +939,11 @@ def test_a_missing_juvenile_declaration_is_plan_origin_although_its_id_is_a_shif
     assert over.plan_violations == ()
     # both at once
     both = run_validator(plan_of(_six_hours_five(), local_date=SUMMER), uniform(LOW), crew)
-    assert sorted(v.origin for v in both.violations if v.rule_id == "P-H5.hours") == [
+    assert [v.origin for v in both.violations if v.rule_id == "P-H5.hours"] == ["shift"]
+    assert sorted(v.origin for v in both.violations if v.rule_id == "P-H5.ban_season") == [
         "plan",
         "plan",
-        "shift",
-    ]  # missing declaration, headcount shortfall, 6 h 05 min
+    ]  # missing declaration, headcount shortfall
 
 
 @pytest.mark.parametrize("rule_id", ["P-H5.window", "P-H5.hours", "P-H5.run", "P-H2.daily", "P-H2.weekly"])
@@ -940,7 +952,7 @@ def test_shift_rules_report_shift_origin_when_they_come_from_the_shift(rule_id: 
     plan = plan_of(
         by_tick((at("06:00"), at("06:00") + 145, S)),
         local_date=WINTER,
-        restrictions=("P-H5.hours",),
+        restrictions=("P-H5.ban_season",),
         restricted_headcount=1,
     )
     result = run_validator(plan, uniform(LOW), crew)
@@ -1033,7 +1045,7 @@ def test_declare_restrictions_replaces_the_declaration_and_counts_each_member_on
     crew = crew_of(workload="heavy", members=(new_returning, member(juvenile=True), member()))
     typed = dataclasses.replace(_typed("06:00-06:30 work"), restrictions=("P-H8.ramp",), restricted_headcount=9)
     declared = declare_restrictions(typed, crew, rules_of())
-    assert declared.restrictions == ("P-H8.ramp", "P-H8.heavy7", "P-H5.hours", "P-H7.unacclimatised")
+    assert declared.restrictions == ("P-H8.ramp", "P-H8.heavy7", "P-H5.ban_season", "P-H7.unacclimatised")
     assert declared.restricted_headcount == 2  # the new returning member (ramp, heavy-7, unacclimatised) and the minor
 
 

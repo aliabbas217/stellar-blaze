@@ -153,7 +153,7 @@ def _people(crew: CrewSpec, rules: PlannerRules, season: bool) -> _People:
             member_flags.add("P-H8.heavy7")
         excluded = m.juvenile and season
         if excluded:
-            member_flags.add("P-H5.hours")
+            member_flags.add("P-H5.ban_season")  # ADR 0011 section 4: excluded from ban-season outdoor heat tasks
         flags |= member_flags
         restricted += bool(member_flags)
         acclimatised += not excluded and "P-H7.unacclimatised" not in member_flags

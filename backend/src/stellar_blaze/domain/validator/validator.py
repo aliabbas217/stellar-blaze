@@ -46,7 +46,7 @@ type Origin = Literal["shift", "plan"]
 SHIFT_RULES: Final[frozenset[str]] = frozenset({"P-H2.daily", "P-H2.weekly", "P-H5.hours", "P-H5.run", "P-H5.window"})
 """The rule ids whose violation has origin ``"shift"`` when it comes from the published shift (hours and juvenile
 checks). It is documentation only: the partition uses ``Violation.origin``, because a rule id can have both origins
-(a missing juvenile declaration is ``P-H5.hours`` with origin ``"plan"``)."""
+(a missing juvenile ban-season declaration is ``P-H5.ban_season``, always origin ``"plan"``, so it is not listed)."""
 
 _DAY_TICKS: Final = 216  # the 04:00-22:00 grid of domain.plans.ticks (a test pins the equality)
 _DAY_START_MINUTE: Final = 4 * 60
@@ -319,7 +319,7 @@ def _ramp_share(member: CrewMember, rules: PlannerRules) -> int:
 
 def _is_acclimatised(member: CrewMember, rules: PlannerRules, *, in_ban_season: bool) -> bool:
     if member.juvenile and in_ban_season:
-        return False  # juveniles are excluded from ban-season outdoor heat tasks (ADR 0011 P-H5)
+        return False  # juveniles are excluded from ban-season outdoor heat tasks (ADR 0011 s4, P-H5.ban_season)
     table = rules.acclimatisation
     if member.days_away > table.unacclimatised_after_days_away:
         return False
@@ -499,7 +499,12 @@ def _juvenile(day: _Day) -> list[_Finding]:
 
 def _required_restrictions(crew: CrewSpec, rules: PlannerRules, *, in_ban_season: bool) -> dict[str, list[int]]:
     """The restriction ids that the members require (rule id to member indexes), in a fixed order."""
-    required: dict[str, list[int]] = {"P-H8.ramp": [], "P-H8.heavy7": [], "P-H5.hours": [], "P-H7.unacclimatised": []}
+    required: dict[str, list[int]] = {
+        "P-H8.ramp": [],
+        "P-H8.heavy7": [],
+        "P-H5.ban_season": [],
+        "P-H7.unacclimatised": [],
+    }
     heavy_days = rules.acclimatisation.heavy_work_after_days
     for index, m in enumerate(crew.members or ()):
         if _ramp_share(m, rules) < 100:
@@ -507,7 +512,7 @@ def _required_restrictions(crew: CrewSpec, rules: PlannerRules, *, in_ban_season
         if crew.workload == "heavy" and (not m.experienced or _is_returning(m)) and m.days_on_site < heavy_days:
             required["P-H8.heavy7"].append(index)
         if m.juvenile and in_ban_season:
-            required["P-H5.hours"].append(index)
+            required["P-H5.ban_season"].append(index)
         elif not _is_acclimatised(m, rules, in_ban_season=in_ban_season):
             required["P-H7.unacclimatised"].append(index)
     return required
@@ -685,7 +690,9 @@ def validate_plan(
         (("P-H2.daily", "P-H2.weekly"), lambda: _hours(day)),
     ]
     if _has_juvenile(crew):
-        groups.append((("P-H5.window", "P-H5.hours", "P-H5.run"), lambda: _juvenile(day)))
+        # P-H5.ban_season is emitted by the declarations check below; it is listed here so that the clause is required
+        # exactly when a juvenile is on the crew.
+        groups.append((("P-H5.window", "P-H5.hours", "P-H5.run", "P-H5.ban_season"), lambda: _juvenile(day)))
     groups.append((("P-H8.ramp", "P-H8.heavy7"), lambda: _declarations(day)))
     if published_shift is not None:
         shift = published_shift

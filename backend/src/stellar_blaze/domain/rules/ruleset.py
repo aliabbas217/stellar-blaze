@@ -283,6 +283,7 @@ REQUIRED_CLAUSE_IDS = frozenset(
         "P-H5.hours",
         "P-H5.run",
         "P-H5.window",
+        "P-H5.ban_season",
         "P-H7.cap60",
         "P-H7.run",
         "P-H7.lone",

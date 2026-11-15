@@ -306,6 +306,10 @@ clause = 'Art. 5(2)(c): "this period(s) shall be defined, so that the juvenile d
 source = "fdl-33-2021"
 clause = 'Art. 5(2)(d): "The juvenile shall not work between 7 pm and 7 am."'
 
+[clauses.entries."P-H5.ban_season"]
+source = "fdl-33-2021"
+clause = 'Art. 5(2)(e): "The juvenile shall not be employed in dangerous or arduous works ..." Product reading (ADR 0011 section 4, not legal text): juveniles are excluded from ban-season outdoor heat tasks by default'
+
 [clauses.entries."P-H7.cap60"]
 source = "adosh-twl"
 clause = 'Table 1: Medium Risk, heavy work "Continuous paced work 45 work - 15 rest"; High Risk "Strict Work/Rest cycling required", light work 45 work - 15 rest, heavy work 20 work - 40 rest. Moderate work uses the heavy column (PROTECTIVE READING, ADR 0046)'

@@ -308,7 +308,8 @@ def test_restrictions_cover_heavy7_returning_and_juveniles() -> None:
     spec = crew(members=members, headcount=4)
     plan = plan_crew(spec, timeline(JULY, [Zone.LOW] * TICKS), rules(), local_date=JULY, tz=TZ)
     assert plan.restricted_headcount == 3  # the first three; the fourth has no restriction
-    assert plan.restrictions == ("P-H5.hours", "P-H7.unacclimatised", "P-H8.heavy7", "P-H8.ramp")
+    assert plan.restrictions == ("P-H5.ban_season", "P-H7.unacclimatised", "P-H8.heavy7", "P-H8.ramp")
+    assert "P-H5.hours" not in plan.restrictions  # the juvenile 6-hour rule is a different rule (R-AC)
     october = plan_crew(spec, timeline(OCTOBER, [Zone.LOW] * TICKS), rules(), local_date=OCTOBER, tz=TZ)
     assert october.restricted_headcount == 2  # juveniles are excluded only in the ban season
     light = plan_crew(

@@ -241,6 +241,7 @@ CLAUSE_IDS = {
     "P-H5.hours",
     "P-H5.run",
     "P-H5.window",
+    "P-H5.ban_season",
     "P-H7.cap60",
     "P-H7.run",
     "P-H7.lone",
@@ -261,6 +262,17 @@ def test_clause_sources_declared() -> None:
     declared = {s.id for s in ruleset.sources}
     assert {entry.source for entry in ruleset.clauses.entries.values()} <= declared
     assert all(entry.clause.strip() for entry in ruleset.clauses.entries.values())
+
+
+def test_the_ban_season_clause_quotes_the_research_sentence_verbatim() -> None:
+    # docs/research/2026-11-11-shift-regulations-and-sleep.md, Decree-Law 33/2021 Art. 5(2)(e): copied, never
+    # paraphrased; the exclusion itself is the product reading (ADR 0011 section 4) and must be labeled as such.
+    ruleset = released()
+    assert ruleset.clauses is not None
+    entry = ruleset.clauses.entries["P-H5.ban_season"]
+    assert entry.source == "fdl-33-2021"
+    assert '"The juvenile shall not be employed in dangerous or arduous works ..."' in entry.clause
+    assert "Product reading (ADR 0011 section 4, not legal text)" in entry.clause
 
 
 def test_an_undeclared_clause_source_is_refused() -> None:
