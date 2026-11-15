@@ -1,6 +1,6 @@
 # ADR 0065: Unwell flow reconciles with CoP 3.1.2(e): the sheet offers three one-tap calls; the app sends and logs nothing
 
-- **Status:** Proposed by the architect, awaiting Ali's confirmation. The clinical wording still needs the consultant's review ([ADR 0035](0035-clinical-review-labelling.md); review pack Q1 and C2), so the sheet carries "Not clinically reviewed" until a review completes.
+- **Status:** Accepted by Ali (2026-11-15, in chat: "accept both"); previously Proposed by the architect. The clinical wording still needs the consultant's review ([ADR 0035](0035-clinical-review-labelling.md); review pack Q1 and C2), so the sheet carries "Not clinically reviewed" until a review completes.
 - **Date:** 2026-11-14
 - **Deciders:** Ali; the architect (Claude)
 - **Supersedes / superseded by:** none. Answers HANDOFF decision 2 and Q1 (`docs/design/HANDOFF.md`, F1 worktree) for the demo and closes the open part of [ADR 0045](0045-f2-scope-core-demo-path.md) flag F2 ("if a message is to be sent, decision 2 and its Q1 and Q2 return"). Gives [ADR 0004](0004-tiered-alert-delivery.md) a pointer (its Amendments).
@@ -44,3 +44,6 @@ The consultant's review of Q1 (due 2026-11-17) says a call is not enough; a pilo
 
 ## Links
 [ADR 0004](0004-tiered-alert-delivery.md) · [0035](0035-clinical-review-labelling.md) · [0045](0045-f2-scope-core-demo-path.md) · [0054](0054-governance-refusal-and-hash-chained-audit.md) · [0057](0057-plans-row-baselines-and-crew-fixture.md) · [review pack](../clinical/review-pack.md) Q1, C2 · [F2 plan](../superpowers/plans/2026-11-14-f2-core-demo-screens.md) Task 18 · [B3 plan](../superpowers/plans/2026-11-14-b3-warnings-planner-governance-api.md) Task 7 · [roster stakeholders](../research/2026-11-11-roster-stakeholders-and-compliance.md) §2.7, G9 · [parking lot](../parking-lot.md)
+
+## Amendments
+- **2026-11-15 (acceptance; decision text unchanged).** Accepted by Ali in chat ("accept both", together with ADR 0066), after the architect summarised the decision, the rejected options and the cost if wrong. Nothing else changed. The open items stay open: the consultant's review of the sheet wording and the row order, the unread ADOSH Element 07 document, and the UAE numbering check for the synthetic site numbers. The demo never dials (F2 ruling of 2026-11-14).
