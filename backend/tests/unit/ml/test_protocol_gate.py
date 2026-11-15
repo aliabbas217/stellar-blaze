@@ -100,6 +100,12 @@ def sha_lf(data: bytes) -> str:
     return sha(data.replace(b"\r\n", b"\n"))
 
 
+def manifest_sha(models_dir: Path, model_id: str) -> str:
+    """The pin a lock holds for a model: SHA-256 of its ``manifest.json`` (CRLF as LF); zeros if there is none."""
+    path = models_dir / model_id / "manifest.json"
+    return sha_lf(path.read_bytes()) if path.is_file() else "0" * 64
+
+
 def go_text(
     *,
     lock_sha256: str,
@@ -145,12 +151,14 @@ class World:
         and lock hash; a lock without a model id keeps the default one), so a test that changes the lock breaks one
         thing only. A go test rewrites the marker afterwards.
         """
+        model_id = changes.get("model_id", MODEL_ID) or MODEL_ID
         values: dict[str, str | None] = {
             "protocol_path": PROTOCOL_PATH,
             "protocol_sha256": sha(PROTOCOL_BYTES),
             "protocol_commit": PROTOCOL_COMMIT,
             "gold_sha256": GOLD_SHA,
             "model_id": MODEL_ID,
+            "model_manifest_sha256": manifest_sha(self.models_dir, model_id),
             "freeze_path": FREEZE_PATH,
             "freeze_sha256": sha(FREEZE_BYTES),
         }
@@ -256,6 +264,23 @@ def _unverifiable_models(w: World) -> None:
     w.models_dir = w.models_dir.parent / "no-such-models-directory"
 
 
+def _no_manifest_pin(w: World) -> None:
+    w.write_lock(model_manifest_sha256=None)
+
+
+def _manifest_pin_for_another_artefact(w: World) -> None:
+    w.write_lock(model_manifest_sha256="a" * 64)
+
+
+def _manifest_edited_after_the_pin(w: World) -> None:
+    """The model's manifest changes after the lock pinned it: the id, the lock and the go all still agree."""
+    copied = w.repo_root.parent / "models"  # never edit the shared fixture directory
+    shutil.copytree(FIXTURE_MODELS, copied)
+    manifest = copied / MODEL_ID / "manifest.json"
+    manifest.write_bytes(manifest.read_bytes() + b"\n")
+    w.models_dir = copied
+
+
 def _no_freeze(w: World) -> None:
     w.write_lock(freeze_path=None, freeze_sha256=None)
 
@@ -345,6 +370,9 @@ _REFUSALS: list[tuple[str, Part, Callable[[World], None]]] = [
     ("model-id-missing", Part.FORECAST, _no_model_id),
     ("model-not-found", Part.FORECAST, _unknown_model_id),
     ("model-integrity", Part.FORECAST, _unverifiable_models),
+    ("model-manifest-sha-missing", Part.FORECAST, _no_manifest_pin),
+    ("model-manifest-mismatch", Part.FORECAST, _manifest_pin_for_another_artefact),
+    ("model-manifest-mismatch", Part.FORECAST, _manifest_edited_after_the_pin),
     ("gold-sha-missing", Part.FORECAST, _no_gold_sha),
     ("gold-sha-missing", Part.WARNINGS, _no_gold_sha),
     ("gold-sha-missing", Part.PLANS, _no_gold_sha),
@@ -609,6 +637,11 @@ def test_the_real_lock_file_is_consistent_with_the_committed_documents() -> None
         assert sha((REPO_ROOT / amendment.path).read_bytes()) == amendment.sha256, amendment.path
     if lock.freeze_path is not None:
         assert sha((REPO_ROOT / lock.freeze_path).read_bytes()) == lock.freeze_sha256
+    if lock.model_id is not None or lock.model_manifest_sha256 is not None:
+        assert lock.model_id is not None, "a manifest pin without the model it belongs to"
+        assert lock.model_manifest_sha256 is not None, "a model id without its manifest pin"
+        manifest = REPO_ROOT / "backend" / "models" / lock.model_id / "manifest.json"
+        assert sha_lf(manifest.read_bytes()) == lock.model_manifest_sha256
 
 
 REAL_PROTOCOL: Final = "docs/research/2026-11-12-preregistration-2026-evaluation.md"
@@ -616,6 +649,19 @@ REAL_AMENDMENTS: Final = (
     "docs/research/2026-11-14-preregistration-amendment-1.md",
     "docs/research/2026-11-15-preregistration-amendment-2.md",
 )
+
+
+REAL_MODEL_ID: Final = "corrector-20261114-d327987-6edafa"
+
+
+def test_the_real_lock_pins_the_released_model_and_its_manifest() -> None:
+    """The lock names the released model AND the hash of its manifest (which lists every artefact file's hash)."""
+    lock = load_lock(REAL_LOCK)
+
+    assert lock.model_id == REAL_MODEL_ID
+    assert lock.model_manifest_sha256 is not None
+    manifest = REPO_ROOT / "backend" / "models" / REAL_MODEL_ID / "manifest.json"
+    assert sha_lf(manifest.read_bytes()) == lock.model_manifest_sha256  # the gate also needs a clean tree
 
 
 def test_the_real_lock_lists_the_preregistration_and_exactly_the_two_amendments() -> None:
@@ -651,7 +697,7 @@ def _copy_of_the_real_repository_files(tmp_path: Path, *, edited: str | None = N
 
 
 def _open_the_copied_gate(tmp_path: Path, repo: Path, copied_lock: Path, git: FakeGit) -> list[str]:
-    with pytest.raises(GateRefusedError) as refused:  # always refused: the real lock has no model_id and no go yet
+    with pytest.raises(GateRefusedError) as refused:  # always refused: no models directory and no go marker here
         open_gate(
             repo_root=repo,
             lock_path=copied_lock,
@@ -1021,6 +1067,7 @@ def test_the_gate_wants_the_go_marker_committed_in_a_real_repository(isolated_gi
         (
             f'protocol_path = "{PROTOCOL_PATH}"\nprotocol_sha256 = "{sha(PROTOCOL_BYTES)}"\n'
             f'protocol_commit = "{protocol_commit}"\ngold_sha256 = "{GOLD_SHA}"\nmodel_id = "{MODEL_ID}"\n'
+            f'model_manifest_sha256 = "{manifest_sha(FIXTURE_MODELS, MODEL_ID)}"\n'
         ).encode()
     )
     _commit(repo, "the lock")

@@ -20,7 +20,7 @@ from typing import Final
 
 import polars as pl
 
-from stellar_blaze.adapters.config.models import scan_models
+from stellar_blaze.adapters.config.models import MANIFEST, scan_models
 from stellar_blaze.domain.config.models import LoadedModel
 from stellar_blaze.domain.forecast.features import FeatureSet
 from stellar_blaze.domain.weather.models import NwpModel
@@ -184,9 +184,11 @@ class GatedWorld:
 
     def write_lock(self, gold_sha256: str) -> None:
         digest = sha(PROTOCOL_BYTES)
+        manifest = (self.models_dir / self.model_id / MANIFEST).read_bytes().replace(b"\r\n", b"\n")  # CRLF as LF
         self.lock_path.write_text(
             f'protocol_path = "{PROTOCOL_PATH}"\nprotocol_sha256 = "{digest}"\nprotocol_commit = "{PROTOCOL_COMMIT}"\n'
             f'gold_sha256 = "{gold_sha256}"\nmodel_id = "{self.model_id}"\n'
+            f'model_manifest_sha256 = "{sha(manifest)}"\n'
             f'freeze_path = "{FREEZE_PATH}"\nfreeze_sha256 = "{sha(FREEZE_BYTES)}"\n' + "".join(self.amendments),
             encoding="utf-8",
         )

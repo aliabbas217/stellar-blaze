@@ -15,15 +15,18 @@ may call ``open_gate`` or ``load_test_pairs`` is listed and checked by ``tests/u
 Reasons start with a stable code, then ``: ``, then the message. Codes: ``lock-missing``, ``lock-invalid``,
 ``protocol-hash-mismatch``, ``commit-not-ancestor``, ``commit-content-mismatch``, ``amendment-hash-mismatch``,
 ``amendment-not-ancestor``, ``amendment-content-mismatch``, ``tree-dirty``, ``git-error``, ``model-id-missing``,
-``model-not-found``, ``model-integrity``, ``gold-sha-missing``, ``freeze-missing``, ``freeze-hash-mismatch``,
+``model-not-found``, ``model-integrity``, ``model-manifest-sha-missing``, ``model-manifest-mismatch``,
+``gold-sha-missing``, ``freeze-missing``, ``freeze-hash-mismatch``,
 ``go-missing``, ``go-invalid``, ``go-mismatch``, ``go-uncommitted``, ``result-exists`` (from ``open_gate``) and
 ``head-changed``, ``tree-dirty`` (from ``GateToken.recheck``).
 
 The lock (``backend/training/protocol.lock.toml``) holds ``protocol_path`` (relative to the repository root),
 ``protocol_sha256`` and ``protocol_commit``, optional ``[[amendments]]`` (``path``, ``sha256``, ``commit``: each is
-checked like the protocol itself), ``gold_sha256`` (the one gold file the evaluation may read), and ``model_id`` and the
-``freeze_*`` keys; all optional keys are absent until they exist (TOML cannot hold a null, so an absent key means
-``None``, or no amendments).
+checked like the protocol itself), ``gold_sha256`` (the one gold file the evaluation may read), ``model_id`` and
+``model_manifest_sha256`` (the SHA-256 of the released model's ``manifest.json``, CRLF read as LF: the manifest
+lists the hash of every artefact file, ``scan_models`` verifies those, so pinning the manifest pins the exact model that
+is evaluated, not only its id) and the ``freeze_*`` keys; all optional keys are absent until they exist (TOML cannot
+hold a null, so an absent key means ``None``, or no amendments).
 
 The "2026 go" marker (``backend/training/2026-go.toml``) is the architect's written go-ahead: ``protocol_sha256``,
 ``model_id``, ``lock_sha256``, ``approved_by`` and ``approved_at`` (an offset date-time). It must exist and parse
@@ -48,7 +51,7 @@ from typing import Annotated, Final, NoReturn, final
 import structlog
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator
 
-from stellar_blaze.adapters.config.models import ModelIntegrityError, scan_models
+from stellar_blaze.adapters.config.models import MANIFEST, ModelIntegrityError, scan_models
 from stellar_blaze.domain.config.models import MODEL_ID, Sha256
 from stellar_blaze.ml.git import GitError, GitReader
 
@@ -140,6 +143,7 @@ class ProtocolLock(BaseModel):
     amendments: tuple[ProtocolAmendment, ...] = ()
     gold_sha256: Sha256 | None = None
     model_id: Annotated[str, StringConstraints(pattern=MODEL_ID)] | None = None
+    model_manifest_sha256: Sha256 | None = None
     freeze_path: str | None = None
     freeze_sha256: Sha256 | None = None
 
@@ -343,6 +347,21 @@ def _check_model(lock: ProtocolLock, models_dir: Path) -> list[str]:
     if lock.model_id not in registry.ids():
         return [
             f"model-not-found: {lock.model_id} is not in {models_dir} (found: {', '.join(registry.ids()) or 'none'})"
+        ]
+    if lock.model_manifest_sha256 is None:
+        return [
+            "model-manifest-sha-missing: the lock does not pin the released model's manifest hash "
+            "(model_manifest_sha256): the evaluated artefact must be the exact one the lock names"
+        ]
+    manifest_path = models_dir / lock.model_id / MANIFEST
+    try:
+        actual = hashlib.sha256(_lf(manifest_path.read_bytes())).hexdigest()
+    except OSError as exc:
+        return [f"model-integrity: cannot read {manifest_path}: {exc}"]
+    if actual != lock.model_manifest_sha256:
+        return [
+            f"model-manifest-mismatch: {manifest_path} has SHA-256 {actual}, the lock pins "
+            f"{lock.model_manifest_sha256} (a different model artefact than the one the lock froze)"
         ]
     return []
 
