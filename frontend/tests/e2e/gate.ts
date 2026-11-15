@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { axeViolations } from "./axe.ts";
+import { isUrllessResourceLine, requestFailure, responseError, UNBUILT_CORE_ROUTES } from "./gate-console.ts";
 
 /*
  * The deterministic half of the design gate (F2 plan, "Design gate protocol" item 2). Every view's e2e calls `gateReport`
@@ -64,29 +65,26 @@ export interface GateReport {
   readonly failures: readonly string[];
 }
 
-/**
- * Core views that are planned but not built yet, and are already linked from the shared desk menu (the judge layout, F2 Task 3).
- * The browser prefetches menu links, so a missing view logs a 404 on every judge page until it lands. Those 404s are ignored by
- * path, and only those: any other failed request is still an error. REMOVE an entry in the same change that builds its view.
- */
-export const UNBUILT_CORE_ROUTES: readonly string[] = ["/replay/day", "/replay/try", "/replay/governance"];
+export { UNBUILT_CORE_ROUTES };
 
 /**
- * Starts collecting console errors, uncaught exceptions and failed requests (HTTP 400 and up, with their URL: the console
- * message for a failed resource does not say which one). Call before `page.goto`; pass the array to `gateReport`.
+ * Starts collecting console errors, uncaught exceptions, HTTP errors (400 and up) and network-layer failures, each with its
+ * URL (the console message for a failed resource does not say which one, and `response` never fires for a request that got
+ * no response). Call before `page.goto`; pass the array to `gateReport`. The rules are in gate-console.ts.
  */
 export function watchConsole(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (message) => {
-    // The console line for a failed resource carries no URL; the response listener below reports it with one.
-    if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) errors.push(message.text());
+    if (message.type() === "error" && !isUrllessResourceLine(message.text())) errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {
-    if (response.status() < 400) return;
-    const path = new URL(response.url()).pathname.replace(/^\/[a-z]{2}(?=\/)/, "");
-    if (UNBUILT_CORE_ROUTES.includes(path)) return;
-    errors.push(`HTTP ${String(response.status())} ${response.url()}`);
+    const error = responseError(response.status(), response.url());
+    if (error !== null) errors.push(error);
+  });
+  page.on("requestfailed", (request) => {
+    const error = requestFailure(request.url(), request.failure()?.errorText);
+    if (error !== null) errors.push(error);
   });
   return errors;
 }

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { MissingProvenance } from "@/components/states/MissingProvenance";
 import { ProofChip } from "./ProofChip";
@@ -12,13 +12,15 @@ export interface VerdictProps {
   readonly sentence: string | null;
   /** Null with a sentence present: the sentence has no provenance and is not shown. */
   readonly proof: Proof | null;
+  /** The data-tier stamp (`DEV 2025`) when the sentence does not come from the held-out run; shown under the heading. */
+  readonly stamp?: ReactNode;
 }
 
 /**
  * "What the season showed": the one sentence the pre-registered outcome table picks, written the same way whether the
  * product won or lost. A sentence without provenance is as unshowable as a number without it.
  */
-export function Verdict({ sentence, proof }: VerdictProps) {
+export function Verdict({ sentence, proof, stamp }: VerdictProps) {
   const t = useTranslations("judge.scoreboard.verdict");
   const headingId = useId();
   return (
@@ -30,6 +32,7 @@ export function Verdict({ sentence, proof }: VerdictProps) {
       <h2 id={headingId} className="text-sm font-medium text-ink-3">
         {t("heading")}
       </h2>
+      {stamp}
       {sentence === null ? (
         <p className="max-w-(--measure) text-lg text-ink-2 sm:text-xl">{t("pending")}</p>
       ) : proof === null ? (

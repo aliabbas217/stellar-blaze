@@ -40,6 +40,7 @@ const text: TableText = {
   row: (id) => ({ label: id, sub: "" }),
   what: (metric, row) => `${metric}, ${row}`,
   interval: (lo, hi) => `${lo} to ${hi}`,
+  unit: (metric) => `unit of ${metric}`,
 };
 const ctx = (name: string): AdapterContext => ({ file: { path: `eval/2026/${name}.json`, sha256: "e".repeat(64) }, format, text });
 const policy = json("tests/fixtures/eval/policy_scoreboard.synthetic.json") as PolicyScoreboard;
@@ -130,6 +131,38 @@ describe("ProofSheet", () => {
     renderWithIntl(<ProofSheet claim={claim} source="dev-2025" />);
     expect(screen.getByText("The 2025 development run wrote this file. It is not the result.")).toBeInTheDocument();
     expect(screen.getByText("DEV 2025")).toBeInTheDocument();
+  });
+
+  it("says a made-up shape file is not a scoring run, in its own words, and not that the 2025 run wrote it", () => {
+    const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
+    if (claim === undefined) throw new Error("no claim");
+    renderWithIntl(<ProofSheet claim={claim} source="synthetic-shape" />);
+    expect(screen.getByText("Not a scoring run: a script wrote this file with made-up numbers, only to check the layout.")).toBeInTheDocument();
+    expect(screen.queryByText(/The 2025 development run wrote this file/)).toBeNull();
+    expect(screen.getByText("DEV 2025")).toBeInTheDocument();
+  });
+
+  it("prints what the number counts beside it, so the number is never bare", () => {
+    const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
+    if (claim === undefined) throw new Error("no claim");
+    expect(claim.unit).toBe("unit of missed_danger_hours");
+    const { container } = renderWithIntl(<ProofSheet claim={claim} source="2026" />);
+    expect(within(container.querySelector("[data-sheet-number]") as HTMLElement).getByText("unit of missed_danger_hours")).toBeInTheDocument();
+  });
+
+  it("an unreadable result file is its own state, with its own message, not 'no provenance recorded'", () => {
+    const { container } = renderWithIntl(<ProofSheet claim={null} source="none" unreadable />);
+    expect(container.querySelector("[data-sheet-state=unreadable]")).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "The file behind this number could not be read" })).toBeInTheDocument();
+    expect(screen.queryByText(/No provenance recorded/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Back to the scoreboard" })).toHaveAttribute("href", "/replay");
+    expect(container.querySelector("[data-sheet-number]")).toBeNull();
+  });
+
+  it("an unknown number stays the empty state, and is told apart from an unreadable file", () => {
+    const { container } = renderWithIntl(<ProofSheet claim={null} source="2026" />);
+    expect(container.querySelector("[data-sheet-state=empty]")).not.toBeNull();
+    expect(container.querySelector("[data-sheet-state=unreadable]")).toBeNull();
   });
 
   it("test_sheet_recount_button_reports_match: hashes the served file and reports Matches, then a changed file", async () => {

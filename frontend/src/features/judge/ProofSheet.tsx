@@ -18,16 +18,33 @@ export interface ProofSheetProps {
   /** The claim, or null for an id that is not one (or has no provenance). */
   readonly claim: Claim | null;
   readonly source: EvalSource;
+  /** The number is a scored one and its file exists but could not be read: a read failure, never "no provenance". */
+  readonly unreadable?: boolean;
 }
 
 const SHEET = "mx-auto flex w-full max-w-(--content-max) flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8";
 
-export function ProofSheet({ claim, source }: ProofSheetProps) {
+export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProps) {
   const t = useTranslations("judge.proof");
+
+  if (claim === null && unreadable) {
+    return (
+      <main id="main-content" className={SHEET} data-sheet-state="unreadable">
+        <h1 className="font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{t("title")}</h1>
+        <EmptyState
+          title={t("unreadableTitle")}
+          reason={t("unreadableReason")}
+          primary={{ label: t("back"), href: "/replay" }}
+          secondary={{ label: t("emptyAction"), href: `/replay/proof/${FORECAST_CLAIMS.hours}` }}
+        />
+        <StoryNav current="proof" />
+      </main>
+    );
+  }
 
   if (claim === null) {
     return (
-      <main id="main-content" className={SHEET}>
+      <main id="main-content" className={SHEET} data-sheet-state="empty">
         <h1 className="font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{t("title")}</h1>
         <EmptyState
           title={t("emptyTitle")}
@@ -48,28 +65,37 @@ export function ProofSheet({ claim, source }: ProofSheetProps) {
         <EvalSourceStamp source={claim.kind === "scored" ? source : "none"} />
       </header>
 
-      <section aria-label={claim.what} className="flex flex-col gap-2" data-sheet-number="">
-        <strong className="font-display text-5xl leading-solid font-normal tracking-display tabular-nums text-ink sm:text-6xl">
-          {claim.value}
-        </strong>
-        {claim.interval === undefined ? null : <p className="text-base text-ink-2 tabular-nums">{claim.interval}</p>}
-      </section>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-12">
+        <div className="flex flex-col gap-10">
+          <section aria-label={claim.what} className="flex flex-col gap-2" data-sheet-number="">
+            <strong className="font-display text-5xl leading-solid font-normal tracking-display tabular-nums text-ink sm:text-6xl">
+              {claim.value}
+            </strong>
+            {claim.unit === undefined || claim.unit === "" ? null : (
+              <p className="max-w-(--measure) text-lg text-ink-2 sm:text-xl" data-sheet-unit="">
+                {claim.unit}
+              </p>
+            )}
+            {claim.interval === undefined ? null : <p className="text-base whitespace-nowrap text-ink-2 tabular-nums">{claim.interval}</p>}
+          </section>
+          <Timeline claim={claim} source={source} />
+        </div>
 
-      <Timeline claim={claim} source={source} />
-
-      <section aria-labelledby="proof-rows-heading" className="flex max-w-xl flex-col rounded-sign border border-hair bg-panel">
-        <h2 id="proof-rows-heading" className="border-b border-hair px-4 py-3 font-display text-lg font-medium">
-          {t("rowsHeading")}
-        </h2>
-        <ProofRows proof={claim.proof} />
-        <RecountButton proof={claim.proof} />
-      </section>
-
-      <p>
-        <Link href="/replay" className="inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4">
-          {t("back")}
-        </Link>
-      </p>
+        <div className="flex flex-col gap-6 lg:pt-2">
+          <section aria-labelledby="proof-rows-heading" className="flex flex-col rounded-sign border border-hair bg-panel">
+            <h2 id="proof-rows-heading" className="border-b border-hair px-4 py-3 font-display text-lg font-medium">
+              {t("rowsHeading")}
+            </h2>
+            <ProofRows proof={claim.proof} />
+            <RecountButton proof={claim.proof} />
+          </section>
+          <p>
+            <Link href="/replay" className="inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4">
+              {t("back")}
+            </Link>
+          </p>
+        </div>
+      </div>
       <StoryNav current="proof" />
     </main>
   );
@@ -93,7 +119,14 @@ function Timeline({ claim, source }: { readonly claim: Claim; readonly source: E
     },
     {
       id: "run",
-      note: kind !== "scored" ? t("notes.runNotScoring") : source === "2026" ? t("notes.runScored") : t("notes.runDev"),
+      note:
+        kind !== "scored"
+          ? t("notes.runNotScoring")
+          : source === "2026"
+            ? t("notes.runScored")
+            : source === "synthetic-shape"
+              ? t("notes.runSynthetic")
+              : t("notes.runDev"),
     },
     { id: "shown", note: t("notes.shown") },
   ] as const;
@@ -103,7 +136,7 @@ function Timeline({ claim, source }: { readonly claim: Claim; readonly source: E
       <h2 id="timeline-heading" className="font-display text-lg font-medium">
         {t("timelineHeading")}
       </h2>
-      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-timeline="">
+      <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2" data-timeline="">
         {steps.map((step, index) => (
           <li key={step.id} data-step={step.id} className="flex flex-col gap-1 border-t border-edge pt-3">
             <span className="text-sm text-ink-3 tabular-nums">{index + 1}</span>

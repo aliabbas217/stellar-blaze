@@ -16,6 +16,8 @@ import type { Proof } from "./proof";
 export interface ScoreCell {
   /** The number, formatted for the reader. */
   readonly value: string;
+  /** What the number counts, in words (the proof sheet prints it beside the number). Optional: the table's column heading says it. */
+  readonly unit?: string;
   /** "95% interval 1.2 to 3.4" or similar, when the metric has one. */
   readonly interval?: string;
   /** What the number is, in words: names it for the proof chip and the missing-provenance note. */
@@ -66,13 +68,13 @@ export function ScoreboardTable({ caption, columns, rows, pending = false, rowHe
             key={row.id}
             data-row={row.id}
             aria-current={row.ours ? "true" : undefined}
-            className={`border-b border-hair max-sm:grid max-sm:gap-2 max-sm:py-3 ${
+            className={`border-b border-hair max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-4 max-sm:gap-y-3 max-sm:py-4 ${
               row.ours ? "bg-panel font-medium max-sm:border-s-3 max-sm:border-s-signal max-sm:ps-3" : ""
             }`}
           >
             <th
               scope="row"
-              className={`px-3 py-3 text-start align-top font-normal max-sm:px-0 max-sm:py-0 ${
+              className={`px-3 py-3 text-start align-top font-normal max-sm:col-span-2 max-sm:px-0 max-sm:py-0 ${
                 row.ours ? "border-s-3 border-s-signal font-semibold max-sm:border-s-0" : "border-s-3 border-s-transparent max-sm:border-s-0"
               }`}
             >
@@ -86,21 +88,21 @@ export function ScoreboardTable({ caption, columns, rows, pending = false, rowHe
                 <td
                   key={column.key}
                   data-label={column.heading}
-                  className="px-3 py-3 text-end align-top tabular-nums max-sm:flex max-sm:items-start max-sm:justify-between max-sm:gap-4 max-sm:px-0 max-sm:py-0 max-sm:text-start max-sm:before:max-w-[60%] max-sm:before:text-sm max-sm:before:font-normal max-sm:before:text-ink-3 max-sm:before:content-[attr(data-label)]"
+                  className="px-3 py-3 text-end align-top tabular-nums max-sm:flex max-sm:flex-col max-sm:gap-1 max-sm:px-0 max-sm:py-0 max-sm:text-start max-sm:before:text-sm max-sm:before:font-normal max-sm:before:text-ink-3 max-sm:before:content-[attr(data-label)]"
                 >
                   {pending || cell === undefined ? (
                     <span role="img" aria-label={t("notScored")} className="text-lg text-ink-3">
                       ###
                     </span>
                   ) : (
-                    <span className="flex flex-col items-end gap-1 max-sm:items-end">
-                      <span className="flex items-center justify-end gap-2">
+                    <span className="flex flex-col items-end gap-1 max-sm:items-start">
+                      <span className="flex items-center justify-end gap-2 max-sm:justify-start">
                         <Proved proof={cell.proof} what={cell.what}>
                           <span className="text-lg text-ink">{cell.value}</span>
                         </Proved>
                       </span>
                       {cell.interval !== undefined && cell.proof !== null ? (
-                        <span className="text-sm font-normal text-ink-3">{cell.interval}</span>
+                        <span className="text-sm font-normal whitespace-nowrap text-ink-3">{cell.interval}</span>
                       ) : null}
                     </span>
                   )}

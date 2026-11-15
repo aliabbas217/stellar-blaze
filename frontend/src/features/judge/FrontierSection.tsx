@@ -3,7 +3,9 @@ import { Suspense } from "react";
 import { PendingBanner } from "@/components/states/PendingBanner";
 import { Skeleton } from "@/components/states/Skeletons";
 import type { FrontierSource } from "./claims";
+import { FrontierHeading } from "./FrontierHeading";
 import { FrontierPanel } from "./FrontierPanel";
+import { DEFAULT_COMMUTE } from "./frontier-statement";
 import type { RosterFrontier } from "./roster-frontier";
 
 /**
@@ -18,14 +20,23 @@ export function FrontierSection({ frontier }: { readonly frontier: { readonly da
   const t = useTranslations("judge.frontier");
   return (
     <section id="frontier" aria-labelledby="frontier-heading" className="flex scroll-mt-4 flex-col gap-4 border-t border-hair pt-8">
-      <h2 id="frontier-heading" className="max-w-(--measure) font-display text-2xl font-medium">
-        {t("heading")}
-      </h2>
-      <p className="max-w-(--measure) text-base text-ink-2">{t("sub")}</p>
       {frontier === null ? (
-        <PendingBanner what={t("whatPending")} />
+        <>
+          <h2 id="frontier-heading" className="max-w-(--measure) font-display text-2xl font-medium">
+            {t("headingPending")}
+          </h2>
+          <p className="max-w-(--measure) text-base text-ink-2">{t("sub")}</p>
+          <PendingBanner what={t("whatPending")} />
+        </>
       ) : (
-        <Suspense fallback={<FrontierSkeleton label={t("loading")} />}>
+        <Suspense
+          fallback={
+            <div className="flex flex-col gap-4">
+              <FrontierHeading data={frontier.data} commute={DEFAULT_COMMUTE} />
+              <FrontierSkeleton label={t("loading")} />
+            </div>
+          }
+        >
           <FrontierPanel data={frontier.data} source={frontier.source} />
         </Suspense>
       )}

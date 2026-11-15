@@ -30,7 +30,7 @@ test("scoreboard final frame at first paint: the whole season is drawn and Play 
   await expect(ribbon).toBeVisible();
   await expect(ribbon).toHaveAttribute("data-upto", String(SEASON_DAYS - 1));
   const play = page.getByRole("button", { name: "Play the season" });
-  await expect(play).toHaveAttribute("aria-pressed", "false");
+  await expect(play).not.toHaveAttribute("aria-pressed");
   // the tally is the finished one, from the recorded forecast file
   const tally = page.locator("[data-tally]");
   await expect(tally.getByText("1,624")).toBeVisible();
@@ -47,7 +47,7 @@ test("scoreboard Play runs the season, Pause stops it, and reduced motion lands 
   await open(page, "/en/replay");
   const ribbon = page.locator("figure[data-ribbon]").first();
   await page.getByRole("button", { name: "Play the season" }).click();
-  await expect(page.getByRole("button", { name: "Pause" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Pause" })).not.toHaveAttribute("aria-pressed");
   await expect.poll(async () => Number(await ribbon.getAttribute("data-upto")), { timeout: 4000 }).toBeLessThan(SEASON_DAYS - 1);
   await page.getByRole("button", { name: "Pause" }).click();
   const paused = await ribbon.getAttribute("data-upto");
@@ -125,7 +125,7 @@ test("scoreboard frontier commute lives in the URL and survives a reload", async
   // the default commute leaves the URL clean
   await page.getByRole("slider", { name: "One-way commute" }).fill("45");
   await expect(page).not.toHaveURL(/commute=/);
-  await expect(page.getByRole("heading", { name: /No roster shape outruns the heat/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Beyond a 15 minute commute, no roster shape outruns the heat/ })).toBeVisible();
 });
 
 test("scoreboard story footer links only to routes that exist and Next goes to the proof sheet", async ({ page }) => {

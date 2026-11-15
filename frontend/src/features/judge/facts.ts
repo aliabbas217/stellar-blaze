@@ -31,7 +31,19 @@ const hourlySchema = z
     days: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1),
     wbgt_c_by_local_hour: z.array(z.array(z.number().nullable()).min(WORK_HOURS.to)).min(1),
   })
-  .refine((s) => s.days.length === s.wbgt_c_by_local_hour.length, { message: "days and hours do not line up" });
+  .refine((s) => s.days.length === s.wbgt_c_by_local_hour.length, { message: "days and hours do not line up" })
+  // A day with no forecast value at any hour has no peak, so it cannot be drawn or counted: it is dropped here, once, with
+  // its date, so `days`, the rows and every index the screens derive from them stay aligned.
+  .transform((series) => {
+    const keep = series.wbgt_c_by_local_hour.map((row) => row.some((value) => value !== null));
+    if (keep.every(Boolean)) return series;
+    return {
+      ...series,
+      days: series.days.filter((_, i) => keep[i]),
+      wbgt_c_by_local_hour: series.wbgt_c_by_local_hour.filter((_, i) => keep[i]),
+    };
+  })
+  .refine((s) => s.days.length > 0, { message: "no day has a forecast value" });
 
 export type HourlySeries = z.infer<typeof hourlySchema>;
 
@@ -95,6 +107,8 @@ function scan(series: HourlySeries, ban: SeasonBan, limit: number): Scan {
     perDay.push(over);
     inBanPerDay.push(inside);
     const present = row.filter((v): v is number => v !== null);
+    // `parseHourlySeries` drops days without a value; a series that skipped it would otherwise get a peak of -Infinity.
+    if (present.length === 0) throw new RangeError(`day ${series.days[i] ?? String(i)} has no forecast value: parse the series with parseHourlySeries`);
     peaks.push(Math.max(...present));
   });
   return { n, perDay, inBanPerDay, peaks, span };

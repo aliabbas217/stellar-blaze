@@ -112,10 +112,36 @@ describe("ScoreboardView", () => {
 
   it("carries the DEV 2025 stamp for development numbers and none for the held-out run", () => {
     const { unmount } = view({ ...ideal, source: "dev-2025" });
-    expect(screen.getByText("DEV 2025")).toBeInTheDocument();
+    expect(screen.getAllByText("DEV 2025").length).toBeGreaterThan(0);
     unmount();
     view(ideal);
     expect(screen.queryByText("DEV 2025")).toBeNull();
+  });
+
+  it("repeats the stamp on the Verdict, Warnings and Plans headings for dev and shape data, and not for the held-out run", () => {
+    for (const source of ["dev-2025", "synthetic-shape"] as const) {
+      const { container, unmount } = view({ ...ideal, source });
+      // the page head, the Verdict, the Warnings heading and the Plans heading each carry one
+      expect(screen.getAllByText("DEV 2025")).toHaveLength(4);
+      for (const id of ["warnings", "plans"]) expect(container.querySelector(`#${id}`)?.textContent).toContain("DEV 2025");
+      expect(container.querySelector("[data-verdict]")?.textContent).toContain("DEV 2025");
+      unmount();
+    }
+    const { container } = view(ideal);
+    expect(container.textContent).not.toContain("DEV 2025");
+  });
+
+  it("states the held-out claim only for the 2026 run (or before any run), never beside a dev or shape stamp", () => {
+    const held = /Held-out 2026, every choice fixed on 2024-2025 data/;
+    for (const source of ["dev-2025", "synthetic-shape"] as const) {
+      const { container, unmount } = view({ ...ideal, source });
+      expect(container.textContent).not.toMatch(held);
+      unmount();
+    }
+    const { container, unmount } = view(ideal);
+    expect(container.textContent).toMatch(held);
+    unmount();
+    expect(view(empty).container.textContent).toMatch(held);
   });
 
   it("on a read failure keeps the static season and says so in words, with a way to try again", () => {
@@ -156,9 +182,8 @@ describe("ScoreboardView", () => {
 
   it("has the frontier section with its sentence, and the story footer for this step", () => {
     view(ideal);
-    expect(
-      screen.getByRole("heading", { name: "No roster shape outruns the heat under law, sleep and commute. Making the common roster legal does more." }),
-    ).toBeInTheDocument();
+    // the heading is generated from the export at the slider's commute (default 45): see frontier.test.tsx for every commute
+    expect(screen.getByRole("heading", { name: /^Beyond a 15 minute commute, no roster shape outruns the heat under law, sleep and commute\./ })).toBeInTheDocument();
     expect(document.getElementById("frontier")).not.toBeNull();
     expect(screen.getByRole("link", { name: "Scoreboard" })).toHaveAttribute("aria-current", "step");
   });

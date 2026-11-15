@@ -19,11 +19,17 @@ import type { RosterFrontier } from "./roster-frontier";
 
 export type ClaimKind = "scored" | "forecast" | "analysis";
 
+/** The id families that come from the scored exporter files: an id in one of them with an unreadable file is a read failure, not an unknown number. */
+export const SCORED_CLAIM_PREFIXES: readonly string[] = ["policy.", "plan."];
+export const isScoredClaimId = (id: string): boolean => SCORED_CLAIM_PREFIXES.some((prefix) => id.startsWith(prefix));
+
 export interface Claim {
   readonly id: string;
   /** The number in words (names it in the proof chip and heads the sheet). */
   readonly what: string;
   readonly value: string;
+  /** What the value counts, worded ("hours", "of danger hours were warned"): the number on the sheet is never bare. */
+  readonly unit?: string;
   readonly interval?: string;
   readonly kind: ClaimKind;
   readonly proof: Proof;
@@ -35,7 +41,17 @@ export function rowClaims(rows: readonly ScoreRow[]): Claim[] {
     row.cells.flatMap((cell): Claim[] => {
       const id = cell.proof?.claim;
       if (cell.proof === null || id === undefined) return [];
-      return [{ id, what: cell.what, value: cell.value, ...(cell.interval === undefined ? {} : { interval: cell.interval }), kind: "scored", proof: cell.proof }];
+      return [
+        {
+          id,
+          what: cell.what,
+          value: cell.value,
+          ...(cell.unit === undefined ? {} : { unit: cell.unit }),
+          ...(cell.interval === undefined ? {} : { interval: cell.interval }),
+          kind: "scored",
+          proof: cell.proof,
+        },
+      ];
     }),
   );
 }
@@ -44,6 +60,8 @@ export interface ForecastClaimText {
   readonly daysOverLimit: string;
   readonly hoursOverLimit: string;
   readonly hoursInBreak: string;
+  /** What each count counts (the player's own unit lines), when the caller has them. */
+  readonly units?: { readonly days: string; readonly hours: string; readonly inBreak: string };
 }
 
 export interface ForecastSource {
@@ -51,6 +69,8 @@ export interface ForecastSource {
   /** What the file is (the manifest's source line). */
   readonly protocol: string;
 }
+
+const unit = (value: string | undefined): { readonly unit?: string } => (value === undefined ? {} : { unit: value });
 
 export const FORECAST_CLAIMS = {
   days: "forecast.days_over_limit",
@@ -68,15 +88,17 @@ export function forecastClaims(facts: SeasonFacts, source: ForecastSource, forma
       claim,
     });
   return [
-    { id: FORECAST_CLAIMS.days, what: text.daysOverLimit, value: format.whole(facts.daysOver), kind: "forecast", proof: proof(text.daysOverLimit, FORECAST_CLAIMS.days) },
-    { id: FORECAST_CLAIMS.hours, what: text.hoursOverLimit, value: format.whole(facts.over), kind: "forecast", proof: proof(text.hoursOverLimit, FORECAST_CLAIMS.hours) },
-    { id: FORECAST_CLAIMS.inBan, what: text.hoursInBreak, value: format.whole(facts.inBan), kind: "forecast", proof: proof(text.hoursInBreak, FORECAST_CLAIMS.inBan) },
+    { id: FORECAST_CLAIMS.days, what: text.daysOverLimit, value: format.whole(facts.daysOver), ...unit(text.units?.days), kind: "forecast", proof: proof(text.daysOverLimit, FORECAST_CLAIMS.days) },
+    { id: FORECAST_CLAIMS.hours, what: text.hoursOverLimit, value: format.whole(facts.over), ...unit(text.units?.hours), kind: "forecast", proof: proof(text.hoursOverLimit, FORECAST_CLAIMS.hours) },
+    { id: FORECAST_CLAIMS.inBan, what: text.hoursInBreak, value: format.whole(facts.inBan), ...unit(text.units?.inBreak), kind: "forecast", proof: proof(text.hoursInBreak, FORECAST_CLAIMS.inBan) },
   ];
 }
 
 export interface FrontierClaimText {
   readonly best: (minutes: number) => string;
   readonly legal: string;
+  /** The readouts' unit lines (the same words the panel prints under each number). */
+  readonly units?: { readonly best: string; readonly legal: string };
 }
 
 export interface FrontierSource {
@@ -102,6 +124,7 @@ export function frontierClaims(data: RosterFrontier, source: FrontierSource, for
         id: frontierBestId(gate.commute_min),
         what: text.best(gate.commute_min),
         value: format.percentOne(gate.avoided_vs_legal_default_ge30),
+        ...unit(text.units?.best),
         kind: "analysis",
         proof: proof(text.best(gate.commute_min), frontierBestId(gate.commute_min)),
       }),
@@ -110,6 +133,7 @@ export function frontierClaims(data: RosterFrontier, source: FrontierSource, for
       id: FRONTIER_LEGAL_ID,
       what: text.legal,
       value: format.percentOne(data.legalisation_B0_to_B1_mean.ge30),
+      ...unit(text.units?.legal),
       kind: "analysis",
       proof: proof(text.legal, FRONTIER_LEGAL_ID),
     },

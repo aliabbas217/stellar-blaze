@@ -104,7 +104,7 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
   return (
     <figure className="m-0 flex flex-col gap-3" data-day-chart="">
       <div role="img" aria-label={labels.ariaLabel} dir="ltr" className="relative h-80 w-full text-ink sm:h-96">
-        <div aria-hidden className="absolute bottom-16 left-0 top-10 w-9 text-xs text-ink-3">
+        <div aria-hidden className="absolute bottom-16 start-0 top-10 w-9 text-xs text-ink-3">
           {Y_TICKS.map((v) => (
             <span key={v} className="absolute end-0 -translate-y-1/2 tabular-nums" style={{ top: `${num(topPct(v))}%` }}>
               {v}
@@ -112,7 +112,7 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
           ))}
         </div>
 
-        <div className="absolute bottom-16 left-10 right-3 top-10">
+        <div className="absolute bottom-16 start-10 end-3 top-10">
           <svg aria-hidden viewBox={`0 0 ${String(VIEW_W)} ${String(VIEW_H)}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
             {Y_TICKS.map((v) => (
               <line key={v} x1={0} x2={VIEW_W} y1={num(yOf(v))} y2={num(yOf(v))} stroke="var(--hair)" vectorEffect="non-scaling-stroke" />
@@ -214,7 +214,7 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
         </div>
 
         {box === null ? null : (
-          <div className="absolute bottom-8 left-10 right-3 h-6">
+          <div className="absolute bottom-8 start-10 end-3 h-6">
             <div
               data-slot={slot === null ? "outline" : "in-force"}
               className={`absolute inset-y-0 flex items-center justify-center overflow-hidden px-1 text-xs text-ink-2 ${
@@ -230,7 +230,7 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
           </div>
         )}
 
-        <div aria-hidden className="absolute bottom-0 left-10 right-3 h-6 text-xs text-ink-3">
+        <div aria-hidden className="absolute bottom-0 start-10 end-3 h-6 text-xs text-ink-3">
           {hours.map((h, i) => (
             <span
               key={h}

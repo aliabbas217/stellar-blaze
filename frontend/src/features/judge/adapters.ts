@@ -48,6 +48,8 @@ export interface TableText {
   /** What a number is, for its proof chip: `metric` is a `PolicyMetric` or `PlanMetric` key. */
   readonly what: (metric: string, rowLabel: string) => string;
   readonly interval: (lo: string, hi: string) => string;
+  /** What a metric counts ("hours", "of danger hours were warned"), for the proof sheet. Optional. */
+  readonly unit?: (metric: string) => string;
 }
 
 export interface AdapterContext {
@@ -106,10 +108,12 @@ function cell(
   claim: string,
   provenance: Schemas["Provenance"],
   ctx: AdapterContext,
+  metricKey: string,
 ): ScoreCell {
   const { value, interval } = shown(metric, scale, show, ctx.text);
   const proof: Proof | null = proofFromProvenance(provenance, metric.anchor, what, ctx.file, { claim });
-  return { value, ...(interval === null ? {} : { interval }), what, proof };
+  const unit = ctx.text.unit?.(metricKey);
+  return { value, ...(unit === undefined ? {} : { unit }), ...(interval === null ? {} : { interval }), what, proof };
 }
 
 /**
@@ -123,7 +127,7 @@ export function toPolicyRows(sb: PolicyScoreboard, lead: 1, ctx: AdapterContext)
   return result.rows.map((row) => {
     const { label, sub } = ctx.text.row(row.policy);
     const at = (key: PolicyMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key), sb.provenance, ctx);
+      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key), sb.provenance, ctx, key);
     return {
       id: row.policy,
       label,
@@ -151,7 +155,7 @@ export function toPlanRows(sb: PlanScoreboard, ctx: AdapterContext): ScoreRow[] 
     const id = isMerged ? "merged" : row.plan;
     const { label, sub } = isMerged ? ctx.text.row("merged") : knownRow(ctx.text, row.plan, row.label);
     const at = (key: PlanMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx);
+      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key);
     rows.push({
       id,
       label,

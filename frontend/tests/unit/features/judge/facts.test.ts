@@ -78,3 +78,31 @@ describe("parseHourlySeries", () => {
     expect(() => parseHourlySeries({ days: ["2026-05-15"], wbgt_c_by_local_hour: [] })).toThrow();
   });
 });
+
+describe("a day with no forecast value at any hour", () => {
+  const raw = JSON.parse(readFileSync(file, "utf8")) as { days: string[]; wbgt_c_by_local_hour: (number | null)[][] };
+  const emptyDay = (rows: (number | null)[][], index: number): (number | null)[][] =>
+    rows.map((row, i) => (i === index ? row.map(() => null) : row));
+
+  it("is dropped by the reader, so days, rows and every index stay aligned and no peak is -Infinity", () => {
+    const parsed = parseHourlySeries({ ...raw, wbgt_c_by_local_hour: emptyDay(raw.wbgt_c_by_local_hour, 3) });
+    expect(parsed.days).toHaveLength(raw.days.length - 1);
+    expect(parsed.days).not.toContain(raw.days[3]);
+    expect(parsed.wbgt_c_by_local_hour).toHaveLength(parsed.days.length);
+    const facts = seasonFacts(parsed, BAN, HEAVY_WORK_LIMIT_WBGT_C);
+    expect(facts.peaks).toHaveLength(parsed.days.length);
+    expect(facts.peaks.every(Number.isFinite)).toBe(true);
+    expect(Number.isFinite(facts.pk)).toBe(true);
+    expect(Number.isFinite(facts.lo)).toBe(true);
+  });
+
+  it("is refused outright when every day is empty", () => {
+    const rows = raw.wbgt_c_by_local_hour.map((row) => row.map(() => null));
+    expect(() => parseHourlySeries({ ...raw, wbgt_c_by_local_hour: rows })).toThrow(/no day has a forecast value/);
+  });
+
+  it("makes the counting code fail loudly, never produce -Infinity, when a series skipped the reader", () => {
+    const bypass = { ...series, wbgt_c_by_local_hour: emptyDay(series.wbgt_c_by_local_hour, 3) };
+    expect(() => seasonFacts(bypass, BAN, HEAVY_WORK_LIMIT_WBGT_C)).toThrow(/has no forecast value/);
+  });
+});

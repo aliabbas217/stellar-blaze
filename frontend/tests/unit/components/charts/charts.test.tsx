@@ -129,7 +129,7 @@ describe("SeasonPlayer", () => {
     const figure = () => container.querySelector("figure[data-upto]");
     // first paint: the final frame, the final tally, the button offers to play
     expect(figure()?.getAttribute("data-upto")).toBe(String(N - 1));
-    expect(screen.getByRole("button", { name: "Play the season" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Play the season" })).not.toHaveAttribute("aria-pressed");
     expect(screen.getByText(String(N * 5))).toBeInTheDocument();
     act(() => {
       vi.advanceTimersByTime(PLAY_MS * 2);
@@ -144,7 +144,8 @@ describe("SeasonPlayer", () => {
     const { container } = renderWithIntl(player());
     const upto = () => Number(container.querySelector("figure[data-upto]")?.getAttribute("data-upto"));
     fireEvent.click(screen.getByRole("button", { name: "Play the season" }));
-    expect(screen.getByRole("button", { name: "Pause" })).toHaveAttribute("aria-pressed", "true");
+    // the label alone carries the state: a changing label plus aria-pressed would be a double toggle
+    expect(screen.getByRole("button", { name: "Pause" })).not.toHaveAttribute("aria-pressed");
     act(() => {
       vi.advanceTimersByTime(PLAY_MS / 2);
     });
@@ -170,7 +171,7 @@ describe("SeasonPlayer", () => {
     const { container } = renderWithIntl(player());
     fireEvent.click(screen.getByRole("button", { name: "Play the season" }));
     expect(container.querySelector("figure[data-upto]")?.getAttribute("data-upto")).toBe(String(N - 1));
-    expect(screen.getByRole("button", { name: "Play the season" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Play the season" })).not.toHaveAttribute("aria-pressed");
     expect(screen.getByText("Animation is off on this device, so the whole season is shown.")).toBeInTheDocument();
   });
 

@@ -7,6 +7,8 @@ import { Counter } from "@/components/provenance/Counter";
 import { useUrlParam } from "@/lib/url-state";
 import { makeFormat } from "./adapters";
 import { FRONTIER_LEGAL_ID, frontierBestId, frontierClaims, type FrontierSource } from "./claims";
+import { FrontierHeading } from "./FrontierHeading";
+import { DEFAULT_COMMUTE } from "./frontier-statement";
 import type { RosterFrontier } from "./roster-frontier";
 
 /*
@@ -16,7 +18,7 @@ import type { RosterFrontier } from "./roster-frontier";
  * static page cannot read on the server. `FrontierSection` wraps it in <Suspense> with the same chart as the fallback.
  */
 
-export const DEFAULT_COMMUTE: Commute = 45;
+export { DEFAULT_COMMUTE };
 export const COMMUTE_PARAM = "commute";
 
 /** The commute a query value names; throws for anything but one of the six the analysis ran (so it reads as the default). */
@@ -59,12 +61,19 @@ export function FrontierPanel({ data, source }: FrontierPanelProps) {
 
   const gate = data.frontier_absolute_gate.find((g) => g.commute_min === commute);
   const best = gate?.avoided_vs_legal_default_ge30 ?? null;
-  const claims = frontierClaims(data, source, format, { best: (minutes) => t("whatBest", { minutes: String(minutes) }), legal: t("whatLegal") });
+  const claims = frontierClaims(data, source, format, {
+    best: (minutes) => t("whatBest", { minutes: String(minutes) }),
+    legal: t("whatLegal"),
+    units: { best: t("bestUnit", { hours: formatHours(data.assumptions.sleep_gate_h) }), legal: t("legalUnit") },
+  });
   const bestClaim = claims.find((claim) => claim.id === frontierBestId(commute));
   const legalClaim = claims.find((claim) => claim.id === FRONTIER_LEGAL_ID);
 
   return (
     <div className="flex flex-col gap-6" data-frontier-panel="" data-commute={commute}>
+      <div className="flex flex-col gap-4">
+        <FrontierHeading data={data} commute={commute} />
+      </div>
       <div className="flex flex-col gap-2">
         <label htmlFor={sliderId} className="flex items-baseline justify-between gap-4 text-base font-medium text-ink">
           <span>{t("commute")}</span>
@@ -101,7 +110,11 @@ export function FrontierPanel({ data, source }: FrontierPanelProps) {
       <div className="grid gap-6 sm:grid-cols-2" data-frontier-readouts="">
         <div className="flex flex-col gap-2 border-t border-edge pt-3">
           <h3 className="text-sm font-medium text-ink-3">{t("bestTitle")}</h3>
-          {best === null || best === 0 ? (
+          {best === null ? (
+            <p className="max-w-(--measure) text-base text-ink-2" data-frontier-best="missing">
+              {t("bestMissing")}
+            </p>
+          ) : best === 0 ? (
             <p className="max-w-(--measure) text-base text-ink" data-frontier-best="none">
               {t("bestNone")}
             </p>

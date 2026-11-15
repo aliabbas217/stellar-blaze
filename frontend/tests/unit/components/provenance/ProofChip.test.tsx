@@ -215,4 +215,18 @@ describe("Proved", () => {
     expect(container).not.toHaveTextContent("2.6");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("has a field size: a 44 px target and 16 px text, where the desk chip is 28 px", () => {
+    const first = renderWithIntl(<ProofChip proof={proofOf()} />);
+    const desk = screen.getByRole("button", { name: /Proof for/ });
+    expect(desk.className).toContain("min-h-7");
+    expect(desk.className).not.toContain("min-h-(--target)");
+    first.unmount();
+    renderWithIntl(<ProofChip proof={proofOf()} field />);
+    const field = screen.getByRole("button", { name: /Proof for/ });
+    expect(field.className).toContain("min-h-(--target)");
+    expect(field.className).toContain("min-w-(--target)");
+    expect(field.className).toContain("text-base");
+    expect(field.className).toContain("touch-manipulation");
+  });
 });

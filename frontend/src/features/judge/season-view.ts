@@ -102,7 +102,12 @@ export function buildSeasonView({ series, file, source, locale, t }: SeasonViewI
     facts,
     { file, protocol: source },
     format,
-    { daysOverLimit: t("tally.whatDays"), hoursOverLimit: t("tally.whatHours"), hoursInBreak: t("tally.whatInBreak") },
+    {
+      daysOverLimit: t("tally.whatDays"),
+      hoursOverLimit: t("tally.whatHours"),
+      hoursInBreak: t("tally.whatInBreak"),
+      units: { days: t("tally.days", { limit: limitText }), hours: t("tally.hours"), inBreak: t("tally.inBreak") },
+    },
   );
   const proofOf = (id: string): Proof | null => claims.find((claim) => claim.id === id)?.proof ?? null;
 

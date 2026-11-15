@@ -79,7 +79,7 @@ export function FrontierChart({ data, commuteMin, labels, formatHours }: Frontie
     <figure className="m-0 flex flex-col gap-3" data-frontier-chart="" data-commute={commuteMin}>
       <p className="text-sm text-ink-3">{labels.yAxis}</p>
       <div role="img" aria-label={labels.ariaLabel} dir="ltr" className="relative h-72 w-full text-ink sm:h-96">
-        <div aria-hidden className="absolute bottom-14 left-0 top-3 w-10 text-xs text-ink-3">
+        <div aria-hidden className="absolute bottom-14 start-0 top-3 w-10 text-xs text-ink-3">
           {exposureTicks.map((v) => (
             <span key={v} className="absolute end-0 -translate-y-1/2 tabular-nums" style={{ top: `${num(y(v))}%` }}>
               {v}
@@ -87,7 +87,7 @@ export function FrontierChart({ data, commuteMin, labels, formatHours }: Frontie
           ))}
         </div>
 
-        <div className="absolute bottom-14 left-12 right-3 top-3 border-b border-s border-edge">
+        <div className="absolute bottom-14 start-12 end-3 top-3 border-b border-s border-edge">
           <svg aria-hidden viewBox={`0 0 ${String(VIEW_W)} ${String(VIEW_H)}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
             {exposureTicks.map((v) => (
               <line key={v} x1={0} x2={VIEW_W} y1={num((y(v) / 100) * VIEW_H)} y2={num((y(v) / 100) * VIEW_H)} stroke="var(--hair)" vectorEffect="non-scaling-stroke" />
@@ -144,14 +144,14 @@ export function FrontierChart({ data, commuteMin, labels, formatHours }: Frontie
               ))}
         </div>
 
-        <div aria-hidden className="absolute bottom-8 left-12 right-3 h-6 text-xs text-ink-3">
+        <div aria-hidden className="absolute bottom-8 start-12 end-3 h-6 text-xs text-ink-3">
           {sleepTicks.map((h) => (
             <span key={h} className="absolute top-1 -translate-x-1/2 tabular-nums" style={{ left: `${num(x(h))}%` }}>
               {formatHours(h)}
             </span>
           ))}
         </div>
-        <p aria-hidden className="absolute bottom-0 left-12 right-3 text-center text-sm text-ink-3">
+        <p aria-hidden className="absolute bottom-0 start-12 end-3 text-center text-sm text-ink-3">
           {labels.xAxis}
         </p>
       </div>

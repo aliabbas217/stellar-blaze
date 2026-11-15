@@ -74,6 +74,10 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
       : null;
 
   const noScoredFile = policy === null && plans === null;
+  // The held-out claim describes the 2026 run (or the protocol before it has run); beside a dev or shape-fixture stamp it would read
+  // as a claim about numbers that are not the held-out result.
+  const source = data?.source ?? "none";
+  const heldOut = source === "2026" || source === "none";
   const crew = policy?.assumed_crew_size;
 
   return (
@@ -88,8 +92,11 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
       <header className="flex flex-col gap-3">
         <h1 className="font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{t("title")}</h1>
         <p className="max-w-(--measure) text-lg text-ink-2">{t("lede", { from: season.firstDay, to: season.lastDay })}</p>
-        <p className="text-sm text-ink-3">{t("facts")}</p>
-        <EvalSourceStamp source={data?.source ?? "none"} />
+        <p className="text-sm text-ink-3">
+          {t("facts")}
+          {heldOut ? ` · ${t("factsHeldOut")}` : ""}
+        </p>
+        <EvalSourceStamp source={source} />
       </header>
 
       <SeasonPlayer ribbon={season.ribbon} tally={season.tally} proofs={season.proofs} limitC={season.ribbon.limitC} />
@@ -98,7 +105,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
         <EmptyState title={t("error.title")} reason={t("error.reason")} primary={{ label: t("error.primary"), href: "/replay" }} />
       ) : (
         <>
-          <Verdict sentence={primary?.text ?? null} proof={verdictProof} />
+          <Verdict sentence={primary?.text ?? null} proof={verdictProof} stamp={<EvalSourceStamp source={source} />} />
 
           {noScoredFile ? (
             <EmptyState
@@ -112,6 +119,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
             <h2 id="warnings-heading" className="font-display text-2xl font-medium">
               {t("warnings.heading")}
             </h2>
+            <EvalSourceStamp source={source} />
             <p className="max-w-(--measure) text-base text-ink-2">{t("warnings.sub")}</p>
             {policy === null ? <PendingBanner what={t("warnings.pending")} /> : null}
             <ScoreboardTable
@@ -128,6 +136,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
             <h2 id="plans-heading" className="font-display text-2xl font-medium">
               {t("plans.heading")}
             </h2>
+            <EvalSourceStamp source={source} />
             <p className="max-w-(--measure) text-base text-ink-2">{t("plans.sub")}</p>
             {plans === null && policy !== null ? (
               <Banner>

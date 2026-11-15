@@ -92,6 +92,10 @@
         "verdictSample": "Sample outcome sentence for the kit. It is not a result."
       },
       "spineLink": "Time spine kit"
+    },
+    "accessLog": {
+      "label": "Refused requests for individual data at this site",
+      "refused": "An employer request for individual health data at this site was refused"
     }
   },
   "shell": {
@@ -580,7 +584,7 @@
     "scoreboard": {
       "title": "Summer 2026, replayed honestly",
       "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded.",
-      "facts": "Forecast made about 24 hours ahead · Scored against station thermometers · Held-out 2026, every choice fixed on 2024-2025 data",
+      "facts": "Forecast made about 24 hours ahead · Scored against station thermometers",
       "skip": "Skip to the scores",
       "season": {
         "heading": "The season, daily peak forecast",
@@ -645,7 +649,7 @@
         "policies": {
           "P0": {
             "label": "Midday break only",
-            "sub": "12:30 to 15:00 by law, nothing else"
+            "sub": "{start} to {end} by law, nothing else"
           },
           "P1": {
             "label": "Fixed 32 °C rule",
@@ -668,7 +672,7 @@
       "plans": {
         "heading": "Plans",
         "sub": "Each shift plan checked by the independent validator against what the station recorded.",
-        "defs": "Rest minutes added are a simulated cost on an assumed crew. We report rule-violation minutes, never illness prevented.",
+        "defs": "Rest minutes added are a simulated cost on an assumed crew. We report rule-violation minutes and make no claim about health outcomes.",
         "caption": "Shift plans, checked on the season",
         "columns": {
           "plan": "Plan",
@@ -723,10 +727,20 @@
         "truth": "Truth is station temperature, humidity and wind plus modelled sunshine.",
         "twl": "Thermal work limit aligned with ADOSH zones, not certified."
       },
-      "loading": "Loading the season"
+      "loading": "Loading the season",
+      "factsHeldOut": "Held-out 2026, every choice fixed on 2024-2025 data",
+      "units": {
+        "missed_danger_hours": "hours over the season",
+        "false_alarm_hours": "hours over the season",
+        "pod": "of danger hours were warned about",
+        "far": "of warnings were false alarms",
+        "violation_minutes_per_season": "minutes per worker-season",
+        "high_cycled_share": "of High-zone heavy work planned as cycled",
+        "missed_protection_ticks": "minutes in a milder plan zone than the truth",
+        "rest_minutes_added_vs_naive": "minutes per worker-season"
+      }
     },
     "frontier": {
-      "heading": "No roster shape outruns the heat under law, sleep and commute. Making the common roster legal does more.",
       "sub": "Each point is a daily roster. Higher means more summer hours at 30 °C or more per scheduled hour; further right means more sleep. Pick a one-way commute.",
       "whatPending": "The roster frontier analysis",
       "loading": "Loading the roster frontier",
@@ -739,10 +753,10 @@
       "baselineLegal": "Legal default",
       "baselineCommon": "Common practice",
       "bestTitle": "Best roster that keeps the sleep gate",
-      "bestUnit": "fewer hours at 30 °C or more than the legal default, with sleep kept at {hours} h or more",
+      "bestUnit": "fewer hours at 30 °C or more, on top of the legal default, with sleep kept at {hours} h or more",
       "bestNone": "No roster beats the legal default and keeps the sleep gate at this commute.",
       "legalTitle": "Making the common roster legal",
-      "legalUnit": "fewer hours at 30 °C or more. This gain belongs to the law, not to Stellar Blaze.",
+      "legalUnit": "fewer hours at 30 °C or more, going from common practice to the legal default. This gain belongs to the law, not to Stellar Blaze.",
       "whatBest": "Share of hours at 30 °C or more avoided against the legal default at a {minutes} minute commute",
       "whatLegal": "Share of hours at 30 °C or more avoided by making the common roster legal",
       "tableToggle": "Show the roster numbers as a table",
@@ -751,7 +765,13 @@
         "roster": "Roster",
         "sleep": "Sleep, hours",
         "exposure": "Hours at 30 °C or more per scheduled hour"
-      }
+      },
+      "headingNone": "At a {minutes} minute commute, no roster shape outruns the heat under law, sleep and commute. Making the common roster legal cuts the hours at 30 °C or more by {legal}.",
+      "headingNoneBeyond": "Beyond a {threshold} minute commute, no roster shape outruns the heat under law, sleep and commute. Making the common roster legal cuts the hours at 30 °C or more by {legal}.",
+      "headingGain": "At a {minutes} minute commute, the best roster that keeps the {hours} h sleep gate cuts the hours at 30 °C or more by {gain} on top of the legal default. Going from common practice to the legal default cuts them by {legal}.",
+      "headingMissing": "The analysis has no result for a {minutes} minute commute",
+      "headingPending": "The roster frontier",
+      "bestMissing": "The analysis has no result for this commute."
     },
     "story": {
       "label": "Story",
@@ -790,11 +810,112 @@
         "runScored": "The single scoring run wrote this file.",
         "runDev": "The 2025 development run wrote this file. It is not the result.",
         "runNotScoring": "Not a scoring run: nothing here is scored.",
-        "shown": "This page reads the file whose fingerprint is above."
+        "shown": "This page reads the file whose fingerprint is above.",
+        "runSynthetic": "Not a scoring run: a script wrote this file with made-up numbers, only to check the layout."
       },
       "emptyTitle": "No provenance recorded for this number",
       "emptyReason": "No provenance recorded for this number. It is not shown as a result.",
-      "emptyAction": "Open a number that has proof"
+      "emptyAction": "Open a number that has proof",
+      "unreadableTitle": "The file behind this number could not be read",
+      "unreadableReason": "The number exists but its result file could not be read, so it is not shown. Nothing here is guessed."
+    },
+    "governance": {
+      "eyebrow": "Governance refusal",
+      "title": "When an employer asks for individual health data, the answer is no, and every worker at the site can see that it was asked.",
+      "lede": "The service holds no individual health data, so it refuses every such request and writes the refusal to a log that every worker at the site can read. Press the button to watch it happen, in time order.",
+      "sequence": "What happens, in time order",
+      "request": {
+        "who": "Employer console",
+        "title": "The employer asks",
+        "subject": "Whose data",
+        "subjectValue": "One worker",
+        "dataClass": "Kind of data",
+        "dataClassHealth": "Health",
+        "workerRef": "Worker reference",
+        "refNote": "A made-up example. The service discards the reference: it is never stored, logged or shown.",
+        "send": "Send the employer's request",
+        "sendAgain": "Send again",
+        "caption": "Each send is a real call to the demo API and adds one row to the log. Nothing is sent until you press the button."
+      },
+      "answer": {
+        "who": "API",
+        "title": "The service answers",
+        "waiting": "Waiting for the API",
+        "none": "Nothing sent yet.",
+        "refused": "Refused",
+        "type": "Problem type",
+        "problemTitle": "Title",
+        "detail": "Detail",
+        "detailRefused": "Individual health data is not held by this service and is never released to an employer.",
+        "requestId": "Request ID"
+      },
+      "audit": {
+        "who": "Audit log",
+        "title": "The audit row",
+        "none": "Nothing recorded.",
+        "when": "Time",
+        "what": "Entry",
+        "whatValue": "Data request",
+        "askedBy": "Asked by",
+        "askedByValue": "An employer account",
+        "outcome": "Outcome",
+        "outcomeValue": "Refused",
+        "why": "Why",
+        "whyValue": "Individual health data is never released to an employer, whatever the reason given.",
+        "rules": "Rules in force",
+        "model": "Model",
+        "noModel": "none loaded",
+        "note": "The log is append-only and tamper-evident: an edited row is detected. It never records whose data was asked for."
+      },
+      "phone": {
+        "who": "Worker's phone",
+        "title": "Who asked for individual data",
+        "empty": "Nobody has asked for individual data at this site.",
+        "emptyHint": "If an employer asks, it is refused and shown here.",
+        "note": "Every worker at this site sees the same list. It says an employer asked at the site, never whose data.",
+        "sourceLive": "From the demo API's log",
+        "sourceRecorded": "From the recorded run",
+        "count": "The newest {shown} of {total} rows, from the demo API's log"
+      },
+      "notes": {
+        "times": "Times are Dubai time. Each step shows when it happened.",
+        "privacy": "A worker's heat level is worked out on the worker's phone and is not stored on the server."
+      },
+      "resetNote": "Reset starts a new demo epoch for this synthetic site. Nothing is deleted: the audit log stays append-only.",
+      "back": "Back to the scoreboard",
+      "proves": {
+        "title": "What proves it in the build",
+        "data_request_403_and_audit_row": "A data request gets a 403 problem and writes one audit row.",
+        "transparency_log_shows_refusal": "The worker-visible log shows the refusal and never whose data was asked for.",
+        "verify_detects_edited_row": "Editing a stored audit row is detected when the log is verified."
+      },
+      "status": {
+        "recorded": "This is a recorded run: the same request, the same answer, the same audit row. Press the button to run it live.",
+        "live": {
+          "title": "Live.",
+          "reason": "This run was just made against the demo API, and the log below is the log the API returned."
+        },
+        "noRun": {
+          "title": "No recorded run is available.",
+          "reason": "Press the button to make the request live."
+        },
+        "limited": "Not sent. Try again in a minute.",
+        "unauthorized": {
+          "title": "The request was not accepted.",
+          "reason": "This deployment has no demo employer token, so the call needed a sign-in it did not have. Nothing was recorded."
+        },
+        "failed": {
+          "title": "Nothing was sent, so nothing was recorded.",
+          "reason": "The demo API could not be reached. The last run stays on screen."
+        },
+        "requestId": "Request ID",
+        "unexpected": {
+          "title": "The API did not refuse the request.",
+          "reason": "This page does not report that as a result. Nothing is shown as a refusal."
+        },
+        "notReady": "The demo site is still loading. Try again in a moment.",
+        "logFailed": "The log could not be refreshed, so the rows shown may be out of date."
+      }
     }
   }
 }

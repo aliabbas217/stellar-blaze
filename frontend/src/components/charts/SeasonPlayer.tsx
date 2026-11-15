@@ -134,7 +134,6 @@ export function SeasonPlayer({ ribbon, tally, proofs, limitC }: SeasonPlayerProp
         <button
           type="button"
           data-primary=""
-          aria-pressed={playing}
           onClick={onPlay}
           className="inline-flex min-h-(--target) items-center justify-center rounded-sign bg-ink px-5 text-base font-medium text-ground hover:underline hover:decoration-2 hover:underline-offset-4"
         >

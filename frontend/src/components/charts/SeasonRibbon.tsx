@@ -67,7 +67,7 @@ function argExtreme(values: readonly number[], pick: (a: number, b: number) => n
 }
 
 /** Plot box inside the figure: room on the left for the y ticks, below for the slot and the month ticks. */
-const PLOT = "absolute left-10 right-3";
+const PLOT = "absolute start-10 end-3";
 
 export function SeasonRibbon({ days, dayLabels, peaks, perDay, ban, limitC, upto, compact = false, ticks, labels }: SeasonRibbonProps) {
   const clipId = useId().replace(/[^A-Za-z0-9_-]/g, "");
@@ -95,7 +95,7 @@ export function SeasonRibbon({ days, dayLabels, peaks, perDay, ban, limitC, upto
         className={`relative w-full text-ink ${compact ? "h-52" : RIBBON_HEIGHT}`}
       >
         {/* y axis: the values every 4 degrees, recessive */}
-        <div aria-hidden className={`absolute left-0 w-9 ${top} bottom-16 text-xs text-ink-3`}>
+        <div aria-hidden className={`absolute start-0 w-9 ${top} bottom-16 text-xs text-ink-3`}>
           {Y_TICKS.map((v) => (
             <span key={v} className="absolute end-0 -translate-y-1/2 tabular-nums" style={{ top: `${num(topPct(v))}%` }}>
               {v}
