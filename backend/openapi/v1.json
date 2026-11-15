@@ -892,6 +892,19 @@
             "title": "Date",
             "type": "string"
           },
+          "evaluation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words shown with a development file, \"DEV 2025, LOCO out-of-fold: not the result\"; null for the scored 2026 file.",
+            "title": "Evaluation Label"
+          },
           "evaluation_set": {
             "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
             "enum": [
@@ -1560,6 +1573,19 @@
             "title": "Crew Label",
             "type": "string"
           },
+          "evaluation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words shown with a development file, \"DEV 2025, LOCO out-of-fold: not the result\"; null for the scored 2026 file.",
+            "title": "Evaluation Label"
+          },
           "evaluation_set": {
             "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
             "enum": [
@@ -2164,6 +2190,19 @@
             "description": "Crew size used for worker-hours: 20, ASSUMED, never a measured crew.",
             "title": "Assumed Crew Size",
             "type": "integer"
+          },
+          "evaluation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words shown with a development file, \"DEV 2025, LOCO out-of-fold: not the result\"; null for the scored 2026 file.",
+            "title": "Evaluation Label"
           },
           "evaluation_set": {
             "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",

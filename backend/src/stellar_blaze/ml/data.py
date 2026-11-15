@@ -32,6 +32,7 @@ __all__ = [
     "HoldoutViolationError",
     "load_dev_pairs",
     "load_test_pairs",
+    "read_corrected_series",
     "read_oof_samples",
 ]
 
@@ -182,4 +183,31 @@ def read_oof_samples(path: Path) -> pl.DataFrame:
         OSError: The file cannot be read.
         polars.exceptions.PolarsError: It is not a Parquet file.
     """
+    return pl.read_parquet(path)
+
+
+def read_corrected_series(path: Path, manifest_path: Path, *, token: GateToken) -> pl.DataFrame:
+    """The forecast part's ``corrected_series_OMAA.parquet`` (2026 rows) for the gated Warnings and Plans parts.
+
+    Needs a ``GateToken`` of the Warnings or the Plans part, and refuses a file whose SHA-256 is not the one its
+    ``corrected_series_OMAA.manifest.json`` records (a changed series is refused, not scored).
+
+    Raises:
+        TypeError: ``token`` is not exactly a ``GateToken``.
+        HoldoutViolationError: The token is for another part.
+        ValueError: The manifest has no ``sha256`` or the file hashes to something else.
+        OSError: A file cannot be read.
+    """
+    import json
+
+    if type(token) is not GateToken:
+        raise TypeError(f"token must be a GateToken from open_gate, got {type(token).__name__}")
+    if token.part not in (Part.WARNINGS, Part.PLANS):
+        raise HoldoutViolationError(
+            f"the corrected series is read by the warnings and plans parts, not {token.part.value!r}"
+        )
+    expected = json.loads(manifest_path.read_bytes()).get("sha256")
+    if not isinstance(expected, str):
+        raise ValueError(f"{manifest_path} has no 'sha256'")
+    _verify_sha256(path, expected)
     return pl.read_parquet(path)

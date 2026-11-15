@@ -33,7 +33,11 @@ pre-registration sections 7.1 or 7.4 as anchor, ``git_sha`` the HEAD the gate sa
 ``forecast_skill.json``, ``reliability.json``, ``corrected_series_OMAA.parquet`` (not committed; its
 ``corrected_series_OMAA.manifest.json`` is) and ``run_meta.json``.
 
-B3 adds ``warnings`` and ``plans`` to ``PART_RUNNERS``.
+``warnings`` and ``plans`` (B3, Task 13) follow the same order and write ``policy_scoreboard.json`` with
+``demo_day.json`` and ``plan_scoreboard.json``. They additionally check that the freeze addendum records the SHA-256
+of ``theta.json``, of the ruleset file and of ``demo_site.toml``, read theta from ``artifacts/eval/dev/theta.json``
+(never the live configuration), need the forecast part's ``corrected_series_OMAA.parquet`` (hash-checked against its
+manifest) and draw the joint samples from its grids in one sampler call (``ml.scoreboard_inputs``).
 """
 
 import hashlib
@@ -41,32 +45,52 @@ import json
 import shlex
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 from typing import Final
 
+import polars as pl
 import structlog
 from pydantic import JsonValue
 
 from stellar_blaze.config import Settings
+from stellar_blaze.domain.config.runtime import EffectiveParams
 from stellar_blaze.domain.provenance import Provenance, ProvenanceLabel
+from stellar_blaze.domain.rules.catalog import LoadedRuleset
+from stellar_blaze.domain.scoreboard import Provenance as ScoreboardProvenance
+from stellar_blaze.domain.scoreboard import ProvenanceLabel as ScoreboardLabel
+from stellar_blaze.domain.scoreboard import ThetaDecision
 from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.domain.weather.stations import STATIONS
 from stellar_blaze.ml import forecast_test
-from stellar_blaze.ml.data import load_test_pairs
+from stellar_blaze.ml.artifact_io import render_artifact
+from stellar_blaze.ml.data import TEST_SUMMER, load_test_pairs, read_corrected_series
+from stellar_blaze.ml.eval_inputs import crew_spec, frozen_params, load_fixture, load_frozen_ruleset, released_sampler
 from stellar_blaze.ml.exporters import PROTOCOL_PATH, SKILL_ANCHOR, github_slug, render_json
 from stellar_blaze.ml.forecast_tables import series_manifest, series_parquet_bytes
 from stellar_blaze.ml.git import SubprocessGit
 from stellar_blaze.ml.protocol_gate import RESULT_FILES, GateRefusedError, GateToken, Part, load_lock, open_gate
 from stellar_blaze.ml.regimes import CLUSTERS
+from stellar_blaze.ml.scoreboard_inputs import ScoringInputs, inputs_2026, load_theta, sha256_texts
+from stellar_blaze.ml.scoreboards import (
+    WARNINGS_ANCHOR,
+    BoardContext,
+    fill_demo_day,
+    plans_scoreboard,
+    select_demo_day,
+    warnings_scoreboard,
+)
 from stellar_blaze.ml.serving_path import cold_config, load_released_model, released_training_config
+from stellar_blaze.ports.sites import SiteFixture
 
 __all__ = [
     "DEV_SKILL_PATH",
     "EXPECTED_CLUSTERS",
     "EXPECTED_STATIONS",
+    "FIXTURE_PATH",
+    "FROZEN_RULESET_ID",
     "GO_PATH",
     "LOCK_PATH",
     "PART_RUNNERS",
@@ -74,13 +98,17 @@ __all__ = [
     "SERIES_FILE",
     "SERIES_MANIFEST_FILE",
     "SERIES_STATION",
+    "THETA_PATH",
     "UV_LOCK_PATH",
+    "FrozenInputs",
     "amendment_ids",
     "evaluate_2026_invocation",
     "open_the_gate",
     "read_dev_tercile_edges",
     "resolve_settings",
     "run_forecast",
+    "run_plans",
+    "run_warnings",
     "write_bytes_exclusive",
 ]
 
@@ -432,5 +460,218 @@ def run_forecast(settings: Settings, token: GateToken, root: Path, *, amendment:
     }
 
 
-PART_RUNNERS: Final[dict[Part, Callable[..., dict[str, JsonValue]]]] = {Part.FORECAST: run_forecast}
-"""The parts that exist (B3 adds ``Part.WARNINGS`` and ``Part.PLANS``); ``--part all`` runs exactly these."""
+# === the warnings and plans parts ====================================================================================
+
+FROZEN_RULESET_ID: Final = "ae-heat-2026.1"
+THETA_PATH: Final = "artifacts/eval/dev/theta.json"
+FIXTURE_PATH: Final = "backend/fixtures/demo_site.toml"
+SCORED_CREW_ID: Final = "crew-b"
+DEMO_DAY_FILE: Final = "demo_day.json"
+SEASON_2026: Final = (date(2026, 5, 15), date(2026, 9, 30))
+_WARNINGS_FILES: Final = (RESULT_FILES[Part.WARNINGS], DEMO_DAY_FILE)
+_PLANS_FILES: Final = (RESULT_FILES[Part.PLANS],)
+_SCORING_MODULE: Final = "stellar_blaze.ml.scoreboards"
+
+
+@dataclass(frozen=True)
+class FrozenInputs:
+    """The frozen inputs of the warnings and plans parts: ruleset, its default tunables, theta and the crew fixture."""
+
+    loaded: LoadedRuleset
+    params: EffectiveParams
+    theta: ThetaDecision
+    fixture: SiteFixture
+    fixture_sha256: str
+
+
+def _freeze_text(token: GateToken, root: Path) -> str:
+    if token.lock.freeze_path is None:  # the gate refuses this already (freeze-missing); this keeps the types honest
+        raise GateRefusedError(("freeze-missing: the lock has no freeze_path",))
+    return (root / token.lock.freeze_path).read_text(encoding="utf-8").lower()
+
+
+def frozen_inputs(settings: Settings, token: GateToken, root: Path) -> FrozenInputs:
+    """Load the frozen ruleset, theta and fixture and check that the addendum names the SHA-256 of each (section 11).
+
+    ``open_gate`` has checked the addendum's own hash (``_check_freeze``); this checks that the addendum's text records
+    the three input files the scoring reads: ``theta.json``, the ruleset file and ``demo_site.toml`` (the hash as the
+    file is read, or with CRLF read as LF: a text file checked out on Windows). Theta is read from the committed dev
+    file, never from the live configuration.
+
+    Raises:
+        GateRefusedError: ``freeze-input-missing``: an input's SHA-256 is not in the addendum.
+        OSError, ValueError, KeyError: An input cannot be read or is invalid.
+    """
+    rulesets = (
+        settings.rulesets_dir if settings.rulesets_dir.is_absolute() else root / "backend" / settings.rulesets_dir
+    )
+    loaded = load_frozen_ruleset(rulesets, FROZEN_RULESET_ID)
+    theta_bytes = (root / THETA_PATH).read_bytes()
+    fixture_bytes = (root / FIXTURE_PATH).read_bytes()
+    text = _freeze_text(token, root)
+    recorded = {
+        THETA_PATH: sha256_texts(theta_bytes),
+        f"ruleset {FROZEN_RULESET_ID}": (loaded.sha256, loaded.sha256),
+        FIXTURE_PATH: sha256_texts(fixture_bytes),
+    }
+    missing = [name for name, candidates in recorded.items() if not any(digest in text for digest in candidates)]
+    if missing:
+        raise GateRefusedError(
+            tuple(f"freeze-input-missing: the SHA-256 of {name} is not in the freeze addendum" for name in missing)
+        )
+    return FrozenInputs(
+        loaded=loaded,
+        params=frozen_params(loaded),
+        theta=load_theta(root / THETA_PATH),
+        fixture=load_fixture(root / FIXTURE_PATH),
+        fixture_sha256=sha256_texts(fixture_bytes)[0],
+    )
+
+
+def _scoring_inputs(settings: Settings, token: GateToken, root: Path, frozen: FrozenInputs) -> ScoringInputs:
+    """The 2026 scoring frame: the forecast part's series, the IFS radiation of the gold rows and the released sampler.
+
+    Raises:
+        FileNotFoundError: The forecast part has not written its series.
+    """
+    lock = token.lock
+    gold_sha256, model_id = lock.gold_sha256, lock.model_id
+    if gold_sha256 is None or model_id is None:  # the gate refuses both; this keeps the types honest
+        raise ValueError("the lock pins no gold file or no model: the gate should have refused")
+    directory = root / RESULTS_PATH
+    series_path, manifest_path = directory / SERIES_FILE, directory / SERIES_MANIFEST_FILE
+    if not series_path.is_file() or not manifest_path.is_file():
+        raise FileNotFoundError(f"{series_path} or its manifest is missing: run evaluate-2026 --part forecast first")
+    series = read_corrected_series(series_path, manifest_path, token=token)
+    pairs = load_test_pairs(
+        settings.data_dir / "gold" / "pairs.parquet",
+        token=token,
+        part=token.part,
+        expected_sha256=gold_sha256,
+        models=frozenset({NwpModel.ECMWF_IFS025.value}),
+    )
+    radiation = pairs.filter((pl.col("station") == SERIES_STATION) & (pl.col("summer") == TEST_SUMMER))
+    del pairs
+    return inputs_2026(
+        series,
+        radiation,
+        released_sampler(settings.models_dir, model_id),
+        frozen.loaded.ruleset,
+        frozen.params,
+        icao=SERIES_STATION,
+    )
+
+
+def _board_context(token: GateToken, frozen: FrozenInputs, now: datetime) -> BoardContext:
+    return BoardContext(
+        evaluation_set="scored_2026",
+        station=SERIES_STATION,
+        season_start=SEASON_2026[0],
+        season_end=SEASON_2026[1],
+        ruleset_id=FROZEN_RULESET_ID,
+        ruleset_sha256=frozen.loaded.sha256,
+        provenance=ScoreboardProvenance(
+            protocol_path=PROTOCOL_PATH,
+            protocol_anchor=WARNINGS_ANCHOR,
+            script=_SCORING_MODULE,
+            function="warnings_scoreboard",
+            git_sha=token.head,
+            data_sha256=token.lock.gold_sha256 or "",
+            model_id=token.lock.model_id,
+            label=ScoreboardLabel.REAL,
+            generated_at=now,
+        ),
+    )
+
+
+def _write_part(
+    part: Part, token: GateToken, root: Path, plan: _Plan, rendered: dict[str, bytes], *, amendment: str | None
+) -> dict[str, JsonValue]:
+    """Recheck the gate, write the rendered files (all or nothing, exclusive create) and summarize."""
+    token.recheck(SubprocessGit(root))
+    plan.commit(rendered)
+    _log.info("evaluate_2026.written", part=part.value, directory=str(plan.directory), head=token.head)
+    return {
+        "part": part.value,
+        "head": token.head,
+        "directory": str(plan.directory),
+        "amendment": amendment or None,
+        "files": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(rendered.items())},
+    }
+
+
+def run_warnings(settings: Settings, token: GateToken, root: Path, *, amendment: str | None) -> dict[str, JsonValue]:
+    """Score the Warnings row and the demo day of 2026 (``policy_scoreboard.json``, ``demo_day.json``).
+
+    The same shape as ``run_forecast``: the gate was opened first (``open_the_gate``), nothing is read before the output
+    paths are known to be free, every byte is rendered before ``token.recheck``, and the files are written all or
+    nothing.
+
+    Raises:
+        GateRefusedError: An input's SHA-256 is not in the freeze addendum, or HEAD moved or the tree went dirty.
+        FileExistsError: An output file is in the way (nothing is written).
+        FileNotFoundError: The forecast part has not run.
+    """
+    plan = _plan(root / RESULTS_PATH, _WARNINGS_FILES, amendment=amendment)
+    frozen = frozen_inputs(settings, token, root)
+    inputs = _scoring_inputs(settings, token, root, frozen)
+    context = _board_context(token, frozen, datetime.now(UTC))
+    theta = frozen.theta
+    ruleset, params = frozen.loaded.ruleset, frozen.params
+    board = warnings_scoreboard(
+        inputs.rows,
+        theta_protect=theta.theta_protect,
+        theta_balanced=theta.theta_balanced,
+        ruleset=ruleset,
+        params=params,
+        context=context,
+    )
+    selection = select_demo_day(inputs.truth_frame(), inputs.present_frame(), ruleset, params, season=SEASON_2026)
+    demo = fill_demo_day(
+        selection,
+        inputs.rows,
+        inputs.wbgt(selection.date),
+        theta_protect=theta.theta_protect,
+        theta_balanced=theta.theta_balanced,
+        ruleset=ruleset,
+        params=params,
+        context=context,
+    )
+    rendered = {RESULT_FILES[Part.WARNINGS]: render_artifact(board), DEMO_DAY_FILE: render_artifact(demo)}
+    return _write_part(Part.WARNINGS, token, root, plan, rendered, amendment=amendment)
+
+
+def run_plans(settings: Settings, token: GateToken, root: Path, *, amendment: str | None) -> dict[str, JsonValue]:
+    """Score the Plans row of 2026 for the scored crew of the frozen fixture (``plan_scoreboard.json``).
+
+    Raises:
+        GateRefusedError, FileExistsError, FileNotFoundError: As ``run_warnings``.
+    """
+    plan = _plan(root / RESULTS_PATH, _PLANS_FILES, amendment=amendment)
+    frozen = frozen_inputs(settings, token, root)
+    inputs = _scoring_inputs(settings, token, root, frozen)
+    crew = crew_spec(frozen.fixture, SCORED_CREW_ID)
+    members = crew.members or ()
+    adults = bool(members) and all(m.experienced and not m.juvenile for m in members)
+    who = "experienced adults" if adults else "members"
+    board = plans_scoreboard(
+        inputs.rows,
+        crew=crew,
+        ruleset=frozen.loaded.ruleset,
+        params=frozen.params,
+        context=_board_context(token, frozen, datetime.now(UTC)),
+        site_id=frozen.fixture.site.id,
+        fixture_sha256=frozen.fixture_sha256,
+        roster="L1: " + " + ".join(f"{b.start:%H:%M}-{b.end:%H:%M}" for b in crew.shift) + " GST",
+        crew_label=f"SIMULATED crew: {crew.headcount} {who}, {crew.workload} work",
+    )
+    rendered = {RESULT_FILES[Part.PLANS]: render_artifact(board)}
+    return _write_part(Part.PLANS, token, root, plan, rendered, amendment=amendment)
+
+
+PART_RUNNERS: Final[dict[Part, Callable[..., dict[str, JsonValue]]]] = {
+    Part.FORECAST: run_forecast,
+    Part.WARNINGS: run_warnings,
+    Part.PLANS: run_plans,
+}
+"""Every part of the gated run; ``--part all`` runs them in this order."""

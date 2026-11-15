@@ -177,6 +177,11 @@ class PolicyScoreboard(ArtifactModel):
         description="`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold "
         'development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".'
     )
+    evaluation_label: str | None = Field(
+        default=None,
+        description='Words shown with a development file, "DEV 2025, LOCO out-of-fold: not the result"; null for the '
+        "scored 2026 file.",
+    )
     station: str = Field(description="ICAO id of the demo station the row is computed at (OMAA).")
     season_start: dt.date = Field(description="First local date of the scored season (15 May 2026).")
     season_end: dt.date = Field(description="Last local date of the scored season (30 Sep 2026).")
@@ -234,6 +239,11 @@ class PlanScoreboard(ArtifactModel):
     evaluation_set: EvaluationSet = Field(
         description="`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold "
         'development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".'
+    )
+    evaluation_label: str | None = Field(
+        default=None,
+        description='Words shown with a development file, "DEV 2025, LOCO out-of-fold: not the result"; null for the '
+        "scored 2026 file.",
     )
     station: str = Field(description="ICAO id of the weather station (OMAA).")
     site_id: str = Field(description="Id of the SIMULATED demo site whose crew is scored (ADR 0057).")
@@ -300,6 +310,11 @@ class DemoDay(ArtifactModel):
     evaluation_set: EvaluationSet = Field(
         description="`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold "
         'development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".'
+    )
+    evaluation_label: str | None = Field(
+        default=None,
+        description='Words shown with a development file, "DEV 2025, LOCO out-of-fold: not the result"; null for the '
+        "scored 2026 file.",
     )
     station: str = Field(description="ICAO id of the demo station (OMAA).")
     date: dt.date = Field(description="Selected local date.")

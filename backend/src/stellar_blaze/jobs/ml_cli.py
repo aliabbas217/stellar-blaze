@@ -16,6 +16,11 @@ The warning thresholds of the freeze addendum (pre-registration 6.5; 2024-2025 o
 
     sb-jobs freeze theta [--oof PATH] [--ruleset ID] [--out PATH]
 
+The scoreboards on development data, and the roster-frontier static export::
+
+    sb-jobs scoreboard dev --summer 2025 [--out DIR] [--oof PATH] [--theta PATH] [--ruleset ID]
+    sb-jobs export roster-frontier --src PATH --out PATH [--run-date YYYY-MM-DD]
+
 The gated 2026 evaluation, behind the pre-registration gate (``jobs/evaluate_2026.py``)::
 
     sb-jobs evaluate-2026 --part forecast|warnings|plans|all [--amendment ID]
@@ -84,6 +89,20 @@ freeze_app = typer.Typer(
     help="Values the pre-registration's freeze addendum records, computed on 2024-2025 data only.",
 )
 ml_app.add_typer(freeze_app, name="freeze")
+scoreboard_app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_show_locals=False,
+    help="Scoreboards dry-run on development data (never the 2026 result).",
+)
+ml_app.add_typer(scoreboard_app, name="scoreboard")
+export_app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_show_locals=False,
+    help="Static exports the frontend imports at build time.",
+)
+ml_app.add_typer(export_app, name="export")
 
 
 def _settings() -> Settings:
@@ -262,6 +281,216 @@ def freeze_theta_command(
             sort_keys=True,
         )
     )
+
+
+@scoreboard_app.command("dev")
+def scoreboard_dev_command(
+    summer: Annotated[int, typer.Option("--summer", help="The development summer to score (2025).")],
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Output directory (default: artifacts/eval/dev/ at the repo root).")
+    ] = None,
+    oof: Annotated[
+        Path | None,
+        typer.Option("--oof", help="oof_samples_abu_dhabi.parquet (default: artifacts/eval/dev/ at the repo root)."),
+    ] = None,
+    theta: Annotated[
+        Path | None, typer.Option("--theta", help="theta.json of `freeze theta` (default: artifacts/eval/dev/).")
+    ] = None,
+    ruleset: Annotated[str, typer.Option("--ruleset", help="Released ruleset whose zones and ban window apply.")] = (
+        "ae-heat-2026.1"
+    ),
+) -> None:
+    """Dry-run the Warnings and Plans scoreboards and the demo day on one development summer (never the 2026 result).
+
+    Reads the 2024-2025 out-of-fold samples (read-only) and the frozen ``theta.json`` and writes
+    ``policy_scoreboard.<summer>.json``, ``plan_scoreboard.<summer>.json`` and ``demo_day.<summer>.json`` with
+    ``evaluation_set = "dev_2025"`` and the label "DEV 2025, LOCO out-of-fold: not the result", so the frontend
+    builds on the real shapes before the 2026 run. The export holds lead 1 only: the rows of leads 2, 3, 5 and 7 are
+    empty and say "not available in the dev export". Refuses (exit 2, nothing written) a file with any row of summer
+    2026, a summer that is not 2025, or an unreadable input. The wall time is printed. Exit codes: 0 written, 1
+    failed, 2 refused.
+    """
+    import hashlib
+    import time
+    from datetime import UTC, date, datetime
+
+    import polars as pl
+
+    from stellar_blaze.domain.scoreboard import Provenance, ProvenanceLabel
+    from stellar_blaze.jobs.replay_build import ReplayBuildError, git_head, repo_root
+    from stellar_blaze.ml.artifact_io import render_artifact
+    from stellar_blaze.ml.data import HoldoutViolationError, read_oof_samples
+    from stellar_blaze.ml.eval_inputs import crew_spec, frozen_params, load_fixture, load_frozen_ruleset
+    from stellar_blaze.ml.exporters import OOF_SAMPLES_FILE, PROTOCOL_PATH
+    from stellar_blaze.ml.scoreboard_inputs import (
+        DEV_LABEL,
+        DEV_ROSTER_NOTE,
+        clip_crew_to_labels,
+        dev_inputs,
+        load_theta,
+    )
+    from stellar_blaze.ml.scoreboards import (
+        WARNINGS_ANCHOR,
+        BoardContext,
+        fill_demo_day,
+        plans_scoreboard,
+        select_demo_day,
+        warnings_scoreboard,
+    )
+
+    if summer != 2025:
+        raise typer.BadParameter("only the development summer 2025 has a dev scoreboard", param_hint="--summer")
+    started = time.monotonic()
+    settings = _settings()
+    root = repo_root()
+    directory = out if out is not None else root / "artifacts" / "eval" / "dev"
+    source = oof if oof is not None else directory / OOF_SAMPLES_FILE
+    theta_path = theta if theta is not None else directory / "theta.json"
+    try:
+        loaded = load_frozen_ruleset(settings.rulesets_dir, ruleset)
+    except (KeyError, OSError, ValueError) as exc:
+        raise typer.BadParameter(f"{ruleset}: {exc}", param_hint="--ruleset") from None
+    try:
+        data = source.read_bytes()
+        frame = read_oof_samples(source)
+    except (OSError, pl.exceptions.PolarsError) as exc:
+        raise typer.BadParameter(f"{source}: {exc}", param_hint="--oof") from None
+    try:
+        frozen_theta = load_theta(theta_path)
+    except (OSError, ValueError) as exc:
+        raise typer.BadParameter(
+            f"{theta_path}: {exc} (run `sb-jobs freeze theta` first)", param_hint="--theta"
+        ) from None
+    try:
+        git_sha = git_head(root)
+    except ReplayBuildError as exc:
+        _fail(f"scoreboard dev refused: {exc}")
+    params = frozen_params(loaded)
+    try:
+        inputs = dev_inputs(frame, loaded.ruleset, params, summer=summer)
+    except (HoldoutViolationError, ValueError) as exc:
+        typer.echo(f"scoreboard dev refused: {exc}", err=True)
+        raise typer.Exit(2) from None
+    context = BoardContext(
+        evaluation_set="dev_2025",
+        station="OMAA",
+        season_start=date(summer, 5, 15),
+        season_end=date(summer, 9, 30),
+        ruleset_id=ruleset,
+        ruleset_sha256=loaded.sha256,
+        provenance=Provenance(
+            protocol_path=PROTOCOL_PATH,
+            protocol_anchor=WARNINGS_ANCHOR,
+            script="stellar_blaze.ml.scoreboards",
+            function="warnings_scoreboard",
+            git_sha=git_sha,
+            data_sha256=hashlib.sha256(data).hexdigest(),
+            model_id=None,
+            label=ProvenanceLabel.REAL,
+            generated_at=datetime.now(UTC),
+        ),
+        evaluation_label=DEV_LABEL,
+    )
+    try:
+        board = warnings_scoreboard(
+            inputs.rows,
+            theta_protect=frozen_theta.theta_protect,
+            theta_balanced=frozen_theta.theta_balanced,
+            ruleset=loaded.ruleset,
+            params=params,
+            context=context,
+        )
+        selection = select_demo_day(
+            inputs.truth_frame(),
+            inputs.present_frame(),
+            loaded.ruleset,
+            params,
+            season=(context.season_start, context.season_end),
+        )
+        demo = fill_demo_day(
+            selection,
+            inputs.rows,
+            inputs.wbgt(selection.date),
+            theta_protect=frozen_theta.theta_protect,
+            theta_balanced=frozen_theta.theta_balanced,
+            ruleset=loaded.ruleset,
+            params=params,
+            context=context,
+        )
+        fixture = load_fixture(root / "backend" / "fixtures" / "demo_site.toml")
+        crew = clip_crew_to_labels(crew_spec(fixture, "crew-b"))
+        plans = plans_scoreboard(
+            inputs.rows,
+            crew=crew,
+            ruleset=loaded.ruleset,
+            params=params,
+            context=context,
+            site_id=fixture.site.id,
+            fixture_sha256=hashlib.sha256((root / "backend" / "fixtures" / "demo_site.toml").read_bytes()).hexdigest(),
+            roster=DEV_ROSTER_NOTE,
+            crew_label=f"SIMULATED crew: {crew.headcount} experienced adults, {crew.workload} work",
+        )
+    except ValueError as exc:
+        typer.echo(f"scoreboard dev refused: {exc}", err=True)
+        raise typer.Exit(2) from None
+    files = {
+        f"policy_scoreboard.{summer}.json": render_artifact(board),
+        f"plan_scoreboard.{summer}.json": render_artifact(plans),
+        f"demo_day.{summer}.json": render_artifact(demo),
+    }
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        (directory / name).write_bytes(content)
+    typer.echo(
+        json.dumps(
+            {
+                "files": {name: hashlib.sha256(content).hexdigest() for name, content in files.items()},
+                "demo_day": selection.date.isoformat(),
+                "theta_protect": frozen_theta.theta_protect,
+                "theta_balanced": frozen_theta.theta_balanced,
+                "seconds": round(time.monotonic() - started, 1),
+                "out": str(directory),
+            },
+            sort_keys=True,
+        )
+    )
+
+
+@export_app.command("roster-frontier")
+def export_roster_frontier_command(
+    src: Annotated[Path, typer.Option("--src", help="The roster script's roster_frontier.json.")],
+    out: Annotated[
+        Path, typer.Option("--out", help="The export, for example artifacts/eval/static/roster_frontier.json.")
+    ],
+    run_date: Annotated[
+        str | None,
+        typer.Option(
+            "--run-date", help="Run date YYYY-MM-DD when the source file records none (it records none today)."
+        ),
+    ] = None,
+) -> None:
+    """Export the roster frontier as ``{data, provenance}``; ``data`` is the source file's bytes, unchanged.
+
+    The source (LF line ends) is embedded as it is, so its numbers are not rounded or reordered, and the provenance
+    names the script (from the file's own ``generated_by``), the source path and its SHA-256, and the run date when
+    the source has one (``--run-date`` otherwise; null if neither). Refuses (exit 2, nothing written) a source that is
+    not JSON or whose guard fails: "nothing recommended at 45 min commute, floor 21:30" (no fold changes the legal
+    default there).
+    """
+    from stellar_blaze.jobs.roster_export import RosterExportError, render_roster_frontier
+
+    try:
+        data = src.read_bytes()
+    except OSError as exc:
+        raise typer.BadParameter(f"{src}: {exc}", param_hint="--src") from None
+    try:
+        content = render_roster_frontier(data, source=src.as_posix(), run_date=run_date)
+    except RosterExportError as exc:
+        typer.echo(f"export roster-frontier refused: {exc}", err=True)
+        raise typer.Exit(2) from None
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(content)
+    typer.echo(json.dumps({"out": str(out), "bytes": len(content)}, sort_keys=True))
 
 
 class CalibrationTargets(StrEnum):
@@ -773,7 +1002,7 @@ def train_command(
 
 
 class EvaluationPart(StrEnum):
-    """``--part`` of ``evaluate-2026``: the three parts of the gated run, or every part that exists."""
+    """``--part`` of ``evaluate-2026``: one of the three parts of the gated run, or all of them in order."""
 
     FORECAST = "forecast"
     WARNINGS = "warnings"
@@ -785,7 +1014,7 @@ class EvaluationPart(StrEnum):
 def evaluate_2026_command(
     part: Annotated[
         EvaluationPart,
-        typer.Option("--part", help="forecast, warnings or plans (the last two are implemented in B3), or all."),
+        typer.Option("--part", help="forecast, warnings or plans, or all (the three, in that order)."),
     ],
     amendment: Annotated[
         str | None,
@@ -803,27 +1032,17 @@ def evaluate_2026_command(
     reason on stderr and exits 2 with no data touched. Then the gold file is loaded (pinned to the lock's hash), scored,
     and ``artifacts/eval/2026/`` is written with exclusive create, after a last check that HEAD has not moved and the
     tree is clean. Runs as the job ``evaluate-2026:<part>`` (a ``job_run`` row, one advisory lock per part). Parts
-    ``warnings`` and ``plans`` are implemented in B3 (exit 2); ``all`` runs the parts that exist. Exit codes: 0 done or
-    skipped (locked, with a message: nothing ran, so it is not a success) is exit 1, 1 failed, 2 refused by the gate or
-    bad usage. A relative ``SB_MODELS_DIR``/``SB_DATA_DIR`` is read against ``<repository>/backend``, and a missing
-    models directory is refused before the gate reads anything.
+    ``warnings`` and ``plans`` also need the committed freeze addendum to record the SHA-256 of ``theta.json``, the
+    ruleset and ``demo_site.toml``, and the forecast part's series; ``all`` runs the three in order. Exit codes: 0
+    done, 1 failed or skipped (another run holds the lock: nothing ran, so it is not a success), 2 refused by the
+    gate or bad usage. A relative ``SB_MODELS_DIR``/``SB_DATA_DIR`` is read against ``<repository>/backend``, and a
+    missing models directory is refused before the gate reads anything.
     """
     from stellar_blaze.jobs import evaluate_2026
     from stellar_blaze.jobs.replay_build import repo_root
     from stellar_blaze.ml.protocol_gate import Part
 
-    existing = list(evaluate_2026.PART_RUNNERS)
-    wanted = existing if part is EvaluationPart.ALL else [Part(part.value)]
-    missing = [item for item in wanted if item not in evaluate_2026.PART_RUNNERS]
-    if missing:
-        typer.echo(
-            f"evaluate-2026 --part {', '.join(item.value for item in missing)}: implemented in B3 (nothing was run)",
-            err=True,
-        )
-        raise typer.Exit(2)
-    if part is EvaluationPart.ALL:
-        later = [item.value for item in Part if item not in evaluate_2026.PART_RUNNERS]
-        typer.echo(f"evaluate-2026 --part all: {', '.join(later)} implemented in B3, not run", err=True)
+    wanted = list(evaluate_2026.PART_RUNNERS) if part is EvaluationPart.ALL else [Part(part.value)]
     note = amendment.strip() if amendment else None
     root = repo_root()
     try:

@@ -152,15 +152,18 @@ def test_the_part_is_required_and_must_be_known() -> None:
 
 
 @pytest.mark.parametrize("part", ["warnings", "plans"])
-def test_the_b3_parts_exit_2_before_the_gate_or_the_database(env: Env, part: str) -> None:
+def test_the_b3_parts_open_the_gate_first_and_fail_on_missing_frozen_inputs_before_the_gold_is_read(
+    env: Env, part: str
+) -> None:
+    # Task 13 added the parts: the synthetic world has the freeze keys and the go marker but no theta.json, ruleset
+    # directory or fixture under the repository, so the part fails (exit 1) after the gate and before any gold read.
     result = invoke("--part", part)
 
-    assert result.exit_code == 2
-    assert "implemented in B3" in result.stderr
-    assert env.git.calls == []  # not even the gate was opened
-    assert env.runs.finished == []
-    assert env.runs.skipped == []
-    assert env.loads == []
+    assert result.exit_code == 1
+    assert env.git.calls  # the gate was opened first
+    assert [status for status, _, _ in env.runs.finished] == ["failed"]
+    assert env.loads == []  # the gold file was never opened
+    assert not env.results.exists()  # and nothing was written
 
 
 def test_the_invocation_is_built_from_the_real_arguments() -> None:
@@ -240,13 +243,16 @@ def test_a_refusal_lists_every_reason_not_the_first(env: Env, monkeypatch: pytes
     assert env.loads == []
 
 
-def test_all_runs_the_parts_that_exist_and_says_what_it_skipped(env: Env) -> None:
+def test_all_runs_the_parts_in_order_and_stops_at_the_first_that_fails(env: Env) -> None:
     result = invoke("--part", "all")
 
-    assert result.exit_code == 0, result.output
-    assert "warnings, plans implemented in B3, not run" in result.stderr
+    # forecast first (it succeeds on the synthetic world), then warnings, which fails on the missing frozen inputs.
+    assert result.exit_code == 1, result.output
+    assert "implemented in B3" not in result.stderr
     assert (env.results / "forecast_skill.json").is_file()
+    assert not (env.results / "policy_scoreboard.json").exists()
     assert [call["part"].value for call in env.loads] == ["forecast"]
+    assert [status for status, _, _ in env.runs.finished] == ["succeeded", "failed"]
 
 
 # === a run ==========================================================================================================
