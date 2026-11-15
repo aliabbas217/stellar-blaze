@@ -175,8 +175,10 @@ export function toPlanRows(sb: PlanScoreboard, ctx: AdapterContext): ScoreRow[] 
     if (isMerged) mergedDone = true;
     const id = isMerged ? "merged" : row.plan;
     const { label, sub } = isMerged ? ctx.text.row("merged") : knownRow(ctx.text, row.plan, row.label);
+    // ban only (and naive, which is ban only on the legal roster) is a baseline by construction: its single-point intervals are not measured
+    const baseline = row.plan === "naive" || row.plan === "ban_only";
     const at = (key: PlanMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key);
+      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key, baseline);
     rows.push({
       id,
       label,

@@ -6,7 +6,9 @@ import type { JudgeT } from "./season-view";
  * way to warn on danger hours missed and on false-alarm hours, with every number and every "fewer than" or "more than" read from the
  * rows of the scored file. Nothing is typed: the comparison word of each clause is computed from the two numbers, so a sentence
  * cannot say "fewer" where the file says "more". The balanced-threshold sentence appears only when the file's own 95% intervals
- * overlap on both counts (the reading "cannot be told apart"); when they do not, it is left out, never softened.
+ * overlap on both counts (the reading "cannot be told apart"); when they do not, it is left out, never softened. The direction of
+ * each clause is the point estimate; where the two 95% intervals of a compared pair overlap the clause says so, so a reader does
+ * not take a difference of point estimates for a settled difference.
  *
  * Returns null when a row or a number it needs is not in the file (a policy that is not computed has no comparison).
  */
@@ -32,6 +34,8 @@ export function policyTradeoff(policy: PolicyScoreboard, lead: number, format: J
   if (!computed) return null;
 
   const cmp = (ours: number, other: number): string => t(`warnings.tradeoff.cmp.${word(ours, other)}`);
+  // "; the 95% intervals overlap" after the number of a comparison whose two intervals overlap, nothing otherwise
+  const tied = (a: Row["missed_danger_hours"], b: Row["missed_danger_hours"]): string => (overlap(a, b) ? t("warnings.tradeoff.overlap") : "");
   const missed = (row: Row): number => row.missed_danger_hours.value;
   const alarms = (row: Row): number => row.false_alarm_hours.value;
   const parts = [
@@ -40,17 +44,22 @@ export function policyTradeoff(policy: PolicyScoreboard, lead: number, format: J
       a: format.one(missed(ours)),
       c0: cmp(missed(ours), missed(p0)),
       p0: format.one(missed(p0)),
+      o0: tied(ours.missed_danger_hours, p0.missed_danger_hours),
       c1: cmp(missed(ours), missed(p1)),
       p1: format.one(missed(p1)),
+      o1: tied(ours.missed_danger_hours, p1.missed_danger_hours),
       c2: cmp(missed(ours), missed(p2)),
       p2: format.one(missed(p2)),
+      o2: tied(ours.missed_danger_hours, p2.missed_danger_hours),
     }),
     t("warnings.tradeoff.falseAlarm", {
       a: format.one(alarms(ours)),
       c1: cmp(alarms(ours), alarms(p1)),
       p1: format.one(alarms(p1)),
+      o1: tied(ours.false_alarm_hours, p1.false_alarm_hours),
       c2: cmp(alarms(ours), alarms(p2)),
       p2: format.one(alarms(p2)),
+      o2: tied(ours.false_alarm_hours, p2.false_alarm_hours),
     }),
   ];
   if (balanced !== undefined && overlap(balanced.missed_danger_hours, p2.missed_danger_hours) && overlap(balanced.false_alarm_hours, p2.false_alarm_hours)) {

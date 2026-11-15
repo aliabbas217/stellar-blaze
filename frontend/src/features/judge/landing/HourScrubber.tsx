@@ -7,7 +7,7 @@ import { hourLabel } from "./field-data";
 
 /*
  * The hour scrubber: the day as a time spine of the station's own forecast, with a slider laid over it. The slider is a
- * `role="slider"` (arrow keys, Home and End, drag) whose value is DOM text ("14:00 ..."), and a Play button. Not interactive
+ * `role="slider"` (arrow keys, Page Up and Down, Home and End, drag) whose value is DOM text ("14:00 ..."), and a Play button. Not interactive
  * (`interactive={false}`) it is the poster the server draws before the island loads: the same spine at the same size, no
  * slider and no button, so nothing moves when the island takes over (CLS 0).
  */
@@ -22,7 +22,7 @@ export interface HourScrubberProps {
   readonly hour: number;
   readonly dir: "ltr" | "rtl";
   readonly dayLabel: string;
-  /** The text value of the slider: hour, hottest point, station. */
+  /** The text value of the slider: hour, hottest grid cell, station. */
   readonly valueText: string;
   readonly interactive: boolean;
   readonly playing: boolean;
@@ -55,8 +55,9 @@ export function HourScrubber({ values, ban, position, hour, dir, dayLabel, value
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     const side = rtl ? -1 : 1;
-    const step = { ArrowRight: side, ArrowLeft: -side, ArrowUp: 1, ArrowDown: -1 }[event.key];
-    if (step !== undefined) onSeek?.((hour + step + 24) % 24);
+    // A WAI-ARIA slider does not wrap: the arrows stop at 00:00 and 23:00; Page Up and Page Down move three hours.
+    const step = { ArrowRight: side, ArrowLeft: -side, ArrowUp: 1, ArrowDown: -1, PageUp: 3, PageDown: -3 }[event.key];
+    if (step !== undefined) onSeek?.(Math.min(23, Math.max(0, hour + step)));
     else if (event.key === "Home") onSeek?.(0);
     else if (event.key === "End") onSeek?.(23);
     else return;
@@ -96,7 +97,8 @@ export function HourScrubber({ values, ban, position, hour, dir, dayLabel, value
       ) : (
         <span aria-hidden="true" className="size-(--target)" />
       )}
-      <div className="relative min-w-0" data-spine-track="">
+      {/* On a phone the track is about 250 px: the 3-hourly tick labels would run into each other, so every other one is dropped (00, 06, 12, 18, 00). */}
+      <div className="relative min-w-0 max-[899px]:[&_[data-tick]:nth-child(even)]:hidden" data-spine-track="">
         <TimeSpine
           orientation="h"
           from={0}

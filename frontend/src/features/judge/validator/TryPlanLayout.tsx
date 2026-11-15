@@ -5,6 +5,7 @@ import type { RosterError } from "@/api/roster-problem";
 import { Stamp } from "@/components/provenance/Stamp";
 import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
 import type { BanState } from "@/components/spine/ban-state";
+import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { Skeleton } from "@/components/states/Skeletons";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
 import { PlanStrip } from "./PlanStrip";
@@ -22,10 +23,11 @@ import type { AnswerView, RecordedPlanView } from "./view";
  *
  * The result is the API's answer; nothing is re-implemented in the browser. States: idle, loading (the button keeps its
  * label), answered with violations, answered with none ("0 rules broken" and what was checked), could not read the roster
- * (422, per line), and the validator did not answer (times kept, retry, request id, "Show a recorded result").
+ * (422, per line), and the validator did not answer (times kept, retry, request id, "Show a recorded result"). Offline is its own
+ * settled state: the page says so (the existing offline banner), sends nothing, and offers the same recorded result.
  */
 
-export type TryPhase = "idle" | "loading" | "answer" | "none" | "invalid" | "error";
+export type TryPhase = "idle" | "loading" | "answer" | "none" | "invalid" | "error" | "offline";
 
 export interface TryHandlers extends RunsFormHandlers {
   readonly onCheck: () => void;
@@ -201,7 +203,26 @@ function Result(props: TryLayoutProps) {
         </div>
       ) : null}
 
-      {phase === "error" && showRecorded && recorded !== null ? <RecordedBlock recorded={recorded} locale={props.locale} /> : null}
+      {phase === "offline" ? (
+        <div className="flex flex-col gap-3" data-notice="offline">
+          <OfflineBanner />
+          {recorded === null ? null : (
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                data-island-action="show-recorded"
+                aria-pressed={showRecorded}
+                {...(handlers === undefined ? {} : { onClick: handlers.onShowRecorded })}
+                className={ACTION_SECONDARY}
+              >
+                {showRecorded ? t("recorded.hide") : t("recorded.button")}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {(phase === "error" || phase === "offline") && showRecorded && recorded !== null ? <RecordedBlock recorded={recorded} locale={props.locale} /> : null}
     </section>
   );
 }

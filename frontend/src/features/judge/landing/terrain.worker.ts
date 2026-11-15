@@ -1,11 +1,12 @@
 import { heatLut, isothermEach, lutOffset, makeSampler } from "./field-data";
-import { cameraMatrix, heightOf, meshFor, projectToScreen } from "./terrain-math";
+import { cameraMatrix, COAST_STRIDE, decimateCoast, heightOf, IsoLines, MAX_VERTICES, meshFor, projectToScreen, vertexCount } from "./terrain-math";
 
 /*
  * The landing terrain, drawn in a worker on an OffscreenCanvas so that creating the WebGL context, building the mesh and drawing
  * never block the page's main thread (ADR 0037). Plain WebGL: one small shader program and five buffers, no 3D library. Unlit
  * on purpose (light would change the encoded colour, which is the value); the relief is the field's own height, and the 1 degree
- * isotherms and the coast stand on it. At most 6,000 vertices on a desktop and 1,500 on a phone (terrain-math.ts).
+ * isotherms and the coast stand on it. At most 6,000 vertices on a desktop and 1,500 on a phone, counted over the mesh, the
+ * isotherm lines and the coast lines together (terrain-math.ts: lines are indexed, so a point where two segments meet is one vertex).
  *
  * Messages in: `init` (the canvas, the grid, the coast already clipped to the box, the station positions), `draw` (hour, orbit
  * angle, size). Messages out: `ready`, `drawn` (with the stations' screen positions: the names stay DOM text on the page), and
@@ -20,6 +21,8 @@ export interface InitMessage {
   readonly values: Float32Array;
   readonly coast: readonly (readonly (readonly [number, number])[])[];
   readonly mobile: boolean;
+  /** Right-to-left page: the copy is on the right, so the scene sits on the left. */
+  readonly rtl: boolean;
   /** `[lat, lon]` of the stations to place. */
   readonly stations: readonly (readonly [number, number])[];
 }
@@ -51,6 +54,7 @@ interface Scene {
   readonly gl: WebGLRenderingContext;
   readonly canvas: OffscreenCanvas;
   readonly mobile: boolean;
+  readonly rtl: boolean;
   readonly nx: number;
   readonly nz: number;
   readonly sample: (lat: number, lon: number, hour: number) => number;
@@ -64,19 +68,26 @@ interface Scene {
   readonly values: Float32Array;
   readonly indices: Uint16Array;
   readonly coastLines: readonly (readonly (readonly [number, number])[])[];
-  readonly coastCount: number;
+  /** Vertices of the coast (one per point) and indices of its line list (two per segment). */
   readonly coastPosition: Float32Array;
-  readonly iso: Float32Array;
-  isoCount: number;
+  readonly coastIndexCount: number;
+  readonly iso: IsoLines;
+  readonly isoPosition: Float32Array;
   lastHour: number;
-  readonly buffers: { readonly position: WebGLBuffer; readonly colour: WebGLBuffer; readonly index: WebGLBuffer; readonly iso: WebGLBuffer; readonly coast: WebGLBuffer };
+  readonly buffers: {
+    readonly position: WebGLBuffer;
+    readonly colour: WebGLBuffer;
+    readonly index: WebGLBuffer;
+    readonly iso: WebGLBuffer;
+    readonly isoIndex: WebGLBuffer;
+    readonly coast: WebGLBuffer;
+    readonly coastIndex: WebGLBuffer;
+  };
   readonly locations: { readonly p: number; readonly c: number; readonly m: WebGLUniformLocation | null; readonly u: WebGLUniformLocation | null };
   readonly stations: readonly (readonly [number, number])[];
 }
 
 let scene: Scene | null = null;
-
-const MAX_ISO_SEGMENTS = 24_000;
 
 function fail(why: string): void {
   scope.postMessage({ type: "fail", why });
@@ -91,7 +102,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
 }
 
 function init(message: InitMessage): void {
-  const { canvas, mobile, stations } = message;
+  const { canvas, mobile, rtl, stations } = message;
   const gl = canvas.getContext("webgl", { antialias: !mobile, alpha: true, premultipliedAlpha: false, powerPreference: "high-performance" });
   if (gl === null) {
     fail("no WebGL");
@@ -148,16 +159,31 @@ function init(message: InitMessage): void {
   const make = (): WebGLBuffer => {
     return gl.createBuffer();
   };
-  const buffers = { position: make(), colour: make(), index: make(), iso: make(), coast: make() };
+  const buffers = { position: make(), colour: make(), index: make(), iso: make(), isoIndex: make(), coast: make(), coastIndex: make() };
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-  // A phone draws every third coast point: the outline is the same at a third of the vertices.
-  const coastLines = message.coast.map((line) => (mobile ? line.filter((_, i) => i % 3 === 0 || i === line.length - 1) : line));
-  const coastCount = coastLines.reduce((sum, line) => sum + (line.length - 1) * 2, 0);
+  // A phone draws every fourth coast point: the outline is the same at a quarter of the vertices (terrain-math.ts).
+  const coastLines = decimateCoast(message.coast, COAST_STRIDE[mobile ? "phone" : "desktop"]);
+  const coastPoints = coastLines.reduce((sum, line) => sum + line.length, 0);
+  const coastIndex = new Uint16Array(coastLines.reduce((sum, line) => sum + (line.length - 1) * 2, 0));
+  let ci = 0;
+  let base = 0;
+  for (const line of coastLines) {
+    for (let i = 0; i < line.length - 1; i++) {
+      coastIndex[ci++] = base + i;
+      coastIndex[ci++] = base + i + 1;
+    }
+    base += line.length;
+  }
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.coastIndex);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, coastIndex, gl.STATIC_DRAW);
+  // the isotherms get what is left of the vertex budget after the mesh and the coast (a guard: the real field never reaches it)
+  const isoCap = Math.max(2, MAX_VERTICES[mobile ? "phone" : "desktop"] - vertexCount({ nx, nz }) - coastPoints);
   scene = {
     gl,
     canvas,
     mobile,
+    rtl,
     nx,
     nz,
     sample: makeSampler({ lat, lon, values: message.values }),
@@ -171,10 +197,10 @@ function init(message: InitMessage): void {
     values: new Float32Array(count),
     indices,
     coastLines,
-    coastCount,
-    coastPosition: new Float32Array(coastCount * 3),
-    iso: new Float32Array(MAX_ISO_SEGMENTS * 6),
-    isoCount: 0,
+    coastPosition: new Float32Array(coastPoints * 3),
+    coastIndexCount: coastIndex.length,
+    iso: new IsoLines(isoCap),
+    isoPosition: new Float32Array(isoCap * 3),
     lastHour: -1,
     buffers,
     locations: { p: gl.getAttribLocation(program, "p"), c: gl.getAttribLocation(program, "c"), m: gl.getUniformLocation(program, "m"), u: gl.getUniformLocation(program, "u") },
@@ -185,7 +211,7 @@ function init(message: InitMessage): void {
 
 /** Rebuilds the surface, its colours, the isotherms and the coast for `hour`. */
 function update(s: Scene, hour: number): void {
-  const { gl, nx, nz, position, colour, values, latLon, iso, buffers } = s;
+  const { gl, nx, nz, position, colour, values, latLon, iso, isoPosition, buffers } = s;
   const lut = heatLut();
   for (let k = 0; k < values.length; k++) {
     const v = s.sample(latLon[k * 2] ?? 0, latLon[k * 2 + 1] ?? 0, hour);
@@ -196,29 +222,21 @@ function update(s: Scene, hour: number): void {
     colour[k * 3 + 1] = (lut[at + 1] ?? 0) / 255;
     colour[k * 3 + 2] = (lut[at + 2] ?? 0) / 255;
   }
-  let count = 0;
+  iso.reset();
   isothermEach(values, nx, nz, 1, (x1, y1, x2, y2, level) => {
-    if (count >= MAX_ISO_SEGMENTS - 1) return;
-    const o = count * 6;
-    const lift = heightOf(level) + 0.004;
-    iso[o] = s.worldX(s.lonAt(x1));
-    iso[o + 1] = lift;
-    iso[o + 2] = s.worldZ(s.latAt(y1));
-    iso[o + 3] = s.worldX(s.lonAt(x2));
-    iso[o + 4] = lift;
-    iso[o + 5] = s.worldZ(s.latAt(y2));
-    count++;
+    iso.add(x1, y1, x2, y2, level);
   });
-  s.isoCount = count;
+  for (let v = 0; v < iso.vertices; v++) {
+    isoPosition[v * 3] = s.worldX(s.lonAt(iso.xy[v * 2] ?? 0));
+    isoPosition[v * 3 + 1] = heightOf(iso.level[v] ?? 0) + 0.004;
+    isoPosition[v * 3 + 2] = s.worldZ(s.latAt(iso.xy[v * 2 + 1] ?? 0));
+  }
   let q = 0;
   for (const line of s.coastLines) {
-    for (let i = 0; i < line.length - 1; i++) {
-      for (const point of [line[i], line[i + 1]]) {
-        const [lo, la] = point ?? [0, 0];
-        s.coastPosition[q++] = s.worldX(lo);
-        s.coastPosition[q++] = heightOf(s.sample(la, lo, hour)) + 0.01;
-        s.coastPosition[q++] = s.worldZ(la);
-      }
+    for (const [lo, la] of line) {
+      s.coastPosition[q++] = s.worldX(lo);
+      s.coastPosition[q++] = heightOf(s.sample(la, lo, hour)) + 0.01;
+      s.coastPosition[q++] = s.worldZ(la);
     }
   }
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
@@ -226,7 +244,9 @@ function update(s: Scene, hour: number): void {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.colour);
   gl.bufferData(gl.ARRAY_BUFFER, colour, gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.iso);
-  gl.bufferData(gl.ARRAY_BUFFER, iso.subarray(0, Math.max(6, count * 6)), gl.DYNAMIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, isoPosition.subarray(0, Math.max(3, iso.vertices * 3)), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.isoIndex);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, iso.index.subarray(0, Math.max(2, iso.segments * 2)), gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.coast);
   gl.bufferData(gl.ARRAY_BUFFER, s.coastPosition, gl.DYNAMIC_DRAW);
 }
@@ -234,7 +254,7 @@ function update(s: Scene, hour: number): void {
 function draw(message: DrawMessage): void {
   const s = scene;
   if (s === null) return;
-  const { gl, canvas, mobile, buffers, locations } = s;
+  const { gl, canvas, mobile, rtl, buffers, locations } = s;
   const { hour, azimuth, width, height, dpr } = message;
   let force = message.force;
   const pixelWidth = Math.round(width * dpr);
@@ -249,7 +269,7 @@ function draw(message: DrawMessage): void {
     update(s, hour);
     s.lastHour = hour;
   }
-  const matrix = cameraMatrix({ mobile, azimuth, aspect: width / height });
+  const matrix = cameraMatrix({ mobile, rtl, azimuth, aspect: width / height });
   const attribute = (buffer: WebGLBuffer, location: number): void => {
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.enableVertexAttribArray(location);
@@ -267,10 +287,12 @@ function draw(message: DrawMessage): void {
   gl.vertexAttrib3f(locations.c, 0, 0, 0);
   gl.uniform4f(locations.u, 0, 0, 0, 0.32);
   attribute(buffers.iso, locations.p);
-  gl.drawArrays(gl.LINES, 0, s.isoCount * 2);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.isoIndex);
+  gl.drawElements(gl.LINES, s.iso.segments * 2, gl.UNSIGNED_SHORT, 0);
   gl.uniform4f(locations.u, 0.043, 0.055, 0.078, 1);
   attribute(buffers.coast, locations.p);
-  gl.drawArrays(gl.LINES, 0, s.coastCount);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.coastIndex);
+  gl.drawElements(gl.LINES, s.coastIndexCount, gl.UNSIGNED_SHORT, 0);
   const labels = s.stations.map(([la, lo]) => projectToScreen(matrix, s.worldX(lo), heightOf(s.sample(la, lo, hour)) + 0.02, s.worldZ(la), width, height));
   scope.postMessage({ type: "drawn", labels });
 }

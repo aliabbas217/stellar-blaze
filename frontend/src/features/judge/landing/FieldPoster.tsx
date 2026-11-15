@@ -73,6 +73,7 @@ export function FieldPoster({ panel, grid, reading }: { readonly panel: FieldPan
       <FieldReadout
         reading={reading}
         live={false}
+        announce={t("scrubber.valueText", { hour: text.hour, hottest: text.hottest, station: text.station })}
         proof={panel.proof}
         source={t(panel.highestOfSeason ? "sourcePeak" : "sourcePlain", { day: panel.dayLabel })}
       />

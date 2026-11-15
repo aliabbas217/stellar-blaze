@@ -4,13 +4,14 @@ import type { Proof } from "@/components/provenance/proof";
 import { hourLabel, LIMIT_C, type FieldReading } from "./field-data";
 
 /*
- * The readout: every reading the canvas shows, as text. Hottest point of the forecast grid at the selected hour, the station's
+ * The readout: every reading the canvas shows, as text. Hottest grid cell of the forecast at the selected hour, the station's
  * own value, the heavy-work limit, how many grid cells are above it, and where the numbers come from (with its proof chip).
  * Presentational and hook-free apart from the message hook, so the server states it in the first HTML at the peak hour and the
  * island states it live with the same code.
  *
- * `live`: while the day plays the region is silent (a number read aloud every second is noise); at rest it is `polite`, so a
- * reader who moves the slider hears the new reading.
+ * `live`: the live region is ONE short sentence (hour, hottest grid cell, airport), not the whole card: an arrow press would
+ * otherwise read about eight nodes. While the day plays it is silent (a number read aloud every second is noise); at rest it is
+ * `polite`, so a reader who moves the slider hears the new reading. The card itself stays ordinary text a reader can browse.
  */
 
 export interface ReadoutText {
@@ -44,18 +45,22 @@ export interface FieldReadoutProps {
   readonly source: string;
   readonly proof: Proof;
   readonly live: boolean;
+  /** The sentence the live region says: hour, hottest grid cell and airport (the same words as the slider's value text). */
+  readonly announce: string;
 }
 
-export function FieldReadout({ reading, source, proof, live }: FieldReadoutProps) {
+export function FieldReadout({ reading, source, proof, live, announce }: FieldReadoutProps) {
   const t = useTranslations("judge.landing.field");
   const text = readoutText(reading);
   return (
     <aside
       aria-label={t("readout")}
-      aria-live={live ? "polite" : "off"}
       data-field-readout=""
-      className="relative z-10 grid gap-2 rounded-sign border border-hair bg-ground/90 p-4 min-[900px]:absolute min-[900px]:end-10 min-[900px]:bottom-36 min-[900px]:w-80 max-[899px]:order-4"
+      className="relative z-10 grid gap-2 rounded-sign border border-hair bg-ground/90 p-4 min-[900px]:absolute min-[900px]:end-10 min-[900px]:bottom-36 min-[900px]:w-80 max-[899px]:order-4 max-[899px]:mx-4"
     >
+      <p className="sr-only" aria-live={live ? "polite" : "off"} data-readout-live="">
+        {announce}
+      </p>
       <p className="text-sm text-ink-3">{t("hottest", { hour: text.hour })}</p>
       <p className="font-display text-4xl leading-solid font-light tracking-display tabular-nums text-ink" data-readout-hottest="">
         {text.hottest}

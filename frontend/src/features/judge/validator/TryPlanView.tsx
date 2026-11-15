@@ -10,6 +10,7 @@ import type { BanState } from "@/components/spine/ban-state";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { DemoSwitch } from "@/features/demo/DemoSwitch";
 import { banStateFor, SEASON_BAN } from "@/features/judge/ban";
+import { useOffline } from "@/lib/net/use-offline";
 import { lastModeTap, NO_ACTIONS, useRestoreFocus, type IslandProps } from "@/features/judge/live/useIslandGate";
 import { TryPlanLayout, type TryPhase } from "./TryPlanLayout";
 import { buildRequest, DEFAULT_ACCLIMATISED, DEFAULT_DAYS_PER_WEEK, parseDays } from "./request";
@@ -45,7 +46,9 @@ export interface TryViewProps extends Partial<IslandProps> {
 type Outcome =
   | { readonly kind: "answer"; readonly answer: AnswerView }
   | { readonly kind: "invalid"; readonly lines: readonly RosterError[] }
-  | { readonly kind: "error"; readonly requestId: string | null };
+  | { readonly kind: "error"; readonly requestId: string | null }
+  /** The check was pressed with no network: nothing was sent. Shown only while the browser stays offline. */
+  | { readonly kind: "offline" };
 
 type Notice = { readonly kind: "none" } | { readonly kind: "notReady" } | { readonly kind: "noDay" } | { readonly kind: "run"; readonly run: number; readonly problem: RunProblem };
 
@@ -77,8 +80,10 @@ export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActio
   const { siteStatus, setDemo } = demo;
   const forecast = useQuery({ ...siteForecastQueryOptions(siteId ?? ""), enabled: siteId !== undefined });
   const forecastDate = forecast.data?.date;
+  // Offline the site list and the forecast are PAUSED by the query client and never settle: that is a state ("offline"), not a wait.
+  const offline = useOffline();
   // Not ready while the site list or the site's forecast is still on its way (a failed one is ready: it is said, not waited for).
-  const waiting = siteStatus === "loading" || (siteId !== undefined && forecast.isPending);
+  const waiting = !offline && (siteStatus === "loading" || (siteId !== undefined && forecast.isPending));
 
   const start = lastTemplateTap(initialActions);
   const [runs, setRuns] = useState<Run[]>(() => (start === undefined ? (runsFromFields(fields) ?? templateRuns("common")) : templateRuns(start)));
@@ -124,6 +129,12 @@ export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActio
       return;
     }
     setDaysProblem(false);
+    if (offline) {
+      // Nothing can reach the validator: say so and offer the recorded result (never queued, never sent).
+      setOutcome({ kind: "offline" });
+      setShowRecorded(false);
+      return;
+    }
     if (siteId === undefined || forecastDate === undefined) {
       // The demo site comes from list_sites and the day from its forecast. While they load the check waits; if they did not answer, say so, never silent.
       if (waiting) setQueued(true);
@@ -183,9 +194,11 @@ export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActio
       ? { heat, ban, dateLabel }
       : { heat: NO_HEAT, ban: banStateFor(SEASON_BAN, shownDate, locale), dateLabel: dayFormat(locale).withWeekday(shownDate) };
 
+  // An offline notice belongs to the moment the check was pressed with no network: back online the page is idle again, and the next
+  // press runs the normal flow (no reload).
   const phase: TryPhase = validate.isPending || queued
     ? "loading"
-    : outcome === null
+    : outcome === null || (outcome.kind === "offline" && !offline)
       ? "idle"
       : outcome.kind === "answer"
         ? outcome.answer.validator.violations.length === 0

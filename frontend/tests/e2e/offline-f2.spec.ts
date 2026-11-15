@@ -211,8 +211,9 @@ test("offline f2: judge pages render offline after one visit", async ({ page, co
     expect((await heading.innerText()).trim(), name).not.toBe(en.offline.title);
   }
 
-  // Governance: the RECORDED run is the first paint, with nothing sent. The live control fails calmly: offline the demo site cannot be
-  // looked up, so the page says so, sends nothing and never claims a live run.
+  // Governance: the RECORDED run is the first paint, with nothing sent. The live control says it is OFFLINE (the demo site cannot be
+  // looked up with no network, which is a settled state, not a wait), sends nothing, keeps the recorded run in view and never claims a
+  // live run.
   const posts: string[] = [];
   page.on("request", (request) => {
     if (request.method() === "POST") posts.push(request.url());
@@ -221,22 +222,30 @@ test("offline f2: judge pages render offline after one visit", async ({ page, co
   await expect(page.locator("[data-governance]")).toHaveAttribute("data-governance", "recorded");
   await expect(page.locator("[data-answer=shown] [data-status]")).toHaveText("403");
   await page.getByRole("button", { name: "Send the employer's request" }).click();
-  await expect(page.getByText("The demo site is still loading. Try again in a moment.")).toBeVisible();
+  await expect(page.locator("[data-notice=offline]")).toContainText(en.states.offlineBanner.title);
+  await expect(page.getByText("The demo site is still loading. Try again in a moment.")).toHaveCount(0);
   await expect(page.locator("[data-governance]")).toHaveAttribute("data-governance", "recorded");
+  await expect(page.locator("[data-answer=shown] [data-status]")).toHaveText("403");
   await expect(page.getByText("Live.")).toHaveCount(0);
   await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
   expect(posts, "nothing was sent").toEqual([]);
 
-  // Try a plan: the page renders its roster and plain controls; a check cannot reach the validator (offline the demo site cannot be
-  // looked up either), so it says so, sends nothing and shows no result. KNOWN GAP (reported, not fixed here: the page is the judge
-  // lane's): the RECORDED result is offered only after a failed validator call, which this path never makes, so offline there is no
-  // recorded result to show, and the notice says "still loading" rather than "offline".
+  // Try a plan: a check cannot reach the validator (and offline the demo site cannot be looked up), so the page says it is offline,
+  // sends nothing, and OFFERS the RECORDED result (the same label as after a failed validator call); the recorded result opens.
   await page.goto("/en/replay/try");
   await page.getByRole("button", { name: "Check this plan" }).click();
-  await expect(page.getByText("The demo site is still loading. Try again in a moment.")).toBeVisible();
-  await expect(page.locator("[data-try]")).toHaveAttribute("data-try", "idle");
-  await expect(page.locator("[data-try-result]")).toHaveCount(0);
+  await expect(page.locator("[data-try]")).toHaveAttribute("data-try", "offline");
+  await expect(page.locator("[data-notice=offline]")).toContainText(en.states.offlineBanner.title);
+  await expect(page.getByText("The demo site is still loading. Try again in a moment.")).toHaveCount(0);
+  await expect(page.locator("[data-recorded]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Show a recorded result" }).click();
+  await expect(page.locator("[data-recorded] [data-answer]")).toBeVisible();
   expect(posts, "nothing was sent").toEqual([]);
+
+  // Back online the page resumes without a reload: the offline notice goes and the check is idle again (the unit test runs the next check).
+  await context.setOffline(false);
+  await expect(page.locator("[data-notice=offline]")).toHaveCount(0);
+  await expect(page.locator("[data-try]")).toHaveAttribute("data-try", "idle");
 });
 
 test("offline f2: offline Today shows the stale protective hero, first, with no live level", async ({ page, context }) => {
@@ -267,6 +276,7 @@ test("offline f2: offline Today shows the stale protective hero, first, with no 
 });
 
 test("offline f2: offline supervisor shows the notice, no data, and a Stop outbox that survives a reload and reports Not sent", async ({ page, context }) => {
+  acted.add(page);
   await loadControlled(page, "/en/supervisor");
   await page.locator("[data-crew]").first().waitFor();
 
@@ -276,7 +286,6 @@ test("offline f2: offline supervisor shows the notice, no data, and a Stop outbo
   // No data: the crews list is online-only (D2), so there are no crews, and the screen says so rather than showing old numbers.
   await expect(stopBar(page)).toBeVisible();
   await expect(page.locator("[data-crew]")).toHaveCount(0);
-  acted.add(page);
   await expect(page.getByRole("button", { name: /^Stop work/ })).toBeEnabled();
   // The screen tells the supervisor it cannot reach the API: the crews list's own error state (the crews view's "ready" state is the
   // only one with an offline banner, and offline there is no ready state), worded from the catalogue.
@@ -313,6 +322,7 @@ test("offline f2: offline supervisor shows the notice, no data, and a Stop outbo
   await context.setOffline(false);
   await expect(stopBar(page)).toContainText("Work stopped", { timeout: 20_000 });
   expect(forbidden(await cacheEntries(page))).toEqual([]);
+});
 
 /**
  * Seeds the Stop outbox the way an earlier visit would have left it. The database and store names are stop-outbox.ts's
@@ -383,17 +393,6 @@ test("offline f2: a stop kept 61 minutes ago is never sent: the page says it exp
   expect(stopRequests, "an expired stop is never sent, not at app open and not later").toEqual([]);
 });
 
-test("offline f2: the alert card's shell is precached: it opens offline for a warning this phone never opened", async ({ page, context }) => {
-  await loadControlled(page, "/en/worker");
-  // The exact path: `/en/worker/alerts` (the list) must not stand in for `/en/worker/alert` (the card).
-  await expect.poll(() => cacheEntries(page).then((entries) => entries.some((entry) => entryPath(entry) === "/en/worker/alert"))).toBe(true);
-
-  await context.setOffline(true);
-});
-  await page.goto(ALERT_UNVISITED);
-
-  await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
-  await expect(page.getByText(en.states.offlineBanner.title)).toBeVisible();
 test("offline f2: a stop that expired for Crew A is told on Crew B's page too, and nothing is sent", async ({ page }) => {
   const stopRequests = watchStopRequests(page);
   await page.goto("/en/replay");
@@ -410,6 +409,16 @@ test("offline f2: a stop that expired for Crew A is told on Crew B's page too, a
 /** The path of a Cache Storage entry listed as "<cache> <path+query>" (no query). */
 const entryPath = (entry: string): string => (entry.slice(entry.indexOf(" ") + 1).split("?")[0]) ?? "";
 
+test("offline f2: the alert card's shell is precached: it opens offline for a warning this phone never opened", async ({ page, context }) => {
+  await loadControlled(page, "/en/worker");
+  // The exact path: `/en/worker/alerts` (the list) must not stand in for `/en/worker/alert` (the card).
+  await expect.poll(() => cacheEntries(page).then((entries) => entries.some((entry) => entryPath(entry) === "/en/worker/alert"))).toBe(true);
+
+  await context.setOffline(true);
+  await page.goto(ALERT_UNVISITED);
+
+  await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
+  await expect(page.getByText(en.states.offlineBanner.title)).toBeVisible();
   // The page is the alert card, not the offline fallback.
   await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(en.offline.title);
 });

@@ -1,4 +1,5 @@
 import { boxOf, heatLut, isothermSegments, lutOffset, rasterize, type Box, type FieldGrid, type Polyline } from "./field-data";
+import { mapCentreX } from "./terrain-math";
 
 /*
  * The 2D drawing of the field: one function per frame, no framework. The field is rasterized on a 0.05 degree mesh, coloured
@@ -46,7 +47,7 @@ export function geometry(width: number, height: number, box: Box, rtl: boolean):
   const latSpan = box[3] - box[1];
   const kx = Math.cos((((box[1] + box[3]) / 2) * Math.PI) / 180);
   const scale = Math.min((width * (phone ? 0.92 : 0.5)) / (lonSpan * kx), (height * (phone ? 0.86 : 0.62)) / latSpan);
-  const centreX = phone ? 0.5 : rtl ? 0.38 : 0.62;
+  const centreX = phone ? 0.5 : mapCentreX(rtl);
   return { width, height, scale, originX: width * centreX, originY: height * (phone ? 0.5 : 0.44), kx, box };
 }
 

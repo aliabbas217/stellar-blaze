@@ -81,7 +81,7 @@ describe("the landing page", () => {
     const readout = container.querySelector("[data-field-readout]");
     const expected = readoutText(readingAt(grid, field.omaa, field.peakHour));
     expect(field.peakHour).toBe(14);
-    expect(readout).toHaveTextContent(`Hottest point on the forecast grid at ${expected.hour}`);
+    expect(readout).toHaveTextContent(`Hottest grid cell at ${expected.hour}`);
     expect(readout?.querySelector("[data-readout-hottest]")).toHaveTextContent(`${expected.hottest}°C`);
     expect(readout?.querySelector("[data-readout-station]")).toHaveTextContent(`${expected.station} °C`);
     expect(readout).toHaveTextContent("26.6 °C");
@@ -98,8 +98,37 @@ describe("the landing page", () => {
     expect(hook).toHaveTextContent(`${metric.ci.lo.toFixed(1)} to ${metric.ci.hi.toFixed(1)}, 95% interval`);
     expect(hook).toHaveTextContent(policy.working_hours_utc);
     expect(hook).toHaveTextContent(`${String(policy.margin_w_m2)} W/m² is an assumption`);
+    // what the truth is: derived from the station's recorded observations, against the ADOSH High or Red zone (the file's own words)
+    expect(hook).toHaveTextContent("derived from the station's recorded observations");
+    expect(hook).toHaveTextContent("ADOSH High or Red zone");
     expect(within(hook as HTMLElement).getByRole("button", { name: /Proof for/ })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/58/);
+  });
+
+  it("test_hours_bridge: one line says the season's raw-forecast hours and the danger hours count different things against different limits, with both numbers read from the files", () => {
+    const { container } = view();
+    const metric = policy.leads.find((lead) => lead.lead_days === 1)?.truth_danger_hours;
+    const bridge = container.querySelector("[data-hours-bridge]");
+    expect(bridge).not.toBeNull();
+    expect(bridge).toHaveTextContent(`These ${facts.over.toLocaleString("en-US")} hours and the ${metric?.value.toFixed(1) ?? "?"} danger hours`);
+    expect(bridge).toHaveTextContent("different things against different limits");
+    expect(bridge).toHaveTextContent(`${String(HEAVY_WORK_LIMIT_WBGT_C)} °C heavy-work limit`);
+    expect(bridge).toHaveTextContent("ADOSH High or Red zone");
+    expect(container.querySelectorAll("[data-hours-bridge]")).toHaveLength(1);
+  });
+
+  it("has no bridge without the hook: with no scored file there is no danger-hour count to reconcile", () => {
+    const { container } = view(null as never);
+    expect(container.querySelector("[data-hours-bridge]")).toBeNull();
+  });
+
+  it("the lede says what the product does, not 'every outdoor crew', and the sub-hook line does not claim every number is a recorded file's", () => {
+    const { container } = view();
+    const text = container.textContent;
+    expect(text).not.toMatch(/every outdoor crew/i);
+    expect(text).toContain("for the crews on a worksite, shift by shift");
+    expect(text).not.toContain("Each number on this page comes from a recorded file");
+    expect(text).toContain("Every figure about the season and the scores comes from a recorded file");
   });
 
   it("drops the hook, not the page, when there is no scored file", () => {
@@ -205,6 +234,9 @@ describe("the live field island", () => {
     dir: "ltr",
   } as const;
 
+  let reducedNow = false;
+  const listeners: (() => void)[] = [];
+
   function stubBrowser(reduced: boolean): { raf: ReturnType<typeof vi.fn> } {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     vi.stubGlobal(
@@ -214,7 +246,20 @@ describe("the live field island", () => {
         disconnect(): void {}
       },
     );
-    vi.stubGlobal("matchMedia", (query: string) => ({ matches: reduced && query.includes("reduce"), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    reducedNow = reduced;
+    listeners.length = 0;
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      get matches() {
+        return reducedNow && query.includes("reduce");
+      },
+      addEventListener: (_type: string, listener: () => void) => {
+        listeners.push(listener);
+      },
+      removeEventListener: (_type: string, listener: () => void) => {
+        const at = listeners.indexOf(listener);
+        if (at >= 0) listeners.splice(at, 1);
+      },
+    }));
     const raf = vi.fn(() => 1);
     vi.stubGlobal("requestAnimationFrame", raf);
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
@@ -235,7 +280,7 @@ describe("the live field island", () => {
     expect(slider).toHaveAttribute("aria-valuemin", "0");
     expect(slider).toHaveAttribute("aria-valuemax", "23");
     expect(slider).toHaveAttribute("aria-valuenow", "14");
-    expect(slider.getAttribute("aria-valuetext")).toBe(`14:00: hottest point ${readoutText(readingAt(grid, field.omaa, 14)).hottest} degrees, Abu Dhabi airport ${field.omaa[14]?.toFixed(1) ?? ""}`);
+    expect(slider.getAttribute("aria-valuetext")).toBe(`14:00: hottest grid cell ${readoutText(readingAt(grid, field.omaa, 14)).hottest} degrees, Abu Dhabi airport ${field.omaa[14]?.toFixed(1) ?? ""}`);
     fireEvent.keyDown(slider, { key: "ArrowRight" });
     expect(slider).toHaveAttribute("aria-valuenow", "15");
     // test_readout_text_equals_canvas_values: the readout names the hour's own hottest cell
@@ -246,11 +291,69 @@ describe("the live field island", () => {
     expect(slider).toHaveAttribute("aria-valuenow", "13");
     fireEvent.keyDown(slider, { key: "Home" });
     expect(slider).toHaveAttribute("aria-valuenow", "0");
+    // a slider does not wrap: Left at 00:00 stays, Right at 23:00 stays
     fireEvent.keyDown(slider, { key: "ArrowLeft" });
-    expect(slider).toHaveAttribute("aria-valuenow", "23");
+    expect(slider).toHaveAttribute("aria-valuenow", "0");
     fireEvent.keyDown(slider, { key: "End" });
     expect(slider).toHaveAttribute("aria-valuenow", "23");
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(slider).toHaveAttribute("aria-valuenow", "23");
+    fireEvent.keyDown(slider, { key: "ArrowUp" });
+    expect(slider).toHaveAttribute("aria-valuenow", "23");
     expect(document.querySelector("[data-readout-where]")).toHaveTextContent(/^\d\d\.\d\d N \d\d\.\d\d E$/);
+  });
+
+  it("test_slider_page_keys_step_three_hours_and_stop_at_the_ends", () => {
+    stubBrowser(true);
+    island();
+    const slider = screen.getByRole("slider");
+    fireEvent.keyDown(slider, { key: "PageDown" });
+    expect(slider).toHaveAttribute("aria-valuenow", "11");
+    fireEvent.keyDown(slider, { key: "PageUp" });
+    fireEvent.keyDown(slider, { key: "PageUp" });
+    expect(slider).toHaveAttribute("aria-valuenow", "17");
+    fireEvent.keyDown(slider, { key: "PageUp" });
+    fireEvent.keyDown(slider, { key: "PageUp" });
+    expect(slider).toHaveAttribute("aria-valuenow", "23");
+    fireEvent.keyDown(slider, { key: "Home" });
+    fireEvent.keyDown(slider, { key: "PageDown" });
+    expect(slider).toHaveAttribute("aria-valuenow", "0");
+  });
+
+  it("test_live_region_is_smaller_than_the_card: only the hour, hottest and airport sentence is live, not the eight nodes of the card", () => {
+    stubBrowser(true);
+    island();
+    const card = document.querySelector("[data-field-readout]") as HTMLElement;
+    const live = document.querySelector("[data-readout-live]") as HTMLElement;
+    expect(card).not.toHaveAttribute("aria-live");
+    expect(card.querySelectorAll("[aria-live]")).toHaveLength(1);
+    expect(card.contains(live)).toBe(true);
+    const sentence = `14:00: hottest grid cell ${readoutText(readingAt(grid, field.omaa, 14)).hottest} degrees, Abu Dhabi airport ${field.omaa[14]?.toFixed(1) ?? ""}`;
+    expect(live.textContent).toBe(sentence);
+    expect(live.textContent.length).toBeLessThan(card.textContent.length / 2);
+    expect(live).toHaveAttribute("aria-live", "polite");
+    // an arrow press changes the live sentence and nothing else of the card is a live region
+    fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowRight" });
+    expect(live.textContent).toContain("15:00");
+    expect(card.querySelectorAll("[aria-live]")).toHaveLength(1);
+  });
+
+  it("test_reduced_motion_is_read_live: asking for reduced motion while the day plays stops it and removes Play; asking later does not restart it", () => {
+    stubBrowser(false);
+    island();
+    expect(screen.getByRole("button", { name: "Pause the day" })).toBeInTheDocument();
+    reducedNow = true;
+    act(() => {
+      for (const listener of [...listeners]) listener();
+    });
+    expect(screen.queryByRole("button", { name: /Play the day|Pause the day/ })).toBeNull();
+    expect(document.querySelector("[data-readout-live]")).toHaveAttribute("aria-live", "polite");
+    // lifting it again shows Play (a press) and does not start the day
+    reducedNow = false;
+    act(() => {
+      for (const listener of [...listeners]) listener();
+    });
+    expect(screen.getByRole("button", { name: "Play the day" })).toBeInTheDocument();
   });
 
   it("test_reduced_motion_no_autoplay: rests on the peak hour, starts no animation and offers no Play button", () => {
@@ -259,19 +362,19 @@ describe("the live field island", () => {
     expect(raf).not.toHaveBeenCalled();
     expect(screen.getByRole("slider")).toHaveAttribute("aria-valuenow", "14");
     expect(screen.queryByRole("button", { name: /Play the day|Pause the day/ })).toBeNull();
-    expect(document.querySelector("[data-field-readout]")).toHaveAttribute("aria-live", "polite");
+    expect(document.querySelector("[data-readout-live]")).toHaveAttribute("aria-live", "polite");
   });
 
   it("plays the day once on its own without reduced motion, silent for screen readers while it plays, and Pause stops it", () => {
     const { raf } = stubBrowser(false);
     island();
     expect(raf).toHaveBeenCalled();
-    expect(document.querySelector("[data-field-readout]")).toHaveAttribute("aria-live", "off");
+    expect(document.querySelector("[data-readout-live]")).toHaveAttribute("aria-live", "off");
     act(() => {
       screen.getByRole("button", { name: "Pause the day" }).click();
     });
     expect(screen.getByRole("button", { name: "Play the day" })).toBeInTheDocument();
-    expect(document.querySelector("[data-field-readout]")).toHaveAttribute("aria-live", "polite");
+    expect(document.querySelector("[data-readout-live]")).toHaveAttribute("aria-live", "polite");
   });
 
   it("test_readout_text_equals_canvas_values: every hour's readout equals the reading the canvas is drawn from", () => {

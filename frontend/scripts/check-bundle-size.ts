@@ -16,16 +16,22 @@
 //  - `/worker/alert` (the static alert-card shell) is covered too (architect, 2026-11-15, afternoon). The covered routes are exactly
 //    /worker, /worker/alerts, /worker/alert, /supervisor and /supervisor/crews/[crewId]; there is no "pending" class any more: every
 //    route either meets its ceiling or fails the build. `/worker/unwell` and every other route stay at 174,080 B.
+//  - the landing's lazy 3D scene (Part L1 I3, the landing review): the scene chunk and the terrain worker's chunks load after first
+//    paint and are not in any route's first-load list, so the first-load check cannot see them. They are gated here on their own:
+//    22 KB gzip, 22,528 B (`SCENE_CEILING`; ADR 0037's scene budget), found in the build output by the worker URL the scene chunk
+//    carries, never by a hashed file name, and failing when they cannot be found (a Turbopack change must not drop the gate silently).
 //  - the check cannot pass vacuously (F2 W4 I2): it fails when the stats hold no route, when a route's size is 0 (a renamed or
 //    missing `firstLoadChunkPaths`, a build that listed no script), and when a route it has a ruling for is absent from the stats
 //    (REQUIRED: a rename would otherwise drop the ceilings silently).
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const KB = 1024;
 export const BUDGET = 170 * KB;
 export const DATA_SCREEN_CEILING = 195 * KB;
+/** The landing's lazy scene (the page-side scene chunk plus the worker's own chunks), gzip: 22 KB. */
+export const SCENE_CEILING = 22 * KB;
 
 export const CEILINGS: Readonly<Record<string, number>> = {
   "/[locale]/worker": DATA_SCREEN_CEILING,
@@ -84,6 +90,64 @@ export function vacuity(stats: readonly RouteStats[], rows: readonly RouteVerdic
   return problems;
 }
 
+/** What Turbopack writes in the page-side scene chunk for `new Worker(new URL("./terrain.worker.ts", ...))`. */
+const SCENE_MARKER = "terrain.worker.";
+const WORKER_ENTRY = /\.f\("(static\/chunks\/turbopack-worker-[^"]+\.js)",\[([^\]]*)\]\)/;
+
+export interface SceneFound {
+  /** Chunk paths as the scene chunk names them (`static/chunks/<hash>.js`), minus the ones the route already loads first. */
+  readonly chunks: string[];
+  readonly size: number;
+  readonly problems: string[];
+}
+
+const base = (path: string): string => path.replaceAll("\\", "/").split("/").pop() ?? path;
+
+/**
+ * The lazy 3D scene in a build: `files` are the paths under `.next/static/chunks` as the scene chunk names them
+ * (`static/chunks/x.js`), `read` their text, `gzipSize` their gzip size (0 for a file that is not there), `firstLoad` the chunks of
+ * `/[locale]` (the first-load check already counts those, so they are not counted twice).
+ */
+export function lazyScene(
+  files: readonly string[],
+  read: (chunk: string) => string | undefined,
+  gzipSize: (chunk: string) => number,
+  firstLoad: readonly string[],
+): SceneFound {
+  const problems: string[] = [];
+  const scene = files.filter((file) => read(file)?.includes(SCENE_MARKER) === true);
+  if (scene.length === 0) return { chunks: [], size: 0, problems: [`no chunk references the terrain worker (\`${SCENE_MARKER}\`): the scene was renamed, or the build no longer emits it`] };
+  const named = new Set<string>(scene);
+  for (const file of scene) {
+    const entry = WORKER_ENTRY.exec(read(file) ?? "");
+    if (entry === null) {
+      problems.push(`${file} names no worker bootstrap (turbopack-worker-*.js): the worker output shape changed`);
+      continue;
+    }
+    named.add(entry[1] ?? "");
+    for (const dep of (entry[2] ?? "").matchAll(/"([^"]+)"/g)) named.add(dep[1] ?? "");
+  }
+  const loaded = new Set(firstLoad.map(base));
+  const chunks = [...named].filter((chunk) => !loaded.has(base(chunk)));
+  const present = new Set(files);
+  let size = 0;
+  for (const chunk of chunks) {
+    if (!present.has(chunk)) {
+      problems.push(`${chunk} is named by the scene chunk but is not in the build`);
+      continue;
+    }
+    const bytes = gzipSize(chunk);
+    if (bytes === 0) problems.push(`${chunk} has no content`);
+    size += bytes;
+  }
+  if (chunks.length === 0) problems.push("the scene has no chunk of its own to count");
+  return { chunks, size, problems };
+}
+
+export function sceneVerdict(found: SceneFound): "ok" | "FAIL" {
+  return found.size <= SCENE_CEILING ? "ok" : "FAIL";
+}
+
 function main(): void {
   const stats = JSON.parse(readFileSync(join(process.cwd(), ".next", "diagnostics", "route-bundle-stats.json"), "utf8")) as RouteStats[];
   const gzipSize = (chunk: string) => gzipSync(readFileSync(join(process.cwd(), chunk.replaceAll("\\", "/")))).length;
@@ -93,10 +157,23 @@ function main(): void {
   }
   const failed = rows.filter((row) => row.status === "FAIL");
   const vacuous = vacuity(stats, rows);
+  const chunkDir = join(process.cwd(), ".next", "static", "chunks");
+  const chunkFiles = readdirSync(chunkDir).filter((name) => name.endsWith(".js")).map((name) => `static/chunks/${name}`);
+  const textOf = (chunk: string): string | undefined => {
+    try {
+      return readFileSync(join(process.cwd(), ".next", chunk), "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+  const scene = lazyScene(chunkFiles, textOf, (chunk) => gzipSync(readFileSync(join(process.cwd(), ".next", chunk))).length, stats.find((entry) => entry.route === "/[locale]")?.firstLoadChunkPaths ?? []);
+  console.log(`${sceneVerdict(scene).padEnd(5)} ${"landing lazy 3D scene".padEnd(38)} ${String(scene.size).padStart(8)} B of ${String(SCENE_CEILING).padStart(7)} (${String(scene.chunks.length)} chunks)`);
+  vacuous.push(...scene.problems);
   if (vacuous.length > 0) {
     console.error(`\nbundle:check cannot vouch for this build:\n - ${vacuous.join("\n - ")}`);
     process.exit(1);
   }
+  if (sceneVerdict(scene) === "FAIL") failed.push({ route: "landing lazy 3D scene", size: scene.size, limit: SCENE_CEILING, status: "FAIL" });
   if (failed.length > 0) {
     console.error(`\nbundle:check failed for ${failed.map((row) => `${row.route} (${String(row.size - row.limit)} B over)`).join(", ")}`);
     process.exit(1);

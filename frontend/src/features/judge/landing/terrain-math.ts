@@ -12,10 +12,82 @@ export interface MeshSize {
   readonly nz: number;
 }
 
-/** ADR 0037 section 3: at most 6,000 vertices on a desktop and 1,500 on a phone. 85 x 65 = 5,525 and 43 x 33 = 1,419. */
-export const MESH = { desktop: { nx: 85, nz: 65 }, phone: { nx: 43, nz: 33 } } as const satisfies Record<string, MeshSize>;
+/**
+ * ADR 0037 section 3: at most 6,000 vertices on a desktop and 1,500 on a phone, counted over EVERYTHING one frame sends to the
+ * GPU: the terrain mesh, the isotherm lines and the coast lines (`frameVertices`). The forecast field is a 22 x 17 grid, so a
+ * mesh of 65 x 49 (desktop) or 27 x 21 (phone) is finer than it (about 8.5 and 1.5 times its nodes).
+ */
+export const MESH = { desktop: { nx: 65, nz: 49 }, phone: { nx: 27, nz: 21 } } as const satisfies Record<string, MeshSize>;
 
 export const MAX_VERTICES = { desktop: 6000, phone: 1500 } as const;
+
+/** Every how many points of a coast line one is kept: a phone draws every fourth (the outline is the same at a quarter of the vertices). */
+export const COAST_STRIDE = { desktop: 1, phone: 4 } as const;
+
+/** The vertices of one frame: the surface, the isotherm lines (shared endpoints) and the coast lines (one vertex per point). */
+export function frameVertices(mesh: MeshSize, isoVertices: number, coastVertices: number): number {
+  return vertexCount(mesh) + isoVertices + coastVertices;
+}
+
+/** The coast lines a scene draws: the points kept by the stride (always the last point of a line), lines of fewer than 2 points dropped. */
+export function decimateCoast<T>(lines: readonly (readonly T[])[], stride: number): T[][] {
+  return lines
+    .map((line) => line.filter((_, i) => i % stride === 0 || i === line.length - 1))
+    .filter((line) => line.length >= 2);
+}
+
+/**
+ * The isotherm segments of one frame as an indexed line list. Marching squares gives each segment its own two endpoints, but
+ * neighbouring segments of one line meet on a cell edge: endpoints that fall on the same spot of the same level are ONE vertex,
+ * which halves the vertices the frame sends (a closed line of n segments is n vertices, not 2n). `xy` holds mesh coordinates
+ * (column, row) so the worker maps them to the world with its own functions.
+ */
+export class IsoLines {
+  readonly xy: Float32Array;
+  readonly level: Float32Array;
+  readonly index: Uint16Array;
+  vertices = 0;
+  segments = 0;
+  /** Segments dropped because the vertex cap was reached (0 on the real field: the cap is a guard, not a decimator). */
+  dropped = 0;
+  readonly #seen = new Map<number, number>();
+
+  constructor(readonly maxVertices: number) {
+    this.xy = new Float32Array(maxVertices * 2);
+    this.level = new Float32Array(maxVertices);
+    this.index = new Uint16Array(maxVertices * 2);
+  }
+
+  reset(): void {
+    this.vertices = 0;
+    this.segments = 0;
+    this.dropped = 0;
+    this.#seen.clear();
+  }
+
+  #vertex(x: number, y: number, level: number): number {
+    // a sixty-fourth of a mesh cell is the same spot; levels are whole degrees (16 to 46 here, under 64 for any WBGT)
+    const key = (Math.round(x * 64) * 8192 + Math.round(y * 64)) * 64 + (level & 63);
+    const known = this.#seen.get(key);
+    if (known !== undefined) return known;
+    const at = this.vertices++;
+    this.xy[at * 2] = x;
+    this.xy[at * 2 + 1] = y;
+    this.level[at] = level;
+    this.#seen.set(key, at);
+    return at;
+  }
+
+  add(x1: number, y1: number, x2: number, y2: number, level: number): void {
+    if (this.vertices + 2 > this.maxVertices) {
+      this.dropped++;
+      return;
+    }
+    this.index[this.segments * 2] = this.#vertex(x1, y1, level);
+    this.index[this.segments * 2 + 1] = this.#vertex(x2, y2, level);
+    this.segments++;
+  }
+}
 
 export function meshFor(mobile: boolean): MeshSize {
   return mobile ? MESH.phone : MESH.desktop;
@@ -73,8 +145,26 @@ export function lookAt(eye: readonly [number, number, number], target: readonly 
   return new Float32Array([xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0, -(xx * eye[0] + xy * eye[1] + xz * eye[2]), -(yx * eye[0] + yy * eye[1] + yz * eye[2]), -(zx * eye[0] + zy * eye[1] + zz * eye[2]), 1]);
 }
 
+/**
+ * Where the map's centre sits across the stage on a wide screen, as a fraction of its width: the copy owns the start side, so the
+ * map is centred on the end side (mirrored in a right-to-left language: the map itself never mirrors, geography has no direction).
+ * One constant for the 2D canvas and the WebGL scene.
+ */
+export const MAP_CENTRE_END = 0.62;
+
+export function mapCentreX(rtl: boolean): number {
+  return rtl ? 1 - MAP_CENTRE_END : MAP_CENTRE_END;
+}
+
+/** The scene's shift along clip-space x (clip space spans 2 units across the stage): the same centre as the 2D canvas. */
+export function sceneShiftX(rtl: boolean): number {
+  return (mapCentreX(rtl) - 0.5) * 2;
+}
+
 export interface CameraOptions {
   readonly mobile: boolean;
+  /** Right-to-left page: the copy is on the right, so the scene shifts to the left. */
+  readonly rtl?: boolean;
   /** Orbit angle in radians (the desktop scene turns slowly while the day plays). */
   readonly azimuth: number;
   readonly aspect: number;
@@ -83,7 +173,7 @@ export interface CameraOptions {
 const TARGET = [0, 0.55, 0.1] as const;
 
 /** The model-view-projection matrix of the scene. */
-export function cameraMatrix({ mobile, azimuth, aspect }: CameraOptions): Mat {
+export function cameraMatrix({ mobile, azimuth, aspect, rtl = false }: CameraOptions): Mat {
   const radius = mobile ? 8.4 : 11.2;
   const tilt = mobile ? 0.98 : 0.74;
   const eye = [
@@ -92,7 +182,7 @@ export function cameraMatrix({ mobile, azimuth, aspect }: CameraOptions): Mat {
     TARGET[2] + Math.cos(azimuth - 0.35) * radius * Math.cos(tilt),
   ] as const;
   // On a desktop the copy owns the start side: the scene is shifted toward the end side in clip space.
-  const shift = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, mobile ? 0 : 0.3, mobile ? 0 : 0.08, 0, 1]);
+  const shift = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, mobile ? 0 : sceneShiftX(rtl), mobile ? 0 : 0.08, 0, 1]);
   return mul(shift, mul(perspective(mobile ? 44 : 32, aspect, 0.1, 100), lookAt(eye, TARGET)));
 }
 
@@ -105,7 +195,10 @@ export function projectToScreen(matrix: Mat, x: number, y: number, z: number, wi
   return [((cx / cw) * 0.5 + 0.5) * width, ((-cy / cw) * 0.5 + 0.5) * height];
 }
 
-/** ADR 0037 section 4: below 30 frames per second for 2 seconds, the scene gives way to the 2D field. */
+/**
+ * ADR 0037 section 4: below 30 frames per second for 2 seconds, the scene gives way to the 2D field. The frames counted are the
+ * ones the WORKER finished (a `drawn` answer), never the page's animation frames: a slow GPU shows up as late answers.
+ */
 export const FPS_FLOOR = 30;
 export const FPS_WINDOW_MS = 2000;
 /** A gap this long between two frames is a pause (nothing was being drawn), not a slow frame. */
@@ -115,7 +208,7 @@ export class FpsMonitor {
   #last: number | null = null;
   #slowMs = 0;
 
-  /** Call once per frame of a PLAYING day with the frame's timestamp (ms). True when the scene should be given up. */
+  /** Call once per frame the worker finished while the day PLAYS, with the time of the answer (ms). True when the scene should be given up. */
   tick(nowMs: number): boolean {
     const last = this.#last;
     this.#last = nowMs;

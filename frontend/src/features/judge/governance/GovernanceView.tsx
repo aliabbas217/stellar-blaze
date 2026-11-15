@@ -9,6 +9,7 @@ import { ResetDemoControl } from "@/components/shell/ResetDemoControl";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { DemoSwitch } from "@/features/demo/DemoSwitch";
 import { lastModeTap, NO_ACTIONS, useRestoreFocus } from "@/features/judge/live/useIslandGate";
+import { useOffline } from "@/lib/net/use-offline";
 import { outcomeOf, REQUEST_DATA_CLASS, SYNTHETIC_WORKER_REF, type Outcome } from "./answer";
 import { CallNotice, GovernanceLayout } from "./GovernanceLayout";
 import { toAuditRow, type AuditRow, type RecordedView, type RefusalAnswer } from "./recorded-view";
@@ -44,6 +45,10 @@ export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreF
   // The last REFUSED call: steps 1 to 4 keep showing it while a later call runs or fails ("the last run stays on screen").
   const [lastRun, setLastRun] = useState<{ readonly sentAt: string; readonly answer: RefusalAnswer } | null>(null);
   const [notReady, setNotReady] = useState(false);
+  // A send tapped with no network: said as offline (the demo site lookup is paused offline and never settles), nothing sent, the
+  // recorded run stays in view. It shows only while the browser stays offline.
+  const offline = useOffline();
+  const [offlineTapped, setOfflineTapped] = useState(false);
   // Set when a call REACHED the service (a refusal, or a 2xx that should not happen), so the button reads "Send again" only
   // then: after a 401, a 429 or a network failure nothing was sent, and it keeps its label while a call runs.
   const [sentOnce, setSentOnce] = useState(false);
@@ -58,6 +63,12 @@ export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreF
 
   function onSend(): void {
     if (send.isPending) return;
+    if (offline) {
+      setNotReady(false);
+      setOfflineTapped(true);
+      return;
+    }
+    setOfflineTapped(false);
     if (siteId === undefined) {
       // The demo site comes from list_sites; until it answers there is nothing to address. Said, never silent.
       setNotReady(true);
@@ -103,10 +114,10 @@ export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreF
     setDemo(modeTap);
   }, [modeTap, setDemo]);
   useEffect(() => {
-    if (!wantsSend || handedOff.current.send || siteStatus === "loading") return;
+    if (!wantsSend || handedOff.current.send || (siteStatus === "loading" && !offline)) return;
     handedOff.current.send = true;
     onSendRef.current();
-  }, [wantsSend, siteStatus]);
+  }, [wantsSend, siteStatus, offline]);
   useRestoreFocus(restoreFocus);
 
   const apiRows: readonly AuditRow[] = log.data?.entries.map(toAuditRow) ?? [];
@@ -123,7 +134,7 @@ export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreF
       logFetching={log.isFetching}
       sentBefore={sentOnce}
       onSend={onSend}
-      notice={<CallNotice outcome={run.outcome} notReady={notReady} logFailed={log.isError && run.runLive} />}
+      notice={<CallNotice outcome={run.outcome} notReady={notReady} offline={offlineTapped && offline} logFailed={log.isError && run.runLive} />}
       modeSwitch={<DemoSwitch />}
       reset={<ResetDemoControl siteId={siteId} autoStart={initialActions.includes("reset")} siteFailed={siteStatus === "error"} notReady={t("notReady")} />}
     />

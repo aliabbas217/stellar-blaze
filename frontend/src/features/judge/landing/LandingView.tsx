@@ -28,7 +28,9 @@ import { LandingHeader } from "./LandingHeader";
 
 /*
  * The landing page body: the hero (the field, over the copy), chapter 1 "The problem" and chapter 2 "The scoreboard", and the
- * story footer. A server component over build-time files: nothing here fetches, and every number on it is read from a
+ * story footer. The hero is at least one screen high and GROWS with its copy (the copy is in the flow, the field, the readout and the
+ * scrubber lie over and under it): a fixed-height hero clipped the buttons and the hook where the copy runs taller than the screen
+ * (a laptop 768 px high, Arabic-script line heights of 2.5), and a clipped link is still focusable. A server component over build-time files: nothing here fetches, and every number on it is read from a
  * committed file by the code that is imported here (never typed): the season counts from the recorded hourly forecast, the
  * danger hours and the table from the scored Warnings file, the field's readout from the recorded forecast grid.
  *
@@ -155,13 +157,13 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
         <section
           aria-labelledby="landing-title"
           data-landing-hero=""
-          className="relative border-b border-hair max-[899px]:flex max-[899px]:flex-col min-[900px]:h-[calc(100svh-3.5rem)] min-[900px]:max-h-240 min-[900px]:min-h-164 min-[900px]:overflow-hidden"
+          className="relative border-b border-hair max-[899px]:flex max-[899px]:flex-col min-[900px]:min-h-[clamp(41rem,calc(100svh-3.5rem),60rem)] min-[900px]:overflow-hidden"
         >
-          <div className="relative z-10 grid content-start gap-5 px-4 pt-6 max-[899px]:order-1 min-[900px]:absolute min-[900px]:start-10 min-[900px]:top-[clamp(1.5rem,6vh,4rem)] min-[900px]:max-w-136 min-[900px]:px-0 min-[900px]:pt-0">
+          <div className="relative z-10 grid content-start gap-5 px-4 pt-6 max-[899px]:order-1 min-[900px]:mt-[clamp(1.5rem,6vh,4rem)] min-[900px]:mb-36 min-[900px]:rtl:mb-48 min-[900px]:ms-10 min-[900px]:max-w-[min(34rem,calc(100%-27rem))] min-[900px]:px-0 min-[900px]:pt-0">
             <p className="text-sm text-ink-3">{t("kicker")}</p>
             <h1
               id="landing-title"
-              className="font-display text-4xl leading-(--sign-leading-word) font-normal tracking-display min-[900px]:text-5xl"
+              className="font-display text-4xl leading-(--sign-leading-word) font-normal tracking-display min-[900px]:text-5xl min-[900px]:[@media(max-height:820px)]:text-4xl min-[900px]:rtl:text-4xl"
             >
               {t("title")}
             </h1>
@@ -181,7 +183,7 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
                   <span className="text-base text-ink-2">{t("hook.label")}</span>
                   <ProofChip proof={hook.proof} />
                 </div>
-                <p className="text-sm text-ink-3 tabular-nums">{hook.interval}</p>
+                <p className="text-sm text-ink-3 tabular-nums"><bdi>{hook.interval}</bdi></p>
                 <p className="max-w-[52ch] text-sm text-ink-3">{hook.definition}</p>
               </div>
             )}
@@ -202,7 +204,7 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
                 <span className="text-base text-ink-2">{t("hook.label")}</span>
                 <ProofChip proof={hook.proof} />
               </div>
-              <p className="text-sm text-ink-3 tabular-nums">{hook.interval}</p>
+              <p className="text-sm text-ink-3 tabular-nums"><bdi>{hook.interval}</bdi></p>
               <p className="max-w-[52ch] text-sm text-ink-3">{hook.definition}</p>
             </div>
           )}
@@ -280,6 +282,11 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
                 <span>{t("problem.legendHot", { limit })}</span>
                 <span>{t("problem.legendCool")}</span>
               </p>
+              {hook === null ? null : (
+                <p className="max-w-(--measure) text-sm text-ink-2" data-hours-bridge="">
+                  {t("problem.bridge", { over: format.whole(facts.over), danger: hook.value, limit })}
+                </p>
+              )}
               <details className="text-sm text-ink-2" data-calendar-table="">
                 <summary className="min-h-(--target) cursor-pointer py-3 text-base text-ink">{t("problem.tableToggle")}</summary>
                 <table className="w-full border-collapse text-start tabular-nums">

@@ -15,14 +15,21 @@ import type { InitMessage, WorkerOut } from "./terrain.worker";
  * the same data, when
  *   - the worker cannot start, the canvas cannot be transferred, or WebGL is not there (`fail` from the worker),
  *   - the context is lost, or the worker throws,
- *   - the day plays under 30 frames per second for 2 seconds (ADR 0037 section 4).
+ *   - the day plays under 30 frames per second for 2 seconds (ADR 0037 section 4). The frames counted are the ones the WORKER
+ *     finished (its `drawn` answers) while the day plays: the animation frames of the page say nothing about a slow GPU, and a
+ *     scene that is standing still is not at 0 frames per second.
  * One frame at a time is in flight: a newer hour waits for the answer to the last one and only the latest is drawn.
+ *
+ * The worker starts in a microtask, not in the effect body: React's development StrictMode runs an effect, its cleanup and the
+ * effect again, and a canvas can hand over its control only once, so the first (discarded) run must not take it.
  */
 
 export interface FieldCanvasGLProps {
   readonly grid: FieldGrid;
   readonly coast: readonly Polyline[];
   readonly initialHour: number;
+  /** Right-to-left page: the scene sits on the left, like the 2D field. */
+  readonly rtl?: boolean;
   readonly handleRef: Ref<FieldCanvasHandle>;
   /** The first frame is on screen: the 2D field can step aside. */
   readonly onReady: () => void;
@@ -33,7 +40,7 @@ export interface FieldCanvasGLProps {
 /** Orbit speed of the desktop scene while the day plays, radians per second. */
 const ORBIT = 0.025;
 
-export function FieldCanvasGL({ grid, coast, initialHour, handleRef, onReady, onFail }: FieldCanvasGLProps) {
+export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef, onReady, onFail }: FieldCanvasGLProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
   const ready = useRef(false);
@@ -44,6 +51,10 @@ export function FieldCanvasGL({ grid, coast, initialHour, handleRef, onReady, on
   const hour = useRef(initialHour);
   const azimuth = useRef(0);
   const lastPlaying = useRef<number | null>(null);
+  /** The latest draw request was a frame of a playing day (a seek is not measured). */
+  const playingNow = useRef(false);
+  const labelHour = useRef<number | null>(null);
+  const labelSize = useRef("");
   const monitor = useRef(new FpsMonitor());
   const sendRef = useRef<() => void>(() => undefined);
   const callbacks = useRef({ onReady, onFail });
@@ -57,6 +68,8 @@ export function FieldCanvasGL({ grid, coast, initialHour, handleRef, onReady, on
   useEffect(() => {
     const el = canvas.current;
     if (el === null) return;
+    let cancelled = false;
+    let started: Worker | null = null;
     const mobile = window.innerWidth < PHONE_MAX_WIDTH;
     const dpr = Math.min(window.devicePixelRatio, mobile ? 1.5 : 2);
     const codes = labelCodes(window.innerWidth);
@@ -84,49 +97,66 @@ export function FieldCanvasGL({ grid, coast, initialHour, handleRef, onReady, on
     };
 
     sendRef.current = send;
-    let started: Worker;
-    try {
-      const offscreen = el.transferControlToOffscreen();
-      started = new Worker(new URL("./terrain.worker.ts", import.meta.url), { type: "module" });
-      worker.current = started;
-      started.onmessage = (event: MessageEvent<WorkerOut>) => {
-        const message = event.data;
-        if (message.type === "fail") {
-          giveUp(message.why);
-        } else if (message.type === "ready") {
-          ready.current = true;
-          send();
-        } else {
-          busy.current = false;
-          setLabels(message.labels.map(([x, y], i) => ({ code: codes[i] ?? "OMAA", x, y })));
-          if (first) {
-            first = false;
-            setShown(true);
-            callbacks.current.onReady();
+
+    const start = (): void => {
+      if (cancelled) return;
+      try {
+        const offscreen = el.transferControlToOffscreen();
+        const w = new Worker(new URL("./terrain.worker.ts", import.meta.url), { type: "module" });
+        started = w;
+        worker.current = w;
+        w.onmessage = (event: MessageEvent<WorkerOut>) => {
+          const message = event.data;
+          if (message.type === "fail") {
+            giveUp(message.why);
+          } else if (message.type === "ready") {
+            ready.current = true;
+            send();
+          } else {
+            busy.current = false;
+            // ADR 0037 section 4: the frames the worker finished, while the day plays. A seek, or a scene standing still, is not slow.
+            if (playingNow.current) {
+              if (monitor.current.tick(performance.now())) giveUp("under 30 frames per second for 2 seconds");
+            } else {
+              monitor.current.reset();
+            }
+            if (given.current) return;
+            // The station names move with the hour (the relief changes under them) and with a resize: not sixty times a second.
+            const whole = Math.floor(hour.current);
+            const size = `${String(el.clientWidth)}x${String(el.clientHeight)}`;
+            if (!playingNow.current || whole !== labelHour.current || size !== labelSize.current || first) {
+              labelHour.current = whole;
+              labelSize.current = size;
+              setLabels(message.labels.map(([x, y], i) => ({ code: codes[i] ?? "OMAA", x, y })));
+            }
+            if (first) {
+              first = false;
+              setShown(true);
+              callbacks.current.onReady();
+            }
+            if (dirty.current) send();
           }
-          if (dirty.current) send();
-        }
-      };
-      started.onerror = () => {
-        giveUp("worker error");
-      };
-      const init: InitMessage = {
-        type: "init",
-        canvas: offscreen,
-        lat: grid.lat,
-        lon: grid.lon,
-        values: grid.values,
-        coast: coast.map((line) => line.map(([lon, lat]) => [lon, lat] as const)),
-        mobile,
-        stations: codes.map((code) => STATIONS[code]),
-      };
-      started.postMessage(init, [offscreen]);
-    } catch (error) {
-      queueMicrotask(() => {
+        };
+        w.onerror = () => {
+          giveUp("worker error");
+        };
+        const init: InitMessage = {
+          type: "init",
+          canvas: offscreen,
+          lat: grid.lat,
+          lon: grid.lon,
+          values: grid.values,
+          coast: coast.map((line) => line.map(([lon, lat]) => [lon, lat] as const)),
+          mobile,
+          rtl,
+          stations: codes.map((code) => STATIONS[code]),
+        };
+        w.postMessage(init, [offscreen]);
+      } catch (error) {
         giveUp(String(error));
-      });
-      return;
-    }
+      }
+    };
+    queueMicrotask(start);
 
     const observer = new ResizeObserver(() => {
       force.current = true;
@@ -134,34 +164,25 @@ export function FieldCanvasGL({ grid, coast, initialHour, handleRef, onReady, on
     });
     observer.observe(el);
     return () => {
+      cancelled = true;
       observer.disconnect();
-      started.terminate();
+      started?.terminate();
       worker.current = null;
     };
-  }, [grid, coast]);
+  }, [grid, coast, rtl]);
 
   useImperativeHandle(
     handleRef,
     () => ({
       draw: (value: number, playing = false) => {
         const now = performance.now();
+        playingNow.current = playing;
         if (playing && ready.current) {
           const last = lastPlaying.current;
           if (last !== null && window.innerWidth >= PHONE_MAX_WIDTH) azimuth.current += (Math.min(now - last, 50) / 1000) * ORBIT;
           lastPlaying.current = now;
-          // ADR 0037 section 4: the scene is given up for the 2D field when the day cannot be drawn at 30 frames per second.
-          if (monitor.current.tick(now)) {
-            if (!given.current) {
-              given.current = true;
-              worker.current?.terminate();
-              worker.current = null;
-              callbacks.current.onFail("under 30 frames per second for 2 seconds");
-            }
-            return;
-          }
         } else if (!playing) {
           lastPlaying.current = null;
-          monitor.current.reset();
         }
         hour.current = value;
         sendRef.current();

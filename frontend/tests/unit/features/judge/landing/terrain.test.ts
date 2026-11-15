@@ -2,16 +2,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   cameraMatrix,
+  COAST_STRIDE,
+  decimateCoast,
+  frameVertices,
   heightOf,
+  IsoLines,
+  mapCentreX,
+  MAX_VERTICES,
   MESH,
   meshFor,
   projectToScreen,
+  sceneShiftX,
   vertexCount,
   FpsMonitor,
   FPS_FLOOR,
   FPS_WINDOW_MS,
 } from "@/features/judge/landing/terrain-math";
-import { isothermEach, isothermSegments } from "@/features/judge/landing/field-data";
+import { boxOf, clipCoast, isothermEach, isothermSegments, makeSampler, parseCoast, parseField } from "@/features/judge/landing/field-data";
+import { geometry, project } from "@/features/judge/landing/field-draw";
 import { canUpgrade } from "@/features/judge/landing/webgl-support";
 
 /*
@@ -21,14 +29,87 @@ import { canUpgrade } from "@/features/judge/landing/webgl-support";
 
 const SRC = path.resolve(import.meta.dirname, "../../../../../src/features/judge/landing");
 
+const ROOT = path.resolve(import.meta.dirname, "../../../../..");
+const json = (file: string): unknown => JSON.parse(readFileSync(path.join(ROOT, file), "utf8")) as unknown;
+const grid = parseField(json("public/data/static/uae_ifs025_d1_wbgt_2026-09-03.json"));
+const coast = clipCoast(parseCoast(json("public/data/static/coast.json")), boxOf(grid));
+
+/** What one frame at `hour` sends to the GPU on the real field, built with the worker's own pieces. */
+function frameAt(mobile: boolean, hour: number): { terrain: number; iso: number; coast: number; total: number; dropped: number } {
+  const mesh = meshFor(mobile);
+  const { nx, nz } = mesh;
+  const [west, south, east, north] = boxOf(grid);
+  const sample = makeSampler(grid);
+  const values = new Float32Array(nx * nz);
+  for (let k = 0; k < values.length; k++) {
+    values[k] = sample(north - ((north - south) * Math.floor(k / nx)) / (nz - 1), west + ((east - west) * (k % nx)) / (nx - 1), hour);
+  }
+  const lines = decimateCoast(coast, COAST_STRIDE[mobile ? "phone" : "desktop"]);
+  const coastVertices = lines.reduce((sum, line) => sum + line.length, 0);
+  // the cap the worker gives the isotherms: what is left of the budget after the mesh and the coast
+  const iso = new IsoLines(MAX_VERTICES[mobile ? "phone" : "desktop"] - vertexCount(mesh) - coastVertices);
+  isothermEach(values, nx, nz, 1, (x1, y1, x2, y2, level) => {
+    iso.add(x1, y1, x2, y2, level);
+  });
+  return { terrain: vertexCount(mesh), iso: iso.vertices, coast: coastVertices, total: frameVertices(mesh, iso.vertices, coastVertices), dropped: iso.dropped };
+}
+
 describe("the vertex budget", () => {
-  it("test_vertex_budget_phone_and_desktop: at most 6,000 vertices on a desktop and 1,500 on a phone", () => {
+  it("test_vertex_budget_phone_and_desktop: the terrain mesh alone is within 6,000 and 1,500, and finer than the 22 x 17 forecast grid", () => {
     expect(vertexCount(meshFor(false))).toBeLessThanOrEqual(6000);
     expect(vertexCount(meshFor(true))).toBeLessThanOrEqual(1500);
-    // non-vacuous: the meshes are real (more than a 10 by 10 patch) and the phone one is the smaller
-    expect(vertexCount(meshFor(false))).toBeGreaterThan(4000);
-    expect(vertexCount(meshFor(true))).toBeGreaterThan(1000);
+    expect(MESH.phone.nx).toBeGreaterThan(grid.lon.length);
+    expect(MESH.phone.nz).toBeGreaterThan(grid.lat.length);
     expect(vertexCount(MESH.phone)).toBeLessThan(vertexCount(MESH.desktop));
+  });
+
+  it("test_total_vertices_per_frame_within_budget: terrain + isotherms + coast, at every quarter hour of the real day, on both devices", () => {
+    for (const mobile of [false, true]) {
+      const limit = MAX_VERTICES[mobile ? "phone" : "desktop"];
+      let worst = 0;
+      for (let hour = 0; hour < 24; hour += 0.25) {
+        const frame = frameAt(mobile, hour);
+        worst = Math.max(worst, frame.total);
+        expect(frame.dropped, `${mobile ? "phone" : "desktop"} at ${String(hour)}: the cap dropped isotherm segments`).toBe(0);
+        expect(frame.total, `${mobile ? "phone" : "desktop"} at ${String(hour)}`).toBeLessThanOrEqual(limit);
+      }
+      // non-vacuous: the lines are really there (the isotherms and the coast add vertices), and the budget is used, not wasted
+      const frame = frameAt(mobile, 14);
+      expect(frame.iso).toBeGreaterThan(100);
+      expect(frame.coast).toBeGreaterThan(100);
+      expect(worst).toBeGreaterThan(limit / 2);
+    }
+  });
+
+  it("isotherm segments share the endpoints where they meet: a closed line of n segments is n vertices", () => {
+    const lines = new IsoLines(100);
+    lines.add(0, 0, 1, 0, 30);
+    lines.add(1, 0, 1, 1, 30);
+    lines.add(1, 1, 0, 1, 30);
+    lines.add(0, 1, 0, 0, 30);
+    expect(lines.segments).toBe(4);
+    expect(lines.vertices).toBe(4);
+    // the same spot on another level is another vertex
+    lines.add(0, 0, 1, 0, 31);
+    expect(lines.vertices).toBe(6);
+    lines.reset();
+    expect([lines.segments, lines.vertices]).toEqual([0, 0]);
+  });
+
+  it("drops segments, and says so, when its cap is reached (a guard, never silently over budget)", () => {
+    const lines = new IsoLines(4);
+    lines.add(0, 0, 1, 0, 30);
+    lines.add(5, 5, 6, 5, 30);
+    lines.add(9, 9, 9.5, 9, 30);
+    expect(lines.vertices).toBe(4);
+    expect(lines.dropped).toBe(1);
+  });
+
+  it("decimates a coast line by its stride and always keeps the last point", () => {
+    const line = Array.from({ length: 10 }, (_, i) => i);
+    expect(decimateCoast([line], 3)).toEqual([[0, 3, 6, 9]]);
+    expect(decimateCoast([line], 4)).toEqual([[0, 4, 8, 9]]);
+    expect(decimateCoast([[1, 2]], 5)).toEqual([[1, 2]]);
   });
 
   it("indexes with 16-bit indices (a mesh over 65,535 vertices would need a 32-bit index buffer)", () => {
@@ -56,6 +137,35 @@ describe("the camera and the relief", () => {
     const phone = cameraMatrix({ mobile: true, azimuth: 0, aspect: 0.46 });
     expect(projectToScreen(phone, 0, 0.55, 0.1, 390, 360)[0]).toBeGreaterThan(100);
     expect(projectToScreen(phone, 0, 0.55, 0.1, 390, 360)[0]).toBeLessThan(290);
+  });
+
+  it("test_rtl_camera_shift_mirrors: the scene sits on the end side, in either direction, at the 2D canvas's own centre", () => {
+    expect(sceneShiftX(false)).toBeCloseTo((mapCentreX(false) - 0.5) * 2, 10);
+    expect(sceneShiftX(true)).toBeCloseTo(-sceneShiftX(false), 10);
+    expect(sceneShiftX(false)).toBeGreaterThan(0);
+    expect(sceneShiftX(true)).toBeLessThan(0);
+    const wide = { mobile: false, azimuth: 0, aspect: 1.6 } as const;
+    const ltr = projectToScreen(cameraMatrix({ ...wide, rtl: false }), 0, 0.55, 0.1, 1440, 900)[0];
+    const rtl = projectToScreen(cameraMatrix({ ...wide, rtl: true }), 0, 0.55, 0.1, 1440, 900)[0];
+    const neutral = projectToScreen(cameraMatrix({ ...wide }), 0, 0.55, 0.1, 1440, 900)[0];
+    // the camera's target lands where the 2D canvas puts the map centre, as a fraction of the width, and mirrors exactly
+    expect(ltr / 1440).toBeCloseTo(mapCentreX(false), 2);
+    expect(rtl / 1440).toBeCloseTo(mapCentreX(true), 2);
+    expect(ltr + rtl).toBeCloseTo(1440, 0);
+    expect(neutral).toBe(ltr); // `rtl` defaults to left-to-right
+    // a phone is centred in both directions
+    const phone = { mobile: true, azimuth: 0, aspect: 0.46 } as const;
+    expect(projectToScreen(cameraMatrix({ ...phone, rtl: true }), 0, 0.55, 0.1, 390, 360)[0]).toBeCloseTo(projectToScreen(cameraMatrix({ ...phone }), 0, 0.55, 0.1, 390, 360)[0], 6);
+  });
+
+  it("the 2D canvas and the WebGL scene put the map on the same side, both ways", () => {
+    const box = boxOf(grid);
+    for (const rtl of [false, true]) {
+      const g = geometry(1440, 900, box, rtl);
+      expect(g.originX / 1440).toBeCloseTo(mapCentreX(rtl), 10);
+      const [x] = project(g, (box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+      expect(rtl ? x < 720 : x > 720).toBe(true);
+    }
   });
 
   it("is a 4 by 4 column-major matrix of finite numbers for any azimuth", () => {

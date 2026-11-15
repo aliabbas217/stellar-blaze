@@ -39,6 +39,21 @@ async function shot(page: Page, name: string, viewport: { width: number; height:
   await page.screenshot({ path: path.join(dir, "landing", `${name}-${wide}-night.png`) });
 }
 
+/** A screenshot with its own file name (the Urdu and tablet shots), only in a design gate run. */
+async function shotAs(page: Page, file: string, fullPage = false): Promise<void> {
+  const dir = process.env.SB_GATE_SHOTS;
+  if (dir === undefined || dir === "") return;
+  mkdirSync(path.join(dir, "landing"), { recursive: true });
+  await page.screenshot({ path: path.join(dir, "landing", file), fullPage });
+}
+
+/**
+ * SB_E2E_REQUIRE_WEBGL=1 turns "the 2D field ran" into a failure on the WebGL tests. Without it those tests are tolerant (a browser
+ * with no WebGL still has a working page, and the 2D path is tested on its own), which means a host with no GL passes them without
+ * running a line of the scene: the locked e2e command in the F2 runs sets it, so a regression that silently falls back is red.
+ */
+const REQUIRE_WEBGL = process.env.SB_E2E_REQUIRE_WEBGL === "1";
+
 function note(label: string, report: Awaited<ReturnType<typeof gateReport>>): void {
   if (process.env.SB_GATE_SHOTS === undefined || process.env.SB_GATE_SHOTS === "") return;
   const heroPct = report.heroShare === null ? "n/a" : (report.heroShare * 100).toFixed(1);
@@ -90,7 +105,7 @@ test("landing hero field: ideal state at rest, readout equals text, gate numbers
   console.log(`landing hero path: ${path2d}`);
   const slider = page.getByRole("slider");
   await expect(slider).toHaveAttribute("aria-valuenow", String(PEAK_HOUR));
-  await expect(page.locator("[data-field-readout]")).toHaveAttribute("aria-live", "polite");
+  await expect(page.locator("[data-readout-live]")).toHaveAttribute("aria-live", "polite");
   await expect(page.locator("[data-readout-hottest]")).toHaveText(/^\d\d\.\d°C$/);
   await expect(page.getByRole("button", { name: /Play the day|Pause the day/ })).toHaveCount(0);
   await shot(page, "ideal", WIDE);
@@ -127,7 +142,12 @@ test("landing hero slider: arrow keys, Home and End change the hour and the read
   await expect(slider).toHaveAttribute("aria-valuenow", "0");
   await page.keyboard.press("End");
   await expect(slider).toHaveAttribute("aria-valuenow", "23");
-  await expect(slider).toHaveAttribute("aria-valuetext", /^23:00: hottest point \d\d\.\d degrees, Abu Dhabi airport \d\d\.\d$/);
+  await expect(slider).toHaveAttribute("aria-valuetext", /^23:00: hottest grid cell \d\d\.\d degrees, Abu Dhabi airport \d\d\.\d$/);
+  // a slider does not wrap: one more step right stays on 23:00, and Page Down steps three hours
+  await page.keyboard.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuenow", "23");
+  await page.keyboard.press("PageDown");
+  await expect(slider).toHaveAttribute("aria-valuenow", "20");
 });
 
 test("landing plays the day once on its own, and a reader can stop it", async ({ page }) => {
@@ -136,13 +156,13 @@ test("landing plays the day once on its own, and a reader can stop it", async ({
   await drawn(page);
   const slider = page.getByRole("slider");
   await expect.poll(async () => slider.getAttribute("aria-valuenow"), { timeout: 5000 }).not.toBe(String(PEAK_HOUR));
-  await expect(page.locator("[data-field-readout]")).toHaveAttribute("aria-live", "off");
+  await expect(page.locator("[data-readout-live]")).toHaveAttribute("aria-live", "off");
   await shot(page, "playing", WIDE);
   await page.getByRole("button", { name: "Pause the day" }).click();
   const held = await slider.getAttribute("aria-valuenow");
   await page.waitForTimeout(700);
   await expect(slider).toHaveAttribute("aria-valuenow", held ?? "");
-  await expect(page.locator("[data-field-readout]")).toHaveAttribute("aria-live", "polite");
+  await expect(page.locator("[data-readout-live]")).toHaveAttribute("aria-live", "polite");
 });
 
 test("landing loading state: the poster is at final size, nothing moves when the field arrives", async ({ page }) => {
@@ -277,6 +297,7 @@ test("landing WebGL path: the scene takes over the 2D field after idle when the 
   const errors = await open(page);
   const ran = await settledPath(page);
   console.log(`landing path that ran (headless Chromium, SwiftShader): ${ran}`);
+  if (REQUIRE_WEBGL) expect(ran, "SB_E2E_REQUIRE_WEBGL=1: the WebGL scene must run, not fall back to 2D").toBe("webgl");
   if (ran === "webgl") {
     expect(workers.some((url) => url.startsWith("http://127.0.0.1:3000/_next/static/") && !url.startsWith("blob:"))).toBe(true);
     await expect(page.locator('[data-field-canvas="webgl"]')).toBeVisible();
@@ -295,6 +316,7 @@ test("landing WebGL path on a phone: the small mesh, drawn at the phone's own fr
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors = await open(page, PHONE);
   const ran = await settledPath(page);
+  if (REQUIRE_WEBGL) expect(ran, "SB_E2E_REQUIRE_WEBGL=1: the WebGL scene must run on a phone, not fall back to 2D").toBe("webgl");
   if (ran === "webgl") {
     await page.waitForTimeout(500);
     await shot(page, "webgl", PHONE);
@@ -350,3 +372,85 @@ test("landing reduced motion: no autoplay on either path, the field rests on the
   await expect(page.getByRole("slider")).toHaveAttribute("aria-valuenow", String(PEAK_HOUR));
   await expect(page.getByRole("button", { name: /Play the day|Pause the day/ })).toHaveCount(0);
 });
+
+/** Where the Abu Dhabi label sits across the hero, as a fraction of the page width (a station name is DOM text on either path; the hidden 2D layer under the scene has one too). */
+async function airportAt(page: Page, width: number): Promise<number> {
+  const box = await page.locator("[data-hero]").first().getByText("Abu Dhabi", { exact: true }).filter({ visible: true }).boundingBox();
+  if (box === null) throw new Error("the Abu Dhabi label is not on the map");
+  return (box.x + box.width / 2) / width;
+}
+
+test("landing in Urdu: the field sits on the end side (the left), on the WebGL path and the 2D path, and the copy is not under it", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const errors = await open(page, WIDE, "/ur");
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  const ran = await settledPath(page);
+  if (REQUIRE_WEBGL) expect(ran, "SB_E2E_REQUIRE_WEBGL=1: the Urdu page must run the WebGL scene").toBe("webgl");
+  await page.waitForTimeout(500);
+  // the copy is on the right in right-to-left; the airport (the map's centre, give or take) is on the left half
+  expect(await airportAt(page, WIDE.width), `path ${ran}`).toBeLessThan(0.5);
+  const h1 = await page.getByRole("heading", { level: 1 }).boundingBox();
+  expect((h1?.x ?? 0) + (h1?.width ?? 0) / 2).toBeGreaterThan(WIDE.width / 2);
+  await shotAs(page, `ur-${ran}-1440-night.png`);
+  const report = await gateReport(page, { consoleErrors: errors, spine: true });
+  note(`landing ur ${ran} 1440`, report);
+  expect(report.failures).toEqual([]);
+  // the English page puts it on the other side (non-vacuous: the assertion above can fail)
+  await page.goto("/en");
+  await drawn(page);
+  await page.waitForTimeout(500);
+  expect(await airportAt(page, WIDE.width)).toBeGreaterThan(0.5);
+});
+
+test("landing in Urdu on the 2D path (?static) and at tablet width", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, WIDE, "/ur?static");
+  await drawn(page);
+  await expect(page.locator("[data-hero][data-field-path]")).toHaveAttribute("data-field-path", "2d");
+  expect(await airportAt(page, WIDE.width)).toBeLessThan(0.5);
+  await shotAs(page, "ur-2d-1440-night.png");
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.waitForTimeout(500);
+  expect(await airportAt(page, 1024)).toBeLessThan(0.5);
+  await shotAs(page, "ur-2d-1024-night.png");
+});
+
+/**
+ * The hero grows with its copy (Part L1): nothing the reader needs is clipped or covered where the copy runs taller than the screen
+ * (a laptop 768 px high, a tablet, Arabic-script line heights of 2.5). A clipped or covered link is still focusable, so this is
+ * measured with the element under the pointer, not with the DOM.
+ */
+for (const [url, width, height] of [
+  ["/en", 900, 800],
+  ["/en", 1024, 768],
+  ["/en", 1366, 768],
+  ["/ur", 1024, 768],
+  ["/ur", 1440, 900],
+] as const) {
+  test(`landing hero keeps its actions and the hook proof reachable at ${url} ${String(width)}x${String(height)}`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await open(page, { width, height }, `${url}?static`);
+    await drawn(page);
+    const result = await page.evaluate(() => {
+      const hero = document.querySelector("[data-landing-hero]") as HTMLElement;
+      const covered = (el: Element | null): string => {
+        if (el === null) return "missing";
+        const r = el.getBoundingClientRect();
+        const heroBox = hero.getBoundingClientRect();
+        if (r.bottom > heroBox.bottom + 0.5 || r.top < heroBox.top - 0.5) return "outside the hero";
+        // the point under the middle of the element, scrolled into view
+        el.scrollIntoView({ block: "center" });
+        const box = el.getBoundingClientRect();
+        const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return top !== null && (el === top || el.contains(top) || top.contains(el)) ? "reachable" : `covered by ${top?.tagName ?? "nothing"} ${top?.className.toString().slice(0, 40) ?? ""}`;
+      };
+      return {
+        primary: covered(document.querySelector("[data-primary]")),
+        secondary: covered([...document.querySelectorAll("[data-landing-hero] a")].find((a) => a.getAttribute("href") === "#problem") ?? null),
+        proof: covered(document.querySelector("[data-hook] button")),
+        scrubber: covered(document.querySelector("[data-hour-slider]")),
+      };
+    });
+    expect(result).toEqual({ primary: "reachable", secondary: "reachable", proof: "reachable", scrubber: "reachable" });
+  });
+}
