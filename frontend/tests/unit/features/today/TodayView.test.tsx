@@ -3,6 +3,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
+import { FieldHeadingContext, type FieldHeadingSlot } from "@/components/shell/FieldHeading";
 import { DemoProvider } from "@/features/demo/DemoProvider";
 import { DEMO_CREW_ID } from "@/features/demo/constants";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
@@ -35,15 +36,16 @@ vi.mock("@/i18n/navigation", () => ({
   ),
 }));
 
-function renderToday() {
+function renderToday(slot?: FieldHeadingSlot) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } } });
-  return renderWithIntl(
+  const view = (
     <QueryClientProvider client={client}>
       <DemoProvider>
         <TodayView />
       </DemoProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  return renderWithIntl(slot === undefined ? view : <FieldHeadingContext.Provider value={slot}>{view}</FieldHeadingContext.Provider>);
 }
 
 function pin(crewId: string | null = DEMO_CREW_ID): void {
@@ -82,8 +84,11 @@ describe("Today: no site yet", () => {
 
     // The pin also takes the site's call numbers (synthetic on the demo site) for the unwell sheet to use offline (F2 Task 18).
     await waitFor(() => {
-      expect(useProfile.getState().site).toEqual({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID, contacts: DEMO_CONTACTS });
+      expect(useProfile.getState().site?.contacts).toMatchObject(DEMO_CONTACTS);
     });
+    expect(useProfile.getState().site).toMatchObject({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID });
+    // Dated when the phone saved them, so the sheet can say how old they are when it is offline.
+    expect(Date.parse(useProfile.getState().site?.contacts?.savedAt ?? "")).not.toBeNaN();
     expect(await orange()).toBeInTheDocument();
   });
 
@@ -104,8 +109,9 @@ describe("Today: no site yet", () => {
 
     expect(await orange()).toBeInTheDocument();
     await waitFor(() => {
-      expect(useProfile.getState().site).toEqual({ siteId: SITE_DEMO, crewId: "crew-a", contacts: DEMO_CONTACTS });
+      expect(useProfile.getState().site?.contacts).toMatchObject(DEMO_CONTACTS);
     });
+    expect(useProfile.getState().site).toMatchObject({ siteId: SITE_DEMO, crewId: "crew-a" });
   });
 
   it("when the site list cannot be loaded it says so and offers the retry, never a dead button", async () => {
@@ -160,12 +166,21 @@ describe("Today: a pinned phone", () => {
     expect(screen.queryByRole("link", { name: "Turn on warnings" })).toBeNull();
   });
 
-  it("names the crew in the header slot through the shell (no layout query)", async () => {
+  it("names the crew in the header slot through the shell (no layout query), and takes the name back when the screen goes", async () => {
     pin();
-    renderToday();
+    const setCrewLabel = vi.fn();
+    const setSiteLabel = vi.fn();
+    const { unmount } = renderToday({ setCrewLabel, setSiteLabel });
     await orange();
-    // The shell's slot is not mounted in this test: what is proved is the screen asks nothing of the layout and still renders.
-    expect(screen.getByRole("heading", { name: "Orange" })).toBeInTheDocument();
+
+    // The name comes from the crew's timeline, which only this screen asks for: it reaches the header through the slot.
+    const crewName = crewTimeline(DEMO_CREW_ID, "2026-09-03")?.crew_name;
+    expect(crewName).toBeTruthy();
+    await waitFor(() => {
+      expect(setCrewLabel).toHaveBeenCalledWith(crewName);
+    });
+    unmount();
+    expect(setCrewLabel).toHaveBeenLastCalledWith(null);
   });
 
   it("a worker's own level above the site's leads and says so", async () => {
@@ -200,6 +215,41 @@ describe("Today: states", () => {
     expect(screen.getByText(/This may be out of date/)).toBeInTheDocument();
     expect(document.querySelector('[data-kind="stale"]')).not.toBeNull();
     expect(document.querySelector('[data-kind="live"]')).toBeNull();
+  });
+
+  it("test_stale_and_fallback_are_not_live (I2): a last known level is secondary: the lead is the protective plan, the spine has no heat and no line at now", async () => {
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) =>
+        HttpResponse.json(forecastToday(String(params["site_id"]), { ageMs: STALE_AGE_MS, status: "stale" })),
+      ),
+    );
+    pin();
+    renderToday();
+    await orange();
+
+    // The lead says there is no fresh forecast and gives the site rules, never the stale hour's own cycle or its extra lines.
+    const lead = document.querySelector("[data-action-lead]") as HTMLElement;
+    expect(lead.textContent).toBe("Site rules: rest in shade every hour, drink water");
+    expect(screen.getByText("No fresh forecast: protective plan")).toBeInTheDocument();
+    expect(screen.queryByText(/Work \d+ min, rest/)).toBeNull();
+    expect(screen.queryByText("Also now")).toBeNull();
+    // The spine: every cell is "no data", and there is no line at now.
+    const cells = [...document.querySelectorAll("[data-spine] [data-cell]")];
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((cell) => cell.getAttribute("data-heat") === "none")).toBe(true);
+    expect(document.querySelector("[data-spine] [data-now]")).toBeNull();
+    // No promise of how long the old level holds.
+    expect(screen.queryByText(/^until /)).toBeNull();
+  });
+
+  it("control for the test above: a live day has heat in the spine, a line at now and the hour's own lead", async () => {
+    pin();
+    renderToday();
+    await orange();
+
+    expect([...document.querySelectorAll("[data-spine] [data-cell]")].some((cell) => cell.getAttribute("data-heat") === "data")).toBe(true);
+    expect(document.querySelector("[data-spine] [data-now]")).not.toBeNull();
+    expect(screen.queryByText("No fresh forecast: protective plan")).toBeNull();
   });
 
   it("a fallback forecast shows no level: the fixed site rules, in every hour", async () => {
@@ -317,10 +367,22 @@ describe("Today: states", () => {
     expect(screen.queryByText("Your level now")).toBeNull();
   });
 
-  it("the loading screen is a skeleton, not the 'no site' screen, before the phone's storage can be read", () => {
-    const { container } = renderToday();
-    // jsdom hydrates in the same tick, but a pinned phone must never flash the entry: with a pin the skeleton leads to a level.
+  it("a pinned phone's loading screen is a skeleton, never the 'no site' entry, and it ends in the level", async () => {
     pin();
-    expect(container.querySelector('[data-skeleton], [aria-busy="true"]') ?? screen.queryByRole("heading", { name: "Scan your crew's code" })).not.toBeNull();
+    const { container } = renderToday();
+    // Synchronously after the first render: the forecast has not arrived, so the screen is the skeleton, and a pinned phone must
+    // never flash the entry for a phone that has no site.
+    expect(container.querySelector('[role="status"][aria-busy="true"] [data-skeleton="level-sign"]')).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "Scan your crew's code" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Orange" })).toBeNull();
+    // ...and the skeleton goes when the level comes.
+    await orange();
+    expect(container.querySelector('[data-skeleton="level-sign"]')).toBeNull();
+  });
+
+  it("an unpinned phone shows the entry at once, not a skeleton that never ends", async () => {
+    const { container } = renderToday();
+    expect(await screen.findByRole("heading", { name: "Scan your crew's code" })).toBeInTheDocument();
+    expect(container.querySelector('[data-skeleton="level-sign"]')).toBeNull();
   });
 });

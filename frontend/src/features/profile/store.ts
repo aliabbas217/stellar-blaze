@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { browserEffects, type ProfileEffects } from "@/features/profile/effects";
 import { isNonEmptyString, toProfile, type Profile } from "@/features/profile/profile-shape";
-import { PROFILE_STORAGE_KEY, publishSitePin, toSitePin, type SitePin } from "@/features/profile/site-pin";
+import { PROFILE_STORAGE_KEY, publishDeviceFlags, publishSitePin, toSitePin, type SitePin } from "@/features/profile/site-pin";
 import {
   beginRevokeActivity,
   clearRevokeIncomplete,
@@ -378,6 +378,14 @@ export function createProfileStore(options: ProfileStoreOptions = {}) {
   // Another tab of the app changed the stored data (ruling R34). Without this, a tab that was open during a revoke in
   // another keeps the revoked data in memory, and its next write (a push registration, a saved profile) puts the data
   // back into localStorage. So the change is read in at once (`rehydrate` does not write what it reads).
+  // The two flags the page reads without this store (site-pin.ts): published now and after every change, so that a profile saved
+  // or a registration made in this tab, or revoked in another, is seen by a page that never loaded the store.
+  const publishFlags = (state: ProfileState): void => {
+    publishDeviceFlags({ hasProfile: state.profile !== null, hasPush: state.push !== null });
+  };
+  publishFlags(store.getState());
+  store.subscribe(publishFlags);
+
   if (typeof window !== "undefined") {
     window.addEventListener("storage", (event) => {
       if (event.key !== null && event.key !== PROFILE_STORAGE_KEY) return;

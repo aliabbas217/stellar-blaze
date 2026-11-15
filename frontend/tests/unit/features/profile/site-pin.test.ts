@@ -1,5 +1,17 @@
 import { act, renderHook } from "@testing-library/react";
-import { PROFILE_STORAGE_KEY, publishSitePin, readSitePin, resetSitePinForTests, toSitePin, useSitePin } from "@/features/profile/site-pin";
+import {
+  nextSitePin,
+  PROFILE_STORAGE_KEY,
+  publishSitePin,
+  readDeviceFlags,
+  readSitePin,
+  resetSitePinForTests,
+  toSitePin,
+  useHasProfile,
+  useHasPush,
+  useSitePin,
+} from "@/features/profile/site-pin";
+import { CONSENT_VERSION } from "@/features/profile/profile-shape";
 import { createProfileStore, type ProfileEffects } from "@/features/profile/store";
 import { clearRevokeIncomplete, endRevokeActivity, readRevokeActive } from "@/features/profile/revoke-marker";
 import { forgetPendingDelete, readPendingDeletes } from "@/features/push/pending-delete";
@@ -156,5 +168,89 @@ describe("useSitePin", () => {
       profile.getState().clearSite();
     });
     expect(result.current).toBeNull();
+  });
+});
+
+describe("the device flags (F2 W1): is there a profile, is there a push registration, asked without the store", () => {
+  const PROFILE = { workloadClass: "moderate" };
+  const PUSH = { serverId: "s", endpoint: "https://push.example/1", siteId: "site-demo-mussafah" };
+
+  it("reads both flags from what is stored, and both are false with nothing stored or on corrupt JSON", () => {
+    expect(readDeviceFlags()).toEqual({ hasProfile: false, hasPush: false });
+    store({ profile: PROFILE, push: null, site: null });
+    expect(readDeviceFlags()).toEqual({ hasProfile: true, hasPush: false });
+    store({ profile: null, push: PUSH, site: null });
+    expect(readDeviceFlags()).toEqual({ hasProfile: false, hasPush: true });
+    localStorage.setItem(PROFILE_STORAGE_KEY, "{not json");
+    expect(readDeviceFlags()).toEqual({ hasProfile: false, hasPush: false });
+  });
+
+  it("a flag says only that a value is there: a profile of the wrong type is not one", () => {
+    store({ profile: "yes", push: 4, site: null });
+    expect(readDeviceFlags()).toEqual({ hasProfile: false, hasPush: false });
+  });
+
+  it("gives the same object while nothing changed (a snapshot compared by identity must not make React loop)", () => {
+    store({ profile: PROFILE, push: null, site: null });
+    expect(readDeviceFlags()).toBe(readDeviceFlags());
+  });
+
+  it("follows the store: saving a profile and registering push flip the flags, and revoke takes them back", async () => {
+    const profileStore = createProfileStore({ effects: fakeEffects() });
+    const flags = renderHook(() => ({ profile: useHasProfile(), push: useHasPush() }));
+    expect(flags.result.current).toEqual({ profile: false, push: false });
+    act(() => {
+      profileStore.getState().save({
+        consentVersion: CONSENT_VERSION,
+        consentedAt: "2026-11-11T08:30:00.000Z",
+        siteId: "site-demo-mussafah",
+        crewId: null,
+        workloadClass: "moderate",
+        heatWorkStartDate: "2026-11-01",
+        clothingCode: "work_clothes",
+      });
+      profileStore.getState().setPush(PUSH);
+    });
+    expect(flags.result.current).toEqual({ profile: true, push: true });
+    await act(async () => {
+      await profileStore.getState().revoke();
+    });
+    expect(flags.result.current).toEqual({ profile: false, push: false });
+  });
+
+  it("another tab's change (a storage event) is read again", () => {
+    const flags = renderHook(() => useHasProfile());
+    expect(flags.result.current).toBe(false);
+    store({ profile: PROFILE, push: null, site: null });
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_STORAGE_KEY }));
+    });
+    expect(flags.result.current).toBe(true);
+  });
+});
+
+describe("nextSitePin: the contacts survive choosing the same site again, and never another site's", () => {
+  const CONTACTS = { supervisorPhone: "+12025550143", firstAiderPhone: null };
+
+  it("keeps the stored contacts for the same site, drops them for another, and takes new ones when given", () => {
+    const current = { siteId: "site-a", crewId: null, contacts: CONTACTS };
+    expect(nextSitePin(current, "site-a", "crew-1")).toEqual({ siteId: "site-a", crewId: "crew-1", contacts: CONTACTS });
+    expect(nextSitePin(current, "site-b", null)).toEqual({ siteId: "site-b", crewId: null });
+    const fresh = { supervisorPhone: null, firstAiderPhone: "+12025550144" };
+    expect(nextSitePin(current, "site-a", null, fresh)).toEqual({ siteId: "site-a", crewId: null, contacts: fresh });
+    expect(nextSitePin(null, "site-a", null)).toEqual({ siteId: "site-a", crewId: null });
+  });
+
+  it("toSiteContacts keeps a readable save date and drops one that is not a date, keeping the numbers either way", async () => {
+    const { toSiteContacts } = await import("@/features/profile/site-pin");
+    expect(toSiteContacts({ ...CONTACTS, savedAt: "2026-11-12T08:00:00.000Z" })).toEqual({ ...CONTACTS, savedAt: "2026-11-12T08:00:00.000Z" });
+    expect(toSiteContacts({ ...CONTACTS, savedAt: "yesterday" })).toEqual(CONTACTS);
+    expect(toSiteContacts({ ...CONTACTS, savedAt: 5 })).toEqual(CONTACTS);
+    expect(toSiteContacts(CONTACTS)).toEqual(CONTACTS);
+  });
+
+  it("sameContacts ignores the save date: a new date alone is not a changed number", async () => {
+    const { sameContacts } = await import("@/features/profile/site-pin");
+    expect(sameContacts({ ...CONTACTS, savedAt: "2026-11-12T08:00:00.000Z" }, { ...CONTACTS, savedAt: "2026-11-13T08:00:00.000Z" })).toBe(true);
   });
 });

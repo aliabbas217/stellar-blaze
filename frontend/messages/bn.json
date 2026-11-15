@@ -195,7 +195,7 @@
       "lead": {
         "cycle": "Work {work} min, rest {rest} min in shade",
         "shade": "Rest in shade",
-        "stop": "Stop work. Go to shade",
+        "stop": "Stop work",
         "siteRules": "Follow the site rules",
         "protective": "Site rules: rest in shade every hour, drink water"
       },
@@ -206,7 +206,7 @@
         "buddy": "Never work alone"
       },
       "why": {
-        "level": "Why {level}?",
+        "level": "Why <bdi>{level}</bdi>?",
         "siteRules": "Why site rules?"
       },
       "proofWhat": {
@@ -252,8 +252,8 @@
       "from": "from <bdi>{time}</bdi>",
       "changed": {
         "heading": "What changed in your shift",
-        "was": "Was {previous}, now {level}",
-        "now": "Now {level}"
+        "was": "Was <bdi>{previous}</bdi>, now <bdi>{level}</bdi>",
+        "now": "Now <bdi>{level}</bdi>"
       },
       "spine": {
         "now": "Now",
@@ -261,16 +261,16 @@
         "ends": "Until {time}",
         "aria": "Heat level by hour. {summary}"
       },
-      "personalHigher": "Your level is higher: {level}",
+      "personalHigher": "Your level is higher: <bdi>{level}</bdi>",
       "doNow": "What to do",
       "gotIt": "Got it",
       "ended": {
         "title": "This warning ended at {time}",
-        "titleNoTime": "This warning has ended",
         "reason": "The level may have changed since the alert was sent. Open Today to see the level now.",
         "primary": "Open Today"
       },
-      "saved": "The forecast is not available right now. This is the level the alert gave, saved on this phone."
+      "saved": "The forecast is not available right now. This is the level the alert gave, saved on this phone.",
+      "notCovered": "The latest forecast does not show this warning. This is the level the alert gave, saved on this phone."
     },
     "unwell": {
       "title": "I feel unwell",
@@ -318,7 +318,8 @@
         "three": "Cool the employee using methods such as: soaking their clothes with water; spraying, sponging, or showering them with water; and fanning their body.",
         "source": "Exact text of the ADOSH-SF Technical Guideline, Safety in the Heat v4.0, section 4.5(c).",
         "reviewed": "Reviewed by an independent clinical consultant, <bdi>{date}</bdi>"
-      }
+      },
+      "numbersSavedOn": "Numbers saved on {date}"
     }
   },
   "today": {
@@ -500,8 +501,8 @@
     },
     "offlineBanner": {
       "title": "You are offline",
-      "body": "Showing what this phone saved. It updates when you are back online.",
-      "lastKnown": "Last known level, updated <bdi>{time}</bdi>, <bdi>{age}</bdi> ago."
+      "body": "Showing what this phone saved.",
+      "lastKnown": "Updated <bdi>{time}</bdi>, <bdi>{age}</bdi> ago."
     },
     "pendingBanner": "{what} is not scored yet. The numbers appear here when it is.",
     "missingProvenance": "{what} is not shown because its source is missing.",

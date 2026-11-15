@@ -116,9 +116,12 @@ describe("useSiteToday: success", () => {
     expect(view.currentHour?.starts_at).toBe("2026-11-11T09:00:00Z");
     expect(view.freshness).toBe("fresh");
     expect(view.siteLevel).toBe("orange");
-    expect(view.personal).toMatchObject({ status: "available", value: { level: "orange" } });
-    expect(view.displayed).toEqual({ level: "orange", source: "personal" });
-    expect(view.versions).toEqual({
+    // The site's level is there at once; the worker's own follows the on-device code (a dynamic import after the first paint).
+    await waitFor(() => {
+      expect(viewOf(result.current).personal).toMatchObject({ status: "available", value: { level: "orange" } });
+    });
+    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
+    expect(viewOf(result.current).versions).toEqual({
       forecast: { policyVersion: "mock-0", configVersion: 1 },
       policy: { version: "mock-0", configVersion: 1 },
     });
@@ -185,7 +188,71 @@ describe("useSiteToday: success", () => {
       useProfile.setState({ profile });
     });
 
-    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "personal" });
+    // The on-device code is loaded after the profile appears (personal-level.ts), so the personal level follows.
+    await waitFor(() => {
+      expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
+    });
+  });
+});
+
+describe("useSiteToday: the on-device pipeline is loaded only for a phone that holds a profile (F2 W1)", () => {
+  it("with no profile it never asks for the risk policy, and still has the site's level", async () => {
+    let policyRequests = 0;
+    server.use(
+      http.get("*/api/v1/risk-policy", () => {
+        policyRequests += 1;
+        return HttpResponse.json(riskPolicy);
+      }),
+    );
+    useProfile.setState({ profile: null });
+    const { result } = mount();
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+    // Give a policy request every chance to happen: effects and the query cache have run by now.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(policyRequests).toBe(0);
+    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
+    expect(viewOf(result.current).versions.policy).toBeNull();
+  });
+
+  it("with a profile it asks for the policy once, and the personal level arrives after the site's", async () => {
+    let policyRequests = 0;
+    server.use(
+      http.get("*/api/v1/risk-policy", () => {
+        policyRequests += 1;
+        return HttpResponse.json(riskPolicy);
+      }),
+    );
+    act(() => {
+      useProfile.setState({ profile });
+    });
+    const { result } = mount();
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+    // The site's level never waits for the personal one.
+    expect(viewOf(result.current).siteLevel).toBe("orange");
+    await waitFor(() => {
+      expect(viewOf(result.current).personal.status).toBe("available");
+    });
+    expect(policyRequests).toBe(1);
+  });
+
+  it("a worker whose profile is revoked while the screen is open falls back to the site's level at once", async () => {
+    act(() => {
+      useProfile.setState({ profile: { ...profile, heatWorkStartDate: "2026-11-11" } });
+    });
+    const { result } = mount();
+    await waitFor(() => {
+      expect(viewOf(result.current).personal.status).toBe("available");
+    });
+    act(() => {
+      useProfile.setState({ profile: null });
+    });
+    expect(viewOf(result.current).personal).toEqual({ status: "unavailable", reason: "no-profile" });
   });
 });
 
@@ -226,7 +293,7 @@ describe("useSiteToday: the forecast fails", () => {
     });
     expect(result.current.fetching).toBe(false);
     expect(result.current.problem).toBeNull();
-    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "personal" });
+    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
   });
 
   it("surfaces a 404 as it is: the problem's status and detail, for an unknown site", async () => {
@@ -308,7 +375,7 @@ describe("useSiteToday: a stale forecast (review focus 3)", () => {
     // 16:05 at Dubai: the 16:00 hour (amber for the site; for this worker P is 0.23, also amber), forecast 2 h 45 min old.
     setSystemTime("2026-11-11T12:05:00Z");
     expect(viewOf(result.current).currentHour?.starts_at).toBe("2026-11-11T12:00:00Z");
-    expect(viewOf(result.current).displayed).toEqual({ level: "amber", source: "personal" });
+    expect(viewOf(result.current).displayed).toEqual({ level: "amber", source: "site" });
     expect(viewOf(result.current).freshness).toBe("fresh");
 
     // 16:21: the forecast, generated at 13:20, is now 3 h 01 min old.
@@ -335,7 +402,7 @@ describe("useSiteToday: the policy does not match the forecast (ADR 0010)", () =
     });
 
     expect(policy.calls()).toBe(2);
-    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "personal" });
+    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
     expect(viewOf(result.current).versions.policy).toEqual({ version: "ruleset-1", configVersion: 1 });
   });
 
@@ -427,7 +494,7 @@ describe("useSiteToday: the policy fails", () => {
       result.current.refetch();
     });
     await waitFor(() => {
-      expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "personal" });
+      expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
     });
   });
 });
@@ -441,7 +508,7 @@ describe("useSiteToday: offline", () => {
     await waitFor(() => {
       expect(result.current.status).toBe("ready");
     });
-    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "personal" });
+    expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
   });
 
   it("with no connection and nothing cached, keeps loading rather than failing, and recovers when the connection returns", async () => {

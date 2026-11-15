@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
+import { FieldLink } from "@/components/shell/FieldLink";
 import { ProofRows, RecountButton } from "./ProofRows";
 import type { Proof } from "./proof";
 
@@ -71,9 +71,9 @@ function SheetLink({ claim }: { readonly claim: string | undefined }) {
   if (claim === undefined) return null;
   return (
     <p className="px-4 pb-4">
-      <Link href={`/replay/proof/${claim}`} className="text-base text-ink underline underline-offset-4">
+      <FieldLink href={`/replay/proof/${claim}`} className="text-base text-ink underline underline-offset-4">
         {t("openSheet")}
-      </Link>
+      </FieldLink>
     </p>
   );
 }

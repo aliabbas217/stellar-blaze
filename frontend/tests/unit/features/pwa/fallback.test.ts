@@ -1,4 +1,4 @@
-import { OFFLINE_URLS, PRECACHE_URLS, UNWELL_URLS, fallbackUrlFor, offlineFallbacks, offlineUrl, unwellUrl } from "@/features/pwa/fallback";
+import { ALERT_QUERY_PARAMS, ALERT_URLS, OFFLINE_URLS, PRECACHE_URLS, UNWELL_URLS, fallbackUrlFor, offlineFallbacks, offlineUrl, unwellUrl } from "@/features/pwa/fallback";
 import { routing, type Locale } from "@/i18n/routing";
 
 /*
@@ -56,7 +56,7 @@ describe("the unwell call sheet in the precache (F2 Task 18, safety)", () => {
   });
 
   it("the precache is the offline pages plus the sheets and nothing else (no personal or employer route)", () => {
-    expect([...PRECACHE_URLS].sort()).toEqual([...OFFLINE_URLS, ...UNWELL_URLS].sort());
+    expect([...PRECACHE_URLS].sort()).toEqual([...OFFLINE_URLS, ...UNWELL_URLS, ...ALERT_URLS].sort());
     expect(new Set(PRECACHE_URLS).size).toBe(PRECACHE_URLS.length);
     for (const url of PRECACHE_URLS) expect(url).not.toMatch(/api|supervisor|day-plan|stop|sign-off/);
   });
@@ -101,4 +101,21 @@ describe("offlineFallbacks (the entries handed to Serwist)", () => {
       expect(chosen(destination, "/en/worker")).toBeUndefined();
     },
   );
+});
+
+describe("the alert card's precached shell (F2 W1, I3)", () => {
+  it("is one URL per locale, and a precached URL has no query", () => {
+    expect([...ALERT_URLS].sort()).toEqual(LOCALES.map((locale) => `/${locale}/worker/alert`).sort());
+    for (const url of ALERT_URLS) {
+      expect(PRECACHE_URLS).toContain(url);
+      expect(url).not.toContain("?");
+    }
+  });
+
+  it("ignores exactly the notification's four parameters and the two replay overrides in precache matching, never `_rsc`", () => {
+    const ignored = (name: string) => ALERT_QUERY_PARAMS.some((pattern) => pattern.test(name));
+    for (const name of ["audience", "target", "level", "valid_from", "at", "demo"]) expect(ignored(name)).toBe(true);
+    // The router payload request must keep its key, or it would be answered with HTML.
+    for (const name of ["_rsc", "utm_source", "audience2", "xtarget", ""]) expect(ignored(name)).toBe(false);
+  });
 });

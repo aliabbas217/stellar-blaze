@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useState, useSyncExternalStore, ViewTransition, type ReactNode } from "react";
 import { Banner } from "@/components/states/Banner";
 import { isDemoMode } from "@/features/demo/constants";
@@ -121,9 +121,13 @@ function gapMessage(contacts: SiteContacts | undefined, absent: string, unknown:
  */
 export function CallActions({ heroIcon, rowIcon }: { readonly heroIcon: ReactNode; readonly rowIcon: ReactNode }) {
   const t = useTranslations("worker.unwell.calls");
-  const note = useTranslations("worker.unwell")("worksOffline");
+  const sheet = useTranslations("worker.unwell");
+  const note = sheet("worksOffline");
   const demo = isDemoMode();
   const contacts = useSitePin()?.contacts;
+  const offline = useOffline();
+  const format = useFormatter();
+  const savedAt = contacts?.savedAt;
   const [confirmed, setConfirmed] = useState<CallKey | null>(null);
 
   const supervisor = contacts?.supervisorPhone ?? null;
@@ -202,6 +206,12 @@ export function CallActions({ heroIcon, rowIcon }: { readonly heroIcon: ReactNod
       </div>
 
       <p className="text-base leading-(--sign-leading-text) text-ink-2">{note}</p>
+      {/* Offline, a number may be old: say when this phone saved it. Online the sheet is not claiming the numbers are current either, so it stays quiet. */}
+      {offline && savedAt !== undefined ? (
+        <p className="text-base leading-(--sign-leading-text) text-ink-2">
+          {sheet("numbersSavedOn", { date: format.dateTime(new Date(savedAt), { day: "numeric", month: "short", numberingSystem: "latn" }) })}
+        </p>
+      ) : null}
     </div>
   );
 }

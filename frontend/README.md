@@ -57,8 +57,10 @@ image (ADR 0009). These variables are wiring only; tunable values (bands, lead t
 **The demo switch is a build-time setting, not a runtime one.** `NEXT_PUBLIC_SB_DEMO` is the one `NEXT_PUBLIC_*` variable, read by
 `isDemoMode()` (`src/features/demo/constants.ts`) and inlined by `next build`. A missing variable means **demo mode** (so a build that
 forgot the flag can never dial a synthetic number); demo is off only when it is exactly `0`, so a real deployment must build with
-`NEXT_PUBLIC_SB_DEMO=0`. The Dockerfile comment that says the demo image is built with `NEXT_PUBLIC_SB_DEMO=1` is out of date: the flag
-now defaults on (the Dockerfile itself is unchanged here).
+`NEXT_PUBLIC_SB_DEMO=0`. The Dockerfile takes it as a build argument of the build stage (`ARG NEXT_PUBLIC_SB_DEMO`, default empty, which is demo
+mode), because Next inlines it while `pnpm build` runs and ARG and ENV do not cross stages: a real image is built with
+`docker build --build-arg NEXT_PUBLIC_SB_DEMO=0 ...`, and an image built without the argument is a demo image (the unwell sheet's calls
+confirm instead of dialling).
 
 **Invariant: no rate limit on another operation may block the safety path (stop work, the unwell call actions).** The
 API limits employer operations to 60 per 60 s per token (`x-rate-limit` in `openapi/stellar-blaze.openapi.json`) and does

@@ -21,10 +21,10 @@ describe("OfflineBanner", () => {
     expect(screen.getByRole("status")).toHaveTextContent("You are offline");
   });
 
-  it("adds the last known level time and age when it has them", () => {
+  it("adds the time and age of what it shows when it has them (the sign beside it says it is the last known level)", () => {
     renderWithIntl(<OfflineBanner updatedAt="09:40" ageLabel="1 h 30 min" />);
     const banner = screen.getByRole("status");
-    expect(banner).toHaveTextContent("Last known level");
+    expect(banner).toHaveTextContent("Updated 09:40, 1 h 30 min ago.");
     expect(banner).toHaveTextContent("09:40");
     expect(banner).toHaveTextContent("1 h 30 min ago");
   });

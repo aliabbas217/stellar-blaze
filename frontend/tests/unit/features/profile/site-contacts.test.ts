@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { PROFILE_STORAGE_KEY, readSitePin, resetSitePinForTests, sameContacts, toE164, toSiteContacts, toSitePin } from "@/features/profile/site-pin";
 import { createProfileStore, useProfile, type ProfileEffects } from "@/features/profile/store";
 import { clearRevokeIncomplete, endRevokeActivity, readRevokeActive } from "@/features/profile/revoke-marker";
@@ -152,16 +152,24 @@ describe("useSiteContactsSync", () => {
     });
   });
 
-  it("fills the pin's contacts from the site list, for the demo entry on Today (the pin is chosen first, the numbers follow)", () => {
+  it("fills the pin's contacts from the site list, for the demo entry on Today (the pin is chosen first, the numbers follow)", async () => {
     useProfile.getState().chooseSite({ siteId: site.id, crewId: "crew-b" });
     renderHook(() => {
       useSiteContactsSync([site]);
     });
-    expect(useProfile.getState().site).toEqual({ siteId: site.id, crewId: "crew-b", contacts: CONTACTS });
-    expect(readSitePin()?.contacts).toEqual(CONTACTS);
+    // The profile store is loaded by the first write (choose-site.ts), so the pin follows a moment later.
+    await waitFor(() => {
+      expect(useProfile.getState().site?.contacts).toMatchObject(CONTACTS);
+    });
+    expect(useProfile.getState().site).toMatchObject({ siteId: site.id, crewId: "crew-b" });
+    expect(readSitePin()?.contacts).toMatchObject(CONTACTS);
+    // Dated when written (the sheet says "Numbers saved on ..." when it is offline).
+    const savedAt = useProfile.getState().site?.contacts?.savedAt ?? "";
+    expect(Date.parse(savedAt)).not.toBeNaN();
+    expect(Math.abs(Date.now() - Date.parse(savedAt))).toBeLessThan(60_000);
   });
 
-  it("refreshes a number the site has changed, and records that a site has none as null (not as unknown)", () => {
+  it("refreshes a number the site has changed, and records that a site has none as null (not as unknown)", async () => {
     useProfile.getState().chooseSite({ siteId: site.id, crewId: null, contacts: CONTACTS });
     const { rerender } = renderHook(
       ({ sites }: { sites: SiteRecord[] }) => {
@@ -170,7 +178,9 @@ describe("useSiteContactsSync", () => {
       { initialProps: { sites: [site] } },
     );
     rerender({ sites: [{ ...site, first_aider_phone: null }] });
-    expect(useProfile.getState().site?.contacts).toEqual({ supervisorPhone: SUPERVISOR, firstAiderPhone: null });
+    await waitFor(() => {
+      expect(useProfile.getState().site?.contacts).toMatchObject({ supervisorPhone: SUPERVISOR, firstAiderPhone: null });
+    });
   });
 
   it("does nothing with no pin, with a site list that lacks the pinned site, or while the list is empty (offline keeps what the phone has)", () => {

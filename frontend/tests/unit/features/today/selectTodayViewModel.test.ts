@@ -1,6 +1,6 @@
 import type { components } from "@/api/schema";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
-import { selectTodayViewModel } from "@/features/today/useSiteToday";
+import { selectWithProfile as selectTodayViewModel } from "./select-with-profile";
 import { legacyForecastToday as forecastToday, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
 
 type HourForecast = components["schemas"]["HourForecast"];
@@ -50,14 +50,14 @@ function hour(startsAt: string, level: HourForecast["site_level"], wbgt: HourFor
 const THIRTEEN_HUNDRED = "2026-11-11T09:00:00Z";
 
 describe("selectTodayViewModel: a fresh forecast and the matching policy", () => {
-  it("gives the worker's own level, and leads with it: the Task 9 vector reads orange from the person", () => {
+  it("gives the worker's own level; at the same level as the site's the site is the source (its run is known)", () => {
     const view = select();
 
     expect(view.freshness).toBe("fresh");
     expect(view.currentHour?.starts_at).toBe(THIRTEEN_HUNDRED);
     expect(view.siteLevel).toBe("orange");
     expect(view.personal).toMatchObject({ status: "available", value: { level: "orange", acclimatised: true } });
-    expect(view.displayed).toEqual({ level: "orange", source: "personal" });
+    expect(view.displayed).toEqual({ level: "orange", source: "site" });
     expect(view.needsPolicyRefetch).toBe(false);
   });
 
@@ -100,8 +100,8 @@ describe("selectTodayViewModel: which level leads (displayedLevel) and where it 
     expect(view.displayed).toEqual({ level: "red", source: "personal" });
   });
 
-  it("credits the worker's own level when both agree", () => {
-    expect(select().displayed?.source).toBe("personal");
+  it("credits the site's level when both agree: 'Your level now' and a dropped 'until' would claim more than the phone knows (W1 F1)", () => {
+    expect(select().displayed).toEqual({ level: "orange", source: "site" });
   });
 
   it("leads with the worker's own level when the site has none for this hour", () => {
@@ -200,7 +200,7 @@ describe("selectTodayViewModel: a stale forecast (review focus 3)", () => {
     const view = select({ forecast: fixtureForecast(5 * HOUR) });
 
     expect(view.freshness).toBe("stale");
-    expect(view.displayed).toEqual({ level: "orange", source: "personal" });
+    expect(view.displayed).toEqual({ level: "orange", source: "site" });
   });
 
   it("is marked stale when generated_at cannot be read", () => {

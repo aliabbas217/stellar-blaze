@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { ViewTransition } from "react";
+import { ViewTransition, type ReactNode } from "react";
 import { LevelSign } from "@/components/level/LevelSign";
 import { Pictogram } from "@/components/level/Pictogram";
 import { ProofChip } from "@/components/provenance/ProofChip";
@@ -32,6 +32,9 @@ import "@/styles/view-transitions.css";
  */
 
 /** Rows the horizontal spine reserves: the labels above the band (up to three), the band and the tick row. */
+/** A level name inside a phrase keeps its own direction: an Urdu name in an English phrase must not reorder the text around it. */
+const bdi = (chunks: ReactNode) => <bdi>{chunks}</bdi>;
+
 const SPINE_SKELETON = "calc(var(--t-16) * var(--sign-leading-text, var(--leading-body)) * 6 + var(--s-8))";
 
 export function AlertSkeleton() {
@@ -66,7 +69,7 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
     return (
       <div className="px-4 pt-4">
         <EmptyState
-          title={model.endedAt === null ? t("ended.titleNoTime") : t("ended.title", { time: time(model.endedAt) })}
+          title={t("ended.title", { time: time(model.endedAt) })}
           reason={t("ended.reason")}
           primary={{ label: t("ended.primary"), href: "/worker" }}
         />
@@ -75,10 +78,19 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
   }
 
   if (model.status === "saved") {
-    // Nothing to read the window from: the card says what the notification itself said, and what to do without a forecast.
+    // Nothing to read the window from: the card says what the notification itself said, and what to do without a forecast. A
+    // forecast that was had but does not place the warning is not a failure (no error block), and it never reads "ended".
     return (
       <div className="flex flex-col gap-4 pb-6">
-        <div className="px-4 pt-3">{model.offline ? <OfflineBanner /> : <Banner><p>{t("saved")}</p></Banner>}</div>
+        <div className="px-4 pt-3">
+          {model.offline ? (
+            <OfflineBanner />
+          ) : (
+            <Banner>
+              <p>{model.cause === "not-covered" ? t("notCovered") : t("saved")}</p>
+            </Banner>
+          )}
+        </div>
         <section aria-label={kicker} className="flex flex-col gap-3 px-4">
           <LevelSign
             level={params.level}
@@ -94,7 +106,7 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
             <span>{today("lead.siteRules")}</span>
           </p>
         </section>
-        {model.offline ? null : (
+        {model.offline || model.cause === "not-covered" ? null : (
           <div className="px-4">
             <ErrorState title={states("error.title")} detail={states("error.detail")} onRetry={model.retry} requestId={model.problem?.request_id ?? null} />
           </div>
@@ -158,7 +170,7 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
               until={t.rich("from", { time: fromLabel(run.from), bdi: (chunks) => <bdi>{chunks}</bdi> })}
             />
             {model.personalHigher === null ? null : (
-              <p className="text-lg font-medium text-ink">{t("personalHigher", { level: levels(`name.${model.personalHigher}`) })}</p>
+              <p className="text-lg font-medium text-ink">{t.rich("personalHigher", { level: levels(`name.${model.personalHigher}`), bdi })}</p>
             )}
           </section>
         </ViewTransition>
@@ -169,8 +181,8 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
           </h2>
           <p className="px-4 text-lg text-ink-2">
             {run.previous === null
-              ? t("changed.now", { level: levelName })
-              : t("changed.was", { previous: levels(`name.${run.previous}`), level: levelName })}
+              ? t.rich("changed.now", { level: levelName, bdi })
+              : t.rich("changed.was", { previous: levels(`name.${run.previous}`), level: levelName, bdi })}
           </p>
           <ChangedBracket from={model.from} to={model.to} changedFrom={model.changedFrom} changedTo={model.changedTo} dir={dir}>
             <TimeSpine
@@ -203,7 +215,12 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
       </section>
 
       <div className="flex flex-col items-start gap-3 px-4">
-        <ProofChip proof={proof} field label={today("why.level", { level: levelName })} />
+        <ProofChip
+          proof={proof}
+          field
+          label={today.markup("why.level", { level: levelName, bdi: (chunks) => chunks })}
+          labelContent={today.rich("why.level", { level: levelName, bdi })}
+        />
         <FieldLink href="/worker" data-primary="" className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation text-lg`}>
           {t("gotIt")}
         </FieldLink>

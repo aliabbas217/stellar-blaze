@@ -20,7 +20,7 @@ export function LevelHeader({ description }: { readonly description: TodayDescri
 
   return (
     <ViewTransition name="level" share="morph" default="none">
-      <section aria-label={t(`kicker.${kicker}`)} className="flex flex-col gap-3 px-4 pt-3">
+      <section aria-label={t(`kicker.${kicker}`)} className="flex flex-col gap-3 px-4">
         <LevelSign
           level={level}
           kind={levelKind}

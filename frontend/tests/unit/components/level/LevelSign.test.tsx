@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { screen, within } from "@testing-library/react";
 import { LevelSign, LEVEL_SIGN_HEIGHT } from "@/components/level/LevelSign";
 import { LEVELS, type Level } from "@/components/level/level";
@@ -62,9 +64,9 @@ describe("LevelSign", () => {
     expect(container.querySelector("[data-pictogram]")).toBeNull();
   });
 
-  it("sets the word at 76 px for hero and 22 px for mini", () => {
+  it("sets the hero word from the per-language size (76 px, 64 px in Arabic script) and the mini word at 22 px", () => {
     const hero = renderWithIntl(<LevelSign level="amber" kind="live" size="hero" kicker="k" />);
-    expect(hero.container.querySelector("h2")?.className).toContain("text-6xl");
+    expect(hero.container.querySelector("h2")?.className).toContain("text-(length:--sign-word-size)");
     hero.unmount();
     const mini = renderWithIntl(<LevelSign level="amber" kind="live" size="mini" kicker="k" />);
     expect(mini.container.querySelector("h2")?.className).toContain("text-xl");
@@ -74,4 +76,32 @@ describe("LevelSign", () => {
     expect(LEVEL_SIGN_HEIGHT.hero).toMatch(/^calc\(/);
     expect(LEVEL_SIGN_HEIGHT.mini).toMatch(/^calc\(/);
   });
+
+  it("steps the hero word down to 64 px in Arabic script only, from one property both the sign and its skeleton read (F2 W1, I6)", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/styles/globals.css"), "utf8");
+    const sizeOf = (selector: string): string | undefined =>
+      new RegExp(String.raw`:lang\(${selector}\)[^{]*\{[^}]*--sign-word-size:\s*([^;]+);`).exec(css)?.[1];
+    expect(sizeOf("ar")).toBe("var(--t-64)");
+    expect(sizeOf("ur")).toBe("var(--t-64)");
+    expect(sizeOf("en")).toBe("var(--t-76)");
+    expect(sizeOf("ne")).toBe("var(--t-76)");
+    expect(LEVEL_SIGN_HEIGHT.hero).toContain("var(--sign-word-size)");
+    expect(LEVEL_SIGN_HEIGHT.hero).not.toContain("--t-76");
+  });
+
+  it("puts the kicker and the 'until' on one row above the word, never below it (hero)", () => {
+    const { container } = renderWithIntl(<LevelSign level="amber" kind="live" size="hero" kicker="Site level now" until="until 17:00" />);
+    const sign = container.querySelector("[data-level-sign]") as HTMLElement;
+    const row = screen_row(sign);
+    expect(row.textContent).toContain("Site level now");
+    expect(row.textContent).toContain("until 17:00");
+    // Order in the sign: the row, the word, the scale. Nothing sits between the word and the scale any more.
+    const children = [...sign.children];
+    expect(children.indexOf(row)).toBe(0);
+    expect(children.indexOf(sign.querySelector("h2")?.parentElement as HTMLElement)).toBe(1);
+  });
 });
+
+function screen_row(sign: HTMLElement): HTMLElement {
+  return sign.children[0] as HTMLElement;
+}

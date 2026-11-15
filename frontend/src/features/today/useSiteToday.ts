@@ -6,10 +6,10 @@ import { apiClient } from "@/api/client";
 import { ApiProblem, type Problem } from "@/api/problem";
 import { call } from "@/api/result";
 import type { components } from "@/api/schema";
-import type { Level } from "@/components/level/level";
-import { isCalendarDate, localCalendarDate, type Profile } from "@/features/profile/profile-shape";
-import { useProfile } from "@/features/profile/store";
-import { displayedLevel, personalLevel, policyMatchesForecast, type PersonalLevel } from "@/features/risk/personal";
+import { levelIndex, type Level } from "@/components/level/level";
+import { useHasProfile } from "@/features/profile/site-pin";
+import { displayedLevel } from "@/features/risk/displayed-level";
+import type { PersonalLevel } from "@/features/risk/personal";
 import { currentHour, freshness, type Freshness } from "@/features/today/freshness";
 
 /*
@@ -25,6 +25,11 @@ import { currentHour, freshness, type Freshness } from "@/features/today/freshne
  * Personal risk is worked out on the phone and never sent anywhere (ADR 0004). It needs a policy whose config_version
  * equals the forecast's (ADR 0010); until it does there is no personal level, only the site's. The versions are shown as
  * the API wrote them and never parsed.
+ *
+ * The personal part is INJECTED (F2 W1, the route script budget): this module holds the site's side only, with no profile
+ * store and no risk code in it. A phone that holds a profile loads `personal-level.ts` (the store, NIOSH, the personal level)
+ * after the first paint and hands `selectTodayViewModel` its pipeline; a phone with none never fetches it. The sign, the
+ * spine and the lead are the site's and do not wait for it: the personal level can only raise the sign once it arrives.
  */
 
 type HourForecast = components["schemas"]["HourForecast"];
@@ -104,6 +109,24 @@ export interface TodayVersions {
   readonly policy: { readonly version: string; readonly configVersion: number } | null;
 }
 
+/** What the on-device pipeline (personal-level.ts) says about one hour: injected into `selectTodayViewModel`. */
+export interface PersonalPart {
+  readonly personal: PersonalStatus;
+  readonly policy: TodayVersions["policy"];
+  /** True when the policy is held and is not the forecast's: the policy should be fetched again (the hook does). */
+  readonly needsPolicyRefetch: boolean;
+}
+
+/** The pipeline itself, bound to the profile and the policy: the forecast, the hour that contains now (or null) and now, to its verdict. */
+export type PersonalSource = (context: { hour: HourForecast | null; forecast: SiteForecastToday; now: Date }) => PersonalPart;
+
+/** What a phone with no profile, or one whose on-device code has not loaded yet, has. */
+export const NO_PERSONAL: PersonalPart = {
+  personal: { status: "unavailable", reason: "no-profile" },
+  policy: null,
+  needsPolicyRefetch: false,
+};
+
 export interface TodayViewModel {
   /** The forecast itself: the hours for the band, `generated_at` for the banner. */
   readonly forecast: SiteForecastToday;
@@ -120,66 +143,40 @@ export interface TodayViewModel {
   readonly needsPolicyRefetch: boolean;
 }
 
-function unavailable(reason: PersonalUnavailableReason): PersonalStatus {
-  return { status: "unavailable", reason };
-}
-
-function personalFor(input: {
-  forecast: SiteForecastToday;
-  hour: HourForecast | null;
-  policy: RiskPolicy | undefined;
-  profile: Profile | null;
-  now: Date;
-}): PersonalStatus {
-  const { forecast, hour, policy, profile, now } = input;
-  if (profile === null) return unavailable("no-profile");
-  if (hour === null) return unavailable("outside-forecast");
-  const { p05, p50, p95 } = hour.wbgt_c;
-  if (p05 === null || p50 === null || p95 === null) return unavailable("no-hour-data");
-  if (policy === undefined) return unavailable("policy-unavailable");
-  if (!policyMatchesForecast(forecast, policy)) return unavailable("version-mismatch");
-  // personalLevel throws on a start date that is not a calendar date; the store validates it, and this keeps a bad
-  // stored value from blanking the screen: the site level still shows.
-  if (!isCalendarDate(profile.heatWorkStartDate)) return unavailable("not-computable");
-  const value = personalLevel({ hour, profile, policy, today: localCalendarDate(now) });
-  return value === null ? unavailable("not-computable") : { status: "available", value };
-}
-
 /**
- * What the Today screen is told, from the four things it knows. Pure and total: it never throws and reads no clock.
+ * What the Today screen is told, from what it knows. Pure and total: it never throws and reads no clock. `personal` is the
+ * injected on-device pipeline, or null when there is none to run (no profile, or its code has not arrived).
  *
  * "Now" must be covered: with no hour of the forecast containing it there is no site level and no personal level, however
  * fresh the forecast is. A stale forecast that does cover now still gives its levels; `freshness` is how the screen says
  * so. The level the screen leads with is the more severe of the site's and the worker's (`displayedLevel`), credited to the
- * worker's own when they are equal.
+ * worker's own only when it is strictly the more severe: equal levels are the site's.
  */
-export function selectTodayViewModel(input: {
-  forecast: SiteForecastToday;
-  policy: RiskPolicy | undefined;
-  profile: Profile | null;
-  now: Date;
-}): TodayViewModel {
-  const { forecast, policy, profile, now } = input;
+export function selectTodayViewModel(input: { forecast: SiteForecastToday; now: Date; personal: PersonalSource | null }): TodayViewModel {
+  const { forecast, now } = input;
   const hour = currentHour(forecast.hours, now);
   const siteLevel = hour?.site_level ?? null;
-  const personal = personalFor({ forecast, hour, policy, profile, now });
+  const part = input.personal === null ? NO_PERSONAL : input.personal({ hour, forecast, now });
 
-  const personalOwn = personal.status === "available" ? personal.value.level : null;
+  const personalOwn = part.personal.status === "available" ? part.personal.value.level : null;
   const level = displayedLevel(siteLevel, personalOwn);
-  const displayed: DisplayedLevel | null = level === null ? null : { level, source: level === personalOwn ? "personal" : "site" };
+  // The worker's own is the source only when it is strictly the more severe (or the site has no level): at the same level the
+  // site's warning stands and its run ("until 17:00") is known, where the worker's own run is not forecast.
+  const ownLeads = personalOwn !== null && (siteLevel === null || levelIndex(personalOwn) > levelIndex(siteLevel));
+  const displayed: DisplayedLevel | null = level === null ? null : { level, source: ownLeads ? "personal" : "site" };
 
   return {
     forecast,
     freshness: freshness(forecast.generated_at, now),
     currentHour: hour,
     siteLevel,
-    personal,
+    personal: part.personal,
     displayed,
     versions: {
       forecast: { policyVersion: forecast.policy_version, configVersion: forecast.config_version },
-      policy: policy === undefined ? null : { version: policy.version, configVersion: policy.config_version },
+      policy: part.policy,
     },
-    needsPolicyRefetch: policy !== undefined && !policyMatchesForecast(forecast, policy),
+    needsPolicyRefetch: part.needsPolicyRefetch,
   };
 }
 
@@ -232,6 +229,53 @@ function useOffline(): boolean {
   );
 }
 
+// --- The on-device pipeline, loaded on demand ---------------------------------------------------------------------------
+
+type PersonalModule = typeof import("@/features/today/personal-level");
+
+function subscribeNever(): () => void {
+  return () => undefined;
+}
+
+function noProfile(): null {
+  return null;
+}
+
+const COULD_NOT_LOAD: PersonalPart = { ...NO_PERSONAL, personal: { status: "unavailable", reason: "not-computable" } };
+
+/**
+ * The injected personal pipeline for a phone that holds a profile, or null: while the phone holds none and while the code
+ * loads (a dynamic import started in an effect, so after the first paint). A load that failed is `not-computable` rather than
+ * "no profile": the worker has a profile, and the screen says its level could not be worked out. The profile is read through
+ * the loaded module's own subscription, so the store stays out of this one.
+ */
+function usePersonalSource(hasProfile: boolean, policy: RiskPolicy | undefined): PersonalSource | null {
+  const [loaded, setLoaded] = useState<PersonalModule | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!hasProfile || loaded !== null || failed) return;
+    let live = true;
+    import("@/features/today/personal-level").then(
+      (module_) => {
+        if (live) setLoaded(module_);
+      },
+      () => {
+        if (live) setFailed(true);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [hasProfile, loaded, failed]);
+
+  const profile = useSyncExternalStore(loaded?.subscribeProfile ?? subscribeNever, loaded?.getProfile ?? noProfile, noProfile);
+  return useMemo((): PersonalSource | null => {
+    if (!hasProfile) return null;
+    if (loaded === null) return failed ? () => COULD_NOT_LOAD : null;
+    return (context) => loaded.personalPartFor({ ...context, profile, policy });
+  }, [hasProfile, loaded, failed, profile, policy]);
+}
+
 // --- The hook ---------------------------------------------------------------------------------------------------------
 
 interface SiteTodayCommon {
@@ -272,19 +316,17 @@ export type SiteToday =
 export function useSiteToday(siteId: string, options: { readonly now?: Date; readonly enabled?: boolean } = {}): SiteToday {
   const queryClient = useQueryClient();
   const enabled = options.enabled ?? true;
+  const hasProfile = useHasProfile();
   const forecastQuery = useQuery({ ...siteTodayQueryOptions(siteId), enabled });
-  const policyQuery = useQuery({ ...riskPolicyQueryOptions(), enabled });
-  const profile = useProfile((state) => state.profile);
+  // The policy is asked for only by a phone that holds a profile: nothing else needs it.
+  const policyQuery = useQuery({ ...riskPolicyQueryOptions(), enabled: enabled && hasProfile });
+  const personal = usePersonalSource(hasProfile, policyQuery.data);
   const deviceNow = useNow();
   const now = options.now ?? deviceNow;
   const offline = useOffline();
 
   const forecast = forecastQuery.data;
-  const policy = policyQuery.data;
-  const view = useMemo(
-    () => (forecast === undefined ? null : selectTodayViewModel({ forecast, policy, profile, now })),
-    [forecast, policy, profile, now],
-  );
+  const view = useMemo(() => (forecast === undefined ? null : selectTodayViewModel({ forecast, now, personal })), [forecast, personal, now]);
 
   const needsPolicyRefetch = view?.needsPolicyRefetch === true;
   const forecastConfigVersion = view?.versions.forecast.configVersion;

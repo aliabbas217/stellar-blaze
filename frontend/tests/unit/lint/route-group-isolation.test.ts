@@ -233,12 +233,18 @@ describe("route-group isolation: what the resolved rules report", () => {
     ["field shell, locale Link", "src/components/shell/FieldShell.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', [IMPORTS]],
     ["worker dock, locale Link", "src/components/shell/WorkerDock.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', [IMPORTS]],
     ["empty state, locale Link", "src/components/states/EmptyState.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', [IMPORTS]],
+    // F2 W1: the proof drawer ships on worker routes (through ProofChip) and links like a field page; a RELATIVE path to the
+    // navigation module is the same module and the same ban.
+    ["test_proof_drawer_cannot_import_the_raw_link: proof drawer, locale Link", "src/components/provenance/ProofDrawer.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', [IMPORTS]],
+    ["worker route, a relative path to the navigation module", WORKER_ROUTE, 'import { Link } from "../../../../../i18n/navigation"; export { Link };', [IMPORTS]],
+    ["supervisor route, a relative path to the navigation module", SUPERVISOR_ROUTE, 'import { Link } from "../../../i18n/navigation"; export { Link };', [IMPORTS]],
     // The shared-code rule still holds for those files (the field-link block repeats it: its options replace the shared block's).
     ["field shell, a feature import is still banned", "src/components/shell/FieldShell.tsx", 'import { s } from "@/features/risk/store"; export { s };', [IMPORTS]],
     ["empty state, a route group import is still banned", "src/components/states/EmptyState.tsx", 'export { default } from "@/app/[locale]/(worker)/worker/page";', [IMPORTS]],
     ["empty state, import() of a feature is still banned", "src/components/states/EmptyState.tsx", 'export const load = () => import("@/features/risk/store");', [SYNTAX]],
     // What must stay allowed.
     ["worker route, FieldLink and the other exports of the navigation module", WORKER_ROUTE, 'import { FieldLink } from "@/components/shell/FieldLink"; import { usePathname, getPathname } from "@/i18n/navigation"; export { FieldLink, usePathname, getPathname };', []],
+    ["worker route, a relative path to the navigation module is fine for what is not Link", WORKER_ROUTE, 'import { useRouter } from "../../../../../i18n/navigation"; export { useRouter };', []],
     ["FieldLink itself is the one file that imports the raw Link", "src/components/shell/FieldLink.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', []],
     ["desk shell keeps the locale Link", "src/components/shell/DeskShell.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', []],
     ["hse route keeps the locale Link", HSE_ROUTE, 'import { Link } from "@/i18n/navigation"; export { Link };', []],

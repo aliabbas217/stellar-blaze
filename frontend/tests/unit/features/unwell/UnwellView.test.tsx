@@ -119,6 +119,33 @@ describe("the three calls on a real deployment", () => {
     expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
+  describe("when the phone saved the numbers (F2 W1)", () => {
+    const SAVED = { ...BOTH, savedAt: "2026-11-12T08:00:00.000Z" };
+
+    it("offline: says on which day this phone saved them, because a number that may be old should look old", () => {
+      pin(SAVED);
+      vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+      renderWithIntl(<UnwellView />);
+      expect(screen.getByText(/^Numbers saved on /)).toBeVisible();
+      // Western digits and a short month, whatever the order the locale writes them in.
+      expect(screen.getByText(/^Numbers saved on /).textContent).toMatch(/12/);
+      expect(screen.getByText(/^Numbers saved on /).textContent).toMatch(/Nov/);
+    });
+
+    it("online: says nothing about it", () => {
+      pin(SAVED);
+      renderWithIntl(<UnwellView />);
+      expect(screen.queryByText(/Numbers saved on/)).toBeNull();
+    });
+
+    it("offline with a pin that has no save date (written before the date existed): says nothing rather than guess one", () => {
+      pin(BOTH);
+      vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+      renderWithIntl(<UnwellView />);
+      expect(screen.queryByText(/Numbers saved on/)).toBeNull();
+    });
+  });
+
   it("says calling needs no internet but does need a signal", () => {
     openIn("ideal");
     expect(screen.getByText("Calling works without internet. It needs a phone signal.")).toBeVisible();

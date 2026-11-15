@@ -110,12 +110,4 @@ export function policyMatchesForecast(forecast: ForecastVersion, policy: PolicyV
   return forecast.config_version === policy.config_version;
 }
 
-/**
- * The level the screen leads with: the more severe of the site's and the worker's own, either of which may be absent.
- * Safety-first; flagged for B3 to confirm.
- */
-export function displayedLevel(site: Level | null, personal: Level | null): Level | null {
-  if (site === null) return personal;
-  if (personal === null) return site;
-  return moreSevere(site, personal);
-}
+export { displayedLevel } from "@/features/risk/displayed-level";

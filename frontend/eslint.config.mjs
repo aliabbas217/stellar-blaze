@@ -57,6 +57,10 @@ const RAW_LINK_PATHS = [
   { name: "@/i18n/navigation", importNames: ["Link"], message: NO_RAW_LINK },
   { name: "next/link", message: NO_RAW_LINK },
 ];
+// The same module reached by a RELATIVE path (`../../i18n/navigation`, `./navigation` from inside src/i18n): `paths` matches the
+// exact specifier only, so a route file could have dodged the ban by spelling the path another way (F2 W1). The alias form is
+// left to `paths`, so an import is reported once.
+const RAW_LINK_PATTERNS = [{ regex: String.raw`^[.]{1,2}/(.*/)?navigation(\.[jt]sx?)?$`, importNames: ["Link"], message: NO_RAW_LINK }];
 
 /**
  * A config object that applies no-restricted-imports and no-restricted-syntax to `files`; one `forbid` entry per message.
@@ -71,7 +75,10 @@ function isolation(files, forbid, { fieldLinks = false } = {}) {
         "error",
         {
           ...(fieldLinks ? { paths: RAW_LINK_PATHS } : {}),
-          patterns: forbid.map(({ targets, message }) => ({ group: targets.flatMap((t) => t.globs), message })),
+          patterns: [
+            ...forbid.map(({ targets, message }) => ({ group: targets.flatMap((t) => t.globs), message })),
+            ...(fieldLinks ? RAW_LINK_PATTERNS : []),
+          ],
         },
       ],
       "no-restricted-syntax": [
@@ -134,7 +141,13 @@ const routeGroupIsolation = [
   // Later than the shared block above, which matches the same files: the options replace, so this block repeats the shared
   // rule and adds the raw-link ban. FieldLink.tsx is not listed: it is the one file that imports the raw Link.
   isolation(
-    ["src/components/shell/FieldShell.tsx", "src/components/shell/WorkerDock.tsx", "src/components/states/**"],
+    [
+      "src/components/shell/FieldShell.tsx",
+      "src/components/shell/WorkerDock.tsx",
+      "src/components/states/**",
+      // Ships on every worker route through ProofChip (a dynamic import, but one tap away): its link is a field link too.
+      "src/components/provenance/ProofDrawer.tsx",
+    ],
     [forbidFeatureCode],
     { fieldLinks: true },
   ),

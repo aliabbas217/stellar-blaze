@@ -29,11 +29,34 @@ export function unwellUrl(locale: Locale): string {
 export const UNWELL_URLS: readonly string[] = routing.locales.map(unwellUrl);
 
 /**
- * What the service worker precaches next to the build's static files: the offline pages (the fallback) and the unwell sheet
- * (a worker in trouble may open it with no signal, before this phone has ever been online on that page). Both are static and
- * the same for everyone, so caching them is safe (ADR 0004); the runtime-caching allow-list (D2) is untouched.
+ * The alert card's static shell of a locale (F2 W1, I3). A tap on a heat warning opens `/<locale>/worker/alert?audience=...`; the
+ * page has no server-side query (AlertEntry reads it on the client), so this one HTML file serves every warning, and the service
+ * worker matches the request to it with the query ignored (`ALERT_QUERY_PARAMS`).
  */
-export const PRECACHE_URLS: readonly string[] = [...OFFLINE_URLS, ...UNWELL_URLS];
+export function alertUrl(locale: Locale): string {
+  return `/${locale}/worker/alert`;
+}
+
+/** Every alert shell, one per locale. */
+export const ALERT_URLS: readonly string[] = routing.locales.map(alertUrl);
+
+/**
+ * The query parameters of the alert card that precache matching ignores (Serwist `ignoreURLParametersMatching`, which strips the
+ * parameters whose NAME matches before looking for a precached URL). The four of a push notification's target (ADR 0058:
+ * `audience`, `target`, `level`, `valid_from`) and the two replay overrides (`at`, `demo`). Deliberately a closed list and not
+ * a match-all pattern: the framework's own `_rsc` parameter must stay in the key, or a client-side navigation to the page would be answered
+ * with this HTML where it asked for the router payload. Applies to precache entries only; the runtime-caching allow-list (D2) is
+ * untouched.
+ */
+export const ALERT_QUERY_PARAMS: readonly RegExp[] = [/^audience$/, /^target$/, /^level$/, /^valid_from$/, /^at$/, /^demo$/];
+
+/**
+ * What the service worker precaches next to the build's static files: the offline pages (the fallback), the unwell sheet (a worker
+ * in trouble may open it with no signal, before this phone has ever been online on that page) and the alert card's shell (a
+ * warning is tapped with the app closed, and may be tapped offline). All are static and the same for everyone, so caching them is
+ * safe (ADR 0004); the runtime-caching allow-list (D2) is untouched.
+ */
+export const PRECACHE_URLS: readonly string[] = [...OFFLINE_URLS, ...UNWELL_URLS, ...ALERT_URLS];
 
 /** The locale a path starts with: its first segment must be one of the routing locales exactly (they are lower case). */
 function localeOf(pathname: string): Locale | undefined {

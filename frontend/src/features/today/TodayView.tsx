@@ -53,24 +53,26 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
   const { description: d, forecast, synthetic, pushOff } = model;
 
   const levelName = d.level === null ? null : levels(`name.${d.level}`);
+  // The chip's accessible name is the plain words (a <bdi> is markup, an accessible name is text); its visible words wrap the level in <bdi>.
+  const plainWhy = (level: string) => t.markup("why.level", { level, bdi: (chunks) => chunks });
   const proof =
     synthetic === null
       ? null
       : proofFromForecast(forecast, levelName === null ? t("proofWhat.siteRules") : t("proofWhat.level", { level: levelName }), { synthetic });
 
   return (
-    <div className="flex flex-col gap-4 pb-6">
+    <div className="flex flex-col gap-3 pb-6">
       {d.personalUnavailable ? (
-        <div className="px-4 pt-3">
+        <div className="px-4">
           <Banner>
             <p>{partial}</p>
           </Banner>
         </div>
       ) : null}
       {d.banner === null ? null : (
-        <div className="px-4 pt-3">
+        <div className="px-4">
           {d.banner.kind === "stale" ? (
-            <StaleBanner updatedAt={time(d.banner.updatedAt)} ageLabel={ageLabel(d.banner.ageMs)} />
+            <StaleBanner updatedAt={time(d.banner.updatedAt)} ageLabel={ageLabel(d.banner.ageMs)} title={t("kicker.fallback")} />
           ) : (
             <OfflineBanner updatedAt={time(d.banner.updatedAt)} ageLabel={ageLabel(d.banner.ageMs)} />
           )}
@@ -90,8 +92,8 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
         </div>
       ) : (
         <>
-          <ShiftSpine description={d} />
           <ActionLead lead={d.plan.lead} protective={d.protective} />
+          <ShiftSpine description={d} />
         </>
       )}
 
@@ -115,7 +117,12 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
       )}
 
       <div className="flex flex-col items-start gap-3 px-4">
-        <ProofChip proof={proof} field label={levelName === null ? t("why.siteRules") : t("why.level", { level: levelName })} />
+        <ProofChip
+          proof={proof}
+          field
+          label={levelName === null ? t("why.siteRules") : plainWhy(levelName)}
+          labelContent={levelName === null ? undefined : t.rich("why.level", { level: levelName, bdi: (chunks) => <bdi>{chunks}</bdi> })}
+        />
         {pushOff && !d.noShift ? (
           <FieldLink href="/worker/alerts" data-primary="" className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation text-lg`}>
             {t("turnOnWarnings")}

@@ -1,7 +1,7 @@
 import type { components } from "@/api/schema";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
 import { describeToday, type DescribeInput } from "@/features/today/describe";
-import { selectTodayViewModel } from "@/features/today/useSiteToday";
+import { selectWithProfile as selectTodayViewModel } from "./select-with-profile";
 import { banWindow, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
 
 /*
@@ -138,6 +138,62 @@ describe("describeToday", () => {
     expect(shown.banner).toMatchObject({ kind: "offline" });
     expect(shown.banner?.updatedAt.toISOString()).toBe("2026-09-03T06:50:00.000Z");
     expect(shown.banner?.ageMs).toBe(90 * 60_000);
+  });
+
+  describe("test_stale_and_fallback_are_not_live (I2): nothing is drawn from a forecast that is not live as if it were current", () => {
+    const NOT_LIVE: readonly [string, Partial<DescribeInput> & { forecast?: Forecast }][] = [
+      ["stale by the API's status", { forecast: forecast({ forecast_status: "stale", generated_at: "2026-09-03T05:00:00Z" }) }],
+      ["stale by age", { forecast: forecast({ generated_at: "2026-09-03T03:00:00Z" }) }],
+      ["offline", { offline: true }],
+      ["fallback", { forecast: forecast({ forecast_status: "fallback" }) }],
+    ];
+
+    it("control: the live day has the hour's cycle lead, the extra lines, heat in the cells and a line at now", () => {
+      const shown = describeWith();
+      expect(shown.plan.lead).toEqual({ kind: "cycle", workMinutes: 20, restMinutes: 40 });
+      expect(shown.plan.also.length).toBeGreaterThan(0);
+      expect(shown.cells.some((cell) => cell.wbgtC !== null)).toBe(true);
+      expect(shown.nowHour).not.toBeNull();
+      expect(shown.waypoints.some((spec) => spec.kind === "now")).toBe(true);
+      expect(shown.lastKnown).toBe(false);
+    });
+
+    it.each(NOT_LIVE)("%s: the lead is the protective site rules, with no current-hour cycle and no extra lines", (_name, input) => {
+      const shown = describeWith(input);
+      expect(shown.protective).toBe(true);
+      expect(shown.plan.lead).toEqual({ kind: "siteRules" });
+      expect(shown.plan.also).toEqual([]);
+    });
+
+    it.each(NOT_LIVE)("%s: no cell carries heat colour (full heat is for live data only)", (_name, input) => {
+      const shown = describeWith(input);
+      expect(shown.cells.length).toBeGreaterThan(0);
+      expect(shown.cells.every((cell) => cell.wbgtC === null)).toBe(true);
+    });
+
+    it.each(NOT_LIVE.filter(([name]) => name !== "fallback"))("%s: last known, no line at now, no Now waypoint, no promise of how long it holds", (_name, input) => {
+      const shown = describeWith(input);
+      expect(shown.lastKnown).toBe(true);
+      expect(shown.levelKind).toBe("stale");
+      expect(shown.nowHour).toBeNull();
+      expect(shown.waypoints.some((spec) => spec.kind === "now")).toBe(false);
+      expect(shown.untilAt).toBeNull();
+      // The sign still says the last known level, dimmed: that is the secondary information.
+      expect(shown.level).not.toBeNull();
+    });
+
+    it("the clock's own waypoints (the break, the shift's end) stay on a last known day: they do not come from the forecast", () => {
+      const shown = describeWith({ offline: true });
+      expect(shown.waypoints.map((spec) => spec.kind)).toEqual(expect.arrayContaining(["breakIn", "backToWork"]));
+    });
+
+    it("a stale forecast never lets a personal level lead or be announced as higher", () => {
+      const shown = describeWith({
+        forecast: forecast({ forecast_status: "stale", generated_at: "2026-09-02T05:00:00Z" }),
+        profile: { ...profile, heatWorkStartDate: "2026-09-03" },
+      });
+      expect(shown.personalHigher).toBe(false);
+    });
   });
 
   it("the age counts from the phone's clock, not the replay clock (a replayed day is months before the forecast was written)", () => {

@@ -15,6 +15,10 @@ import type { TodayViewModel } from "@/features/today/useSiteToday";
  *  - A level is "live" only for a current forecast on a connected phone. A stale forecast (the API says so, or it is older
  *    than three hours) and any forecast on a phone that reports no connection are the LAST KNOWN level, with the time they were
  *    written and their age. A fallback forecast has no level at all: the site rules stand in.
+ *  - A last known level is SECONDARY (F2 W1, I2): it keeps the sign (dimmed, with the clock and the dashed marker) and the banner
+ *    that says when it was written and how old it is, and nothing else is drawn from it. The lead is the protective site rules
+ *    (never the stale hour's own cycle or "Also now" lines), the spine's cells carry no heat colour and there is no line at now,
+ *    and no "until" is promised. A stale hour read as current ("Work 20 min, rest 40 min in shade") is a wrong instruction.
  *  - A forecast that does not cover now (another day, an empty list) has no level and no personal level: the site rules.
  *  - The age counts from the phone's own clock. The replay clock is a recorded morning months ago; a forecast is "26 h old"
  *    by how long ago it was written, not by how far it is from the replayed hour.
@@ -69,7 +73,9 @@ export interface TodayDescription {
   /** The worker has a profile and the phone could not work their level out: the screen says why the site level is shown. */
   readonly personalUnavailable: boolean;
   readonly banner: Banner | null;
-  /** There is no level to act on: the lead is the protective site rules, in fixed words. */
+  /** The forecast on screen is last known, not live (stale, or the phone is offline): nothing is drawn from it as current. */
+  readonly lastKnown: boolean;
+  /** There is no level to act on, or only a last known one: the lead is the protective site rules, in fixed words. */
   readonly protective: boolean;
   readonly plan: ActionPlan;
   readonly cells: readonly SpineCell[];
@@ -136,8 +142,9 @@ export function describeToday(input: DescribeInput): TodayDescription {
           ? "personal"
           : "site";
 
-  const run = displayed?.source === "site" ? levelRun(forecast.hours, now) : null;
+  const run = displayed?.source === "site" && !lastKnown ? levelRun(forecast.hours, now) : null;
   const personalHigher =
+    !lastKnown &&
     level !== null &&
     view.personal.status === "available" &&
     view.siteLevel !== null &&
@@ -153,10 +160,16 @@ export function describeToday(input: DescribeInput): TodayDescription {
   const span = shiftSpan(timeline, zone);
   const nowHour = localDate(now, zone) === forecast.date ? hourOfDay(now, zone) : null;
   const ban = banStateFrom(forecast.ban_window, zone, forecast.date, locale);
+  // No heat colour from a forecast that is not live: a null cell is drawn in the hair colour (no data), never as a level.
   const cells: SpineCell[] = forecast.hours.map((hour) => ({
     hour: Math.floor(hourOfDay(new Date(hour.starts_at), zone)),
-    wbgtC: fallback ? null : hour.wbgt_c.p50,
+    wbgtC: fallback || lastKnown ? null : hour.wbgt_c.p50,
   }));
+  // The waypoints that come from the clock and the day's own rules (the break, the shift's end) stay; "Now" is a claim about the
+  // hour's heat on a forecast that no longer vouches for it, so it goes with the line.
+  const waypoints = waypointSpecs({ nowHour, ban, shiftEndHour: span.endHour, from: span.from, to: span.to }).filter(
+    (spec) => !(lastKnown && spec.kind === "now"),
+  );
 
   return {
     level,
@@ -166,15 +179,18 @@ export function describeToday(input: DescribeInput): TodayDescription {
     personalHigher,
     personalUnavailable,
     banner,
-    protective: level === null,
-    plan: actionPlan(view.currentHour?.action_codes ?? []),
+    lastKnown,
+    protective: level === null || lastKnown,
+    // The hour's codes are read only from a live forecast (a fallback one has no level to act on either): no codes is "Follow the
+    // site rules" and no extra lines.
+    plan: actionPlan(lastKnown || fallback ? [] : (view.currentHour?.action_codes ?? [])),
     cells,
     from: span.from,
     to: span.to,
-    nowHour,
+    nowHour: lastKnown ? null : nowHour,
     ban,
     banNote: banNoteOf(forecast, ban),
-    waypoints: waypointSpecs({ nowHour, ban, shiftEndHour: span.endHour, from: span.from, to: span.to }),
+    waypoints,
     noShift: timeline !== null && timeline.shift.length === 0,
     crewName: timeline?.crew_name ?? null,
   };

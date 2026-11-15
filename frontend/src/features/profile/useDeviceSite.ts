@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type { SiteContacts } from "@/features/profile/site-pin";
+import { nextSitePin, type SiteContacts } from "@/features/profile/site-pin";
 import { useProfile } from "@/features/profile/store";
 
 /*
@@ -32,9 +32,7 @@ export function useDeviceSite(): DeviceSiteApi {
   const choose = useCallback(
     (siteId: string, crewId: string | null, contacts?: SiteContacts) => {
       // Read at call time, so the callback stays stable while the pin changes.
-      const current = useProfile.getState().site;
-      const kept = contacts ?? (current?.siteId === siteId ? current.contacts : undefined);
-      chooseSite(kept === undefined ? { siteId, crewId } : { siteId, crewId, contacts: kept });
+      chooseSite(nextSitePin(useProfile.getState().site, siteId, crewId, contacts));
     },
     [chooseSite],
   );

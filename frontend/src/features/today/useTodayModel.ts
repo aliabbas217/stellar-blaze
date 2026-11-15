@@ -11,8 +11,8 @@ import { useFieldCrewLabel } from "@/components/shell/FieldHeading";
 import { DEMO_CREW_ID } from "@/features/demo/constants";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { useClock } from "@/features/demo/useClock";
-import { useProfile } from "@/features/profile/store";
-import { useDeviceSite } from "@/features/profile/useDeviceSite";
+import { chooseDeviceSite } from "@/features/profile/choose-site";
+import { useHasPush, useSitePin } from "@/features/profile/site-pin";
 import { useSiteContactsSync } from "@/features/profile/useSiteContactsSync";
 import { describeToday, type TodayDescription } from "@/features/today/describe";
 import { useSiteToday } from "@/features/today/useSiteToday";
@@ -72,21 +72,23 @@ export function useTodayModel(): TodayModel {
   );
   const [siteParam] = useUrlParam(SITE_PARAM, parseId, null);
   const [crewParam] = useUrlParam(CREW_PARAM, parseId, null);
-  const pin = useDeviceSite();
+  const pin = useSitePin();
   const { site: demoSite, sites, siteStatus } = useDemo();
   // The pinned site's call numbers go onto the phone, for the unwell sheet to use offline (features/profile/useSiteContactsSync.ts).
   useSiteContactsSync(sites);
   const queryClient = useQueryClient();
-  const pushOff = useProfile((state) => state.push) === null;
+  const pushOff = !useHasPush();
 
-  const siteId = siteParam ?? pin.siteId;
-  const crewId = siteParam === null ? pin.crewId : crewParam;
+  const pinnedSite = pin?.siteId ?? null;
+  const pinnedCrew = pin?.crewId ?? null;
+  const siteId = siteParam ?? pinnedSite;
+  const crewId = siteParam === null ? pinnedCrew : crewParam;
 
-  // `?site=` pins the phone (and `?crew=`, or none): the URL is how a link or an e2e chooses.
-  const { choose } = pin;
+  // `?site=` pins the phone (and `?crew=`, or none): the URL is how a link or an e2e chooses. The profile store that writes the
+  // pin is loaded by the first choice, not by this screen (see features/profile/choose-site.ts).
   useEffect(() => {
-    if (siteParam !== null && (pin.siteId !== siteParam || pin.crewId !== crewParam)) choose(siteParam, crewParam);
-  }, [siteParam, crewParam, pin.siteId, pin.crewId, choose]);
+    if (siteParam !== null && (pinnedSite !== siteParam || pinnedCrew !== crewParam)) void chooseDeviceSite(siteParam, crewParam);
+  }, [siteParam, crewParam, pinnedSite, pinnedCrew]);
 
   const clock = useClock();
   const enabled = hydrated && siteId !== null;
@@ -107,8 +109,8 @@ export function useTodayModel(): TodayModel {
   );
 
   const demoYard = useCallback(() => {
-    if (demoSite !== null) choose(demoSite.id, DEMO_CREW_ID);
-  }, [demoSite, choose]);
+    if (demoSite !== null) void chooseDeviceSite(demoSite.id, DEMO_CREW_ID);
+  }, [demoSite]);
   const retrySites = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.sites() });
   }, [queryClient]);

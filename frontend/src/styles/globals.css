@@ -243,21 +243,29 @@
    * loading skeleton both compute their height from these two properties, so the skeleton is as tall as the sign in
    * every language (CLS): never write a language's leading into either component. Mutually exclusive, like the
    * tracking rules in tokens.css. text: kicker, scale labels, "until". word: the level word, which is set solid
-   * (line-height 1) only where the script has no ascenders or marks to clip, i.e. English.
+   * (line-height 1) only where the script has no ascenders or marks to clip, i.e. English. size: the hero word's font size.
    */
   :lang(en) {
     --sign-leading-text: var(--leading-body);
     --sign-leading-word: var(--leading-solid);
+    --sign-word-size: var(--t-76);
+    --sign-word-trim: 0px;
   }
 
+  /* The hero word steps down one size (64 px) in Arabic script: at line height 2.5 (Nastaliq clips below about 2) a 76 px word
+     would take 190 px of a phone's first fold for one line (F2 W1, I6). Ar and ur both write the hero in this script. */
   :lang(ar) {
     --sign-leading-text: var(--leading-ar);
     --sign-leading-word: var(--leading-ar);
+    --sign-word-size: var(--t-64);
+    --sign-word-trim: calc(var(--t-64) * 0.15);
   }
 
   :lang(ur) {
     --sign-leading-text: var(--leading-ur);
     --sign-leading-word: var(--leading-ur);
+    --sign-word-size: var(--t-64);
+    --sign-word-trim: calc(var(--t-64) * 0.5);
   }
 
   :lang(hi),
@@ -265,6 +273,8 @@
   :lang(ne) {
     --sign-leading-text: var(--leading-body);
     --sign-leading-word: var(--leading-body);
+    --sign-word-size: var(--t-76);
+    --sign-word-trim: 0px;
   }
 
   *,

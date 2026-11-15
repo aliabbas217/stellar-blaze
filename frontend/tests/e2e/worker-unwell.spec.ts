@@ -4,6 +4,7 @@ import en from "../../messages/en.json";
 import ur from "../../messages/ur.json";
 import { SITE_DEMO, SITE_EMPTY } from "../../src/mocks/fixtures.ts";
 import { gateReport, watchConsole, type GateReport } from "./gate.ts";
+import { loadControlled } from "./helpers/service-worker.ts";
 
 /*
  * The "I feel unwell" call sheet (F2 Task 18, safety) in a production build against the mock API. Every title contains
@@ -19,7 +20,6 @@ import { gateReport, watchConsole, type GateReport } from "./gate.ts";
 
 const PHONE = { width: 390, height: 844 };
 const REAL_DEPLOYMENT = process.env["NEXT_PUBLIC_SB_DEMO"] === "0";
-const INSTALL_TIMEOUT_MS = 20_000;
 
 const SUPERVISOR = "+12025550143";
 const FIRST_AIDER = "+12025550144";
@@ -200,20 +200,30 @@ test.describe("unwell sheet: content", () => {
     expect(Math.abs(edges.fillRight - edges.trackRight)).toBeLessThan(1);
   });
 
-  test("unwell sheet: sends nothing, logs nothing: no request but the site list, no write but the timer's key", async ({ page }) => {
-    const requests: string[] = [];
+  test("unwell sheet: sends nothing, logs nothing: the page makes no request at all, not even the site list, and writes only the timer's key", async ({ page }) => {
+    // F2 W1, I4. The sheet's layout is outside the group that fetches the site list, so opening it cannot tell the server (or put in
+    // its logs, with the Referer) that this phone opened the emergency sheet. Every request is recorded from before the navigation.
+    const requests: { method: string; type: string; path: string; afterLoad: boolean }[] = [];
+    let loaded = false;
     page.on("request", (request) => {
-      if (new URL(request.url()).pathname.startsWith("/api/")) requests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      requests.push({ method: request.method(), type: request.resourceType(), path: new URL(request.url()).pathname, afterLoad: loaded });
     });
     await openSheet(page);
+    await page.waitForLoadState("networkidle");
+    loaded = true;
     if (!REAL_DEPLOYMENT) {
       const { supervisor, emergency } = calls(page);
       await supervisor.click();
       await emergency.click();
     }
     await page.waitForTimeout(2500);
-    // The worker layout lists sites to name the pinned site; nothing about the worker or the sheet goes anywhere.
-    expect(requests.filter((request) => request !== "GET /api/v1/sites")).toEqual([]);
+
+    // While loading: the document, its scripts, styles and fonts and nothing the page's own code asks for (fetch, XHR, beacons).
+    const asked = requests.filter((request) => !["document", "script", "stylesheet", "font", "image", "manifest", "other"].includes(request.type));
+    expect(asked, "no fetch, XHR or beacon while the sheet loads").toEqual([]);
+    expect(requests.filter((request) => request.path.startsWith("/api/")), "no API request at all (the site list included)").toEqual([]);
+    // After it has loaded, and through every tap on it: nothing whatever.
+    expect(requests.filter((request) => request.afterLoad), "no request after load, whatever the type").toEqual([]);
     expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual(["sb-unwell-t0"]);
     expect((await page.context().cookies()).filter((cookie) => /unwell|tap|timer/i.test(cookie.name))).toEqual([]);
   });
@@ -244,21 +254,6 @@ test.describe("unwell sheet: the design gate", () => {
     await expectGate(page, errors, "en");
   });
 });
-
-/** Waits for the app's service worker to be active, then reloads so the page is loaded under its control (see pwa.spec.ts). */
-async function loadControlled(page: Page, path: string): Promise<void> {
-  await page.goto(path);
-  await expect
-    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map((registration) => registration.active?.state)), {
-      message: "the app registers a service worker and it activates",
-      timeout: INSTALL_TIMEOUT_MS,
-    })
-    .toEqual(["activated"]);
-  await page.reload();
-  await expect
-    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), { timeout: INSTALL_TIMEOUT_MS })
-    .toBe(true);
-}
 
 test.describe("unwell sheet: offline", () => {
   test("unwell sheet precache: the sheet of every locale is in the cache after install", async ({ page }) => {

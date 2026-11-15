@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useId, useRef, useState, type ComponentType } from "react";
+import { useId, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ProofDrawerProps } from "./ProofDrawer";
 import type { Proof } from "./proof";
@@ -18,12 +18,33 @@ import type { Proof } from "./proof";
  * `label` replaces the word "Proof" on the button ("Why Orange?"); the accessible name stays "Proof for <what>". `field` is
  * the phone size: 44 px target and 16 px text, for the worker screens (a desk chip is 28 px).
  */
-export function ProofChip({ proof, label, field = false }: { readonly proof: Proof | null; readonly label?: string; readonly field?: boolean }) {
+export function ProofChip({
+  proof,
+  label,
+  labelContent,
+  field = false,
+}: {
+  readonly proof: Proof | null;
+  readonly label?: string;
+  /** The same words as `label`, as nodes (a level name wrapped in <bdi>, so an Urdu name inside an English phrase keeps its place). The accessible name stays `label`. */
+  readonly labelContent?: ReactNode;
+  readonly field?: boolean;
+}) {
   if (proof === null) return null;
-  return <Chip proof={proof} label={label} field={field} />;
+  return <Chip proof={proof} label={label} labelContent={labelContent} field={field} />;
 }
 
-function Chip({ proof, label, field }: { readonly proof: Proof; readonly label: string | undefined; readonly field: boolean }) {
+function Chip({
+  proof,
+  label,
+  labelContent,
+  field,
+}: {
+  readonly proof: Proof;
+  readonly label: string | undefined;
+  readonly labelContent: ReactNode;
+  readonly field: boolean;
+}) {
   const t = useTranslations("states.proof");
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
@@ -67,7 +88,8 @@ function Chip({ proof, label, field }: { readonly proof: Proof; readonly label: 
         }`}
       >
         <span aria-hidden className="size-1.5 rotate-45 border border-current" />
-        {label ?? t("chip")}
+        {/* One element: the button is a flex row, and a fragment of text, <bdi> and text would be three items with a gap between them. */}
+        <span>{labelContent ?? label ?? t("chip")}</span>
       </button>
       {failed ? (
         <span role="status" className="text-xs text-ink-2">

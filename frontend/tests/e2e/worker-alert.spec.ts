@@ -4,6 +4,7 @@ import ur from "../../messages/ur.json";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 import { gateReport, watchConsole, type GateOptions } from "./gate.ts";
 import { withScenario, type Scenario } from "./helpers/scenario.ts";
+import { loadControlled } from "./helpers/service-worker.ts";
 
 /*
  * The alert card (F2 Task 17) in a production build against the mock API: what a tap on a warning opens. Every title contains
@@ -153,5 +154,81 @@ test.describe("the alert card offline", () => {
       await expect(page.getByText(en.states.offlineBanner.title)).toBeVisible();
       await gate(page, errors, { hero: false, locale: "en" }, `offline-en-${theme}`);
     }
+  });
+});
+
+test.describe("the alert card with the real service worker (F2 W1, I3)", () => {
+  // The worker is ACTIVE here: this is the first tap on a warning with no signal, which is the case a heat warning is for. The card
+  // is one static page that every warning's query is matched to, so a query nobody has requested before is still answered.
+  test("the alert card is precached for every locale, and a notification's query never asks the network for it", async ({ page }) => {
+    await loadControlled(page, "/en/worker");
+    const cached = await page.evaluate(async () => {
+      const found: Record<string, boolean> = {};
+      for (const locale of ["en", "ur", "hi", "bn", "ne", "ar"]) {
+        found[locale] = (await caches.match(`/${locale}/worker/alert`, { ignoreSearch: true })) !== undefined;
+      }
+      return found;
+    });
+    expect(cached).toEqual({ en: true, ur: true, hi: true, bn: true, ne: true, ar: true });
+  });
+
+  test("the alert card opens offline from a notification's own url that this phone has never loaded, and shows the warning, not the offline page", async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize(PHONE);
+    // One visit to the app while online (any worker page): that is all the phone has done before the notification arrives.
+    await loadControlled(page, "/en/worker");
+    await context.setOffline(true);
+    // A navigation like the one a tap on a notification makes: a new document, a query this phone has never seen.
+    const url = alertPath("en", "red", "2026-09-03T10:00:00Z", "site-never-visited");
+    await page.goto(url);
+    await expect(page).toHaveURL(new RegExp(String.raw`/en/worker/alert\?audience=site&target=site-never-visited&level=red`));
+    await expect(page.getByRole("heading", { name: en.levels.name.red, level: 2 })).toBeVisible();
+    await expect(page.getByText(en.states.offlineBanner.title)).toBeVisible();
+    await expect(page.getByText(en.worker.today.lead.siteRules)).toBeVisible();
+    // Not the offline page: its own heading is absent and the card's action is there.
+    await expect(page.getByRole("link", { name: en.worker.alert.gotIt })).toBeVisible();
+    await expect(page.getByText(en.worker.alert.kicker.site)).toBeVisible();
+  });
+
+  test("a query that is not a warning still opens Today (the check is on the client now)", async ({ page }) => {
+    await page.goto("/en/worker/alert?audience=site&level=purple");
+    await expect(page).toHaveURL(/\/en\/worker$/);
+  });
+
+  test("an urdu worker offline gets the card in Urdu from the same shell", async ({ page, context }) => {
+    await page.setViewportSize(PHONE);
+    await loadControlled(page, "/ur/worker");
+    await context.setOffline(true);
+    await page.goto(alertPath("ur", "red", "2026-09-03T10:00:00Z", "site-never-visited"));
+    await expect(page.locator('html[lang="ur"][dir="rtl"]')).toHaveCount(1);
+    await expect(page.getByRole("heading", { name: ur.levels.name.red, level: 2 })).toBeVisible();
+  });
+});
+
+test.describe("the alert card when the forecast cannot place the warning (F2 W1, I1)", () => {
+  test("never says ended: a Red warning tapped while the forecast is in fallback keeps the level and the site rules", async ({ page }) => {
+    for (const theme of ["night", "sun"] as const) {
+      const errors = await openAlert(page, { theme, scenario: "fallback", path: alertPath("en", "red", ORANGE_FROM_TEN) });
+      await expect(page.getByRole("heading", { name: en.levels.name.red, level: 2 })).toBeVisible();
+      await expect(page.getByText(en.worker.alert.notCovered)).toBeVisible();
+      await expect(page.getByText(en.worker.today.lead.siteRules)).toBeVisible();
+      await expect(page.getByText(/This warning (has )?ended/)).toHaveCount(0);
+      await gate(page, errors, { hero: false, locale: "en" }, `uncovered-en-${theme}`);
+    }
+  });
+
+  test("a warning that starts tomorrow is the same card, never 'ended'", async ({ page }) => {
+    await openAlert(page, { path: alertPath("en", "orange", "2026-09-04T06:00:00Z") });
+    await expect(page.getByRole("heading", { name: en.levels.name.orange, level: 2 })).toBeVisible();
+    await expect(page.getByText(en.worker.alert.notCovered)).toBeVisible();
+    await expect(page.getByText(/This warning (has )?ended/)).toHaveCount(0);
+  });
+
+  test("the header names the warning's site on a phone that is pinned to none, never 'No site chosen' above a site warning", async ({ page }) => {
+    await openAlert(page);
+    await expect(page.getByRole("heading", { name: en.levels.name.orange, level: 2 })).toBeVisible();
+    await expect(page.getByText(en.shell.field.noSite)).toHaveCount(0);
   });
 });

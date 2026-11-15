@@ -229,4 +229,14 @@ describe("Proved", () => {
     expect(field.className).toContain("text-base");
     expect(field.className).toContain("touch-manipulation");
   });
+
+  it("labelContent is the visible label (a level name in <bdi>) in one element, and the accessible name stays the plain label", () => {
+    renderWithIntl(<ProofChip proof={proofOf()} field label="Why Orange?" labelContent={<>Why <bdi>Orange</bdi>?</>} />);
+    const chip = screen.getByRole("button", { name: "Why Orange?" });
+    // The chip is a flex row with a gap: text, <bdi>, text as three items would read "Why Orange ?". One span keeps the sentence whole.
+    const spans = [...chip.querySelectorAll(":scope > span")].filter((span) => span.getAttribute("aria-hidden") === null);
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.textContent).toBe("Why Orange?");
+    expect(spans[0]?.querySelector("bdi")?.textContent).toBe("Orange");
+  });
 });

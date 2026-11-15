@@ -29,19 +29,25 @@ export function FieldShell({
   dock,
   children,
 }: {
-  /** The site's name, or null when none is known yet (an honest line is shown, never a blank). */
-  siteName: string | null;
+  /**
+   * The site's name, or null when none is known yet (an honest line is shown, never a blank). Omitted: the header names no
+   * site at all, for a sheet that must not look anything up (the unwell sheet).
+   */
+  siteName?: string | null;
   crewLabel?: string | null;
-  /** The time to show, already formatted (a node, so the caller can put a Suspense boundary around what reads the URL). */
-  clock: ReactNode;
+  /** The time to show, already formatted (a node, so the caller can put a Suspense boundary around what reads the URL). Omitted: none is shown. */
+  clock?: ReactNode;
   dock?: ReactNode;
   children: ReactNode;
 }) {
   const t = useTranslations();
   useRouteTheme("route");
   const [reportedCrew, setReportedCrew] = useState<string | null>(null);
-  const slot = useMemo<FieldHeadingSlot>(() => ({ setCrewLabel: setReportedCrew }), []);
+  const [reportedSite, setReportedSite] = useState<string | null>(null);
+  const slot = useMemo<FieldHeadingSlot>(() => ({ setCrewLabel: setReportedCrew, setSiteLabel: setReportedSite }), []);
   const crew = crewLabel != null && crewLabel !== "" ? crewLabel : reportedCrew;
+  // What the page says wins: it knows which site its own data is about.
+  const site = reportedSite ?? siteName;
 
   // Unmount only: the shell that mounts next (another field route) applies its own theme in the same commit, so night never paints.
   useEffect(
@@ -53,7 +59,7 @@ export function FieldShell({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-110 flex-col bg-ground sm:my-6 sm:min-h-0 sm:border sm:border-hair">
-      <header className="flex items-center gap-3 border-b border-hair px-4 py-3">
+      <header className="flex items-center gap-3 border-b border-hair px-4 py-2">
         <ViewTransition name="wordmark" share="morph" default="none">
           <FieldLink
             href="/"
@@ -63,19 +69,25 @@ export function FieldShell({
           </FieldLink>
         </ViewTransition>
         <div className="min-w-0 flex-1">
-          <p className="font-body text-base leading-tight font-semibold text-ink">
-            {siteName === null ? t("shell.field.noSite") : <bdi>{siteName}</bdi>}
-          </p>
+          {site === undefined ? null : (
+            // Two lines at most, then cut. The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a
+            // rule for every element of the page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
+            <p className="line-clamp-2 font-body text-base leading-tight font-semibold text-ink">
+              {site === null ? t("shell.field.noSite") : <bdi className="leading-[inherit]">{site}</bdi>}
+            </p>
+          )}
           {crew === null ? null : (
-            <p className="font-body text-sm text-ink-3">
-              <bdi>{crew}</bdi>
+            <p className="truncate font-body text-sm leading-tight text-ink-3">
+              <bdi className="leading-[inherit]">{crew}</bdi>
             </p>
           )}
         </div>
-        <p data-time-label="" className="font-display text-xl font-medium text-ink">
-          <span className="sr-only">{t("shell.field.clockLabel")} </span>
-          <bdi dir="ltr">{clock}</bdi>
-        </p>
+        {clock === undefined ? null : (
+          <p data-time-label="" className="font-display text-xl font-medium text-ink">
+            <span className="sr-only">{t("shell.field.clockLabel")} </span>
+            <bdi dir="ltr">{clock}</bdi>
+          </p>
+        )}
         <SunToggle />
       </header>
       <LanguageChips />

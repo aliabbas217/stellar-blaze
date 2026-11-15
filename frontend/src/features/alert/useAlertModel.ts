@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { crewTimelineQueryOptions } from "@/api/queries";
 import type { Problem } from "@/api/problem";
 import type { components } from "@/api/schema";
+import { useFieldSiteLabel } from "@/components/shell/FieldHeading";
 import { levelIndex, type Level } from "@/components/level/level";
 import type { SpineCell } from "@/components/spine/TimeSpine";
 import { useDemo } from "@/features/demo/DemoProvider";
@@ -24,8 +25,11 @@ import { useSiteToday } from "@/features/today/useSiteToday";
  *  - The identity comes from the notification's own query (`params`): level, audience, when it applies. If the forecast
  *    cannot be had (offline, or the request failed) the card still says the level and from when, from that: `saved`.
  *  - The window comes from the forecast (a site alert) or the crew's timeline (a crew alert). The card tells the truth
- *    about the forecast now: the level it shows is the forecast's, not the push's, and an alert whose window is over is not
- *    shown as live: `ended`.
+ *    about the forecast now: the level it shows is the forecast's, not the push's. An alert whose window is over is not shown
+ *    as live: `ended`, and ONLY when the end is known and has passed. A forecast that cannot place the warning at all (no
+ *    forecast level for that hour, an empty list, another day, a start in the future) says nothing about whether the heat has
+ *    ended, so the card keeps the warning and the site rules (`saved`, cause "not-covered"): "ended" there would be false
+ *    reassurance on a warning that may still apply.
  *  - The worker's own level is worked out here, on the phone, when the card opens, and shown only when it is higher.
  */
 
@@ -35,16 +39,21 @@ type Timeline = components["schemas"]["CrewTimeline"];
 export type AlertModel =
   | { readonly status: "loading" }
   | {
-      /** No forecast to read (offline with nothing saved, or the request failed): what the notification itself said. */
+      /**
+       * No window to read from the forecast: what the notification itself said, and the site rules. `cause` says why: the
+       * forecast could not be had (offline with nothing saved, or the request failed), or it was had and does not place this
+       * warning ("not-covered").
+       */
       readonly status: "saved";
+      readonly cause: "unavailable" | "not-covered";
       readonly offline: boolean;
       readonly problem: Problem | null;
       readonly retry: () => void;
     }
   | {
-      /** The window is over, or the forecast no longer has that level at that time. `endedAt` is null when it cannot say when. */
+      /** The window's end is known and has passed. */
       readonly status: "ended";
-      readonly endedAt: Date | null;
+      readonly endedAt: Date;
     }
   | {
       readonly status: "ready";
@@ -106,14 +115,17 @@ export function useAlertModel(params: AlertParams): AlertModel {
 
   const failedOrWaiting = isCrew ? crewTimeline.isError : today.status === "error";
   const loaded = hours !== null;
+  // The header names the warning's own site, whatever the phone is pinned to (or whether it is pinned at all).
+  const siteName = siteId === null ? null : (sites.find((site) => site.id === siteId)?.name ?? siteId);
+  useFieldSiteLabel(siteName);
 
   return useMemo((): AlertModel => {
     if (!loaded) {
       return failedOrWaiting
-        ? { status: "saved", offline: today.offline, problem: today.problem, retry: today.refetch }
+        ? { status: "saved", cause: "unavailable", offline: today.offline, problem: today.problem, retry: today.refetch }
         : { status: "loading" };
     }
-    if (window === null) return { status: "ended", endedAt: null };
+    if (window === null) return { status: "saved", cause: "not-covered", offline: today.offline, problem: null, retry: today.refetch };
     if (window.to !== null && clock.getTime() >= Date.parse(window.to)) return { status: "ended", endedAt: new Date(window.to) };
 
     const span = shiftSpan(timeline, zone);

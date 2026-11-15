@@ -1,6 +1,6 @@
 import { defaultCache } from "@serwist/turbopack/worker";
 import { Serwist, type PrecacheEntry, type SerwistGlobalConfig } from "serwist";
-import { offlineFallbacks } from "@/features/pwa/fallback";
+import { ALERT_QUERY_PARAMS, offlineFallbacks } from "@/features/pwa/fallback";
 import { readLocalePref } from "@/features/pwa/prefs";
 import { runtimeCachingWith } from "@/features/pwa/runtime-caching";
 import { openNotificationTarget, readPushData, showPushNotification } from "@/features/push/sw-handlers";
@@ -22,6 +22,9 @@ declare const self: ServiceWorkerGlobalScope;
 const serwist = new Serwist({
   // undefined in development, where Serwist does not build a precache manifest.
   precacheEntries: self.__SW_MANIFEST ?? [],
+  // The alert card is one static page for every warning, opened with a different query each time: match the precached copy with
+  // that query ignored (and only that query: `_rsc` stays, see ALERT_QUERY_PARAMS). Precache entries only.
+  precacheOptions: { ignoreURLParametersMatching: [...ALERT_QUERY_PARAMS] },
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,

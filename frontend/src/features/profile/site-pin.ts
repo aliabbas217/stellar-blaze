@@ -23,6 +23,11 @@ export const PROFILE_STORAGE_KEY = "sb-profile-v1";
 export interface SiteContacts {
   readonly supervisorPhone: string | null;
   readonly firstAiderPhone: string | null;
+  /**
+   * When the phone last wrote or changed these numbers (an ISO instant), so that the sheet can say "Numbers saved on 12 Nov"
+   * when it is offline: a number that may be old should look old. Absent on a pin written before this field existed.
+   */
+  readonly savedAt?: string;
 }
 
 /**
@@ -54,13 +59,15 @@ export function toE164(value: unknown): string | null {
  */
 export function toSiteContacts(value: unknown): SiteContacts | undefined {
   if (typeof value !== "object" || value === null) return undefined;
-  const { supervisorPhone, firstAiderPhone } = value as Record<string, unknown>;
+  const { supervisorPhone, firstAiderPhone, savedAt } = value as Record<string, unknown>;
   const ok = (field: unknown) => field === null || typeof field === "string";
   if (!ok(supervisorPhone) || !ok(firstAiderPhone)) return undefined;
-  return { supervisorPhone: toE164(supervisorPhone), firstAiderPhone: toE164(firstAiderPhone) };
+  const numbers = { supervisorPhone: toE164(supervisorPhone), firstAiderPhone: toE164(firstAiderPhone) };
+  // A date that is not a date is dropped, not trusted: the numbers are still good.
+  return typeof savedAt === "string" && !Number.isNaN(Date.parse(savedAt)) ? { ...numbers, savedAt } : numbers;
 }
 
-/** Whether two sets of contacts hold the same numbers (both absent counts as the same). */
+/** Whether two sets of contacts hold the same numbers (both absent counts as the same). The save date is not a number: it never counts. */
 export function sameContacts(a: SiteContacts | undefined, b: SiteContacts | undefined): boolean {
   if (a === undefined || b === undefined) return a === b;
   return a.supervisorPhone === b.supervisorPhone && a.firstAiderPhone === b.firstAiderPhone;
@@ -76,10 +83,25 @@ export function toSitePin(value: unknown): SitePin | null {
   return known === undefined ? { siteId, crewId } : { siteId, crewId, contacts: known };
 }
 
+/**
+ * What else the phone holds, as two flags: a profile is saved (Today then loads the on-device risk code to work out the personal
+ * level, and nothing of it otherwise), and a push registration exists (Today then does not offer "Turn on warnings"). Read here so
+ * that Today need not import the profile store to ask: the store would pull zustand's persist middleware and `revoke` into the
+ * first load of the page for a phone that has neither (F2 W1, the route script budget). A flag says only that a value is there;
+ * the store validates the value itself when something loads it.
+ */
+export interface DeviceFlags {
+  readonly hasProfile: boolean;
+  readonly hasPush: boolean;
+}
+
+const NO_FLAGS: DeviceFlags = { hasProfile: false, hasPush: false };
+
 // undefined: the store has not published, read storage. null: published "no pin".
 let published: SitePin | null | undefined;
+let publishedFlags: DeviceFlags | undefined;
 const listeners = new Set<() => void>();
-let parsed: { raw: string | null; pin: SitePin | null } = { raw: null, pin: null };
+let parsed: { raw: string | null; pin: SitePin | null; flags: DeviceFlags } = { raw: null, pin: null, flags: NO_FLAGS };
 
 function emit(): void {
   for (const listener of listeners) listener();
@@ -91,30 +113,51 @@ export function publishSitePin(pin: SitePin | null): void {
   emit();
 }
 
-function readStorage(): SitePin | null {
+/** Called by the profile store after it changes the profile or the push registration. */
+export function publishDeviceFlags(flags: DeviceFlags): void {
+  if (publishedFlags?.hasProfile === flags.hasProfile && publishedFlags.hasPush === flags.hasPush) return;
+  publishedFlags = flags;
+  emit();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readStorage(): { pin: SitePin | null; flags: DeviceFlags } {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(PROFILE_STORAGE_KEY);
   } catch {
-    return null;
+    return { pin: null, flags: NO_FLAGS };
   }
   // The same object for the same text: useSyncExternalStore compares snapshots by identity.
-  if (raw === parsed.raw) return parsed.pin;
+  if (raw === parsed.raw) return parsed;
   let pin: SitePin | null = null;
+  let flags = NO_FLAGS;
   try {
     const value: unknown = raw === null ? null : JSON.parse(raw);
-    const state = typeof value === "object" && value !== null ? (value as Record<string, unknown>)["state"] : null;
-    pin = typeof state === "object" && state !== null ? toSitePin((state as Record<string, unknown>)["site"]) : null;
+    const state = isRecord(value) ? value["state"] : null;
+    if (isRecord(state)) {
+      pin = toSitePin(state["site"]);
+      flags = { hasProfile: isRecord(state["profile"]), hasPush: isRecord(state["push"]) };
+    }
   } catch {
     pin = null;
+    flags = NO_FLAGS;
   }
-  parsed = { raw, pin };
-  return pin;
+  parsed = { raw, pin, flags };
+  return parsed;
 }
 
 /** The pin now: what the store last published, else what storage holds, else null. */
 export function readSitePin(): SitePin | null {
-  return published !== undefined ? published : readStorage();
+  return published !== undefined ? published : readStorage().pin;
+}
+
+/** The flags now: what the store last published, else what storage holds. A stable object while nothing changed. */
+export function readDeviceFlags(): DeviceFlags {
+  return publishedFlags !== undefined ? publishedFlags : readStorage().flags;
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -123,6 +166,7 @@ function subscribe(onChange: () => void): () => void {
     if (event.key !== null && event.key !== PROFILE_STORAGE_KEY) return;
     // Another tab changed (or removed) the stored data: what this tab published is out of date.
     published = undefined;
+    publishedFlags = undefined;
     onChange();
   };
   window.addEventListener("storage", onStorage);
@@ -137,8 +181,28 @@ export function useSitePin(): SitePin | null {
   return useSyncExternalStore(subscribe, readSitePin, () => null);
 }
 
+/** Whether a profile is saved on this phone. False on the server and until the phone says otherwise. */
+export function useHasProfile(): boolean {
+  return useSyncExternalStore(subscribe, () => readDeviceFlags().hasProfile, () => false);
+}
+
+/** Whether this phone holds a push registration. False on the server and until the phone says otherwise. */
+export function useHasPush(): boolean {
+  return useSyncExternalStore(subscribe, () => readDeviceFlags().hasPush, () => false);
+}
+
+/**
+ * The pin that choosing `siteId` and `crewId` makes: the stored contacts survive choosing the same site again without new
+ * ones, and are dropped when the site changes (another site's supervisor number must never be offered for this one).
+ */
+export function nextSitePin(current: SitePin | null, siteId: string, crewId: string | null, contacts?: SiteContacts): SitePin {
+  const kept = contacts ?? (current?.siteId === siteId ? current.contacts : undefined);
+  return kept === undefined ? { siteId, crewId } : { siteId, crewId, contacts: kept };
+}
+
 /** For tests: forgets what the store published and what was parsed. */
 export function resetSitePinForTests(): void {
   published = undefined;
-  parsed = { raw: null, pin: null };
+  publishedFlags = undefined;
+  parsed = { raw: null, pin: null, flags: NO_FLAGS };
 }
