@@ -5,6 +5,7 @@ import { useId, useState, type ReactNode } from "react";
 import { PlanSwatch, type PlanBlockState } from "@/components/plan/PlanBars";
 import { formatClock } from "@/components/spine/geometry";
 import type { PlanBlock } from "@/features/supervisor/plan/plan-model";
+import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 
 /*
  * Every block of the plan as a row (F2 Task 20, critique fix 5): the chart's blocks are 4 to 22 px wide, so what a supervisor
@@ -13,7 +14,7 @@ import type { PlanBlock } from "@/features/supervisor/plan/plan-model";
  * aria-controls), never an SVG shape.
  *
  * The current block carries `aria-current="time"` and a "Now" tag; blocks that have ended are quieter. The clause is the API's
- * text and is shown as sent; a block whose clause is empty says so rather than showing nothing.
+ * text and is shown as sent, less the internal ADR references the ruleset keeps in it (sanitizeClause: the law's words are untouched); a block whose clause is empty says so rather than showing nothing.
  */
 
 const bdi = (chunks: ReactNode): ReactNode => <bdi>{chunks}</bdi>;
@@ -58,7 +59,7 @@ function Row({ block, current, past }: { readonly block: PlanBlock; readonly cur
         </svg>
       </button>
       <div id={panel} hidden={!open} className="flex flex-col gap-1 pb-3 ps-8 text-sm leading-(--sign-leading-text) text-ink-2">
-        <p>{block.clause === "" ? t("blocks.noClause") : block.clause}</p>
+        <p>{block.clause === "" ? t("blocks.noClause") : sanitizeClause(block.clause)}</p>
         <p>
           {t("blocks.rule")} <code dir="ltr" translate="no" className="font-mono text-ink-2">{block.ruleId}</code>
         </p>

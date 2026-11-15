@@ -229,6 +229,9 @@ test("supervisor plan: sign off a plan: tick each run then Sign off, then Stop w
   // one tick per run of Medium or High work; the message names them
   await expect(page.getByRole("checkbox")).toHaveCount(4);
   await expect(page.locator("[data-sign-off-items]")).toContainText("4 items need a tick");
+  // plan zones are named as plan zones, never as a bare zone beside the hourly level (a Medium zone can sit in a Green hour)
+  await expect(page.locator("[data-sign-off-items]")).toContainText("Plan zone Medium");
+  await expect(page.locator("[data-zone-note]")).toContainText("A plan zone is set for each block");
   await tickAll(page);
   await page.getByRole("button", { name: "Sign off" }).click();
 

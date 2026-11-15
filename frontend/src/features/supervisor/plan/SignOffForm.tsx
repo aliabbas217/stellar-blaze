@@ -187,6 +187,8 @@ export default function SignOffForm({ crewId, date, items, zone }: SignOffFormPr
         {t("signOff.heading")}
       </h2>
       <p className="text-base leading-(--sign-leading-text) text-ink-2">{t("signOff.intro")}</p>
+      {/* A plan zone is not a level: the items name plan zones, the sentence above names the hourly level, and the two can differ. */}
+      {items.length === 0 ? null : <p data-zone-note="" className="text-sm leading-(--sign-leading-text) text-ink-3">{t("signOff.zoneNote")}</p>}
       <form noValidate onSubmit={submit} className="flex flex-col gap-3">
         <p data-sign-off-items="" className="text-base leading-(--sign-leading-text) text-ink-2">
           {intro}

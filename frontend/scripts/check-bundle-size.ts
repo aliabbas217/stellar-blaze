@@ -6,9 +6,10 @@
 // plus the response headers of each chunk, which this does not count, so a route that passes here can still read a little higher
 // in lighthouserc.json:
 //  - every route: 170 KB gzip, 174,080 B (the product budget; it is never edited);
-//  - `/worker` and `/worker/alerts` ONLY (the two data screens): 195 KB gzip, 199,680 B, with Lighthouse asserts of performance
-//    0.80, LCP 3.5 s and TBT 350 ms for those two routes (lighthouserc.json, the architect's ADR). Every other route keeps
-//    performance 0.9, LCP 2.5 s, TBT 200 ms. `/worker/unwell` is NOT covered: it stays at 174,080 B and makes no request.
+//  - the five exception routes ONLY (the data screens): `/worker`, `/worker/alerts`, `/worker/alert`, `/supervisor` and
+//    `/supervisor/crews/[crewId]`: 195 KB gzip, 199,680 B, with Lighthouse asserts of performance 0.80, LCP 3.5 s and TBT 350 ms
+//    for the covered routes (lighthouserc.json, the architect's ADRs). Every other route keeps performance 0.9, LCP 2.5 s,
+//    TBT 200 ms. `/worker/unwell` is NOT covered: it stays at 174,080 B and makes no request.
 //  - the supervisor routes `/supervisor` and `/supervisor/crews/[crewId]` (the plan and sign-off screen) are covered by the same
 //    ceiling since the architect's ruling of 2026-11-15 (late morning); lighthouse asserts for them (perf 0.80, LCP 3.5 s,
 //    TBT 350 ms) belong to ADR 0069 and Task 25 (lighthouserc.json is not edited here).

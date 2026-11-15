@@ -77,6 +77,38 @@ describe("messages: structure", () => {
     }
   });
 
+  it("lists the safety strings in _meta.safety_keys, and every listed key exists in all six catalogues (the clinical review manifest reads it)", () => {
+    const listed = (en["_meta"] as { readonly safety_keys?: unknown }).safety_keys;
+    expect(Array.isArray(listed)).toBe(true);
+    const keys = listed as readonly unknown[];
+    expect(keys.length).toBeGreaterThan(0);
+    expect(new Set(keys).size, "no duplicates").toBe(keys.length);
+    for (const locale of routing.locales) {
+      const flat = flatten(load(locale));
+      for (const key of keys) {
+        expect(typeof key, `${locale}: ${String(key)}`).toBe("string");
+        expect(flat.has(key as string), `${locale}: safety key ${String(key)} is not in the catalogue`).toBe(true);
+      }
+    }
+    // The families the review pack names: the four action codes, the Stop strings, the unwell sheet, the protective lead, the alert strings.
+    for (const key of [
+      "worker.today.also.selfPaced",
+      "worker.today.also.noUnacclimatised",
+      "worker.today.also.induction",
+      "worker.today.also.bottle",
+      "supervisor.stop.recorded",
+      "supervisor.stop.queued",
+      "worker.unwell.steps.one",
+      "worker.today.lead.protective",
+      "worker.alert.doNow",
+    ]) {
+      expect(keys, key).toContain(key);
+    }
+    expect(keys.filter((key) => String(key).startsWith("supervisor.stop.")).length, "every Stop string").toBe(
+      [...enFlat.keys()].filter((key) => key.startsWith("supervisor.stop.")).length,
+    );
+  });
+
   it("has no empty strings in en", () => {
     for (const [key, value] of enFlat) expect(value.trim(), key).not.toBe("");
   });

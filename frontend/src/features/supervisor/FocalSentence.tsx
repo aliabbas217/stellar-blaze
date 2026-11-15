@@ -37,7 +37,7 @@ export function FocalSentence({
 }: {
   readonly focal: CrewStripModel;
   readonly breakInMinutes: number | null;
-  /** The line above the sentence; the crews screen's own ("Needs you first") unless the plan screen says what the sentence is. */
+  /** The line above the sentence; the crews screen's own ("Needs you first", or "Highest level, off shift now" for a crew that is not on shift) unless the plan screen says what the sentence is. */
   readonly kicker?: string;
 }) {
   const t = useTranslations("supervisor.crews");
@@ -71,7 +71,7 @@ export function FocalSentence({
     <section aria-labelledby="focal" className="flex flex-col gap-2 px-4 pt-3">
       <p className="flex items-center gap-2 text-base text-ink-2">
         {focal.level === null ? null : <LevelMark level={focal.level} />}
-        {kicker ?? t("kicker")}
+        {kicker ?? (focal.working || focal.stopped ? t("kicker") : t("kickerOff"))}
       </p>
       <h2 id="focal" className="font-display text-xl font-medium leading-(--sign-leading-text) text-ink">
         {sentence}

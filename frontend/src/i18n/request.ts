@@ -5,7 +5,12 @@ import * as rootParams from "next/root-params";
 import type enMessages from "../../messages/en.json";
 import { routing, type Locale } from "./routing";
 
-export type Messages = typeof enMessages;
+/**
+ * en is the type of every catalogue, except `_meta.safety_keys`: the machine-readable list of the safety strings lives in en alone
+ * (tests/unit/i18n/messages-parity.test.ts asserts every listed key exists in all six), so the other five do not carry it, and a list
+ * is not a message (next-intl's `AbstractIntlMessages` has no arrays), so the type leaves it out; nothing reads it at runtime.
+ */
+export type Messages = Omit<typeof enMessages, "_meta"> & { readonly _meta: { readonly review_status: string } };
 
 // One explicit loader per locale: typed (a file whose keys differ from en does not compile), exhaustive
 // (a new locale does not compile without one), and each file becomes its own lazily loaded chunk.

@@ -1,6 +1,6 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
-import { ApiProblem } from "@/api/problem";
+import { ApiProblem, networkProblem } from "@/api/problem";
 import { queryKeys } from "@/api/query-keys";
 import { call } from "@/api/result";
 import { ROSTER_INVALID_TYPE, RosterInvalidProblem, rosterErrorsOf } from "@/api/roster-problem";
@@ -140,9 +140,39 @@ export function stopMutation(crewId: string) {
   });
 }
 
+/**
+ * How long a Stop request may take before the phone gives up on it (W5 I1: safety actions never wait). On a degraded or captive
+ * connection a fetch can hang for minutes; after this the stop is treated like "no signal" (kept in the outbox, "Not sent. Tell the
+ * crew now.") instead of leaving the bar on a spinner. A stop that did reach the server meanwhile is reconciled by the refetch.
+ */
+export const STOP_TIMEOUT_MS = 8_000;
+
+/** Undo and resume (`DELETE`) get a longer bound: ending a stop is the opposite risk and should be given time to land, but never forever. */
+export const CLEAR_STOP_TIMEOUT_MS = 15_000;
+
+/** Whether `error` is a request that was aborted or timed out (`AbortSignal.timeout` rejects with a `TimeoutError`). */
+function isAbort(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError");
+}
+
+/**
+ * `orThrow` for the safety writes: an abort or a timeout is the same as no answer at all (a status 0 `ApiProblem`, the offline path),
+ * not the rethrown `AbortError` that `call()` keeps for cancelled queries. Nothing cancels these requests; only the clock does.
+ */
+async function orThrowBounded<T>(request: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
+  try {
+    return await orThrow(request);
+  } catch (error) {
+    if (isAbort(error)) throw new ApiProblem(networkProblem());
+    throw error;
+  }
+}
+
 /** The stop request itself, for the mutation above and for the Stop outbox, which sends a stop pressed with no signal later. */
 export function postStop(crewId: string, body: Schemas["CrewStopCreate"]): Promise<Schemas["CrewStop"]> {
-  return orThrow(apiClient.POST("/api/v1/crews/{crew_id}/stops", { params: { path: { crew_id: crewId } }, body }));
+  return orThrowBounded(
+    apiClient.POST("/api/v1/crews/{crew_id}/stops", { params: { path: { crew_id: crewId } }, body, signal: AbortSignal.timeout(STOP_TIMEOUT_MS) }),
+  );
 }
 
 /** Clears a stop: the 10 second undo, or the end of the stop. The variable is the stop id. */
@@ -151,7 +181,12 @@ export function clearStopMutation(crewId: string) {
     mutationKey: ["crew-stop-clear", crewId],
     networkMode: "always",
     mutationFn: (stopId) =>
-      orThrow(apiClient.DELETE("/api/v1/crews/{crew_id}/stops/{stop_id}", { params: { path: { crew_id: crewId, stop_id: stopId } } })),
+      orThrowBounded(
+        apiClient.DELETE("/api/v1/crews/{crew_id}/stops/{stop_id}", {
+          params: { path: { crew_id: crewId, stop_id: stopId } },
+          signal: AbortSignal.timeout(CLEAR_STOP_TIMEOUT_MS),
+        }),
+      ),
   });
 }
 

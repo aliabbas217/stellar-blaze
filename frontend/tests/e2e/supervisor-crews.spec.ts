@@ -225,6 +225,14 @@ test("supervisor crews: after 10 s the bar reads Work stopped with Resume work b
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(bar(page)).toContainText("Work stopped 11:10");
+  // Focus goes back to the control that opened the dialog (a keyboard user is not dropped at the top of the page).
+  await expect(page.getByRole("button", { name: en.supervisor.stop.resume })).toBeFocused();
+
+  // Cancel closes the dialog for real, so focus comes back the same way as for Escape (W5: Cancel used to unmount it without close()).
+  await page.getByRole("button", { name: en.supervisor.stop.resume }).click();
+  await dialog.getByRole("button", { name: en.supervisor.stop.resumeCancel }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: en.supervisor.stop.resume })).toBeFocused();
 
   await page.getByRole("button", { name: en.supervisor.stop.resume }).click();
   await dialog.getByRole("button", { name: en.supervisor.stop.resumeConfirm }).click();
@@ -306,7 +314,7 @@ test("supervisor crews: Stop work is there, and works, while the crew list is st
   dirty = true;
 
   // The list has not come: the bar is live (the demo's own crew stands in) and a press records a stop.
-  const press = page.getByRole("button", { name: en.supervisor.stop.buttonGeneric });
+  const press = page.getByRole("button", { name: stopLabel("crew-b") });
   await expect(press).toBeVisible();
   await expect(press).toBeEnabled();
   await press.click();
@@ -337,7 +345,7 @@ test("supervisor crews: the error state names the failure with its request id an
 
   await expect(page.getByText(en.supervisor.crews.error.title)).toBeVisible();
   await expect(page.getByText("mock-req-1").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: en.supervisor.stop.buttonGeneric })).toBeEnabled();
+  await expect(page.getByRole("button", { name: stopLabel("crew-b") })).toBeEnabled();
 });
 
 test("supervisor crews: Reset demo site starts a new epoch and the crews screen refreshes", async ({ page }) => {
@@ -459,6 +467,13 @@ test("supervisor crews pass the design gate: the stop states (recorded with undo
       // stopped for good (after the undo window)
       await expect(bar(page)).toContainText("Work stopped 11:10", { timeout: 15_000 });
       await gate(page, errors, { locale: "en", spine: true, ...(width === "390" ? {} : { hero: false }) }, `stop-stopped-${width}-${theme}`);
+      // an hour later (the replay clock moves to 12:15): the six-minute promise is no longer made, the rest of the line stands
+      await page.goto("/en/supervisor?at=12:15");
+      await ready(page);
+      await expect(bar(page)).toContainText("Work stopped 11:10");
+      await expect(bar(page)).toContainText("Crew A. Tell the crew now.");
+      await expect(bar(page)).not.toContainText("six minutes");
+      await gate(page, errors, { locale: "en", spine: true, ...(width === "390" ? {} : { hero: false }) }, `stop-stopped-late-${width}-${theme}`);
 
       // queued: no signal
       errors = await openCrews(page, { theme, size });

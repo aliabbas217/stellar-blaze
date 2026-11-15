@@ -435,6 +435,34 @@ describe("the plan screen: sign-off", () => {
     expect(screen.queryByText(/^Not signed/)).toBeNull();
   });
 
+  it("a signed plan with no time on record still reads 'Signed' (never neither the row nor the form)", async () => {
+    const plan = crewDayPlan("crew-a", REPLAY_DATE);
+    if (plan === undefined) throw new Error("no plan");
+    server.use(http.get(DAY_PLAN, () => HttpResponse.json({ ...plan, signoff_state: "signed", signed_at: null })));
+    renderPlan("crew-a");
+
+    await pageSays("Signed. Crews see this plan.");
+    expect(document.querySelector("[data-signed]")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
+  });
+
+  it("test_plan_zone_labels: the sign-off items say 'Plan zone', never a bare zone name next to the hourly level, and a note says why they can differ", async () => {
+    renderPlan("crew-b");
+    const list = await screen.findByText(/^4 items need a tick: /);
+
+    expect(textOf(list)).toContain("Plan zone Medium, 08:00 to 10:00");
+    expect(textOf(list)).not.toMatch(/(^|: |, )(Medium|High|Red), \d/);
+    const labels = screen.getAllByRole("checkbox").map((box) => textOf(box.closest("label")));
+    expect(labels).toHaveLength(4);
+    for (const text of labels) expect(text, text).toMatch(/^Plan zone (Medium|High|Red), \d\d:\d\d to \d\d:\d\d/);
+    const note = document.querySelector("[data-zone-note]");
+    expect(textOf(note)).toBe("A plan zone is set for each block from the plan's protective heat reading. The level shown above is the hourly warning, so the two can differ.");
+    // The level sentence names a level, not a plan zone.
+    await pageSays(/Crew B is /);
+    expect(textOf(document.querySelector("#focal"))).toMatch(/(Green|Amber|Orange|Red)/);
+    expect(textOf(document.querySelector("#focal"))).not.toContain("Plan zone");
+  });
+
   it("a plan changed since it was signed says so, names the earlier time, and offers the form (Crew C)", async () => {
     renderPlan("crew-c");
     await pageSays(/Changed since signed at 05:40\. Crews see the current rule plan/);
@@ -639,10 +667,142 @@ describe("the plan screen: the request budget", () => {
     server.events.on("request:start", ({ request }) => {
       if (request.method === "GET" && /\/day-plan(\?|$)/.test(new URL(request.url).pathname + new URL(request.url).search)) planGets += 1;
     });
+    const user = userEvent.setup();
     renderPlan("crew-b");
     await screen.findByRole("button", { name: "Sign off" });
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(planGets).toBe(1);
+
+    // Something changed the plan (a stop raises the crew's hours): the mutation invalidates it, and that is exactly one more read.
+    await user.click(await screen.findByRole("button", { name: "Stop work, Crew B" }));
+    await waitFor(() => {
+      expect(planGets).toBe(2);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(planGets).toBe(2);
+  });
+});
+
+describe("the plan screen: a plan that starts failing after it loaded (W5 I3)", () => {
+  const PLAN_INVALID = () => json(500, problemBody({ type: "urn:stellar-blaze:problem:plan-invalid", status: 500 }));
+  const NOT_LEGAL = () =>
+    json(
+      422,
+      problemBody({
+        type: "urn:stellar-blaze:problem:shift-not-legal",
+        status: 422,
+        violations: [{ rule_id: "P-H1.midday-break", clause: "", source_id: "ae-heat-2026.1" }],
+      }),
+    );
+
+  /** Loads the plan fine, then makes the NEXT plan read fail the given way and forces that read with a Stop (which refreshes the plan). */
+  async function loadThenFail(failure: () => Response): Promise<void> {
+    const user = userEvent.setup();
+    renderPlan("crew-b");
+    await screen.findByRole("button", { name: "Sign off" });
+    expect(rows().length).toBeGreaterThan(0);
+
+    server.use(http.get(DAY_PLAN, failure));
+    await user.click(await screen.findByRole("button", { name: "Stop work, Crew B" }));
+    await pageSays("Stop recorded");
+  }
+
+  it("test_plan_that_fails_its_validator_after_loading_is_removed: plan-invalid on the refetch shows no blocks and no form, and Stop is still there", async () => {
+    await loadThenFail(PLAN_INVALID);
+
+    expect(await screen.findByText("This plan failed the rule check and is not shown.")).toBeInTheDocument();
+    expect(rows()).toHaveLength(0);
+    expect(document.querySelector("[data-plan-bars]")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(within(stopBar()).getByRole("button", { name: /Undo/ })).toBeInTheDocument();
+  });
+
+  it("test_plan_that_becomes_not_legal_after_loading_is_removed: shift-not-legal on the refetch lists the violations, no blocks, no form", async () => {
+    await loadThenFail(NOT_LEGAL);
+
+    const title = await screen.findByText("This shift is not legal as planned");
+    expect(title.closest("[data-shift-not-legal]")).toHaveAttribute("role", "status");
+    expect(rows()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
+    expect(stopBar()).toBeInTheDocument();
+  });
+
+  it("a generic failure keeps the last plan under a 'could not be refreshed' notice, and offers no sign-off on it", async () => {
+    await loadThenFail(() => json(503, problemBody({ type: "urn:stellar-blaze:problem:unavailable", status: 503 })));
+
+    await pageSays("This plan could not be refreshed");
+    // The last plan stays readable, but sign-off is never offered on a plan whose latest read failed.
+    expect(rows().length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(stopBar()).toBeInTheDocument();
+  });
+
+  it("when the plan reads again, the form is back", async () => {
+    const user = userEvent.setup();
+    await loadThenFail(() => json(503, problemBody({ type: "urn:stellar-blaze:problem:unavailable", status: 503 })));
+    await pageSays("This plan could not be refreshed");
+
+    server.resetHandlers();
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("button", { name: "Sign off" })).toBeInTheDocument();
+    expect(textOf(document.body)).not.toContain("could not be refreshed");
+  });
+});
+
+describe("the plan screen: clause text from the real ruleset carries no ADR jargon (W5)", () => {
+  const REAL_P_H3 =
+    'Art. 18: "The worker may not work for more than (5) five consecutive hours without a break or breaks of not less than an hour in total, provided that these periods are not included in the working hours." PROTECTIVE READING (ADR 0011 P-H3): ban time and ADOSH cycle rest are not credited as the break';
+
+  it("a block row shows its clause without the ADR reference, and the law's own words as sent", async () => {
+    const plan = crewDayPlan("crew-b", REPLAY_DATE);
+    if (plan === undefined) throw new Error("no plan");
+    server.use(
+      http.get(DAY_PLAN, () =>
+        HttpResponse.json({
+          ...plan,
+          segments: plan.segments.map((segment) => (segment.state === "work" ? { ...segment, rule_id: "P-H3", clause: REAL_P_H3 } : segment)),
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPlan("crew-b");
+    await waitFor(() => {
+      expect(rows().length).toBeGreaterThan(0);
+    });
+    const work = rows().find((row) => row.getAttribute("data-block") === "work");
+    if (work === undefined) throw new Error("no work row");
+    await user.click(within(work).getByRole("button"));
+
+    const clause = textOf(work);
+    expect(clause).not.toMatch(/ADR\s*\d/);
+    expect(clause).not.toContain("PROTECTIVE READING");
+    expect(clause).toContain("The worker may not work for more than (5) five consecutive hours without a break or breaks of not less than an hour in total");
+    expect(clause).toContain("Protective reading: ban time and ADOSH cycle rest are not credited as the break");
+    // The rule id is still shown beside it, as an identifier.
+    expect(within(work).getByText("P-H3")).toBeInTheDocument();
+  });
+
+  it("a shift-not-legal row shows its clause without the ADR reference", async () => {
+    server.use(
+      http.get(DAY_PLAN, () =>
+        json(422, {
+          type: "urn:stellar-blaze:problem:shift-not-legal",
+          title: "Shift not legal",
+          status: 422,
+          request_id: "req-nl",
+          violations: [{ rule_id: "P-H3", clause: REAL_P_H3, source_id: "fdl-33-2021" }],
+        }),
+      ),
+    );
+    renderPlan("crew-b");
+
+    const title = await screen.findByText("This shift is not legal as planned");
+    const section = title.closest("[data-shift-not-legal]") as HTMLElement;
+    expect(textOf(section)).not.toMatch(/ADR\s*\d/);
+    expect(textOf(section)).toContain("Protective reading: ban time and ADOSH cycle rest are not credited as the break");
   });
 });

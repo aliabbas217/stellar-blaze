@@ -482,6 +482,7 @@
     "crews": {
       "pageTitle": "Crews today",
       "kicker": "Needs you first",
+      "kickerOff": "Highest level, off shift now",
       "strips": {
         "aria": "Crews today, worst first. Now {now}.",
         "ariaBreak": "Crews today, worst first. Midday break {from} to {to}. Now {now}.",
@@ -600,12 +601,13 @@
       },
       "signOff": {
         "heading": "Sign off today's plan",
-        "intro": "Medium, High and Red items need a tick each. Signing never delays an alert or a stop.",
+        "intro": "Items in the Medium, High and Red plan zones need a tick each. Signing never delays an alert or a stop.",
+        "zoneNote": "A plan zone is set for each block from the plan's protective heat reading. The level shown above is the hourly warning, so the two can differ.",
         "none": "No item on this plan needs a tick.",
         "itemsOne": "1 item needs a tick: {list}.",
         "items": "{count} items need a tick: {list}.",
-        "item": "<bdi>{zone}</bdi>, <bdi>{from}</bdi> to <bdi>{to}</bdi>",
-      "itemText": "{zone}, {from} to {to}",
+        "item": "Plan zone <bdi>{zone}</bdi>, <bdi>{from}</bdi> to <bdi>{to}</bdi>",
+      "itemText": "Plan zone {zone}, {from} to {to}",
         "tickOne": "Tick 1 more item to sign",
         "tickMany": "Tick {count} more items to sign",
         "submit": "Sign off",
@@ -613,7 +615,8 @@
         "missing": "These items still need a tick: {list}.",
         "failed": "Sign-off was not recorded. Try again. Alerts and Stop work do not wait for it.",
         "offline": "No signal. Sign-off was not sent. Alerts and Stop work do not wait for it.",
-        "signed": "Signed <bdi>{time}</bdi> by the site supervisor. Crews see this plan."
+        "signed": "Signed <bdi>{time}</bdi> by the site supervisor. Crews see this plan.",
+        "signedNoTime": "Signed. Crews see this plan."
       },
       "loading": "Loading the plan",
       "empty": {
@@ -624,6 +627,11 @@
       "error": {
         "title": "The plan did not load",
         "detail": "Crews see the rule plan meanwhile. Alerts and Stop work are not affected."
+      },
+      "refreshFailed": {
+        "title": "This plan could not be refreshed.",
+        "body": "Showing the last plan this phone read. It may be out of date. Sign-off is off until the plan loads.",
+        "retry": "Try again"
       },
       "invalid": {
         "title": "This plan failed the rule check and is not shown.",
@@ -649,6 +657,7 @@
       "undoFailed": "Undo was not sent. Try again, or use Resume work.",
       "stoppedBar": "Work stopped <bdi>{time}</bdi>",
       "stoppedDetail": "<bdi>{crew}</bdi>. Stop recorded. Crews are notified within about six minutes. Tell the crew now.",
+      "stoppedDetailLate": "<bdi>{crew}</bdi>. Tell the crew now.",
       "resume": "Resume work",
       "resumeTitle": "Resume work for <bdi>{crew}</bdi>?",
       "resumeBody": "This ends the stop recorded at <bdi>{time}</bdi>.",
@@ -661,8 +670,6 @@
       "failed": "Not sent. Tell the crew now.",
       "failedDetail": "Press Stop work to try again.",
       "noCrew": "The crew list did not load. Tell the crew to stop work now.",
-      "theCrew": "The crew",
-      "buttonGeneric": "Stop work",
       "noCrews": "There are no crews at this site to stop."
     }
   },

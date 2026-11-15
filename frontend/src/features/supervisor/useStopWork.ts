@@ -5,7 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearStopMutation, postStop, stopMutation } from "@/api/queries";
 import { ApiProblem } from "@/api/problem";
 import type { components } from "@/api/schema";
-import { drainStopOutbox, enqueueStop, outboxAvailable, type SendResult } from "@/features/supervisor/stop-outbox";
+import {
+  clearStopsFor,
+  drainStopOutbox,
+  enqueueStop,
+  outboxAvailable,
+  pendingStops,
+  type SendResult,
+} from "@/features/supervisor/stop-outbox";
 
 /*
  * Stop work, as state (F2 Task 19). It is the one safety action of the crews screen, so its rules are the point:
@@ -21,6 +28,10 @@ import { drainStopOutbox, enqueueStop, outboxAvailable, type SendResult } from "
  *    unless the API answered 2xx. A 404 (the stop is gone: already resumed elsewhere, or a demo reset started a new epoch) is a
  *    neutral "no active stop found" and a refetch of the crew: the server's answer decides what the bar reads next.
  *
+ * Safety actions never wait (W5 I1): the stop and the undo/resume requests carry a bounded signal (`STOP_TIMEOUT_MS`,
+ * `CLEAR_STOP_TIMEOUT_MS`), and a timeout is read exactly like no signal: the stop is kept in the outbox, the bar reads "Not sent"
+ * and the next press goes out. A stop that did reach the server meanwhile is shown from the crews list the refetch brings back.
+ *
  * The server's own view of the crew (`server`, from the crews list) is merged in: a stop that is active after a reload, or
  * recorded by another phone, reads "stopped" here too, without an undo window.
  */
@@ -30,6 +41,12 @@ type CrewStop = components["schemas"]["CrewStop"];
 /** The undo window after a stop is recorded: ten seconds, then the bar reads "Work stopped" with "Resume work". */
 export const UNDO_SECONDS = 10;
 const UNDO_MS = UNDO_SECONDS * 1000;
+
+/**
+ * How long after a stop started the screen may say "Crews are notified within about six minutes" (the default dispatch cadence, ADR 0058).
+ * Later the sentence is a stale promise and the bar drops it.
+ */
+export const NOTIFY_WINDOW_MS = 6 * 60 * 1000;
 
 export type StopState = "idle" | "sending" | "stopped" | "queued" | "failed";
 export type StopFailure = "rate-limited" | "other";
@@ -66,6 +83,15 @@ type LocalState =
   | { readonly kind: "queued"; readonly at: string; readonly queuedAt: number }
   | { readonly kind: "failed"; readonly reason: StopFailure };
 
+/**
+ * The stop waiting in the outbox for a crew (one row per crew). The outbox, not React state, is the truth about a queued stop:
+ * it survives a reload, so after one the bar still says "Not sent" and a second press cannot write a second row.
+ */
+interface OutboxRow {
+  readonly crewId: string;
+  readonly at: string;
+}
+
 /** What this phone knows about a stop, and which crew it is about: a state for another crew is no state for this one. */
 type Local = LocalState & { readonly crewId: string | null };
 
@@ -73,6 +99,16 @@ const IDLE = { kind: "idle", crewId: null } as const;
 
 /** The prefixes of the keys whose answers a stop, an undo or a resume changes. */
 const CREW_STATE_KEYS = [["crews"], ["crew-timeline"], ["crew-day-plan"]] as const;
+
+/** Removes a crew's waiting rows from the outbox (its stop is recorded, so they are spent); true once they are gone. */
+async function dropRows(crewId: string): Promise<boolean> {
+  try {
+    await clearStopsFor(crewId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** What a drained row means for the outbox: sent or refused for good is done; anything that may work later stays. */
 function resultOf(error: unknown): SendResult {
@@ -112,6 +148,8 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     },
     [crewId],
   );
+  // The stop kept in the outbox for this crew, read when the crew is known (a reload) and kept up to date by this hook's own writes.
+  const [outboxRow, setOutboxRow] = useState<OutboxRow | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // The crew a failed undo or resume was about (null: none), so a failure never follows the bar to another crew.
   const [undoFailedFor, setUndoFailedFor] = useState<string | null>(null);
@@ -152,7 +190,9 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
       try {
         if (!outboxAvailable()) throw new Error("no outbox");
         await enqueueStop(crewId, pressedAt);
-        setLocal({ kind: "queued", at: pressedAt.toISOString(), queuedAt: pressedAt.getTime() });
+        // The row is the queued state (one row per crew); local state falls back to idle so the outbox row is what the bar reads.
+        setOutboxRow({ crewId, at: pressedAt.toISOString() });
+        setLocal({ kind: "idle" });
       } catch {
         setLocal({ kind: "failed", reason: "other" });
       }
@@ -170,10 +210,18 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
         setLocal({ kind: "stopped", stopId: recorded.id, at: recorded.started_at, undoUntil: at + UNDO_MS, confirmedAt: at });
         setNow(at);
         refresh();
+        // Recorded: a row left from an earlier no-signal press would stop the crew again after a resume.
+        void dropRows(crewId).then((gone) => {
+          if (gone) setOutboxRow((row) => (row !== null && row.crewId === crewId ? null : row));
+        });
       } catch (error) {
         const status = error instanceof ApiProblem ? error.problem.status : -1;
-        if (status === 0) await queue();
-        else setLocal({ kind: "failed", reason: status === 429 ? "rate-limited" : "other" });
+        if (status === 0) {
+          await queue();
+          // No answer is not "not recorded": the request may have landed. The refetch brings the server's truth (a stop it did record
+          // reads as a stop, not as "queued"), so a timeout can never leave a recorded stop shown as unsent.
+          refresh();
+        } else setLocal({ kind: "failed", reason: status === 429 ? "rate-limited" : "other" });
       }
     };
     void run().finally(() => {
@@ -183,14 +231,25 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
 
   // Derived, never synchronised by an effect: a state for another crew is idle, and the crews list wins over local state once it
   // is newer than that state and disagrees (`settled`).
-  const local: LocalState = stored.crewId === crewId ? settled(stored, server) : IDLE;
+  const own: LocalState = stored.crewId === crewId ? settled(stored, server) : IDLE;
+  const queuedRow: Local | null =
+    outboxRow !== null && outboxRow.crewId === crewId
+      ? { kind: "queued", at: outboxRow.at, queuedAt: Date.parse(outboxRow.at), crewId }
+      : null;
+  const local: LocalState = own.kind !== "idle" ? own : queuedRow === null ? IDLE : settled(queuedRow, server);
+  // The crews list shows the stop the row was waiting to send: the row is spent (see the effect below).
+  const rowSpent = own.kind === "idle" && queuedRow !== null && settled(queuedRow, server).kind === "idle";
 
   const stale = resumedAt !== null && server !== null && server.asOf <= resumedAt;
   // Said while the crew list has not yet answered after the 404, and after it only while it agrees that nothing is stopped.
   const noActiveStop = gone !== null && gone.crewId === crewId && !(server !== null && server.stopped && server.asOf > gone.at);
   const serverStopId = server !== null && server.stopped && !stale ? server.activeStopId : null;
 
-  const currentStopId = local.kind === "stopped" ? local.stopId : serverStopId;
+  // The server's id wins once its list is newer than this phone's own record and names another stop: another phone resumed and
+  // stopped again, and the id this phone remembers would 404 forever ("fails forever" class).
+  const serverNewer = server !== null && local.kind === "stopped" && server.asOf > local.confirmedAt;
+  const currentStopId =
+    local.kind === "stopped" ? (serverNewer && serverStopId !== null && serverStopId !== local.stopId ? serverStopId : local.stopId) : serverStopId;
 
   const clear = async (onDone: () => void, onFail: () => void): Promise<void> => {
     if (currentStopId === null) return;
@@ -250,32 +309,68 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     };
   }, [undoOpen]);
 
+  // After a reload: a stop still waiting in the outbox is "Not sent" again, not a plain idle button. The read never clears a row this
+  // hook has just written (a press can land before the read does).
+  useEffect(() => {
+    if (crewId === null || !outboxAvailable()) return;
+    let live = true;
+    void pendingStops()
+      .then((rows) => {
+        const row = rows.find((candidate) => candidate.crewId === crewId);
+        if (!live || row === undefined) return;
+        setOutboxRow({ crewId, at: row.clientTime });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [crewId]);
+
+  // The crews list shows the stop a waiting row was for: sending it later would stop the crew again after a resume.
+  useEffect(() => {
+    if (!rowSpent || crewId === null) return;
+    void dropRows(crewId).then((gone) => {
+      if (gone) setOutboxRow((row) => (row !== null && row.crewId === crewId ? null : row));
+    });
+  }, [rowSpent, crewId]);
+
+  // The crew the bar is about NOW, for a drain that finishes after the bar moved to another crew (the demo's stand-in crew gives way
+  // to the focal one when the list arrives). A drain is single-flight and shared, so its closure may belong to an earlier effect run.
+  const latestCrew = useRef<string | null>(crewId);
+  useEffect(() => {
+    latestCrew.current = crewId;
+  }, [crewId]);
+
   // The outbox drains when the app opens and whenever the phone comes back online. It never reports a send by itself: a row is
-  // removed only after the API answered, and the bar says "recorded" only for the stop the API returned.
+  // removed only after the API answered, and the bar says "recorded" only for the stop the API returned. It reconciles with the
+  // LATEST crew and always refreshes: the server's answer decides what the bar reads, even if the crew changed mid-drain.
   useEffect(() => {
     if (crewId === null) return;
-    let live = true;
     const drain = async (): Promise<void> => {
-      let recorded = null as CrewStop | null;
-      let removed = 0;
+      // Offline there is nothing to send: the rows wait for the `online` event instead of each opening a request that must fail.
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      const recorded = new Map<string, CrewStop>();
+      let done: readonly { readonly crewId: string }[];
       try {
-        const done = await drainStopOutbox(async (row) => {
+        done = await drainStopOutbox(async (row) => {
           try {
-            const stop = await postStop(row.crewId, { reason_code: "heat" });
-            if (row.crewId === crewId) recorded = stop;
+            recorded.set(row.crewId, await postStop(row.crewId, { reason_code: "heat" }));
             return "done";
           } catch (error) {
             return resultOf(error);
           }
         });
-        removed = done.length;
       } catch {
         return;
       }
-      if (!live || removed === 0) return;
+      if (done.length === 0) return;
       refresh();
-      if (recorded !== null) {
-        setLocal({ kind: "stopped", stopId: recorded.id, at: recorded.started_at, undoUntil: 0, confirmedAt: Date.now() });
+      const latest = latestCrew.current;
+      if (latest === null) return;
+      if (done.some((row) => row.crewId === latest)) setOutboxRow((row) => (row !== null && row.crewId === latest ? null : row));
+      const stop = recorded.get(latest);
+      if (stop !== undefined) {
+        setStored({ kind: "stopped", stopId: stop.id, at: stop.started_at, undoUntil: 0, confirmedAt: Date.now(), crewId: latest });
       }
     };
     void drain();
@@ -284,16 +379,15 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     };
     window.addEventListener("online", onOnline);
     return () => {
-      live = false;
       window.removeEventListener("online", onOnline);
     };
-  }, [crewId, refresh, setLocal]);
+  }, [crewId, refresh]);
 
   if (local.kind === "stopped") {
     return {
       crewId,
       state: "stopped",
-      stopId: local.stopId,
+      stopId: currentStopId,
       undoSecondsLeft: Math.max(0, Math.ceil((local.undoUntil - now) / 1000)),
       at: local.at,
       failure: null,

@@ -59,20 +59,21 @@ export function FieldShell({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-110 flex-col bg-ground sm:my-6 sm:min-h-0 sm:border sm:border-hair">
-      <header className="flex items-center gap-3 border-b border-hair px-4 py-2">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hair px-4 py-2">
         <ViewTransition name="wordmark" share="morph" default="none">
           <FieldLink
             href="/"
-            className="hidden min-h-(--target) items-center font-display text-sm font-semibold uppercase tracking-wordmark text-ink no-underline sm:inline-flex"
+            className="hidden min-h-(--target) items-center font-display text-sm font-semibold uppercase tracking-wordmark text-ink no-underline sm:inline-flex sm:basis-full"
           >
             {t("common.appName")}
           </FieldLink>
         </ViewTransition>
+        {/* From sm up the wordmark takes its own line (basis-full above): beside it the name had about 90 px and a long word ("Mussafah") was cut. */}
         <div className="min-w-0 flex-1">
           {site === undefined ? null : (
             // Two lines at most, then cut. The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a
             // rule for every element of the page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
-            <p className="line-clamp-2 font-body text-base leading-tight font-semibold text-ink">
+            <p {...(site === null ? {} : { title: site })} className="line-clamp-2 font-body text-base leading-tight font-semibold text-ink">
               {site === null ? t("shell.field.noSite") : <bdi className="leading-[inherit]">{site}</bdi>}
             </p>
           )}

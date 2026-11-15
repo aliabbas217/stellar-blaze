@@ -2,13 +2,14 @@
 
 import { useTranslations } from "next-intl";
 import type { ShiftViolation } from "@/api/problem";
+import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 
 /*
  * The 422 `shift-not-legal` of the day plan and the sign-off (F2 Task 20): the crew's published shift breaks a rule by itself, so
  * the planner cannot fix it and no plan is served. This is a RESULT the supervisor can act on (fix the shift), not a fault of the
  * app: no alert role, no error colour, no request id, and nothing here says anything is wrong with Stop work or alerts. Each
  * violated rule is a row with its id (an identifier, in the mono face); the clause text is shown only when the API sent some
- * (the contract allows it empty), as sent.
+ * (the contract allows it empty), as sent less the internal ADR references (sanitizeClause).
  */
 
 export function ShiftNotLegalResult({ violations }: { readonly violations: readonly ShiftViolation[] }) {
@@ -26,7 +27,7 @@ export function ShiftNotLegalResult({ violations }: { readonly violations: reado
                 <code dir="ltr" translate="no" className="font-mono text-sm text-ink">
                   {violation.rule_id}
                 </code>
-                {violation.clause === "" ? null : <p className="text-base leading-(--sign-leading-text) text-ink-2">{violation.clause}</p>}
+                {violation.clause === "" ? null : <p className="text-base leading-(--sign-leading-text) text-ink-2">{sanitizeClause(violation.clause, { sourceId: violation.source_id })}</p>}
               </li>
             ))}
           </ul>

@@ -57,6 +57,12 @@ export type PlanScreenState =
       readonly items: readonly PlanAckItem[];
       /** No fresh forecast: the crews see the protective plan. */
       readonly protective: boolean;
+      /**
+       * The latest read of the plan failed in a way that does not say the plan is wrong (no network, a 5xx): the last plan stays on
+       * screen as it was, under a notice, and sign-off is NOT offered on it (a sign-off must never be offered on a plan whose latest
+       * read failed). `null` when the latest read succeeded.
+       */
+      readonly refreshFailed: { readonly retry: () => void } | null;
     };
 
 export interface PlanScreen {
@@ -97,7 +103,12 @@ export function usePlanModel(crewId: string): PlanScreen {
   const crews = crewsQuery.data;
   const crew = crews?.find((candidate) => candidate.id === crewId);
   const timeline = timelineQuery.data;
-  const plan = planQuery.data;
+  // What the latest read of the plan says. TanStack keeps the old data when a refetch fails, so the data alone cannot be trusted:
+  // a plan the validator now rejects, a shift that is now not legal, or a crew that is gone must REPLACE the cached plan (a validator-
+  // failed plan is never shown and sign-off is off). Only a failure that says nothing about the plan (no network, a 5xx) keeps it.
+  const latestFailure = planQuery.isError ? planFailureOf(planQuery.error.problem) : null;
+  const replacesPlan = latestFailure !== null && latestFailure.kind !== "error";
+  const plan = replacesPlan ? undefined : planQuery.data;
   const forecast = forecastQuery.data;
 
   const strip = useMemo(
@@ -111,7 +122,7 @@ export function usePlanModel(crewId: string): PlanScreen {
       const problem = planQuery.error.problem;
       return {
         status: "failed",
-        failure: planFailureOf(problem),
+        failure: latestFailure ?? planFailureOf(problem),
         problem,
         retry: () => {
           void planQuery.refetch();
@@ -140,6 +151,13 @@ export function usePlanModel(crewId: string): PlanScreen {
       currentIndex,
       items: ackItemsOf(plan, zone),
       protective,
+      refreshFailed: planQuery.isError
+        ? {
+            retry: () => {
+              void planQuery.refetch();
+            },
+          }
+        : null,
     };
   })();
 

@@ -39,6 +39,9 @@ describe("Crews: ready", () => {
 
     // At 11:10 every crew is off shift and orange when it is back at 15:00: equal ranks keep the API's order.
     expect(textOf(await focal())).toBe("Crew A is off shift now. Back at 15:00 into Orange.");
+    // An off-shift crew does not "need you first": the kicker says what the ranking is.
+    expect(textOf((await focal()).closest("section"))).toContain("Highest level, off shift now");
+    expect(textOf(document.body)).not.toContain("Needs you first");
     expect(rows().map((row) => row.dataset["crew"])).toEqual(["crew-a", "crew-b", "crew-c", "crew-d"]);
 
     const primary = document.querySelectorAll("[data-primary]");
@@ -54,6 +57,9 @@ describe("Crews: ready", () => {
 
     // 09:30: Amber until 10:00 (the 09:00 hour), the 45 minute Medium cycle from the plan, break at 12:30 in 3 h.
     expect(textOf(await focal())).toBe("Crew A is Amber until 10:00 (work 45, rest 15); midday break in 3 h.");
+    // A crew on shift does need the supervisor first.
+    expect(textOf((await focal()).closest("section"))).toContain("Needs you first");
+    expect(textOf(document.body)).not.toContain("Highest level, off shift now");
   });
 
   it("ranks by the crews' levels: a red crew leads, whatever the order the API listed them in", async () => {
@@ -275,7 +281,7 @@ describe("Crews: loading, error, empty (Stop work is there in all of them)", () 
     const { container } = renderCrews();
 
     expect(container.querySelector('[aria-busy="true"] [data-skeleton]')).not.toBeNull();
-    expect(within(stopBar()).getByRole("button", { name: "Stop work" })).toBeEnabled();
+    expect(within(stopBar()).getByRole("button", { name: "Stop work, crew-b" })).toBeEnabled();
   });
 
   it("error: the failure with its request id and a retry; Stop work still there", async () => {
@@ -292,7 +298,7 @@ describe("Crews: loading, error, empty (Stop work is there in all of them)", () 
     expect(await screen.findByText("Crew status did not load")).toBeInTheDocument();
     expect(screen.getByText("req-503")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
-    expect(within(stopBar()).getByRole("button", { name: "Stop work" })).toBeEnabled();
+    expect(within(stopBar()).getByRole("button", { name: "Stop work, crew-b" })).toBeEnabled();
   });
 
   it("empty: no crews is an actionable state with no deferred link, and the bar says there is no crew to stop", async () => {

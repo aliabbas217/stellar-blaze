@@ -77,11 +77,36 @@ export function outboxAvailable(factory: Factory | undefined = defaultFactory())
   return factory !== undefined;
 }
 
-/** Writes one stop. Rejects when the row could not be committed: the caller must then say "Not sent", never "queued". */
+/**
+ * Writes one stop. One row per crew: a crew whose stop is already waiting gets no second row (a second press changes nothing the
+ * API would not do once; the check and the write are one transaction, so two presses cannot both miss each other). Rejects when
+ * the row could not be committed: the caller must then say "Not sent", never "queued".
+ */
 export async function enqueueStop(crewId: string, clientTime: Date, factory: Factory | undefined = defaultFactory()): Promise<void> {
   if (factory === undefined) throw new Error("No IndexedDB: the stop cannot be kept.");
   const row = { crewId, clientTime: clientTime.toISOString() };
-  await inTransaction(factory, "readwrite", (store) => store.add(row));
+  await inTransaction(factory, "readwrite", (store) => {
+    const existing = store.getAll() as IDBRequest<QueuedStop[]>;
+    existing.onsuccess = () => {
+      if (!existing.result.some((waiting) => waiting.crewId === crewId)) store.add(row);
+    };
+    return existing;
+  });
+}
+
+/**
+ * Removes every waiting stop of one crew: its stop is recorded (a direct send answered, or the crews list shows it), so a row
+ * left behind would stop the crew AGAIN at the next app open, after a resume. Safe to call with nothing waiting.
+ */
+export async function clearStopsFor(crewId: string, factory: Factory | undefined = defaultFactory()): Promise<void> {
+  if (factory === undefined) return;
+  await inTransaction(factory, "readwrite", (store) => {
+    const existing = store.getAll() as IDBRequest<QueuedStop[]>;
+    existing.onsuccess = () => {
+      for (const waiting of existing.result) if (waiting.crewId === crewId) store.delete(waiting.key);
+    };
+    return existing;
+  });
 }
 
 /** Every waiting stop, oldest first. */

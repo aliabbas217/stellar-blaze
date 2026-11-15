@@ -102,13 +102,13 @@ function Subtitle({ screen, suppressed, restricted }: { readonly screen: PlanScr
 function SignedRow({ at }: { readonly at: string | null }) {
   const t = useTranslations("supervisor.plan");
   const time = useTimeFormat();
-  if (at === null) return null;
+  // A signed plan always says so: with no time on record it reads "Signed" alone (never neither the row nor the form).
   return (
     <p role="status" data-signed="" className="flex items-start gap-3 px-4 pt-6 text-base font-medium leading-(--sign-leading-text) text-ink">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="mt-1 size-5 shrink-0">
         <path d="M4 12l5 5L20 6" stroke="currentColor" strokeWidth="2.5" fill="none" />
       </svg>
-      <span>{t.rich("signOff.signed", { time: time(new Date(at)), bdi })}</span>
+      <span>{at === null ? t("signOff.signedNoTime") : t.rich("signOff.signed", { time: time(new Date(at)), bdi })}</span>
     </p>
   );
 }
@@ -135,6 +135,18 @@ function Notices({ screen }: { readonly screen: PlanScreen }) {
             <>
               <strong className="block font-medium text-ink">{crews("offline.title")}</strong>
               {crews("offline.body")}
+            </>,
+          )
+        : null}
+      {state.refreshFailed !== null
+        ? note(
+            "refresh-failed",
+            <>
+              <strong className="block font-medium text-ink">{t("refreshFailed.title")}</strong>
+              {t("refreshFailed.body")}{" "}
+              <button type="button" onClick={state.refreshFailed.retry} className="min-h-11 touch-manipulation font-medium text-ink underline underline-offset-4">
+                {t("refreshFailed.retry")}
+              </button>
             </>,
           )
         : null}
@@ -210,7 +222,8 @@ function Body({ screen }: { readonly screen: PlanScreen }) {
       </div>
       {signed ? (
         <SignedRow at={plan.signed_at} />
-      ) : (
+      ) : state.refreshFailed !== null ? null : (
+        // Sign-off is never offered on a plan whose latest read failed: what would be signed may no longer be the plan.
         <Suspense fallback={<div className="px-4 pt-6"><Skeleton height="14rem" /></div>}>
           <SignOffForm crewId={screen.crewId} date={plan.date} items={state.items} zone={screen.zone} />
         </Suspense>
