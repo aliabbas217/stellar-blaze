@@ -44,9 +44,11 @@ Definitions, all from the pre-registration (and amendment 1):
 
 * Section 13's "Lead 2 (strict) contradicts lead 1 on H4" needs the H4 verdict AT lead 2: ``warnings_scoreboard``
   applies the same rule (same paired bootstrap, blocks and seed) to the lead-2 rows and adds the verdict ``H4-lead2``.
-  The stamp "issued by 18:00 GST the evening before" may be carried only when H4 holds at lead 2; where H4 holds at
-  lead 1 but not at lead 2 the text says the stamp is dropped from the video and the strict number is shown. With no
-  scorable lead-2 row (the dev export) there is no ``H4-lead2`` verdict and the lead-2 entry says "not available".
+  The stamp "issued by 18:00 GST the evening before" may be carried only when H4 holds at lead 1 AND at lead 2
+  (amendment 3 section 3); where H4 holds at lead 1 but not at lead 2 the text says the stamp is dropped from the video
+  and the strict number is shown, and where H4 fails at lead 1 it says the stamp is not carried (whatever lead 2 shows)
+  and the strict number is shown. The verdict's ``outcome`` stays H4 at lead 2 alone. With no scorable lead-2 row (the
+  dev export) there is no ``H4-lead2`` verdict and the lead-2 entry says "not available".
 * The withdrawal "on" cell of the 2 x 2 sensitivity is dry-bulb leg only (> 44 C); no natural wet-bulb source exists,
   so the second leg of the ADR 0006 rule is not applied.
 """
@@ -582,33 +584,43 @@ def _verdicts(
 
 
 def _lead2_verdict(h4: _H4, *, holds_at_lead_1: bool) -> HypothesisVerdict:
-    """Section 13's lead-2 row: the "evening before" stamp may be carried only when H4 holds at lead 2.
+    """Section 13's lead-2 row: the "evening before" stamp may be carried only when H4 holds at lead 1 AND at lead 2.
 
-    The rule is H4's own (the same paired differences, bootstrap, blocks and seed) on the lead-2 rows. Where H4 holds at
-    lead 1 but not at lead 2 the stamp is dropped from the video and the strict (lead-2) number is shown.
+    The rule is H4's own (the same paired differences, bootstrap, blocks and seed) on the lead-2 rows; ``outcome`` is
+    that rule's result at lead 2 alone and does not encode the stamp decision, which is the sentence of ``text``
+    (amendment 3 section 3). Where H4 holds at lead 1 but not at lead 2 the stamp is dropped from the video and the
+    strict (lead-2) number is shown. Where H4 fails at lead 1 the lead-1 headline is unsupported, so the stamp is not
+    carried, whatever lead 2 shows, and the strict number is shown.
     """
     stamp = _LEAD_LABELS[STRICT_LEAD]
     if h4.holds:
         text = (
             f"H4 holds at lead 2 ({stamp}): P3 has fewer missed danger hours than P0 ({_signed(h4.missed_p0)}) and "
-            f'fewer false-alarm hours than P1 ({_signed(h4.alarms_p1)}). The stamp "{stamp}" may be carried.'
+            f"fewer false-alarm hours than P1 ({_signed(h4.alarms_p1)})."
         )
-        if not holds_at_lead_1:
-            text += " H4 does not hold at lead 1, so the lead-1 headline is not supported."
-    else:
+        if holds_at_lead_1:
+            text += f' The stamp "{stamp}" may be carried: H4 holds at lead 1 and at lead 2.'
+        else:
+            text += (
+                " H4 does not hold at lead 1, so the lead-1 headline is unsupported, "
+                f'the stamp "{stamp}" is not carried, and the strict number is shown.'
+            )
+    elif holds_at_lead_1:
         text = (
             f'H4 does not hold at lead 2 ({stamp}). Failing: {h4.failing()}. The stamp "{stamp}" is dropped from the '
-            "video, and the strict number is shown."
+            "video, and the strict number is shown. H4 holds at lead 1: lead 2 contradicts it."
         )
-        text += (
-            " H4 holds at lead 1: lead 2 contradicts it." if holds_at_lead_1 else " H4 does not hold at lead 1 either."
+    else:
+        text = (
+            f'H4 does not hold at lead 2 ({stamp}). Failing: {h4.failing()}. The stamp "{stamp}" is not carried, and '
+            "the strict number is shown. H4 does not hold at lead 1 either."
         )
     return HypothesisVerdict(
         id="H4-lead2",
         primary=False,
         statement=f"At the demo station, working daytime, lead 2 (strict: {stamp}): P3 has fewer missed danger hours "
         "than P0 (ban only) and fewer false-alarm hours than P1 (WBGT >= 32 on raw IFS). The stamp may be carried "
-        "only when this holds.",
+        "only when this holds and H4 holds at lead 1.",
         outcome="supported" if h4.holds else "negative",
         comparisons=h4.comparisons(),
         text=text,

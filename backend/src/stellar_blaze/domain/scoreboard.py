@@ -113,8 +113,9 @@ class HypothesisVerdict(ArtifactModel):
 
     id: str = Field(
         description="Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans); `H4-lead2` is H4 "
-        "computed on the lead-2 rows (section 13: the stamp `issued by 18:00 GST the evening before` may be carried "
-        "only when it is `supported`). A scoreboard without a lead-2 row has no `H4-lead2` entry."
+        "computed on the lead-2 rows (section 13 and amendment 3: the stamp `issued by 18:00 GST the evening before` "
+        "may be carried only when H4 is `supported` at lead 1 AND `H4-lead2` is `supported`; its `text` says whether "
+        "the stamp is carried). A scoreboard without a lead-2 row has no `H4-lead2` entry."
     )
     primary: bool = Field(description="True for the one primary hypothesis of the row.")
     statement: str = Field(description="The hypothesis as pre-registered, in words.")
@@ -239,8 +240,8 @@ class PolicyScoreboard(ArtifactModel):
         "not applied."
     )
     verdicts: list[HypothesisVerdict] = Field(
-        description="H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2, which decides "
-        "the `evening before` stamp) where lead 2 has rows."
+        description="H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2; with H4 at "
+        "lead 1 it decides the `evening before` stamp, carried only when both are `supported`) where lead 2 has rows."
     )
     provenance: Provenance = Field(description="Where the numbers in this file came from.")
 

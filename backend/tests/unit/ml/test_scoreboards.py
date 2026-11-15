@@ -465,18 +465,30 @@ def lead_entries(lead: int, *, p3_warns: bool) -> list[E]:
     return entries
 
 
+CARRIED: Final = f'The stamp "{STAMP}" may be carried: H4 holds at lead 1 and at lead 2.'
+DROPPED: Final = f'The stamp "{STAMP}" is dropped from the video, and the strict number is shown.'
+NOT_CARRIED_AFTER_LEAD_1: Final = (
+    f'H4 does not hold at lead 1, so the lead-1 headline is unsupported, the stamp "{STAMP}" is not carried, and the '
+    "strict number is shown."
+)
+NOT_CARRIED: Final = f'The stamp "{STAMP}" is not carried, and the strict number is shown.'
+
+
 @pytest.mark.parametrize(
-    ("holds_at_1", "holds_at_2", "stamp_may_be_carried", "phrases"),
+    ("holds_at_1", "holds_at_2", "stamp_sentence", "phrases"),
     [
-        (True, True, True, ("H4 holds at lead 2", "may be carried")),
-        (True, False, False, ("H4 does not hold at lead 2", "is dropped from the video", "strict number is shown")),
-        (False, True, True, ("H4 holds at lead 2", "H4 does not hold at lead 1")),
-        (False, False, False, ("H4 does not hold at lead 2", "is dropped from the video", "at lead 1 either")),
+        (True, True, CARRIED, ("H4 holds at lead 2",)),
+        (True, False, DROPPED, ("H4 does not hold at lead 2", "H4 holds at lead 1: lead 2 contradicts it.")),
+        (False, True, NOT_CARRIED_AFTER_LEAD_1, ("H4 holds at lead 2",)),
+        (False, False, NOT_CARRIED, ("H4 does not hold at lead 2", "H4 does not hold at lead 1 either.")),
     ],
+    ids=["hold-hold", "hold-fail", "fail-hold", "fail-fail"],
 )
 def test_the_h4_verdict_at_lead_2_decides_the_evening_before_stamp(
-    holds_at_1: bool, holds_at_2: bool, stamp_may_be_carried: bool, phrases: tuple[str, ...]
+    holds_at_1: bool, holds_at_2: bool, stamp_sentence: str, phrases: tuple[str, ...]
 ) -> None:
+    """Amendment 3 section 3: the stamp is carried only when H4 holds at BOTH leads (the carried sentence appears in
+    exactly the hold/hold case; every other case says why it is not, and shows the strict number)."""
     entries = lead_entries(1, p3_warns=holds_at_1) + lead_entries(2, p3_warns=holds_at_2)
 
     board = span_board(entries, leads=(1, 2))
@@ -491,8 +503,13 @@ def test_the_h4_verdict_at_lead_2_decides_the_evening_before_stamp(
     assert [c.subject for c in lead2.comparisons] == ["P3_protect", "P3_protect"]
     assert "lead 2" in lead2.statement
     assert STAMP in lead2.text
-    assert (f'"{STAMP}" may be carried' in lead2.text) is stamp_may_be_carried
-    assert (f'"{STAMP}" is dropped' in lead2.text) is (not stamp_may_be_carried)
+    carried = holds_at_1 and holds_at_2
+    assert lead2.text.count(stamp_sentence) == 1
+    assert (CARRIED in lead2.text) is carried
+    assert ("may be carried" in lead2.text) is carried
+    assert (f'"{STAMP}" is dropped' in lead2.text) is (holds_at_1 and not holds_at_2)
+    assert ("is not carried" in lead2.text) is (not holds_at_1)
+    assert ("strict number is shown" in lead2.text) is (not carried)
     for phrase in phrases:
         assert phrase in lead2.text
 
