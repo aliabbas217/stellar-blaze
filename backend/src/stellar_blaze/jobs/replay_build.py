@@ -65,7 +65,7 @@ PROTOCOL_PATH: Final = "docs/research/2026-11-12-preregistration-2026-evaluation
 PROTOCOL_ANCHOR: Final = "#21-data"  # section 2.1, Data: the sources the evaluation reads
 
 _PARQUET_COMPRESSION: Final = "zstd"
-_PARQUET_COMPRESSION_LEVEL: Final = 3
+_PARQUET_COMPRESSION_LEVEL: Final = 9
 _PARQUET_ROW_GROUP_SIZE: Final = 100_000
 _COMMIT = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 _GIT_TIMEOUT_S: Final = 30
