@@ -117,10 +117,18 @@ describe("describeToday", () => {
     expect(shown.banner?.updatedAt.toISOString()).toBe("2026-09-02T05:00:00.000Z");
   });
 
-  it("a forecast older than three hours is stale on its own account, whatever the API's status says", () => {
-    const shown = describeWith({ forecast: forecast({ generated_at: "2026-09-03T03:00:00Z" }) });
+  it("a live forecast older than three hours is stale on its own account, whatever the API's status says", () => {
+    const shown = describeWith({ forecast: forecast({ mode: "live", generated_at: "2026-09-03T03:00:00Z" }) });
     expect(shown.levelKind).toBe("stale");
     expect(shown.banner?.kind).toBe("stale");
+  });
+
+  it("Part S0: a replay forecast the API calls fresh is live even when generated_at is a day before the replay clock", () => {
+    const shown = describeWith({ forecast: forecast({ mode: "replay", generated_at: "2026-09-02T06:00:00Z" }) });
+    expect(shown.levelKind).toBe("live");
+    expect(shown.lastKnown).toBe(false);
+    expect(shown.banner).toBeNull();
+    expect(shown.cells.some((cell) => cell.wbgtC !== null)).toBe(true);
   });
 
   it("test_stale_and_fallback_are_not_live: a fallback forecast has no level at all, only the site rules", () => {
@@ -143,7 +151,7 @@ describe("describeToday", () => {
   describe("test_stale_and_fallback_are_not_live (I2): nothing is drawn from a forecast that is not live as if it were current", () => {
     const NOT_LIVE: readonly [string, Partial<DescribeInput> & { forecast?: Forecast }][] = [
       ["stale by the API's status", { forecast: forecast({ forecast_status: "stale", generated_at: "2026-09-03T05:00:00Z" }) }],
-      ["stale by age", { forecast: forecast({ generated_at: "2026-09-03T03:00:00Z" }) }],
+      ["stale by age (live mode)", { forecast: forecast({ mode: "live", generated_at: "2026-09-03T03:00:00Z" }) }],
       ["offline", { offline: true }],
       ["fallback", { forecast: forecast({ forecast_status: "fallback" }) }],
     ];

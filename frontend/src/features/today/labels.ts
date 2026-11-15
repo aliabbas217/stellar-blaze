@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useCallback } from "react";
 import { ageParts } from "@/features/today/schedule";
 
@@ -9,14 +9,7 @@ import { ageParts } from "@/features/today/schedule";
  * (numbers are passed as strings, never as numbers a locale could re-digit) and a time is in the provider's zone, the site's.
  */
 
-/** `HH:MM`, 24-hour, in the site's zone, Western digits: the same options as the header clock (DemoClock). */
-export function useTimeFormat(): (at: Date) => string {
-  const format = useFormatter();
-  return useCallback(
-    (at: Date) => format.dateTime(at, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", numberingSystem: "latn" }),
-    [format],
-  );
-}
+export { useTimeFormat } from "@/lib/time/use-time-format";
 
 /** "1 h 30 min", "26 h", "45 min": the age of something, from milliseconds. */
 export function useAgeLabel(): (ms: number) => string {

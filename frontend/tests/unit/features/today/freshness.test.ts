@@ -1,5 +1,5 @@
 import type { components } from "@/api/schema";
-import { STALE_AFTER_MS, currentHour, freshness } from "@/features/today/freshness";
+import { STALE_AFTER_MS, currentHour, forecastFreshness, freshness } from "@/features/today/freshness";
 import { legacyForecastToday as forecastToday, SITE_DEMO } from "@/mocks/fixtures";
 
 type HourForecast = components["schemas"]["HourForecast"];
@@ -69,6 +69,42 @@ describe("freshness", () => {
     const stale = forecastToday(SITE_DEMO, { ageMs: 26 * 60 * MINUTE, now: NOW });
     expect(freshness(fresh?.generated_at ?? "", NOW)).toBe("fresh");
     expect(freshness(stale?.generated_at ?? "", NOW)).toBe("stale");
+  });
+});
+
+describe("forecastFreshness (Part S0: replay mode takes freshness from the API's forecast_status)", () => {
+  type Basis = Parameters<typeof forecastFreshness>[0];
+  const old = ago(26 * 60 * MINUTE);
+  const recent = ago(10 * MINUTE);
+  const basis = (mode: Basis["mode"], status: Basis["forecast_status"], generatedAt: string): Basis => ({
+    mode,
+    forecast_status: status,
+    generated_at: generatedAt,
+  });
+
+  it("replay, fresh, with a generated_at a day before the replay clock: fresh (the real B3 replay shape)", () => {
+    expect(forecastFreshness(basis("replay", "fresh", old), NOW)).toBe("fresh");
+  });
+
+  it("live, fresh, with an old generated_at: stale (the 3 hour rule still applies)", () => {
+    expect(forecastFreshness(basis("live", "fresh", old), NOW)).toBe("stale");
+  });
+
+  it("live, fresh, 10 minutes old: fresh", () => {
+    expect(forecastFreshness(basis("live", "fresh", recent), NOW)).toBe("fresh");
+  });
+
+  it.each(["stale", "fallback"] as const)("replay with %s from the API is never drawn as live, however new generated_at is", (status) => {
+    expect(forecastFreshness(basis("replay", status, recent), NOW)).toBe("stale");
+  });
+
+  it.each(["stale", "fallback"] as const)("live with %s from the API is never drawn as live, however new generated_at is", (status) => {
+    expect(forecastFreshness(basis("live", status, recent), NOW)).toBe("stale");
+  });
+
+  it("live with an unreadable generated_at is stale; replay with a fresh status does not read it at all", () => {
+    expect(forecastFreshness(basis("live", "fresh", "yesterday-ish"), NOW)).toBe("stale");
+    expect(forecastFreshness(basis("replay", "fresh", "yesterday-ish"), NOW)).toBe("fresh");
   });
 });
 

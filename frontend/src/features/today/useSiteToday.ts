@@ -10,7 +10,7 @@ import { levelIndex, type Level } from "@/components/level/level";
 import { useHasProfile } from "@/features/profile/site-pin";
 import { displayedLevel } from "@/features/risk/displayed-level";
 import type { PersonalLevel } from "@/features/risk/personal";
-import { currentHour, freshness, type Freshness } from "@/features/today/freshness";
+import { currentHour, forecastFreshness, type Freshness } from "@/features/today/freshness";
 
 /*
  * The data behind the worker's Today screen, with no markup in it: the site's forecast and the risk policy through
@@ -167,7 +167,7 @@ export function selectTodayViewModel(input: { forecast: SiteForecastToday; now: 
 
   return {
     forecast,
-    freshness: freshness(forecast.generated_at, now),
+    freshness: forecastFreshness(forecast, now),
     currentHour: hour,
     siteLevel,
     personal: part.personal,

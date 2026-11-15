@@ -29,10 +29,12 @@ const profile: Profile = {
   clothingCode: "work_clothes",
 };
 
-function fixtureForecast(ageMs?: number): SiteForecastToday {
+/** The fixture day; `mode` is "live" unless a case says otherwise, because the 3 hour rule is the live mode's (Part S0). */
+function fixtureForecast(ageMs?: number, mode: SiteForecastToday["mode"] = "live"): SiteForecastToday {
   const forecast = forecastToday(SITE_DEMO, { now: NOW, ...(ageMs === undefined ? {} : { ageMs }) });
   if (forecast === undefined) throw new Error("the fixture site has a forecast");
-  return forecast;
+  // The mock's own status is "stale" only from 26 h, so a live day between 3 h and 26 h is stale by the 3 hour rule alone.
+  return { ...forecast, mode };
 }
 
 function select(overrides: Partial<Parameters<typeof selectTodayViewModel>[0]> = {}) {
@@ -206,6 +208,12 @@ describe("selectTodayViewModel: a stale forecast (review focus 3)", () => {
 
     expect(view.freshness).toBe("stale");
     expect(view.displayed).toEqual({ level: "orange", source: "site" });
+  });
+
+  it("a replay day takes its freshness from the API, not from generated_at (Part S0)", () => {
+    expect(select({ forecast: fixtureForecast(5 * HOUR, "replay") }).freshness).toBe("fresh");
+    expect(select({ forecast: { ...fixtureForecast(0, "replay"), forecast_status: "stale" } }).freshness).toBe("stale");
+    expect(select({ forecast: { ...fixtureForecast(0, "replay"), forecast_status: "fallback" } }).freshness).toBe("stale");
   });
 
   it("is marked stale when generated_at cannot be read", () => {

@@ -362,7 +362,9 @@ describe("useSiteToday: a stale forecast (review focus 3)", () => {
     server.use(
       http.get("*/api/v1/sites/:site_id/forecast/today", () => {
         requests += 1;
-        return HttpResponse.json(forecastToday(SITE_DEMO));
+        // Live mode: the 3 hour rule is the live mode's; a replay day takes its freshness from forecast_status (Part S0).
+        const day = forecastToday(SITE_DEMO);
+        return HttpResponse.json(day === undefined ? day : { ...day, mode: "live" });
       }),
     );
     const { result } = mount();

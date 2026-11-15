@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ViewTransition, type ReactNode } from "react";
 import { LevelSign } from "@/components/level/LevelSign";
 import { Pictogram } from "@/components/level/Pictogram";
+import { ModeStamp } from "@/components/provenance/ModeStamp";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { proofFromForecast } from "@/components/provenance/proof";
 import { FieldLink } from "@/components/shell/FieldLink";
@@ -167,6 +168,7 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
               kind={model.stale || model.offline ? "stale" : "live"}
               size="hero"
               kicker={kicker}
+              stamp={<ModeStamp mode={model.forecast?.mode ?? null} />}
               until={t.rich("from", { time: fromLabel(run.from), bdi: (chunks) => <bdi>{chunks}</bdi> })}
             />
             {model.personalHigher === null ? null : (

@@ -19,6 +19,11 @@ export interface LevelSignProps {
   readonly until?: ReactNode;
   /** What the sign is the level of ("Site level now", "Last known level"), already worded for the locale. */
   readonly kicker: string;
+  /**
+   * A small stamp that sits on the kicker line after the kicker (the Replay stamp of a replayed day). It takes the line's own
+   * height, so a sign with a stamp is exactly as tall as one without.
+   */
+  readonly stamp?: ReactNode;
 }
 
 // Full class names, never built by interpolation, so Tailwind's scanner finds them.
@@ -74,16 +79,17 @@ export const LEVEL_SIGN_HEIGHT = {
  * are all present. There is no filled plate, no shadow and no hatch. A stale or fallback level shows a clock beside
  * the kicker, a dimmer word and a dashed marker, so it is never mistaken for a live one.
  */
-export function LevelSign({ level, kind, size, until, kicker }: LevelSignProps) {
+export function LevelSign({ level, kind, size, until, kicker, stamp }: LevelSignProps) {
   const t = useTranslations("levels");
   const live = kind === "live";
   const word = level === null ? t("siteRules") : t(`name.${level}`);
   // "Site rules" is a phrase, not a level: it is set smaller than a hero level word (journeys, fallback state).
   const wordSize = size === "mini" ? "text-xl" : level === null ? "text-4xl" : "text-(length:--sign-word-size)";
   const kickerLine = (
-    <p className={`flex items-center gap-2 text-base leading-(--sign-leading-text) ${live ? "text-ink-3" : "text-ink-2"}`}>
+    <p className={`flex flex-wrap items-center gap-x-2 text-base leading-(--sign-leading-text) ${live ? "text-ink-3" : "text-ink-2"}`}>
       {live ? null : <Pictogram name="clock" className="size-4" />}
       <span>{kicker}</span>
+      {stamp}
     </p>
   );
 

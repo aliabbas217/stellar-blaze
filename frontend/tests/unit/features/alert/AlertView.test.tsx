@@ -226,4 +226,27 @@ describe("AlertView", () => {
     const { container } = renderAlert(orangeFromTen);
     expect(container.querySelector('[aria-busy="true"] [data-skeleton]')).not.toBeNull();
   });
+
+  describe("replay mode (Part S0, review focus 6)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("a replay day carries a Replay stamp; a live day carries none", async () => {
+      const first = renderAlert(orangeFromTen);
+      expect(await screen.findByRole("heading", { name: "Orange" })).toBeInTheDocument();
+      expect(within(first.container.querySelector("[data-mode-stamp]") as HTMLElement).getByRole("note")).toHaveTextContent("Replay");
+      first.unmount();
+
+      const forecast = forecastToday(SITE_DEMO, { now: new Date("2026-09-03T07:10:00Z") });
+      if (forecast === undefined) throw new Error("the fixture site has a forecast");
+      server.use(http.get("*/api/v1/sites/:site_id/forecast/today", () => HttpResponse.json({ ...forecast, mode: "live" })));
+      // A live day is read at the phone's own clock: set it to the moment the mock day covers.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-03T07:10:00Z"));
+      const second = renderAlert(orangeFromTen);
+      expect(await screen.findByRole("heading", { name: "Orange" })).toBeInTheDocument();
+      expect(second.container.querySelector("[data-mode-stamp]")).toBeNull();
+    });
+  });
 });

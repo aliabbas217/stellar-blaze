@@ -3,6 +3,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
+import type { components } from "@/api/schema";
 import { FieldHeadingContext, type FieldHeadingSlot } from "@/components/shell/FieldHeading";
 import { DemoProvider } from "@/features/demo/DemoProvider";
 import { DEMO_CREW_ID } from "@/features/demo/constants";
@@ -384,5 +385,71 @@ describe("Today: states", () => {
     const { container } = renderToday();
     expect(await screen.findByRole("heading", { name: "Scan your crew's code" })).toBeInTheDocument();
     expect(container.querySelector('[data-skeleton="level-sign"]')).toBeNull();
+  });
+});
+
+describe("Today: replay mode (Part S0, review focus 6)", () => {
+  const REPLAY_NOW = new Date("2026-09-03T07:10:00Z");
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A live day is read at the phone's own clock, so the phone's clock is set to the moment the mock day covers. */
+  function phoneClockAtReplayMoment() {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(REPLAY_NOW);
+  }
+
+  function serveDay(change: (day: components["schemas"]["SiteForecastToday"]) => components["schemas"]["SiteForecastToday"], ageMs: number) {
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => {
+        const day = forecastToday(String(params["site_id"]), { now: REPLAY_NOW, ageMs });
+        return HttpResponse.json(day === undefined ? day : change(day));
+      }),
+    );
+  }
+
+  it("a replay day carries a Replay stamp, once the forecast has arrived", async () => {
+    pin();
+    const { container } = renderToday();
+    expect(container.querySelector("[data-mode-stamp]")).toBeNull();
+
+    await orange();
+    expect(within(container.querySelector("[data-mode-stamp]") as HTMLElement).getByRole("note")).toHaveTextContent("Replay");
+  });
+
+  it("a live day carries no stamp", async () => {
+    phoneClockAtReplayMoment();
+    serveDay((day) => ({ ...day, mode: "live" }), 10 * 60_000);
+    pin();
+    const { container } = renderToday();
+
+    await orange();
+    expect(container.querySelector("[data-mode-stamp]")).toBeNull();
+    expect(screen.queryByText("Replay")).toBeNull();
+  });
+
+  it("a replay forecast the API calls fresh is drawn live although generated_at is 20 hours before the replay clock", async () => {
+    serveDay((day) => day, 20 * 60 * 60 * 1000);
+    pin();
+    renderToday();
+
+    await orange();
+    expect(screen.getByText("Site level now")).toBeInTheDocument();
+    expect(screen.queryByText("Last known level")).toBeNull();
+    expect(document.querySelector('[data-kind="live"]')).not.toBeNull();
+    expect(document.querySelector('[data-kind="stale"]')).toBeNull();
+  });
+
+  it("a live forecast generated 20 hours before is last known", async () => {
+    phoneClockAtReplayMoment();
+    serveDay((day) => ({ ...day, mode: "live" }), 20 * 60 * 60 * 1000);
+    pin();
+    renderToday();
+
+    await orange();
+    expect(screen.getAllByText("Last known level").length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-kind="live"]')).toBeNull();
   });
 });

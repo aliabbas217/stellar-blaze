@@ -13,19 +13,7 @@ type HourForecast = components["schemas"]["HourForecast"];
 
 const HOUR_MS = 60 * 60 * 1000;
 
-/** Hours since local midnight in `zone` at `at`, fractional: 11:10 is 11.1667. */
-export function hourOfDay(at: Date, zone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", hour: "2-digit", minute: "2-digit" }).formatToParts(at);
-  const get = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((part) => part.type === type)?.value);
-  return get("hour") + get("minute") / 60;
-}
-
-/** The site-local calendar date, `YYYY-MM-DD`. */
-export function localDate(at: Date, zone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(at);
-  const get = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
+export { hourOfDay, localDate } from "@/lib/time/zone";
 
 /**
  * `MM-DD` as "15 Sep": day first, in the reader's language, Western digits (the house style of every date label). The year

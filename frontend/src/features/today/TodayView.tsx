@@ -79,7 +79,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
         </div>
       )}
 
-      <LevelHeader description={d} />
+      <LevelHeader description={d} mode={forecast.mode} />
 
       {d.noShift ? (
         <div className="px-4">

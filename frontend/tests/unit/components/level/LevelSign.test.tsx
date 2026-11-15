@@ -34,6 +34,17 @@ describe("LevelSign", () => {
     expect(screen.getByText("until 17:00")).toBeInTheDocument();
   });
 
+  it("puts a stamp on the kicker line, after the kicker: no extra row, so the sign is as tall as one without (Part S0)", () => {
+    const { container } = renderWithIntl(
+      <LevelSign level="orange" kind="live" size="hero" kicker="Site level now" stamp={<span data-test-stamp="">Replay</span>} until="until 17:00" />,
+    );
+    const kickerLine = (container.querySelector("[data-test-stamp]") as HTMLElement).parentElement as HTMLElement;
+
+    expect(kickerLine.tagName).toBe("P");
+    expect(kickerLine).toHaveTextContent("Site level nowReplay");
+    expect(kickerLine.nextElementSibling).toHaveTextContent("until 17:00");
+  });
+
   it("takes the until text as a node, so the caller can isolate the clock time with bdi", () => {
     for (const size of ["hero", "mini"] as const) {
       const { container, unmount } = renderWithIntl(
