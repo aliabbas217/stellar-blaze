@@ -77,18 +77,25 @@ def codes(violations: list[ConfigViolation]) -> list[tuple[str, str]]:
 # --- schema and hash ---------------------------------------------------------------------------------------------
 
 
-def test_the_default_file_is_all_defaults_and_validates() -> None:
+def test_the_default_file_pins_only_the_preregistered_warning_theta_and_validates() -> None:
+    # theta_protect = 0.30 (freeze addendum section 2; ADR 0048 section 3): the one value that moves off the ruleset
+    # default (0.10). Everything else is unset, so it stays "the ruleset default".
     loaded_config = load_runtime_config_file(DEFAULT_FILE)
-    assert loaded_config == RuntimeConfig()
+    assert loaded_config == RuntimeConfig(tunables=Tunables(warning_theta=0.30))
+    assert loaded_config != RuntimeConfig()
     assert loaded_config.ruleset_pin is None
     assert loaded_config.model_id is None
-    assert loaded_config.tunables == Tunables()
+    assert loaded_config.tunables == Tunables(warning_theta=0.30)
     assert loaded_config.flags == RuntimeFlags()
-    assert validate(loaded_config) == []
+    assert validate(loaded_config) == []  # 0.30 is inside the seed ruleset's [0.05, 0.50] for warning_theta
 
 
-def test_the_default_file_has_the_schema_version_and_empty_tunables_and_flags_tables() -> None:
-    assert tomllib.loads(DEFAULT_FILE.read_text(encoding="utf-8")) == {"schema_version": 1, "tunables": {}, "flags": {}}
+def test_the_default_file_has_the_schema_version_the_pinned_theta_and_an_empty_flags_table() -> None:
+    assert tomllib.loads(DEFAULT_FILE.read_text(encoding="utf-8")) == {
+        "schema_version": 1,
+        "tunables": {"warning_theta": 0.30},
+        "flags": {},
+    }
 
 
 def test_the_canonical_hash_is_the_documented_formula() -> None:
@@ -109,7 +116,8 @@ def test_the_hash_is_stable_across_two_loads() -> None:
     second = config_sha256(load_runtime_config_file(DEFAULT_FILE))
     assert first == second
     assert len(first) == 64
-    assert first == config_sha256(RuntimeConfig())
+    assert first == config_sha256(config(tunables={"warning_theta": 0.30}))
+    assert first != config_sha256(RuntimeConfig())  # the pinned theta is part of the hashed body
 
 
 def test_the_hash_does_not_depend_on_key_order(tmp_path: Path) -> None:

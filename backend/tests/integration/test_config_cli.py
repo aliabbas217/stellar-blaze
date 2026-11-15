@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from stellar_blaze.config import Settings
-from stellar_blaze.domain.config.runtime import RuntimeConfig, config_body, config_sha256
+from stellar_blaze.domain.config.runtime import RuntimeConfig, Tunables, config_body, config_sha256
 from stellar_blaze.jobs import cli
 from tests.alembic_support import BACKEND_DIR
 from tests.integration.db_admin import fetch_all
@@ -83,7 +83,9 @@ def test_db_upgrade_migrates_an_empty_database_and_seeds_the_git_default(
     assert result.exit_code == 0, result.output
     assert rows(empty_settings, "SELECT version_num FROM alembic_version") == [{"version_num": "0003"}]
     (version,) = rows(empty_settings, "SELECT sha256, body, created_by, reason FROM config_version")
-    assert version["sha256"] == config_sha256(RuntimeConfig())
+    # The git default is the ruleset defaults plus the pre-registered theta_protect (ADR 0048 section 3).
+    assert version["sha256"] == config_sha256(RuntimeConfig(tunables=Tunables(warning_theta=0.30)))
+    assert version["body"]["tunables"]["warning_theta"] == 0.30
     assert version["created_by"] == "seed:abc1234"
     assert version["reason"] == "seed from git default"
     (activation,) = rows(empty_settings, "SELECT kind, actor, previous_activation_id FROM config_activation")

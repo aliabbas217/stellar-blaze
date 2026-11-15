@@ -14,7 +14,7 @@ from typer.testing import CliRunner, Result
 from stellar_blaze.adapters.fakes.audit import InMemoryAuditLog
 from stellar_blaze.adapters.fakes.config_store import InMemoryConfigStore
 from stellar_blaze.config import Settings
-from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
+from stellar_blaze.domain.config.runtime import RuntimeConfig, Tunables, config_sha256
 from stellar_blaze.jobs import cli
 from stellar_blaze.ports.config_store import RuntimeConfigStore, StoreUnavailableError
 from tests.unit.config.support import FIRST_MODEL, FIXTURE_MODELS, margin
@@ -24,6 +24,8 @@ pytestmark = pytest.mark.unit
 
 PASSWORD = "hunter2"  # noqa: S105  (a made-up value the tests assert never reaches the output)
 REASON_ARGS = ("--actor", "ali", "--reason", "B3 margin trial")
+UNPINNED_SEED = BACKEND_ROOT / "tests" / "fixtures" / "runtime" / "unpinned.toml"  # every tunable is the default
+GIT_DEFAULT_SEED = BACKEND_ROOT / "config" / "runtime" / "default.toml"
 
 
 @pytest.fixture
@@ -36,7 +38,9 @@ def store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> InMemoryConfigStor
     monkeypatch.setenv("SB_GIT_SHA", "abc1234")
     monkeypatch.setenv("SB_RULESETS_DIR", str(RULESETS_DIR))
     monkeypatch.setenv("SB_MODELS_DIR", str(FIXTURE_MODELS))
-    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(BACKEND_ROOT / "config" / "runtime" / "default.toml"))
+    # These tests are about the commands, not about what the git default pins: they seed from a file with nothing pinned
+    # (the product default has its own test below, `test_seed_of_the_git_default_stores_the_pre_registered_theta`).
+    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(UNPINNED_SEED))
     fake = InMemoryConfigStore()
 
     def build(_engine: AsyncEngine, _settings: Settings) -> RuntimeConfigStore:
@@ -415,6 +419,20 @@ def test_seed_creates_and_activates_the_git_default_under_the_deploys_identity(s
     version = asyncio.run(store.get_version(printed["version_id"]))
     assert version.created_by == "seed:abc1234"
     assert version.sha256 == config_sha256(RuntimeConfig())
+
+
+def test_seed_of_the_git_default_stores_the_pre_registered_theta(
+    store: InMemoryConfigStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The product default (not the unpinned test seed): a fresh `sb-jobs config seed` matches the frozen theta_protect.
+    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(GIT_DEFAULT_SEED))
+
+    printed = seed_it()
+
+    expected = RuntimeConfig(tunables=Tunables(warning_theta=0.30))
+    assert printed["sha256"] == config_sha256(expected)
+    assert out(invoke("config", "show"))["body"] == expected.model_dump(mode="json")
+    assert out(invoke("config", "show"))["body"]["tunables"]["warning_theta"] == 0.30
 
 
 @pytest.mark.parametrize("git_sha", [None, "unknown"])

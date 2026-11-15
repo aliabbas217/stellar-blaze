@@ -1,4 +1,5 @@
-# Runtime configuration seed (ADR 0010): every value is the ruleset default and nothing is pinned.
+# Runtime configuration seed (ADR 0010): every value is the ruleset default except the pinned ones listed under
+# [tunables] below (today only `warning_theta`, the pre-registered theta_protect).
 #
 # This is the git default that is loaded at startup, and that `sb-jobs config seed` (Task 7B) writes to the database as
 # the first config version. A tunable is set only to move away from its ruleset default, within the range that the
@@ -8,5 +9,10 @@
 schema_version = 1
 
 [tunables]
+# The pre-registered theta_protect (ADR 0048 section 3; freeze addendum section 2 in
+# docs/research/2026-11-15-preregistration-freeze.md): the largest theta whose hour-weighted POD for truth-High hours
+# is at least 0.90 (the weighted reading; the unweighted reading gives 0.35, published in the addendum). The ruleset
+# default is 0.10 within [0.05, 0.50]. A fresh `sb-jobs config seed` therefore matches the frozen value.
+warning_theta = 0.30
 
 [flags]

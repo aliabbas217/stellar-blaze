@@ -19,9 +19,12 @@ from stellar_blaze.composition import ConfigSourceError, Runtime
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
 from stellar_blaze.domain.rules.catalog import NoRulesetError
-from tests.unit.rules.support import RULESETS_DIR
+from tests.unit.rules.support import BACKEND_ROOT, RULESETS_DIR
 
 pytestmark = pytest.mark.unit
+
+# A seed with nothing pinned: the snapshot plumbing below is independent of what the git default pins (theta 0.30).
+UNPINNED_SEED = BACKEND_ROOT / "tests" / "fixtures" / "runtime" / "unpinned.toml"
 
 
 def app_with_probe_routes(settings: Settings) -> FastAPI:
@@ -69,7 +72,8 @@ def test_the_runtime_dependency_explains_a_missing_lifespan(settings: Settings) 
 def test_the_snapshot_dependency_gives_the_active_snapshot_and_binds_its_identity_to_the_log_context(
     settings: Settings,
 ) -> None:
-    with TestClient(app_with_probe_routes(settings)) as client:
+    unpinned = settings.model_copy(update={"runtime_config_seed": UNPINNED_SEED})
+    with TestClient(app_with_probe_routes(unpinned)) as client:
         body = client.get("/test/snapshot").json()
     assert body["version_id"] is None
     assert body["source"] == "file"

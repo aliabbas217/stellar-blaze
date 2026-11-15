@@ -31,7 +31,7 @@ from stellar_blaze.composition import (
     load_runtime_config,
 )
 from stellar_blaze.config import ForecastSourceKind, Settings
-from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
+from stellar_blaze.domain.config.runtime import RuntimeConfig, Tunables, config_sha256
 from stellar_blaze.domain.rules.catalog import NoRulesetError
 from tests.unit.rules.support import BACKEND_ROOT, RULESETS_DIR
 
@@ -41,6 +41,8 @@ FIXTURE_MODELS = BACKEND_ROOT / "tests" / "fixtures" / "models"
 FIRST = "corrector-20261111-0000000-000000"
 SECOND = "corrector-20261112-0000000-000001"
 TODAY = date(2026, 11, 11)
+# backend/config/runtime/default.toml: the ruleset defaults except the pre-registered theta_protect (ADR 0048 s.3).
+GIT_DEFAULT = RuntimeConfig(tunables=Tunables(warning_theta=0.30))
 PROD_PINS_MESSAGE = "SB_RULESET_ID/SB_MODEL_ID are not used in prod; use the runtime config (ADR 0010)"
 
 
@@ -70,10 +72,11 @@ def test_defaults_build_the_seed_catalog_and_a_file_snapshot() -> None:
     snapshot = runtime.config.current()
     assert snapshot.source == "file"
     assert snapshot.version_id is None
-    assert snapshot.config == RuntimeConfig()
+    assert snapshot.config == GIT_DEFAULT  # the git default pins the pre-registered theta_protect, nothing else
+    assert snapshot.config.tunables.warning_theta == 0.30
     assert snapshot.config.model_id is None
     assert snapshot.model is None
-    assert snapshot.sha256 == config_sha256(RuntimeConfig())
+    assert snapshot.sha256 == config_sha256(GIT_DEFAULT)
 
 
 def test_the_runtime_is_immutable() -> None:
@@ -314,4 +317,4 @@ def test_load_runtime_config_parses_and_validates_a_toml_file(tmp_path: Path) ->
     path.write_text("schema_version = 1\n[tunables]\ntwl_margin_w_m2 = 7.0\n[flags]\n", encoding="utf-8")
 
     assert load_runtime_config(path).tunables.twl_margin_w_m2 == 7.0
-    assert load_runtime_config(BACKEND_ROOT / "config" / "runtime" / "default.toml") == RuntimeConfig()
+    assert load_runtime_config(BACKEND_ROOT / "config" / "runtime" / "default.toml") == GIT_DEFAULT
