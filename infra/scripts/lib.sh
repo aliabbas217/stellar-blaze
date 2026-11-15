@@ -92,3 +92,27 @@ find_python() {
   done
   return 1
 }
+
+# az_tsv <az args...>: run `az <args> -o tsv` with carriage returns removed (az.cmd on Windows ends lines with CRLF).
+# The exit status is az's. Knack prints a JSON null as `None`, a boolean in lower case (older
+# CLIs: `True`/`False`), a list of scalars one per line; callers must cope with `None` and with either boolean spelling.
+az_tsv() {
+  local out
+  out="$(az "$@" -o tsv)" || return
+  if [ -n "$out" ]; then
+    printf '%s\n' "${out//$'\r'/}"
+  fi
+}
+
+# is_null_value <text>: success when an az tsv value means "absent": empty or `None` (any case).
+is_null_value() {
+  [ -z "$1" ] || [ "${1,,}" = "none" ]
+}
+
+# is_iso8601_offset_datetime <text>: success when the text is a real ISO 8601 date-time that carries an offset (`Z` or
+# `+hh:mm`), the shape the backend's SB_REPLAY_NOW (a timezone-aware datetime) needs. Needs GNU date (Git Bash, Ubuntu).
+is_iso8601_offset_datetime() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]] || return 1
+  date -d "$value" >/dev/null 2>&1
+}

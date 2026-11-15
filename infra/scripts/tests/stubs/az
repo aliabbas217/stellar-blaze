@@ -12,6 +12,7 @@
 #   tls_require  the stored sb-database-url secret ends ssl=require (check-db-tls --deployed)
 #   tls_noenv    the deployed containers have no PGSSLROOTCERT entry
 #   tls_alerts   only the alerts app has the weak secret
+#   dedicated, api_external, max3, other_region   smoke test shortcuts (see the knobs below)
 # The stored secret below is a made-up URL; the tests assert that no script ever prints it.
 set -euo pipefail
 
@@ -29,6 +30,270 @@ flag_value() {
     fi
   done
 }
+
+if [ -n "${STUB_AZ_LOG:-}" ]; then
+  printf '%s\n' "$joined" >>"$STUB_AZ_LOG"
+fi
+
+# ---- calls of the deploy scripts (resolve, migrate, healthcheck, smoke, restart, cold start) -----------------------------
+# Knobs (environment; a name with _API / _WEB / _ALERTS applies to that app only, e.g. STUB_MAX_REPLICAS_API=3):
+#   STUB_STATE_DIR          a per-test directory for counters and markers (the harness sets it; STUB_AZ_LOG there records calls)
+#   containerapp show:      STUB_LATEST STUB_LATEST_READY STUB_APP_IMAGE STUB_MIN_REPLICAS STUB_MAX_REPLICAS
+#                           STUB_INGRESS_EXTERNAL STUB_REPLAY_NOW STUB_WEB_FQDN
+#   containerapp revision show: STUB_REV_IMAGE STUB_PROV STUB_RUNNING STUB_HEALTH STUB_TRAFFIC STUB_REPLICAS
+#                           STUB_REVISION_MISSING=1 (the revision cannot be read)
+#                           STUB_HEALTH_SEQ="Unhealthy Healthy" (healthState of the 1st, 2nd, ... call; the last repeats)
+#   job-migrate:            STUB_JOB_IMAGE STUB_JOB_MISSING=1 STUB_JOB_START_SILENT=1 STUB_JOB_START_FAIL=1
+#                           STUB_MIGRATE_STATUSES="Failed Running+Succeeded" (final status per execution; "+" separates the
+#                           statuses of successive polls of one execution; the last word repeats for later executions)
+#   smoke:                  STUB_ENV_NAME STUB_PROFILES STUB_PROFILE_TYPES STUB_PRIVATE_ENDPOINTS STUB_EXTRA_RESOURCE="name:location"
+#   restart / cold start:   STUB_REPLICAS_STAY=1 (replicas never go away after min 0) STUB_UPDATE_FAIL=1
+#                           STUB_REPLICAS_STATIC=1 (a restart never replaces the replicas)
+# Scenarios dedicated, api_external, max3 and other_region are shortcuts for the smoke tests.
+# shellcheck disable=SC2034  # read through the indirect expansion in knob
+case "$scenario" in
+  api_external) STUB_INGRESS_EXTERNAL_API=true ;;
+  max3) STUB_MAX_REPLICAS_API=3 ;;
+  *) ;;
+esac
+state_dir="${STUB_STATE_DIR:-}"
+
+# One pass over the arguments, no subshell (a fork costs about 60 ms under Git Bash, and the smoke tests make hundreds of calls).
+app_name=""
+query=""
+revision_arg=""
+exec_name_arg=""
+for ((i = 0; i < ${#args[@]} - 1; i++)); do
+  case "${args[$i]}" in
+    -n) app_name="${args[$((i + 1))]}" ;;
+    --query) query="${args[$((i + 1))]}" ;;
+    --revision) revision_arg="${args[$((i + 1))]}" ;;
+    --job-execution-name) exec_name_arg="${args[$((i + 1))]}" ;;
+    *) ;;
+  esac
+done
+app_upper="${app_name^^}"
+
+need_state() {
+  if [ -z "$state_dir" ]; then
+    echo "az stub: STUB_STATE_DIR is required for: $joined" >&2
+    exit 2
+  fi
+}
+
+# knob <NAME> <default>: sets REPLY to $STUB_<NAME>_<APP> if set, else $STUB_<NAME>, else the default.
+knob() {
+  local app_var="STUB_$1_${app_upper}" any_var="STUB_$1"
+  REPLY="${!app_var:-${!any_var:-$2}}"
+}
+
+case "$app_name" in
+  web) default_image='reg.example/sb-web:abc' ;;
+  *) default_image='reg.example/sb-api:abc' ;;
+esac
+default_latest="${app_name}--rev1"
+if [ -n "$state_dir" ] && [ -e "$state_dir/updated-$app_name" ]; then
+  default_latest="${app_name}--rev2"
+fi
+
+# word_of <list> <n>: sets REPLY to the n-th (1-based) space separated word, the last word when n is beyond the end.
+word_of() {
+  local -a words
+  read -r -a words <<<"$1"
+  local n="$2"
+  if [ "$n" -gt "${#words[@]}" ]; then n="${#words[@]}"; fi
+  REPLY="${words[$((n - 1))]}"
+}
+
+# bump <file>: increment a counter file; sets REPLY to the new value.
+bump() {
+  need_state
+  local n=0
+  if [ -f "$state_dir/$1" ]; then read -r n <"$state_dir/$1"; fi
+  n=$((n + 1))
+  printf '%s' "$n" >"$state_dir/$1"
+  REPLY="$n"
+}
+
+serve_deploy_call() {
+  case "$joined" in
+    "containerapp show "*)
+      case "$query" in
+        *latestReadyRevisionName*)
+          knob LATEST "$default_latest"
+          local latest="$REPLY"
+          knob LATEST_READY "$latest"
+          printf '%s\n%s\n' "$latest" "$REPLY"
+          ;;
+        *latestRevisionName*)
+          knob LATEST "$default_latest"
+          printf '%s\n' "$REPLY"
+          ;;
+        *"containers[0].image"*)
+          knob APP_IMAGE "$default_image"
+          printf '%s\n' "$REPLY"
+          ;;
+        *SB_REPLAY_NOW*)
+          if [ -n "$state_dir" ] && [ -f "$state_dir/replay-now-$app_name" ]; then
+            read -r REPLY <"$state_dir/replay-now-$app_name"
+          else
+            knob REPLAY_NOW '2026-06-14T10:10:00+04:00'
+          fi
+          printf '%s\n' "$REPLY"
+          ;;
+        *minReplicas*)
+          knob MIN_REPLICAS 1
+          local min_r="$REPLY"
+          knob MAX_REPLICAS 1
+          printf '%s\n%s\n' "$min_r" "$REPLY"
+          ;;
+        *ingress.external*)
+          case "$app_name" in
+            api) knob INGRESS_EXTERNAL false ;;
+            web) knob INGRESS_EXTERNAL true ;;
+            *) knob INGRESS_EXTERNAL None ;;
+          esac
+          printf '%s\n' "$REPLY"
+          ;;
+        *ingress.fqdn*)
+          case "$app_name" in
+            web) printf '%s\n' "${STUB_WEB_FQDN:-web.stub.uaenorth.azurecontainerapps.io}" ;;
+            api) printf 'api.internal.stub.uaenorth.azurecontainerapps.io\n' ;;
+            *) printf 'None\n' ;;
+          esac
+          ;;
+        *) return 1 ;;
+      esac
+      ;;
+    "containerapp revision show "*)
+      knob LATEST "$default_latest"
+      if [ "$revision_arg" != "$REPLY" ] || [ "${STUB_REVISION_MISSING:-}" = "1" ]; then
+        echo "ERROR: (ResourceNotFound) revision $revision_arg of $app_name does not exist (latest is $REPLY)" >&2
+        exit 3
+      fi
+      local health_default="Healthy" traffic_default="100"
+      if [ "$app_name" = "alerts" ]; then
+        health_default="None"
+        traffic_default="None"
+      fi
+      knob APP_IMAGE "$default_image"
+      knob REV_IMAGE "$REPLY"
+      local rev_image="$REPLY" prov running health traffic replicas seq_var seq
+      knob PROV Provisioned
+      prov="$REPLY"
+      knob RUNNING Running
+      running="$REPLY"
+      knob HEALTH "$health_default"
+      health="$REPLY"
+      seq_var="STUB_HEALTH_SEQ_${app_upper}"
+      seq="${!seq_var:-${STUB_HEALTH_SEQ:-}}"
+      if [ -n "$seq" ]; then
+        bump "health-$app_name"
+        word_of "$seq" "$REPLY"
+        health="$REPLY"
+      fi
+      knob TRAFFIC "$traffic_default"
+      traffic="$REPLY"
+      knob REPLICAS 1
+      replicas="$REPLY"
+      printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$rev_image" "$prov" "$running" "$health" "$traffic" "$replicas"
+      ;;
+    "containerapp revision restart "*)
+      need_state
+      : >"$state_dir/restarted-$app_name"
+      ;;
+    "containerapp replica list "*)
+      need_state
+      if [ -e "$state_dir/min0-$app_name" ] && [ "${STUB_REPLICAS_STAY:-}" != "1" ]; then
+        :
+      elif [ -e "$state_dir/restarted-$app_name" ] && [ "${STUB_REPLICAS_STATIC:-}" != "1" ]; then
+        printf '%s-replica-new\n' "$app_name"
+      else
+        printf '%s-replica-old\n' "$app_name"
+      fi
+      ;;
+    "containerapp update "*)
+      need_state
+      if [ "${STUB_UPDATE_FAIL:-}" = "1" ]; then
+        echo "ERROR: stub update failure" >&2
+        exit 1
+      fi
+      : >"$state_dir/updated-$app_name"
+      case "$joined" in
+        *"--min-replicas 0"*) : >"$state_dir/min0-$app_name" ;;
+        *"--min-replicas 1"*) rm -f "$state_dir/min0-$app_name" ;;
+        *) ;;
+      esac
+      case "$joined" in
+        *"--set-env-vars SB_REPLAY_NOW="*)
+          local after="${joined#*--set-env-vars SB_REPLAY_NOW=}"
+          printf '%s' "${after%% *}" >"$state_dir/replay-now-$app_name"
+          ;;
+        *) ;;
+      esac
+      ;;
+    "containerapp env list "*) printf '%s\n' "${STUB_ENV_NAME:-cae-test}" ;;
+    "containerapp env show "*)
+      local profiles="${STUB_PROFILES:-Consumption}" types
+      if [ "$scenario" = "dedicated" ]; then profiles="Consumption D4"; fi
+      types="${STUB_PROFILE_TYPES:-$profiles}"
+      # shellcheck disable=SC2086  # the lists are space separated on purpose: one output line per word
+      case "$query" in
+        *workloadProfileType*) printf '%s\n' $types ;;
+        *) printf '%s\n' $profiles ;;
+      esac
+      ;;
+    "network private-endpoint list "*)
+      # shellcheck disable=SC2086  # a space separated list, one output line per word
+      if [ -n "${STUB_PRIVATE_ENDPOINTS:-}" ]; then printf '%s\n' $STUB_PRIVATE_ENDPOINTS; fi
+      ;;
+    "resource list "*)
+      printf 'api\tuaenorth\nweb\tuaenorth\npg-test\tUAE North\n'
+      if [ "$scenario" = "other_region" ]; then printf 'stray-db\twesteurope\n'; fi
+      if [ -n "${STUB_EXTRA_RESOURCE:-}" ]; then printf '%s\t%s\n' "${STUB_EXTRA_RESOURCE%%:*}" "${STUB_EXTRA_RESOURCE#*:}"; fi
+      ;;
+    "containerapp job show "*)
+      case "$query" in
+        *"containers[0].image"*)
+          if [ "${STUB_JOB_MISSING:-}" = "1" ]; then
+            echo "ERROR: (ResourceNotFound) The Resource 'Microsoft.App/jobs/${app_name}' was not found." >&2
+            exit 3
+          fi
+          printf '%s\n' "${STUB_JOB_IMAGE:-reg.example/sb-api:abc}"
+          ;;
+        *) return 1 ;;
+      esac
+      ;;
+    "containerapp job start "*)
+      if [ "${STUB_JOB_START_FAIL:-}" = "1" ]; then
+        echo "ERROR: stub job start failure" >&2
+        exit 1
+      fi
+      bump executions
+      if [ "${STUB_JOB_START_SILENT:-}" != "1" ]; then printf 'job-migrate-exec%s\n' "$REPLY"; fi
+      ;;
+    "containerapp job execution list "*)
+      need_state
+      if [ -f "$state_dir/executions" ]; then
+        read -r REPLY <"$state_dir/executions"
+        printf 'job-migrate-exec%s\n' "$REPLY"
+      fi
+      ;;
+    "containerapp job execution show "*)
+      local exec_n="${exec_name_arg##*exec}" word
+      word_of "${STUB_MIGRATE_STATUSES:-Succeeded}" "$exec_n"
+      word="${REPLY//+/ }"
+      bump "poll-$exec_n"
+      word_of "$word" "$REPLY"
+      printf '%s\n' "$REPLY"
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+if serve_deploy_call; then
+  exit 0
+fi
 
 case "$joined" in
   "provider show "*)

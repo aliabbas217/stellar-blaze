@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Self-tests for the infra scripts, with `az` and `curl` replaced by stubs. Run from anywhere:
-#   bash infra/scripts/tests/run.sh
+#   bash infra/scripts/tests/run.sh                  every test (about 6 minutes: the template tests call bicep many times)
+#   bash infra/scripts/tests/run.sh --fast           skips every test that needs bicep (template and db-tls --template tests)
+#   bash infra/scripts/tests/run.sh <name part>      only the tests whose name contains it, for example
+#                                                    run_migrate, healthcheck, smoke, restart_replay_clock, measure_cold_start,
+#                                                    resolve_image; --fast and a name part can be combined
 # Works under Git Bash and on Ubuntu CI. It does not rely on the executable bit: the stubs are
-# committed without it, so each is invoked through a generated wrapper that calls `bash <stub>`.
+# committed without it, so the harness runs copies of them that it makes executable.
 # One function per case; the first failing assertion stops the run with a non-zero exit.
+# Each test gets its own STUB_STATE_DIR; the az stub records every call in $STUB_STATE_DIR/az.log and the curl stub in curl.log.
 
 set -euo pipefail
 
@@ -17,7 +22,9 @@ bin="$work/bin"
 mkdir -p "$bin"
 
 for tool in az curl docker; do
-  printf '#!/usr/bin/env bash\nexec bash "%s/%s" "$@"\n' "$stubs_dir" "$tool" >"$bin/$tool"
+  # A copy made executable here (one process start per call, not two as with a wrapper that execs bash <stub>: under Git Bash
+  # a process start costs about 0.1 s and the smoke tests make a few dozen az calls each).
+  cp "$stubs_dir/$tool" "$bin/$tool"
   chmod +x "$bin/$tool"
 done
 real_path="$PATH" # without the stubs: the few tests that need the real docker use it
@@ -577,6 +584,725 @@ test_check_db_tls_rejects_bad_usage() {
   assert_err_has "usage"
 }
 
+# ---- deploy scripts: helpers --------------------------------------------------------------------
+
+az_log() {
+  cat "$STUB_STATE_DIR/az.log" 2>/dev/null || true
+}
+
+# az_count <fixed text>: how many recorded az calls contain the text.
+az_count() {
+  local n
+  n="$(az_log | grep -cF -- "$1" || true)"
+  printf '%s' "$n"
+}
+
+# az_line <fixed text>: the line numbers (space separated) of the recorded az calls that contain the text.
+az_line() {
+  az_log | grep -nF -- "$1" | cut -d: -f1 | tr '\n' ' ' || true
+}
+
+assert_az_count() { # <fixed text> <expected>
+  local n
+  n="$(az_count "$1")"
+  [ "$n" = "$2" ] || fail "expected $2 az call(s) containing '$1', saw $n"
+}
+
+assert_no_az_calls() {
+  [ -z "$(az_log)" ] || fail "az was called: $(az_log | head -n 3 | tr '\n' '|')"
+}
+
+# ---- resolve-image.sh ---------------------------------------------------------------------------
+
+test_resolve_image_placeholder_when_no_dockerfile() {
+  mkdir -p "$work/ri-empty"
+  local svc
+  for svc in api web; do
+    run_cmd bash "$scripts_dir/resolve-image.sh" "$svc" "$work/ri-empty" abc acr.example
+    assert_rc 0
+    assert_out_has "image=mcr.microsoft.com/k8se/quickstart:latest"
+    assert_out_has "port=80"
+    assert_out_has "live=/"
+    assert_out_has "ready=/"
+    assert_out_has "health=/"
+    assert_out_has "placeholder=true"
+  done
+}
+
+test_resolve_image_real_api() {
+  mkdir -p "$work/ri-api"
+  : >"$work/ri-api/Dockerfile"
+  run_cmd bash "$scripts_dir/resolve-image.sh" api "$work/ri-api" abc acr.example
+  assert_rc 0
+  assert_out_has "image=acr.example/sb-api:abc"
+  assert_out_has "port=8000"
+  assert_out_has "live=/api/v1/health/live"
+  assert_out_has "ready=/api/v1/health/ready"
+  assert_out_has "placeholder=false"
+  assert_out_lacks "health=/api/healthz"
+}
+
+test_resolve_image_real_web() {
+  mkdir -p "$work/ri-web"
+  : >"$work/ri-web/Dockerfile"
+  run_cmd bash "$scripts_dir/resolve-image.sh" web "$work/ri-web" abc acr.example
+  assert_rc 0
+  assert_out_has "image=acr.example/sb-web:abc"
+  assert_out_has "port=3000"
+  assert_out_has "health=/api/healthz"
+  assert_out_has "placeholder=false"
+}
+
+test_resolve_image_appends_to_github_output() {
+  mkdir -p "$work/ri-out"
+  : >"$work/ri-out/Dockerfile"
+  printf 'earlier=1\n' >"$work/github-output"
+  GITHUB_OUTPUT="$work/github-output" run_cmd bash "$scripts_dir/resolve-image.sh" api "$work/ri-out" abc acr.example
+  assert_rc 0
+  [ "$(head -n 1 "$work/github-output")" = "earlier=1" ] || fail "GITHUB_OUTPUT was overwritten, not appended"
+  grep -qxF "image=acr.example/sb-api:abc" "$work/github-output" || fail "image= line missing from GITHUB_OUTPUT"
+  grep -qxF "placeholder=false" "$work/github-output" || fail "placeholder= line missing from GITHUB_OUTPUT"
+}
+
+test_resolve_image_rejects_values_that_could_inject_an_output_line() {
+  mkdir -p "$work/ri-bad"
+  : >"$work/ri-bad/Dockerfile"
+  : >"$work/github-output"
+  GITHUB_OUTPUT="$work/github-output" run_cmd bash "$scripts_dir/resolve-image.sh" api "$work/ri-bad" "$(printf 'abc\nplaceholder=true')" acr.example
+  assert_rc 1
+  assert_err_has "not a valid image tag"
+  [ ! -s "$work/github-output" ] || fail "something was written to GITHUB_OUTPUT for a bad tag"
+  run_cmd bash "$scripts_dir/resolve-image.sh" api "$work/ri-bad" abc "acr.example/evil"
+  assert_rc 1
+  assert_err_has "not a valid registry login server"
+  run_cmd bash "$scripts_dir/resolve-image.sh" db "$work/ri-bad" abc acr.example
+  assert_rc 1
+  assert_err_has "usage"
+}
+
+# ---- run-migrate.sh -----------------------------------------------------------------------------
+
+run_migrate() { # <args...>: no waiting between polls or attempts
+  MIGRATE_POLL_S=0 MIGRATE_RETRY_WAIT_S=0 run_cmd bash "$scripts_dir/run-migrate.sh" "$@"
+}
+
+test_run_migrate_skips_when_placeholder() {
+  run_migrate rg-test mcr.microsoft.com/k8se/quickstart:latest true
+  assert_rc 0
+  assert_out_has "skip: placeholder"
+  assert_no_az_calls
+}
+
+test_run_migrate_succeeds() {
+  run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
+  assert_az_count "containerapp job start" 1
+}
+
+test_run_migrate_polls_until_the_execution_ends() {
+  STUB_MIGRATE_STATUSES="Running+Running+Succeeded" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_az_count "containerapp job execution show" 3
+  assert_az_count "containerapp job start" 1
+}
+
+test_run_migrate_fails_on_a_failed_execution_after_two_attempts() {
+  STUB_MIGRATE_STATUSES="Failed" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_az_count "containerapp job start" 2
+  assert_out_has "migrate FAILED after 2 attempt(s)"
+  assert_out_has "job-migrate-exec2"
+  assert_out_has 'ContainerAppConsoleLogs | where ContainerGroupName startswith "job-migrate" | order by TimeGenerated desc | take 50'
+}
+
+test_run_migrate_succeeds_on_the_second_attempt() {
+  STUB_MIGRATE_STATUSES="Failed Succeeded" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_az_count "containerapp job start" 2
+  assert_out_has "execution job-migrate-exec2 Succeeded (attempt 2)"
+}
+
+test_run_migrate_retries_after_stopped_and_degraded() {
+  STUB_MIGRATE_STATUSES="Stopped Degraded" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_az_count "containerapp job start" 2
+  assert_out_has "last execution job-migrate-exec2, result Degraded"
+}
+
+test_run_migrate_treats_a_timeout_as_a_failed_attempt() {
+  STUB_MIGRATE_STATUSES="Running" MIGRATE_TIMEOUT_S=0 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_az_count "containerapp job start" 2
+  assert_out_has "result timeout"
+}
+
+test_run_migrate_honours_the_attempts_setting() {
+  STUB_MIGRATE_STATUSES="Failed Failed Succeeded" MIGRATE_ATTEMPTS=3 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_az_count "containerapp job start" 3
+}
+
+test_run_migrate_fails_when_the_job_is_missing() {
+  STUB_JOB_MISSING=1 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_err_has "job-migrate not found"
+  assert_az_count "containerapp job start" 0
+}
+
+test_run_migrate_stops_before_starting_when_the_job_runs_another_image() {
+  STUB_JOB_IMAGE="reg.example/sb-api:old" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_err_has "does not run the image of this deploy"
+  assert_az_count "containerapp job start" 0
+  assert_az_count "execution show" 0
+}
+
+test_run_migrate_never_overrides_the_job() {
+  STUB_MIGRATE_STATUSES="Failed Succeeded" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_az_count "job update" 0
+  assert_az_count "containerapp job create" 0
+  assert_az_count "--command" 0
+  assert_az_count "--args" 0
+  assert_az_count "--image" 0
+}
+
+test_run_migrate_falls_back_to_the_newest_execution_when_start_prints_nothing() {
+  STUB_JOB_START_SILENT=1 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "job-migrate-exec1"
+  assert_az_count "containerapp job execution list" 1
+}
+
+test_run_migrate_fails_when_the_job_cannot_be_started() {
+  STUB_JOB_START_FAIL=1 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_out_has "migrate FAILED after 2 attempt(s)"
+}
+
+test_run_migrate_rejects_bad_usage() {
+  run_migrate rg-test reg.example/sb-api:abc maybe
+  assert_rc 1
+  assert_err_has "usage"
+  run_migrate rg-test
+  assert_rc 1
+  assert_err_has "usage"
+}
+
+# ---- healthcheck.sh -----------------------------------------------------------------------------
+
+run_health() { # <extra args...>: api, no waiting between polls; the test passes --timeout
+  HEALTH_POLL_S=0 run_cmd bash "$scripts_dir/healthcheck.sh" --app api --rg rg-test --image reg.example/sb-api:abc "$@"
+}
+
+test_healthcheck_passes_on_the_happy_fixture() {
+  run_health --timeout 0
+  assert_rc 0
+  assert_out_has "PASS healthcheck api"
+  assert_az_count "containerapp revision show -n api -g rg-test --revision api--rev1" 1
+}
+
+test_healthcheck_fails_when_the_active_image_differs() {
+  # The plan's Review Focus 1: the old revision still serves, so everything is green except the image it runs.
+  STUB_REV_IMAGE="old" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "runs image 'old', expected 'reg.example/sb-api:abc'"
+  assert_out_has "FAIL healthcheck api"
+}
+
+test_healthcheck_fails_when_latest_ready_differs_from_latest() {
+  STUB_LATEST="api--rev2" STUB_LATEST_READY="api--rev1" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "latest revision api--rev2 is not the latest ready revision (api--rev1)"
+}
+
+test_healthcheck_fails_when_unhealthy() {
+  STUB_HEALTH="Unhealthy" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "healthState is 'Unhealthy'"
+}
+
+test_healthcheck_fails_while_provisioning() {
+  STUB_PROV="Provisioning" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "provisioningState is 'Provisioning'"
+}
+
+test_healthcheck_fails_when_not_running() {
+  STUB_RUNNING="Failed" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "runningState is 'Failed'"
+}
+
+test_healthcheck_fails_when_traffic_is_not_100() {
+  STUB_TRAFFIC="0" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "trafficWeight is '0'"
+}
+
+test_healthcheck_fails_without_a_replica() {
+  STUB_REPLICAS="0" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "has '0' replicas"
+}
+
+test_healthcheck_no_ingress_accepts_none_but_the_default_does_not() {
+  STUB_HEALTH="None" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "healthState is 'None'"
+  STUB_HEALTH="None" STUB_TRAFFIC="None" run_health --timeout 0 --no-ingress
+  assert_rc 0
+  STUB_HEALTH="Unhealthy" run_health --timeout 0 --no-ingress
+  assert_rc 1
+}
+
+test_healthcheck_polls_until_healthy() {
+  STUB_HEALTH_SEQ="Unhealthy Unhealthy Healthy" run_health --timeout 60
+  assert_rc 0
+  assert_out_has "WAIT api"
+  assert_az_count "containerapp revision show" 3
+}
+
+test_healthcheck_makes_one_attempt_with_timeout_zero() {
+  STUB_HEALTH="Unhealthy" run_health --timeout 0
+  assert_rc 1
+  assert_az_count "containerapp revision show" 1
+}
+
+test_healthcheck_url_failure_fails() {
+  STUB_CURL_RULES="https://=503" run_health --timeout 0 --url https://web.example.invalid/api/healthz
+  assert_rc 1
+  assert_out_has "answered '503', expected 200"
+  # the revision itself was fine: only the URL condition is reported
+  assert_out_lacks "runs image"
+}
+
+test_healthcheck_url_passes_and_checks_the_json() {
+  run_health --timeout 0 --url https://web.example.invalid/api/healthz --expect-json-key status --expect-json-value ok
+  assert_rc 0
+  STUB_CURL_BODY='{"status":"degraded"}' run_health --timeout 0 --url https://web.example.invalid/api/healthz --expect-json-key status --expect-json-value ok
+  assert_rc 1
+  assert_out_has 'lacks "status": "ok"'
+}
+
+test_healthcheck_only_takes_an_https_url() {
+  run_health --timeout 0 --url http://web.example.invalid/
+  assert_rc 1
+  assert_err_has "--url must be the public https URL"
+  run_health --timeout 0 --expect-json-key status --expect-json-value ok
+  assert_rc 1
+  assert_err_has "need --url"
+  assert_no_az_calls
+}
+
+test_healthcheck_reports_an_unreadable_revision() {
+  STUB_REVISION_MISSING=1 run_health --timeout 0
+  assert_rc 1
+  assert_out_has "cannot read revision"
+}
+
+test_healthcheck_rejects_bad_usage() {
+  run_cmd bash "$scripts_dir/healthcheck.sh" --app api
+  assert_rc 1
+  assert_err_has "usage"
+  run_health --timeout soon
+  assert_rc 1
+  assert_err_has "whole number"
+}
+
+# ---- smoke.sh -----------------------------------------------------------------------------------
+
+make_fake_smoke_http() {
+  cat >"$work/fake-smoke-http.sh" <<'EOF'
+printf '%s\n' "$*" >"$FAKE_HTTP_ARGS"
+for id in H1 H2 H3 H4 H5 H7 H6; do
+  if [ "${FAKE_HTTP_FAIL:-}" = "$id" ]; then
+    printf 'FAIL %s fake failure\n' "$id"
+  else
+    printf 'PASS %s fake ok\n' "$id"
+  fi
+done
+if [ -n "${FAKE_HTTP_FAIL:-}" ]; then
+  printf 'SMOKE FAILED: 1 check(s) failed\n'
+  exit 1
+fi
+printf 'SMOKE OK\n'
+EOF
+}
+
+run_smoke() { # <args...>: the real healthcheck.sh and check-db-tls.sh on the stub, smoke-http.sh replaced by a fake
+  make_fake_smoke_http
+  SMOKE_HTTP_SCRIPT="$work/fake-smoke-http.sh" FAKE_HTTP_ARGS="$work/fake-http-args" SMOKE_S5_TIMEOUT=0 HEALTH_POLL_S=0 \
+    STUB_CURL_RULES="${STUB_CURL_RULES-http://=301}" run_cmd bash "$scripts_dir/smoke.sh" "$@"
+}
+
+test_smoke_passes_on_the_happy_run() {
+  run_smoke rg-test --no-wait
+  assert_rc 0
+  local id
+  for id in S1 S2 S4 S5 S6 S7 S8; do
+    assert_out_has "PASS $id "
+  done
+  assert_out_has "PASS S3 H1 fake ok"
+  assert_out_has "PASS S3 H2 fake ok"
+  assert_out_has "PASS S9 H3 fake ok"
+  assert_out_has "PASS S9 H6 fake ok"
+  assert_out_has "PASS S2 alerts"
+  assert_out_has "PASS S6 all 3 resources are in uaenorth"
+  assert_out_has "SMOKE OK"
+  assert_out_lacks "FAIL"
+  [ "$(cat "$work/fake-http-args")" = "https://web.stub.uaenorth.azurecontainerapps.io" ] || fail "smoke-http.sh got: $(cat "$work/fake-http-args")"
+  assert_az_count "containerapp job start" 0
+  assert_az_count "update" 0
+}
+
+test_smoke_waits_out_the_rate_limit_window_unless_told_not_to() {
+  run_smoke rg-test
+  assert_rc 0
+  [ "$(cat "$work/fake-http-args")" = "https://web.stub.uaenorth.azurecontainerapps.io --wait" ] || fail "smoke-http.sh got: $(cat "$work/fake-http-args")"
+}
+
+test_smoke_reports_fail_s1_on_dedicated_profile() {
+  STUB_SCENARIO=dedicated run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S1"
+  assert_out_has "[Consumption,D4]"
+  assert_out_has "PASS S4"
+  assert_out_has "SMOKE FAILED"
+}
+
+test_smoke_reports_fail_s1_on_a_private_endpoint() {
+  STUB_PRIVATE_ENDPOINTS="pe-db" run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S1 the group has private endpoint(s): pe-db"
+}
+
+test_smoke_reports_fail_s4_when_the_api_ingress_is_external() {
+  STUB_SCENARIO=api_external run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S4 api ingress.external is 'true', expected false"
+  assert_out_has "PASS S4 web ingress is external"
+  assert_out_has "PASS S4 alerts has no ingress"
+}
+
+test_smoke_reports_fail_s4_when_the_worker_has_an_ingress() {
+  STUB_INGRESS_EXTERNAL_ALERTS="false" run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S4 alerts has an ingress"
+}
+
+test_smoke_reports_fail_s2_when_max_replicas_is_3() {
+  STUB_SCENARIO=max3 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S2 api scale is min 1 / max 3"
+  assert_out_has "PASS S2 web"
+  assert_out_has "PASS S2 alerts"
+}
+
+test_smoke_reports_fail_s6_on_a_resource_in_another_region() {
+  STUB_SCENARIO=other_region run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S6 resources outside uaenorth: stray-db(westeurope)"
+  # a display-name location ("UAE North") is the same region, not a failure
+  assert_out_lacks "pg-test"
+}
+
+test_smoke_s6_follows_expect_location() {
+  run_smoke rg-test --no-wait --expect-location "UAE North"
+  assert_rc 0
+  assert_out_has "PASS S6"
+  run_smoke rg-test --no-wait --expect-location westeurope
+  assert_rc 1
+  assert_out_has "FAIL S6 resources outside westeurope: api(uaenorth)"
+}
+
+test_smoke_reports_fail_s7_when_plain_http_is_served() {
+  STUB_CURL_RULES="" run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S7"
+  assert_out_has "answered 200 over plain http"
+}
+
+test_smoke_s7_accepts_a_refusal() {
+  STUB_CURL_RULES="http://=000" run_smoke rg-test --no-wait
+  assert_rc 0
+  assert_out_has "PASS S7 plain http is not served: http://web.stub.uaenorth.azurecontainerapps.io/ answered 000"
+}
+
+test_smoke_reports_fail_s5_when_the_worker_is_not_running() {
+  STUB_RUNNING_ALERTS="Failed" run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S5"
+  assert_out_has "runningState is 'Failed'"
+}
+
+test_smoke_reports_fail_s8_when_the_database_url_is_weak() {
+  STUB_SCENARIO=tls_require run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S8"
+  assert_no_url_anywhere
+}
+
+test_smoke_passes_the_http_failures_through_as_s3_and_s9() {
+  FAKE_HTTP_FAIL=H2 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S3 H2 fake failure"
+  assert_out_has "PASS S3 H1"
+  FAKE_HTTP_FAIL=H6 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S9 H6 fake failure"
+}
+
+test_smoke_placeholder_runs_only_the_cost_and_reachability_checks() {
+  rm -f "$work/fake-http-args"
+  run_smoke rg-test --placeholder --no-wait
+  assert_rc 0
+  assert_out_has "PASS S1 "
+  assert_out_has "PASS S2 api"
+  assert_out_has "PASS S2 web"
+  assert_out_lacks "S2 alerts"
+  assert_out_has "PASS S3 placeholder web: https://web.stub.uaenorth.azurecontainerapps.io/ is 200"
+  assert_out_has "PASS S6 "
+  assert_out_has "PASS S7 "
+  local id
+  for id in S4 S5 S8 S9; do
+    assert_out_has "SKIP $id placeholder"
+  done
+  assert_az_count "containerapp secret list" 0
+  [ ! -e "$work/fake-http-args" ] || fail "smoke-http.sh ran for a placeholder"
+}
+
+test_smoke_placeholder_fails_when_the_web_root_is_not_200() {
+  STUB_CURL_RULES="https://=503 http://=301" run_smoke rg-test --placeholder --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S3 placeholder web"
+}
+
+test_smoke_rejects_bad_usage() {
+  run_smoke
+  assert_rc 1
+  assert_err_has "usage"
+  run_smoke rg-test --bogus
+  assert_rc 1
+  assert_err_has "usage"
+}
+
+# ---- restart-replay-clock.sh --------------------------------------------------------------------
+
+run_restart() { # <args...>
+  HEALTH_POLL_S=0 run_cmd bash "$scripts_dir/restart-replay-clock.sh" "$@"
+}
+
+test_restart_replay_clock_restarts_both_back_to_back_before_waiting() {
+  run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
+  assert_az_count "containerapp revision restart -n alerts -g rg-test --revision alerts--rev1" 1
+  local restarts first_restart last_restart first_wait
+  restarts="$(az_line "revision restart")"
+  first_restart="${restarts%% *}"
+  last_restart="$(printf '%s' "$restarts" | awk '{print $NF}')"
+  [ "$((last_restart - first_restart))" -eq 1 ] || fail "the two restarts are not back to back (lines $restarts)"
+  first_wait="$(az_line "revision show" | awk '{print $1}')"
+  [ -n "$first_wait" ] && [ "$first_wait" -gt "$last_restart" ] || fail "a wait started before both restarts were issued"
+  assert_az_count "containerapp update" 0
+  assert_out_has "Replay clock restarted."
+  assert_out_has "restarting only ONE of api and alerts desynchronises their clocks"
+  assert_out_has "next Bicep deploy resets SB_REPLAY_NOW"
+  assert_out_has "api=2026-06-14T10:10:00+04:00 alerts=2026-06-14T10:10:00+04:00"
+}
+
+test_restart_replay_clock_waits_with_the_healthcheck_conditions() {
+  run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_out_has "PASS healthcheck api"
+  assert_out_has "PASS healthcheck alerts"
+  assert_az_count "containerapp revision show -n alerts -g rg-test --revision alerts--rev1" 1
+}
+
+test_restart_replay_clock_fails_when_a_replica_is_not_replaced() {
+  STUB_REPLICAS_STATIC=1 run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "replicas were not replaced"
+  assert_out_has "FAILED"
+}
+
+test_restart_replay_clock_fails_when_an_app_is_unhealthy_afterwards() {
+  STUB_HEALTH_API="Unhealthy" run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_out_has "FAIL healthcheck api"
+  assert_out_has "FAILED"
+}
+
+test_restart_replay_clock_with_now_updates_both_apps() {
+  run_restart rg-test --now 2026-06-14T09:00:00+04:00 --timeout 0
+  assert_rc 0
+  assert_az_count "containerapp update -n api -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" 1
+  assert_az_count "containerapp update -n alerts -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" 1
+  assert_az_count "revision restart" 0
+  local updates last_update first_wait
+  updates="$(az_line "containerapp update")"
+  last_update="$(printf '%s' "$updates" | awk '{print $NF}')"
+  first_wait="$(az_line "revision show" | awk '{print $1}')"
+  [ -n "$first_wait" ] && [ "$first_wait" -gt "$last_update" ] || fail "a wait started before both updates were issued"
+  assert_out_has "api=2026-06-14T09:00:00+04:00 alerts=2026-06-14T09:00:00+04:00"
+  assert_out_has "restarting only ONE of api and alerts desynchronises their clocks"
+}
+
+test_restart_replay_clock_rejects_a_bad_now_before_changing_anything() {
+  local bad
+  for bad in "2026-06-14T10:10:00" "2026-06-14 10:10:00+04:00" "2026-06-14" "10:10" "2026-13-45T10:10:00+04:00" "soon" "2026-06-14T10:10:00+0400"; do
+    run_restart rg-test --now "$bad"
+    assert_rc 1
+    assert_err_has "--now must be an ISO 8601 date-time WITH an offset"
+    assert_no_az_calls
+  done
+  run_restart rg-test --now "2026-06-14T10:10:00Z" --timeout 0
+  assert_rc 0
+}
+
+test_restart_replay_clock_touches_nothing_else() {
+  run_restart rg-test --timeout 0
+  assert_rc 0
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      "containerapp show -n api "* | "containerapp show -n alerts "* | \
+        "containerapp replica list -n api "* | "containerapp replica list -n alerts "* | \
+        "containerapp revision restart -n api "* | "containerapp revision restart -n alerts "* | \
+        "containerapp revision show -n api "* | "containerapp revision show -n alerts "*) ;;
+      *) fail "unexpected az call: $line" ;;
+    esac
+  done <<<"$(az_log)"
+  : >"$STUB_STATE_DIR/az.log"
+  run_restart rg-test --now 2026-06-14T09:00:00+04:00 --timeout 0
+  assert_rc 0
+  while IFS= read -r line; do
+    case "$line" in
+      "containerapp update -n api -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" | \
+        "containerapp update -n alerts -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" | \
+        "containerapp show -n api "* | "containerapp show -n alerts "* | \
+        "containerapp revision show -n api "* | "containerapp revision show -n alerts "*) ;;
+      *) fail "unexpected az call: $line" ;;
+    esac
+  done <<<"$(az_log)"
+  assert_az_count "web" 0
+  assert_az_count "job" 0
+  assert_az_count "--image" 0
+}
+
+test_restart_replay_clock_rejects_bad_usage() {
+  run_restart
+  assert_rc 1
+  assert_err_has "usage"
+  run_restart rg-test --timeout soon
+  assert_rc 1
+  assert_err_has "whole number"
+}
+
+# ---- measure-cold-start.sh ----------------------------------------------------------------------
+
+run_cold() { # <args...>: no waiting; today is outside the judging window unless the test says otherwise
+  COLD_START_TODAY="${COLD_START_TODAY:-2026-11-15}" COLD_POLL_S=0 run_cmd bash "$scripts_dir/measure-cold-start.sh" "$@"
+}
+
+test_measure_cold_start_refuses_inside_the_judging_window() {
+  local day
+  for day in 2026-11-20 2026-11-25 2026-12-11; do
+    COLD_START_TODAY="$day" run_cold rg-test
+    assert_rc 1
+    assert_err_has "judging window"
+    assert_no_az_calls
+  done
+}
+
+test_measure_cold_start_runs_just_outside_the_window() {
+  local day
+  for day in 2026-11-19 2026-12-12; do
+    : >"$STUB_STATE_DIR/az.log"
+    COLD_START_TODAY="$day" run_cold rg-test
+    assert_rc 0
+    assert_out_has "COLD START:"
+  done
+}
+
+test_measure_cold_start_i_know_overrides_the_window() {
+  COLD_START_TODAY=2026-11-25 run_cold rg-test --i-know
+  assert_rc 0
+  assert_err_has "WARNING"
+  assert_out_has "COLD START:"
+}
+
+test_measure_cold_start_scales_to_zero_measures_and_restores() {
+  run_cold rg-test
+  assert_rc 0
+  assert_out_has "COLD START: 0.123 s to first 200 from https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready"
+  assert_out_has "REMINDER: run infra/scripts/restart-replay-clock.sh rg-test"
+  assert_out_has "alerts worker kept running"
+  assert_az_count "containerapp update -n web -g rg-test --min-replicas 0" 1
+  assert_az_count "containerapp update -n api -g rg-test --min-replicas 0" 1
+  assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
+  assert_az_count "containerapp update -n api -g rg-test --min-replicas 1" 1
+  assert_az_count "alerts" 0
+  # restored only after the zero-wait: the last two updates are the restores
+  local zeros ones
+  zeros="$(az_line "--min-replicas 0" | awk '{print $NF}')"
+  ones="$(az_line "--min-replicas 1" | awk '{print $1}')"
+  [ "$ones" -gt "$zeros" ] || fail "min replicas were restored before the measurement"
+  grep -qF "https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready" "$STUB_STATE_DIR/curl.log" || fail "curl did not call the web URL"
+}
+
+test_measure_cold_start_takes_a_path_and_one_app() {
+  run_cold rg-test /api/healthz web
+  assert_rc 0
+  assert_out_has "https://web.stub.uaenorth.azurecontainerapps.io/api/healthz (scaled to zero: web)"
+  assert_az_count "containerapp update -n api" 0
+  assert_out_has "The api was not scaled"
+  assert_out_lacks "REMINDER"
+  run_cold rg-test /x alerts
+  assert_rc 1
+  assert_err_has "must be web or api"
+}
+
+test_measure_cold_start_restores_when_the_replicas_never_leave() {
+  STUB_REPLICAS_STAY=1 COLD_TIMEOUT_S=0 run_cold rg-test
+  assert_rc 1
+  assert_err_has "still has replica(s)"
+  assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
+  assert_az_count "containerapp update -n api -g rg-test --min-replicas 1" 1
+  assert_out_lacks "COLD START:"
+}
+
+test_measure_cold_start_restores_when_the_request_fails() {
+  STUB_CURL_RULES="https://=503" run_cold rg-test
+  assert_rc 1
+  assert_err_has "answered 503"
+  assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
+  assert_az_count "containerapp update -n api -g rg-test --min-replicas 1" 1
+  : >"$STUB_STATE_DIR/az.log"
+  STUB_CURL_RULES="https://=000" run_cold rg-test
+  assert_rc 1
+  assert_az_count "--min-replicas 1" 2
+}
+
+test_measure_cold_start_restores_the_apps_it_had_touched_when_scaling_fails_midway() {
+  # a failing update on the way down: whatever was touched (including the failed one) is restored, and a failed restore is loud
+  STUB_UPDATE_FAIL=1 run_cold rg-test
+  assert_rc 1
+  assert_err_has "run 'az containerapp update -n web -g rg-test --min-replicas 1' NOW"
+  assert_az_count "--min-replicas 1" 1
+}
+
+test_measure_cold_start_rejects_bad_usage() {
+  run_cold
+  assert_rc 1
+  assert_err_has "usage"
+  run_cold rg-test api/v1
+  assert_rc 1
+  assert_err_has "must start with /"
+}
+
 # ---- runner -------------------------------------------------------------------------------------
 
 tests=(
@@ -635,15 +1361,118 @@ tests=(
   test_check_db_tls_image_fails_when_the_ca_check_fails
   test_check_db_tls_image_against_a_real_image
   test_check_db_tls_rejects_bad_usage
+  test_resolve_image_placeholder_when_no_dockerfile
+  test_resolve_image_real_api
+  test_resolve_image_real_web
+  test_resolve_image_appends_to_github_output
+  test_resolve_image_rejects_values_that_could_inject_an_output_line
+  test_run_migrate_skips_when_placeholder
+  test_run_migrate_succeeds
+  test_run_migrate_polls_until_the_execution_ends
+  test_run_migrate_fails_on_a_failed_execution_after_two_attempts
+  test_run_migrate_succeeds_on_the_second_attempt
+  test_run_migrate_retries_after_stopped_and_degraded
+  test_run_migrate_treats_a_timeout_as_a_failed_attempt
+  test_run_migrate_honours_the_attempts_setting
+  test_run_migrate_fails_when_the_job_is_missing
+  test_run_migrate_stops_before_starting_when_the_job_runs_another_image
+  test_run_migrate_never_overrides_the_job
+  test_run_migrate_falls_back_to_the_newest_execution_when_start_prints_nothing
+  test_run_migrate_fails_when_the_job_cannot_be_started
+  test_run_migrate_rejects_bad_usage
+  test_healthcheck_passes_on_the_happy_fixture
+  test_healthcheck_fails_when_the_active_image_differs
+  test_healthcheck_fails_when_latest_ready_differs_from_latest
+  test_healthcheck_fails_when_unhealthy
+  test_healthcheck_fails_while_provisioning
+  test_healthcheck_fails_when_not_running
+  test_healthcheck_fails_when_traffic_is_not_100
+  test_healthcheck_fails_without_a_replica
+  test_healthcheck_no_ingress_accepts_none_but_the_default_does_not
+  test_healthcheck_polls_until_healthy
+  test_healthcheck_makes_one_attempt_with_timeout_zero
+  test_healthcheck_url_failure_fails
+  test_healthcheck_url_passes_and_checks_the_json
+  test_healthcheck_only_takes_an_https_url
+  test_healthcheck_reports_an_unreadable_revision
+  test_healthcheck_rejects_bad_usage
+  test_smoke_passes_on_the_happy_run
+  test_smoke_waits_out_the_rate_limit_window_unless_told_not_to
+  test_smoke_reports_fail_s1_on_dedicated_profile
+  test_smoke_reports_fail_s1_on_a_private_endpoint
+  test_smoke_reports_fail_s4_when_the_api_ingress_is_external
+  test_smoke_reports_fail_s4_when_the_worker_has_an_ingress
+  test_smoke_reports_fail_s2_when_max_replicas_is_3
+  test_smoke_reports_fail_s6_on_a_resource_in_another_region
+  test_smoke_s6_follows_expect_location
+  test_smoke_reports_fail_s7_when_plain_http_is_served
+  test_smoke_s7_accepts_a_refusal
+  test_smoke_reports_fail_s5_when_the_worker_is_not_running
+  test_smoke_reports_fail_s8_when_the_database_url_is_weak
+  test_smoke_passes_the_http_failures_through_as_s3_and_s9
+  test_smoke_placeholder_runs_only_the_cost_and_reachability_checks
+  test_smoke_placeholder_fails_when_the_web_root_is_not_200
+  test_smoke_rejects_bad_usage
+  test_restart_replay_clock_restarts_both_back_to_back_before_waiting
+  test_restart_replay_clock_waits_with_the_healthcheck_conditions
+  test_restart_replay_clock_fails_when_a_replica_is_not_replaced
+  test_restart_replay_clock_fails_when_an_app_is_unhealthy_afterwards
+  test_restart_replay_clock_with_now_updates_both_apps
+  test_restart_replay_clock_rejects_a_bad_now_before_changing_anything
+  test_restart_replay_clock_touches_nothing_else
+  test_restart_replay_clock_rejects_bad_usage
+  test_measure_cold_start_refuses_inside_the_judging_window
+  test_measure_cold_start_runs_just_outside_the_window
+  test_measure_cold_start_i_know_overrides_the_window
+  test_measure_cold_start_scales_to_zero_measures_and_restores
+  test_measure_cold_start_takes_a_path_and_one_app
+  test_measure_cold_start_restores_when_the_replicas_never_leave
+  test_measure_cold_start_restores_when_the_request_fails
+  test_measure_cold_start_restores_the_apps_it_had_touched_when_scaling_fails_midway
+  test_measure_cold_start_rejects_bad_usage
 )
 
-# An optional argument selects the tests whose name contains it (for example: bash run.sh check_db_tls_deployed).
-filter="${1:-}"
+# needs_bicep <test name>: success for the tests that compile the real template with bicep (slow: about 6 minutes in total).
+needs_bicep() {
+  case "$1" in
+    test_check_template_rejects_bad_usage) return 1 ;;
+    test_check_template_* | test_check_db_tls_template_*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Arguments: --fast and/or a name part that selects the tests whose name contains it (for example: bash run.sh check_db_tls_deployed).
+fast=false
+filter=""
+for arg in "$@"; do
+  case "$arg" in
+    --fast) fast=true ;;
+    -*)
+      printf 'unknown option: %s (usage: run.sh [--fast] [name part])\n' "$arg" >&2
+      exit 2
+      ;;
+    *) filter="$arg" ;;
+  esac
+done
+
 ran=0
+skipped=0
 for current_test in "${tests[@]}"; do
   case "$current_test" in *"$filter"*) ;; *) continue ;; esac
+  if [ "$fast" = true ] && needs_bicep "$current_test"; then
+    printf 'skip %s (--fast: needs bicep)\n' "${current_test#test_}"
+    skipped=$((skipped + 1))
+    continue
+  fi
   out=""
   err=""
+  # a fresh state directory per test: the az stub keeps its counters and its call log (az.log) there, the curl stub curl.log
+  STUB_STATE_DIR="$work/state/$current_test"
+  rm -rf "$STUB_STATE_DIR"
+  mkdir -p "$STUB_STATE_DIR"
+  export STUB_STATE_DIR
+  export STUB_AZ_LOG="$STUB_STATE_DIR/az.log"
+  export STUB_CURL_LOG="$STUB_STATE_DIR/curl.log"
   "$current_test"
   printf 'ok %s\n' "${current_test#test_}"
   ran=$((ran + 1))
@@ -652,4 +1481,8 @@ if [ "$ran" -eq 0 ]; then
   printf 'no test matches "%s"\n' "$filter" >&2
   exit 1
 fi
-printf 'all %s tests passed\n' "$ran"
+if [ "$skipped" -gt 0 ]; then
+  printf 'all %s tests passed (%s skipped by --fast)\n' "$ran" "$skipped"
+else
+  printf 'all %s tests passed\n' "$ran"
+fi
