@@ -56,9 +56,25 @@ WORKDIR /app
 # The layers that never change with the code come first, so a code change does not re-run apt or the user setup.
 # libgomp1: LightGBM's wheel links the OpenMP runtime, which python:slim does not ship. `import lightgbm` failed in this
 # image with "libgomp.so.1: cannot open shared object file" before the package was added; the B3 model artifacts need it.
+#
+# The second apt-get takes the security fixes Debian has published since the pinned base image was built (checked
+# 2026-11-15 with `apt list --upgradable` and a trivy scan of the image): openssl (CVE-2026-84782), libpcre2
+# (CVE-2026-103111), zlib1g (CVE-2026-76844, CVE-2026-85091) and apt (CVE-2026-109518). Only these packages move, not the
+# whole system, and the digest pin above stays. The base image itself is not bumped for them: ADR 0008 keeps python
+# 3.13.15 until the post-submission dependency sweep. Delete the second apt-get when that sweep moves the base image to
+# one that already carries the fixes.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends libgomp1 \
+    && apt-get install --yes --no-install-recommends --only-upgrade \
+        apt libapt-pkg7.0 libpcre2-8-0 libssl3t64 openssl openssl-provider-legacy zlib1g \
     && rm -rf /var/lib/apt/lists/*
+
+# python:slim ships pip in /usr/local, and pip vendors certifi, urllib3, msgpack and setuptools at the versions of its own
+# release (pip/_vendor/vendor.txt). trivy reported GHSA-6q48-6c7w-9gw2 (certifi 2026.6.17, critical) and five high
+# findings (msgpack, setuptools, urllib3) against those copies, not against uv.lock, which locks certifi 2026.10.23 and
+# urllib3 2.8.0. Nothing installs at run time: uv built the virtualenv in the build stage and the virtualenv holds no pip.
+# So pip goes, with its vendored copies.
+RUN /usr/local/bin/python -m pip uninstall --yes pip
 
 # Code and rulesets stay root-owned and read-only to the app user. A named user (not just a uid) because some libraries
 # look the current uid up in /etc/passwd.
