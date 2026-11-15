@@ -24,8 +24,9 @@ model). A missing forecast or truth is out of the scores and counted; nothing is
 """
 
 import hashlib
+import inspect
 import math
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -37,7 +38,7 @@ from stellar_blaze.domain.config.models import LoadedModel
 from stellar_blaze.domain.forecast.features import FeatureSet, FoldStats, Target, fit_fold_stats
 from stellar_blaze.domain.forecast.grid import F64
 from stellar_blaze.domain.weather.models import NwpModel
-from stellar_blaze.ml.bootstrap import DEFAULT_SEED
+from stellar_blaze.ml.bootstrap import DEFAULT_SEED, paired_block_bootstrap
 from stellar_blaze.ml.conformal import CalibrationWindow, calibration_mask, fit_mask
 from stellar_blaze.ml.data import DEV_SUMMERS, TEST_SUMMER
 from stellar_blaze.ml.evaluate import (
@@ -55,7 +56,7 @@ from stellar_blaze.ml.regimes import CLUSTERS, regime_c_folds
 from stellar_blaze.ml.serving_path import correct_with_released_model, released_training_config
 from stellar_blaze.ml.training_config import TrainingConfig
 
-__all__ = ["B_ALL_NOT_RUN", "ForecastTestResult", "cold_config_sha256", "evaluate_forecast_test"]
+__all__ = ["B_ALL_NOT_RUN", "ForecastTestResult", "check_test_coverage", "cold_config_sha256", "evaluate_forecast_test"]
 
 _log = structlog.get_logger(__name__)
 
@@ -66,6 +67,25 @@ _IFS: Final = NwpModel.ECMWF_IFS025.value
 _GFS: Final = NwpModel.GFS_SEAMLESS.value
 _RELEASED_FOLD: Final = "a_released"
 _KEY: Final = ["station", "valid_time", "lead_days"]
+_BOOTSTRAP_DEFAULTS: Final = {
+    name: parameter.default
+    for name, parameter in inspect.signature(paired_block_bootstrap).parameters.items()
+    if parameter.default is not inspect.Parameter.empty
+}
+"""The pre-registered bootstrap (7-day blocks, 95% percentile) as ``paired_block_bootstrap`` itself defaults it.
+
+``evaluate.skill_table`` calls that function with only ``n_boot`` and the seed, so these are the values in force; the
+output reports them from here (not from literals) and ``tests/unit/ml/test_forecast_test.py`` pins them to section 8.
+"""
+_SCORED_ROWS_NOTES: Final = (
+    "Regime (a) serves the released model through the serving path, whose gate needs all nine inputs (t, td, wind, "
+    "shortwave, direct radiation, pressure, grid latitude, longitude and elevation): a row missing any of them has no "
+    "corrector forecast and is dropped for EVERY model of regime (a), so its models are scored on the same rows.",
+    "Regime (c) refits cold models whose features do not need pressure or radiation: it can score T, Td and "
+    "wind on rows "
+    "regime (a) drops, so the two regimes may score different row sets for those variables. Read each regime's numbers "
+    "next to its own counts (counts.test_rows, and n_rows and n_no_forecast in each skill row).",
+)
 
 
 @dataclass(frozen=True, eq=False)
@@ -86,6 +106,40 @@ class ForecastTestResult:
 def cold_config_sha256(cfg: TrainingConfig) -> str:
     """SHA-256 of a derived (regime (c)) config's canonical JSON: it has no file, so no file hash."""
     return hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()
+
+
+def check_test_coverage(
+    pairs: pl.DataFrame, *, clusters: Collection[str], stations: Collection[str], models: Collection[str]
+) -> None:
+    """Refuse a loaded frame that cannot be scored completely, naming EVERY missing item (a cheap precheck).
+
+    The gated run reads the hold-out once and scoring takes about an hour: a missing station found at the end would
+    discard that hour and invite a patch under the once-only rule. So the caller runs this right after the load and
+    before any computation: the 2026 rows must hold every model asked for and, for the corrector's IFS rows, every
+    cluster and every station.
+
+    Args:
+        pairs: The frame ``load_test_pairs`` returned.
+        clusters: The clusters that must have 2026 IFS rows (regime (c) holds each out).
+        stations: The stations that must have 2026 IFS rows.
+        models: The ``model`` values that must have 2026 rows (IFS and GFS, and AIFS for the raw comparison).
+
+    Raises:
+        ValueError: At least one item is missing; the message lists all of them.
+    """
+    test = pairs.filter(pl.col("summer") == TEST_SUMMER)
+    ifs = test.filter(pl.col("model") == _IFS)
+    problems: list[str] = []
+    for label, wanted, present in (
+        ("model(s)", models, set(test["model"].unique().to_list())),
+        ("cluster(s)", clusters, set(ifs["cluster"].unique().to_list())),
+        ("station(s)", stations, set(ifs["station"].unique().to_list())),
+    ):
+        missing = sorted(set(wanted) - present)
+        if missing:
+            problems.append(f"no {TEST_SUMMER} rows for {label} {missing}")
+    if problems:
+        raise ValueError("the loaded frame cannot be scored completely (nothing was computed): " + "; ".join(problems))
 
 
 def _checked_edges(edges: tuple[float, float]) -> tuple[float, float]:
@@ -243,6 +297,7 @@ def evaluate_forecast_test(
         {target: truth(oof_a, target) for target in Target},
         station=series_station,
         summer=TEST_SUMMER,
+        reference=test.filter(pl.col("model") == _IFS),  # row for row the keys of regime (a) (``serve`` checks)
     )
     del oof_a
 
@@ -266,7 +321,13 @@ def evaluate_forecast_test(
         "tercile_edges": [edges[0], edges[1]],
         "tercile_edges_source": "artifacts/eval/dev/dev_skill.json (key tercile_edges), 2024-2025 forecasts only",
         "serving_statuses": dict(statuses),
-        "bootstrap": {"block_days": 7, "n_boot": n_boot, "seed": DEFAULT_SEED, "interval": "95% percentile"},
+        "bootstrap": {
+            "block_days": _BOOTSTRAP_DEFAULTS["block_days"],
+            "n_boot": n_boot,
+            "seed": DEFAULT_SEED,
+            "interval": f"{round(_BOOTSTRAP_DEFAULTS['confidence_level'] * 100)}% percentile",
+        },
+        "notes": list(_SCORED_ROWS_NOTES),
         "brier_thresholds_c": list(BRIER_THRESHOLDS_C),
         "baselines": {
             "b0": "built",

@@ -70,7 +70,7 @@ def _load(path: Path, *, summers: frozenset[int], models: Collection[str] = _MOD
     """The modelled rows of ``summers`` and ``models``: filtered inside the lazy scan, checked again after the collect.
 
     Raises:
-        HoldoutViolationError: The collected frame holds a summer outside ``summers``.
+        HoldoutViolationError: The collected frame holds a summer outside ``summers`` or a model outside ``models``.
         stellar_blaze.domain.weather.schemas.SchemaMismatchError: The file is not ``GOLD_PAIRS_SCHEMA``.
     """
     # glob=False: a path is a path, never a pattern (B1's parquet store reads the same way).
@@ -86,6 +86,12 @@ def _load(path: Path, *, summers: frozenset[int], models: Collection[str] = _MOD
         raise HoldoutViolationError(
             f"the collected frame holds summers {sorted(present - summers)} outside {sorted(summers)}: "
             "the summer filter did not hold"
+        )
+    stray_models = {str(model) for model in frame["model"].unique().to_list()} - set(models)
+    if stray_models:
+        raise HoldoutViolationError(
+            f"the collected frame holds models {sorted(stray_models)} outside {sorted(models)}: "
+            "the model filter did not hold"
         )
     return frame
 

@@ -140,6 +140,22 @@ def test_dev_loader_detects_a_filter_that_did_not_hold(
         load_dev_pairs(path, expected_sha256=sha)
 
 
+def test_the_loaders_detect_a_model_filter_that_did_not_hold(
+    gold: tuple[Path, str, pl.DataFrame], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same belt for the models: a scan that keeps a model nobody asked for (AIFS in the dev rows) is refused."""
+    path, sha, _ = gold
+    original = pl.LazyFrame.filter
+
+    def summers_only(self: pl.LazyFrame, *args: Any, **kwargs: Any) -> pl.LazyFrame:
+        return original(self, pl.col("summer").is_in(sorted(DEV_SUMMERS)))
+
+    monkeypatch.setattr(pl.LazyFrame, "filter", summers_only)
+    with pytest.raises(HoldoutViolationError, match="model filter did not hold") as refused:
+        load_dev_pairs(path, expected_sha256=sha)
+    assert _OTHER_MODEL in str(refused.value)
+
+
 def test_test_loader_requires_token(gold: tuple[Path, str, pl.DataFrame]) -> None:
     path, sha, _ = gold
     with pytest.raises(TypeError, match="GateToken"):

@@ -20,8 +20,9 @@ from typing import Final
 
 import polars as pl
 
-from stellar_blaze.adapters.config.models import scan_models
+from stellar_blaze.adapters.config.models import MANIFEST, scan_models
 from stellar_blaze.domain.config.models import LoadedModel
+from stellar_blaze.domain.forecast.features import FeatureSet
 from stellar_blaze.domain.weather.models import NwpModel
 from stellar_blaze.ml.artefacts import write_model
 from stellar_blaze.ml.git import GitError, GitReader
@@ -48,6 +49,7 @@ PROTOCOL_COMMIT: Final = "a" * 40
 PROTOCOL_PATH: Final = "docs/research/protocol.md"
 PROTOCOL_BYTES: Final = b"# Pre-registration\nline two\n"
 FREEZE_PATH: Final = "docs/research/freeze.md"
+GO_PATH: Final = "backend/training/2026-go.toml"
 FREEZE_BYTES: Final = b"# Freeze addendum\n"
 DEV_EDGES: Final = (27.0, 30.0)
 """The stored development tercile edges of the synthetic world (degrees Celsius)."""
@@ -69,12 +71,15 @@ class Released:
 
 
 @cache
-def released() -> Released:
-    """One tiny ``site``/``joint`` corrector trained on the synthetic 2024-2025 rows and written like a release."""
+def released(feature_set: FeatureSet = FeatureSet.SITE) -> Released:
+    """One tiny corrector trained on the synthetic 2024-2025 rows and written like a release.
+
+    ``site`` by default; ``FeatureSet.COLD`` is the configuration of the real released model (no station history).
+    """
     root = Path(tempfile.mkdtemp(prefix="sb-released-"))
     atexit.register(shutil.rmtree, root, ignore_errors=True)
     dev = dev_pairs()
-    trained = train_corrector(dev, dev_cfg(), cfg_sha256=CFG_SHA256)
+    trained = train_corrector(dev, dev_cfg(feature_set=feature_set), cfg_sha256=CFG_SHA256)
     uv_lock = root / "uv.lock"
     uv_lock.write_bytes(b"version = 1\n")
     directory = write_model(
@@ -164,22 +169,36 @@ class GatedWorld:
             path.mkdir(parents=True, exist_ok=True)
         (self.repo_root / PROTOCOL_PATH).write_bytes(PROTOCOL_BYTES)
         (self.repo_root / FREEZE_PATH).write_bytes(FREEZE_BYTES)
+        (self.repo_root / "backend" / "uv.lock").write_bytes(b"version = 1\n")
+        self.amendments = [self._add_amendment(number, commit) for number, commit in ((1, "c" * 40), (2, "d" * 40))]
         self.write_lock(gold_sha256)
         self.write_dev_skill(DEV_EDGES)
 
+    def _add_amendment(self, number: int, commit: str) -> str:
+        """Create the committed file of ``amendment-<number>`` (in the tree and at ``commit`` in the fake git)."""
+        path, data = f"docs/research/amendment-{number}.md", f"amendment {number}\n".encode()
+        (self.repo_root / path).write_bytes(data)
+        self.git.files[(commit, path)] = data
+        self.git.ancestors.add((commit, HEAD))
+        return f'[[amendments]]\npath = "{path}"\nsha256 = "{sha(data)}"\ncommit = "{commit}"\n'
+
     def write_lock(self, gold_sha256: str) -> None:
         digest = sha(PROTOCOL_BYTES)
+        manifest = (self.models_dir / self.model_id / MANIFEST).read_bytes().replace(b"\r\n", b"\n")  # CRLF as LF
         self.lock_path.write_text(
             f'protocol_path = "{PROTOCOL_PATH}"\nprotocol_sha256 = "{digest}"\nprotocol_commit = "{PROTOCOL_COMMIT}"\n'
             f'gold_sha256 = "{gold_sha256}"\nmodel_id = "{self.model_id}"\n'
-            f'freeze_path = "{FREEZE_PATH}"\nfreeze_sha256 = "{sha(FREEZE_BYTES)}"\n',
+            f'model_manifest_sha256 = "{sha(manifest)}"\n'
+            f'freeze_path = "{FREEZE_PATH}"\nfreeze_sha256 = "{sha(FREEZE_BYTES)}"\n' + "".join(self.amendments),
             encoding="utf-8",
         )
-        self.go_path.write_text(
-            f'protocol_sha256 = "{digest}"\nmodel_id = "{self.model_id}"\napproved_by = "the architect"\n'
-            "approved_at = 2026-11-15T09:30:00+04:00\n",
-            encoding="utf-8",
-        )
+        lock_sha256 = sha(self.lock_path.read_bytes().replace(b"\r\n", b"\n"))  # the go binds the lock, CRLF as LF
+        go = (
+            f'protocol_sha256 = "{digest}"\nmodel_id = "{self.model_id}"\nlock_sha256 = "{lock_sha256}"\n'
+            'approved_by = "the architect"\napproved_at = 2026-11-15T09:30:00+04:00\n'
+        ).encode()
+        self.go_path.write_bytes(go)
+        self.git.files[(HEAD, GO_PATH)] = go  # the marker is committed at HEAD, as the gate requires
 
     def write_dev_skill(self, edges: tuple[float, float]) -> None:
         self.dev_skill_path.write_bytes(json.dumps({"tercile_edges": list(edges), "skill": {}}).encode("utf-8"))

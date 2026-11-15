@@ -12,13 +12,21 @@ Order of a part, the same for every part:
    data has been touched.
 2. Everything cheap that can fail fails now: the model loads and verifies, the stored development tercile edges parse,
    and no output file is in the way (or, with ``--amendment``, the first run can be kept beside the new one).
-3. Only then the gold file is loaded (``load_test_pairs``, whose own checks pin the file to the lock's hash) and scored.
-4. ``token.recheck`` runs immediately before the first write (HEAD unmoved, tree clean), and the outputs are written
-   with exclusive create: a second run that raced past the once-only check fails instead of overwriting.
+3. Only then the gold file is loaded (``load_test_pairs``, whose own checks pin the file to the lock's hash). Before any
+   computation ``check_test_coverage`` checks that all six clusters, all eight stations and every requested model have
+   2026 rows (a failure names every missing item, exits 1 and writes nothing), and then the frame is scored.
+4. Every output is rendered to bytes first (pure: the JSON, the parquet, the manifest, ``run_meta.json``), then
+   ``token.recheck`` runs (HEAD unmoved, tree clean), then the earlier outputs are archived (amendment) and the new ones
+   are written with exclusive create, ``run_meta.json`` last. The archive and the writes are all or nothing: on any
+   exception the files this run created are removed and the archived ones restored, so a failed run never strands
+   outputs and never forces an amendment. A second run that raced past the once-only check fails instead of overwriting.
 
-``--amendment ID`` (a row of the pre-registration's section 13 log) lifts the once-only check; the first output is
+``--amendment ID`` names one of the lock's amendments (``amendment-1``, ``amendment-2``, ... by the order of
+``[[amendments]]``; anything else is refused with ``amendment-id-unknown``). It lifts the once-only check; the first
+output is
 kept as ``<name>.run1.<ext>`` (the next free ``runN``) before the new one is written, and the amendment id is
-recorded in ``run_meta.json``.
+recorded in ``run_meta.json``, which also holds the SHA-256 of ``backend/uv.lock`` and the versions of ``lightgbm``,
+``polars``, ``numpy`` and ``scipy``.
 
 Outputs of the forecast part (``artifacts/eval/2026/``), each JSON with a provenance block (label ``REAL``, the
 pre-registration sections 7.1 or 7.4 as anchor, ``git_sha`` the HEAD the gate saw, the model id, the gold hash):
@@ -31,9 +39,11 @@ B3 adds ``warnings`` and ``plans`` to ``PART_RUNNERS``.
 import hashlib
 import json
 import shlex
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
+from importlib.metadata import version
 from pathlib import Path
 from typing import Final
 
@@ -43,16 +53,20 @@ from pydantic import JsonValue
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.provenance import Provenance, ProvenanceLabel
 from stellar_blaze.domain.weather.models import NwpModel
+from stellar_blaze.domain.weather.stations import STATIONS
 from stellar_blaze.ml import forecast_test
 from stellar_blaze.ml.data import load_test_pairs
-from stellar_blaze.ml.exporters import PROTOCOL_PATH, SKILL_ANCHOR, github_slug, write_json
+from stellar_blaze.ml.exporters import PROTOCOL_PATH, SKILL_ANCHOR, github_slug, render_json
 from stellar_blaze.ml.forecast_tables import series_manifest, series_parquet_bytes
 from stellar_blaze.ml.git import SubprocessGit
-from stellar_blaze.ml.protocol_gate import RESULT_FILES, GateToken, Part, open_gate
+from stellar_blaze.ml.protocol_gate import RESULT_FILES, GateRefusedError, GateToken, Part, load_lock, open_gate
+from stellar_blaze.ml.regimes import CLUSTERS
 from stellar_blaze.ml.serving_path import cold_config, load_released_model, released_training_config
 
 __all__ = [
     "DEV_SKILL_PATH",
+    "EXPECTED_CLUSTERS",
+    "EXPECTED_STATIONS",
     "GO_PATH",
     "LOCK_PATH",
     "PART_RUNNERS",
@@ -60,9 +74,12 @@ __all__ = [
     "SERIES_FILE",
     "SERIES_MANIFEST_FILE",
     "SERIES_STATION",
+    "UV_LOCK_PATH",
+    "amendment_ids",
     "evaluate_2026_invocation",
     "open_the_gate",
     "read_dev_tercile_edges",
+    "resolve_settings",
     "run_forecast",
     "write_bytes_exclusive",
 ]
@@ -73,6 +90,7 @@ LOCK_PATH: Final = "backend/training/protocol.lock.toml"
 GO_PATH: Final = "backend/training/2026-go.toml"
 RESULTS_PATH: Final = "artifacts/eval/2026"
 DEV_SKILL_PATH: Final = "artifacts/eval/dev/dev_skill.json"
+UV_LOCK_PATH: Final = "backend/uv.lock"
 """Repository-relative paths of the lock, the architect's go marker, the 2026 results and the dev skill tables."""
 
 SERIES_STATION: Final = "OMAA"
@@ -91,8 +109,13 @@ _FORECAST_FILES: Final = (
 _DEMO_ANCHOR: Final = "#" + github_slug('7.4 Demo day ("day zoom") selection rule')
 _RUN_ANCHOR: Final = "#" + github_slug("9. The gated 2026 run (once)")
 _MODULE: Final = "stellar_blaze.ml.forecast_test"
+_RECORDED_PACKAGES: Final = ("lightgbm", "polars", "numpy", "scipy")
+"""Installed versions written to ``run_meta.json`` next to the SHA-256 of ``uv.lock`` (the environment that scored)."""
 _RAW_MODELS: Final = frozenset({NwpModel.ECMWF_IFS025.value, NwpModel.GFS_SEAMLESS.value, NwpModel.ECMWF_AIFS025.value})
 """IFS and GFS (the corrector's models) and AIFS (the raw comparison of 7.1)."""
+EXPECTED_CLUSTERS: Final[tuple[str, ...]] = CLUSTERS
+EXPECTED_STATIONS: Final[tuple[str, ...]] = tuple(station.icao for station in STATIONS)
+"""The six clusters and eight stations the 2026 frame must hold before anything is scored (``check_test_coverage``)."""
 
 
 def evaluate_2026_invocation(part: str, amendment: str | None) -> str:
@@ -103,13 +126,64 @@ def evaluate_2026_invocation(part: str, amendment: str | None) -> str:
     return shlex.join(words)
 
 
+def amendment_ids(count: int) -> tuple[str, ...]:
+    """The ids a re-run may name: ``amendment-1`` ... ``amendment-<count>``, by the order of the lock's amendments."""
+    return tuple(f"amendment-{number}" for number in range(1, count + 1))
+
+
+def _refuse_unknown_amendment(root: Path, amendment: str | None) -> None:
+    """``--amendment`` must be one of the lock's amendments (``amendment-N``): a typo must not lift the once-only rule.
+
+    An unreadable lock is left to ``open_gate``, which reports it (``lock-missing`` or ``lock-invalid``).
+
+    Raises:
+        stellar_blaze.ml.protocol_gate.GateRefusedError: ``amendment-id-unknown``.
+    """
+    if not amendment:
+        return
+    try:
+        lock = load_lock(root / LOCK_PATH)
+    except (OSError, ValueError):  # a missing, non-TOML or invalid lock: the gate says which
+        return
+    valid = amendment_ids(len(lock.amendments))
+    if amendment not in valid:
+        raise GateRefusedError(
+            (
+                f"amendment-id-unknown: {amendment!r} is not an amendment of {LOCK_PATH}; valid ids, by the order of "
+                f"its [[amendments]]: {', '.join(valid) or 'none (the lock has no amendments)'}",
+            )
+        )
+
+
+def resolve_settings(settings: Settings, root: Path) -> Settings:
+    """``settings`` with ``models_dir`` and ``data_dir`` absolute: the working directory cannot change what is read.
+
+    The defaults (``models``, ``data``) are relative to ``backend/``, where the project is run from; a relative path
+    is resolved against ``<root>/backend``, never against the current directory. The model directory must exist: the
+    job refuses here, before the gate reads anything.
+
+    Raises:
+        ValueError: ``models_dir`` does not exist.
+    """
+    backend = root / "backend"
+    models_dir = settings.models_dir if settings.models_dir.is_absolute() else backend / settings.models_dir
+    data_dir = settings.data_dir if settings.data_dir.is_absolute() else backend / settings.data_dir
+    if not models_dir.is_dir():
+        raise ValueError(
+            f"models_dir {models_dir} does not exist (SB_MODELS_DIR={settings.models_dir}; a relative path is read "
+            f"against {backend}): nothing was read"
+        )
+    return settings.model_copy(update={"models_dir": models_dir, "data_dir": data_dir})
+
+
 def open_the_gate(settings: Settings, root: Path, part: Part, amendment: str | None) -> GateToken:
     """Open the pre-registration gate for ``part`` (the first step of every part; no data is touched).
 
     Raises:
-        stellar_blaze.ml.protocol_gate.GateRefusedError: At least one condition of section 9 fails; ``reasons`` has
-            every one.
+        stellar_blaze.ml.protocol_gate.GateRefusedError: At least one condition of section 9 fails (``reasons`` has
+            every one), or ``amendment`` is not one of the lock's amendments (``amendment-id-unknown``).
     """
+    _refuse_unknown_amendment(root, amendment)
     return open_gate(
         repo_root=root,
         lock_path=root / LOCK_PATH,
@@ -164,9 +238,58 @@ class _Plan:
             if target.exists() and target not in self.keep:
                 raise FileExistsError(f"{target} exists: a result is never overwritten")
 
-    def keep_first_run(self) -> None:
-        for source, destination in self.keep.items():
-            source.rename(destination)
+    def commit(self, files: Mapping[str, bytes]) -> None:
+        """Archive the earlier outputs, then write ``files`` (name to bytes) with exclusive create, all or nothing.
+
+        On any exception (an I/O error, a file that appeared meanwhile, an interrupt) exactly what this call created is
+        removed, the archived outputs move back and the directories it made are removed, so the output directory is as
+        it was before the call; then the exception propagates. The caller has rendered every byte string already: the
+        only failures left here are the file system's.
+        """
+        made = self._missing_directories()
+        moved: list[tuple[Path, Path]] = []
+        written: list[Path] = []
+        try:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            for source, destination in self.keep.items():
+                source.rename(destination)
+                moved.append((source, destination))
+            for name, data in files.items():
+                write_bytes_exclusive(self.directory / name, data)
+                written.append(self.directory / name)
+        except BaseException:
+            _roll_back(written, moved, made)
+            raise
+
+    def _missing_directories(self) -> list[Path]:
+        """The output directory and the ancestors that do not exist yet, deepest first (``commit`` makes them)."""
+        missing: list[Path] = []
+        for candidate in (self.directory, *self.directory.parents):
+            if candidate.exists():
+                break
+            missing.append(candidate)
+        return missing
+
+
+def _roll_back(written: list[Path], moved: list[tuple[Path, Path]], made: list[Path]) -> None:
+    """Undo ``_Plan.commit``: delete what it wrote, move the archived files back, remove the directories it made.
+
+    Every step is attempted even when an earlier one fails (the original exception is the one that propagates); a
+    step that fails is logged at error level with its path, because the directory then needs a human.
+    """
+    for path in reversed(written):
+        _attempt("remove", path, partial(path.unlink, missing_ok=True))
+    for source, destination in reversed(moved):
+        _attempt("restore", source, partial(destination.rename, source))
+    for directory in made:
+        _attempt("rmdir", directory, directory.rmdir)
+
+
+def _attempt(action: str, path: Path, step: Callable[[], object]) -> None:
+    try:
+        step()
+    except OSError:
+        _log.exception("evaluate_2026.rollback_failed", action=action, path=str(path))
 
 
 def _plan(directory: Path, names: tuple[str, ...], *, amendment: str | None) -> _Plan:
@@ -187,10 +310,19 @@ def _plan(directory: Path, names: tuple[str, ...], *, amendment: str | None) -> 
 
 
 def write_bytes_exclusive(path: Path, data: bytes) -> str:
-    """Write ``data`` with exclusive create (``"xb"``) and return its SHA-256; an existing file raises, untouched."""
+    """Write ``data`` with exclusive create (``"xb"``) and return its SHA-256.
+
+    An existing file raises ``FileExistsError`` and is left untouched; a failure after the file was created removes the
+    partial file again, so a raise never leaves a file this call made.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("xb") as file:
-        file.write(data)
+        try:
+            file.write(data)
+        except BaseException:
+            file.close()
+            path.unlink(missing_ok=True)
+            raise
     return hashlib.sha256(data).hexdigest()
 
 
@@ -223,6 +355,8 @@ def run_forecast(settings: Settings, token: GateToken, root: Path, *, amendment:
         expected_sha256=gold_sha256,
         models=_RAW_MODELS,
     )
+    # Before any computation: a missing cluster, station or model fails now, with everything named, not after the hour.
+    forecast_test.check_test_coverage(pairs, clusters=EXPECTED_CLUSTERS, stations=EXPECTED_STATIONS, models=_RAW_MODELS)
     result = forecast_test.evaluate_forecast_test(
         pairs,
         model=model,
@@ -248,10 +382,18 @@ def run_forecast(settings: Settings, token: GateToken, root: Path, *, amendment:
             generated_at=now,
         )
 
+    # Everything that can fail on its own is rendered first (pure): no file exists until every byte string does.
     command = evaluate_2026_invocation(Part.FORECAST.value, amendment)
     series_provenance = provenance(_DEMO_ANCHOR, "series_frame")
     series_bytes = series_parquet_bytes(result.series, series_provenance)
     manifest = series_manifest(result.series, file=SERIES_FILE, data=series_bytes, command=command, git_sha=token.head)
+    rendered: dict[str, bytes] = {
+        RESULT_FILES[Part.FORECAST]: render_json(result.skill, provenance(SKILL_ANCHOR, "evaluate_forecast_test")),
+        RELIABILITY_FILE: render_json(result.reliability, provenance(SKILL_ANCHOR, "reliability_payload")),
+        SERIES_FILE: series_bytes,
+        SERIES_MANIFEST_FILE: render_json(manifest, provenance(_DEMO_ANCHOR, "series_manifest")),
+    }
+    hashes: dict[str, JsonValue] = {name: hashlib.sha256(data).hexdigest() for name, data in rendered.items()}
     meta: dict[str, JsonValue] = {
         "part": Part.FORECAST.value,
         "head": token.head,
@@ -262,37 +404,22 @@ def run_forecast(settings: Settings, token: GateToken, root: Path, *, amendment:
         "gold_sha256": gold_sha256,
         "model_id": model_id,
         "go_sha256": hashlib.sha256((root / GO_PATH).read_bytes()).hexdigest(),
+        "uv_lock_sha256": hashlib.sha256((root / UV_LOCK_PATH).read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
+        "versions": {package: version(package) for package in _RECORDED_PACKAGES},
         "dev_skill_sha256": hashlib.sha256((root / DEV_SKILL_PATH).read_bytes()).hexdigest(),
         "tercile_edges": [edges[0], edges[1]],
         "amendment": amendment or None,
         "command": command,
         "regime_b_all": forecast_test.B_ALL_NOT_RUN,
+        "files": dict(hashes),
     }
+    rendered[RUN_META_FILE] = render_json(meta, provenance(_RUN_ANCHOR, "run_forecast"))  # last: it names the others
+    hashes[RUN_META_FILE] = hashlib.sha256(rendered[RUN_META_FILE]).hexdigest()
 
-    # The last act before the first byte is written: HEAD unmoved, tree clean. Then nothing slow happens.
+    # The last act before the first byte is written: HEAD unmoved, tree clean. Then nothing slow happens, and the
+    # archive and the writes are all or nothing (a failure restores the directory as it was).
     token.recheck(SubprocessGit(root))
-    plan.keep_first_run()
-    hashes: dict[str, JsonValue] = {}
-    hashes[RESULT_FILES[Part.FORECAST]] = write_json(
-        directory / RESULT_FILES[Part.FORECAST],
-        result.skill,
-        provenance(SKILL_ANCHOR, "evaluate_forecast_test"),
-        exclusive=True,
-    )
-    hashes[RELIABILITY_FILE] = write_json(
-        directory / RELIABILITY_FILE,
-        result.reliability,
-        provenance(SKILL_ANCHOR, "reliability_payload"),
-        exclusive=True,
-    )
-    hashes[SERIES_FILE] = write_bytes_exclusive(directory / SERIES_FILE, series_bytes)
-    hashes[SERIES_MANIFEST_FILE] = write_json(
-        directory / SERIES_MANIFEST_FILE, manifest, provenance(_DEMO_ANCHOR, "series_manifest"), exclusive=True
-    )
-    meta["files"] = dict(hashes)
-    hashes[RUN_META_FILE] = write_json(
-        directory / RUN_META_FILE, meta, provenance(_RUN_ANCHOR, "run_forecast"), exclusive=True
-    )
+    plan.commit(rendered)
     _log.info("evaluate_2026.written", part="forecast", directory=str(directory), head=token.head)
     return {
         "part": Part.FORECAST.value,
