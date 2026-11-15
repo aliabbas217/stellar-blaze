@@ -123,7 +123,18 @@ def test_the_warnings_part_selects_the_demo_day_before_it_scores_the_board(monke
 # === the freeze inputs ==============================================================================================
 
 
-def theta_file(path: Path) -> str:
+FROZEN_RULESET_SHA256: Final = hashlib.sha256(
+    (RULESETS_DIR / f"{evaluate_2026.FROZEN_RULESET_ID}.toml").read_bytes()
+).hexdigest()
+
+
+def theta_file(
+    path: Path,
+    *,
+    ruleset_id: str | None = evaluate_2026.FROZEN_RULESET_ID,
+    ruleset_sha256: str | None = FROZEN_RULESET_SHA256,
+) -> str:
+    """Write a theta.json that records the given ruleset (the frozen one by default) and return its SHA-256."""
     grid = [ThetaGridPoint(theta=0.05, pod=1.0, far=0.5, pss=0.5, n_hours=10)]
     decision = ThetaDecision(
         theta_protect=0.25,
@@ -131,6 +142,8 @@ def theta_file(path: Path) -> str:
         grid=grid,
         red_hour_share=0.1,
         n_hours=10,
+        ruleset_id=ruleset_id,
+        ruleset_sha256=ruleset_sha256,
         rule="preregistration §6.5",
         provenance=Provenance(
             protocol_path="docs/research/p.md",
@@ -157,7 +170,7 @@ def repo(tmp_path: Path) -> tuple[GatedWorld, Path, Settings, dict[str, str]]:
     fixture = root / evaluate_2026.FIXTURE_PATH
     fixture.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(BACKEND / "fixtures" / "demo_site.toml", fixture)
-    ruleset_sha = hashlib.sha256((RULESETS_DIR / f"{evaluate_2026.FROZEN_RULESET_ID}.toml").read_bytes()).hexdigest()
+    ruleset_sha = FROZEN_RULESET_SHA256
     settings = cast(Settings, SimpleNamespace(rulesets_dir=RULESETS_DIR))
     hashes = {
         "theta": theta_sha,
@@ -200,3 +213,37 @@ def test_the_frozen_inputs_load_when_the_addendum_records_them_and_theta_comes_f
     assert frozen.loaded.ruleset.meta.id == evaluate_2026.FROZEN_RULESET_ID
     assert frozen.fixture_sha256 == hashes["fixture"]
     assert frozen.params.twl_margin_w_m2 == 7.0  # the ruleset's default, never the live configuration
+
+
+@pytest.mark.parametrize(
+    ("recorded", "message"),
+    [
+        (
+            {"ruleset_sha256": "e" * 64},
+            f"theta.json was computed under ruleset ae-heat-2026.1 eeeeeeee..., not the frozen ruleset "
+            f"ae-heat-2026.1 {FROZEN_RULESET_SHA256[:8]}...",
+        ),
+        (
+            {"ruleset_id": "ae-heat-2025.9"},
+            f"theta.json was computed under ruleset ae-heat-2025.9 {FROZEN_RULESET_SHA256[:8]}..., not the frozen ",
+        ),
+        ({"ruleset_id": None}, "theta.json records no ruleset"),
+        ({"ruleset_sha256": None}, "theta.json records no ruleset"),
+        ({"ruleset_id": None, "ruleset_sha256": None}, "theta.json records no ruleset"),
+    ],
+)
+def test_a_theta_that_was_not_computed_under_the_frozen_ruleset_is_refused(
+    repo: tuple[GatedWorld, Path, Settings, dict[str, str]], recorded: dict[str, str | None], message: str
+) -> None:
+    world, root, settings, hashes = repo
+    gate = world.token(Part.WARNINGS)
+    hashes["theta"] = theta_file(root / evaluate_2026.THETA_PATH, **recorded)
+    freeze = root / "docs" / "research" / "freeze.md"
+    freeze.write_text("\n".join(hashes.values()) + "\n", encoding="utf-8")  # the addendum records every input's hash
+
+    with pytest.raises(GateRefusedError) as raised:
+        evaluate_2026.frozen_inputs(settings, gate, root)
+
+    [reason] = raised.value.reasons
+    assert reason.startswith("freeze-input-stale: ")
+    assert message in reason

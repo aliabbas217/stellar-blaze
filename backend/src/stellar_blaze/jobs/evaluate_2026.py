@@ -36,7 +36,8 @@ pre-registration sections 7.1 or 7.4 as anchor, ``git_sha`` the HEAD the gate sa
 ``warnings`` and ``plans`` (B3, Task 13) follow the same order and write ``policy_scoreboard.json`` with
 ``demo_day.json`` and ``plan_scoreboard.json``. They additionally check that the freeze addendum records the SHA-256
 of ``theta.json``, of the ruleset file and of ``demo_site.toml``, read theta from ``artifacts/eval/dev/theta.json``
-(never the live configuration), need the forecast part's ``corrected_series_OMAA.parquet`` (hash-checked against its
+(never the live configuration) and refuse it (``freeze-input-stale``) unless it records the frozen ruleset's id and
+SHA-256, need the forecast part's ``corrected_series_OMAA.parquet`` (hash-checked against its
 manifest) and draw the joint samples from its grids in one sampler call (``ml.scoreboard_inputs``).
 """
 
@@ -490,16 +491,38 @@ def _freeze_text(token: GateToken, root: Path) -> str:
     return (root / token.lock.freeze_path).read_text(encoding="utf-8").lower()
 
 
+def _check_theta_ruleset(theta: ThetaDecision, loaded: LoadedRuleset) -> None:
+    """Refuse a ``theta.json`` that was not computed under the frozen ruleset (id and SHA-256 of its file).
+
+    Raises:
+        GateRefusedError: ``freeze-input-stale``: theta records no ruleset, or another one.
+    """
+    frozen = f"{FROZEN_RULESET_ID} {loaded.sha256[:8]}..."
+    if theta.ruleset_id is None or theta.ruleset_sha256 is None:
+        raise GateRefusedError(
+            (f"freeze-input-stale: theta.json records no ruleset, so it is not known to be under the frozen {frozen}",)
+        )
+    if theta.ruleset_id != FROZEN_RULESET_ID or theta.ruleset_sha256 != loaded.sha256:
+        raise GateRefusedError(
+            (
+                f"freeze-input-stale: theta.json was computed under ruleset {theta.ruleset_id} "
+                f"{theta.ruleset_sha256[:8]}..., not the frozen ruleset {frozen}",
+            )
+        )
+
+
 def frozen_inputs(settings: Settings, token: GateToken, root: Path) -> FrozenInputs:
     """Load the frozen ruleset, theta and fixture and check that the addendum names the SHA-256 of each (section 11).
 
     ``open_gate`` has checked the addendum's own hash (``_check_freeze``); this checks that the addendum's text records
     the three input files the scoring reads: ``theta.json``, the ruleset file and ``demo_site.toml`` (the hash as the
     file is read, or with CRLF read as LF: a text file checked out on Windows). Theta is read from the committed dev
-    file, never from the live configuration.
+    file, never from the live configuration. The thetas and the ruleset must also be the same pair: the ruleset id and
+    SHA-256 that ``theta.json`` records must be the frozen ruleset's (the Warnings row is scored with both).
 
     Raises:
-        GateRefusedError: ``freeze-input-missing``: an input's SHA-256 is not in the addendum.
+        GateRefusedError: ``freeze-input-missing``: an input's SHA-256 is not in the addendum. ``freeze-input-stale``:
+            ``theta.json`` records no ruleset id or SHA-256, or another ruleset than the frozen one.
         OSError, ValueError, KeyError: An input cannot be read or is invalid.
     """
     rulesets = (
@@ -519,10 +542,12 @@ def frozen_inputs(settings: Settings, token: GateToken, root: Path) -> FrozenInp
         raise GateRefusedError(
             tuple(f"freeze-input-missing: the SHA-256 of {name} is not in the freeze addendum" for name in missing)
         )
+    theta = load_theta(root / THETA_PATH)
+    _check_theta_ruleset(theta, loaded)
     return FrozenInputs(
         loaded=loaded,
         params=frozen_params(loaded),
-        theta=load_theta(root / THETA_PATH),
+        theta=theta,
         fixture=load_fixture(root / FIXTURE_PATH),
         fixture_sha256=sha256_texts(fixture_bytes)[0],
     )
@@ -608,7 +633,8 @@ def run_warnings(settings: Settings, token: GateToken, root: Path, *, amendment:
     nothing.
 
     Raises:
-        GateRefusedError: An input's SHA-256 is not in the freeze addendum, or HEAD moved or the tree went dirty.
+        GateRefusedError: An input's SHA-256 is not in the freeze addendum (``freeze-input-missing``), ``theta.json``
+            was not computed under the frozen ruleset (``freeze-input-stale``), or HEAD moved or the tree went dirty.
         FileExistsError: An output file is in the way (nothing is written).
         FileNotFoundError: The forecast part has not run.
     """

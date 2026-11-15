@@ -348,10 +348,20 @@ def make_env(mp: pytest.MonkeyPatch, root: Path) -> base.Env:
     return base.Env(root, world, gold_path, gold_sha256, runs, lock, loads, [])
 
 
-def build_world(env: base.Env, *, series: bool = True) -> World:
-    """Lay the B3 world out under ``env`` (series with its manifest, theta, ruleset, fixture, freeze addendum)."""
+def build_world(
+    env: base.Env, *, series: bool = True, theta_ruleset: tuple[str | None, str | None] | None = None
+) -> World:
+    """Lay the B3 world out under ``env`` (series with its manifest, theta, ruleset, fixture, freeze addendum).
+
+    ``theta_ruleset`` is the (id, SHA-256) that ``theta.json`` records; the default is the frozen ruleset's own.
+    """
     root = env.world.repo_root
     theta = root / evaluate_2026.THETA_PATH
+    ruleset_file = f"{evaluate_2026.FROZEN_RULESET_ID}.toml"
+    ruleset_id, ruleset_sha256 = theta_ruleset or (
+        evaluate_2026.FROZEN_RULESET_ID,
+        sha((RULESETS_DIR / ruleset_file).read_bytes()),
+    )
     write_artifact(
         theta,
         ThetaDecision(
@@ -360,7 +370,8 @@ def build_world(env: base.Env, *, series: bool = True) -> World:
             grid=[ThetaGridPoint(theta=0.05, pod=1.0, far=0.5, pss=0.5, n_hours=10)],
             red_hour_share=0.1,
             n_hours=10,
-            ruleset_id=evaluate_2026.FROZEN_RULESET_ID,
+            ruleset_id=ruleset_id,
+            ruleset_sha256=ruleset_sha256,
             rule="preregistration §6.5",
             provenance=_scoreboard_provenance(),
         ),
@@ -368,7 +379,6 @@ def build_world(env: base.Env, *, series: bool = True) -> World:
     fixture = root / evaluate_2026.FIXTURE_PATH
     fixture.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(BACKEND / "fixtures" / "demo_site.toml", fixture)
-    ruleset_file = f"{evaluate_2026.FROZEN_RULESET_ID}.toml"
     shutil.copytree(RULESETS_DIR, root / "backend" / "rulesets")  # the catalog checks every file against lock.json
     hashes = {
         "theta": sha(theta.read_bytes()),
@@ -820,3 +830,36 @@ def test_an_addendum_missing_one_input_hash_is_refused_before_any_data_is_read(
             assert f"the SHA-256 of {name} " not in result.stderr  # only the missing one is named
     assert world.written() == []
     assert world.env.loads == []  # no gold read
+
+
+@pytest.mark.parametrize(
+    ("recorded", "message"),
+    [
+        (
+            (evaluate_2026.FROZEN_RULESET_ID, "e" * 64),
+            "was computed under ruleset ae-heat-2026.1 eeeeeeee..., not the ",
+        ),
+        (("ae-heat-2025.9", None), "records no ruleset"),
+        ((None, None), "records no ruleset"),
+        (("ae-heat-2025.9", "e" * 64), "was computed under ruleset ae-heat-2025.9 eeeeeeee..., not the "),
+    ],
+)
+@pytest.mark.parametrize("part", ["warnings", "plans"])
+def test_a_theta_computed_under_another_ruleset_is_refused_before_any_data_is_read(
+    env: base.Env, part: str, recorded: tuple[str | None, str | None], message: str
+) -> None:
+    world = build_world(
+        env, theta_ruleset=recorded
+    )  # the addendum records this theta's own hash: only the ruleset is off
+
+    result = invoke("--part", part)
+
+    assert result.exit_code == 2
+    assert "freeze-input-stale: theta.json " in result.stderr
+    assert message in result.stderr
+    assert f"{evaluate_2026.FROZEN_RULESET_ID} {world.hashes['ruleset'][:8]}..." in result.stderr
+    assert world.written() == []
+    assert world.env.loads == []  # no gold read
+    assert sorted(p.name for p in world.results.iterdir()) == sorted(
+        [evaluate_2026.SERIES_FILE, evaluate_2026.SERIES_MANIFEST_FILE]
+    )  # only the forecast part's two files: nothing was written
