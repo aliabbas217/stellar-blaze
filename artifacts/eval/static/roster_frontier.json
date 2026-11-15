@@ -1,0 +1,788 @@
+{"data":{
+  "label": "REAL climatology (station obs WBGT, 2024-2026, LOSO); commute, buffer and bedtime are [I] assumptions",
+  "generated_by": "docs/research/scripts/roster/legal_sleep_templates.py v2",
+  "assumptions": {
+    "prep_h": 0.75,
+    "evening_buffer_h": 2.0,
+    "bedtime_floor": "21:30",
+    "sleep_gate_h": 7.5
+  },
+  "baselines": {
+    "B0_common_practice_non_compliant": "06:00-12:30 + 15:00-17:00",
+    "B1_legal_default": "06:00-11:00 + 15:00-18:00"
+  },
+  "legalisation_B0_to_B1_mean": {
+    "ge28": 0.0223,
+    "ge30": 0.0745,
+    "ge32": 0.191
+  },
+  "frontier_absolute_gate": [
+    {
+      "commute_min": 15,
+      "b1_sleep_h": 7.5,
+      "b1_passes_sleep_gate": true,
+      "folds_no_change": 0,
+      "folds": 18,
+      "avoided_vs_legal_default_ge28": 0.0262,
+      "avoided_vs_legal_default_ge30": 0.1021,
+      "avoided_vs_legal_default_ge32": 0.2358
+    },
+    {
+      "commute_min": 30,
+      "b1_sleep_h": 7.25,
+      "b1_passes_sleep_gate": false,
+      "folds_no_change": 18,
+      "folds": 18,
+      "avoided_vs_legal_default_ge28": 0.0,
+      "avoided_vs_legal_default_ge30": 0.0,
+      "avoided_vs_legal_default_ge32": 0.0
+    },
+    {
+      "commute_min": 45,
+      "b1_sleep_h": 7.0,
+      "b1_passes_sleep_gate": false,
+      "folds_no_change": 18,
+      "folds": 18,
+      "avoided_vs_legal_default_ge28": 0.0,
+      "avoided_vs_legal_default_ge30": 0.0,
+      "avoided_vs_legal_default_ge32": 0.0
+    },
+    {
+      "commute_min": 60,
+      "b1_sleep_h": 6.75,
+      "b1_passes_sleep_gate": false,
+      "folds_no_change": 18,
+      "folds": 18,
+      "avoided_vs_legal_default_ge28": 0.0,
+      "avoided_vs_legal_default_ge30": 0.0,
+      "avoided_vs_legal_default_ge32": 0.0
+    },
+    {
+      "commute_min": 75,
+      "b1_sleep_h": 6.5,
+      "b1_passes_sleep_gate": false,
+      "folds_no_change": 18,
+      "folds": 18,
+      "avoided_vs_legal_default_ge28": 0.0,
+      "avoided_vs_legal_default_ge30": 0.0,
+      "avoided_vs_legal_default_ge32": 0.0
+    },
+    {
+      "commute_min": 90,
+      "b1_sleep_h": 6.25,
+      "b1_passes_sleep_gate": false,
+      "folds_no_change": 18,
+      "folds": 18,
+      "avoided_vs_legal_default_ge28": 0.0,
+      "avoided_vs_legal_default_ge30": 0.0,
+      "avoided_vs_legal_default_ge32": 0.0
+    }
+  ],
+  "sleep_neutral_vs_legal_default": [
+    {
+      "commute_min": 45,
+      "scenario": "sleep no worse than legal default, bedtime floor 21:00",
+      "vsB1_28": 0.0,
+      "vsB1_30": 0.0,
+      "vsB1_32": 0.0
+    },
+    {
+      "commute_min": 45,
+      "scenario": "sleep no worse than legal default, bedtime floor 21:30",
+      "vsB1_28": 0.0085,
+      "vsB1_30": 0.0368,
+      "vsB1_32": 0.1078
+    },
+    {
+      "commute_min": 45,
+      "scenario": "sleep no worse than legal default, bedtime floor 22:00",
+      "vsB1_28": 0.0262,
+      "vsB1_30": 0.1021,
+      "vsB1_32": 0.2358
+    },
+    {
+      "commute_min": 90,
+      "scenario": "sleep no worse than legal default, bedtime floor 21:00",
+      "vsB1_28": 0.0351,
+      "vsB1_30": 0.0444,
+      "vsB1_32": 0.0162
+    },
+    {
+      "commute_min": 90,
+      "scenario": "sleep no worse than legal default, bedtime floor 21:30",
+      "vsB1_28": 0.0,
+      "vsB1_30": 0.0,
+      "vsB1_32": 0.0
+    },
+    {
+      "commute_min": 90,
+      "scenario": "sleep no worse than legal default, bedtime floor 22:00",
+      "vsB1_28": 0.0085,
+      "vsB1_30": 0.0368,
+      "vsB1_32": 0.1078
+    }
+  ],
+  "pareto_e30_vs_sleep": [
+    {
+      "commute_min": 15,
+      "pareto": [
+        {
+          "roster": "08:00-11:30 + 15:00-19:30",
+          "sleep_h": 9.25,
+          "e30_per_h": 99.167,
+          "e32_per_h": 53.538
+        },
+        {
+          "roster": "08:00-11:30 + 15:30-20:00",
+          "sleep_h": 8.75,
+          "e30_per_h": 93.66,
+          "e32_per_h": 47.701
+        },
+        {
+          "roster": "07:00-11:30 + 15:30-19:00",
+          "sleep_h": 8.5,
+          "e30_per_h": 92.781,
+          "e32_per_h": 48.424
+        },
+        {
+          "roster": "07:00-11:00 + 15:30-19:30",
+          "sleep_h": 8.25,
+          "e30_per_h": 88.108,
+          "e32_per_h": 43.316
+        },
+        {
+          "roster": "06:30-11:00 + 15:30-19:00",
+          "sleep_h": 8.0,
+          "e30_per_h": 86.347,
+          "e32_per_h": 43.059
+        },
+        {
+          "roster": "06:30-10:30 + 15:30-19:30",
+          "sleep_h": 7.75,
+          "e30_per_h": 81.674,
+          "e32_per_h": 37.951
+        },
+        {
+          "roster": "06:00-10:30 + 15:30-19:00",
+          "sleep_h": 7.5,
+          "e30_per_h": 79.104,
+          "e32_per_h": 37.514
+        },
+        {
+          "roster": "06:00-10:30 + 16:00-19:30",
+          "sleep_h": 7.25,
+          "e30_per_h": 74.691,
+          "e32_per_h": 32.92
+        },
+        {
+          "roster": "05:30-10:30 + 16:00-19:00",
+          "sleep_h": 7.0,
+          "e30_per_h": 72.122,
+          "e32_per_h": 32.483
+        },
+        {
+          "roster": "05:30-10:30 + 16:30-19:30",
+          "sleep_h": 6.75,
+          "e30_per_h": 67.708,
+          "e32_per_h": 27.889
+        },
+        {
+          "roster": "05:00-10:00 + 16:00-19:00",
+          "sleep_h": 6.5,
+          "e30_per_h": 65.747,
+          "e32_per_h": 28.337
+        },
+        {
+          "roster": "05:00-10:00 + 16:30-19:30",
+          "sleep_h": 6.25,
+          "e30_per_h": 61.333,
+          "e32_per_h": 23.743
+        },
+        {
+          "roster": "04:30-09:30 + 16:00-19:00",
+          "sleep_h": 6.0,
+          "e30_per_h": 59.372,
+          "e32_per_h": 24.191
+        },
+        {
+          "roster": "04:30-09:30 + 16:30-19:30",
+          "sleep_h": 5.75,
+          "e30_per_h": 54.958,
+          "e32_per_h": 19.597
+        },
+        {
+          "roster": "04:30-09:30 + 17:00-20:00",
+          "sleep_h": 5.25,
+          "e30_per_h": 50.59,
+          "e32_per_h": 16.25
+        },
+        {
+          "roster": "04:30-09:30 + 17:30-20:30",
+          "sleep_h": 4.75,
+          "e30_per_h": 46.222,
+          "e32_per_h": 12.903
+        },
+        {
+          "roster": "04:30-09:00 + 17:30-21:00",
+          "sleep_h": 4.25,
+          "e30_per_h": 42.917,
+          "e32_per_h": 10.382
+        },
+        {
+          "roster": "04:30-08:30 + 17:30-21:30",
+          "sleep_h": 3.75,
+          "e30_per_h": 39.611,
+          "e32_per_h": 7.861
+        },
+        {
+          "roster": "04:30-08:30 + 18:00-22:00",
+          "sleep_h": 3.25,
+          "e30_per_h": 36.319,
+          "e32_per_h": 6.271
+        }
+      ],
+      "B0": {
+        "sleep_h": 7.5,
+        "e30_per_h": 92.84,
+        "e32_per_h": 56.582
+      },
+      "B1": {
+        "sleep_h": 7.5,
+        "e30_per_h": 86.569,
+        "e32_per_h": 46.948
+      }
+    },
+    {
+      "commute_min": 30,
+      "pareto": [
+        {
+          "roster": "08:00-11:30 + 15:00-19:30",
+          "sleep_h": 8.75,
+          "e30_per_h": 99.167,
+          "e32_per_h": 53.538
+        },
+        {
+          "roster": "07:00-11:30 + 15:30-19:00",
+          "sleep_h": 8.25,
+          "e30_per_h": 92.781,
+          "e32_per_h": 48.424
+        },
+        {
+          "roster": "06:30-11:00 + 15:30-19:00",
+          "sleep_h": 7.75,
+          "e30_per_h": 86.347,
+          "e32_per_h": 43.059
+        },
+        {
+          "roster": "06:00-10:30 + 15:30-19:00",
+          "sleep_h": 7.25,
+          "e30_per_h": 79.104,
+          "e32_per_h": 37.514
+        },
+        {
+          "roster": "05:30-10:30 + 16:00-19:00",
+          "sleep_h": 6.75,
+          "e30_per_h": 72.122,
+          "e32_per_h": 32.483
+        },
+        {
+          "roster": "05:00-10:00 + 16:00-19:00",
+          "sleep_h": 6.25,
+          "e30_per_h": 65.747,
+          "e32_per_h": 28.337
+        },
+        {
+          "roster": "04:30-09:30 + 16:00-19:00",
+          "sleep_h": 5.75,
+          "e30_per_h": 59.372,
+          "e32_per_h": 24.191
+        },
+        {
+          "roster": "04:30-09:30 + 16:30-19:30",
+          "sleep_h": 5.25,
+          "e30_per_h": 54.958,
+          "e32_per_h": 19.597
+        },
+        {
+          "roster": "04:30-09:30 + 17:00-20:00",
+          "sleep_h": 4.75,
+          "e30_per_h": 50.59,
+          "e32_per_h": 16.25
+        },
+        {
+          "roster": "04:30-09:30 + 17:30-20:30",
+          "sleep_h": 4.25,
+          "e30_per_h": 46.222,
+          "e32_per_h": 12.903
+        },
+        {
+          "roster": "04:30-09:00 + 17:30-21:00",
+          "sleep_h": 3.75,
+          "e30_per_h": 42.917,
+          "e32_per_h": 10.382
+        },
+        {
+          "roster": "04:30-08:30 + 17:30-21:30",
+          "sleep_h": 3.25,
+          "e30_per_h": 39.611,
+          "e32_per_h": 7.861
+        },
+        {
+          "roster": "04:30-08:30 + 18:00-22:00",
+          "sleep_h": 2.75,
+          "e30_per_h": 36.319,
+          "e32_per_h": 6.271
+        }
+      ],
+      "B0": {
+        "sleep_h": 7.25,
+        "e30_per_h": 92.84,
+        "e32_per_h": 56.582
+      },
+      "B1": {
+        "sleep_h": 7.25,
+        "e30_per_h": 86.569,
+        "e32_per_h": 46.948
+      }
+    },
+    {
+      "commute_min": 45,
+      "pareto": [
+        {
+          "roster": "08:00-11:30 + 15:00-19:30",
+          "sleep_h": 8.25,
+          "e30_per_h": 99.167,
+          "e32_per_h": 53.538
+        },
+        {
+          "roster": "07:00-11:30 + 15:00-18:30",
+          "sleep_h": 8.0,
+          "e30_per_h": 97.517,
+          "e32_per_h": 53.972
+        },
+        {
+          "roster": "07:00-11:30 + 15:30-19:00",
+          "sleep_h": 7.75,
+          "e30_per_h": 92.781,
+          "e32_per_h": 48.424
+        },
+        {
+          "roster": "06:30-11:30 + 15:30-18:30",
+          "sleep_h": 7.5,
+          "e30_per_h": 91.021,
+          "e32_per_h": 48.167
+        },
+        {
+          "roster": "06:30-11:00 + 15:30-19:00",
+          "sleep_h": 7.25,
+          "e30_per_h": 86.347,
+          "e32_per_h": 43.059
+        },
+        {
+          "roster": "06:00-11:00 + 15:30-18:30",
+          "sleep_h": 7.0,
+          "e30_per_h": 83.778,
+          "e32_per_h": 42.622
+        },
+        {
+          "roster": "06:00-10:30 + 15:30-19:00",
+          "sleep_h": 6.75,
+          "e30_per_h": 79.104,
+          "e32_per_h": 37.514
+        },
+        {
+          "roster": "05:30-10:30 + 15:30-18:30",
+          "sleep_h": 6.5,
+          "e30_per_h": 76.535,
+          "e32_per_h": 37.076
+        },
+        {
+          "roster": "05:30-10:30 + 16:00-19:00",
+          "sleep_h": 6.25,
+          "e30_per_h": 72.122,
+          "e32_per_h": 32.483
+        },
+        {
+          "roster": "05:00-10:00 + 15:30-18:30",
+          "sleep_h": 6.0,
+          "e30_per_h": 70.16,
+          "e32_per_h": 32.931
+        },
+        {
+          "roster": "05:00-10:00 + 16:00-19:00",
+          "sleep_h": 5.75,
+          "e30_per_h": 65.747,
+          "e32_per_h": 28.337
+        },
+        {
+          "roster": "04:30-09:30 + 15:30-18:30",
+          "sleep_h": 5.5,
+          "e30_per_h": 63.785,
+          "e32_per_h": 28.785
+        },
+        {
+          "roster": "04:30-09:30 + 16:00-19:00",
+          "sleep_h": 5.25,
+          "e30_per_h": 59.372,
+          "e32_per_h": 24.191
+        },
+        {
+          "roster": "04:30-09:30 + 16:30-19:30",
+          "sleep_h": 4.75,
+          "e30_per_h": 54.958,
+          "e32_per_h": 19.597
+        },
+        {
+          "roster": "04:30-09:30 + 17:00-20:00",
+          "sleep_h": 4.25,
+          "e30_per_h": 50.59,
+          "e32_per_h": 16.25
+        },
+        {
+          "roster": "04:30-09:30 + 17:30-20:30",
+          "sleep_h": 3.75,
+          "e30_per_h": 46.222,
+          "e32_per_h": 12.903
+        },
+        {
+          "roster": "04:30-09:00 + 17:30-21:00",
+          "sleep_h": 3.25,
+          "e30_per_h": 42.917,
+          "e32_per_h": 10.382
+        },
+        {
+          "roster": "04:30-08:30 + 17:30-21:30",
+          "sleep_h": 2.75,
+          "e30_per_h": 39.611,
+          "e32_per_h": 7.861
+        },
+        {
+          "roster": "04:30-08:30 + 18:00-22:00",
+          "sleep_h": 2.25,
+          "e30_per_h": 36.319,
+          "e32_per_h": 6.271
+        }
+      ],
+      "B0": {
+        "sleep_h": 7.0,
+        "e30_per_h": 92.84,
+        "e32_per_h": 56.582
+      },
+      "B1": {
+        "sleep_h": 7.0,
+        "e30_per_h": 86.569,
+        "e32_per_h": 46.948
+      }
+    },
+    {
+      "commute_min": 60,
+      "pareto": [
+        {
+          "roster": "07:00-11:30 + 15:00-18:30",
+          "sleep_h": 7.75,
+          "e30_per_h": 97.517,
+          "e32_per_h": 53.972
+        },
+        {
+          "roster": "06:30-11:30 + 15:30-18:30",
+          "sleep_h": 7.25,
+          "e30_per_h": 91.021,
+          "e32_per_h": 48.167
+        },
+        {
+          "roster": "06:00-11:00 + 15:30-18:30",
+          "sleep_h": 6.75,
+          "e30_per_h": 83.778,
+          "e32_per_h": 42.622
+        },
+        {
+          "roster": "05:30-10:30 + 15:30-18:30",
+          "sleep_h": 6.25,
+          "e30_per_h": 76.535,
+          "e32_per_h": 37.076
+        },
+        {
+          "roster": "05:00-10:00 + 15:30-18:30",
+          "sleep_h": 5.75,
+          "e30_per_h": 70.16,
+          "e32_per_h": 32.931
+        },
+        {
+          "roster": "04:30-09:30 + 15:30-18:30",
+          "sleep_h": 5.25,
+          "e30_per_h": 63.785,
+          "e32_per_h": 28.785
+        },
+        {
+          "roster": "04:30-09:30 + 16:00-19:00",
+          "sleep_h": 4.75,
+          "e30_per_h": 59.372,
+          "e32_per_h": 24.191
+        },
+        {
+          "roster": "04:30-09:30 + 16:30-19:30",
+          "sleep_h": 4.25,
+          "e30_per_h": 54.958,
+          "e32_per_h": 19.597
+        },
+        {
+          "roster": "04:30-09:30 + 17:00-20:00",
+          "sleep_h": 3.75,
+          "e30_per_h": 50.59,
+          "e32_per_h": 16.25
+        },
+        {
+          "roster": "04:30-09:30 + 17:30-20:30",
+          "sleep_h": 3.25,
+          "e30_per_h": 46.222,
+          "e32_per_h": 12.903
+        },
+        {
+          "roster": "04:30-09:00 + 17:30-21:00",
+          "sleep_h": 2.75,
+          "e30_per_h": 42.917,
+          "e32_per_h": 10.382
+        },
+        {
+          "roster": "04:30-08:30 + 17:30-21:30",
+          "sleep_h": 2.25,
+          "e30_per_h": 39.611,
+          "e32_per_h": 7.861
+        },
+        {
+          "roster": "04:30-08:30 + 18:00-22:00",
+          "sleep_h": 1.75,
+          "e30_per_h": 36.319,
+          "e32_per_h": 6.271
+        }
+      ],
+      "B0": {
+        "sleep_h": 6.75,
+        "e30_per_h": 92.84,
+        "e32_per_h": 56.582
+      },
+      "B1": {
+        "sleep_h": 6.75,
+        "e30_per_h": 86.569,
+        "e32_per_h": 46.948
+      }
+    },
+    {
+      "commute_min": 75,
+      "pareto": [
+        {
+          "roster": "07:00-11:30 + 15:00-18:30",
+          "sleep_h": 7.25,
+          "e30_per_h": 97.517,
+          "e32_per_h": 53.972
+        },
+        {
+          "roster": "06:30-11:30 + 15:00-18:00",
+          "sleep_h": 7.0,
+          "e30_per_h": 93.812,
+          "e32_per_h": 52.493
+        },
+        {
+          "roster": "06:30-11:30 + 15:30-18:30",
+          "sleep_h": 6.75,
+          "e30_per_h": 91.021,
+          "e32_per_h": 48.167
+        },
+        {
+          "roster": "06:00-11:00 + 15:00-18:00",
+          "sleep_h": 6.5,
+          "e30_per_h": 86.569,
+          "e32_per_h": 46.948
+        },
+        {
+          "roster": "06:00-11:00 + 15:30-18:30",
+          "sleep_h": 6.25,
+          "e30_per_h": 83.778,
+          "e32_per_h": 42.622
+        },
+        {
+          "roster": "05:30-10:30 + 15:00-18:00",
+          "sleep_h": 6.0,
+          "e30_per_h": 79.326,
+          "e32_per_h": 41.403
+        },
+        {
+          "roster": "05:30-10:30 + 15:30-18:30",
+          "sleep_h": 5.75,
+          "e30_per_h": 76.535,
+          "e32_per_h": 37.076
+        },
+        {
+          "roster": "05:00-10:00 + 11:00-11:30 + 15:30-18:00",
+          "sleep_h": 5.5,
+          "e30_per_h": 72.889,
+          "e32_per_h": 36.816
+        },
+        {
+          "roster": "05:00-10:00 + 15:30-18:30",
+          "sleep_h": 5.25,
+          "e30_per_h": 70.16,
+          "e32_per_h": 32.931
+        },
+        {
+          "roster": "04:30-09:30 + 10:30-11:00 + 15:30-18:00",
+          "sleep_h": 5.0,
+          "e30_per_h": 66.514,
+          "e32_per_h": 32.67
+        },
+        {
+          "roster": "04:30-09:30 + 15:30-18:30",
+          "sleep_h": 4.75,
+          "e30_per_h": 63.785,
+          "e32_per_h": 28.785
+        },
+        {
+          "roster": "04:30-09:30 + 16:00-19:00",
+          "sleep_h": 4.25,
+          "e30_per_h": 59.372,
+          "e32_per_h": 24.191
+        },
+        {
+          "roster": "04:30-09:30 + 16:30-19:30",
+          "sleep_h": 3.75,
+          "e30_per_h": 54.958,
+          "e32_per_h": 19.597
+        },
+        {
+          "roster": "04:30-09:30 + 17:00-20:00",
+          "sleep_h": 3.25,
+          "e30_per_h": 50.59,
+          "e32_per_h": 16.25
+        },
+        {
+          "roster": "04:30-09:30 + 17:30-20:30",
+          "sleep_h": 2.75,
+          "e30_per_h": 46.222,
+          "e32_per_h": 12.903
+        },
+        {
+          "roster": "04:30-09:00 + 17:30-21:00",
+          "sleep_h": 2.25,
+          "e30_per_h": 42.917,
+          "e32_per_h": 10.382
+        },
+        {
+          "roster": "04:30-08:30 + 17:30-21:30",
+          "sleep_h": 1.75,
+          "e30_per_h": 39.611,
+          "e32_per_h": 7.861
+        },
+        {
+          "roster": "04:30-08:30 + 18:00-22:00",
+          "sleep_h": 1.25,
+          "e30_per_h": 36.319,
+          "e32_per_h": 6.271
+        }
+      ],
+      "B0": {
+        "sleep_h": 6.5,
+        "e30_per_h": 92.84,
+        "e32_per_h": 56.582
+      },
+      "B1": {
+        "sleep_h": 6.5,
+        "e30_per_h": 86.569,
+        "e32_per_h": 46.948
+      }
+    },
+    {
+      "commute_min": 90,
+      "pareto": [
+        {
+          "roster": "06:30-11:30 + 15:00-18:00",
+          "sleep_h": 6.75,
+          "e30_per_h": 93.812,
+          "e32_per_h": 52.493
+        },
+        {
+          "roster": "06:00-11:00 + 15:00-18:00",
+          "sleep_h": 6.25,
+          "e30_per_h": 86.569,
+          "e32_per_h": 46.948
+        },
+        {
+          "roster": "05:30-10:30 + 15:00-18:00",
+          "sleep_h": 5.75,
+          "e30_per_h": 79.326,
+          "e32_per_h": 41.403
+        },
+        {
+          "roster": "05:00-10:00 + 11:00-11:30 + 15:30-18:00",
+          "sleep_h": 5.25,
+          "e30_per_h": 72.889,
+          "e32_per_h": 36.816
+        },
+        {
+          "roster": "04:30-09:30 + 10:30-11:00 + 15:30-18:00",
+          "sleep_h": 4.75,
+          "e30_per_h": 66.514,
+          "e32_per_h": 32.67
+        },
+        {
+          "roster": "04:30-09:30 + 15:30-18:30",
+          "sleep_h": 4.25,
+          "e30_per_h": 63.785,
+          "e32_per_h": 28.785
+        },
+        {
+          "roster": "04:30-09:30 + 16:00-19:00",
+          "sleep_h": 3.75,
+          "e30_per_h": 59.372,
+          "e32_per_h": 24.191
+        },
+        {
+          "roster": "04:30-09:30 + 16:30-19:30",
+          "sleep_h": 3.25,
+          "e30_per_h": 54.958,
+          "e32_per_h": 19.597
+        },
+        {
+          "roster": "04:30-09:30 + 17:00-20:00",
+          "sleep_h": 2.75,
+          "e30_per_h": 50.59,
+          "e32_per_h": 16.25
+        },
+        {
+          "roster": "04:30-09:30 + 17:30-20:30",
+          "sleep_h": 2.25,
+          "e30_per_h": 46.222,
+          "e32_per_h": 12.903
+        },
+        {
+          "roster": "04:30-09:00 + 17:30-21:00",
+          "sleep_h": 1.75,
+          "e30_per_h": 42.917,
+          "e32_per_h": 10.382
+        },
+        {
+          "roster": "04:30-08:30 + 17:30-21:30",
+          "sleep_h": 1.25,
+          "e30_per_h": 39.611,
+          "e32_per_h": 7.861
+        },
+        {
+          "roster": "04:30-08:30 + 18:00-22:00",
+          "sleep_h": 0.75,
+          "e30_per_h": 36.319,
+          "e32_per_h": 6.271
+        }
+      ],
+      "B0": {
+        "sleep_h": 6.25,
+        "e30_per_h": 92.84,
+        "e32_per_h": 56.582
+      },
+      "B1": {
+        "sleep_h": 6.25,
+        "e30_per_h": 86.569,
+        "e32_per_h": 46.948
+      }
+    }
+  ],
+  "units": "e30_per_h = summer worker-hours at WBGT>=30 per scheduled daily hour (divide by ~139 days for a share)"
+},"provenance":{"guard":"nothing recommended at 45 min commute, floor 21:30: asserted","label":"REAL climatology (station obs WBGT, 2024-2026, LOSO); commute, buffer and bedtime are [I] assumptions","run_date":null,"run_date_note":"the source file records no run date","script":"docs/research/scripts/roster/legal_sleep_templates.py v2","source":"docs/research/scripts/roster/results/roster_frontier.json","source_sha256":"8d1ff102ff0bc20200cbb1b3a5fbe58b5c8b3dbad3a1c0f7f7c378f0654513cb"}}
