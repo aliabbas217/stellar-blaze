@@ -7,8 +7,9 @@
 #   run-migrate.sh               the api must never start against an unmigrated schema
 #   phase 2 (DEPLOY_APPS=true)   api (private), web (public), alerts (worker)
 # then the checks that the deployment is the code just built: the database TLS settings still verify the server (ADR 0042),
-# a revision gate per app, and the smoke test. A step that fails stops the run: nothing rolls back (single-revision mode keeps
-# the old revision serving while a new one is not ready).
+# a revision gate per app; then restart-apps.sh (a rotated secret VALUE reaches replicas only after a restart), a demo reset
+# (a fresh epoch), the smoke test, and a final demo reset. A step that fails stops the run: nothing rolls back (single-revision
+# mode keeps the old revision serving while a new one is not ready). infra/scripts/check-workflow.sh pins this order.
 #
 # GitHub environment `demo` (Settings > Environments). Its OIDC subject is `repo:<owner>/<repo>:environment:demo`
 # (infra/README.md). Restrict its deployment branches to `main`.
@@ -87,11 +88,17 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Log in to the registry
+      # `az acr login` leaves a registry token for Docker in ~/.docker/config.json (valid for hours), which is all the image
+      # upload and the build action need. The Azure session itself is the deployer identity with Contributor on the group, so
+      # it is dropped before third-party build actions run. The azure/login post step only runs `az account clear`, which
+      # succeeds with no account.
+      - name: Log in to the registry, then drop the Azure session
         if: steps.img.outputs.placeholder == 'false'
         env:
           ACR_NAME: ${{ vars.ACR_NAME }}
-        run: az acr login --name "$ACR_NAME"
+        run: |
+          az acr login --name "$ACR_NAME"
+          az logout
 
       - name: Set up Buildx
         if: steps.img.outputs.placeholder == 'false'
@@ -159,11 +166,17 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Log in to the registry
+      # `az acr login` leaves a registry token for Docker in ~/.docker/config.json (valid for hours), which is all the image
+      # upload and the build action need. The Azure session itself is the deployer identity with Contributor on the group, so
+      # it is dropped before third-party build actions run. The azure/login post step only runs `az account clear`, which
+      # succeeds with no account.
+      - name: Log in to the registry, then drop the Azure session
         if: steps.img.outputs.placeholder == 'false'
         env:
           ACR_NAME: ${{ vars.ACR_NAME }}
-        run: az acr login --name "$ACR_NAME"
+        run: |
+          az acr login --name "$ACR_NAME"
+          az logout
 
       - name: Set up Buildx
         if: steps.img.outputs.placeholder == 'false'
@@ -291,6 +304,18 @@ jobs:
         timeout-minutes: 30
         run: bash infra/scripts/run-migrate.sh "$AZURE_RESOURCE_GROUP" "$API_IMAGE" "$API_IS_PLACEHOLDER"
 
+      # After phase 1 and the migration, so the environment and the database the apps refer to exist.
+      - name: Phase 2 what-if (api, web, alerts)
+        env:
+          DEPLOY_APPS: "true"
+          PG_ADMIN_PASSWORD: ${{ secrets.PG_ADMIN_PASSWORD }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          SB_ACCESS_TOKENS: ${{ secrets.SB_ACCESS_TOKENS }}
+          DEMO_EMPLOYER_TOKEN: ${{ secrets.DEMO_EMPLOYER_TOKEN }}
+        run: |
+          az deployment group what-if --resource-group "$AZURE_RESOURCE_GROUP" \
+            --parameters infra/bicep/main.bicepparam --only-show-errors -o none
+
       - name: Phase 2 deploy (api, web, alerts)
         timeout-minutes: 30
         env:
@@ -343,6 +368,21 @@ jobs:
         timeout-minutes: 30
         run: bash infra/scripts/healthcheck.sh --app alerts --rg "$AZURE_RESOURCE_GROUP" --image "$API_IMAGE" --no-ingress
 
+      # Container Apps creates no revision when only secret VALUES change, so a rotated secret reaches the running replicas only
+      # after a restart (restart-apps.sh restarts api, alerts and web together and waits for the revision gates again).
+      - name: Restart the apps (rotated secrets reach the replicas only after a restart)
+        if: needs.build-api.outputs.placeholder == 'false'
+        timeout-minutes: 30
+        run: bash infra/scripts/restart-apps.sh "$AZURE_RESOURCE_GROUP"
+
+      # A fresh demo epoch (through the public web URL, which injects the demo token itself), so the smoke test's replay-clock
+      # window check (H4) is meaningful: since B3's epoch clock, `sb-jobs site load` starts the epoch at the FIRST deploy only.
+      - name: Reset the demo (a fresh epoch for the smoke test)
+        if: needs.build-api.outputs.placeholder == 'false' && needs.build-web.outputs.placeholder == 'false'
+        timeout-minutes: 5
+        run: bash infra/scripts/reset-demo.sh "https://$WEB_FQDN"
+
+      # Its H6 drains the BFF rate-limit bucket and the script waits that out by default (about a minute).
       - name: Smoke test
         id: smoke
         timeout-minutes: 30
@@ -351,8 +391,16 @@ jobs:
           if [ "$API_IS_PLACEHOLDER" = true ]; then flags+=(--placeholder); fi
           bash infra/scripts/smoke.sh "$AZURE_RESOURCE_GROUP" ${flags[@]+"${flags[@]}"} | tee "$RUNNER_TEMP/smoke.txt"
 
-      # The web URL only: the api is private, so it has no URL worth publishing. Kept even when the smoke test failed, and
-      # filtered to the result lines.
+      # Leaves a clean epoch for whoever opens the demo next: the smoke test's stop and its undo belong to the epoch, and a reset
+      # is limited upstream to 1 per 60 s, so a 429 is waited out once. Runs after a failed smoke test as well (its recovery
+      # for a stop left behind is exactly a reset).
+      - name: Reset the demo again (leave a clean epoch)
+        if: always() && steps.smoke.outcome != 'skipped' && needs.build-api.outputs.placeholder == 'false' && needs.build-web.outputs.placeholder == 'false'
+        timeout-minutes: 5
+        run: bash infra/scripts/reset-demo.sh "https://$WEB_FQDN" --retry-after-once
+
+      # The web URL and the smoke result lines only: the api is private, so it has no URL worth publishing. Kept even when the
+      # smoke test failed, and filtered to the result lines.
       - name: Summary
         if: always() && steps.smoke.outcome != 'skipped'
         run: |
@@ -360,8 +408,6 @@ jobs:
             echo "### Demo deploy ${GIT_SHA::12}"
             echo
             echo "- web: https://${WEB_FQDN}"
-            echo "- api image: \`${API_IMAGE}\` (placeholder: ${API_IS_PLACEHOLDER})"
-            echo "- web image: \`${WEB_IMAGE}\` (placeholder: ${WEB_IS_PLACEHOLDER})"
             echo
             echo '```'
             if [ -f "$RUNNER_TEMP/smoke.txt" ]; then

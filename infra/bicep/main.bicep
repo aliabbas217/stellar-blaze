@@ -215,20 +215,22 @@ var alertsEnv = concat(
   pinEnv
 )
 
-// Container Apps secrets: the only place a secret value is written. Environment entries refer to them by name.
-var databaseUrlSecret = { name: 'sb-database-url', value: databaseUrl }
+// Container Apps secrets: the only place a secret value is written. Each is an OBJECT, secret name to value, passed to a
+// `@secure() param secrets object` of the module: Azure redacts a securestring or secureObject parameter from the deployment
+// history (Reader on the group sees no value), which it is not known to do for a secure property inside an array parameter.
+// The module turns the object into the { name, value } array Container Apps wants. Environment entries refer to a secret by
+// name (secretRef); an entry is present only when its value is not empty, because Container Apps refuses an empty secret.
+var databaseUrlSecret = {
+  'sb-database-url': databaseUrl
+}
 
-var apiSecrets = [
-  databaseUrlSecret
-  { name: 'sb-access-tokens', value: sbAccessTokens }
-]
+var apiSecrets = union(databaseUrlSecret, empty(sbAccessTokens) ? {} : { 'sb-access-tokens': sbAccessTokens })
 
-var alertsSecrets = concat(
-  [databaseUrlSecret],
-  hasVapid ? [{ name: 'sb-vapid-private-key', value: vapidPrivateKey }] : []
-)
+var alertsSecrets = union(databaseUrlSecret, hasVapid ? { 'sb-vapid-private-key': vapidPrivateKey } : {})
 
-var jobSecrets = [databaseUrlSecret]
+var jobSecrets = databaseUrlSecret
+
+var webSecrets = empty(demoEmployerToken) ? {} : { 'demo-employer-token': demoEmployerToken }
 
 // ---- job-migrate (phase 1) ----------------------------------------------------------------------------------------------
 
@@ -249,7 +251,7 @@ module migrateJob 'modules/container-job.bicep' = {
     command: apiIsPlaceholder ? [] : ['/bin/sh', '-c']
     args: apiIsPlaceholder ? [] : [migrateScript]
     env: apiIsPlaceholder ? [] : coreEnv
-    secrets: apiIsPlaceholder ? [] : jobSecrets
+    secrets: apiIsPlaceholder ? {} : jobSecrets
     cpu: '0.5'
     memory: '1Gi'
     replicaTimeout: 600
@@ -275,7 +277,7 @@ module api 'modules/container-app.bicep' = if (deployApps) {
     cpu: apiCpu
     memory: apiMemory
     env: apiIsPlaceholder ? [] : apiEnv
-    secrets: apiIsPlaceholder ? [] : apiSecrets
+    secrets: apiIsPlaceholder ? {} : apiSecrets
     startupPath: apiIsPlaceholder ? '/' : apiLivePath
     livePath: apiIsPlaceholder ? '/' : apiLivePath
     readyPath: apiIsPlaceholder ? '/' : apiReadyPath
@@ -317,7 +319,7 @@ module web 'modules/container-app.bicep' = if (deployApps) {
     cpu: webCpu
     memory: webMemory
     env: webIsPlaceholder ? [] : webEnv
-    secrets: webIsPlaceholder ? [] : [{ name: 'demo-employer-token', value: demoEmployerToken }]
+    secrets: webIsPlaceholder ? {} : webSecrets
     startupPath: webIsPlaceholder ? '/' : webHealthPath
     livePath: webIsPlaceholder ? '/' : webHealthPath
     readyPath: webIsPlaceholder ? '/' : webHealthPath

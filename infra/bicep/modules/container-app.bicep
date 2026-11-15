@@ -3,8 +3,6 @@
 // Single revision mode, a fixed replica count, a user-assigned identity that pulls the image, and probes written out
 // explicitly: Container Apps adds default probes only in the portal, not for a template or an ARM deployment.
 
-import { secretType } from 'types.bicep'
-
 targetScope = 'resourceGroup'
 
 @description('App name; also the first label of its ingress FQDN.')
@@ -49,8 +47,9 @@ param args array = []
 @description('Environment entries: { name, value } or { name, secretRef }.')
 param env array = []
 
-@description('Container Apps secrets; the value of each is secure (types.bicep).')
-param secrets secretType[] = []
+@secure()
+@description('Container Apps secrets as an object: secret name to secret value. A secureObject, so Azure redacts the whole value from the deployment history; the array of { name, value } that Container Apps wants is built below.')
+param secrets object = {}
 
 @description('Startup probe path. All three paths empty means no probes.')
 param startupPath string = ''
@@ -69,6 +68,12 @@ param minReplicas int = 1
 
 @minValue(1)
 param maxReplicas int = 1
+
+// The names are all that objectKeys() returns of a secure object; each value is read by name.
+var secretEntries = [for secretName in objectKeys(secrets): {
+  name: secretName
+  value: secrets[secretName]
+}]
 
 var hasIngress = targetPort > 0
 var hasProbes = !empty(startupPath) || !empty(livePath) || !empty(readyPath)
@@ -141,7 +146,7 @@ resource app 'Microsoft.App/containerApps@2026-07-01' = {
           identity: identityId
         }
       ]
-      secrets: secrets
+      secrets: secretEntries
     }
     template: {
       containers: [

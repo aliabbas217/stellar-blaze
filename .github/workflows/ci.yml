@@ -293,6 +293,11 @@ jobs:
       - name: Database TLS in the template (check-db-tls.sh, ADR 0042)
         run: bash infra/scripts/check-db-tls.sh --template infra/bicep/main.bicep
 
+      # The deploy workflow's own invariants (pinned actions, the push guard, image check before push, step order, no secret
+      # in a run block, minimal permissions). Line based: actionlint below is the syntax check.
+      - name: Deploy workflow invariants (check-workflow.sh)
+        run: bash infra/scripts/check-workflow.sh .github/workflows/deploy.yml
+
       # A release binary whose sha256 is pinned here, in the repository, and not read from the checksums file served next to it
       # (see the gitleaks step in `backend`). Taken on 2026-11-15 from actionlint_1.7.12_checksums.txt of the v1.7.12 release
       # (v1.7.12, 2026-03-30, is the latest release); the release asset's `digest` in the GitHub API says the same. Change

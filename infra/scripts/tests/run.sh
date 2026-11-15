@@ -320,7 +320,7 @@ test_check_template_passes_on_the_repo_template() {
   run_cmd bash "$scripts_dir/check-template.sh" "$repo_bicep_dir/main.bicep"
   assert_rc 0
   local id
-  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10; do
+  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 B1 B2 B3 B4; do
     assert_out_has "PASS $id "
   done
   assert_out_lacks "FAIL"
@@ -429,6 +429,75 @@ test_check_template_c10_fails_when_a_placeholder_api_gets_the_worker() {
     "placeholder creates"
 }
 
+test_check_template_c9_fails_when_the_module_misnames_the_secrets() {
+  bicep_ready || return 0
+  # The module turns the secret object into the { name, value } list; a wrong name leaves every secretRef dangling.
+  expect_c_fail c9-module C9 modules/container-app.bicep 's/^  name: secretName$/  name: toUpper(secretName)/' "unknown secret"
+}
+
+test_check_template_c11_fails_when_the_module_secrets_are_not_secure() {
+  bicep_ready || return 0
+  # Without @secure() the parameter is a plain object. Bicep's own secure-secrets-in-params rule (an error in
+  # bicepconfig.json) would stop the build first, so the rule is switched off in the copy to prove C11 on its own.
+  local template
+  template="$(mutant c11 modules/container-app.bicep '/^@secure()$/d')"
+  sed -i 's/"secure-secrets-in-params": { "level": "error" }/"secure-secrets-in-params": { "level": "off" }/' "$(dirname "$template")/bicepconfig.json"
+  run_cmd bash "$scripts_dir/check-template.sh" --only C11 "$template"
+  assert_rc 1
+  assert_out_has "FAIL C11"
+  assert_out_has "parameter secrets carries a secret value but is declared 'object'"
+}
+
+test_check_template_c11_fails_when_the_job_secrets_are_not_secure() {
+  bicep_ready || return 0
+  local template
+  template="$(mutant c11-job modules/container-job.bicep '/^@secure()$/d')"
+  sed -i 's/"secure-secrets-in-params": { "level": "error" }/"secure-secrets-in-params": { "level": "off" }/' "$(dirname "$template")/bicepconfig.json"
+  run_cmd bash "$scripts_dir/check-template.sh" --only C11 "$template"
+  assert_rc 1
+  assert_out_has "full/job-migrate: parameter secrets carries a secret value but is declared 'object'"
+}
+
+test_check_template_b1_fails_when_the_budget_does_not_start_on_the_first() {
+  bicep_ready || return 0
+  expect_c_fail b1-day B1 bootstrap.bicep 's/-01T00:00:00Z/-15T00:00:00Z/' "budget startDate is"
+}
+
+test_check_template_b1_fails_when_budget_month_is_ignored() {
+  bicep_ready || return 0
+  expect_c_fail b1-override B1 bootstrap.bicep 's/^var effectiveBudgetMonth = .*/var effectiveBudgetMonth = currentMonth/' "boot-month"
+}
+
+test_check_template_b2_fails_when_the_subject_loses_its_case() {
+  bicep_ready || return 0
+  expect_c_fail b2-case B2 modules/bootstrap-rg.bicep 's/{githubOwner}/{toLower(githubOwner)}/' "subject is 'repo:foo/bar-Baz:environment:demo'"
+}
+
+test_check_template_b2_fails_when_a_credential_exists_without_an_owner() {
+  bicep_ready || return 0
+  expect_c_fail b2-owner B2 modules/bootstrap-rg.bicep 's/= if (!empty(githubOwner)) {/= {/' "although githubOwner is empty"
+}
+
+test_check_template_b3_fails_when_the_operator_gets_a_role_unasked() {
+  bicep_ready || return 0
+  expect_c_fail b3-operator B3 modules/bootstrap-rg.bicep 's/= if (!empty(operatorPrincipalId)) {/= {/' "boot-bare: unexpected role assignment"
+}
+
+test_check_template_b3_fails_when_the_apps_identity_cannot_pull() {
+  bicep_ready || return 0
+  expect_c_fail b3-pull B3 modules/bootstrap-rg.bicep "s/^var acrPullRoleId = .*/var acrPullRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec'/" "expected one apps AcrPull"
+}
+
+test_check_template_b4_fails_when_the_admin_user_is_enabled() {
+  bicep_ready || return 0
+  expect_c_fail b4-admin B4 modules/bootstrap-rg.bicep 's/adminUserEnabled: false/adminUserEnabled: true/' "adminUserEnabled is True"
+}
+
+test_check_template_b4_fails_when_the_registry_is_abac() {
+  bicep_ready || return 0
+  expect_c_fail b4-abac B4 modules/bootstrap-rg.bicep "s/roleAssignmentMode: 'LegacyRegistryPermissions'/roleAssignmentMode: 'AbacRepositoryPermissions'/" "roleAssignmentMode is 'AbacRepositoryPermissions'"
+}
+
 test_check_db_tls_template_passes_on_the_repo_template() {
   bicep_ready || return 0
   run_cmd bash "$scripts_dir/check-db-tls.sh" --template "$repo_bicep_dir/main.bicep"
@@ -481,6 +550,126 @@ test_check_db_tls_template_fails_when_only_the_job_loses_pgsslrootcert() {
   assert_out_has "FAIL T3"
   assert_out_has "job-migrate: PGSSLROOTCERT"
   assert_out_lacks "api: PGSSLROOTCERT"
+}
+
+# ---- check-workflow.sh: line based checks on deploy.yml (no bicep needed) ------------------------
+
+deploy_workflow="$(cd "$scripts_dir/../.." && pwd)/.github/workflows/deploy.yml"
+
+# wf_mutant <name> <sed expression>: print the path of a copy of deploy.yml changed by the sed expression. Fails when the
+# expression no longer changes anything, so a test cannot pass vacuously because the workflow was reworded.
+wf_mutant() {
+  local name="$1" expr="$2" file="$work/workflows/$1.yml"
+  mkdir -p "$work/workflows"
+  cp "$deploy_workflow" "$file"
+  sed -i -e "$expr" "$file"
+  if cmp -s "$deploy_workflow" "$file"; then
+    fail "workflow mutation '$name' did not change deploy.yml: update the sed expression"
+  fi
+  printf '%s\n' "$file"
+}
+
+# expect_w_fail <name> <check id> <sed expression> <text that must be in the output>
+expect_w_fail() {
+  local name="$1" id="$2" expr="$3" text="$4" file
+  file="$(wf_mutant "$name" "$expr")"
+  run_cmd bash "$scripts_dir/check-workflow.sh" "$file"
+  assert_rc 1
+  assert_out_has "FAIL $id"
+  assert_out_has "$text"
+}
+
+test_check_workflow_passes_on_the_repo_workflow() {
+  run_cmd bash "$scripts_dir/check-workflow.sh"
+  assert_rc 0
+  local id
+  for id in W1 W2 W3 W4 W5 W6 W7; do
+    assert_out_has "PASS $id "
+  done
+  assert_out_lacks "FAIL"
+}
+
+test_check_workflow_rejects_bad_usage() {
+  run_cmd bash "$scripts_dir/check-workflow.sh" "$work/does-not-exist.yml"
+  assert_rc 1
+  assert_err_has "no such workflow file"
+  run_cmd bash "$scripts_dir/check-workflow.sh" a b
+  assert_rc 1
+  assert_err_has "usage"
+}
+
+test_check_workflow_w1_fails_on_an_action_pinned_by_tag() {
+  expect_w_fail w1 W1 's|actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1|actions/checkout@v7|' \
+    "'actions/checkout@v7' is not pinned"
+}
+
+test_check_workflow_w2_fails_without_the_push_guard() {
+  expect_w_fail w2 W2 "s/ && github.event.workflow_run.event == 'push'//" "does not require github.event.workflow_run.event == 'push'"
+}
+
+test_check_workflow_w2_fails_on_pull_request_target() {
+  expect_w_fail w2-prt W2 's/^  workflow_dispatch:$/  workflow_dispatch:\n  pull_request_target:/' "pull_request_target is used"
+}
+
+test_check_workflow_w3_fails_when_the_image_is_pushed_before_the_check() {
+  # The build step then pushes (push: true) before check-db-tls.sh --image runs.
+  expect_w_fail w3 W3 's/^          push: false$/          push: true/' "pushes the image (line"
+}
+
+test_check_workflow_w3_fails_without_the_image_check() {
+  expect_w_fail w3-missing W3 's|check-db-tls.sh --image|check-db-tls.sh --template|' "no step running check-db-tls.sh --image"
+}
+
+test_check_workflow_w4_fails_when_the_gates_are_out_of_order() {
+  expect_w_fail w4-order W4 's/--app api/--app TMP/; s/--app alerts/--app api/; s/--app TMP/--app alerts/' \
+    "healthcheck.sh gate web is missing, or comes before"
+}
+
+test_check_workflow_w4_fails_without_the_restart() {
+  expect_w_fail w4-restart W4 '/restart-apps[.]sh "/d' "restart-apps.sh is missing"
+}
+
+test_check_workflow_w4_fails_without_the_final_reset() {
+  expect_w_fail w4-final W4 's/ --retry-after-once//' "reset-demo.sh --retry-after-once (final) is missing"
+}
+
+test_check_workflow_w4_fails_without_the_second_what_if() {
+  expect_w_fail w4-whatif W4 '/Phase 2 what-if/,/az deployment group what-if/s/deployment group what-if/deployment group show/' "phase 2 what-if is missing"
+}
+
+test_check_workflow_w5_fails_when_deploy_does_not_wait_for_the_builds() {
+  expect_w_fail w5-needs W5 's/needs: \[build-api, build-web\]/needs: [build-api]/' "needs does not list build-web"
+}
+
+test_check_workflow_w5_fails_without_the_environment() {
+  expect_w_fail w5-env W5 '0,/^    environment: demo$/s//    environment: other/' "job build-api does not run in 'environment: demo'"
+}
+
+# shellcheck disable=SC2016  # the sed expressions carry literal ${{ ... }} and $VARIABLE text for the workflow
+test_check_workflow_w6_fails_on_a_secret_in_a_one_line_run() {
+  expect_w_fail w6-line W6 's|run: bash infra/scripts/restart-apps.sh "$AZURE_RESOURCE_GROUP"|run: bash infra/scripts/restart-apps.sh "${{ secrets.PG_ADMIN_PASSWORD }}"|' \
+    "a secret expression is inside a run: block"
+}
+
+# shellcheck disable=SC2016  # the sed expressions carry literal ${{ ... }} and $VARIABLE text for the workflow
+test_check_workflow_w6_fails_on_a_secret_in_a_block_run() {
+  expect_w_fail w6-block W6 's|^          az deployment group create --resource-group "$AZURE_RESOURCE_GROUP" --name "main-p1-|          echo "${{ secrets.PG_ADMIN_PASSWORD }}"\n&|' \
+    "a secret expression is inside a run: block"
+}
+
+test_check_workflow_w6_accepts_a_secret_under_env() {
+  # PG_ADMIN_PASSWORD under env: is how the workflow passes it, and the repo workflow passes W6 with several of them.
+  grep -qE '^ +PG_ADMIN_PASSWORD: \$\{\{ secrets\.PG_ADMIN_PASSWORD \}\}$' "$deploy_workflow" || fail "the repo workflow no longer has a secret under env:"
+  run_cmd bash "$scripts_dir/check-workflow.sh" "$deploy_workflow"
+  assert_out_has "PASS W6 "
+}
+
+test_check_workflow_w7_fails_on_a_broader_permission() {
+  expect_w_fail w7 W7 's/^  contents: read$/  contents: write/' "contents: write is not allowed"
+}
+
+test_check_workflow_w7_fails_without_id_token() {
+  expect_w_fail w7-id W7 '/^  id-token: write/d' "lacks id-token: write"
 }
 
 # ---- check-db-tls.sh --deployed / --image -------------------------------------------------------
@@ -1246,7 +1435,6 @@ test_smoke_http_h4_outside_the_window_says_to_run_reset_demo() {
     assert_rc 1
     assert_out_has "FAIL H4 replay clock is outside the demo window: run: bash infra/scripts/reset-demo.sh <web-url>"
     assert_out_has "here: bash infra/scripts/reset-demo.sh http://127.0.0.1:8080"
-    assert_out_lacks "restart-replay-clock"
     [ "$(bff_count "$reset_route")" = "0" ] || fail "an H4 failure sent a reset"
   done
   FAKE_STARTED_AT=2026-06-14T13:30:00Z run_smoke_http
@@ -1608,7 +1796,6 @@ test_measure_cold_start_scales_to_zero_measures_and_restores() {
   assert_out_has "COLD START: 0.123 s to first 200 from https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready"
   assert_out_has "The api restarted. The replay clock counts from the demo epoch in the database, so it is unchanged and nothing needs restarting."
   assert_out_lacks "REMINDER"
-  assert_out_lacks "restart-replay-clock"
   assert_az_count "containerapp update -n web -g rg-test --min-replicas 0" 1
   assert_az_count "containerapp update -n api -g rg-test --min-replicas 0" 1
   assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
@@ -1716,11 +1903,40 @@ tests=(
   test_check_template_c9_fails_on_a_dangling_secret_ref
   test_check_template_c10_fails_when_phase_1_creates_the_api
   test_check_template_c10_fails_when_a_placeholder_api_gets_the_worker
+  test_check_template_c9_fails_when_the_module_misnames_the_secrets
+  test_check_template_c11_fails_when_the_module_secrets_are_not_secure
+  test_check_template_c11_fails_when_the_job_secrets_are_not_secure
+  test_check_template_b1_fails_when_the_budget_does_not_start_on_the_first
+  test_check_template_b1_fails_when_budget_month_is_ignored
+  test_check_template_b2_fails_when_the_subject_loses_its_case
+  test_check_template_b2_fails_when_a_credential_exists_without_an_owner
+  test_check_template_b3_fails_when_the_operator_gets_a_role_unasked
+  test_check_template_b3_fails_when_the_apps_identity_cannot_pull
+  test_check_template_b4_fails_when_the_admin_user_is_enabled
+  test_check_template_b4_fails_when_the_registry_is_abac
   test_check_db_tls_template_passes_on_the_repo_template
   test_check_db_tls_template_fails_on_ssl_require
   test_check_db_tls_template_fails_on_sslmode
   test_check_db_tls_template_fails_without_pgsslrootcert
   test_check_db_tls_template_fails_when_only_the_job_loses_pgsslrootcert
+  test_check_workflow_passes_on_the_repo_workflow
+  test_check_workflow_rejects_bad_usage
+  test_check_workflow_w1_fails_on_an_action_pinned_by_tag
+  test_check_workflow_w2_fails_without_the_push_guard
+  test_check_workflow_w2_fails_on_pull_request_target
+  test_check_workflow_w3_fails_when_the_image_is_pushed_before_the_check
+  test_check_workflow_w3_fails_without_the_image_check
+  test_check_workflow_w4_fails_when_the_gates_are_out_of_order
+  test_check_workflow_w4_fails_without_the_restart
+  test_check_workflow_w4_fails_without_the_final_reset
+  test_check_workflow_w4_fails_without_the_second_what_if
+  test_check_workflow_w5_fails_when_deploy_does_not_wait_for_the_builds
+  test_check_workflow_w5_fails_without_the_environment
+  test_check_workflow_w6_fails_on_a_secret_in_a_one_line_run
+  test_check_workflow_w6_fails_on_a_secret_in_a_block_run
+  test_check_workflow_w6_accepts_a_secret_under_env
+  test_check_workflow_w7_fails_on_a_broader_permission
+  test_check_workflow_w7_fails_without_id_token
   test_check_db_tls_deployed_passes_when_everything_verifies
   test_check_db_tls_deployed_fails_when_the_secret_lacks_verify_full
   test_check_db_tls_deployed_names_the_one_weak_container

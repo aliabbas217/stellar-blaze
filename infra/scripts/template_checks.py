@@ -4,7 +4,10 @@ Nothing here contacts Azure. For every scenario (a set of dummy environment vari
 ``bicep build-params`` and ``bicep snapshot`` on a COPY of the template directory, so the repository is never written to,
 and then evaluates the ARM expressions that the snapshot leaves open (it cannot see secure parameters, so the ones
 that depend on a secret stay as ``[...]`` text) with the dummy parameter values. The checks therefore run on concrete
-values: the resources Bicep would create, with the real secret placeholders in them.
+values: the resources Bicep would create, with the real secret placeholders in them. What the snapshot cannot see (a value
+built from a secure parameter prints as ``unknown()``, which is every Container Apps secret) is evaluated from the compiled
+template instead: main.bicep's module parameters, then what each module turns them into. The B checks run the same way on
+bootstrap.bicep (next to main.bicep) through its snapshot.
 
 Output: one ``PASS|FAIL <id> <subject>`` line per check on stdout (reasons indented below a FAIL), exit 1 on any FAIL.
 Standard library only.
@@ -13,6 +16,7 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -21,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from secrets import token_hex
 from typing import Any
@@ -103,6 +108,30 @@ SCENARIOS: dict[str, dict[str, str | None]] = {
 }
 
 
+# bootstrap.bicepparam (B checks). The caller's own GITHUB_OWNER, OPERATOR_PRINCIPAL_ID ... are removed from every scenario.
+BOOTSTRAP_BASE_ENV: dict[str, str] = {"BUDGET_CONTACT_EMAIL": "ops@example.org"}
+BOOTSTRAP_OPTIONAL_ENV = (
+    "LOCATION",
+    "GITHUB_OWNER",
+    "GITHUB_REPO",
+    "OPERATOR_PRINCIPAL_ID",
+    "BUDGET_MONTH",
+)
+OPERATOR_ID = "11111111-1111-4111-8111-111111111111"
+GITHUB_OWNER = "Foo"  # mixed case on purpose: the OIDC subject is case-sensitive
+GITHUB_REPO = "bar-Baz"
+BUDGET_MONTH_OVERRIDE = "2026-12"
+BOOTSTRAP_SCENARIOS: dict[str, dict[str, str | None]] = {
+    "boot-full": {
+        "GITHUB_OWNER": GITHUB_OWNER,
+        "GITHUB_REPO": GITHUB_REPO,
+        "OPERATOR_PRINCIPAL_ID": OPERATOR_ID,
+    },
+    "boot-bare": {},
+    "boot-month": {"BUDGET_MONTH": BUDGET_MONTH_OVERRIDE},
+}
+
+
 class CheckError(Exception):
     """A scenario could not be evaluated; the checks that need it fail with this message."""
 
@@ -115,7 +144,14 @@ _TOKEN = re.compile(
 
 
 class Runtime:
-    """A value that only exists in Azure (for example a server's host name). Any attribute of it is again a Runtime."""
+    """A value that only exists in Azure (for example a server's host name). Any attribute of it is again a Runtime.
+
+    `origin` is the first argument of the reference() it came from (the resource id), so a check can tell whose principal id
+    a role assignment holds.
+    """
+
+    def __init__(self, origin: str = "") -> None:
+        self.origin = origin
 
     def __str__(self) -> str:
         return "<runtime-value>"
@@ -206,8 +242,31 @@ def _create_object(*args: Any) -> dict[str, Any]:
     return {args[i]: args[i + 1] for i in range(0, len(args), 2)}
 
 
+def _utc_now(fmt: str = "yyyy-MM") -> str:
+    if fmt != "yyyy-MM":
+        msg = f"utcNow({fmt!r}): this checker only knows the format yyyy-MM"
+        raise CheckError(msg)
+    return datetime.now(UTC).strftime("%Y-%m")
+
+
+def _union(*args: Any) -> Any:
+    if args and all(isinstance(a, dict) for a in args):
+        return {key: value for a in args for key, value in a.items()}
+    return [item for a in args for item in a]
+
+
+class Unknown:
+    """What `bicep snapshot` prints as ``unknown()``: a value built from a secure parameter, which it cannot see."""
+
+    def __str__(self) -> str:
+        return "<unknown>"
+
+
 _FUNCTIONS: dict[str, Callable[..., Any]] = {
     "concat": _concat,
+    "union": _union,
+    "objectKeys": lambda a: list(a),
+    "unknown": Unknown,
     "createArray": lambda *a: list(a),
     "createObject": _create_object,
     "not": lambda a: not _truthy(a),
@@ -224,55 +283,104 @@ _FUNCTIONS: dict[str, Callable[..., Any]] = {
     "length": len,
     "greater": lambda a, b: a > b,
     # Anything that points at a deployed resource has no value offline.
-    "reference": lambda *_: Runtime(),
-    "listKeys": lambda *_: Runtime(),
+    "reference": lambda *a: Runtime(str(a[0])),
+    "listKeys": lambda *a: Runtime(str(a[0])),
+    "utcNow": _utc_now,
+    "subscriptionResourceId": lambda *a: "/".join(str(x) for x in a),
+    "take": lambda a, n: a[:n],
+    "toLower": lambda a: str(a).lower(),
+    "toUpper": lambda a: str(a).upper(),
     "resourceId": lambda *a: "/".join(str(x) for x in a),
+    "uniqueString": lambda *a: hashlib.sha256(
+        "/".join(map(str, a)).encode()
+    ).hexdigest()[:13],
+    "resourceGroup": lambda: {
+        "location": "uaenorth",
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test",
+    },
 }
 
 
-def _evaluate_node(node: Any, params: dict[str, Any]) -> Any:
+class Scope:
+    """What an ARM expression can read: parameter values, variables (lazily, as an ARM engine does) and ``copy`` indexes."""
+
+    def __init__(
+        self,
+        params: dict[str, Any],
+        variables: dict[str, Any] | None = None,
+    ) -> None:
+        self.params = params
+        defs = dict(variables or {})
+        self.copies: dict[str, Any] = {c["name"]: c for c in defs.pop("copy", [])}
+        self.defs = defs
+        self.index: dict[str, int] = {}
+        self._cache: dict[str, Any] = {}
+
+    def variable(self, name: str) -> Any:
+        if name not in self._cache:
+            if name in self.copies:
+                spec = self.copies[name]
+                items = []
+                for i in range(resolve(spec["count"], self)):
+                    self.index[name] = i
+                    items.append(resolve(spec["input"], self))
+                self.index.pop(name, None)
+                self._cache[name] = items
+            elif name in self.defs:
+                self._cache[name] = resolve(self.defs[name], self)
+            else:
+                msg = f"ARM expression: no variable {name!r}"
+                raise CheckError(msg)
+        return self._cache[name]
+
+
+def _evaluate_node(node: Any, scope: Scope) -> Any:
     kind = node[0]
     if kind == "lit":
         return node[1]
     if kind == "attr":
-        base = _evaluate_node(node[1], params)
-        if isinstance(base, Runtime):
+        base = _evaluate_node(node[1], scope)
+        if isinstance(base, Runtime | Unknown):
             return base
         if isinstance(base, dict) and node[2] in base:
             return base[node[2]]
         msg = f"ARM expression: no property {node[2]!r}"
         raise CheckError(msg)
     if kind == "index":
-        base = _evaluate_node(node[1], params)
-        if isinstance(base, Runtime):
+        base = _evaluate_node(node[1], scope)
+        if isinstance(base, Runtime | Unknown):
             return base
-        return base[_evaluate_node(node[2], params)]
+        return base[_evaluate_node(node[2], scope)]
     _, name, args = node
     if name == "parameters":
-        key = _evaluate_node(args[0], params)
-        if key not in params:
+        key = _evaluate_node(args[0], scope)
+        if key not in scope.params:
             msg = (
                 f"ARM expression: parameter {key!r} has no value in the parameters file"
             )
             raise CheckError(msg)
-        return params[key]
+        return scope.params[key]
+    if name == "variables":
+        return scope.variable(_evaluate_node(args[0], scope))
+    if name == "copyIndex":
+        return scope.index[_evaluate_node(args[0], scope)]
     if (
         name == "if"
     ):  # lazy: the branch that is not taken may contain things that cannot be evaluated
-        branch = args[1] if _truthy(_evaluate_node(args[0], params)) else args[2]
-        return _evaluate_node(branch, params)
+        branch = args[1] if _truthy(_evaluate_node(args[0], scope)) else args[2]
+        return _evaluate_node(branch, scope)
     if name not in _FUNCTIONS:
         msg = f"ARM expression uses {name}(), which this checker cannot evaluate"
         raise CheckError(msg)
-    return _FUNCTIONS[name](*[_evaluate_node(a, params) for a in args])
+    return _FUNCTIONS[name](*[_evaluate_node(a, scope) for a in args])
 
 
-def resolve(node: Any, params: dict[str, Any]) -> Any:
+def resolve(node: Any, scope: Scope) -> Any:
     """Return `node` with every ``[expression]`` string replaced by its value."""
     if isinstance(node, dict):
-        return {key: resolve(value, params) for key, value in node.items()}
+        return {key: resolve(value, scope) for key, value in node.items()}
     if isinstance(node, list):
-        return [resolve(item, params) for item in node]
+        return [resolve(item, scope) for item in node]
     if (
         isinstance(node, str)
         and node.startswith("[")
@@ -280,7 +388,7 @@ def resolve(node: Any, params: dict[str, Any]) -> Any:
         and not node.startswith("[[")
     ):
         parser = _Parser(node[1:-1])
-        value = _evaluate_node(parser.expr(), params)
+        value = _evaluate_node(parser.expr(), scope)
         if parser.i != len(parser.toks):
             msg = f"ARM expression has trailing input: {node[:80]}"
             raise CheckError(msg)
@@ -302,8 +410,9 @@ class Workspace:
             template.parent, self.dir, ignore=shutil.ignore_patterns("*.snapshot.json")
         )
         self.template = self.dir / template.name
-        self.params_file = self.template.with_suffix(".bicepparam")
         self._snapshots: dict[str, dict[str, Any]] = {}
+        self._params: dict[str, dict[str, Any]] = {}
+        self._modules: dict[str, list[Module]] = {}
         self._compiled: dict[str, Any] | None = None
 
     def close(self) -> None:
@@ -333,48 +442,161 @@ class Workspace:
             )
         return self._compiled
 
-    def snapshot(self, name: str) -> dict[str, Any]:
-        """The predicted resources of scenario `name`, with every expression evaluated."""
-        if name not in self._snapshots:
-            env = {k: v for k, v in os.environ.items() if k not in OPTIONAL_ENV}
-            env.update(BASE_ENV)
-            for key, value in SCENARIOS[name].items():
-                if value is None:
-                    env.pop(key, None)
-                else:
-                    env[key] = value
-            env["MSYS_NO_PATHCONV"] = "1"
+    def _target(self, name: str) -> str:
+        """`bootstrap` for a scenario of bootstrap.bicepparam, else `main`."""
+        return "bootstrap" if name in BOOTSTRAP_SCENARIOS else "main"
+
+    def params_file(self, name: str) -> Path:
+        if self._target(name) == "bootstrap":
+            return self.dir / "bootstrap.bicepparam"
+        return self.template.with_suffix(".bicepparam")
+
+    def _scenario_env(self, name: str) -> dict[str, str]:
+        scrub = (*OPTIONAL_ENV, *BOOTSTRAP_OPTIONAL_ENV)
+        env = {k: v for k, v in os.environ.items() if k not in scrub}
+        boot = self._target(name) == "bootstrap"
+        env.update(BOOTSTRAP_BASE_ENV if boot else BASE_ENV)
+        for key, value in (BOOTSTRAP_SCENARIOS if boot else SCENARIOS)[name].items():
+            if value is None:
+                env.pop(key, None)
+            else:
+                env[key] = value
+        env["MSYS_NO_PATHCONV"] = "1"
+        return env
+
+    def scenario_params(self, name: str) -> dict[str, Any]:
+        """The parameter values `bicep build-params` gives main.bicepparam under scenario `name`."""
+        if name not in self._params:
             wrapper = json.loads(
-                self._run(["build-params", self.params_file.name, "--stdout"], env)
+                self._run(
+                    ["build-params", self.params_file(name).name, "--stdout"],
+                    self._scenario_env(name),
+                )
             )
-            params = {
+            self._params[name] = {
                 key: entry["value"]
                 for key, entry in json.loads(wrapper["parametersJson"])[
                     "parameters"
                 ].items()
             }
+        return self._params[name]
+
+    def snapshot(self, name: str) -> dict[str, Any]:
+        """The predicted resources of scenario `name`, with every expression evaluated."""
+        if name not in self._snapshots:
+            params = self.scenario_params(name)
+            scope_args = (
+                ["--location", "uaenorth"]
+                if self._target(name) == "bootstrap"
+                else ["--resource-group", "rg-test", "--location", "uaenorth"]
+            )
+            params_file = self.params_file(name)
             self._run(
                 [
                     "snapshot",
-                    self.params_file.name,
+                    params_file.name,
                     "--mode",
                     "overwrite",
                     "--subscription-id",
                     "00000000-0000-0000-0000-000000000000",
-                    "--resource-group",
-                    "rg-test",
-                    "--location",
-                    "uaenorth",
+                    *scope_args,
                 ],
-                env,
+                self._scenario_env(name),
             )
             raw = json.loads(
-                (self.dir / f"{self.params_file.stem}.snapshot.json").read_text(
+                (self.dir / f"{params_file.stem}.snapshot.json").read_text(
                     encoding="utf-8"
                 )
             )
-            self._snapshots[name] = resolve(raw, params)
+            # Only the resources: the snapshot's outputs use subscription(), tenant() ..., and no check reads them.
+            self._snapshots[name] = {
+                "predictedResources": resolve(raw["predictedResources"], Scope(params))
+            }
         return self._snapshots[name]
+
+    def modules(self, name: str) -> list[Module]:
+        """The module deployments scenario `name` makes, their parameters evaluated, from the compiled template.
+
+        `bicep snapshot` cannot see a value built from a secure parameter (it prints ``unknown()``), and the secrets of a
+        container app are exactly that, so they are evaluated here: first the parameters main.bicep gives each module, then
+        what the module turns its secure ``secrets`` parameter into.
+        """
+        if name not in self._modules:
+            compiled = self.compiled()
+            given_top = self.scenario_params(name)
+            defaults = {
+                key: spec["defaultValue"]
+                for key, spec in compiled.get("parameters", {}).items()
+                if key not in given_top and "defaultValue" in spec
+            }
+            top = Scope(
+                {**given_top, **resolve(defaults, Scope(given_top))},
+                compiled.get("variables"),
+            )
+            found: list[Module] = []
+            for res in compiled["resources"]:
+                if res["type"] != "Microsoft.Resources/deployments":
+                    continue
+                if "condition" in res and not _truthy(resolve(res["condition"], top)):
+                    continue
+                template = res["properties"]["template"]
+                given = {
+                    key: resolve(entry, top)["value"]
+                    for key, entry in res["properties"]["parameters"].items()
+                }
+                types = {
+                    key: spec["type"] for key, spec in template["parameters"].items()
+                }
+                found.append(
+                    Module(
+                        res["name"],
+                        template,
+                        given,
+                        types,
+                        _module_secrets(template, given),
+                    )
+                )
+            self._modules[name] = found
+        return self._modules[name]
+
+
+class Module:
+    """One module deployment of main.bicep under one scenario."""
+
+    def __init__(
+        self,
+        deployment: str,
+        template: dict[str, Any],
+        params: dict[str, Any],
+        types: dict[str, str],
+        secrets: dict[str, str] | None,
+    ) -> None:
+        self.deployment = deployment
+        self.template = template
+        self.params = params  # the values main.bicep passes (defaults of the module are not added)
+        self.types = types  # the declared type of every parameter of the module
+        self.secrets = secrets  # container app / job modules only: secret name -> value, as the app will hold it
+
+
+def _module_secrets(
+    template: dict[str, Any], given: dict[str, Any]
+) -> dict[str, str] | None:
+    """Evaluate, for a container app or job module, the ``secrets`` list its resource gets from the ``secrets`` parameter."""
+    if "secrets" not in template["parameters"]:
+        return None
+    params = {
+        key: given.get(key, spec.get("defaultValue"))
+        for key, spec in template["parameters"].items()
+    }
+    scope = Scope(params, template.get("variables"))
+    resources = template[
+        "resources"
+    ]  # a list, or a dict by symbolic name (languageVersion 2.0)
+    for res in resources.values() if isinstance(resources, dict) else resources:
+        if res["type"] in ("Microsoft.App/containerApps", "Microsoft.App/jobs"):
+            entries = resolve(res["properties"]["configuration"]["secrets"], scope)
+            return {entry["name"]: entry["value"] for entry in entries}
+    return None
 
 
 # ---- views on a snapshot -----------------------------------------------------------------------------------------------
@@ -400,11 +622,12 @@ def env_of(res: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {entry["name"]: entry for entry in container(res).get("env") or []}
 
 
-def secrets_of(res: dict[str, Any]) -> dict[str, str]:
-    return {
-        s["name"]: s["value"]
-        for s in res["properties"]["configuration"].get("secrets") or []
-    }
+def secrets_of(ws: Workspace, scenario: str, name: str) -> dict[str, str]:
+    """The Container Apps secrets (name -> value) that app or job `name` holds under `scenario`; empty if it is not made."""
+    for module in ws.modules(scenario):
+        if module.secrets is not None and module.params.get("name") == name:
+            return module.secrets
+    return {}
 
 
 def walk(node: Any) -> Iterator[tuple[str, Any]]:
@@ -604,7 +827,7 @@ def check_c7(ws: Workspace) -> list[str]:
                 for var in env_of(found[name]):
                     if "VAPID_PRIVATE" in var or "VAPID_SUBJECT" in var:
                         problems.append(f"{scenario}/{name}: has {var}")
-                for secret in secrets_of(found[name]):
+                for secret in secrets_of(ws, scenario, name):
                     if "vapid" in secret:
                         problems.append(f"{scenario}/{name}: has the secret {secret}")
     alerts = apps(ws.snapshot("full")).get("alerts")
@@ -619,7 +842,10 @@ def check_c7(ws: Workspace) -> list[str]:
             problems.append(
                 "full/alerts: SB_VAPID_PRIVATE_KEY is not a secretRef to sb-vapid-private-key"
             )
-        if secrets_of(alerts).get("sb-vapid-private-key") != VAPID_PRIVATE:
+        if (
+            secrets_of(ws, "full", "alerts").get("sb-vapid-private-key")
+            != VAPID_PRIVATE
+        ):
             problems.append(
                 "full/alerts: the secret sb-vapid-private-key does not hold the parameter value"
             )
@@ -662,7 +888,7 @@ def check_c9(ws: Workspace) -> list[str]:
     for scenario in ("full", "placeholder", "phase1"):
         snap = ws.snapshot(scenario)
         for name, res in {**apps(snap), **jobs(snap)}.items():
-            known = secrets_of(res)
+            known = secrets_of(ws, scenario, name)
             for var, entry in env_of(res).items():
                 text = str(entry.get("value", ""))
                 if any(secret in text for secret in SECRET_VALUES):
@@ -691,7 +917,7 @@ def check_c10(ws: Workspace) -> list[str]:
         )
     for name, res in found.items():
         cont = container(res)
-        if env_of(res) or secrets_of(res):
+        if env_of(res) or secrets_of(ws, "placeholder", name):
             problems.append(f"placeholder/{name}: has environment entries or secrets")
         paths = {p["httpGet"]["path"] for p in cont.get("probes", [])}
         if paths != {"/"}:
@@ -708,11 +934,195 @@ def check_c10(ws: Workspace) -> list[str]:
             or cont.get("command")
             or cont.get("args")
             or env_of(job)
-            or secrets_of(job)
+            or secrets_of(ws, "placeholder", "job-migrate")
         ):
             problems.append(
                 "placeholder/job-migrate: must run the jobs image with no command, env or secret"
             )
+    return problems
+
+
+def check_c11(ws: Workspace) -> list[str]:
+    """A module parameter that carries a secret value must be a securestring or secureObject.
+
+    ARM redacts only those two types from `properties.parameters` of the nested deployment, which Reader on the resource
+    group can read; a secure property inside a plain array or object parameter is not known to be redacted.
+    """
+    secure_types = ("securestring", "secureobject")
+    problems = []
+    carried = 0
+    for scenario in ("full", "phase1", "placeholder"):
+        for module in ws.modules(scenario):
+            for key, value in module.params.items():
+                text = json.dumps(value, default=str)
+                if not any(secret in text for secret in SECRET_VALUES):
+                    continue
+                carried += 1
+                declared = module.types.get(key, "<undeclared>")
+                if declared.lower() not in secure_types:
+                    problems.append(
+                        f"{scenario}/{module.deployment}: parameter {key} carries a secret value but is declared {declared!r}, "
+                        "not securestring or secureObject"
+                    )
+    if carried == 0:
+        problems.append(
+            "no module parameter carries a secret value: the check saw nothing"
+        )
+    return problems
+
+
+# ---- bootstrap.bicep (B checks: the subscription-scope template the operator runs once) -------------------------------
+
+ACR_PULL = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
+ACR_PUSH = "8311e382-0749-4cb8-b61a-304f252e45ec"
+CONTRIBUTOR = "b24988ac-6180-42a0-ab88-20f7382dd24c"
+FEDERATED_CREDENTIAL = (
+    "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials"
+)
+
+
+def _role_assignments(snap: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every role assignment as {role, principal, scope: registry|group, type}.
+
+    The principal of an identity is the resource id it was read from (see Runtime); the operator's is its object id.
+    """
+    found = []
+    for res in snap["predictedResources"]:
+        if res["type"] != "Microsoft.Authorization/roleAssignments":
+            continue
+        props = res["properties"]
+        principal = props["principalId"]
+        found.append(
+            {
+                "role": str(props["roleDefinitionId"]).rsplit("/", 1)[-1],
+                "principal": principal.origin
+                if isinstance(principal, Runtime)
+                else str(principal),
+                "scope": "registry" if "/registries/" in res["id"] else "group",
+                "type": props.get("principalType"),
+            }
+        )
+    return found
+
+
+def _utc_month() -> str:
+    return datetime.now(UTC).strftime("%Y-%m")
+
+
+def check_b1(ws: Workspace) -> list[str]:
+    problems = []
+    first = _utc_month()
+    for scenario, override in (
+        ("boot-bare", None),
+        ("boot-full", None),
+        ("boot-month", BUDGET_MONTH_OVERRIDE),
+    ):
+        budgets = _resources(ws.snapshot(scenario), "Microsoft.Consumption/budgets")
+        if len(budgets) != 1:
+            problems.append(f"{scenario}: expected one budget, found {len(budgets)}")
+            continue
+        start = next(iter(budgets.values()))["properties"]["timePeriod"]["startDate"]
+        # A run that straddles midnight on the last day of a month may see either month.
+        months = {override} if override else {first, _utc_month()}
+        wanted = sorted(f"{m}-01T00:00:00Z" for m in months)
+        if start not in wanted:
+            how = "the BUDGET_MONTH override" if override else "the current UTC month"
+            problems.append(
+                f"{scenario}: budget startDate is {start!r}, expected {wanted} ({how})"
+            )
+    return problems
+
+
+def check_b2(ws: Workspace) -> list[str]:
+    problems = []
+    found = _resources(ws.snapshot("boot-full"), FEDERATED_CREDENTIAL)
+    if len(found) != 1:
+        problems.append(
+            f"boot-full: expected one federated credential, found {len(found)}"
+        )
+    for name, res in found.items():
+        props = res["properties"]
+        want = f"repo:{GITHUB_OWNER}/{GITHUB_REPO}:environment:demo"
+        if props.get("subject") != want:
+            problems.append(
+                f"{name}: subject is {props.get('subject')!r}, expected exactly {want!r}"
+            )
+        if props.get("issuer") != "https://token.actions.githubusercontent.com":
+            problems.append(f"{name}: issuer is {props.get('issuer')!r}")
+        if props.get("audiences") != ["api://AzureADTokenExchange"]:
+            problems.append(f"{name}: audiences are {props.get('audiences')!r}")
+        if not name.startswith("id-sb-deployer/"):
+            problems.append(f"{name}: not a credential of the deployer identity")
+    bare = _resources(ws.snapshot("boot-bare"), FEDERATED_CREDENTIAL)
+    if bare:
+        problems.append(
+            f"boot-bare: a federated credential is created although githubOwner is empty: {sorted(bare)}"
+        )
+    return problems
+
+
+def check_b3(ws: Workspace) -> list[str]:
+    problems = []
+    wanted = [
+        ("apps AcrPull on the registry", ACR_PULL, "id-sb-apps", "registry"),
+        ("deployer AcrPush on the registry", ACR_PUSH, "id-sb-deployer", "registry"),
+        ("deployer Contributor on the group", CONTRIBUTOR, "id-sb-deployer", "group"),
+    ]
+    for scenario, operator in (("boot-full", True), ("boot-bare", False)):
+        remaining = _role_assignments(ws.snapshot(scenario))
+        for label, role, who, scope in wanted:
+            hits = [
+                a
+                for a in remaining
+                if a["role"] == role and who in a["principal"] and a["scope"] == scope
+            ]
+            if len(hits) != 1:
+                problems.append(f"{scenario}: expected one {label}, found {len(hits)}")
+            else:
+                remaining.remove(hits[0])
+        if operator:
+            mine = [
+                a
+                for a in remaining
+                if a["role"] == ACR_PUSH
+                and a["scope"] == "registry"
+                and a["principal"] == OPERATOR_ID
+            ]
+            if len(mine) != 1:
+                problems.append(
+                    f"{scenario}: expected one AcrPush on the registry for the operator {OPERATOR_ID}, found {len(mine)}"
+                )
+            elif mine[0]["type"] != "User":
+                problems.append(
+                    f"{scenario}: the operator is a {mine[0]['type']!r}, not a User"
+                )
+            remaining = [a for a in remaining if a not in mine]
+        if remaining:
+            problems.append(f"{scenario}: unexpected role assignment(s): {remaining}")
+    return problems
+
+
+def check_b4(ws: Workspace) -> list[str]:
+    registries = _resources(
+        ws.snapshot("boot-bare"), "Microsoft.ContainerRegistry/registries"
+    )
+    if len(registries) != 1:
+        return [f"expected one registry, found {len(registries)}"]
+    props = next(iter(registries.values()))["properties"]
+    problems = []
+    if props.get("roleAssignmentMode") != "LegacyRegistryPermissions":
+        problems.append(
+            f"roleAssignmentMode is {props.get('roleAssignmentMode')!r}, not 'LegacyRegistryPermissions'"
+            " (AcrPull and AcrPush are not honoured in an ABAC-mode registry)"
+        )
+    for key in ("adminUserEnabled", "anonymousPullEnabled"):
+        if props.get(key) is not False:
+            problems.append(f"{key} is {props.get(key)!r}, not false")
+    arm = props.get("policies", {}).get("azureADAuthenticationAsArmPolicy", {})
+    if arm.get("status") != "enabled":
+        problems.append(
+            "azureADAuthenticationAsArmPolicy is not enabled (a managed-identity image pull needs the ARM-audience token)"
+        )
     return problems
 
 
@@ -736,6 +1146,26 @@ STATIC_CHECKS: dict[str, tuple[str, Check]] = {
     "C8": ("replay settings are identical on api and alerts", check_c8),
     "C9": ("no secret value in env values; every secretRef resolves", check_c9),
     "C10": ("phase 1 creates no app; a placeholder api creates no alerts", check_c10),
+    "C11": (
+        "every module parameter that carries a secret value is a securestring or secureObject",
+        check_c11,
+    ),
+    "B1": (
+        "bootstrap: budget startDate is <yyyy-MM>-01T00:00:00Z, by default and with BUDGET_MONTH",
+        check_b1,
+    ),
+    "B2": (
+        "bootstrap: federated credential subject is repo:<owner>/<repo>:environment:<env>, case kept; none without an owner",
+        check_b2,
+    ),
+    "B3": (
+        "bootstrap: role assignments are exactly apps AcrPull, deployer AcrPush and Contributor, plus operator AcrPush when given",
+        check_b3,
+    ),
+    "B4": (
+        "bootstrap: registry is LegacyRegistryPermissions, no admin user, no anonymous pull",
+        check_b4,
+    ),
 }
 
 

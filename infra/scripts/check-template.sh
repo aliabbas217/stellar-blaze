@@ -3,10 +3,15 @@
 #
 #   check-template.sh [--only C1,C3] <main.bicep>
 #
-# Prints one `PASS|FAIL C<n> <subject>` line per check (reasons indented under a FAIL) and exits 1 on any FAIL.
+# Prints one `PASS|FAIL <id> <subject>` line per check (reasons indented under a FAIL) and exits 1 on any FAIL.
+#   C1-C10  main.bicep: outputs, environment, apps, pins, migrate job, VAPID, replay settings, secrets, phases
+#   C11     every module parameter that carries a secret value is a securestring or secureObject (ARM redacts only those from
+#           the deployment history)
+#   B1-B4   bootstrap.bicep (next to main.bicep): budget start date, federated credential subject, role assignments, registry
 # The template directory is COPIED to a temporary directory first (`bicep snapshot` writes a file next to the
 # parameter file), and the checks run on dummy values only: the resources Bicep would create under several
-# scenarios (full, pinned ids, no push key, phase 1, placeholder images). The logic is in template_checks.py.
+# scenarios (full, pinned ids, no push key, phase 1, placeholder images; bootstrap with and without an owner and an
+# operator, and with a BUDGET_MONTH override). The logic is in template_checks.py.
 #
 # Needs bicep (BICEP_BIN, PATH, or the copy `az bicep install` leaves in ~/.azure/bin) and Python 3.10+.
 
