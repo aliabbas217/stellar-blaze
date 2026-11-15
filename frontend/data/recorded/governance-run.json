@@ -1,0 +1,43 @@
+{
+  "recorded_at": "2026-11-14T23:30:15.439Z",
+  "source": "msw-mock",
+  "site_id": "site-demo-mussafah",
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/sites/site-demo-mussafah/data-requests",
+    "sent_at": "2026-11-14T23:30:15.427Z",
+    "body": {
+      "subject": "worker",
+      "data_class": "health",
+      "worker_ref": "synthetic-example-worker"
+    }
+  },
+  "response": {
+    "status": 403,
+    "content_type": "application/problem+json",
+    "answered_at": "2026-11-14T23:30:15.439Z",
+    "body": {
+      "type": "urn:stellar-blaze:problem:individual-data-refused",
+      "title": "Individual data refused",
+      "status": 403,
+      "detail": "Individual health data is not held by this service and is never released to an employer (ADR 0004).",
+      "instance": "/api/v1/sites/site-demo-mussafah/data-requests",
+      "request_id": "mock-req-1"
+    }
+  },
+  "log": {
+    "site_id": "site-demo-mussafah",
+    "entries": [
+      {
+        "at": "2026-11-14T23:30:15.438Z",
+        "kind": "data_request.refused",
+        "outcome": "refused",
+        "actor_role": "employer",
+        "rule": "ADR 0004; PDPL purpose limitation",
+        "policy_version": "mock-0",
+        "config_version": 1,
+        "model_id": "mock"
+      }
+    ]
+  }
+}
