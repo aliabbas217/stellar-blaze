@@ -34,3 +34,6 @@ A third usable summer of data (the 2027 season, or a longer archive); a pilot si
 
 ## Links
 [ADR 0005](0005-data-truth-features-and-validation.md) · [0007](0007-ml-quantile-corrector-conformal.md) · [0034](0034-demo-strategy.md)
+
+## Amendments
+- **2026-11-15 (precision; decision text unchanged).** The Context's statement that B3d beat the corrector on temperature in development holds at **lead 1 only**: corrector minus B3d CRPS +0.051 [0.013, 0.091] (B3d better, the interval excludes zero); at leads 2 and 3 the development intervals include zero (B2 evaluation report section 5.2, commit `5951563`). Read "beat" in the Context as "was better at lead 1".
