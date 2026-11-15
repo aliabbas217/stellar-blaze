@@ -8,7 +8,7 @@ of the type: adding a field is a deliberate change here, not a keyword someone p
 from enum import StrEnum
 from typing import Protocol, Self
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from stellar_blaze.domain.risk.levels import AlertLevel
 
@@ -52,7 +52,18 @@ class DeliveryStatus(StrEnum):
 
 
 class DeliveryResult(BaseModel):
-    """The outcome of ``NotificationChannel.send``."""
+    """The outcome of ``NotificationChannel.send``.
+
+    The last four fields say HOW a failure failed, so the dispatch can classify it without parsing ``detail`` (ADR 0058,
+    second entry of 2026-11-15: one bounded retry of a transient failure for an operator-recorded stop). A channel is
+    ONE attempt per call and fills what it knows; every field is optional with a neutral default.
+
+    * ``http_status``: the status the push service answered (404 and 410 included), ``None`` when none was read.
+    * ``retry_after_s``: the ``Retry-After`` it sent, in seconds, at most one day; ``None`` when it sent none. A header
+      that could not be read is the one-day maximum, never ``None`` (an unreadable hint is not permission to retry).
+    * ``timed_out``: the attempt ended in a timeout (the channel's own, or the dispatch's per-attempt cut).
+    * ``attempts``: how many attempts the dispatch made for this result (set by the dispatch; a channel leaves it 1).
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -60,6 +71,10 @@ class DeliveryResult(BaseModel):
     status: DeliveryStatus
     provider_message_id: str | None = None
     detail: str | None = None
+    http_status: int | None = None
+    retry_after_s: float | None = Field(default=None, ge=0)
+    timed_out: bool = False
+    attempts: int = Field(default=1, ge=1)
 
 
 class NotificationChannel(Protocol):

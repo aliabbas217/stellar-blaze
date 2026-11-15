@@ -21,7 +21,9 @@ from stellar_blaze.ports.notifications import DeliveryResult, OutboundMessage
 # same cycle is the worst case of one site; operator stops are rate limited to 30 per 60 s per token and almost never
 # coincide). Beyond that bound nothing fails at once: the excess sends wait for a free connection INSIDE their
 # per-delivery deadline and, if none frees up, fail with ``deadline`` (a stop's recipients that cannot connect in time
-# are failed and counted, never retried). Raise the constant (and the host's file-descriptor limit) to provision more.
+# are failed and counted; the one bounded retry of ``application.alerts`` applies only to a transient failure with time
+# left in the send deadline, never to a send that waited for a connection until the deadline). Raise the constant
+# (and the host's file-descriptor limit) to provision more.
 MAX_SUBSCRIPTIONS_PER_CREW: Final = 200
 ORDINARY_SEND_CONCURRENCY: Final = 16
 SIMULTANEOUS_STOPS_PROVISIONED: Final = 4

@@ -25,7 +25,7 @@ stored on every ``alert_event`` row and in the ``alerts.dispatched`` audit row o
 failed something (``job_run`` is the heartbeat), so the decision record says how often the job was meant to run.
 
 Delivery design (the escalation SLA). A stop is delivered within one period PLUS the forecast-leg deadline PLUS one
-delivery deadline of being recorded (about 5 min 45 s with the defaults: 300 s + 30 s + 12 s), whatever any weather
+delivery deadline of being recorded (342 s with the defaults: 300 s + 30 s + 12 s), whatever any weather
 source or push service does: the worst case is a stop recorded just after the previous cycle read the stops; the next
 cycle starts one period after that one STARTED, spends at most the forecast-leg deadline in phase A (the forecast fetch
 is cut and the day falls back to the protective one, so the stop is still read and escalated), and its stop sends then
@@ -50,7 +50,19 @@ extension of the list), read per run. Each send
 is under a hard per-delivery deadline (the channel's timeout plus a margin) and the whole run under a per-run deadline
 anchored at the START OF THE CYCLE (``period - margin``, phase A counts against it): a send that times out, or that
 cannot start before the run deadline, counts as ``failed`` with detail ``deadline``, and the event row is still
-inserted after its own sends. The job loop is fixed-rate (``jobs.alerts``): the next run starts one period after the
+inserted after its own sends.
+
+One bounded retry, for OPERATOR-RECORDED stops only (ADR 0058, second entry of 2026-11-15; every other event is
+attempted ONCE). A stop's send that fails transiently (a timeout, HTTP 5xx, or 429 whose ``Retry-After`` is absent or at
+most ``RETRY_AFTER_CAP_S``) waits ``RETRY_BACKOFF_S`` (or that ``Retry-After``) and is attempted once more, INSIDE the
+same per-send deadline, in the same lane slot: the 342 s stop bound does not move. To make room, a stop's first attempt
+gets ``FIRST_ATTEMPT_SHARE`` of the deadline (7.2 s of 12 s) where an ordinary event keeps all of it, so a push service
+that works but needs 7.2 to 12 s to answer is now cut for a stop (and answered, if at all, for an ordinary event). The
+retry starts only if ``MIN_RETRY_WINDOW_S`` remains in the send deadline and in the run deadline. 404, 410, 413 and the
+other 4xx, a blocked or redirecting or oversized endpoint, the whole-run deadline and a channel fault are never retried
+(``plan_retry``, ``is_transient``). A stop that needed its retry counts ``delivered`` or ``failed`` by the LAST attempt
+and shows in ``DispatchReport.retried`` and the ``alerts.dispatched`` audit detail (``retried``, present only when
+positive). The job loop is fixed-rate (``jobs.alerts``): the next run starts one period after the
 previous one STARTED. ``period = max(60 s, alert_dispatch_interval_minutes x 60)``.
 
 Sign-off never gates an alert (class (d) invariant): this module takes no sign-off store and reads no sign-off state;
@@ -59,8 +71,10 @@ Sign-off never gates an alert (class (d) invariant): this module takes no sign-o
 Delivery bookkeeping is append-only: ``alert_event.delivered/failed`` are fixed at INSERT, so each event is SENT first
 and INSERTED after, with the counts. A crash between the send and the insert means the next run sends the event again
 (at-least-once delivery; a push is idempotent for the reader: the same level again). Once the row IS stored the event
-is never sent again: a failed delivery is not retried, so a stop is delivered AT MOST ONCE per recipient per event (a
-failed stop push shows in the event row's ``failed`` count and in the ``alerts.dispatched`` audit row). The dedupe key
+is never sent again: no later run retries a failed delivery. Delivery is AT MOST ONCE per recipient per event, with ONE
+exception: the in-run retry of a transient failure of an operator-recorded stop (above), so a stop is attempted at most
+twice and a forecast alert at most once (a failed push shows in the event row's ``failed`` count and in the
+``alerts.dispatched`` audit row). The dedupe key
 includes the id of the target's previous event (``none`` for the first): a retry of the same transition stays
 deduped, while a legitimate revisit of an earlier level (red, green, red again) is a new event. The key is also looked
 up BEFORE sending, so an event that is stored already is never sent again. With a file or env snapshot (``version_id is
@@ -70,7 +84,7 @@ None``) nothing is persisted and nothing is sent (``config_version`` 0).
 import asyncio
 import dataclasses
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Final, Literal
@@ -100,14 +114,21 @@ from stellar_blaze.ports.push import (
 from stellar_blaze.ports.sites import SiteRepository
 
 __all__ = [
+    "FIRST_ATTEMPT_SHARE",
+    "MIN_RETRY_WINDOW_S",
+    "RETRY_AFTER_CAP_S",
+    "RETRY_BACKOFF_S",
     "DeliveryLimits",
     "DispatchReport",
     "NewAlert",
     "Prepared",
+    "RetryPlan",
     "deliver",
     "dispatch",
+    "is_transient",
     "period_seconds",
     "plan_alert_events",
+    "plan_retry",
     "prepare",
 ]
 
@@ -120,6 +141,16 @@ STOP_LANE_CONCURRENCY: Final = MAX_SUBSCRIPTIONS_PER_CREW  # the size of EACH op
 MIN_PERIOD_S: Final = 60.0
 RUN_MARGIN_S: Final = 10.0  # the run deadline is the period minus this: a run ends before the next one starts
 DELIVERY_MARGIN_S: Final = 2.0  # the per-delivery deadline is the channel's own timeout plus this
+# The one bounded retry of an OPERATOR-RECORDED stop (ADR 0058, second entry of 2026-11-15). All of it happens INSIDE
+# the stop's per-send deadline (``DeliveryLimits.delivery_deadline_s``, 12 s with the defaults), so the published
+# stop bound does not move. The first attempt gets at most ``FIRST_ATTEMPT_SHARE`` of the deadline (7.2 s of 12 s); a
+# transient failure waits ``RETRY_BACKOFF_S`` (or the service's own ``Retry-After`` when it is at most
+# ``RETRY_AFTER_CAP_S``) and the retry gets what is left, but only if at least ``MIN_RETRY_WINDOW_S`` is left in the
+# send deadline AND in the run deadline.
+FIRST_ATTEMPT_SHARE: Final = 0.6
+RETRY_AFTER_CAP_S: Final = 2.0  # a Retry-After above this is not waited for: autopush's default is about 120 s
+RETRY_BACKOFF_S: Final = 1.0  # the wait when the service named none
+MIN_RETRY_WINDOW_S: Final = 2.0  # a retry that would get less than this is not started
 _ACTOR: Final = "alerts-dispatch"
 _ROLE: Final = "system"
 CHANGE_TEMPLATE: Final = "level-change"
@@ -203,6 +234,7 @@ class DispatchReport:
     delivered: int = 0
     failed: int = 0
     gone: int = 0
+    retried: int = 0  # sends of operator stops that needed their one retry (delivered or not)
     events: tuple[AlertRecord, ...] = ()
 
 
@@ -217,7 +249,8 @@ class DeliveryLimits:
     margin. ``monotonic`` is injectable (a test advances it). ``started_at`` is the ``monotonic`` reading at the START
     OF THE CYCLE: the run deadline is anchored there (phase A counts against the budget); ``None`` anchors it at the
     start of ``deliver``. ``stop_concurrency`` is the size of the reserved lane of EACH operator-recorded stop (a
-    semaphore per stop)."""
+    semaphore per stop). The retry knobs default to the named constants above (a test shrinks them); ``sleep`` is the
+    wait between a stop's two attempts (injectable, like ``monotonic``)."""
 
     concurrency: int = SEND_CONCURRENCY
     delivery_deadline_s: float | None = None
@@ -225,6 +258,11 @@ class DeliveryLimits:
     monotonic: Callable[[], float] = time.monotonic
     started_at: float | None = None
     stop_concurrency: int = STOP_LANE_CONCURRENCY
+    first_attempt_share: float = FIRST_ATTEMPT_SHARE
+    retry_after_cap_s: float = RETRY_AFTER_CAP_S
+    retry_backoff_s: float = RETRY_BACKOFF_S
+    min_retry_window_s: float = MIN_RETRY_WINDOW_S
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
 
 
 @dataclass(frozen=True)
@@ -385,6 +423,72 @@ def _is_stop(item: _Pending) -> bool:
     return item.operator_stop
 
 
+@dataclass(frozen=True)
+class RetryPlan:
+    """The one retry of an operator stop's send: wait ``wait_s``, then attempt with at most ``timeout_s``."""
+
+    wait_s: float
+    timeout_s: float
+
+
+def _retry_wait(result: DeliveryResult, cap_s: float, backoff_s: float) -> float | None:
+    """How long to wait before retrying ``result``, or ``None`` when it is not a transient failure.
+
+    Transient: a timeout (the channel's own, or the dispatch's per-attempt cut), HTTP 5xx, and HTTP 429. When the
+    service sent ``Retry-After`` it is honored if at most ``cap_s`` and the failure is NOT retried above it
+    (autopush's 429 default is about 120 s); with none, ``backoff_s``. Everything else is final: 4xx other than
+    429 (400, 401, 403, 404 and 410 gone, 413), a blocked or redirecting or oversized endpoint, the whole-run
+    deadline, a channel fault.
+    """
+    if result.status is not DeliveryStatus.FAILED:
+        return None
+    if result.timed_out:
+        return backoff_s
+    status = result.http_status
+    if status is None or not (status == 429 or 500 <= status <= 599):
+        return None
+    if result.retry_after_s is None:
+        return backoff_s
+    return result.retry_after_s if result.retry_after_s <= cap_s else None
+
+
+def is_transient(result: DeliveryResult, *, cap_s: float = RETRY_AFTER_CAP_S) -> bool:
+    """Whether ``result`` is a failure worth one retry (see ``_retry_wait``)."""
+    return _retry_wait(result, cap_s, RETRY_BACKOFF_S) is not None
+
+
+def plan_retry(
+    result: DeliveryResult,
+    *,
+    now: float,
+    send_deadline: float,
+    run_deadline: float,
+    cap_s: float = RETRY_AFTER_CAP_S,
+    backoff_s: float = RETRY_BACKOFF_S,
+    min_window_s: float = MIN_RETRY_WINDOW_S,
+) -> RetryPlan | None:
+    """The retry of a failed first attempt that ended at ``now``, or ``None`` (not transient, or too little time).
+
+    The retry starts after its wait and ends by ``min(send_deadline, run_deadline)``, so it can never run past the
+    stop's per-send deadline (which is what keeps the published stop bound); it is not started when that leaves less
+    than ``min_window_s``. All times are readings of the same monotonic clock.
+    """
+    wait = _retry_wait(result, cap_s, backoff_s)
+    if wait is None:
+        return None
+    timeout = min(send_deadline, run_deadline) - (now + wait)
+    if timeout < min_window_s:
+        return None
+    return RetryPlan(wait, timeout)
+
+
+def _retry_reason(result: DeliveryResult) -> str:
+    """The class of a transient failure for the log: never a host, a header value or a body."""
+    if result.timed_out:
+        return "timeout"
+    return "http_429" if result.http_status == 429 else "http_5xx"
+
+
 async def dispatch(
     *,
     site_day: SiteDay,
@@ -461,27 +565,67 @@ async def deliver(
     run_deadline = (mono() if bounds.started_at is None else bounds.started_at) + budget
     gate = asyncio.Semaphore(bounds.concurrency)
 
+    async def attempt(
+        active: PushChannel,
+        sub: SubscriptionRecord,
+        message: OutboundMessage,
+        extra_hosts: Sequence[str],
+        *,
+        limit_s: float,
+        by_cap: bool,
+    ) -> DeliveryResult:
+        """ONE call of the channel under ``limit_s``. ``by_cap``: a cut at ``limit_s`` is the attempt's own cap (a
+        transient timeout), not the end of the whole run."""
+        try:
+            return await asyncio.wait_for(
+                active.send_to(sub, message, extra_host_suffixes=extra_hosts), timeout=limit_s
+            )
+        except TimeoutError:
+            logger.error("alerts.send_deadline", subscription_id=sub.id)
+            return DeliveryResult(
+                channel=active.name, status=DeliveryStatus.FAILED, detail="deadline", timed_out=by_cap
+            )
+        except Exception as error:  # the contract says a result, not an exception: stay alive if one breaks it
+            logger.error("alerts.channel_raised", subscription_id=sub.id, error=type(error).__name__)
+            return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="error:channel_raised")
+
     async def send(
         active: PushChannel,
         sub: SubscriptionRecord,
         message: OutboundMessage,
         lane: asyncio.Semaphore,
         extra_hosts: Sequence[str],
+        stop: bool,
     ) -> DeliveryResult:
         async with lane:
-            remaining = run_deadline - mono()
+            started = mono()
+            remaining = run_deadline - started
             if remaining <= 0:
                 return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
-            try:
-                result = await asyncio.wait_for(
-                    active.send_to(sub, message, extra_host_suffixes=extra_hosts), timeout=min(per_send, remaining)
+            send_deadline = started + per_send  # the per-send deadline: ALL attempts of this send end inside it
+            first_cap = per_send * bounds.first_attempt_share if stop else per_send
+            result = await attempt(
+                active, sub, message, extra_hosts, limit_s=min(first_cap, remaining), by_cap=first_cap < remaining
+            )
+            if stop:  # an OPERATOR-RECORDED stop: one bounded retry of a transient failure, in its own lane
+                plan = plan_retry(
+                    result,
+                    now=mono(),
+                    send_deadline=send_deadline,
+                    run_deadline=run_deadline,
+                    cap_s=bounds.retry_after_cap_s,
+                    backoff_s=bounds.retry_backoff_s,
+                    min_window_s=bounds.min_retry_window_s,
                 )
-            except TimeoutError:
-                logger.error("alerts.send_deadline", subscription_id=sub.id)
-                return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
-            except Exception as error:  # the contract says a result, not an exception: stay alive if one breaks it
-                logger.error("alerts.channel_raised", subscription_id=sub.id, error=type(error).__name__)
-                return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="error:channel_raised")
+                if plan is not None:
+                    logger.warning("alerts.send_retry", subscription_id=sub.id, attempt=2, reason=_retry_reason(result))
+                    await bounds.sleep(plan.wait_s)
+                    window = min(send_deadline, run_deadline) - mono()  # the wait may have overshot
+                    if window >= bounds.min_retry_window_s:
+                        again = await attempt(
+                            active, sub, message, extra_hosts, limit_s=window, by_cap=send_deadline <= run_deadline
+                        )
+                        result = again.model_copy(update={"attempts": 2})
         if _is_gone(result):
             await subs.delete_gone(sub.id)
         return result
@@ -502,14 +646,17 @@ async def deliver(
         # (``push_extra_host_suffixes``): the channel refuses any other host at send time, at once (FAILED ``blocked``).
         extra_hosts = prepared[i].snapshot.config.push_extra_host_suffixes
         sends[(i, j)] = (
-            [asyncio.create_task(send(channel, sub, item.message, lane, extra_hosts)) for sub in item.recipients]
+            [
+                asyncio.create_task(send(channel, sub, item.message, lane, extra_hosts, _is_stop(item)))
+                for sub in item.recipients
+            ]
             if channel is not None
             else []
         )
     stored: dict[tuple[int, int], asyncio.Future[None]] = {
         (i, j): asyncio.get_running_loop().create_future() for i, j in order
     }
-    totals = [[0, 0, 0] for _ in prepared]  # delivered, failed, gone
+    totals = [[0, 0, 0, 0] for _ in prepared]  # delivered, failed, gone, retried
     created: list[list[AlertRecord]] = [[] for _ in prepared]
 
     async def finish(i: int, j: int) -> None:
@@ -521,6 +668,7 @@ async def deliver(
                 await stored[(i, item.after)]  # one target's events are stored in the order they were planned
             ok = sum(r.status is DeliveryStatus.DELIVERED for r in results)
             bad = sum(r.status is DeliveryStatus.FAILED for r in results)
+            retried = sum(r.attempts > 1 for r in results)
             record = await alerts.insert(
                 AlertEventInput(
                     site_id=day.site.id,
@@ -550,6 +698,7 @@ async def deliver(
         totals[i][0] += ok
         totals[i][1] += bad
         totals[i][2] += sum(_is_gone(r) for r in results)
+        totals[i][3] += retried
         if record is not None:
             created[i].append(record)
         logger.info(
@@ -560,19 +709,21 @@ async def deliver(
             kind=item.alert.kind,
             delivered=ok,
             failed=bad,
+            retried=retried,
             stored=record is not None,
         )
 
     outcomes = await asyncio.gather(*(finish(i, j) for i, j in order), return_exceptions=True)
     reports: list[DispatchReport] = []
     for i, p in enumerate(prepared):
-        delivered, failed, gone = totals[i]
+        delivered, failed, gone, retried = totals[i]
         report = dataclasses.replace(
             p.report,
             events_created=len(created[i]),
             delivered=delivered,
             failed=failed,
             gone=gone,
+            retried=retried,
             events=tuple(created[i]),
         )
         reports.append(report)
@@ -595,6 +746,8 @@ def _audit_event(prepared: Prepared, report: DispatchReport) -> AuditEvent:
         "interval_minutes": report.interval_minutes,
         "push_configured": report.push_configured,
     }
+    if report.retried:  # additive: present only when an operator stop's send needed its one retry
+        detail["retried"] = report.retried
     return AuditEvent(
         kind="alerts.dispatched",
         actor=_ACTOR,

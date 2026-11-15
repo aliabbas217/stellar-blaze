@@ -298,7 +298,9 @@ async def create_crew_stop(
 
     Stop recorded. It is visible on the next read. Push alerts follow when the alert dispatch job is running: within
     one dispatch interval of the stop plus the time the cycle itself takes (the forecast fetch is cut at 30 s and a
-    push at 12 s), about 5 min 42 s with the default 5-minute interval.
+    push at 12 s), about 5 min 42 s with the default 5-minute interval. A push that fails with a transient error
+    (a 5xx, a 429 with a short Retry-After, a timeout) is tried once more inside that 12 s; no other push is tried
+    twice.
 
     Idempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch
     returns that stop (201, same body, no second row, no second audit row).

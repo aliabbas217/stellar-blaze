@@ -883,6 +883,10 @@ ALERT_SENTENCE = (
     "the cycle itself takes (the forecast fetch is cut at 30 s and a push at 12 s), about 5 min 42 s with the default "
     "5-minute interval."
 )
+RETRY_SENTENCE = (
+    "A push that fails with a transient error (a 5xx, a 429 with a short Retry-After, a timeout) is tried once more "
+    "inside that 12 s; no other push is tried twice."
+)
 RESUME_SENTENCE = (
     "A de-escalation alert follows after the de-escalation dwell, at the next alert dispatch cycle once the dwell has "
     "elapsed (one dispatch interval at most, plus the time the cycle itself takes)."
@@ -902,9 +906,13 @@ def test_stop_and_sign_off_copy_never_claims_delivery(spec: dict[str, Any]) -> N
         schemas(spec)["CrewStop"]["description"],
     ]
     for text in texts:
-        flat = " ".join(text.split()).replace(ALERT_SENTENCE, "").replace(RESUME_SENTENCE, "")
+        flat = (
+            " ".join(text.split()).replace(ALERT_SENTENCE, "").replace(RETRY_SENTENCE, "").replace(RESUME_SENTENCE, "")
+        )
         assert not claim.search(flat), text
     assert "Stop recorded" in stop_texts[0]
     assert " ".join(stop_texts[0].split()).count(ALERT_SENTENCE) == 1
+    assert " ".join(stop_texts[0].split()).count(RETRY_SENTENCE) == 1  # ADR 0058, second entry of 2026-11-15
+    assert RETRY_SENTENCE not in " ".join(stop_texts[1].split())
     assert " ".join(stop_texts[1].split()).count(RESUME_SENTENCE) == 1
     assert "Resume recorded" in stop_texts[1]

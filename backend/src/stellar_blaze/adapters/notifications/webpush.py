@@ -9,10 +9,12 @@ against the installed 2.5.0 source and by ``test_the_real_library_accepts_these_
   stall the dispatch) and a FRESH ``vapid_claims`` dict per call (it writes ``aud`` and ``exp`` into the dict);
 * a status above 202 raises ``WebPushException`` with ``status_code``: 404 and 410 mean the subscription is gone (it is
   deleted and the result says ``gone:<status>``); 429 and 5xx are ``http:<status>`` and keep it (``Retry-After`` is
-  logged only). NOTHING retries a failed delivery: the event row is stored (and deduplicated) after its sends, so a
-  push that failed is never sent again. For a stop that means AT MOST ONCE per recipient per event: a failed stop push
-  is visible only in the event row's ``failed`` count and the ``alerts.dispatched`` audit row. Anything else is
-  ``error:<ExceptionClass>``;
+  logged and reported as ``DeliveryResult.retry_after_s``, bounded). ``send_to`` is ONE attempt and reports how it
+  failed (``http_status``, ``retry_after_s``, ``timed_out``: a ``TimeoutError``, aiohttp's included); it never
+  retries. The RETRY decision is the dispatch's (``application.alerts``): the event row is stored (and
+  deduplicated) after its sends, so a push that failed is never sent by a later run, and within the run only an
+  operator-recorded stop gets ONE bounded retry of a transient failure (5xx, 429 with a short ``Retry-After``, a
+  timeout); every other event is AT MOST ONCE. Anything else is ``error:<ExceptionClass>``;
 * ``str(exception)`` quotes the response body and the endpoint: it is never logged or returned. Logs carry the
   subscription id and class names only.
 
@@ -46,9 +48,11 @@ of push services (ADR 0067), which is what keeps a hostile or hanging host out o
 
 import ipaddress
 import json
+import re
 import socket
 from collections.abc import Awaitable, Callable, Sequence
-from datetime import UTC
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from types import SimpleNamespace
 from typing import Any, Final, cast
 
@@ -63,6 +67,7 @@ from stellar_blaze.ports.push_endpoint import check_send_endpoint
 
 __all__ = [
     "MAX_RESPONSE_BYTES",
+    "MAX_RETRY_AFTER_S",
     "TTL_SECONDS",
     "BlockedAddressError",
     "PublicOnlyResolver",
@@ -80,6 +85,10 @@ CONTENT_ENCODING: Final = "aes128gcm"
 # A push service answers 201 with an empty body and an error with a few hundred bytes: wire bytes read per response.
 MAX_RESPONSE_BYTES: Final = 16 * 1024
 _GONE: Final = frozenset({404, 410})  # RFC 8030 section 7.3 (404 expired); 410 is the browsers' usual answer
+# The largest ``Retry-After`` the channel reports, in seconds. It is also what an UNREADABLE header is reported as:
+# "absent" earns the dispatch's short default backoff, an unreadable hint must never be read as permission to retry.
+MAX_RETRY_AFTER_S: Final = 86400.0
+_DELAY_SECONDS: Final = re.compile(r"[0-9]+")  # RFC 9110 section 10.2.3: delay-seconds is 1*DIGIT (ASCII, no sign)
 
 type Sender = Callable[..., Awaitable[object]]
 
@@ -95,6 +104,27 @@ def payload_of(message: OutboundMessage) -> dict[str, str | int]:
         "template_id": message.template_id,
         "valid_from": message.valid_from.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+
+
+def retry_after_seconds(raw: str | None, *, now: datetime | None = None) -> float | None:
+    """The ``Retry-After`` header value as seconds, bounded to ``[0, MAX_RETRY_AFTER_S]``.
+
+    ``None`` when the header is absent. delay-seconds is digits only; an HTTP date is the seconds from ``now`` (never
+    negative). Anything else (empty, signed, a fraction, an exponent, ``nan``, a date that does not parse) is reported
+    as ``MAX_RETRY_AFTER_S``, so a hint the channel cannot read is never mistaken for "retry soon" (RFC 9110 10.2.3).
+    """
+    if raw is None:
+        return None
+    text = raw.strip()
+    if _DELAY_SECONDS.fullmatch(text):
+        return min(float(int(text)), MAX_RETRY_AFTER_S)
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError):
+        return MAX_RETRY_AFTER_S
+    if when.tzinfo is None:
+        return MAX_RETRY_AFTER_S  # an HTTP date is always GMT: a zone-less answer is not one
+    return min(max((when - (now or datetime.now(UTC))).total_seconds(), 0.0), MAX_RETRY_AFTER_S)
 
 
 class RedirectRefusedError(Exception):
@@ -301,6 +331,9 @@ class WebPushChannel:
         except ResponseTooLargeError:
             logger.warning("webpush.response_too_large", subscription_id=sub.id, error="ResponseTooLargeError")
             return self._result("response_too_large")
+        except TimeoutError as error:  # also aiohttp's ServerTimeoutError family: the dispatch may retry a stop
+            logger.warning("webpush.failed", subscription_id=sub.id, error=type(error).__name__)
+            return self._result(f"error:{type(error).__name__}", timed_out=True)
         except Exception as error:  # a delivery failure is a result, never an exception (``PushChannel``)
             logger.warning("webpush.failed", subscription_id=sub.id, error=type(error).__name__)
             return self._result(f"error:{type(error).__name__}")
@@ -312,8 +345,22 @@ class WebPushChannel:
             await session.close()
             await self._resolver.close()
 
-    def _result(self, detail: str) -> DeliveryResult:
-        return DeliveryResult(channel=self.name, status=DeliveryStatus.FAILED, detail=detail)
+    def _result(
+        self,
+        detail: str,
+        *,
+        http_status: int | None = None,
+        retry_after_s: float | None = None,
+        timed_out: bool = False,
+    ) -> DeliveryResult:
+        return DeliveryResult(
+            channel=self.name,
+            status=DeliveryStatus.FAILED,
+            detail=detail,
+            http_status=http_status,
+            retry_after_s=retry_after_s,
+            timed_out=timed_out,
+        )
 
     def _session_in_use(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -333,9 +380,11 @@ class WebPushChannel:
         if status in _GONE:
             await self._subs.delete_gone(sub.id)
             logger.info("webpush.subscription_gone", subscription_id=sub.id, status=status)
-            return self._result(f"gone:{status}")
+            return self._result(f"gone:{status}", http_status=status)
         if status is not None:
             logger.warning("webpush.rejected", subscription_id=sub.id, status=status, retry_after=error.retry_after)
-            return self._result(f"http:{status}")
+            return self._result(
+                f"http:{status}", http_status=status, retry_after_s=retry_after_seconds(error.retry_after)
+            )
         logger.warning("webpush.failed", subscription_id=sub.id, error=type(error).__name__)
         return self._result(f"error:{type(error).__name__}")
