@@ -36,6 +36,19 @@ function dateQuery(date: string | undefined): { date?: string } {
 
 // --- Reads -----------------------------------------------------------------------------------------------------------------
 
+/**
+ * A site's forecast for today (a public read, no credential). The supervisor's crews read it for the replay stamp, the
+ * freshness rule and the heat colour of each hour. The key is the one the worker's Today uses, so the demo clock
+ * (`useClock`, which reads the newest forecast in the cache) works on every screen that holds it.
+ */
+export function siteForecastQueryOptions(siteId: string) {
+  return queryOptions<Schemas["SiteForecastToday"], ApiProblem>({
+    queryKey: queryKeys.today(siteId),
+    queryFn: ({ signal }) =>
+      orThrow(apiClient.GET("/api/v1/sites/{site_id}/forecast/today", { params: { path: { site_id: siteId } }, signal })),
+  });
+}
+
 /** The crews of a site with their stop and sign-off state for `date` (omitted: the API's default date). */
 export function crewsQueryOptions(siteId: string, date?: string) {
   return queryOptions<Schemas["Crew"][], ApiProblem>({
@@ -104,8 +117,13 @@ export function stopMutation(crewId: string) {
   return mutationOptions<Schemas["CrewStop"], ApiProblem, Schemas["CrewStopCreate"]>({
     mutationKey: ["crew-stop", crewId],
     networkMode: "always",
-    mutationFn: (body) => orThrow(apiClient.POST("/api/v1/crews/{crew_id}/stops", { params: { path: { crew_id: crewId } }, body })),
+    mutationFn: (body) => postStop(crewId, body),
   });
+}
+
+/** The stop request itself, for the mutation above and for the Stop outbox, which sends a stop pressed with no signal later. */
+export function postStop(crewId: string, body: Schemas["CrewStopCreate"]): Promise<Schemas["CrewStop"]> {
+  return orThrow(apiClient.POST("/api/v1/crews/{crew_id}/stops", { params: { path: { crew_id: crewId } }, body }));
 }
 
 /** Clears a stop: the 10 second undo, or the end of the stop. The variable is the stop id. */

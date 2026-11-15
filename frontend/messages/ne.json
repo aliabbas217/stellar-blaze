@@ -469,7 +469,94 @@
       "shareRow": "एम्बरभन्दा माथि समूहको अंश",
       "date": "मिति"
     },
-    "suppressed": "{k} जनाभन्दा कम मानिस, गोपनीयता जोगाउन विवरण लुकाइएको छ"
+    "suppressed": "{k} जनाभन्दा कम मानिस, गोपनीयता जोगाउन विवरण लुकाइएको छ",
+    "crews": {
+      "pageTitle": "Crews today",
+      "kicker": "Needs you first",
+      "strips": {
+        "aria": "Crews today, worst first. Now {now}.",
+        "ariaBreak": "Crews today, worst first. Midday break {from} to {to}. Now {now}.",
+        "legend": "Bar height is the crew's level. Colour is the heat of the hour. Only shift hours are drawn.",
+        "now": "Now"
+      },
+      "focal": {
+        "workingCycleBreak": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi> (<bdi>{cycle}</bdi>); midday break in <bdi>{breakIn}</bdi>.",
+        "workingCycle": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi> (<bdi>{cycle}</bdi>).",
+        "workingBreak": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi>; midday break in <bdi>{breakIn}</bdi>.",
+        "working": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi>.",
+        "off": "<bdi>{crew}</bdi> is off shift now. Back at <bdi>{start}</bdi> into <bdi>{level}</bdi>.",
+        "offNoStart": "<bdi>{crew}</bdi> is off shift now.",
+        "stopped": "<bdi>{crew}</bdi> stopped work at <bdi>{time}</bdi>.",
+        "noLevel": "No level for <bdi>{crew}</bdi> right now. Follow the protective plan.",
+        "cycle": "work {work}, rest {rest}"
+      },
+      "duration": {
+        "minutes": "{minutes} min",
+        "hours": "{hours} h",
+        "hoursMinutes": "{hours} h {minutes} min"
+      },
+      "row": {
+        "working": "<bdi>{level}</bdi> until <bdi>{until}</bdi>",
+        "off": "Off, <bdi>{level}</bdi> at <bdi>{start}</bdi>",
+        "offNoStart": "Off now",
+        "none": "No level",
+        "stopped": "Work stopped <bdi>{time}</bdi>",
+        "noShift": "No shift today",
+        "plan": {
+          "signed": "Plan signed",
+          "unsigned": "Plan unsigned",
+          "changed": "Plan changed since signed"
+        },
+        "runs": "Levels by hour: {runs}.",
+        "run": "{level} {from} to {to}",
+        "openPlan": "Open plan"
+      },
+      "primary": "Open <bdi>{crew}</bdi> plan",
+      "footnote": {
+        "one": "<bdi>{crews}</bdi> has fewer than <bdi>{k}</bdi> people, so its health detail is hidden to protect privacy. Its level is shown.",
+        "many": "<bdi>{crews}</bdi> have fewer than <bdi>{k}</bdi> people, so their health detail is hidden to protect privacy. Their levels are shown."
+      },
+      "stale": {
+        "title": "No fresh forecast: protective plan",
+        "body": "Crews see the protective plan until the forecast refreshes. Stop work is not affected."
+      },
+      "offline": {
+        "title": "You are offline",
+        "body": "What is on screen may be out of date. Stop work is kept on this phone and sent when it is back online."
+      },
+      "error": {
+        "title": "Crew status did not load"
+      },
+      "empty": {
+        "title": "No crews at this site yet",
+        "reason": "Crews appear here once they are added for this site.",
+        "primary": "Back to the start"
+      }
+    },
+    "stop": {
+      "region": "Stop work",
+      "button": "Stop work, <bdi>{crew}</bdi>",
+      "sending": "Sending the stop",
+      "recorded": "<bdi>{crew}</bdi> stopped <bdi>{time}</bdi>. Stop recorded. Tell the crew now.",
+      "undo": "Undo ({seconds} s)",
+      "undoFailed": "Undo was not sent. Try again, or use Resume work.",
+      "stoppedBar": "Work stopped <bdi>{time}</bdi>",
+      "stoppedDetail": "<bdi>{crew}</bdi>. Stop recorded. Tell the crew now.",
+      "resume": "Resume work",
+      "resumeTitle": "Resume work for <bdi>{crew}</bdi>?",
+      "resumeBody": "This ends the stop recorded at <bdi>{time}</bdi>.",
+      "resumeConfirm": "Resume work",
+      "resumeCancel": "Keep work stopped",
+      "resumeFailed": "Resume was not sent. Try again.",
+      "queued": "Not sent: no signal. Tell the crew now.",
+      "queuedDetail": "The stop for <bdi>{crew}</bdi> is kept on this phone and sent when it is back online.",
+      "failed": "Not sent. Tell the crew now.",
+      "failedDetail": "Press Stop work to try again.",
+      "noCrew": "The crew list did not load. Tell the crew to stop work now.",
+      "theCrew": "The crew",
+      "buttonGeneric": "Stop work",
+      "noCrews": "There are no crews at this site to stop."
+    }
   },
   "hse": {
     "title": "एचएसई सारांश",
