@@ -5,11 +5,19 @@ audit row and error carries the subscription ``id`` instead.
 """
 
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Final, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from stellar_blaze.ports.notifications import DeliveryResult, OutboundMessage
+
+# The public subscribe route is capped at this many subscriptions per crew and epoch. The dispatch gives crew red
+# escalations (stops) a send lane of exactly this size, so one crew's recipients all send at once whatever the other
+# lane does; ``ORDINARY_SEND_CONCURRENCY`` is the lane of every other event. A channel that pools connections must allow
+# at least ``CONNECTION_LIMIT`` of them (the sum of both lanes).
+MAX_SUBSCRIPTIONS_PER_CREW: Final = 200
+ORDINARY_SEND_CONCURRENCY: Final = 16
+CONNECTION_LIMIT: Final = MAX_SUBSCRIPTIONS_PER_CREW + ORDINARY_SEND_CONCURRENCY
 
 
 class NewSubscription(BaseModel):

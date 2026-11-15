@@ -22,26 +22,35 @@ recorded between two runs is escalated by the NEXT run: one immediate ``red`` cr
 stored on every ``alert_event`` row and in the ``alerts.dispatched`` audit row of each run that created, delivered or
 failed something (``job_run`` is the heartbeat), so the decision record says how often the job was meant to run.
 
-Delivery design (the escalation SLA). A stop reaches a crew within ONE DISPATCH PERIOD of being recorded, whatever any
-push service does. ``prepare`` (phase A: every target of a site, database reads only, no call to a push service)
-computes the new events and their recipients; ``deliver`` (phase B, over every prepared site at once) sends them all
-concurrently under one bounded semaphore, ORDERED by severity (escalations before de-escalations, higher level first,
-crew before site: a stop is a red crew escalation, so it is first in the queue), each send under a hard per-delivery
-deadline (the channel's timeout plus a margin) and the whole run under a per-run deadline (``period - margin``): a send
-that times out, or that cannot start before the run deadline, counts as ``failed`` with detail ``deadline``, and the
-event row is still inserted after its own sends. The job loop is fixed-rate (``jobs.alerts``): the next run starts one
-period after the previous one STARTED. ``period = max(60 s, alert_dispatch_interval_minutes x 60)``.
+Delivery design (the escalation SLA). A stop is delivered within one period PLUS the forecast-leg deadline PLUS one
+delivery deadline of being recorded (about 5 min 45 s with the defaults: 300 s + 30 s + 12 s), whatever any weather
+source or push service does: the worst case is a stop recorded just after the previous cycle read the stops; the next
+cycle starts one period after that one STARTED, spends at most the forecast-leg deadline in phase A (the forecast fetch
+is cut and the day falls back to the protective one, so the stop is still read and escalated), and its stop sends then
+start at once in their own lane and end within one delivery deadline. ``prepare`` (phase A: every target of a site,
+database reads only, no call to a push service) computes the new events and their recipients; ``deliver`` (phase B, over
+every prepared site at once) sends them all concurrently, ORDERED by severity (escalations before de-escalations, higher
+level first, crew before site: a stop is a red crew escalation, so it is first in the queue). Ordinary events share one
+bounded semaphore (16); crew red escalations (stops) have a RESERVED lane sized to the per-crew subscription cap (200),
+so a crew's recipients all send at once and public subscriptions that hang can neither queue nor delay them. Each send
+is under a hard per-delivery deadline (the channel's timeout plus a margin) and the whole run under a per-run deadline
+anchored at the START OF THE CYCLE (``period - margin``, phase A counts against it): a send that times out, or that
+cannot start before the run deadline, counts as ``failed`` with detail ``deadline``, and the event row is still
+inserted after its own sends. The job loop is fixed-rate (``jobs.alerts``): the next run starts one period after the
+previous one STARTED. ``period = max(60 s, alert_dispatch_interval_minutes x 60)``.
 
 Sign-off never gates an alert (class (d) invariant): this module takes no sign-off store and reads no sign-off state;
 ``test_the_dispatch_import_graph_has_no_signoff`` is the proof and fails if one is ever imported.
 
 Delivery bookkeeping is append-only: ``alert_event.delivered/failed`` are fixed at INSERT, so each event is SENT first
 and INSERTED after, with the counts. A crash between the send and the insert means the next run sends the event again
-(at-least-once delivery; a push is idempotent for the reader: the same level again). The dedupe key includes the id of
-the target's previous event (``none`` for the first): a retry of the same transition stays deduped, while a legitimate
-revisit of an earlier level (red, green, red again) is a new event. The key is also looked up BEFORE sending, so an
-event that is stored already is never sent again. With a file or env snapshot (``version_id is None``) nothing is
-persisted and nothing is sent (``config_version`` 0).
+(at-least-once delivery; a push is idempotent for the reader: the same level again). Once the row IS stored the event
+is never sent again: a failed delivery is not retried, so a stop is delivered AT MOST ONCE per recipient per event (a
+failed stop push shows in the event row's ``failed`` count and in the ``alerts.dispatched`` audit row). The dedupe key
+includes the id of the target's previous event (``none`` for the first): a retry of the same transition stays
+deduped, while a legitimate revisit of an earlier level (red, green, red again) is a new event. The key is also looked
+up BEFORE sending, so an event that is stored already is never sent again. With a file or env snapshot (``version_id is
+None``) nothing is persisted and nothing is sent (``config_version`` 0).
 """
 
 import asyncio
@@ -66,7 +75,13 @@ from stellar_blaze.ports.alerts import AlertEventInput, AlertRecord, AlertStore
 from stellar_blaze.ports.audit import AuditEvent, AuditLog
 from stellar_blaze.ports.notifications import DeliveryResult, DeliveryStatus, OutboundMessage
 from stellar_blaze.ports.plans import CrewStopStore
-from stellar_blaze.ports.push import PushChannel, PushSubscriptionStore, SubscriptionRecord
+from stellar_blaze.ports.push import (
+    MAX_SUBSCRIPTIONS_PER_CREW,
+    ORDINARY_SEND_CONCURRENCY,
+    PushChannel,
+    PushSubscriptionStore,
+    SubscriptionRecord,
+)
 from stellar_blaze.ports.sites import SiteRepository
 
 __all__ = [
@@ -85,7 +100,8 @@ logger = structlog.stdlib.get_logger(__name__)
 
 _HOUR: Final = timedelta(hours=1)
 _ORDER: Final = tuple(AlertLevel)  # declared in ascending severity
-SEND_CONCURRENCY: Final = 16
+SEND_CONCURRENCY: Final = ORDINARY_SEND_CONCURRENCY
+STOP_LANE_CONCURRENCY: Final = MAX_SUBSCRIPTIONS_PER_CREW  # the reserved lane of crew red escalations
 MIN_PERIOD_S: Final = 60.0
 RUN_MARGIN_S: Final = 10.0  # the run deadline is the period minus this: a run ends before the next one starts
 DELIVERY_MARGIN_S: Final = 2.0  # the per-delivery deadline is the channel's own timeout plus this
@@ -183,12 +199,16 @@ def period_seconds(interval_minutes: int) -> float:
 @dataclass(frozen=True)
 class DeliveryLimits:
     """Bounds of phase B. ``None`` deadlines are derived: the channel's timeout plus a margin, and the period minus a
-    margin. ``monotonic`` is injectable (a test advances it)."""
+    margin. ``monotonic`` is injectable (a test advances it). ``started_at`` is the ``monotonic`` reading at the START
+    OF THE CYCLE: the run deadline is anchored there (phase A counts against the budget); ``None`` anchors it at the
+    start of ``deliver``. ``stop_concurrency`` is the size of the reserved lane of crew red escalations."""
 
     concurrency: int = SEND_CONCURRENCY
     delivery_deadline_s: float | None = None
     run_budget_s: float | None = None
     monotonic: Callable[[], float] = time.monotonic
+    started_at: float | None = None
+    stop_concurrency: int = STOP_LANE_CONCURRENCY
 
 
 @dataclass(frozen=True)
@@ -316,8 +336,17 @@ async def prepare(
 
 
 def _priority(item: _Pending) -> tuple[int, int, int]:
-    """Send order: escalations first, then the higher level, then crew before site (a stop is a red crew escalation)."""
+    """Send order: escalations first, then the higher level, then crew before site (a stop is a red crew escalation).
+
+    Severity comes first on purpose: inside ONE target a later, more severe planned event is therefore sent BEFORE an
+    earlier, milder one (the wire order can invert the planned order; the client reads each event's ``valid_from``, and
+    the most severe announcement must not wait behind a milder one). The rows are still stored in planned order."""
     return (0 if item.alert.kind == "escalate" else 1, -_rank(item.alert.level), 0 if item.message.crew_id else 1)
+
+
+def _is_stop(item: _Pending) -> bool:
+    """A crew RED escalation: what a crew-lead stop produces (a forecast red for the crew too): the reserved lane."""
+    return item.message.crew_id is not None and item.alert.level is AlertLevel.RED and item.alert.kind == "escalate"
 
 
 async def dispatch(
@@ -350,8 +379,8 @@ async def dispatch(
         snapshot: The active config snapshot; with no ``version_id`` nothing is persisted and nothing is sent.
         catalog: The rulesets (the tunables resolve against the one in force on the date).
         now: The DOMAIN time of the run (a replay clock in replay mode), timezone-aware.
-        limits: Phase B bounds (defaults: 16 concurrent sends, the channel's timeout plus 2 s per send, the period minus
-            10 s for the run).
+        limits: Phase B bounds (defaults: 16 concurrent sends and a reserved 200-send lane for crew red escalations,
+            the channel's timeout plus 2 s per send, the period minus 10 s for the run).
 
     Raises:
         ConfigParametersError, NoRulesetError, RulesetIncompleteError, SiteNotFoundError: Deployment or caller faults.
@@ -393,11 +422,14 @@ async def deliver(
     per_send = bounds.delivery_deadline_s
     if per_send is None:
         per_send = (channel.timeout_s if channel is not None else 0.0) + DELIVERY_MARGIN_S
-    run_deadline = mono() + budget
+    run_deadline = (mono() if bounds.started_at is None else bounds.started_at) + budget
     gate = asyncio.Semaphore(bounds.concurrency)
+    stop_gate = asyncio.Semaphore(bounds.stop_concurrency)
 
-    async def send(active: PushChannel, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
-        async with gate:
+    async def send(
+        active: PushChannel, sub: SubscriptionRecord, message: OutboundMessage, lane: asyncio.Semaphore
+    ) -> DeliveryResult:
+        async with lane:
             remaining = run_deadline - mono()
             if remaining <= 0:
                 return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
@@ -422,8 +454,9 @@ async def deliver(
     sends: dict[tuple[int, int], list[asyncio.Task[DeliveryResult]]] = {}
     for i, j in order:
         item = prepared[i].pending[j]
+        lane = stop_gate if _is_stop(item) else gate
         sends[(i, j)] = (
-            [asyncio.create_task(send(channel, sub, item.message)) for sub in item.recipients]
+            [asyncio.create_task(send(channel, sub, item.message, lane)) for sub in item.recipients]
             if channel is not None
             else []
         )

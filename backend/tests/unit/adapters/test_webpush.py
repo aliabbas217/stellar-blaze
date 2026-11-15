@@ -5,18 +5,29 @@ runs the REAL library against a local push service to prove the parameter names 
 import base64
 import json
 import logging
+import socket
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
+import aiohttp
 import pytest
 import structlog
+from aiohttp import web
+from aiohttp.abc import AbstractResolver, ResolveResult
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from pywebpush import WebPushException
 
 from stellar_blaze.adapters.fakes.push import InMemoryPushStore
-from stellar_blaze.adapters.notifications.webpush import WebPushChannel, payload_of
+from stellar_blaze.adapters.notifications.webpush import (
+    BlockedAddressError,
+    PublicOnlyResolver,
+    WebPushChannel,
+    payload_of,
+)
 from stellar_blaze.ports.notifications import Audience, DeliveryStatus, OutboundMessage
-from stellar_blaze.ports.push import NewSubscription, SubscriptionRecord
+from stellar_blaze.ports.push import CONNECTION_LIMIT, NewSubscription, SubscriptionRecord
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
@@ -240,3 +251,159 @@ async def test_the_real_library_accepts_these_parameters_and_reports_a_gone_subs
     assert lowered["authorization"].startswith("vapid ")
     plain = http_ece.decrypt(body, private_key=browser_key, auth_secret=auth)
     assert json.loads(plain) == payload_of(message())
+
+
+# --- W4: the shared session refuses redirects and names that resolve to non-public addresses -----------------
+
+
+class FakeDns(AbstractResolver):
+    """A resolver with a fixed answer per name; ``asked`` records the names it was asked."""
+
+    def __init__(self, answers: dict[str, list[str]]) -> None:
+        self.answers = answers
+        self.asked: list[str] = []
+
+    async def resolve(
+        self, host: str, port: int = 0, family: socket.AddressFamily = socket.AF_INET
+    ) -> list[ResolveResult]:
+        self.asked.append(host)
+        return [
+            ResolveResult(
+                hostname=host, host=address, port=port, family=socket.AF_INET, proto=0, flags=socket.AI_NUMERICHOST
+            )
+            for address in self.answers[host]
+        ]
+
+    async def close(self) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "10.0.0.1",
+        "127.0.0.1",
+        "169.254.169.254",
+        "192.168.1.5",
+        "172.16.0.9",
+        "100.64.0.1",
+        "0.0.0.0",  # noqa: S104
+        "224.0.0.1",
+        "240.0.0.1",
+        "::1",
+        "fe80::1",
+        "fc00::1",
+        "ff02::1",
+        "::ffff:10.0.0.1",
+    ],
+)
+async def test_the_public_only_resolver_refuses_a_non_global_answer(address: str) -> None:
+    resolver = PublicOnlyResolver(FakeDns({"push.test": [address]}))
+
+    with pytest.raises(BlockedAddressError):
+        await resolver.resolve("push.test", 443)
+
+
+async def test_the_public_only_resolver_refuses_when_any_address_is_non_global_and_passes_public_ones() -> None:
+    mixed = PublicOnlyResolver(FakeDns({"push.test": ["93.184.216.34", "10.0.0.1"]}))
+    public = PublicOnlyResolver(FakeDns({"push.test": ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"]}))
+
+    with pytest.raises(BlockedAddressError):
+        await mixed.resolve("push.test", 443)
+    assert [a["host"] for a in await public.resolve("push.test", 443)] == [
+        "93.184.216.34",
+        "2606:2800:220:1:248:1893:25c8:1946",
+    ]
+
+
+async def _local_service(port: int, hits: list[str], redirect_to: str | None = None) -> web.AppRunner:
+    async def handler(request: web.Request) -> web.Response:
+        hits.append(request.path)
+        if request.path == "/redirect" and redirect_to is not None:
+            return web.Response(status=307, headers={"Location": redirect_to})
+        return web.Response(status=201)
+
+    app = web.Application()
+    app.router.add_post("/{tail:.*}", handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "127.0.0.1", port).start()
+    return runner
+
+
+def _real_keys() -> tuple[str, str, str]:
+    public = (
+        ec.generate_private_key(ec.SECP256R1())
+        .public_key()
+        .public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    )
+    vapid = ec.generate_private_key(ec.SECP256R1())
+    secret = base64.urlsafe_b64encode(vapid.private_numbers().private_value.to_bytes(32, "big")).rstrip(b"=")
+    return secret.decode(), b64(public), b64(b"0123456789abcdef")
+
+
+async def _record_for(store: InMemoryPushStore, endpoint: str, p256dh: str, auth: str) -> SubscriptionRecord:
+    await store.upsert_by_endpoint(NewSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth, site_id="s1"), 1)
+    [record] = await store.for_site("s1", 1)
+    return record
+
+
+async def test_a_redirect_is_refused_and_the_target_never_receives_a_request(
+    unused_tcp_port: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    hits: list[str] = []
+    runner = await _local_service(unused_tcp_port, hits, redirect_to=f"http://127.0.0.1:{unused_tcp_port}/internal")
+    try:
+        secret, p256dh, auth = _real_keys()
+        store = InMemoryPushStore()
+        record = await _record_for(store, f"http://127.0.0.1:{unused_tcp_port}/redirect", p256dh, auth)
+        channel = WebPushChannel(secret, SUBJECT, store)
+        try:
+            with caplog.at_level(logging.DEBUG), structlog.testing.capture_logs() as captured:
+                result = await channel.send_to(record, message())
+        finally:
+            await channel.aclose()
+    finally:
+        await runner.cleanup()
+
+    assert (result.status, result.detail) == (DeliveryStatus.FAILED, "redirect")
+    assert hits == ["/redirect"]  # the target of the redirect ("/internal") was never requested
+    assert [(c["event"], c["subscription_id"], c["error"]) for c in captured] == [
+        ("webpush.redirect_refused", record.id, "RedirectRefusedError")
+    ]
+    assert "/internal" not in caplog.text + json.dumps(captured, default=str)
+    assert len(await store.for_site("s1", 1)) == 1  # a refused redirect keeps the subscription
+
+
+async def test_a_name_that_resolves_to_a_private_address_is_blocked_before_connecting(unused_tcp_port: int) -> None:
+    hits: list[str] = []
+    runner = await _local_service(unused_tcp_port, hits)  # a live listener: nothing may reach it
+    try:
+        secret, p256dh, auth = _real_keys()
+        store = InMemoryPushStore()
+        dns = FakeDns({"push.example.test": ["10.0.0.1"]})
+        record = await _record_for(store, f"http://push.example.test:{unused_tcp_port}/send", p256dh, auth)
+        channel = WebPushChannel(secret, SUBJECT, store, resolver=PublicOnlyResolver(dns))
+        try:
+            result = await channel.send_to(record, message())
+        finally:
+            await channel.aclose()
+    finally:
+        await runner.cleanup()
+
+    assert (result.status, result.detail) == (DeliveryStatus.FAILED, "blocked")
+    assert dns.asked == ["push.example.test"]
+    assert hits == []
+
+
+async def test_the_channels_default_resolver_is_the_public_only_one_and_the_connector_has_room_for_both_lanes() -> None:
+    store = InMemoryPushStore()
+    channel = WebPushChannel("key", SUBJECT, store)
+    try:
+        session = channel._session_in_use()  # noqa: SLF001
+        connector = session.connector
+        assert isinstance(connector, aiohttp.TCPConnector)
+        assert connector.limit == CONNECTION_LIMIT == 216
+        assert isinstance(connector._resolver, PublicOnlyResolver)  # noqa: SLF001
+    finally:
+        await channel.aclose()

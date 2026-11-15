@@ -7,6 +7,8 @@ access token; an exceeded limit is the ``rate-limited`` problem (429) with a ``R
 
 from typing import Any, NamedTuple
 
+from stellar_blaze.ports.push import MAX_SUBSCRIPTIONS_PER_CREW as MAX_SUBSCRIPTIONS_PER_CREW
+
 
 class RateLimit(NamedTuple):
     limit: int
@@ -22,9 +24,9 @@ DEMO_RESET_LIMITS: tuple[RateLimit, ...] = (
 # The safety path has its OWN bucket (ADR 0062 / ledger R-Q): no other operation's limit can ever block a stop.
 STOP_BUCKET = "stop"
 STOP_LIMITS: tuple[RateLimit, ...] = (RateLimit(limit=30, window_seconds=60, bucket=STOP_BUCKET),)
-# Stored Web Push subscriptions are bounded (the route is public): per site, and per crew, within one epoch.
+# Stored Web Push subscriptions are bounded (the route is public): per site, and per crew (the port states the crew
+# cap: the dispatch's stop lane is sized to it), within one epoch.
 MAX_SUBSCRIPTIONS_PER_SITE = 500
-MAX_SUBSCRIPTIONS_PER_CREW = 200
 EXTENSION = "x-rate-limit"
 KEYING_NOTE = (
     "Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one "

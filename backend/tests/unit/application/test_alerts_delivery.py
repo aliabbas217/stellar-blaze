@@ -242,3 +242,54 @@ def test_the_current_hour_is_never_under_announced(
     if hour_level is not None:
         order = list(AlertLevel)
         assert order.index(announced) >= order.index(hour_level)
+
+
+class LaneProbeChannel(RecordingPushChannel):
+    """Crew pushes to every endpoint but ``real`` hang for ever; ``peak`` is the most sends in flight at once."""
+
+    def __init__(self, real: str) -> None:
+        super().__init__()
+        self.real = real
+        self.in_flight = 0
+        self.peak = 0
+
+    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+        self.in_flight += 1
+        self.peak = max(self.peak, self.in_flight)
+        try:
+            if message.audience.value == "crew" and sub.endpoint != self.real:
+                await asyncio.Event().wait()
+            return await super().send_to(sub, message)
+        finally:
+            self.in_flight -= 1
+
+
+@pytest.mark.asyncio
+async def test_a_stops_own_recipients_cannot_be_flooded_by_hanging_subscriptions() -> None:
+    """W2: 200 hanging subscriptions of the crew (the public cap) register BEFORE one real worker. With one 16-slot lane
+    the real one would wait about 13 batches of the delivery deadline; in the reserved stop lane every send starts at
+    once (all 201 in flight together) and the real one is delivered at once, the 200 are cut by the deadline."""
+    w = await world(AMBER_FROM_10)
+    for n in range(200):
+        await w.subscribe(f"https://push.example/hang-{n}", crew="crew-b")
+    await w.subscribe("https://push.example/real", crew="crew-b")
+    epoch = await w.sites.active_epoch(SITE_ID)
+    w.clock.now = datetime(2026, 7, 1, 4, 10, tzinfo=UTC)
+    await w.stops.start("crew-b", "heat", "lead-b", epoch)
+    channel = LaneProbeChannel("https://push.example/real")
+
+    await asyncio.wait_for(
+        run_with(
+            w,
+            channel,
+            datetime(2026, 7, 1, 4, 20, tzinfo=UTC),
+            DeliveryLimits(delivery_deadline_s=0.3, run_budget_s=30),
+        ),
+        timeout=20,
+    )
+
+    [red] = [r for r in w.crew_events("crew-b") if r.level is R]
+    assert (red.delivered, red.failed) == (1, 200)
+    real = [sub_id for sub_id, m in channel.sent if m.crew_id == "crew-b" and m.level is R]
+    assert len(real) == 1
+    assert channel.peak >= 201  # all of the crew's sends were in flight together (a 16-slot lane peaks at 16)

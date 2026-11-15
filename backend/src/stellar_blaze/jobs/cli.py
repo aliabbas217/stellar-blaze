@@ -54,6 +54,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
+import structlog
 import typer
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
@@ -105,6 +106,7 @@ from stellar_blaze.ports.config_store import (
     VersionNotFoundError,
 )
 
+logger = structlog.stdlib.get_logger(__name__)
 alerts_clock: Callable[[], float] = time.monotonic  # replaced by a test (a frozen clock)
 
 # No rich traceback with locals: the locals of a failing command hold its settings, and so its connection string.
@@ -696,7 +698,11 @@ async def _dispatch_sites(
     instant: dt.datetime | None,
 ) -> tuple[int, dict[str, JsonValue]]:
     """Dispatch every site (or ``site``) as its own ``job_run`` under its own lock, concurrently: a hanging push service
-    of one site cannot delay another site's escalation. Returns the worst exit code and the merged summary."""
+    of one site cannot delay another site's escalation. Returns the worst exit code and the merged summary.
+
+    A site whose job raises (rather than returning a failure code) does not stop the others: every site is finished
+    first, the summaries of the sites that completed are merged, and the exit code is 1 with a message on stderr naming
+    the failed sites and the class of each error (never its text)."""
     ids = [site] if site is not None else await job.site_ids()
     summaries: list[Mapping[str, JsonValue]] = []
 
@@ -713,7 +719,20 @@ async def _dispatch_sites(
         }
         return await run_job(settings, "alerts-dispatch", params, work, lock_key=_lock_key(site_id))
 
-    codes = await asyncio.gather(*(one(site_id) for site_id in ids))
+    outcomes = await asyncio.gather(*(one(site_id) for site_id in ids), return_exceptions=True)
+    codes: list[int] = []
+    raised: list[str] = []
+    for site_id, outcome in zip(ids, outcomes, strict=True):
+        if isinstance(outcome, BaseException):
+            if not isinstance(outcome, Exception):
+                raise outcome  # a cancellation or interrupt is not a site failure
+            logger.error("alerts.site_job_raised", site_id=site_id, error=type(outcome).__name__)
+            raised.append(f"{site_id} ({type(outcome).__name__})")
+            codes.append(1)
+        else:
+            codes.append(outcome)
+    if raised:
+        typer.echo(f"alert dispatch failed for: {', '.join(raised)}", err=True)
     if not summaries:
         return max(codes, default=0), {}
     merged: dict[str, JsonValue] = dict(summaries[0])
@@ -784,8 +803,10 @@ def alerts_dispatch_command(
 def alerts_run_command(site: SiteOption = None) -> None:
     """Dispatch in a FIXED-RATE loop: a run starts every ``max(60 s, alert_dispatch_interval_minutes x 60)`` (the ACTIVE
     config, read again every cycle; default 5, range 1 to 30), measured from the START of the previous run. Escalation
-    SLA: a crew stop is delivered within one such period of being recorded; every push is bounded by a hard deadline and
-    the run by the period minus 10 s, so a hanging push service cannot delay it. SIGTERM or Ctrl-C ends it cleanly after
+    SLA: a crew stop is delivered within one period plus the forecast-leg deadline plus one delivery deadline of being
+    recorded (about 5 min 45 s with the defaults); the weather fetch is cut at min(30 s, period / 4), every push is
+    bounded by a hard deadline and the run by the period minus 10 s counted from the START of the cycle, so a hanging
+    weather source or push service cannot delay it. SIGTERM or Ctrl-C ends it cleanly after
     the current run; a failing cycle is logged and the loop goes on. Each site of each cycle is a ``job_run`` row, like
     ``alerts dispatch``, under its own per-site lock. The API and this loop are separate processes with their own
     replay clocks."""

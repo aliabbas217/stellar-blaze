@@ -36,8 +36,8 @@ async def create_push_subscription(payload: PushSubscriptionCreate, services: Se
     most 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, "too many subscriptions"). The body
     holds no worker identifier by design.
 
-    A store failure answers 500 without data: the cause may carry the statement parameters (the endpoint and keys), so
-    only its class name is logged and the exception chain is cut (``from None``).
+    If the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data
+    (the endpoint and keys are never echoed back or logged); retry later.
     """
     site = await site_or_404(services, payload.site_id)
     if payload.crew_id is not None:

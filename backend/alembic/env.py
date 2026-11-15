@@ -57,7 +57,11 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     # NullPool: a migration is one short-lived connection, closed when it finishes.
-    engine = create_async_engine(settings.database_url.get_secret_value(), poolclass=pool.NullPool)
+    engine = create_async_engine(
+        settings.database_url.get_secret_value(),
+        poolclass=pool.NullPool,
+        hide_parameters=True,  # a failing statement must not print row values (a migration may backfill data)
+    )
     try:
         async with engine.connect() as connection:
             await connection.run_sync(do_run_migrations)

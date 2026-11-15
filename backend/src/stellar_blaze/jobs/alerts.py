@@ -11,9 +11,12 @@ active is recorded as skipped, not stacked).
 * it is FIXED-RATE: ``period = max(60 s, interval x 60)`` (the interval of the last good cycle, or the 5-minute default
   when no cycle has ever read one) and it waits ``max(0, period - elapsed)`` after a cycle, so a cycle starts one period
   after the previous one STARTED, however long the run took. The escalation SLA follows: a crew stop is delivered within
-  ONE PERIOD of being recorded (the run that follows it starts at most one period later and escalates it first; every
-  send of that run is bounded, ``application.alerts``). A loop that never waits is impossible: the period is at least
-  60 s and a failing cycle that returns at once still waits the rest of it;
+  one period plus the forecast-leg deadline plus one delivery deadline of being recorded (about 5 min 45 s with the
+  defaults). The worst case is a stop recorded just after the previous cycle read the stops: the next cycle starts one
+  period after that one started, its forecast leg is cut at ``min(30 s, period / 4)`` (``forecast_deadline_s``: a stop
+  needs no forecast, so a hanging weather source costs the stop at most that, then the protective fallback day is used
+  and the stop is read and escalated), and its sends are bounded (``application.alerts``). A loop that never waits is
+  impossible: the period is at least 60 s and a failing cycle that returns at once still waits the rest of it;
 * a cycle that raises is logged with the exception class name and the loop continues (an unreachable database must
   not end the process that the next cycle would have healed);
 * SIGTERM, SIGINT and KeyboardInterrupt set the stop event: the current run finishes, then the loop returns.
@@ -37,7 +40,14 @@ import structlog
 from pydantic import JsonValue
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from stellar_blaze.application.alerts import DispatchReport, Prepared, deliver, period_seconds, prepare
+from stellar_blaze.application.alerts import (
+    DeliveryLimits,
+    DispatchReport,
+    Prepared,
+    deliver,
+    period_seconds,
+    prepare,
+)
 from stellar_blaze.application.runtime_config import ConfigService, ConfigSnapshot, ConfigUnavailableError
 from stellar_blaze.application.services import Services
 from stellar_blaze.application.site_day import SiteDay, site_day
@@ -46,17 +56,44 @@ from stellar_blaze.config import Settings
 from stellar_blaze.ports.corrector import ForecastCorrector
 from stellar_blaze.ports.push import PushChannel, PushSubscriptionStore
 from stellar_blaze.ports.sites import SiteNotFoundError, SiteRecord
+from stellar_blaze.ports.weather import SourceUnavailableError, WeatherForecastSource
 
-__all__ = ["DEFAULT_INTERVAL_MINUTES", "AlertJob", "DispatchFailedError", "install_stop_signals", "run_loop", "wait"]
+__all__ = [
+    "DEFAULT_INTERVAL_MINUTES",
+    "FORECAST_DEADLINE_S",
+    "AlertJob",
+    "DispatchFailedError",
+    "forecast_deadline",
+    "install_stop_signals",
+    "run_loop",
+    "wait",
+]
 
 logger = structlog.stdlib.get_logger(__name__)
 
 DEFAULT_INTERVAL_MINUTES: Final = 5  # the ruleset default of alert_dispatch_interval_minutes, until a cycle reads one
 MIN_WAIT_S: Final = 60.0  # the shortest period (application.alerts.MIN_PERIOD_S)
+FORECAST_DEADLINE_S: Final = (
+    30.0  # the longest the forecast leg of one site's phase A may take (see ``forecast_deadline``)
+)
 
 type Sleeper = Callable[[float, asyncio.Event], Awaitable[None]]
 type ServicesBuilder = Callable[[Settings, AsyncEngine], Awaitable[tuple[Services, Callable[[], Awaitable[None]]]]]
 type ChannelBuilder = Callable[[Settings, PushSubscriptionStore], PushChannel | None]
+
+
+def forecast_deadline(interval_minutes: int) -> float:
+    """The hard bound of the forecast leg: ``min(30 s, period / 4)``. A stop needs no forecast, so the weather source
+    may cost an escalation at most this much."""
+    return min(FORECAST_DEADLINE_S, period_seconds(interval_minutes) / 4)
+
+
+class _NoForecasts:
+    """Stands in for the weather source once its leg timed out: it answers at once with a failure, so ``site_day``
+    builds the protective fallback day (all High, ``forecast_status="fallback"``) without another network call."""
+
+    async def previous_runs(self, **_: object) -> NoReturn:
+        raise SourceUnavailableError("the forecast leg timed out")
 
 
 class DispatchFailedError(Exception):
@@ -157,6 +194,8 @@ class AlertJob:
     close_services: Callable[[], Awaitable[None]]
     interval_minutes: int | None = None
     summary: dict[str, JsonValue] = field(default_factory=dict)
+    forecast_deadline_s: float | None = None  # None: ``forecast_deadline`` of the latest interval (tests scale it down)
+    clock: Callable[[], float] = time.monotonic  # the cycle start and the run deadline (injectable)
 
     @classmethod
     async def build(
@@ -198,6 +237,7 @@ class AlertJob:
     ) -> Mapping[str, JsonValue]:
         """One dispatch run over ``site_id`` (default: the job's filter, else every site); what ``run_job`` runs. Every
         site is tried; any failure fails the job after the others were dispatched."""
+        began = self.clock()  # the start of the cycle: the run deadline of phase B is anchored here
         snapshot = await self.snapshot()
         now = as_of or self.services.clock()
         mode: Literal["replay", "live"] = "replay" if self.settings.forecast_source == "replay" else "live"
@@ -216,7 +256,12 @@ class AlertJob:
             services = self.services
             try:
                 reports = await deliver(
-                    prepared, channel=self.channel, alerts=services.alerts, subs=services.subs, audit=services.audit
+                    prepared,
+                    channel=self.channel,
+                    alerts=services.alerts,
+                    subs=services.subs,
+                    audit=services.audit,
+                    limits=DeliveryLimits(monotonic=self.clock, started_at=began),
                 )
             except Exception as error:  # an insert failed: every other event was still sent and stored
                 logger.error("alerts.deliver_failed", error=type(error).__name__)
@@ -252,24 +297,39 @@ class AlertJob:
         local_date: date,
     ) -> SiteDay:
         """The day of the site. When the corrector cannot even be built (a missing model directory, a malformed
-        parameter file) the day is the protective fallback: a stop needs no forecast, crews must still be reachable."""
+        parameter file) the day is the protective fallback: a stop needs no forecast, crews must still be reachable.
+
+        The forecast leg has a HARD deadline (``forecast_deadline_s``, default ``min(30 s, period / 4)``): a weather
+        source that hangs is cut (``asyncio.wait_for``), logged at error level with the class name ``TimeoutError`` and
+        the day is the protective fallback, so the stop read that follows is never held back by the network."""
         services = self.services
         try:
             corrector: ForecastCorrector = services.correctors.for_snapshot(snapshot)
         except Exception as error:
             logger.error("alerts.corrector_unavailable", site_id=site.id, error=type(error).__name__)
             corrector = _UnavailableCorrector()
-        return await site_day(
-            site=site,
-            local_date=local_date,
-            snapshot=snapshot,
-            catalog=self.runtime.rulesets,
-            forecasts=services.forecasts,
-            observations=services.observations,
-            corrector=corrector,
-            mode=mode,
-            now=now,
-        )
+
+        async def build(forecasts: WeatherForecastSource) -> SiteDay:
+            return await site_day(
+                site=site,
+                local_date=local_date,
+                snapshot=snapshot,
+                catalog=self.runtime.rulesets,
+                forecasts=forecasts,
+                observations=services.observations,
+                corrector=corrector,
+                mode=mode,
+                now=now,
+            )
+
+        deadline = self.forecast_deadline_s
+        if deadline is None:
+            deadline = forecast_deadline(self.interval_minutes or DEFAULT_INTERVAL_MINUTES)
+        try:
+            return await asyncio.wait_for(build(services.forecasts), timeout=deadline)
+        except TimeoutError as error:
+            logger.error("alerts.forecast_deadline", site_id=site.id, error=type(error).__name__, deadline_s=deadline)
+        return await build(_NoForecasts())
 
     async def _prepare(
         self,

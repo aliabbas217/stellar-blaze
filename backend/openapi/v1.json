@@ -5258,7 +5258,7 @@
     },
     "/api/v1/push/subscriptions": {
       "post": {
-        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted\nagainst the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The\nendpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at\nmost 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, \"too many subscriptions\"). The body\nholds no worker identifier by design.\n\nA store failure answers 500 without data: the cause may carry the statement parameters (the endpoint and keys), so\nonly its class name is logged and the exception chain is cut (``from None``).",
+        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted\nagainst the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The\nendpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at\nmost 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, \"too many subscriptions\"). The body\nholds no worker identifier by design.\n\nIf the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data\n(the endpoint and keys are never echoed back or logged); retry later.",
         "operationId": "create_push_subscription",
         "requestBody": {
           "content": {
