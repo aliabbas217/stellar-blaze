@@ -293,8 +293,9 @@ async def create_crew_stop(
 ) -> CrewStop:
     """Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.
 
-    Stop recorded. It is visible on the next read; push alerts follow within one dispatch interval of the stop when
-    the alert dispatch job is running.
+    Stop recorded. It is visible on the next read. Push alerts follow when the alert dispatch job is running: within
+    one dispatch interval of the stop plus the time the cycle itself takes (the forecast fetch is cut at 30 s and a
+    push at 12 s), about 5 min 42 s with the default 5-minute interval.
 
     Idempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch
     returns that stop (201, same body, no second row, no second audit row).
@@ -359,8 +360,8 @@ async def delete_crew_stop(
 ) -> Response:
     """Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.
 
-    Resume recorded. A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it
-    elapsing.
+    Resume recorded. A de-escalation alert follows after the de-escalation dwell, at the next alert dispatch cycle
+    once the dwell has elapsed (one dispatch interval at most, plus the time the cycle itself takes).
     """
     crew = await crew_or_404(services, crew_id)
     await deny_if_foreign(

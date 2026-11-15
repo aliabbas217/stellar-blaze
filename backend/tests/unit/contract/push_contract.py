@@ -1,6 +1,8 @@
 """Contract suite of ``PushSubscriptionStore`` (fake in unit, Postgres in integration)."""
 
-from stellar_blaze.ports.push import NewSubscription
+import pytest
+
+from stellar_blaze.ports.push import NewSubscription, SubscriptionCapError
 from tests.unit.contract.b3_world import SITE_ID, Check, World, seeded
 
 
@@ -112,6 +114,35 @@ async def check_id_for_endpoint_and_the_counts_are_per_epoch(world: World) -> No
     assert await world.push.count_for_site(SITE_ID, later) == 0
     await world.push.delete(site_wide)
     assert await world.push.count_for_site(SITE_ID, epoch) == 1
+
+
+async def check_the_caps_are_enforced_in_the_upsert_itself(world: World) -> None:
+    epoch = await seeded(world)
+    later = await world.sites.start_epoch(SITE_ID, "demo-token")
+    ep = [f"https://push.example/cap-{n}" for n in range(4)]
+
+    first = await world.push.upsert_by_endpoint(sub(ep[0]), epoch, site_cap=2)
+    await world.push.upsert_by_endpoint(sub(ep[1], crew_id="crew-a"), epoch, site_cap=2)  # crew rows count for the site
+    with pytest.raises(SubscriptionCapError) as site_full:
+        await world.push.upsert_by_endpoint(sub(ep[2]), epoch, site_cap=2)
+    assert site_full.value.scope == "site"
+    assert await world.push.upsert_by_endpoint(sub(ep[0]), epoch, site_cap=2) == first  # a repeat is not counted
+    assert await world.push.count_for_site(SITE_ID, epoch) == 2  # the refused row was not stored
+    assert await world.push.id_for_endpoint(ep[2], epoch) is None
+    await world.push.upsert_by_endpoint(sub(ep[2]), later, site_cap=2)  # the cap is per epoch
+
+    with pytest.raises(SubscriptionCapError) as crew_full:  # crew-a already holds one
+        await world.push.upsert_by_endpoint(sub(ep[3], crew_id="crew-a"), epoch, crew_cap=1)
+    assert crew_full.value.scope == "crew"
+    await world.push.upsert_by_endpoint(sub(ep[3], crew_id="crew-b"), epoch, crew_cap=1)  # per crew
+    await world.push.upsert_by_endpoint(
+        sub("https://push.example/site-wide"), epoch, crew_cap=1
+    )  # no crew: no crew cap
+    assert await world.push.count_for_crew("crew-a", epoch) == 1
+    assert await world.push.count_for_crew("crew-b", epoch) == 1
+
+    for n in range(5):  # no cap given: no limit (the caps are the caller's policy)
+        await world.push.upsert_by_endpoint(sub(f"https://push.example/free-{n}"), epoch)
 
 
 CHECKS: dict[str, Check] = {

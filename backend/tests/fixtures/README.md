@@ -39,7 +39,7 @@ Intl), 2025-07-01 00:00:00 to 2025-07-02 23:00:00 UTC (58 rows, all 329 columns,
 
 ## `risk/personal_level_vectors.json`
 
-Reference vectors for the personal level (ADR 0049): 46 exceedance cases (`exceedance_3q`) and 14 band cases
+Reference vectors for the personal level (ADR 0049): 46 exceedance cases (`exceedance_3q`) and 12 band cases
 (`band_level`), `format_version` 1. They are generated, not recorded: the Python implementation in
 `stellar_blaze.domain.risk.personal` is the source and the frontend's `personal.ts` (F2) must reproduce every vector,
 so the file is the parity contract between the two. F2 consumes it as a test fixture.

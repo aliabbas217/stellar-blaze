@@ -39,6 +39,12 @@ VALID_FROM = datetime(2026, 11, 11, 9, 0, tzinfo=UTC)
 SUBJECT = "mailto:ops@example.org"
 
 
+def allow_any_endpoint(endpoint: str) -> str:
+    """The explicit TEST allowance for the send-time endpoint check (``WebPushChannel(endpoint_check=...)``): a test
+    server is a localhost ``http`` URL, which the production check refuses. Production never passes it."""
+    return endpoint
+
+
 def b64(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
 
@@ -232,7 +238,7 @@ async def test_the_real_library_accepts_these_parameters_and_reports_a_gone_subs
                 1,
             )
         records = {r.endpoint.rsplit("/", 1)[1]: r for r in await store.for_site("site-demo-mussafah", 1)}
-        channel = WebPushChannel(vapid_secret.decode(), SUBJECT, store)
+        channel = WebPushChannel(vapid_secret.decode(), SUBJECT, store, endpoint_check=allow_any_endpoint)
         try:
             delivered = await channel.send_to(records["ok"], message())
             gone = await channel.send_to(records["gone"], message())
@@ -374,6 +380,56 @@ async def test_the_refused_prefixes_do_not_depend_on_the_standard_librarys_table
     assert [a["host"] for a in await ok.resolve("push.test", 443)] == ["2606:4700::1111"]
 
 
+# Final review E3: IPv6 prefixes that are not routable unicast, found by probing ``ipaddress`` on 3.13.15. The rows
+# marked "global" are the ones ``is_global`` still ACCEPTS (so the explicit list is what refuses them); the rest the
+# standard library refuses today, listed so that the verdict does not depend on its tables.
+NON_ROUTABLE_V6 = [
+    "fec0::1",  # deprecated site-local fec0::/10 (global)
+    "feff:ffff::1",  # the top of fec0::/10 (global)
+    "3ffe::1",  # 6bone 3ffe::/16 (global)
+    "5f00::1",  # SRv6 5f00::/16 (global)
+    "100::1",  # discard-only 100::/64
+    "100:0:0:1::1",  # dummy prefix 100:0:0:1::/64 (global)
+    "2001:2::1",  # benchmarking 2001:2::/48
+    "2001:10::1",  # deprecated ORCHID 2001:10::/28
+    "2001:20::1",  # ORCHIDv2 2001:20::/28 (global)
+    "2001:2f:ffff::1",  # the top of 2001:20::/28 (global)
+    "2001:30::1",  # drone remote ID 2001:30::/28 (global)
+    "2001:db8::1",  # documentation 2001:db8::/32
+    "3fff::1",  # documentation 3fff::/20
+    "3fff:fff:ffff::1",  # the top of 3fff::/20
+]
+
+
+@pytest.mark.parametrize("address", NON_ROUTABLE_V6)
+async def test_the_public_only_resolver_refuses_a_non_routable_ipv6_prefix(address: str) -> None:
+    resolver = PublicOnlyResolver(FakeDns({"push.test": [address]}))
+    with pytest.raises(BlockedAddressError):
+        await resolver.resolve("push.test", 443)
+
+    mixed = PublicOnlyResolver(FakeDns({"push.test": ["2606:4700::1111", address]}))
+    with pytest.raises(BlockedAddressError):
+        await mixed.resolve("push.test", 443)
+
+
+@pytest.mark.parametrize("address", NON_ROUTABLE_V6)
+async def test_the_non_routable_ipv6_prefixes_do_not_depend_on_the_standard_librarys_tables(
+    address: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for attribute, value in (
+        ("is_global", True),
+        ("is_private", False),
+        ("is_reserved", False),
+        ("is_loopback", False),
+        ("is_link_local", False),
+        ("is_multicast", False),
+        ("is_unspecified", False),
+    ):
+        monkeypatch.setattr(ipaddress.IPv6Address, attribute, _constant(value))
+    with pytest.raises(BlockedAddressError):
+        await PublicOnlyResolver(FakeDns({"push.test": [address]})).resolve("push.test", 443)
+
+
 @pytest.mark.parametrize("address", EMBEDDING_FORMS)
 async def test_a_name_that_resolves_to_an_embedding_address_is_blocked_before_any_connection(address: str) -> None:
     """The send itself: FAILED ``blocked``, and the fake DNS was asked exactly once (nothing else was attempted)."""
@@ -444,7 +500,7 @@ async def test_a_redirect_is_refused_and_the_target_never_receives_a_request(
         secret, p256dh, auth = _real_keys()
         store = InMemoryPushStore()
         record = await _record_for(store, f"http://127.0.0.1:{unused_tcp_port}/redirect", p256dh, auth)
-        channel = WebPushChannel(secret, SUBJECT, store)
+        channel = WebPushChannel(secret, SUBJECT, store, endpoint_check=allow_any_endpoint)
         try:
             with caplog.at_level(logging.DEBUG), structlog.testing.capture_logs() as captured:
                 result = await channel.send_to(record, message())
@@ -470,7 +526,9 @@ async def test_a_name_that_resolves_to_a_private_address_is_blocked_before_conne
         store = InMemoryPushStore()
         dns = FakeDns({"push.example.test": ["10.0.0.1"]})
         record = await _record_for(store, f"http://push.example.test:{unused_tcp_port}/send", p256dh, auth)
-        channel = WebPushChannel(secret, SUBJECT, store, resolver=PublicOnlyResolver(dns))
+        channel = WebPushChannel(
+            secret, SUBJECT, store, resolver=PublicOnlyResolver(dns), endpoint_check=allow_any_endpoint
+        )
         try:
             result = await channel.send_to(record, message())
         finally:

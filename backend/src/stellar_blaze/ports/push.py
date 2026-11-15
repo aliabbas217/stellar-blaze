@@ -5,7 +5,7 @@ audit row and error carries the subscription ``id`` instead.
 """
 
 from collections.abc import Sequence
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -53,6 +53,14 @@ class PushStoreError(Exception):
     so callers raise this ``from None`` and the log names only the class of the cause."""
 
 
+class SubscriptionCapError(Exception):
+    """A NEW subscription would exceed the site or crew cap (``scope``). Carries no data."""
+
+    def __init__(self, scope: Literal["site", "crew"]) -> None:
+        super().__init__(scope)
+        self.scope = scope
+
+
 class PushSubscriptionStore(Protocol):
     async def id_for_endpoint(self, endpoint: str, epoch_id: int) -> str | None:
         """The id of the subscription with this endpoint in the epoch, or ``None``."""
@@ -66,9 +74,19 @@ class PushSubscriptionStore(Protocol):
         """How many subscriptions name this crew in the epoch."""
         ...
 
-    async def upsert_by_endpoint(self, sub: NewSubscription, epoch_id: int) -> str:
+    async def upsert_by_endpoint(
+        self, sub: NewSubscription, epoch_id: int, *, site_cap: int | None = None, crew_cap: int | None = None
+    ) -> str:
         """Store ``sub`` and return its id; when the epoch already holds this endpoint, return the existing id and
-        change nothing (the first row's keys and targets stay)."""
+        change nothing (the first row's keys and targets stay; a repeat is not counted against a cap).
+
+        With ``site_cap`` or ``crew_cap`` the count and the insert are ONE atomic step (concurrent callers cannot
+        both pass a check that only one of them fits under): a new row that would make the site hold more than
+        ``site_cap`` subscriptions, or ``sub.crew_id``'s crew more than ``crew_cap``, is not stored.
+
+        Raises:
+            SubscriptionCapError: The new row would exceed a cap (nothing was stored).
+        """
         ...
 
     async def delete(self, subscription_id: str) -> None:

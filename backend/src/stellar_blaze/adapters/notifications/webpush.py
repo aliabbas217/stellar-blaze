@@ -25,6 +25,17 @@ the session is hardened against server-side request forgery (the host allow-list
   to an IPv6 address inside a refused transition network (IPv4-mapped, IPv4-compatible, NAT64, 6to4, Teredo:
   ``_REFUSED_V6_NETWORKS``) is refused by ``PublicOnlyResolver`` before a connection is made (FAILED ``blocked``). An
   IP literal is not resolved by aiohttp: the subscribe route refuses those (``api.push_validation``);
+* the endpoint is checked at SEND time (``ports.push_endpoint.check_endpoint``, the route's own check): aiohttp does not
+  resolve an IP literal, so the resolver alone would let a stored row reach ``http://127.0.0.1:...`` (FAILED
+  ``blocked``, no connection; a test names a looser check through ``endpoint_check``);
+* the RESPONSE is bounded: pywebpush reads the whole body (``await resp.text()``) and aiohttp inflates a gzip body while
+  reading it, so a hostile endpoint could cost gigabytes of memory per send (a 1 MB gzip body inflated to 1 GB in the
+  reviewer's probe). The session therefore never decompresses (``auto_decompress=False``) and asks for
+  ``Accept-Encoding: identity``, and ``_BoundedSession`` hands the library a response whose ``text()`` stops reading at
+  ``MAX_RESPONSE_BYTES`` of wire bytes (FAILED ``response_too_large``; a ``TraceConfig`` cannot do this: aiohttp 3.14
+  fires ``on_response_chunk_received`` once, after the whole body is buffered). A body that is not text decodes with
+  replacement characters: the status decides the result, never the body. A body over the cap hides the status (a
+  410 with a 20 KB body is ``response_too_large``, not ``gone``): no push service answers like that;
 * the connector allows ``CONNECTION_LIMIT`` connections (the ordinary lane plus ``SIMULTANEOUS_STOPS_PROVISIONED``
   operator-stop lanes, ``ports.push``; sends beyond it wait for a connection inside their delivery deadline).
 """
@@ -35,7 +46,7 @@ import socket
 from collections.abc import Awaitable, Callable
 from datetime import UTC
 from types import SimpleNamespace
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import aiohttp
 import structlog
@@ -44,12 +55,15 @@ from pywebpush import WebPushException, webpush_async
 
 from stellar_blaze.ports.notifications import DeliveryResult, DeliveryStatus, OutboundMessage
 from stellar_blaze.ports.push import CONNECTION_LIMIT, PushSubscriptionStore, SubscriptionRecord
+from stellar_blaze.ports.push_endpoint import check_endpoint
 
 __all__ = [
+    "MAX_RESPONSE_BYTES",
     "TTL_SECONDS",
     "BlockedAddressError",
     "PublicOnlyResolver",
     "RedirectRefusedError",
+    "ResponseTooLargeError",
     "WebPushChannel",
     "payload_of",
 ]
@@ -59,6 +73,8 @@ logger = structlog.stdlib.get_logger(__name__)
 TTL_SECONDS: Final = 3600  # F1 web-push.md section 3: an alert is dropped rather than delivered an hour late
 URGENCY: Final = "high"  # RFC 8030 section 5.3; ADR 0004
 CONTENT_ENCODING: Final = "aes128gcm"
+# A push service answers 201 with an empty body and an error with a few hundred bytes: wire bytes read per response.
+MAX_RESPONSE_BYTES: Final = 16 * 1024
 _GONE: Final = frozenset({404, 410})  # RFC 8030 section 7.3 (404 expired); 410 is the browsers' usual answer
 
 type Sender = Callable[..., Awaitable[object]]
@@ -85,6 +101,11 @@ class BlockedAddressError(Exception):
     """A host name resolved to an address that is not globally routable: no connection is made."""
 
 
+class ResponseTooLargeError(Exception):
+    """The push service's response is bigger than ``MAX_RESPONSE_BYTES`` on the wire: reading stopped, the connection
+    is closed. Carries nothing of the body."""
+
+
 # IPv6 networks that carry an IPv4 address (or are a transition mechanism to one). No push service is reached through
 # them, and they can smuggle an internal IPv4 target past a check that only reads the IPv6 flags, so they are refused
 # outright (not unwrapped and judged: a resolver answer in one of them is never a legitimate public push service). The
@@ -99,6 +120,19 @@ _REFUSED_V6_NETWORKS: Final = tuple(
         "64:ff9b:1::/48",  # NAT64 local-use prefix (RFC 8215)
         "2002::/16",  # 6to4 (RFC 3056; deprecated by RFC 7526)
         "2001::/32",  # Teredo (RFC 4380)
+        # Not routable unicast, though ``ipaddress.is_global`` (3.13.15) still accepts the rows marked (global): refused
+        # outright, the verdict does not rest on the standard library's tables. Probed with ``ipaddress`` on 3.13.15.
+        "fec0::/10",  # deprecated site-local (RFC 3879) (global)
+        "3ffe::/16",  # 6bone test network, returned to IANA in 2006 (RFC 3701) (global)
+        "5f00::/16",  # SRv6 SIDs (RFC 9602) (global)
+        "100::/64",  # discard-only (RFC 6666)
+        "100:0:0:1::/64",  # dummy IPv6 prefix (RFC 9780) (global)
+        "2001:2::/48",  # benchmarking (RFC 5180)
+        "2001:10::/28",  # deprecated ORCHID (RFC 4843)
+        "2001:20::/28",  # ORCHIDv2 (RFC 7343), not globally reachable by registry (global)
+        "2001:30::/28",  # Drone Remote ID tags (RFC 9374), not routable (global)
+        "2001:db8::/32",  # documentation (RFC 3849)
+        "3fff::/20",  # documentation (RFC 9637)
     )
 )
 
@@ -142,6 +176,49 @@ class PublicOnlyResolver(AbstractResolver):
             await self._inner.close()
 
 
+class _BoundedResponse:
+    """The response as pywebpush sees it: ``status``, ``reason`` and ``headers`` of the real one, and a ``text()`` that
+    reads at most ``limit`` bytes (cached: the library calls it again for a status above 202)."""
+
+    def __init__(self, response: aiohttp.ClientResponse, limit: int) -> None:
+        self._response = response
+        self._limit = limit
+        self._text: str | None = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._response, name)
+
+    async def text(self) -> str:
+        if self._text is None:
+            self._text = (await self._read()).decode("utf-8", errors="replace")
+        return self._text
+
+    async def _read(self) -> bytes:
+        response = self._response
+        declared = response.content_length
+        if declared is not None and declared > self._limit:
+            response.close()
+            raise ResponseTooLargeError
+        body = bytearray()
+        async for piece in response.content.iter_any():
+            body += piece
+            if len(body) > self._limit:
+                response.close()  # drop the connection: the rest of the flood is never read
+                raise ResponseTooLargeError
+        return bytes(body)
+
+
+class _BoundedSession:
+    """The only part of ``aiohttp.ClientSession`` pywebpush uses (``post``), with the response bounded."""
+
+    def __init__(self, session: aiohttp.ClientSession, limit: int = MAX_RESPONSE_BYTES) -> None:
+        self._session = session
+        self._limit = limit
+
+    async def post(self, url: str, **kwargs: Any) -> _BoundedResponse:
+        return _BoundedResponse(await self._session.post(url, **kwargs), self._limit)
+
+
 async def _refuse_redirect(
     session: aiohttp.ClientSession, context: SimpleNamespace, params: aiohttp.TraceRequestRedirectParams
 ) -> None:
@@ -150,7 +227,8 @@ async def _refuse_redirect(
 
 class WebPushChannel:
     """``PushChannel`` for Web Push. ``sender`` replaces ``webpush_async`` in tests; ``resolver`` replaces the
-    public-only resolver (a test names a fake DNS)."""
+    public-only resolver (a test names a fake DNS); ``endpoint_check`` replaces the production endpoint check (a test
+    that serves a localhost ``http`` endpoint names a looser one: production never passes it)."""
 
     name = "webpush"
 
@@ -164,6 +242,7 @@ class WebPushChannel:
         sender: Sender | None = None,
         resolver: AbstractResolver | None = None,
         connection_limit: int = CONNECTION_LIMIT,
+        endpoint_check: Callable[[str], str] = check_endpoint,
     ) -> None:
         self._key = vapid_private_key
         self._subject = vapid_subject
@@ -173,6 +252,7 @@ class WebPushChannel:
         self._own_session = sender is None
         self._resolver: AbstractResolver = resolver or PublicOnlyResolver()
         self._connection_limit = connection_limit
+        self._endpoint_check = endpoint_check
         self._session: aiohttp.ClientSession | None = None
 
     def __repr__(self) -> str:
@@ -184,6 +264,11 @@ class WebPushChannel:
         return self._timeout_s
 
     async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+        try:
+            self._endpoint_check(sub.endpoint)
+        except ValueError:  # the message never holds the endpoint; neither does the log line
+            logger.warning("webpush.blocked", subscription_id=sub.id, error="EndpointRefused")
+            return self._result("blocked")
         arguments: dict[str, Any] = {
             "subscription_info": {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}},
             "data": json.dumps(payload_of(message), separators=(",", ":")),
@@ -195,7 +280,7 @@ class WebPushChannel:
             "headers": {"Urgency": URGENCY},
         }
         if self._own_session:
-            arguments["aiohttp_session"] = self._session_in_use()
+            arguments["aiohttp_session"] = cast(aiohttp.ClientSession, _BoundedSession(self._session_in_use()))
         try:
             await self._sender(**arguments)
         except WebPushException as error:
@@ -206,6 +291,9 @@ class WebPushChannel:
         except BlockedAddressError:
             logger.warning("webpush.blocked", subscription_id=sub.id, error="BlockedAddressError")
             return self._result("blocked")
+        except ResponseTooLargeError:
+            logger.warning("webpush.response_too_large", subscription_id=sub.id, error="ResponseTooLargeError")
+            return self._result("response_too_large")
         except Exception as error:  # a delivery failure is a result, never an exception (``PushChannel``)
             logger.warning("webpush.failed", subscription_id=sub.id, error=type(error).__name__)
             return self._result(f"error:{type(error).__name__}")
@@ -225,7 +313,12 @@ class WebPushChannel:
             trace = aiohttp.TraceConfig()
             trace.on_request_redirect.append(_refuse_redirect)
             connector = aiohttp.TCPConnector(limit=self._connection_limit, resolver=self._resolver)
-            self._session = aiohttp.ClientSession(connector=connector, trace_configs=[trace])
+            self._session = aiohttp.ClientSession(
+                connector=connector,
+                trace_configs=[trace],
+                auto_decompress=False,  # a gzip bomb is never inflated; the cap counts wire bytes
+                headers={"Accept-Encoding": "identity"},  # replaces aiohttp's gzip, deflate, br default
+            )
         return self._session
 
     async def _failed(self, sub: SubscriptionRecord, error: WebPushException) -> DeliveryResult:

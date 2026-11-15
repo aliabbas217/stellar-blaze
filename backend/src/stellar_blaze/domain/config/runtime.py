@@ -276,7 +276,7 @@ def _tunable_violations(pinned: Ruleset, in_force: Ruleset) -> list[ConfigViolat
             ("default", pin_default, force.default),
         )
         for field, pin_value, force_value in checks:
-            if pin_value < force_value if higher else pin_value > force_value:
+            if (pin_value < force_value) if higher else (pin_value > force_value):
                 violations.append(
                     ConfigViolation(
                         "floor-violation",

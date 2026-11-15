@@ -848,9 +848,16 @@ def test_rate_limits_are_in_the_contract_on_every_employer_operation(spec: dict[
             assert f"{item['limit']} per {item['window_seconds']} s" in operation["description"], op_id
 
 
-ALERT_SENTENCE = "push alerts follow within one dispatch interval of the stop when the alert dispatch job is running"
+# The stop sentence states the real bound (final review M1): one period plus the forecast-leg deadline (30 s) plus one
+# delivery deadline (12 s) = 342 s with the defaults, not "within one dispatch interval".
+ALERT_SENTENCE = (
+    "Push alerts follow when the alert dispatch job is running: within one dispatch interval of the stop plus the time "
+    "the cycle itself takes (the forecast fetch is cut at 30 s and a push at 12 s), about 5 min 42 s with the default "
+    "5-minute interval."
+)
 RESUME_SENTENCE = (
-    "A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it elapsing"
+    "A de-escalation alert follows after the de-escalation dwell, at the next alert dispatch cycle once the dwell has "
+    "elapsed (one dispatch interval at most, plus the time the cycle itself takes)."
 )
 
 

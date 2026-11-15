@@ -15,7 +15,7 @@ from stellar_blaze.api.rate_limits import MAX_SUBSCRIPTIONS_PER_CREW, MAX_SUBSCR
 from stellar_blaze.api.responses import problem_responses
 from stellar_blaze.api.views import not_found, site_or_404, validation_failed
 from stellar_blaze.errors import DomainProblem
-from stellar_blaze.ports.push import NewSubscription, PushStoreError
+from stellar_blaze.ports.push import NewSubscription, PushStoreError, SubscriptionCapError
 
 router = APIRouter(tags=["push"])
 logger = structlog.stdlib.get_logger(__name__)
@@ -47,20 +47,8 @@ async def create_push_subscription(payload: PushSubscriptionCreate, services: Se
     epoch = await services.sites.active_epoch(site.id)
     details = payload.subscription
     try:
-        known = await services.subs.id_for_endpoint(details.endpoint, epoch)
-        if known is not None:
-            return PushSubscriptionCreated(id=known)
-        if await services.subs.count_for_site(site.id, epoch) >= MAX_SUBSCRIPTIONS_PER_SITE:
-            raise validation_failed(
-                "site_id", "too many subscriptions for this site", "too-many-subscriptions", where="body"
-            )
-        if (
-            payload.crew_id is not None
-            and await services.subs.count_for_crew(payload.crew_id, epoch) >= MAX_SUBSCRIPTIONS_PER_CREW
-        ):
-            raise validation_failed(
-                "crew_id", "too many subscriptions for this crew", "too-many-subscriptions", where="body"
-            )
+        # ONE atomic step in the store: a repeat endpoint answers with the existing id (not counted); a new one is
+        # counted and inserted together, so concurrent POSTs cannot pass a cap by the size of the burst.
         stored = await services.subs.upsert_by_endpoint(
             NewSubscription(
                 endpoint=details.endpoint,
@@ -71,7 +59,17 @@ async def create_push_subscription(payload: PushSubscriptionCreate, services: Se
                 crew_id=payload.crew_id,
             ),
             epoch,
+            site_cap=MAX_SUBSCRIPTIONS_PER_SITE,
+            crew_cap=MAX_SUBSCRIPTIONS_PER_CREW,
         )
+    except SubscriptionCapError as cap:
+        if cap.scope == "site":
+            raise validation_failed(
+                "site_id", "too many subscriptions for this site", "too-many-subscriptions", where="body"
+            ) from None
+        raise validation_failed(
+            "crew_id", "too many subscriptions for this crew", "too-many-subscriptions", where="body"
+        ) from None
     except Exception as error:
         if isinstance(error, DomainProblem):
             raise

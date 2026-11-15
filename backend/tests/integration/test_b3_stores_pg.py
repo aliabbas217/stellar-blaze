@@ -1,6 +1,7 @@
 """The Postgres B3 stores: the contract suites the fakes also run, the append-only triggers on every decision table,
 the CHECK constraints, and the config store's audit rows (same transaction as the change)."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -18,6 +19,7 @@ from stellar_blaze.adapters.db.push import PostgresPushStore
 from stellar_blaze.adapters.db.sites import PostgresSiteStore
 from stellar_blaze.config import Settings
 from stellar_blaze.domain.config.runtime import RuntimeConfig, Tunables, config_sha256
+from stellar_blaze.ports.push import SubscriptionCapError
 from tests.integration.db_admin import fetch_all
 from tests.unit.contract import audit_contract, decisions_contract, push_contract, sites_contract
 from tests.unit.contract.b3_world import SHA, SITE_ID, World, seeded
@@ -295,3 +297,59 @@ async def test_config_activation_writes_audit_in_same_txn(engine: AsyncEngine, s
 
     assert await store.latest_activation() is None  # the activation rolled back with its audit row
     assert [r["kind"] for r in audit_rows(settings)] == ["config.version_created"]
+
+
+BURST = 40  # concurrent subscribers against a cap of CAP: before the fix about BURST - CAP + (pool size) got in
+
+
+async def _burst(world: World, epoch: int, **caps: int) -> list[str | SubscriptionCapError]:
+    async def one(n: int) -> str | SubscriptionCapError:
+        crew = "crew-a" if "crew_cap" in caps else None
+        try:
+            return await world.push.upsert_by_endpoint(
+                push_contract.sub(f"https://push.example/burst-{n}", crew_id=crew), epoch, **caps
+            )
+        except SubscriptionCapError as error:
+            return error
+
+    return await asyncio.gather(*(one(n) for n in range(BURST)))
+
+
+async def test_concurrent_subscriptions_never_exceed_the_site_cap(world: World) -> None:
+    epoch = await seeded(world)
+
+    results = await _burst(world, epoch, site_cap=7)
+
+    stored = [r for r in results if isinstance(r, str)]
+    refused = [r for r in results if isinstance(r, SubscriptionCapError)]
+    assert (len(stored), len(refused)) == (7, BURST - 7)
+    assert {r.scope for r in refused} == {"site"}
+    assert await world.push.count_for_site(SITE_ID, epoch) == 7  # the cap held: not 7 plus the burst's overlap
+
+
+async def test_concurrent_subscriptions_never_exceed_the_crew_cap_and_a_crew_row_counts_for_the_site(
+    world: World,
+) -> None:
+    epoch = await seeded(world)
+
+    results = await _burst(world, epoch, crew_cap=5, site_cap=100)
+
+    assert sum(isinstance(r, str) for r in results) == 5
+    assert {r.scope for r in results if isinstance(r, SubscriptionCapError)} == {"crew"}
+    assert await world.push.count_for_crew("crew-a", epoch) == 5
+    assert await world.push.count_for_site(SITE_ID, epoch) == 5
+
+
+async def test_concurrent_repeats_of_one_endpoint_at_the_cap_all_get_the_same_id(world: World) -> None:
+    epoch = await seeded(world)
+    await world.push.upsert_by_endpoint(push_contract.sub("https://push.example/only"), epoch, site_cap=1)
+
+    ids = await asyncio.gather(
+        *(
+            world.push.upsert_by_endpoint(push_contract.sub("https://push.example/only"), epoch, site_cap=1)
+            for _ in range(20)
+        )
+    )
+
+    assert len(set(ids)) == 1  # a repeat at the cap is the existing id, never a 422
+    assert await world.push.count_for_site(SITE_ID, epoch) == 1
