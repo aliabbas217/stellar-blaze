@@ -73,6 +73,7 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0067](0067-push-endpoint-host-allow-list.md) | Web Push subscription endpoints must be on an allow-list of push-service hosts (default on, overridable); un-parks the allow-list | Accepted by the architect (Ali informed 2026-11-15) | 2026-11-15 | Amends 0058 decision 3 |
 | [0068](0068-defer-worker-card-aside.md) | Defer the day-view worker-card aside (F2 Task 9): no level in the exported day, no invented wording | Accepted by the architect (Ali informed 2026-11-15) | 2026-11-15 | Cut order item 6; narrows 0045 |
 | [0069](0069-per-route-budget-exception-for-data-routes.md) | Per-route budget exception for the five data routes (worker and supervisor): 195 KiB build-failing cap, separate Lighthouse terms for worker and supervisor routes | Accepted by the architect (Ali informed 2026-11-15) | 2026-11-15 | Narrows the F1 budget; option B parked |
+| [0070](0070-validation-rotates-clusters-not-summers.md) | Validation rotates clusters, not summers, for the 2026 evaluation (limit disclosed); summer-rotated validation is the design for the next model; the 2024-2025 summer swap is parked | Accepted by the architect (Ali's suggestion, researched; Ali informed 2026-11-15) | 2026-11-15 | Explains a limit of 0005 and the pre-registration §2.3 and §6 |
 
 ## Decisions recorded inside earlier ADRs (linked, not duplicated)
 | Cut / park / defer | Where decided |
