@@ -7,10 +7,13 @@ import { ApiProblem } from "@/api/problem";
 import type { components } from "@/api/schema";
 import {
   clearStopsFor,
+  discardExpiredStops,
   drainStopOutbox,
   enqueueStop,
   outboxAvailable,
   pendingStops,
+  type DrainResult,
+  type QueuedStop,
   type SendResult,
 } from "@/features/supervisor/stop-outbox";
 
@@ -31,6 +34,11 @@ import {
  * Safety actions never wait (W5 I1): the stop and the undo/resume requests carry a bounded signal (`STOP_TIMEOUT_MS`,
  * `CLEAR_STOP_TIMEOUT_MS`), and a timeout is read exactly like no signal: the stop is kept in the outbox, the bar reads "Not sent"
  * and the next press goes out. A stop that did reach the server meanwhile is shown from the crews list the refetch brings back.
+ *
+ * The outbox is bounded too (W6): every IndexedDB operation gives up after `OUTBOX_IO_TIMEOUT_MS` and reads as "Not sent", so a hung
+ * store can neither hold the single-flight flag nor leave the bar on "sending". A waiting row older than `OUTBOX_ROW_TTL_MS` is never
+ * sent (the crew may have been stopped and resumed elsewhere meanwhile): it is discarded and the bar says so (`expiredAt`), for the
+ * crew the bar is about, until the next press.
  *
  * The server's own view of the crew (`server`, from the crews list) is merged in: a stop that is active after a reload, or
  * recorded by another phone, reads "stopped" here too, without an undo window.
@@ -71,6 +79,11 @@ export interface StopWork {
   readonly resumeFailed: boolean;
   /** The last undo or resume found no stop to clear (404): said neutrally until the crew list says otherwise. */
   readonly noActiveStop: boolean;
+  /**
+   * ISO time (the phone's clock) of a stop this phone kept for the crew that was NEVER sent and has expired (older than the outbox TTL),
+   * or null. Shown as a calm notice until the next press; never a delivery claim, and the stop is not sent.
+   */
+  readonly expiredAt: string | null;
   readonly stop: () => void;
   readonly undo: () => void;
   readonly resume: () => void;
@@ -108,6 +121,11 @@ async function dropRows(crewId: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** The API gave no answer (or a server failure): the request may have landed, so the server's list decides what is true. */
+function outcomeUnknown(error: unknown): boolean {
+  return error instanceof ApiProblem && (error.problem.status === 0 || error.problem.status >= 500);
 }
 
 /** What a drained row means for the outbox: sent or refused for good is done; anything that may work later stays. */
@@ -161,6 +179,8 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
   const resumedAt = resumed !== null && resumed.crewId === crewId ? resumed.at : null;
   // The crew an undo or resume found no stop for (404), and when: shown until a crew list newer than that says the crew is stopped again.
   const [gone, setGone] = useState<{ readonly crewId: string | null; readonly at: number } | null>(null);
+  // Stops this phone kept that were never sent and have expired (older than the outbox TTL), by crew: crew id -> the row's time.
+  const [expiredRows, setExpiredRows] = useState<Readonly<Record<string, string>>>({});
   const sending = useRef(false);
 
   const stopMutationOptions = useMemo(() => stopMutation(crewId ?? ""), [crewId]);
@@ -174,11 +194,34 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     for (const queryKey of CREW_STATE_KEYS) void queryClient.invalidateQueries({ queryKey });
   }, [queryClient]);
 
+  const noteExpired = useCallback((rows: readonly QueuedStop[]): void => {
+    if (rows.length === 0) return;
+    setExpiredRows((known) => {
+      const next = { ...known };
+      // The latest row per crew is the one the notice names.
+      for (const row of rows) {
+        const earlier = next[row.crewId];
+        if (earlier === undefined || Date.parse(row.clientTime) > Date.parse(earlier)) next[row.crewId] = row.clientTime;
+      }
+      return next;
+    });
+  }, []);
+
+  /** The notice is over once the supervisor acts again (a new stop, an undo, a resume). */
+  const dismissExpired = (): void => {
+    if (crewId === null) return;
+    setExpiredRows((known) => {
+      if (known[crewId] === undefined) return known;
+      return Object.fromEntries(Object.entries(known).filter(([id]) => id !== crewId));
+    });
+  };
+
   const stop = (): void => {
     if (crewId === null || sending.current) return;
     // Pressed again with no signal while this crew's stop is already kept: one row is enough, the outbox sends it once.
     if (local.kind === "queued" && typeof navigator !== "undefined" && !navigator.onLine) return;
     sending.current = true;
+    dismissExpired();
     setUndoFailedFor(null);
     setResumeFailedFor(null);
     setResumed(null);
@@ -265,11 +308,15 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
         return;
       }
       onFail();
+      // No answer, or a server failure: the DELETE may have landed. The server's list says what is true; a failed undo or resume never
+      // waits for the next scheduled refetch (the same rule as the stop path).
+      if (outcomeUnknown(error)) refresh();
     }
   };
 
   const undo = (): void => {
     if (local.kind !== "stopped" || Date.now() >= local.undoUntil) return;
+    dismissExpired();
     setUndoFailedFor(null);
     setGone(null);
     void clear(
@@ -284,6 +331,7 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
   };
 
   const resume = (): void => {
+    dismissExpired();
     setResumeFailedFor(null);
     setGone(null);
     void clear(
@@ -309,12 +357,17 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     };
   }, [undoOpen]);
 
-  // After a reload: a stop still waiting in the outbox is "Not sent" again, not a plain idle button. The read never clears a row this
-  // hook has just written (a press can land before the read does).
+  // After a reload: a stop still waiting in the outbox is "Not sent" again, not a plain idle button. A row older than the TTL is
+  // discarded first (offline too: it will never be sent, so it must not read "sent when it is back online") and reported as expired.
+  // The read never clears a row this hook has just written (a press can land before the read does).
   useEffect(() => {
     if (crewId === null || !outboxAvailable()) return;
     let live = true;
-    void pendingStops()
+    void discardExpiredStops()
+      .then((old) => {
+        noteExpired(old);
+        return pendingStops();
+      })
       .then((rows) => {
         const row = rows.find((candidate) => candidate.crewId === crewId);
         if (!live || row === undefined) return;
@@ -324,7 +377,7 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     return () => {
       live = false;
     };
-  }, [crewId]);
+  }, [crewId, noteExpired]);
 
   // The crews list shows the stop a waiting row was for: sending it later would stop the crew again after a resume.
   useEffect(() => {
@@ -350,21 +403,26 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
       // Offline there is nothing to send: the rows wait for the `online` event instead of each opening a request that must fail.
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
       const recorded = new Map<string, CrewStop>();
-      let done: readonly { readonly crewId: string }[];
+      // A send that got no answer may still have landed: the list then decides what the bar reads, not the row that stayed.
+      const unanswered: string[] = [];
+      let result: DrainResult;
       try {
-        done = await drainStopOutbox(async (row) => {
+        result = await drainStopOutbox(async (row) => {
           try {
             recorded.set(row.crewId, await postStop(row.crewId, { reason_code: "heat" }));
             return "done";
           } catch (error) {
+            if (outcomeUnknown(error)) unanswered.push(row.crewId);
             return resultOf(error);
           }
         });
       } catch {
         return;
       }
+      const { done, expired } = result;
+      noteExpired(expired);
+      if (done.length > 0 || unanswered.length > 0) refresh();
       if (done.length === 0) return;
-      refresh();
       const latest = latestCrew.current;
       if (latest === null) return;
       if (done.some((row) => row.crewId === latest)) setOutboxRow((row) => (row !== null && row.crewId === latest ? null : row));
@@ -381,7 +439,9 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     return () => {
       window.removeEventListener("online", onOnline);
     };
-  }, [crewId, refresh]);
+  }, [crewId, refresh, noteExpired]);
+
+  const expiredAt = crewId === null ? null : (expiredRows[crewId] ?? null);
 
   if (local.kind === "stopped") {
     return {
@@ -394,17 +454,18 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
       undoFailed,
       resumeFailed,
       noActiveStop,
+      expiredAt: null,
       stop,
       undo,
       resume,
     };
   }
-  const base = { crewId, stopId: null, undoSecondsLeft: 0, undoFailed: false, resumeFailed, noActiveStop, stop, undo, resume } as const;
+  const base = { crewId, stopId: null, undoSecondsLeft: 0, undoFailed: false, resumeFailed, noActiveStop, expiredAt, stop, undo, resume } as const;
   if (local.kind === "sending") return { ...base, state: "sending", at: null, failure: null };
   if (local.kind === "queued") return { ...base, state: "queued", at: local.at, failure: null };
   if (local.kind === "failed") return { ...base, state: "failed", at: null, failure: local.reason };
   if (serverStopId !== null) {
-    return { ...base, state: "stopped", stopId: serverStopId, at: server?.stoppedAt ?? null, failure: null };
+    return { ...base, expiredAt: null, state: "stopped", stopId: serverStopId, at: server?.stoppedAt ?? null, failure: null };
   }
   return { ...base, state: "idle", at: null, failure: null };
 }

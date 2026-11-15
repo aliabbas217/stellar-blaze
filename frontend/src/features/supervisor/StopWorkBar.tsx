@@ -53,15 +53,19 @@ function StopMark({ className = "size-7" }: { className?: string }) {
   );
 }
 
-function ResumeDialog({ crewName, at, onConfirm, onCancel }: { crewName: string; at: string; onConfirm: () => void; onCancel: () => void }) {
+export function ResumeDialog({ crewName, at, onConfirm, onCancel }: { crewName: string; at: string; onConfirm: () => void; onCancel: () => void }) {
   const t = useTranslations("supervisor.stop");
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
+  // The dialog ends once, whichever way it ends: a button closes it natively, and the native `close` event that follows must not call
+  // the cancel handler a second time (nor, after Resume work, call it at all).
+  const ended = useRef(false);
 
   // Closes the dialog for real before the bar drops it: a native dialog that is closed (not just unmounted) hands focus back to the
   // control that opened it ("Resume work"), which a keyboard or screen reader user needs.
   const close = (then: () => void): void => {
+    ended.current = true;
     const dialog = ref.current;
     if (dialog !== null) {
       if (typeof dialog.close === "function") dialog.close();
@@ -86,7 +90,12 @@ function ResumeDialog({ crewName, at, onConfirm, onCancel }: { crewName: string;
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={onCancel}
+      onClose={() => {
+        // Escape (or the browser closing it): the same as "Keep work stopped", once.
+        if (ended.current) return;
+        ended.current = true;
+        onCancel();
+      }}
       className="m-auto w-[min(92vw,26rem)] rounded-sign border border-edge bg-panel p-6 text-ink backdrop:bg-ground/80"
     >
       <h2 id={titleId} className="font-display text-xl font-medium leading-(--sign-leading-text)">
@@ -212,6 +221,11 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
   return (
     <div data-emergency="" data-stop-state={work.state} className={BAR}>
       <div className={`${INNER} bg-ground`}>
+        {work.expiredAt !== null ? (
+          <p role="status" data-expired-stop="" className="pb-3 text-base leading-(--sign-leading-text) text-ink-2">
+            {t.rich("expired", { time: time(new Date(work.expiredAt)), bdi })}
+          </p>
+        ) : null}
         {work.state === "queued" ? (
           <div role="alert" className="flex flex-col gap-1 pb-3 text-ink">
             <p className="text-lg font-semibold leading-(--sign-leading-text)">{t("queued")}</p>

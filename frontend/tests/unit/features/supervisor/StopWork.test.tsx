@@ -4,9 +4,11 @@ import { IDBFactory } from "fake-indexeddb";
 import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
 import en from "../../../../messages/en.json";
+import { ResumeDialog } from "@/features/supervisor/StopWorkBar";
 import { enqueueStop, pendingStops } from "@/features/supervisor/stop-outbox";
 import { clearStop, createStop, crewStops, resetDemoState } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
+import { renderWithIntl } from "../../../utils/intl";
 import { renderCrews, stopBar, textOf, installSupervisorTestEnvironment } from "./support";
 
 /*
@@ -40,12 +42,38 @@ afterEach(() => {
 });
 
 const STOP_ROUTE = "*/api/v1/crews/:crew_id/stops";
-const press = () => screen.findByRole("button", { name: "Stop work, Crew A" });
+/** A phone-clock time a few minutes ago: a waiting row this old is inside the outbox TTL whenever the test runs. */
+const recent = (): Date => new Date(Date.now() - 5 * 60 * 1000);
+// A generous wait: under a loaded machine (the whole suite runs files in parallel) the crews list can take longer than a second.
+const SLOW = { timeout: 5_000 } as const;
+const press = () => screen.findByRole("button", { name: "Stop work, Crew A" }, SLOW);
 const problem429 = (): Response =>
   HttpResponse.json(
     { type: "urn:stellar-blaze:problem:rate-limited", title: "Too many requests", status: 429, request_id: "req-429" },
     { status: 429, headers: { "content-type": "application/problem+json", "retry-after": "5" } },
   );
+
+/**
+ * `AbortSignal.timeout` runs on an internal timer that fake timers cannot advance (see proxy.test.ts), so the test hands the
+ * client a signal it fires itself: "the timeout elapses" is one call. The requested durations are recorded.
+ */
+function controlledTimeouts(): { fire: () => void; asked: number[] } {
+  const controllers: AbortController[] = [];
+  const asked: number[] = [];
+  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+    asked.push(ms);
+    const controller = new AbortController();
+    controllers.push(controller);
+    return controller.signal;
+  });
+  return {
+    asked,
+    fire: () => {
+      for (const controller of controllers) controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
+    },
+  };
+}
+const hang = (): Promise<never> => new Promise<never>(() => undefined);
 
 /**
  * The one sentence about when crews hear of a stop (ADR 0058, second entry: the default dispatch cadence, a promise about WHEN and
@@ -65,9 +93,12 @@ function barText(): string {
 
 /** Waits until the bar says `text` (the bar's sentences are spread over <bdi> elements, so a text query on one element cannot see them). */
 async function barSays(text: string): Promise<void> {
-  await waitFor(() => {
-    expect(barText()).toContain(text);
-  });
+  await waitFor(
+    () => {
+      expect(barText()).toContain(text);
+    },
+    SLOW,
+  );
 }
 
 describe("Stop work: structure", () => {
@@ -432,7 +463,7 @@ describe("Stop work: never shown as delivered when it was not", () => {
   it("a stop waiting in the outbox when the app opens is sent then, and recorded only after the API answered", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", new Date("2026-09-03T07:05:00Z"), factory);
+    await enqueueStop("crew-a", recent(), factory);
     renderCrews();
 
     await waitFor(() => {
@@ -447,7 +478,7 @@ describe("Stop work: never shown as delivered when it was not", () => {
   it("a stop the API keeps refusing (429) stays in the outbox and is not reported sent", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", new Date("2026-09-03T07:05:00Z"), factory);
+    await enqueueStop("crew-a", recent(), factory);
     server.use(http.post(STOP_ROUTE, () => problem429()));
     renderCrews();
     await press();
@@ -506,28 +537,6 @@ describe("Stop work: it stays with the crew it was pressed for", () => {
 });
 
 describe("Stop work: a request that hangs never leaves the bar on 'sending' (W5 I1)", () => {
-  /**
-   * `AbortSignal.timeout` runs on an internal timer that fake timers cannot advance (see proxy.test.ts), so the test hands the
-   * client a signal it fires itself: "the timeout elapses" is one call. The requested durations are recorded.
-   */
-  function controlledTimeouts(): { fire: () => void; asked: number[] } {
-    const controllers: AbortController[] = [];
-    const asked: number[] = [];
-    vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
-      asked.push(ms);
-      const controller = new AbortController();
-      controllers.push(controller);
-      return controller.signal;
-    });
-    return {
-      asked,
-      fire: () => {
-        for (const controller of controllers) controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
-      },
-    };
-  }
-  const hang = (): Promise<never> => new Promise<never>(() => undefined);
-
   it("a stop whose request never answers reads 'Not sent: no signal' after the timeout, is kept in the outbox, and a second press works", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
@@ -614,7 +623,7 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("with no signal and a row already waiting, the bar opens on 'Not sent: no signal', and pressing again writes no second row", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", new Date("2026-09-03T07:05:00Z"), factory);
+    await enqueueStop("crew-a", recent(), factory);
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
     const user = userEvent.setup();
     renderCrews();
@@ -635,7 +644,7 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("online with the API refusing the waiting row (429), the bar reads 'Not sent' instead of a plain idle button", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", new Date("2026-09-03T07:05:00Z"), factory);
+    await enqueueStop("crew-a", recent(), factory);
     server.use(http.post(STOP_ROUTE, () => problem429()));
     renderCrews();
 
@@ -646,9 +655,9 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("enqueueStop keeps one row per crew even when two presses race", async () => {
     const factory = new IDBFactory();
     await Promise.all([
-      enqueueStop("crew-a", new Date("2026-09-03T07:05:00Z"), factory),
-      enqueueStop("crew-a", new Date("2026-09-03T07:05:01Z"), factory),
-      enqueueStop("crew-b", new Date("2026-09-03T07:05:02Z"), factory),
+      enqueueStop("crew-a", recent(), factory),
+      enqueueStop("crew-a", recent(), factory),
+      enqueueStop("crew-b", recent(), factory),
     ]);
 
     const rows = await pendingStops(factory);
@@ -658,7 +667,7 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("a drain that finishes after the bar moved to the focal crew reconciles on that crew: it refreshes and reads the recorded stop", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", new Date("2026-09-03T07:05:00Z"), factory);
+    await enqueueStop("crew-a", recent(), factory);
     // The drain starts while the demo's stand-in crew (crew-b) is the bar's crew; the POST answers only once the crew list has
     // arrived and the focal crew (Crew A) has taken over, so the drain's own effect run is no longer the live one.
     let release: () => void = () => undefined;
@@ -822,5 +831,386 @@ describe("Stop work: copy that holds while it is true, and a target that is alwa
     expect(button.querySelector("[data-stop-mark]")).not.toBeNull();
     expect(stopBar().innerHTML).toContain("border-t-4");
     expect(button.getAttribute("aria-hidden")).toBeNull();
+  });
+});
+
+/** An IndexedDB whose `open` never answers (no success, no error): a hung browser store. `opens()` counts the attempts. */
+function hungIndexedDb(): { factory: Pick<IDBFactory, "open">; opens: () => number } {
+  let opens = 0;
+  return {
+    factory: {
+      open: () => {
+        opens += 1;
+        return {} as IDBOpenDBRequest;
+      },
+    },
+    opens: () => opens,
+  };
+}
+
+describe("Stop work: a hung IndexedDB never holds the bar (W6.1)", () => {
+  it("offline, with an outbox that never answers: after its timeout the bar reads 'Not sent. Tell the crew now.' (not 'queued'), and the next press is tried", async () => {
+    const hung = hungIndexedDb();
+    vi.stubGlobal("indexedDB", hung.factory);
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    const user = userEvent.setup();
+    renderCrews();
+    const button = await press();
+
+    await user.click(button);
+
+    await waitFor(
+      () => {
+        expect(barText()).toContain("Not sent. Tell the crew now.");
+      },
+      { timeout: 8_000 },
+    );
+    expect(barText()).not.toContain("no signal");
+    expect(barText()).toContain("Press Stop work to try again.");
+    expect(stopBar()).toHaveAttribute("data-stop-state", "failed");
+    expect(button).toBeEnabled();
+
+    // The press after it is not swallowed by the dead write.
+    const before = hung.opens();
+    await user.click(await press());
+    expect(hung.opens()).toBeGreaterThan(before);
+  }, 20_000);
+
+  it("a stop whose request timed out and whose outbox hangs too reads 'Not sent. Tell the crew now.', never stays on 'sending', and the next press goes out", async () => {
+    const hung = hungIndexedDb();
+    vi.stubGlobal("indexedDB", hung.factory);
+    const timeouts = controlledTimeouts();
+    server.use(http.post(STOP_ROUTE, hang));
+    const user = userEvent.setup();
+    renderCrews();
+    const button = await press();
+
+    await user.click(button);
+    await waitFor(() => {
+      expect(button).toHaveAttribute("aria-busy", "true");
+    });
+    timeouts.fire();
+
+    await waitFor(
+      () => {
+        expect(barText()).toContain("Not sent. Tell the crew now.");
+      },
+      { timeout: 8_000 },
+    );
+    expect(button).not.toHaveAttribute("aria-busy", "true");
+    expect(barText()).not.toContain("no signal");
+
+    // With the API answering again, a second press records the stop.
+    server.resetHandlers();
+    await user.click(await press());
+    await barSays("Stop recorded");
+    expect(crewStops("crew-a")).toHaveLength(1);
+  }, 20_000);
+});
+
+describe("Stop work: a row older than an hour is never sent, and the bar says so (W6.2)", () => {
+  const hhmm = (at: Date): string =>
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dubai", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(at);
+  const noticeFor = (at: Date): string => `A stop from ${hhmm(at)} was never sent and has expired. If it still applies, press Stop work.`;
+  const hoursAgo = (hours: number): Date => new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  it("the catalogue holds the words the assignment gives, and the key is a safety key", () => {
+    expect(en.supervisor.stop.expired).toBe("A stop from <bdi>{time}</bdi> was never sent and has expired. If it still applies, press Stop work.");
+    expect((en._meta.safety_keys as readonly string[]).includes("supervisor.stop.expired")).toBe(true);
+  });
+
+  it("an old row is not sent: no POST, the row is removed, the bar shows the calm notice with the row's time, and Stop work is a plain idle button", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    const old = hoursAgo(2);
+    await enqueueStop("crew-a", old, factory);
+    let posts = 0;
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST") posts += 1;
+    });
+    renderCrews();
+    await press();
+
+    await barSays(noticeFor(old));
+    expect(stopBar()).toHaveAttribute("data-stop-state", "idle");
+    expect(barText()).not.toMatch(/Not sent|kept on this phone|Stop recorded|stopped/);
+    expect(await pendingStops(factory)).toEqual([]);
+    expect(posts).toBe(0);
+    expect(crewStops("crew-a")).toHaveLength(0);
+    expect(await press()).toBeEnabled();
+    server.events.removeAllListeners();
+  });
+
+  it("offline, an old row is still discarded when the app opens (it must not read 'sent when it is back online')", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    const old = hoursAgo(3);
+    await enqueueStop("crew-a", old, factory);
+    renderCrews();
+    await press();
+
+    await barSays(noticeFor(old));
+    expect(barText()).not.toMatch(/no signal|kept on this phone/);
+    expect(await pendingStops(factory)).toEqual([]);
+  });
+
+  it("a fresh row is sent as before and shows no notice", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-a", new Date(Date.now() - 59 * 60 * 1000), factory);
+    renderCrews();
+
+    await barSays("Work stopped 11:10");
+    expect(crewStops("crew-a")).toHaveLength(1);
+    expect(barText()).not.toContain("never sent");
+    expect(await pendingStops(factory)).toEqual([]);
+  });
+
+  it("the notice clears on the next press, whatever that press does", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    const old = hoursAgo(2);
+    await enqueueStop("crew-a", old, factory);
+    const user = userEvent.setup();
+    renderCrews();
+    await barSays(noticeFor(old));
+
+    await user.click(await press());
+
+    await barSays("Stop recorded");
+    expect(barText()).not.toContain("never sent");
+    expect(crewStops("crew-a")).toHaveLength(1);
+  });
+
+  it("the notice does not follow the bar to another crew: a row of a crew the bar is not about says nothing under that crew's Stop work", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-d", hoursAgo(2), factory);
+    renderCrews();
+    await press();
+
+    await waitFor(async () => {
+      expect(await pendingStops(factory)).toEqual([]);
+    });
+    expect(barText()).not.toContain("never sent");
+    expect(crewStops("crew-d")).toHaveLength(0);
+  });
+});
+
+describe("Stop work: a timed-out undo, resume or drain asks the server what is true (W6.3, W6.4)", () => {
+  /** Counts the crews list requests (the refetch the bar relies on). */
+  function listRequests(): { count: () => number; stop: () => void } {
+    let count = 0;
+    server.events.on("request:start", ({ request }) => {
+      if (/\/api\/v1\/sites\/[^/]+\/crews$/.test(new URL(request.url).pathname)) count += 1;
+    });
+    return {
+      count: () => count,
+      stop: () => {
+        server.events.removeAllListeners();
+      },
+    };
+  }
+
+  it("a resume whose request timed out refetches the crews once, besides saying 'Resume was not sent'", async () => {
+    createStop("crew-a");
+    const timeouts = controlledTimeouts();
+    server.use(http.delete("*/api/v1/crews/:crew_id/stops/:stop_id", hang));
+    const lists = listRequests();
+    const user = userEvent.setup();
+    renderCrews();
+    await user.click(await within(await waitForBar()).findByRole("button", { name: "Resume work" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Resume work" }));
+    await waitFor(() => {
+      expect(timeouts.asked.length).toBeGreaterThan(0);
+    });
+    const before = lists.count();
+
+    timeouts.fire();
+
+    expect(await screen.findByText("Resume was not sent. Try again.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(lists.count()).toBe(before + 1);
+    });
+    lists.stop();
+  });
+
+  it("an undo whose request timed out refetches the crews once too", async () => {
+    const timeouts = controlledTimeouts();
+    server.use(http.delete("*/api/v1/crews/:crew_id/stops/:stop_id", hang));
+    const lists = listRequests();
+    const user = userEvent.setup();
+    renderCrews();
+    await user.click(await press());
+    await user.click(await screen.findByRole("button", { name: /^Undo/ }));
+    await waitFor(() => {
+      expect(timeouts.asked.length).toBeGreaterThan(1);
+    });
+    const before = lists.count();
+
+    timeouts.fire();
+
+    expect(await screen.findByText("Undo was not sent. Try again, or use Resume work.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(lists.count()).toBeGreaterThan(before);
+    });
+    lists.stop();
+  });
+
+  it("a drain whose POST times out but landed on the server reads the recorded stop, not 'Not sent'", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-a", recent(), factory);
+    const timeouts = controlledTimeouts();
+    server.use(
+      http.post(STOP_ROUTE, ({ params }) => {
+        createStop(String(params["crew_id"]));
+        return hang();
+      }),
+    );
+    renderCrews();
+    await press();
+    await waitFor(
+      () => {
+        expect(crewStops("crew-a")).toHaveLength(1);
+      },
+      SLOW,
+    );
+    // Until the drain's request gives up, the row waits and the bar says so.
+    await barSays("Not sent: no signal. Tell the crew now.");
+
+    timeouts.fire();
+
+    await barSays("Work stopped 11:10");
+    expect(barText()).not.toContain("Not sent");
+    expect(crewStops("crew-a")).toHaveLength(1);
+  });
+});
+
+describe("Resume dialog: each way of ending it calls its handler once (W6)", () => {
+  /** A native dialog closes with an asynchronous `close` event; jsdom has none, so the test makes one the way the browser does. */
+  function browserLikeDialog(): void {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.setAttribute("open", "");
+      },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, "close", {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        if (!this.hasAttribute("open")) return;
+        this.removeAttribute("open");
+        queueMicrotask(() => {
+          this.dispatchEvent(new Event("close"));
+        });
+      },
+    });
+  }
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+  });
+
+  function open(): { onCancel: ReturnType<typeof vi.fn>; onConfirm: ReturnType<typeof vi.fn>; dialog: HTMLDialogElement } {
+    browserLikeDialog();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    renderWithIntl(<ResumeDialog crewName="Crew A" at="11:10" onCancel={onCancel} onConfirm={onConfirm} />);
+    return { onCancel, onConfirm, dialog: document.querySelector("dialog") as HTMLDialogElement };
+  }
+  const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 20));
+
+  it("Keep work stopped: onCancel once, not twice, and onConfirm never", async () => {
+    const { onCancel, onConfirm } = open();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Keep work stopped" }));
+    await settle();
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("Resume work: onConfirm once, and onCancel never (the native close that follows is not a cancel)", async () => {
+    const { onCancel, onConfirm } = open();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Resume work" }));
+    await settle();
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("Escape (the browser closes the dialog itself): onCancel once", async () => {
+    const { onCancel, onConfirm, dialog } = open();
+    dialog.close();
+    await settle();
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+describe("Stop work: the outbox survives a reload and never reports a send (Task 23)", () => {
+  it("test_stop_outbox_survives_reload_and_never_reports_sent: pressed offline, reloaded offline, refused online: 'Not sent' every time, and 'recorded' only after the API answers 2xx", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    const onLine = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    const posts: string[] = [];
+    let refuse = true;
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST" && /\/stops$/.test(new URL(request.url).pathname)) posts.push(request.url);
+    });
+    server.use(http.post(STOP_ROUTE, () => (refuse ? problem429() : undefined)));
+    const NOT_SENT = /Not sent/;
+    const NEVER = /Stop recorded|Work stopped|stopped 11:10|delivered|alerted/;
+    const user = userEvent.setup();
+
+    // 1. Pressed with no signal: kept, "Not sent", no request.
+    const first = renderCrews();
+    await user.click(await press());
+    await barSays("Not sent: no signal. Tell the crew now.");
+    expect(barText()).not.toMatch(NEVER);
+    const keyBefore = (await pendingStops(factory)).map((row) => row.key);
+    expect(keyBefore).toHaveLength(1);
+    expect(posts).toEqual([]);
+
+    // 2. A reload (the page is gone, the phone and its IndexedDB are not), still offline: the same row, the same words, still no request.
+    first.unmount();
+    renderCrews();
+    await press();
+    await barSays("Not sent: no signal. Tell the crew now.");
+    expect(stopBar()).toHaveAttribute("data-stop-state", "queued");
+    expect(barText()).not.toMatch(NEVER);
+    expect((await pendingStops(factory)).map((row) => row.key)).toEqual(keyBefore);
+    expect(posts).toEqual([]);
+
+    // 3. The signal returns but the API refuses (429): the row goes out, is refused, stays, and the bar never says recorded.
+    onLine.mockReturnValue(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(
+      () => {
+        expect(posts.length).toBeGreaterThan(0);
+      },
+      SLOW,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(barText()).toMatch(NOT_SENT);
+    expect(barText()).not.toMatch(NEVER);
+    expect((await pendingStops(factory)).map((row) => row.key)).toEqual(keyBefore);
+    expect(crewStops("crew-a")).toHaveLength(0);
+
+    // 4. Only when the API answers 2xx is it recorded, and the row is spent.
+    refuse = false;
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await barSays("Work stopped 11:10");
+    expect(crewStops("crew-a")).toHaveLength(1);
+    await waitFor(async () => {
+      expect(await pendingStops(factory)).toEqual([]);
+    });
+    server.events.removeAllListeners();
   });
 });

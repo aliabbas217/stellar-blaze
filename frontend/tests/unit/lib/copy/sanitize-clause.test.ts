@@ -145,3 +145,28 @@ describe("sanitizeClause: a clause that is only a reference", () => {
     expect(sanitizeClause("")).toBe("");
   });
 });
+
+describe("sanitizeClause: a rule id never swallows the sentence's own full stop (W6.5)", () => {
+  it("keeps the boundary after a reference that ends a sentence: 'ADR 0011 P-H10. Next' stays two sentences", () => {
+    const out = sanitizeClause("This follows the reading ADR 0011 P-H10. Next sentence stays as it was.");
+
+    noJargon(out);
+    expect(out).toBe("This follows the reading. Next sentence stays as it was.");
+  });
+
+  it("keeps the boundary after a reference with no rule id, and after a reference inside the last sentence", () => {
+    expect(sanitizeClause("This follows the reading ADR 0011. Next sentence stays.")).toBe("This follows the reading. Next sentence stays.");
+    expect(sanitizeClause("Next sentence stays. It follows the reading ADR 0011 P-H4.")).toBe("Next sentence stays. It follows the reading.");
+  });
+
+  it("still takes a dotted rule id whole: P-H7.cap60 and P-H5.ban_season are one token, the full stop after it is not part of it", () => {
+    expect(sanitizeClause("Rest is capped, the reading in ADR 0011 P-H7.cap60. Next sentence stays.")).toBe("Next sentence stays.");
+    expect(sanitizeClause("Juveniles are excluded (ADR 0011 P-H5.ban_season). Next sentence stays.")).toBe("Juveniles are excluded. Next sentence stays.");
+    expect(sanitizeClause("It is a product rule ADR 0011 P-H5.ban_season, not law.")).toBe("It is a product rule, not law.");
+  });
+
+  it("does not take a sentence-final full stop with a leading rule id either", () => {
+    expect(sanitizeClause("P-H10 No added minutes: a plan never extends the shift.")).toBe("No added minutes: a plan never extends the shift.");
+    expect(sanitizeClause("P-H10. No added minutes.")).toBe("P-H10. No added minutes.");
+  });
+});
