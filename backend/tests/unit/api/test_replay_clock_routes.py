@@ -49,9 +49,13 @@ def test_a_stop_recorded_in_replay_mode_lands_on_the_replay_day_and_a_resume_end
     assert stop.json()["started_at"] == "2026-07-01T07:10:00Z"  # the replay day, not 2026-11-15
     assert stop.json()["cleared_at"] is None
     assert "red" not in {before["2026-07-01T06:00:00Z"], before["2026-07-01T07:00:00Z"]}
-    # Open stop: from the instant it was recorded to the end of the response day.
+    # Open stop: from the instant it was recorded (07:10Z, the midday break) to the end of crew B's shift, 18:00 local =
+    # 14:00Z: hours 07Z..13Z are red; the hours starting 14Z and 15Z (after the shift) are not.
     assert open_levels["2026-07-01T06:00:00Z"] != "red"
-    assert all(level == "red" for start, level in open_levels.items() if start >= "2026-07-01T07:00:00Z")
+    in_shift = {s: lv for s, lv in open_levels.items() if "2026-07-01T07:00:00Z" <= s < "2026-07-01T14:00:00Z"}
+    assert in_shift
+    assert all(level == "red" for level in in_shift.values())
+    assert all(level != "red" for s, level in open_levels.items() if s >= "2026-07-01T14:00:00Z")
     stopped = [s for s in open_plan["segments"] if s["state"] == "stopped"]
     assert stopped, "the afternoon block of the shift is stopped"
     assert min(s["starts_at"] for s in stopped) >= "2026-07-01T07:10:00Z"

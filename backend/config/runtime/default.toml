@@ -1,12 +1,16 @@
-# Runtime configuration seed (ADR 0010): every value is the ruleset default except the pinned ones listed under
-# [tunables] below (today only `warning_theta`, the pre-registered theta_protect).
+# Runtime configuration seed (ADR 0010): every value is the ruleset default except the two pinned ones: the released
+# model (`model_id`, below) and the pre-registered theta_protect (`warning_theta`, under [tunables]).
 #
 # This is the git default that is loaded at startup, and that `sb-jobs config seed` (Task 7B) writes to the database as
 # the first config version. A tunable is set only to move away from its ruleset default, within the range that the
-# ruleset declares under [tunables.<name>]; legal floors are not settable here at all. `model_id` stays absent until a
-# trained model exists (B2): absent means the uncorrected forecast.
+# ruleset declares under [tunables.<name>]; legal floors are not settable here at all. A config WITHOUT `model_id`
+# serves the uncorrected forecast (no corrector): that is not the product.
 
 schema_version = 1
+
+# The released model of the protocol lock (B2 owns it; the model is committed under backend/models/). Without this pin
+# the corrector is absent, so the demo day 2025-07-10 comes out Green all day on the uncorrected forecast.
+model_id = "corrector-20261114-d327987-6edafa"
 
 [tunables]
 # The pre-registered theta_protect (ADR 0048 section 3; freeze addendum section 2 in

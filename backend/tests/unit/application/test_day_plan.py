@@ -312,7 +312,8 @@ async def test_an_active_stop_turns_the_covered_ticks_red_and_the_planner_stops_
 
     result = await w.run(day, await w.crew("crew-b"))
 
-    assert red_ticks(result) == list(range(36, 216))
+    # Active stop: from 07:00 local (tick 36) to the end of crew B's shift, 18:00 local = tick 168 (exclusive), not 216.
+    assert red_ticks(result) == list(range(36, 168))
     assert result.validation.passed
     assert "STOP.red" in result.validation.checked_rules
     work_ticks = [i for i, s in enumerate(result.plan.states) if s is TickState.WORK]
@@ -320,7 +321,8 @@ async def test_an_active_stop_turns_the_covered_ticks_red_and_the_planner_stops_
     assert TickState.STOPPED in result.plan.states[36:]
     hours = {hour.starts_at.hour: hour for hour in result.hours}
     assert (hours[2].level, hours[2].zone) == (AlertLevel.GREEN, Zone.LOW)  # 06:00-07:00 is before the stop
-    assert all(hours[h].level is AlertLevel.RED and hours[h].zone is Zone.RED for h in range(3, 16))
+    assert all(hours[h].level is AlertLevel.RED and hours[h].zone is Zone.RED for h in range(3, 14))  # 07:00-18:00
+    assert all(hours[h].level is AlertLevel.GREEN for h in (14, 15))  # 18:00-20:00 local: the shift is over
     assert [hour.level for hour in day.hours] == [AlertLevel.GREEN] * 14  # the site's own levels are untouched
 
 
@@ -336,6 +338,60 @@ async def test_a_cleared_stop_ends_at_that_instant() -> None:
     assert red_ticks(result) == list(range(36, 48))  # 03:00Z to 04:00Z, exclusive
     hours = {hour.starts_at.hour: hour.level for hour in result.hours}
     assert (hours[3], hours[4]) == (AlertLevel.RED, AlertLevel.GREEN)
+
+
+@pytest.mark.parametrize("undo_after_s", [8, 10])
+async def test_a_stop_undone_within_the_undo_window_leaves_no_trace_in_the_plan(undo_after_s: int) -> None:
+    """07:00 local (tick 36) is inside crew B's first block: the old mask made tick 36 red (5 min `stopped`). A stop
+    cleared within 10 s is ignored entirely: same plan as without it, no stopped minutes, no red hour; the row stays."""
+    w = await world()
+    day = await make_site_day(forecasts_of(day_of(GREEN_DAY)))
+    baseline = await w.run(day, await w.crew("crew-b"))
+    stop = await w.stops.start("crew-b", "lead_stop", "crew-lead", w.epoch)
+    w.clock.now = datetime(2026, 7, 1, 3, 0, undo_after_s, tzinfo=UTC)
+    await w.stops.clear(stop.id, "crew-lead")
+
+    result = await w.run(day, await w.crew("crew-b"))
+
+    assert red_ticks(result) == []
+    assert result.plan.stopped_minutes == 0
+    assert result.plan.states == baseline.plan.states
+    assert [(h.level, h.zone) for h in result.hours] == [(h.level, h.zone) for h in baseline.hours]
+    stored = await w.stops.get(stop.id)
+    assert stored is not None
+    assert (stored.started_at, stored.cleared_at) == (datetime(2026, 7, 1, 3, tzinfo=UTC), w.clock.now)  # the row stays
+
+
+async def test_a_stop_cleared_after_25_minutes_stops_exactly_five_ticks() -> None:
+    """[03:00Z, 03:25Z) = 07:00-07:25 local = ticks 36..40: 25 minutes `stopped`; the hours after 07:00Z are not red."""
+    w = await world()
+    day = await make_site_day(forecasts_of(day_of(GREEN_DAY)))
+    stop = await w.stops.start("crew-b", "lead_stop", "crew-lead", w.epoch)
+    w.clock.now = datetime(2026, 7, 1, 3, 25, tzinfo=UTC)
+    await w.stops.clear(stop.id, "crew-lead")
+
+    result = await w.run(day, await w.crew("crew-b"))
+
+    assert red_ticks(result) == [36, 37, 38, 39, 40]
+    assert result.plan.states[36:41] == (TickState.STOPPED,) * 5
+    assert result.plan.stopped_minutes == 25
+    hours = {hour.starts_at.hour: hour.level for hour in result.hours}
+    assert (hours[3], hours[4], hours[5]) == (AlertLevel.RED, AlertLevel.GREEN, AlertLevel.GREEN)
+
+
+async def test_an_active_stop_in_the_midday_break_stops_the_afternoon_block_to_the_shift_end() -> None:
+    """07:10Z = 11:10 local (tick 86) is between crew B's blocks; the active stop runs to 18:00 local (tick 168), so the
+    15:00-18:00 block (ticks 132..167) is all `stopped` and nothing works after the stop."""
+    w = await world()
+    w.clock.now = datetime(2026, 7, 1, 7, 10, tzinfo=UTC)
+    day = await make_site_day(forecasts_of(day_of(GREEN_DAY)))
+    await w.stops.start("crew-b", "lead_stop", "crew-lead", w.epoch)
+
+    result = await w.run(day, await w.crew("crew-b"))
+
+    assert red_ticks(result) == list(range(86, 168))
+    assert set(result.plan.states[132:168]) == {TickState.STOPPED}
+    assert TickState.WORK not in result.plan.states[86:]
 
 
 async def test_stops_of_another_epoch_or_crew_do_not_turn_ticks_red() -> None:
@@ -365,7 +421,7 @@ async def test_a_stop_needs_no_forecast() -> None:
     assert result.validation.passed
     assert result.plan.status == "fallback"
     assert result.forecast_status == "fallback"
-    assert red_ticks(result) == list(range(36, 216))
+    assert red_ticks(result) == list(range(36, 168))
     assert result.record is not None
     assert result.record.status == "fallback"
     hours = {hour.starts_at.hour: hour for hour in result.hours}

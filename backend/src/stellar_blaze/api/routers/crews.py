@@ -42,7 +42,7 @@ from stellar_blaze.api.views import (
     zone_hours_model,
 )
 from stellar_blaze.application.crew_views import plan_crew_day
-from stellar_blaze.application.day_plan import crew_hours, stopped_mask
+from stellar_blaze.application.day_plan import crew_hours, shift_end_utc, stopped_mask
 from stellar_blaze.application.governance import audit_identity
 from stellar_blaze.application.runtime_config import ruleset_for
 from stellar_blaze.application.signoff import ReviewRequiredError, SignoffNeedsDatabaseConfigError, sign_off
@@ -85,7 +85,8 @@ async def get_crew_timeline(
         epoch = await services.sites.active_epoch(site.id)
         start = day.zones.start_utc
         stops = await services.stops.active_between(crew.id, start, start + _GRID, epoch)
-        hours = crew_hours(day, stopped_mask([(s.started_at, s.cleared_at) for s in stops], start), start)
+        shift_end = shift_end_utc(crew.shift, local_date, ZoneInfo(site.timezone))
+        hours = crew_hours(day, stopped_mask([(s.started_at, s.cleared_at) for s in stops], start, shift_end), start)
         ruleset = ruleset_for(snapshot, runtime.rulesets, local_date).ruleset
         k = effective_params(snapshot, ruleset).k_exposure
         state = await signoff_state_of(
@@ -106,6 +107,7 @@ async def get_crew_timeline(
             CrewHour(starts_at=hour.starts_at, crew_level=hour.level, ban_active=site_hour.ban_active)
             for hour, site_hour in zip(hours, day.hours, strict=True)
         ],
+        mode=day.mode,
     )
 
 
@@ -180,6 +182,7 @@ async def get_crew_day_plan(
         policy_version=day.identity.ruleset_id,
         config_version=day.identity.config_version,
         model_id=day.identity.model_id,
+        mode=day.mode,
     )
 
 
@@ -300,6 +303,10 @@ async def create_crew_stop(
     Idempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch
     returns that stop (201, same body, no second row, no second audit row).
 
+    Undo window: a stop cleared by `delete_crew_stop` within 10 seconds of being recorded leaves no trace in levels or
+    plans; both audit rows stay. An active stop covers the crew's levels and plan from its start to the end of the
+    crew's shift for the day, and a cleared stop only until it was cleared.
+
     Known edge (not changed): the warning levels cover the working day 06:00 to 20:00 site-local, so a stop recorded
     outside it changes no warning level, and a stop that was never cleared is read again by the next day's runs only
     through the stops of that day's window.
@@ -359,6 +366,9 @@ async def delete_crew_stop(
     runtime: RuntimeDep,
 ) -> Response:
     """Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.
+
+    A stop cleared within 10 seconds of being recorded (the undo) leaves no trace in levels or plans; both audit rows
+    stay. After that, the stop covers the levels and the plan only until it was cleared.
 
     Resume recorded. A de-escalation alert follows after the de-escalation dwell, at the next alert dispatch cycle
     once the dwell has elapsed (one dispatch interval at most, plus the time the cycle itself takes).

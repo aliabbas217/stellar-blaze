@@ -39,7 +39,8 @@ def test_data_request_403_and_audit_row(settings: Settings, caplog: pytest.LogCa
     assert row.epoch_id == 1
     assert row.ruleset_id == "ae-heat-2026.1"
     assert len(row.ruleset_sha256 or "") == 64
-    assert (row.model_id, row.config_version_id) == (None, None)  # file snapshot: version reported as 0
+    # The git default seed pins the released model, so the row names it; a file snapshot has no version (reported as 0).
+    assert (row.model_id, row.config_version_id) == ("corrector-20261114-d327987-6edafa", None)
     assert row.config_sha256
     everywhere = response.text + row.model_dump_json() + caplog.text
     assert WORKER_REF not in everywhere

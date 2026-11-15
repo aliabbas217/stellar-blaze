@@ -32,6 +32,10 @@ SITE = "site-demo-mussafah"
 REPLAY_DATE = date(2025, 7, 10)  # a day of the B2 replay fixture (the 9th to the 11th of July 2025)
 DEMO_FIXTURE = BACKEND_DIR / "fixtures" / "demo_site.toml"
 ACTOR_ARGS = ("--actor", "ali", "--reason", "end to end check of the B3 api")
+# The end-to-end mechanics run over the FIXTURE models and a seed that pins nothing: the git default pins the released
+# model, which the fixture models dir does not hold (the product default is proved in test_default_seed_serving.py and
+# test_config_cli.py).
+UNPINNED_SEED = BACKEND_DIR / "tests" / "fixtures" / "runtime" / "unpinned.toml"
 
 
 def token_key(token: str) -> str:
@@ -58,7 +62,7 @@ def cli_environment(monkeypatch: pytest.MonkeyPatch, settings: Settings, workdir
     monkeypatch.setenv("SB_GIT_SHA", "abc1234")
     monkeypatch.setenv("SB_RULESETS_DIR", str(BACKEND_DIR / "rulesets"))
     monkeypatch.setenv("SB_MODELS_DIR", str(FIXTURE_MODELS))
-    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(BACKEND_DIR / "config" / "runtime" / "default.toml"))
+    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(UNPINNED_SEED))
     monkeypatch.chdir(workdir)  # a developer's backend/.env is not read
 
 
@@ -103,7 +107,7 @@ def app_settings(database: Settings, *, replay_dir: Path | None = None, snapshot
         access_tokens=SecretStr(ACCESS_TOKENS),
         rulesets_dir=BACKEND_DIR / "rulesets",
         models_dir=FIXTURE_MODELS,
-        runtime_config_seed=BACKEND_DIR / "config" / "runtime" / "default.toml",
+        runtime_config_seed=UNPINNED_SEED,
         config_poll_interval_s=1.0,
         **replay,
     )

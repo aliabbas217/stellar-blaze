@@ -15,11 +15,22 @@ Conventions, all of them part of the contract:
 
 import datetime as dt
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetJsonSchemaHandler,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 from pydantic.config import JsonDict
+from pydantic.json_schema import JsonSchemaValue
 from pydantic.types import JsonValue
+from pydantic_core import CoreSchema
 
 from stellar_blaze.api.push_validation import check_endpoint, check_expiration, check_key
 from stellar_blaze.api.schemas import ResponseModel
@@ -68,6 +79,9 @@ BAN_WINDOW_DESCRIPTION = (
 )
 
 
+MODE_DESCRIPTION = (
+    "Whether the day was computed against the live clock and live forecasts or the fixed replay snapshot."
+)
 BANNER_DESCRIPTION = (
     'Always present on every plan payload: the client shows the floor banner ("Green is not permission to extend '
     'work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.").'
@@ -111,6 +125,36 @@ class ApiResponse(ResponseModel):
     """Base of every response body: always-sent fields are ``required``; unknown members are forbidden."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+class OptionalMemberResponse(ApiResponse):
+    """A response whose members named in ``wire_optional`` stay OPTIONAL in the OpenAPI schema (additive evolution).
+
+    ``ResponseModel`` marks every field required, which is right for a member the contract always carries and wrong for
+    one added later: a required new member is not additive for a generated client. A member listed here is declared
+    ``X | None = None`` on the model; the API still always sends it, the schema leaves it out of ``required`` and shows
+    the plain type (no ``null`` variant, no ``default``: present means a real value).
+    """
+
+    wire_optional: ClassVar[frozenset[str]] = frozenset()
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
+        schema = handler.resolve_ref_schema(handler(core_schema))
+        required = schema.get("required")
+        if isinstance(required, list):
+            schema["required"] = [name for name in required if name not in cls.wire_optional]
+        properties = schema.get("properties", {})
+        for name in cls.wire_optional:
+            member = properties.get(name)
+            if not isinstance(member, dict):
+                continue
+            variants = [v for v in member.get("anyOf", []) if v != {"type": "null"}]
+            if len(variants) == 1:
+                member.pop("anyOf")
+                member.pop("default", None)
+                member.update(variants[0])
+        return schema
 
 
 # --- sites, forecast, policy --------------------------------------------------------------------------------------
@@ -391,7 +435,8 @@ class TimeRange(ApiResponse):
     ends_at: AwareDatetime = Field(description="UTC end of the range, exclusive.")
 
 
-class CrewTimeline(ApiResponse):
+class CrewTimeline(OptionalMemberResponse):
+    wire_optional = frozenset({"mode"})
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -410,6 +455,7 @@ class CrewTimeline(ApiResponse):
                     ],
                     "ban_window": BAN,
                     "hours": [_CREW_HOUR_EXAMPLE],
+                    "mode": "replay",
                 }
             ]
         }
@@ -436,6 +482,7 @@ class CrewTimeline(ApiResponse):
     )
     ban_window: BanWindow = Field(description=BAN_WINDOW_DESCRIPTION)
     hours: list[CrewHour] = Field(description="Working-day hours in time order (06:00-19:00 site-local).")
+    mode: ForecastMode | None = Field(default=None, description=MODE_DESCRIPTION)
 
 
 class PlanSegment(ApiResponse):
@@ -530,7 +577,8 @@ _SEGMENTS_EXAMPLE: list[JsonValue] = [
 ]
 
 
-class DayPlan(ApiResponse):
+class DayPlan(OptionalMemberResponse):
+    wire_optional = frozenset({"mode"})
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -567,6 +615,7 @@ class DayPlan(ApiResponse):
                     "policy_version": POLICY_VERSION,
                     "config_version": 1,
                     "model_id": MODEL_ID,
+                    "mode": "replay",
                 }
             ]
         }
@@ -616,6 +665,7 @@ class DayPlan(ApiResponse):
         description="Active runtime configuration id; 0 when running without a database configuration."
     )
     model_id: str | None = Field(description="Id of the corrector model behind the zones; null in fallback.")
+    mode: ForecastMode | None = Field(default=None, description=MODE_DESCRIPTION)
 
 
 class PlanSignOffRequest(ApiRequest):

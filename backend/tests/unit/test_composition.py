@@ -41,8 +41,13 @@ FIXTURE_MODELS = BACKEND_ROOT / "tests" / "fixtures" / "models"
 FIRST = "corrector-20261111-0000000-000000"
 SECOND = "corrector-20261112-0000000-000001"
 TODAY = date(2026, 11, 11)
-# backend/config/runtime/default.toml: the ruleset defaults except the pre-registered theta_protect (ADR 0048 s.3).
-GIT_DEFAULT = RuntimeConfig(tunables=Tunables(warning_theta=0.30))
+RELEASED = "corrector-20261114-d327987-6edafa"  # the released model of the protocol lock (committed in backend/models/)
+# backend/config/runtime/default.toml: the ruleset defaults except the released model and the pre-registered
+# theta_protect (ADR 0048 s.3).
+GIT_DEFAULT = RuntimeConfig(model_id=RELEASED, tunables=Tunables(warning_theta=0.30))
+# The build mechanics below are tested with a seed that pins nothing (and the fixture models), so they do not depend on
+# what the product default pins; the product default has its own test, over the real committed models.
+UNPINNED_SEED = BACKEND_ROOT / "tests" / "fixtures" / "runtime" / "unpinned.toml"
 PROD_PINS_MESSAGE = "SB_RULESET_ID/SB_MODEL_ID are not used in prod; use the runtime config (ADR 0010)"
 
 
@@ -53,7 +58,7 @@ def make_settings(**overrides: Any) -> Settings:
         "database_url": SecretStr("postgresql+asyncpg://sb:sb@localhost:5432/stellar_blaze"),
         "rulesets_dir": RULESETS_DIR,
         "models_dir": FIXTURE_MODELS,
-        "runtime_config_seed": BACKEND_ROOT / "config" / "runtime" / "default.toml",
+        "runtime_config_seed": UNPINNED_SEED,
     }
     fields.update(overrides)
     return Settings(_env_file=None, **fields)
@@ -72,10 +77,24 @@ def test_defaults_build_the_seed_catalog_and_a_file_snapshot() -> None:
     snapshot = runtime.config.current()
     assert snapshot.source == "file"
     assert snapshot.version_id is None
-    assert snapshot.config == GIT_DEFAULT  # the git default pins the pre-registered theta_protect, nothing else
-    assert snapshot.config.tunables.warning_theta == 0.30
+    assert snapshot.config == RuntimeConfig()  # the unpinned test seed: every value is the ruleset default
     assert snapshot.config.model_id is None
     assert snapshot.model is None
+    assert snapshot.sha256 == config_sha256(RuntimeConfig())
+
+
+def test_the_product_default_seed_builds_a_file_snapshot_with_the_released_model_loaded() -> None:
+    settings = make_settings(
+        runtime_config_seed=BACKEND_ROOT / "config" / "runtime" / "default.toml", models_dir=BACKEND_ROOT / "models"
+    )
+    runtime = build_runtime(settings, today=TODAY)
+    snapshot = runtime.config.current()
+    assert runtime.models.ids() == (RELEASED,)
+    assert snapshot.source == "file"
+    assert snapshot.config == GIT_DEFAULT  # the git default pins the released model and the theta_protect, nothing else
+    assert snapshot.config.tunables.warning_theta == 0.30
+    assert snapshot.model is not None
+    assert snapshot.model.manifest.model_id == RELEASED
     assert snapshot.sha256 == config_sha256(GIT_DEFAULT)
 
 

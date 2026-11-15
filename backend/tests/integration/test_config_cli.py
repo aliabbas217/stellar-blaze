@@ -19,18 +19,28 @@ from tests.unit.config.support import FIXTURE_MODELS, margin
 pytestmark = pytest.mark.integration
 
 REASON_ARGS = ("--actor", "ali", "--reason", "B3 margin trial")
+RELEASED_MODEL = "corrector-20261114-d327987-6edafa"  # the released model; the product default pins it
+GIT_DEFAULT = BACKEND_DIR / "config" / "runtime" / "default.toml"
+# The command mechanics run from a seed that pins nothing and the FIXTURE models, so they do not depend on what the git
+# default pins; the product default (seed and real committed models) is used by the tests that say so.
+UNPINNED_SEED = BACKEND_DIR / "tests" / "fixtures" / "runtime" / "unpinned.toml"
 
 
 def environment(
-    monkeypatch: pytest.MonkeyPatch, settings: Settings, workdir: Path, *, seed: Path | None = None
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Settings,
+    workdir: Path,
+    *,
+    seed: Path | None = None,
+    models: Path | None = None,
 ) -> None:
     monkeypatch.setenv("SB_DATABASE_URL", settings.database_url.get_secret_value())
     monkeypatch.setenv("SB_ENV", "test")
     monkeypatch.setenv("SB_LOG_FORMAT", "json")
     monkeypatch.setenv("SB_GIT_SHA", "abc1234")
     monkeypatch.setenv("SB_RULESETS_DIR", str(BACKEND_DIR / "rulesets"))
-    monkeypatch.setenv("SB_MODELS_DIR", str(FIXTURE_MODELS))
-    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(seed or BACKEND_DIR / "config" / "runtime" / "default.toml"))
+    monkeypatch.setenv("SB_MODELS_DIR", str(models or FIXTURE_MODELS))
+    monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(seed or UNPINNED_SEED))
     monkeypatch.chdir(workdir)  # a developer's backend/.env is not read
 
 
@@ -76,16 +86,19 @@ def margin_file(directory: Path, value: float, name: str = "proposal.toml") -> P
 def test_db_upgrade_migrates_an_empty_database_and_seeds_the_git_default(
     empty_settings: Settings, workdir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    environment(monkeypatch, empty_settings, workdir)
+    environment(monkeypatch, empty_settings, workdir, seed=GIT_DEFAULT, models=BACKEND_DIR / "models")
 
     result = invoke("db", "upgrade")
 
     assert result.exit_code == 0, result.output
     assert rows(empty_settings, "SELECT version_num FROM alembic_version") == [{"version_num": "0003"}]
     (version,) = rows(empty_settings, "SELECT sha256, body, created_by, reason FROM config_version")
-    # The git default is the ruleset defaults plus the pre-registered theta_protect (ADR 0048 section 3).
-    assert version["sha256"] == config_sha256(RuntimeConfig(tunables=Tunables(warning_theta=0.30)))
+    # The git default is the ruleset defaults plus the released model and the pre-registered theta_protect (ADR 0048
+    # section 3): a fresh `db upgrade` seeds both pins.
+    expected = RuntimeConfig(model_id=RELEASED_MODEL, tunables=Tunables(warning_theta=0.30))
+    assert version["sha256"] == config_sha256(expected)
     assert version["body"]["tunables"]["warning_theta"] == 0.30
+    assert version["body"]["model_id"] == RELEASED_MODEL
     assert version["created_by"] == "seed:abc1234"
     assert version["reason"] == "seed from git default"
     (activation,) = rows(empty_settings, "SELECT kind, actor, previous_activation_id FROM config_activation")
@@ -98,6 +111,36 @@ def test_db_upgrade_migrates_an_empty_database_and_seeds_the_git_default(
         json.loads(line) for line in result.stdout.splitlines() if line.startswith("{") and "Running upgrade" in line
     ]
     assert len(migrated) == 3
+
+
+def test_a_database_seeded_before_the_pins_is_moved_by_propose_and_activate_of_the_default_file(
+    empty_settings: Settings, workdir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The README recipe: a database seeded with nothing pinned keeps it (`db upgrade` never replaces an active config);
+    `config propose` of the git default and `config activate N` move it to the released model and the frozen theta."""
+    environment(monkeypatch, empty_settings, workdir)  # an older seed: nothing pinned
+    assert invoke("db", "upgrade").exit_code == 0
+    assert shown(invoke("config", "show"))["body"]["model_id"] is None
+
+    environment(monkeypatch, empty_settings, workdir, seed=GIT_DEFAULT, models=BACKEND_DIR / "models")
+    again = invoke("db", "upgrade")  # the next deploy: the seed does not run over the active config
+    assert again.exit_code == 0, again.output
+    assert last_json(again)["activation_id"] is None
+    assert shown(invoke("config", "show"))["body"]["model_id"] is None
+
+    assert invoke("config", "validate", str(GIT_DEFAULT)).exit_code == 0
+    proposed = invoke(
+        "config", "propose", str(GIT_DEFAULT), "--actor", "ali", "--reason", "pin released model and theta"
+    )
+    assert proposed.exit_code == 0, proposed.output
+    version_id = last_json(proposed)["version_id"]
+    activated = invoke(
+        "config", "activate", str(version_id), "--actor", "ali", "--reason", "serve the corrected forecast"
+    )
+    assert activated.exit_code == 0, activated.output
+
+    body = shown(invoke("config", "show"))["body"]
+    assert (body["model_id"], body["tunables"]["warning_theta"]) == (RELEASED_MODEL, 0.30)
 
 
 def test_db_upgrade_is_idempotent_and_never_replaces_an_active_config(

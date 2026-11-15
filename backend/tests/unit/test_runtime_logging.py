@@ -29,8 +29,10 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_MODELS = BACKEND_ROOT / "tests" / "fixtures" / "models"
 FIRST = "corrector-20261111-0000000-000000"
 SECOND = "corrector-20261112-0000000-000001"
-# The sha of the config the app loads at startup: the git default seed (it pins the frozen warning_theta).
-SEED_CONFIG_SHA = config_sha256(load_runtime_config(BACKEND_ROOT / "config" / "runtime" / "default.toml"))
+# These tests are about the ids in the logs, not about what the git default pins (it pins the released model, which the
+# FIXTURE models dir does not hold): the app runs from a seed that pins nothing. The sha is that seed's.
+UNPINNED_SEED = BACKEND_ROOT / "tests" / "fixtures" / "runtime" / "unpinned.toml"
+SEED_CONFIG_SHA = config_sha256(load_runtime_config(UNPINNED_SEED))
 
 
 @pytest.fixture(autouse=True)
@@ -41,7 +43,8 @@ def _clean_log_context() -> Iterator[None]:
 
 
 def test_bind_runtime_ids_binds_the_loaded_ruleset_and_model_ids(settings: Settings) -> None:
-    runtime = build_runtime(settings.model_copy(update={"models_dir": FIXTURE_MODELS}), today=date(2026, 11, 11))
+    fixture = {"models_dir": FIXTURE_MODELS, "runtime_config_seed": UNPINNED_SEED}
+    runtime = build_runtime(settings.model_copy(update=fixture), today=date(2026, 11, 11))
     bind_runtime_ids(runtime)
     bound = structlog.contextvars.get_contextvars()
     assert bound == {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": f"{FIRST},{SECOND}"}
@@ -50,7 +53,8 @@ def test_bind_runtime_ids_binds_the_loaded_ruleset_and_model_ids(settings: Setti
 def test_bind_runtime_ids_with_no_models_binds_an_empty_string(settings: Settings, tmp_path: Path) -> None:
     no_models = tmp_path / "models"
     no_models.mkdir()
-    bind_runtime_ids(build_runtime(settings.model_copy(update={"models_dir": no_models}), today=date(2026, 11, 11)))
+    empty = {"models_dir": no_models, "runtime_config_seed": UNPINNED_SEED}
+    bind_runtime_ids(build_runtime(settings.model_copy(update=empty), today=date(2026, 11, 11)))
     assert structlog.contextvars.get_contextvars() == {"ruleset_ids": "ae-heat-0.1,ae-heat-2026.1", "model_ids": ""}
 
 
@@ -66,7 +70,7 @@ def test_bind_runtime_ids_with_the_committed_models_binds_the_released_model_id(
 
 
 def probe_app(settings: Settings) -> FastAPI:
-    app = create_app(settings.model_copy(update={"models_dir": FIXTURE_MODELS}))
+    app = create_app(settings.model_copy(update={"models_dir": FIXTURE_MODELS, "runtime_config_seed": UNPINNED_SEED}))
 
     @app.get("/test/decision")
     async def decision(snapshot: SnapshotDep) -> dict[str, str]:

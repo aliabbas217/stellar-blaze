@@ -50,6 +50,7 @@ SIGNED_AT = "2025-07-10T07:15:00Z"
 STOP_AT = "2025-07-10T07:20:00Z"
 CLEARED_AT = "2025-07-10T07:30:00Z"
 AFTERNOON_SHIFT = "2025-07-10T11:00:00Z"  # crew B works 06:00-11:00 and 15:00-18:00 local; 11:20 is its mid-day break
+SHIFT_END = "2025-07-10T14:00:00Z"  # 18:00 local: the end of crew B's last block
 
 
 def instant(value: str) -> datetime:
@@ -197,7 +198,9 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         stopped_timeline = client.get("/api/v1/crews/crew-b/timeline", params=DATE).json()
         levels = {h["starts_at"]: h["crew_level"] for h in stopped_timeline["hours"]}
         assert levels["2025-07-10T07:00:00Z"] == "red"  # the hour the stop starts in
-        assert all(level == "red" for start, level in levels.items() if start >= "2025-07-10T07:00:00Z")
+        # An active stop covers up to the end of crew B's shift (18:00 local = 14:00Z), not to the end of the day.
+        assert all(level == "red" for start, level in levels.items() if "2025-07-10T07:00:00Z" <= start < SHIFT_END)
+        assert all(level != "red" for start, level in levels.items() if start >= SHIFT_END)
         assert levels["2025-07-10T06:00:00Z"] != "red"
         stopped_plan = client.get("/api/v1/crews/crew-b/day-plan", params=DATE, headers=bearer()).json()
         stopped_segments = [s for s in stopped_plan["segments"] if s["state"] == "stopped"]

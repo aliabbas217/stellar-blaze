@@ -376,6 +376,54 @@ async def test_cleared_stop_deescalates_only_after_the_dwell() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("undo_after_s", [8, 10])
+async def test_a_stop_undone_within_the_window_escalates_nothing_and_pushes_nothing(undo_after_s: int) -> None:
+    """The stop at 07:20:00Z is cleared 8 s (or exactly 10 s) later: it overlaps the 07:00Z hour, which the old mask
+    turned red (a red crew escalation and a push). Within the undo window it is ignored for levels and dispatch."""
+    w = await world(AMBER_FROM_10)
+    await w.subscribe("https://push.example/crew-b", crew="crew-b")
+    epoch = await w.sites.active_epoch(SITE_ID)
+    w.clock.now = datetime(2026, 7, 1, 7, 20, tzinfo=UTC)
+    stop = await w.stops.start("crew-b", "heat", "lead-b", epoch)
+    w.clock.now = datetime(2026, 7, 1, 7, 20, undo_after_s, tzinfo=UTC)
+    await w.stops.clear(stop.id, "lead-b")
+
+    await w.run(datetime(2026, 7, 1, 7, 25, tzinfo=UTC))
+
+    assert [r for r in w.crew_events("crew-b") if r.level is R] == []
+    assert [(m.crew_id, m.level) for _, m in w.channel.sent if m.level is R] == []
+
+
+@pytest.mark.asyncio
+async def test_a_stop_recorded_after_the_shift_ended_escalates_nothing() -> None:
+    """Crew B's last block ends 18:00 local = 14:00Z. An active stop at 14:30Z has no shift left to stop, so it makes no
+    red hour and no operator-stop escalation (the old mask ran from the stop to the end of the day)."""
+    w = await world(AMBER_FROM_10)
+    epoch = await w.sites.active_epoch(SITE_ID)
+    w.clock.now = datetime(2026, 7, 1, 14, 30, tzinfo=UTC)
+    await w.stops.start("crew-b", "heat", "lead-b", epoch)
+
+    await w.run(datetime(2026, 7, 1, 14, 35, tzinfo=UTC))
+
+    assert [r for r in w.crew_events("crew-b") if r.level is R] == []
+
+
+@pytest.mark.asyncio
+async def test_a_stop_in_the_midday_break_still_escalates_the_afternoon_block() -> None:
+    """11:10 local = 07:10Z, between crew B's blocks: the stop stays active to the shift end, so it is still an
+    operator-recorded red escalation from the 07:00Z hour (the replay-day demo)."""
+    w = await world(AMBER_FROM_10)
+    epoch = await w.sites.active_epoch(SITE_ID)
+    w.clock.now = datetime(2026, 7, 1, 7, 10, tzinfo=UTC)
+    await w.stops.start("crew-b", "heat", "lead-b", epoch)
+
+    await w.run(datetime(2026, 7, 1, 7, 15, tzinfo=UTC))
+
+    [red] = [r for r in w.crew_events("crew-b") if r.level is R]
+    assert (red.kind, red.valid_from) == ("escalate", datetime(2026, 7, 1, 7, tzinfo=UTC))
+
+
+@pytest.mark.asyncio
 async def test_the_last_event_is_per_epoch() -> None:
     w = await world(dict.fromkeys(range(2, 16), R))
     first = await w.run(datetime(2026, 7, 1, 3, tzinfo=UTC))

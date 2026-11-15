@@ -17,7 +17,8 @@ hourly level timeline with the last event of that target in the epoch:
 
 ``dispatch`` is the use case ``sb-jobs alerts dispatch`` runs. The crew level it computes includes the crew's active
 stops of the ACTIVE epoch, through the same helpers ``day_plan`` uses (``stopped_mask``, ``stopped_hours``,
-``crew_hours``), so a stop
+``crew_hours``, which call ``effective_stops``: a stop cleared within ``STOP_UNDO_WINDOW_S`` is ignored, an active one
+ends with the crew's shift), so a stop
 recorded between two runs is escalated by the NEXT run: one immediate ``red`` crew event, no dwell, no sign-off wait
 (there is no HTTP trigger, ADR 0058 decision 5). Cadence: ``alert_dispatch_interval_minutes`` of the active config is
 stored on every ``alert_event`` row and in the ``alerts.dispatched`` audit row of each run that created, delivered or
@@ -69,11 +70,12 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Final, Literal
+from zoneinfo import ZoneInfo
 
 import structlog
 from pydantic import JsonValue
 
-from stellar_blaze.application.day_plan import crew_hours, stopped_hours, stopped_mask
+from stellar_blaze.application.day_plan import crew_hours, shift_end_utc, stopped_hours, stopped_mask
 from stellar_blaze.application.runtime_config import ConfigSnapshot, ruleset_for
 from stellar_blaze.application.site_day import SiteDay, effective_params
 from stellar_blaze.domain.plans.model import CrewSpec
@@ -303,12 +305,15 @@ async def prepare(
         return Prepared(report, site_day, 0, snapshot)
 
     epoch = await sites.active_epoch(site_id)
+    tz = ZoneInfo(site_day.site.timezone)
     start = site_day.zones.start_utc
     end = start + timedelta(minutes=TICK_MINUTES * len(site_day.zones.zones))
     targets = [_Target(None, [(h.starts_at, h.level) for h in site_day.hours])]
     for crew in crews:
         found = await stops.active_between(crew.crew_id, start, end, epoch)
-        mask = stopped_mask([(s.started_at, s.cleared_at) for s in found], start)
+        mask = stopped_mask(
+            [(s.started_at, s.cleared_at) for s in found], start, shift_end_utc(crew.shift, local_date, tz)
+        )
         targets.append(
             _Target(
                 crew.crew_id,

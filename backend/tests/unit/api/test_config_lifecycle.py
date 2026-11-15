@@ -21,9 +21,13 @@ from stellar_blaze.domain.config.runtime import RuntimeConfig, config_body
 from stellar_blaze.errors import PROBLEM_JSON
 from stellar_blaze.ports.config_store import RuntimeConfigStore, StoreUnavailableError
 from tests.unit.config.support import FIXTURE_MODELS, SECOND_MODEL, TODAY, log_events, make_service, margin
-from tests.unit.rules.support import RULESETS_DIR
+from tests.unit.rules.support import BACKEND_ROOT, RULESETS_DIR
 
 pytestmark = pytest.mark.unit
+
+# The lifecycle is tested over the FIXTURE models: the seed pins nothing (the git default pins the released model,
+# which the fixture models dir does not hold).
+UNPINNED_SEED = BACKEND_ROOT / "tests" / "fixtures" / "runtime" / "unpinned.toml"
 
 ACTOR = "ali"
 REASON = "B3 margin trial"
@@ -60,7 +64,14 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryConfigStore:
 
 def app_for(settings: Settings, *, env: str = "test") -> FastAPI:
     app = create_app(
-        settings.model_copy(update={"env": env, "rulesets_dir": RULESETS_DIR, "models_dir": FIXTURE_MODELS})
+        settings.model_copy(
+            update={
+                "env": env,
+                "rulesets_dir": RULESETS_DIR,
+                "models_dir": FIXTURE_MODELS,
+                "runtime_config_seed": UNPINNED_SEED,
+            }
+        )
     )
     app.dependency_overrides[get_engine] = lambda: cast("AsyncEngine", UpEngine())
 
@@ -345,7 +356,12 @@ def test_pinned_by_the_environment_the_api_keeps_its_snapshot_and_says_why_once(
     store.calls.clear()  # what the seeding itself read is not what the API reads
     app = create_app(
         settings.model_copy(
-            update={"ruleset_id": "ae-heat-2026.1", "rulesets_dir": RULESETS_DIR, "models_dir": FIXTURE_MODELS}
+            update={
+                "ruleset_id": "ae-heat-2026.1",
+                "rulesets_dir": RULESETS_DIR,
+                "models_dir": FIXTURE_MODELS,
+                "runtime_config_seed": UNPINNED_SEED,
+            }
         )
     )
     with TestClient(app) as client:

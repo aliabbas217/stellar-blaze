@@ -39,7 +39,7 @@ def store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> InMemoryConfigStor
     monkeypatch.setenv("SB_RULESETS_DIR", str(RULESETS_DIR))
     monkeypatch.setenv("SB_MODELS_DIR", str(FIXTURE_MODELS))
     # These tests are about the commands, not about what the git default pins: they seed from a file with nothing pinned
-    # (the product default has its own test below, `test_seed_of_the_git_default_stores_the_pre_registered_theta`).
+    # (the product default has its own test below, `test_seed_of_the_git_default_stores_...`).
     monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(UNPINNED_SEED))
     fake = InMemoryConfigStore()
 
@@ -421,18 +421,21 @@ def test_seed_creates_and_activates_the_git_default_under_the_deploys_identity(s
     assert version.sha256 == config_sha256(RuntimeConfig())
 
 
-def test_seed_of_the_git_default_stores_the_pre_registered_theta(
+def test_seed_of_the_git_default_stores_the_pre_registered_theta_and_the_released_model(
     store: InMemoryConfigStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # The product default (not the unpinned test seed): a fresh `sb-jobs config seed` matches the frozen theta_protect.
+    # The product default (not the unpinned test seed): a fresh `sb-jobs config seed` matches the frozen theta_protect
+    # and pins the released model. That model is committed under backend/models/, not in the fixture models dir.
     monkeypatch.setenv("SB_RUNTIME_CONFIG_SEED", str(GIT_DEFAULT_SEED))
+    monkeypatch.setenv("SB_MODELS_DIR", str(BACKEND_ROOT / "models"))
 
     printed = seed_it()
 
-    expected = RuntimeConfig(tunables=Tunables(warning_theta=0.30))
+    expected = RuntimeConfig(model_id="corrector-20261114-d327987-6edafa", tunables=Tunables(warning_theta=0.30))
     assert printed["sha256"] == config_sha256(expected)
     assert out(invoke("config", "show"))["body"] == expected.model_dump(mode="json")
     assert out(invoke("config", "show"))["body"]["tunables"]["warning_theta"] == 0.30
+    assert out(invoke("config", "show"))["body"]["model_id"] == "corrector-20261114-d327987-6edafa"
 
 
 @pytest.mark.parametrize("git_sha", [None, "unknown"])

@@ -24,9 +24,9 @@ fields and the epoch id are on it. Nothing here pushes an alert (ADR 0058 decisi
 clause of its rule; Task 10 uses it as is.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
@@ -36,7 +36,7 @@ from pydantic import JsonValue
 from stellar_blaze.application.runtime_config import ConfigSnapshot, ruleset_for
 from stellar_blaze.application.site_day import SiteDay, effective_params
 from stellar_blaze.domain.planner.rule_planner import plan_crew
-from stellar_blaze.domain.plans.model import CrewPlan, CrewSpec, TickState, ZoneTimeline
+from stellar_blaze.domain.plans.model import CrewPlan, CrewSpec, ShiftBlock, TickState, ZoneTimeline
 from stellar_blaze.domain.plans.rules import PlannerRules, planner_rules
 from stellar_blaze.domain.plans.ticks import TICK_MINUTES, day_ticks, in_ban
 from stellar_blaze.domain.risk.levels import AlertLevel, Zone
@@ -48,6 +48,7 @@ from stellar_blaze.ports.plans import CrewStopStore, DayPlanInput, DayPlanRecord
 from stellar_blaze.ports.sites import SiteRepository
 
 __all__ = [
+    "STOP_UNDO_WINDOW_S",
     "CrewHour",
     "DayPlanResult",
     "PlanSegmentData",
@@ -55,13 +56,21 @@ __all__ = [
     "ShiftNotLegalError",
     "crew_hours",
     "day_plan",
+    "effective_stops",
     "plan_segments",
     "protective_timeline",
+    "shift_end_utc",
     "stopped_hours",
     "stopped_mask",
 ]
 
 logger = structlog.stdlib.get_logger(__name__)
+
+STOP_UNDO_WINDOW_S: Final = 10
+"""A stop cleared within this many seconds (inclusive) of being recorded is an undo: it is ignored entirely for levels,
+plans and alerts (both audit rows stay). The F2 stop UI has "no confirm dialog and a 10 s undo; undo inside 10 s calls
+``delete_crew_stop``" (``docs/superpowers/plans/2026-11-14-f2-core-demo-screens.md``, ADR 0045,
+``docs/clinical/review-pack.md``). A code constant on purpose: it is a UI contract, not a ruleset value."""
 
 _TICKS: Final = 216
 _TICK: Final = timedelta(minutes=TICK_MINUTES)
@@ -165,13 +174,44 @@ def plan_segments(plan: CrewPlan, zones: ZoneTimeline, clauses: Mapping[str, Cla
     return tuple(segments)
 
 
-def stopped_mask(stops: list[tuple[datetime, datetime | None]], start: datetime) -> list[bool]:
-    """Which ticks a stop covers: it overlaps the tick, from ``started_at`` and up to ``cleared_at`` (exclusive)."""
-    mask = [False] * _TICKS
+def shift_end_utc(shift: Sequence[ShiftBlock], local_date: date, tz: ZoneInfo) -> datetime:
+    """The end of the crew's last shift block on ``local_date`` as a UTC instant (the end of an active stop's cover)."""
+    return datetime.combine(local_date, shift[-1].end, tzinfo=tz).astimezone(UTC)
+
+
+def effective_stops(
+    stops: Sequence[tuple[datetime, datetime | None]], shift_end: datetime
+) -> list[tuple[datetime, datetime]]:
+    """The intervals a crew-lead stop makes Red, as ``(start, end)``; the ONE place that decides what a stop covers.
+
+    * cleared within ``STOP_UNDO_WINDOW_S`` of ``started_at`` (inclusive): an undo, ignored entirely;
+    * otherwise cleared: ``[started_at, cleared_at)``, as recorded (not cut at the shift end);
+    * ACTIVE (not cleared): ``[started_at, shift_end)``, never beyond the crew's shift end. A stop recorded at or after
+      the shift end has nothing left to stop and covers nothing (the record still stands until cleared); one recorded
+      before the shift or in the midday break covers from its own instant, so it still stops the later block.
+    """
+    window = timedelta(seconds=STOP_UNDO_WINDOW_S)
+    out: list[tuple[datetime, datetime]] = []
     for started, cleared in stops:
+        if cleared is None:
+            end = shift_end
+        elif cleared - started <= window:
+            continue
+        else:
+            end = cleared
+        if end > started:
+            out.append((started, end))
+    return out
+
+
+def stopped_mask(stops: Sequence[tuple[datetime, datetime | None]], start: datetime, shift_end: datetime) -> list[bool]:
+    """Which ticks a stop covers: those that overlap an effective interval of ``effective_stops`` (``started_at``
+    inclusive, the end exclusive). ``shift_end`` is the crew's shift end for the day (``shift_end_utc``)."""
+    mask = [False] * _TICKS
+    for started, end in effective_stops(stops, shift_end):
         for i in range(_TICKS):
             tick_start = start + _TICK * i
-            if started < tick_start + _TICK and (cleared is None or cleared > tick_start):
+            if started < tick_start + _TICK and end > tick_start:
                 mask[i] = True
     return mask
 
@@ -259,7 +299,7 @@ async def day_plan(
         timeline = protective_timeline(timeline)
     start = timeline.start_utc
     found = await stops.active_between(crew.crew_id, start, start + _TICK * _TICKS, epoch)
-    mask = stopped_mask([(s.started_at, s.cleared_at) for s in found], start)
+    mask = stopped_mask([(s.started_at, s.cleared_at) for s in found], start, shift_end_utc(crew.shift, local_date, tz))
     if any(mask):
         timeline = timeline.with_zones([Zone.RED if m else z for m, z in zip(mask, timeline.zones, strict=True)])
 

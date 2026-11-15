@@ -494,7 +494,9 @@ def test_ban_window_is_data_on_every_timeline_response(spec: dict[str, Any]) -> 
 def test_day_plan_shape(spec: dict[str, Any]) -> None:
     plan = schemas(spec)["DayPlan"]
 
-    assert sorted(plan["required"]) == sorted(plan["properties"])
+    # Every member is required except `mode`, added after the freeze as an OPTIONAL property (additive contract).
+    assert sorted(plan["required"]) == sorted(set(plan["properties"]) - {"mode"})
+    assert plan["properties"]["mode"]["enum"] == ["replay", "live"]
     assert plan["properties"]["banner_code"]["const"] == "plan.floor_banner"
     assert plan["properties"]["signoff_state"]["enum"] == ["unsigned", "signed", "changed_since_signed"]
     assert plan["properties"]["status"]["enum"] == ["rule", "fallback"]
