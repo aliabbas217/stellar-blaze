@@ -30,7 +30,7 @@ from stellar_blaze.ml.protocol_gate import GateToken, Part, open_gate
 from stellar_blaze.ml.train import TrainedCorrector, train_corrector
 from tests.fixtures.forecast.dev_run import HOURS, STATIONS, WARM, dev_cfg, dev_pairs
 from tests.fixtures.forecast.synthetic import make_pairs
-from tests.fixtures.forecast.trained import CFG_SHA256
+from tests.fixtures.forecast.trained import CFG_SHA256, small_config
 
 __all__ = [
     "DEV_EDGES",
@@ -71,15 +71,29 @@ class Released:
 
 
 @cache
-def released(feature_set: FeatureSet = FeatureSet.SITE) -> Released:
+def released(feature_set: FeatureSet = FeatureSet.SITE, *, all_leads: bool = False) -> Released:
     """One tiny corrector trained on the synthetic 2024-2025 rows and written like a release.
 
     ``site`` by default; ``FeatureSet.COLD`` is the configuration of the real released model (no station history).
+    The default model covers leads 1-3 (its joint-sample strata are ``1|early`` ... ``3|late``); ``all_leads`` trains
+    on leads 1-7 like the real model, for the tests that draw samples at every scored lead (the B3 runners).
     """
     root = Path(tempfile.mkdtemp(prefix="sb-released-"))
     atexit.register(shutil.rmtree, root, ignore_errors=True)
-    dev = dev_pairs()
-    trained = train_corrector(dev, dev_cfg(feature_set=feature_set), cfg_sha256=CFG_SHA256)
+    if all_leads:
+        dev = make_pairs(
+            seed=7,
+            summers=(2024, 2025),
+            station_bias_c=dict.fromkeys(WARM, 3.0),
+            stations=STATIONS,
+            leads=range(8),
+            hours_utc=HOURS,
+        ).filter(pl.col("lead_days") > 0)
+        config = small_config(feature_set=feature_set)
+    else:
+        dev = dev_pairs()
+        config = dev_cfg(feature_set=feature_set)
+    trained = train_corrector(dev, config, cfg_sha256=CFG_SHA256)
     uv_lock = root / "uv.lock"
     uv_lock.write_bytes(b"version = 1\n")
     directory = write_model(
@@ -161,6 +175,8 @@ class GatedWorld:
         self.models_dir = models_dir
         self.model_id = model_id
         self.git = FakeGit()
+        self.gold_sha256 = gold_sha256
+        self.freeze_bytes = FREEZE_BYTES
         self.lock_path = self.repo_root / "backend" / "training" / "protocol.lock.toml"
         self.go_path = self.repo_root / "backend" / "training" / "2026-go.toml"
         self.results_dir = self.repo_root / "artifacts" / "eval" / "2026"
@@ -182,14 +198,22 @@ class GatedWorld:
         self.git.ancestors.add((commit, HEAD))
         return f'[[amendments]]\npath = "{path}"\nsha256 = "{sha(data)}"\ncommit = "{commit}"\n'
 
+    def write_freeze(self, data: bytes) -> None:
+        """Replace the freeze addendum by ``data`` (in the tree and at HEAD in the fake git) and re-sign lock and go."""
+        self.freeze_bytes = data
+        (self.repo_root / FREEZE_PATH).write_bytes(data)
+        self.git.files[(HEAD, FREEZE_PATH)] = data
+        self.write_lock(self.gold_sha256)
+
     def write_lock(self, gold_sha256: str) -> None:
+        self.gold_sha256 = gold_sha256
         digest = sha(PROTOCOL_BYTES)
         manifest = (self.models_dir / self.model_id / MANIFEST).read_bytes().replace(b"\r\n", b"\n")  # CRLF as LF
         self.lock_path.write_text(
             f'protocol_path = "{PROTOCOL_PATH}"\nprotocol_sha256 = "{digest}"\nprotocol_commit = "{PROTOCOL_COMMIT}"\n'
             f'gold_sha256 = "{gold_sha256}"\nmodel_id = "{self.model_id}"\n'
             f'model_manifest_sha256 = "{sha(manifest)}"\n'
-            f'freeze_path = "{FREEZE_PATH}"\nfreeze_sha256 = "{sha(FREEZE_BYTES)}"\n' + "".join(self.amendments),
+            f'freeze_path = "{FREEZE_PATH}"\nfreeze_sha256 = "{sha(self.freeze_bytes)}"\n' + "".join(self.amendments),
             encoding="utf-8",
         )
         lock_sha256 = sha(self.lock_path.read_bytes().replace(b"\r\n", b"\n"))  # the go binds the lock, CRLF as LF
