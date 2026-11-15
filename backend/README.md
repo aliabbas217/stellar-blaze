@@ -133,6 +133,45 @@ the crew's shift for the day (never beyond). A stop cleared within `STOP_UNDO_WI
 for levels, plans and alerts; the `crew.stop_started` and `crew.stop_cleared` audit rows and the stop row stay. One helper
 decides this (`application/day_plan.py` `effective_stops`); the plan, the timeline route and the alert dispatch all call it.
 
+## Run recipe: the real OMAA day of 2026-06-14 in replay mode
+
+The committed snapshot `replay/demo-omaa-2026/` (OMAA, the whole 2026 summer, IFS and GFS forecasts plus observations) serves a
+real day through the same routes as production. From `backend/`, with a Postgres of your own (the commands below use
+`sb-demo-pg` on port 55434; remove it afterwards) and the committed `models/` (the released model
+`corrector-20261114-d327987-6edafa`):
+
+```bash
+docker run -d --name sb-demo-pg -e POSTGRES_USER=sb -e POSTGRES_PASSWORD=sb -e POSTGRES_DB=stellar_blaze -p 127.0.0.1:55434:5432 postgres:18.6
+export SB_DATABASE_URL=postgresql+asyncpg://sb:sb@127.0.0.1:55434/stellar_blaze
+export SB_ENV=dev
+export SB_FORECAST_SOURCE=replay SB_REPLAY_SNAPSHOT_ID=demo-omaa-2026        # the snapshot directory under replay/
+export SB_REPLAY_DEFAULT_DATE=2026-06-14                                     # the site-local day served when a request names none
+export SB_REPLAY_NOW=2026-06-14T10:10:00+04:00                               # the replay clock anchor: 10:10 Asia/Dubai, then real speed
+export SB_ACCESS_TOKENS='{"<sha256 of your demo token>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}}'
+
+uv run sb-jobs db upgrade            # migrates and seeds the git default config: the released model and warning_theta 0.30
+uv run sb-jobs site load fixtures/demo_site.toml --actor you --reason "demo"
+uv run uvicorn stellar_blaze.api.app:create_app --factory --host 127.0.0.1 --port 8123
+```
+
+`<sha256 of your demo token>` is `python -c "import hashlib; print(hashlib.sha256(b'YOUR-TOKEN').hexdigest())"`; send the
+token as `Authorization: Bearer YOUR-TOKEN`. The demo site is `site-demo-mussafah`; the crew of the demo is `crew-b`. Wait
+about 5 seconds after start before the first sign-off (the config poller replaces the seed snapshot with the database
+version, which sign-off needs). `sb-jobs alerts run` must get the SAME `SB_REPLAY_*` values and start together with the
+API (separate processes, separate clocks: see above); after a `demo-reset`, restart both so that their replay clocks agree
+again (the reset itself needs no restart).
+
+What the day shows (checked through the real routes on 2026-11-15; times are Asia/Dubai, the API returns UTC instants):
+`forecast_status` is `fresh`, `mode` is `replay`, `model_id` is the released model (pinned in the seed), and the crew
+levels are green 06-07, amber 08, orange 09-16, amber 17, green 18-19; the day plan for `crew-b` is a rule plan with four
+acknowledgement items; a stop recorded at about 10:10 makes the crew Red to the end of the shift (18:00), a stop undone
+within 10 s leaves no trace in levels or plans, a stop cleared later is Red only for the hours it covered, a sign-off with
+every item returns 201, and a worker-data request returns 403 `individual-data-refused`. The seed config must carry the
+model: a database seeded before `model_id` was pinned has none, so its site day is served from the uncorrected forecast
+(`model_id` null) until the operator runs `sb-jobs config propose` and `activate` (see "Runtime config in the database").
+Another day: change `SB_REPLAY_DEFAULT_DATE` and `SB_REPLAY_NOW` together to a date inside the snapshot (2026-05-15 to
+2026-09-30; only 2026-06-14 was checked).
+
 ## OpenAPI snapshot
 
 `openapi/v1.json` is the committed API contract (ADR 0009 section 5); a unit test fails when it drifts from the app. After changing a route or a response model:
