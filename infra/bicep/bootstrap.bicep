@@ -19,6 +19,8 @@ param githubEnvironment string = 'demo'
 @description('Object id of the signed-in operator. When non-empty that user gets AcrPush on the registry. Get it with: az ad signed-in-user show --query id -o tsv')
 param operatorPrincipalId string = ''
 
+// Cheap-mode estimate about USD 45-55 a month with a paid Postgres (infra/README.md "What costs money") plus margin; the alerts at 80 % and 100 % of this and a
+// forecast at 100 % go to budgetContactEmail.
 @minValue(1)
 param budgetAmount int = 75
 

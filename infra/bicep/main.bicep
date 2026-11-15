@@ -5,6 +5,18 @@
 //   false  monitoring, environment, PostgreSQL and job-migrate only. Then infra/scripts/run-migrate.sh.
 //   true   the same, plus api, web and alerts. The api must not start against an unmigrated schema.
 //
+// CHEAP BY DEFAULT (architect ruling 2026-11-15, "keep things as cheap as possible"). Prices are Azure Retail Prices for
+// uaenorth on 2026-11-15, in USD: active vCPU 0.000024 per second, memory 0.000003 per GiB-second, idle vCPU 0.000003 per
+// second; every subscription gets 180,000 vCPU-seconds and 360,000 GiB-seconds free each month. What that bought:
+//   web     0.25 vCPU / 0.5 GiB, always one replica. It is the public face and measured about 73 MiB.
+//   api     0.5 vCPU / 1 GiB, INTERNAL ingress, scale to ZERO by default (apiMinReplicas = 0): a demo that nobody is looking at
+//           costs nothing for it. This is safe only because the replay clock is the epoch row in Postgres (ADR 0034 amendment),
+//           so an api that restarts from zero loses no state; the price is a cold start on the first request after the
+//           300 s scale-down cooldown (infra/scripts/measure-cold-start.sh measures it).
+//   alerts  0.25 vCPU / 0.5 GiB, always one replica: an always-on 0.25 vCPU / 0.5 GiB worker billed active is about USD 19.71
+//           a month. It stays a worker and NOT a one-minute cron job, on measured evidence (see the alerts module below).
+//   Log Analytics is capped at 0.15 GB a day (monitoring.bicep) and PostgreSQL is Burstable B1ms with the minimum 32 GiB.
+//
 // The registry and the apps identity come from bootstrap.bicep and are only referenced here.
 
 targetScope = 'resourceGroup'
@@ -35,6 +47,11 @@ param gitSha string
 
 @description('false: phase 1 (no apps). true: phase 2 (api, web and, for a real api image, alerts).')
 param deployApps bool = true
+
+@description('Minimum replicas of the api: 0 (the default) scales it to zero when idle and costs nothing then; 1 keeps it warm and avoids the cold start on the first request (about 0.5 vCPU / 1 GiB, USD 0.000024 x 0.5 + 0.000003 x 1 a second when billed active). The maximum is 1 either way.')
+@minValue(0)
+@maxValue(1)
+param apiMinReplicas int = 0
 
 // ---- images and ports --------------------------------------------------------------------------------------------------
 
@@ -94,12 +111,15 @@ param trustedProxyHops int = 1
 
 // ---- sizes -------------------------------------------------------------------------------------------------------------
 
-param apiCpu string = '1.0'
-param apiMemory string = '2Gi'
-param webCpu string = '0.5'
-param webMemory string = '1Gi'
-param alertsCpu string = '0.5'
-param alertsMemory string = '1Gi'
+// api: 0.5 vCPU / 1 GiB. Measured about 205 MiB at rest, so 1 GiB is about 5x headroom for a PHS worker and the model; the
+// smallest Consumption pairing that has it is 0.5 vCPU / 1 GiB. web measured about 73 MiB; the alerts worker's one-off
+// dispatch ran inside a 512 MiB limit. 0.25 vCPU / 0.5 GiB is the smallest Consumption size.
+param apiCpu string = '0.5'
+param apiMemory string = '1Gi'
+param webCpu string = '0.25'
+param webMemory string = '0.5Gi'
+param alertsCpu string = '0.25'
+param alertsMemory string = '0.5Gi'
 
 // ---- names, tags, constants -------------------------------------------------------------------------------------------
 
@@ -234,9 +254,11 @@ var webSecrets = empty(demoEmployerToken) ? {} : { 'demo-employer-token': demoEm
 
 // ---- job-migrate (phase 1) ----------------------------------------------------------------------------------------------
 
-// One shell string: `sb-jobs` is on the image PATH and WORKDIR is /app, so alembic.ini and fixtures/ resolve. Both commands
-// are idempotent (backend/README.md): the schema upgrade plus the config seed, then the synthetic demo site.
-var migrateScript = 'sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor "deploy:${gitSha}" --reason "load the synthetic demo site at deploy ${gitSha}"'
+// The whole job is the file infra/bicep/scripts/migrate.sh, loaded as text and run as `/bin/sh -c <text>`: the schema upgrade and
+// config seed, the synthetic demo site, then the active runtime config with alert_dispatch_interval_minutes = 1. The rehearsal
+// (infra/local/compose.yaml) mounts and runs the very same file, so the two cannot drift. `sb-jobs` is on the image PATH and
+// WORKDIR is /app, so alembic.ini, fixtures/ and config/ resolve. Every step is idempotent (backend/README.md).
+var migrateScript = loadTextContent('scripts/migrate.sh')
 
 module migrateJob 'modules/container-job.bicep' = {
   name: 'job-migrate'
@@ -261,7 +283,9 @@ module migrateJob 'modules/container-job.bicep' = {
 
 // ---- apps (phase 2) -----------------------------------------------------------------------------------------------------
 
-// INTERNAL ingress: the api is not reachable from the internet; only web calls it.
+// INTERNAL ingress: the api is not reachable from the internet; only web calls it. With apiMinReplicas = 0 there is no scale
+// rule of our own, so Container Apps applies its default HTTP rule (10 concurrent requests) and removes the last replica
+// after the 300 s cooldown; the first request after that waits for a cold start (the startup probe allows 150 s).
 module api 'modules/container-app.bicep' = if (deployApps) {
   name: 'app-api'
   params: {
@@ -276,6 +300,7 @@ module api 'modules/container-app.bicep' = if (deployApps) {
     externalIngress: false
     cpu: apiCpu
     memory: apiMemory
+    minReplicas: apiMinReplicas
     env: apiIsPlaceholder ? [] : apiEnv
     secrets: apiIsPlaceholder ? {} : apiSecrets
     startupPath: apiIsPlaceholder ? '/' : apiLivePath
@@ -328,6 +353,18 @@ module web 'modules/container-app.bicep' = if (deployApps) {
 
 // A long-running loop, not a cron job: no ingress, no probes. `command` and `args` are both set because Microsoft does not
 // document whether the image CMD survives when only `command` is set.
+//
+// WHY NOT A ONE-MINUTE CRON JOB (`sb-jobs alerts dispatch`, which would bill only while it runs; the architect asked for it to be
+// tried and the rehearsal, infra/local/rehearse.sh R8, measures it). One dispatch in a fresh container of the api image against
+// the migrated database took 11-12 s unconstrained but 57-62 s (3 runs) at 0.25 vCPU / 512 MiB and 38.7 s at 0.5 vCPU, in a
+// docker CPU quota that stands in for the Container Apps limit; `sb-jobs --help` alone takes 17.7 s at 0.25 vCPU, because
+// the python imports are paid in full by every start. At the job's size a run does not finish inside one minute (a
+// Container Apps job has no concurrency policy, so runs would overlap), and at 0.5 vCPU it takes about 39 s, which at
+// USD 0.000024 x 0.5 + 0.000003 x 1 a second is about USD 25 a month, more than this worker's USD 19.71. The worker pays
+// the imports once. Revisit if the import time drops (a backend change, not an infrastructure one).
+//
+// Its cadence is max(60 s, alert_dispatch_interval_minutes x 60) of the ACTIVE config; job-migrate (scripts/migrate.sh) sets
+// that to 1, so a stop reaches a phone in about 1 min 30 s (60 s period + 15 s forecast leg + 15 s delivery).
 module alerts 'modules/container-app.bicep' = if (deployAlerts) {
   name: 'app-alerts'
   params: {

@@ -8,6 +8,11 @@
 # the script never calls it directly: everything goes through the web app's BFF (`/api/v1/*` is proxied to the api and the
 # BFF injects the demo employer token, ADR 0062), which is also what a visitor's browser does.
 #
+# COLD START: in cheap mode the api scales to zero, so before H1 the script waits (wait-ready.sh, up to SMOKE_WARM_TIMEOUT_S,
+# default 300 s, polling /api/v1/health/ready THROUGH the web and printing `waiting for the api to start (cold start)`) until the
+# api answers. The web BFF gives up on the api after 10 s, so one long request would not wait; the polling does. H2 then also
+# allows --max-time 180. The wait prints NOTE lines only and never a PASS or FAIL: when it times out, H2 reports the failure.
+#
 # Output: one `PASS|FAIL|SKIP H<n> <subject>` line per check. Exit 1 if any check FAILed, else 0. Checks run in the order
 # H1 H2 H3 H4 H5 H7 H6 (H6 last, see below):
 #   H1  GET /api/healthz is 200 with "status":"ok" and a "version" (printed). The web container is up.
@@ -95,12 +100,13 @@ note() { printf '     %s\n' "$*"; }
 
 # call <METHOD> <path> [curl args...]: sets $status (000 when curl itself failed) and $body; the response headers of
 # the last call are in $tmp/headers. Each call is bounded in time; nothing here retries.
+call_max_time=20
 call() {
   local method="$1" path="$2"
   shift 2
   : >"$tmp/headers"
   : >"$tmp/body"
-  status="$(curl -sS --max-time 20 -X "$method" -o "$tmp/body" -D "$tmp/headers" -w '%{http_code}' "$@" "$base$path" 2>"$tmp/err")" || status="000"
+  status="$(curl -sS --max-time "$call_max_time" -X "$method" -o "$tmp/body" -D "$tmp/headers" -w '%{http_code}' "$@" "$base$path" 2>"$tmp/err")" || status="000"
   body="$(cat "$tmp/body")"
 }
 
@@ -114,6 +120,17 @@ has_json_pair() { # <name> <value> <text>
   printf '%s' "$3" | grep -Eq "\"$1\"[[:space:]]*:[[:space:]]*\"$2\""
 }
 
+# --- cold start (no check of its own) ---------------------------------------------------------------------------------
+warm_timeout="${SMOKE_WARM_TIMEOUT_S:-300}"
+if [[ ! "$warm_timeout" =~ ^[0-9]+$ ]]; then
+  printf 'SMOKE_WARM_TIMEOUT_S must be a whole number, got %s\n' "$warm_timeout" >&2
+  exit 2
+fi
+warm_out="$(bash "$(dirname -- "${BASH_SOURCE[0]}")/wait-ready.sh" "$base" --timeout "$warm_timeout" 2>&1)" || true
+while IFS= read -r warm_line; do
+  [ -z "$warm_line" ] || printf 'NOTE %s\n' "$warm_line"
+done <<<"$warm_out"
+
 # --- H1 -------------------------------------------------------------------------------------------------------------
 call GET /api/healthz
 version="$(json_string version "$body")"
@@ -124,7 +141,9 @@ else
 fi
 
 # --- H2 -------------------------------------------------------------------------------------------------------------
+call_max_time=180 # the api may still be waking up when the wait above timed out
 call GET /api/v1/health/ready
+call_max_time=20
 if [ "$status" = "200" ] && has_json_pair status ok "$body"; then
   pass H2 "web to api to database to config: GET /api/v1/health/ready through the BFF is 200, status ok"
 else

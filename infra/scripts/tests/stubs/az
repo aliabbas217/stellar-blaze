@@ -40,6 +40,7 @@ fi
 #   STUB_STATE_DIR          a per-test directory for counters and markers (the harness sets it; STUB_AZ_LOG there records calls)
 #   containerapp show:      STUB_LATEST STUB_LATEST_READY STUB_APP_IMAGE STUB_MIN_REPLICAS STUB_MAX_REPLICAS
 #                           STUB_INGRESS_EXTERNAL STUB_WEB_FQDN
+#                           (min replicas default to 0 for the api, which scales to zero in cheap mode, and 1 for web and alerts)
 #   containerapp revision show: STUB_REV_IMAGE STUB_PROV STUB_RUNNING STUB_HEALTH STUB_TRAFFIC STUB_REPLICAS
 #                           STUB_REVISION_MISSING=1 (the revision cannot be read)
 #                           STUB_HEALTH_SEQ="Unhealthy Healthy" (healthState of the 1st, 2nd, ... call; the last repeats)
@@ -53,7 +54,9 @@ fi
 #                             a huge N means it never appears) STUB_JOB_LIST_FAIL=1 (the list call fails)
 #                           STUB_JOB_START_REUSES_OLD=1 (start answers the name of the first old execution)
 #   smoke:                  STUB_ENV_NAME STUB_PROFILES STUB_PROFILE_TYPES STUB_PRIVATE_ENDPOINTS STUB_EXTRA_RESOURCE="name:location"
-#   restart / cold start:   STUB_REPLICAS_STAY=1 (replicas never go away after min 0) STUB_UPDATE_FAIL=1
+#   restart / cold start:   STUB_REPLICAS_ZERO=1 (the app has no replica at all: `replica list` is empty)
+#                           STUB_REPLICA_LIST_EMPTY_AFTER=N (`replica list` names a replica for its first N calls, then none: the
+#                             app scales down while a script waits; unset = the replica stays) STUB_UPDATE_FAIL=1
 #                           STUB_REPLICAS_STATIC=1 (a restart never replaces the replicas)
 # Scenarios dedicated, api_external, max3 and other_region are shortcuts for the smoke tests.
 # shellcheck disable=SC2034  # read through the indirect expansion in knob
@@ -140,7 +143,10 @@ serve_deploy_call() {
           printf '%s\n' "$REPLY"
           ;;
         *minReplicas*)
-          knob MIN_REPLICAS 1
+          case "$app_name" in
+            api) knob MIN_REPLICAS 0 ;;
+            *) knob MIN_REPLICAS 1 ;;
+          esac
           local min_r="$REPLY"
           knob MAX_REPLICAS 1
           printf '%s\n%s\n' "$min_r" "$REPLY"
@@ -202,7 +208,16 @@ serve_deploy_call() {
       ;;
     "containerapp replica list "*)
       need_state
-      if [ -e "$state_dir/min0-$app_name" ] && [ "${STUB_REPLICAS_STAY:-}" != "1" ]; then
+      knob REPLICAS_ZERO 0
+      local zero="$REPLY" empty_after="" empty_var="STUB_REPLICA_LIST_EMPTY_AFTER_${app_upper}" listed=0
+      empty_after="${!empty_var:-${STUB_REPLICA_LIST_EMPTY_AFTER:-}}"
+      if [ -n "$empty_after" ]; then
+        bump "replica-list-$app_name"
+        listed="$REPLY"
+      fi
+      if [ "$zero" = "1" ]; then
+        :
+      elif [ -n "$empty_after" ] && [ "$listed" -gt "$empty_after" ]; then
         :
       elif [ -e "$state_dir/restarted-$app_name" ] && [ "${STUB_REPLICAS_STATIC:-}" != "1" ]; then
         printf '%s-replica-new\n' "$app_name"
@@ -217,11 +232,6 @@ serve_deploy_call() {
         exit 1
       fi
       : >"$state_dir/updated-$app_name"
-      case "$joined" in
-        *"--min-replicas 0"*) : >"$state_dir/min0-$app_name" ;;
-        *"--min-replicas 1"*) rm -f "$state_dir/min0-$app_name" ;;
-        *) ;;
-      esac
       ;;
     "containerapp env list "*) printf '%s\n' "${STUB_ENV_NAME:-cae-test}" ;;
     "containerapp env show "*)

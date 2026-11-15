@@ -3,8 +3,9 @@
 #   bash infra/scripts/tests/run.sh                  every test (about 6 minutes: the template tests call bicep many times)
 #   bash infra/scripts/tests/run.sh --fast           skips every test that needs bicep (template and db-tls --template tests)
 #   bash infra/scripts/tests/run.sh <name part>      only the tests whose name contains it, for example
-#                                                    run_migrate, healthcheck, smoke, smoke_http, restart_apps, reset_demo,
-#                                                    measure_cold_start, resolve_image; --fast and a name part can be combined
+#                                                    run_migrate, migrate_script, healthcheck, smoke, smoke_http, wait_ready,
+#                                                    restart_apps, reset_demo, measure_cold_start, resolve_image; --fast and a name part
+#                                                    can be combined
 # Works under Git Bash and on Ubuntu CI. It does not rely on the executable bit: the stubs are
 # committed without it, so the harness runs copies of them that it makes executable.
 # One function per case; the first failing assertion stops the run with a non-zero exit.
@@ -21,7 +22,7 @@ trap 'rm -rf "$work"' EXIT
 bin="$work/bin"
 mkdir -p "$bin"
 
-for tool in az curl docker; do
+for tool in az curl docker sb-jobs; do
   # A copy made executable here (one process start per call, not two as with a wrapper that execs bash <stub>: under Git Bash
   # a process start costs about 0.1 s and the smoke tests make a few dozen az calls each).
   cp "$stubs_dir/$tool" "$bin/$tool"
@@ -320,7 +321,7 @@ test_check_template_passes_on_the_repo_template() {
   run_cmd bash "$scripts_dir/check-template.sh" "$repo_bicep_dir/main.bicep"
   assert_rc 0
   local id
-  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 B1 B2 B3 B4; do
+  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 B1 B2 B3 B4 B5; do
     assert_out_has "PASS $id "
   done
   assert_out_lacks "FAIL"
@@ -376,9 +377,69 @@ test_check_template_c4_fails_when_a_pin_is_emitted_empty() {
     "SB_RULESET_ID"
 }
 
+test_check_template_c3_fails_when_the_api_ignores_api_min_replicas() {
+  bicep_ready || return 0
+  # With 0 hard-wired the default scenario still passes: it is the API_MIN_REPLICAS=1 scenario that shows the parameter is unused.
+  expect_c_fail c3-ignore C3 main.bicep 's/^    minReplicas: apiMinReplicas$/    minReplicas: 0/' "apimin1/api: replicas are 0..1, expected 1..1"
+}
+
+test_check_template_c3_fails_when_the_api_default_is_not_zero() {
+  bicep_ready || return 0
+  # The other direction: a default of 1 keeps the api warm and costs money; the default scenario must say so.
+  expect_c_fail c3-default C3 main.bicepparam "s/readEnvironmentVariable('API_MIN_REPLICAS', '0')/readEnvironmentVariable('API_MIN_REPLICAS', '1')/" \
+    "full/api: replicas are 1..1, expected 0..1"
+}
+
+test_check_template_c3_fails_when_web_may_scale_to_zero() {
+  bicep_ready || return 0
+  expect_c_fail c3-web C3 modules/container-app.bicep 's/^param minReplicas int = 1/param minReplicas int = 0/' "full/web: replicas are 0..1, expected 1..1"
+}
+
 test_check_template_c5_fails_when_the_job_runs_alembic() {
   bicep_ready || return 0
-  expect_c_fail c5 C5 main.bicep "s/sb-jobs db upgrade && /alembic upgrade head \&\& /" "alembic upgrade head"
+  expect_c_fail c5 C5 scripts/migrate.sh 's/^sb-jobs db upgrade$/alembic upgrade head/' "alembic upgrade head"
+}
+
+test_check_template_c5_fails_when_the_script_never_activates_the_config() {
+  bicep_ready || return 0
+  expect_c_fail c5-activate C5 scripts/migrate.sh 's/sb-jobs config activate/echo not-activating/' "script does not run 'sb-jobs config activate'"
+}
+
+test_check_template_c5_fails_when_the_job_does_not_run_the_script_file() {
+  bicep_ready || return 0
+  # An inline string with the same three steps is not the file the rehearsal mounts: the two could drift.
+  expect_c_fail c5-inline C5 main.bicep \
+    "s/^var migrateScript = loadTextContent('scripts\/migrate.sh')/var migrateScript = 'sb-jobs db upgrade; sb-jobs site load fixtures\/demo_site.toml; sb-jobs config activate 1'/" \
+    "not the text of scripts/migrate.sh"
+}
+
+test_check_template_c5_fails_when_the_steps_are_out_of_order() {
+  bicep_ready || return 0
+  # A mention of the last step before the first one: the order check looks at where each step first appears.
+  expect_c_fail c5-order C5 scripts/migrate.sh '1a\
+# sb-jobs config activate comes last' "in the wrong order"
+}
+
+test_check_template_c12_fails_when_a_container_is_bigger_than_costed() {
+  bicep_ready || return 0
+  expect_c_fail c12-api C12 main.bicep "s/^param apiCpu string = '0.5'/param apiCpu string = '1.0'/" "full/api: size is 1.0 vCPU / 1Gi, expected 0.5 vCPU / 1Gi"
+  expect_c_fail c12-web C12 main.bicep "s/^param webMemory string = '0.5Gi'/param webMemory string = '1Gi'/" "full/web: size is 0.25 vCPU / 1Gi, expected 0.25 vCPU / 0.5Gi"
+}
+
+test_check_template_c12_fails_when_the_log_cap_is_off_or_too_big() {
+  bicep_ready || return 0
+  expect_c_fail c12-nocap C12 modules/monitoring.bicep "s/^param dailyQuotaGb string = '0.15'/param dailyQuotaGb string = '-1'/" "dailyQuotaGb is -1"
+  expect_c_fail c12-1gb C12 modules/monitoring.bicep "s/^param dailyQuotaGb string = '0.15'/param dailyQuotaGb string = '1'/" "dailyQuotaGb is 1"
+}
+
+test_check_template_c12_fails_when_the_retention_changes() {
+  bicep_ready || return 0
+  expect_c_fail c12-retention C12 modules/monitoring.bicep 's/^param retentionInDays int = 30/param retentionInDays int = 90/' "retentionInDays is 90"
+}
+
+test_check_template_b5_fails_when_the_budget_default_changes() {
+  bicep_ready || return 0
+  expect_c_fail b5 B5 bootstrap.bicep 's/^param budgetAmount int = 75/param budgetAmount int = 120/' "the budget amount is 120"
 }
 
 test_check_template_c6_fails_when_the_worker_args_are_missing() {
@@ -670,6 +731,31 @@ test_check_workflow_w7_fails_on_a_broader_permission() {
 
 test_check_workflow_w7_fails_without_id_token() {
   expect_w_fail w7-id W7 '/^  id-token: write/d' "lacks id-token: write"
+}
+
+test_check_workflow_w4_fails_without_the_cold_start_wait() {
+  expect_w_fail w4-wait W4 's|bash infra/scripts/wait-ready.sh|bash infra/scripts/skipped.sh|' "wait-ready.sh (the api may be cold) is missing"
+}
+
+# shellcheck disable=SC2016  # the sed expressions carry literal $VARIABLE text for the workflow
+test_check_workflow_w4_fails_when_the_wait_comes_after_the_reset() {
+  # the reset goes through the BFF, which cuts a cold api off after 10 s: the wait must come first. The two commands are swapped.
+  expect_w_fail w4-wait-late W4 \
+    's|run: bash infra/scripts/wait-ready.sh "https://$WEB_FQDN" --timeout 300|run: bash infra/scripts/TMP|; s|run: bash infra/scripts/reset-demo.sh "https://$WEB_FQDN"$|run: bash infra/scripts/wait-ready.sh "https://$WEB_FQDN" --timeout 300|; s|run: bash infra/scripts/TMP|run: bash infra/scripts/reset-demo.sh "https://$WEB_FQDN"|' \
+    "is missing, or comes before"
+}
+
+test_check_workflow_w8_fails_without_the_api_min_replicas_variable() {
+  expect_w_fail w8-var W8 's|^      API_MIN_REPLICAS: .*|      API_MIN_REPLICAS: "0"|' "deploy lacks the job env entry API_MIN_REPLICAS from vars.API_MIN_REPLICAS"
+}
+
+test_check_workflow_w8_fails_without_the_zero_replica_gate() {
+  expect_w_fail w8-gate W8 's/--allow-zero-replicas/--allow-zero/' "deploy lacks the api gate flag --allow-zero-replicas"
+}
+
+# shellcheck disable=SC2016  # the sed expression carries literal $VARIABLE text for the workflow
+test_check_workflow_w8_fails_when_the_smoke_test_is_not_told_the_api_min() {
+  expect_w_fail w8-smoke W8 's/--api-min "$API_MIN_REPLICAS"/--api-min 0/' "deploy lacks smoke.sh --api-min"
 }
 
 # ---- check-db-tls.sh --deployed / --image -------------------------------------------------------
@@ -1049,6 +1135,168 @@ test_run_migrate_rejects_bad_usage() {
   assert_err_has "usage"
 }
 
+# ---- infra/bicep/scripts/migrate.sh (the text of job-migrate), run with the sb-jobs stub ----------
+
+migrate_script="$(cd "$scripts_dir/../bicep/scripts" && pwd)/migrate.sh"
+
+# migrate_workdir [default.toml text]: a working directory laid out like /app (config/runtime/default.toml), with the repo's real
+# default config unless a text is given. Sets migrate_dir.
+migrate_dir=""
+migrate_workdir() {
+  migrate_dir="$work/migrate-cwd/$current_test"
+  rm -rf "$migrate_dir"
+  mkdir -p "$migrate_dir/config/runtime"
+  if [ "$#" -ge 1 ]; then
+    printf '%s' "$1" >"$migrate_dir/config/runtime/default.toml"
+  else
+    cp "$scripts_dir/../../backend/config/runtime/default.toml" "$migrate_dir/config/runtime/default.toml"
+  fi
+}
+
+# run_migrate_script: the real script under `sh` (dash on Ubuntu CI), in $migrate_dir, with SB_GIT_SHA set unless the test says not.
+# shellcheck disable=SC2016  # the single-quoted program is meant to expand in the child bash
+run_migrate_script() {
+  [ -n "$migrate_dir" ] || migrate_workdir
+  SB_GIT_SHA="${SB_GIT_SHA-abc1234}" run_cmd bash -c 'cd "$1" && exec sh "$2"' _ "$migrate_dir" "$migrate_script"
+}
+
+sbjobs_log() { cat "$STUB_STATE_DIR/sbjobs.log" 2>/dev/null || true; }
+
+# sbjobs_count <fixed text>: how many sb-jobs calls contain the text.
+sbjobs_count() {
+  local n
+  n="$(sbjobs_log | grep -cF -- "$1" || true)"
+  printf '%s' "$n"
+}
+
+assert_sbjobs_count() { # <fixed text> <expected>
+  local n
+  n="$(sbjobs_count "$1")"
+  [ "$n" = "$2" ] || fail "expected $2 sb-jobs call(s) containing '$1', saw $n: $(sbjobs_log | tr '\n' '|')"
+}
+
+test_migrate_script_runs_the_steps_in_order_and_activates_the_interval() {
+  migrate_workdir
+  run_migrate_script
+  assert_rc 0
+  local order
+  order="$(sbjobs_log | awk '{print $1 " " $2}' | tr '\n' '|')"
+  [ "$order" = "db upgrade|site load|config show|config validate|config propose|config activate|config show|" ] || fail "sb-jobs calls were: $order"
+  assert_sbjobs_count 'site load fixtures/demo_site.toml --actor deploy:abc1234 --reason load the synthetic demo site at deploy abc1234' 1
+  assert_sbjobs_count 'config activate 7 --actor deploy:abc1234' 1
+  # the proposal is the repo default plus the one tunable under [tunables]
+  local proposed="$STUB_STATE_DIR/proposed.toml"
+  grep -qx 'alert_dispatch_interval_minutes = 1' "$proposed" || fail "the proposal lacks the interval"
+  grep -qx 'warning_theta = 0.30' "$proposed" || fail "the proposal lost the default's warning_theta"
+  [ "$(grep -n '^\[tunables\]$' "$proposed" | cut -d: -f1)" = "$(($(grep -n '^alert_dispatch_interval_minutes' "$proposed" | cut -d: -f1) - 1))" ] \
+    || fail "the interval is not the line right after [tunables]"
+  [ "$(grep -c 'alert_dispatch_interval_minutes' "$proposed")" = "1" ] || fail "the interval is in the proposal more than once"
+  assert_out_has "activated config version 7"
+}
+
+test_migrate_script_is_idempotent() {
+  migrate_workdir
+  run_migrate_script
+  assert_rc 0
+  local before
+  before="$(sbjobs_count 'config propose')$(sbjobs_count 'config activate')"
+  [ "$before" = "11" ] || fail "first run: expected one propose and one activate, saw '$before'"
+  run_migrate_script
+  assert_rc 0
+  assert_out_has "already 1"
+  assert_sbjobs_count 'config propose' 1
+  assert_sbjobs_count 'config activate' 1
+  assert_sbjobs_count 'config validate' 1
+  # the schema and the site are asked for again (they are idempotent in the backend); the config is not touched
+  assert_sbjobs_count 'db upgrade' 2
+  assert_sbjobs_count 'site load' 2
+}
+
+test_migrate_script_leaves_an_active_interval_of_1_alone_in_either_json_position() {
+  local last
+  for last in "" 1; do
+    migrate_workdir
+    rm -rf "${STUB_STATE_DIR:?}"/*
+    STUB_ACTIVE_INTERVAL=1 STUB_SHOW_INTERVAL_LAST="$last" run_migrate_script
+    assert_rc 0
+    assert_out_has "already 1"
+    assert_sbjobs_count 'config propose' 0
+    assert_sbjobs_count 'config activate' 0
+    assert_sbjobs_count 'config validate' 0
+  done
+}
+
+test_migrate_script_replaces_another_interval_and_does_not_mistake_10_for_1() {
+  local value
+  for value in 5 10 30; do
+    migrate_workdir
+    rm -rf "${STUB_STATE_DIR:?}"/*
+    STUB_ACTIVE_INTERVAL="$value" run_migrate_script
+    assert_rc 0
+    assert_sbjobs_count 'config propose' 1
+    assert_sbjobs_count 'config activate 7' 1
+    assert_out_lacks "already 1"
+  done
+}
+
+test_migrate_script_survives_a_default_config_checked_out_with_crlf() {
+  migrate_workdir "$(printf 'schema_version = 1\r\n\r\n[tunables]\r\nwarning_theta = 0.30\r\n\r\n[flags]\r\n')"
+  run_migrate_script
+  assert_rc 0
+  grep -qx 'alert_dispatch_interval_minutes = 1' "$STUB_STATE_DIR/proposed.toml" || fail "no proposal with the interval from a CRLF default"
+  if grep -q $'\r' "$STUB_STATE_DIR/proposed.toml"; then fail "the proposal still has carriage returns"; fi
+}
+
+test_migrate_script_fails_when_the_default_has_no_tunables_table() {
+  migrate_workdir "$(printf 'schema_version = 1\n\n[flags]\n')"
+  run_migrate_script
+  assert_rc 1
+  assert_err_has "no [tunables] table"
+  assert_sbjobs_count 'config propose' 0
+  assert_sbjobs_count 'config activate' 0
+}
+
+test_migrate_script_stops_at_the_first_failing_step() {
+  local step later
+  # step: the failing sb-jobs subcommand; later: a call that must then NOT have happened
+  for pair in "db-upgrade:site load" "site-load:config show" "show:config validate" "validate:config propose" "propose:config activate"; do
+    step="${pair%%:*}"
+    later="${pair#*:}"
+    migrate_workdir
+    rm -rf "${STUB_STATE_DIR:?}"/*
+    STUB_SBJOBS_FAIL="$step" run_migrate_script
+    [ "$rc" -ne 0 ] || fail "step $step failed but the script exited 0"
+    assert_sbjobs_count "$later" 0
+  done
+}
+
+test_migrate_script_fails_when_activate_fails_or_does_not_take_effect() {
+  migrate_workdir
+  STUB_SBJOBS_FAIL=activate run_migrate_script
+  assert_rc 1
+  rm -rf "${STUB_STATE_DIR:?}"/*
+  migrate_workdir
+  STUB_ACTIVATE_NOOP=1 run_migrate_script
+  assert_rc 1
+  assert_err_has "still lacks alert_dispatch_interval_minutes = 1"
+}
+
+test_migrate_script_fails_when_propose_prints_no_version() {
+  migrate_workdir
+  STUB_PROPOSE_OUT="proposed, somehow" run_migrate_script
+  assert_rc 1
+  assert_err_has "did not print a version_id"
+  assert_sbjobs_count 'config activate' 0
+}
+
+test_migrate_script_needs_the_release_sha() {
+  migrate_workdir
+  SB_GIT_SHA="" run_migrate_script
+  assert_rc 1
+  assert_err_has "SB_GIT_SHA is not set"
+  [ -z "$(sbjobs_log)" ] || fail "sb-jobs ran without a release sha: $(sbjobs_log | tr '\n' '|')"
+}
+
 # ---- healthcheck.sh -----------------------------------------------------------------------------
 
 run_health() { # <extra args...>: api, no waiting between polls; the test passes --timeout
@@ -1161,6 +1409,59 @@ test_healthcheck_reports_an_unreadable_revision() {
   assert_out_has "cannot read revision"
 }
 
+test_healthcheck_allow_zero_replicas_passes_a_scaled_to_zero_revision() {
+  # No replica: the revision is neither Running nor Healthy, and that is fine for an app that may scale to zero.
+  STUB_REPLICAS=0 STUB_RUNNING="Stopped" STUB_HEALTH="None" STUB_TRAFFIC="None" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 0
+  assert_out_has "PASS healthcheck api"
+  assert_out_has "scaled to zero"
+  # the same revision without the flag still fails: only an app that may be at zero is allowed to be
+  STUB_REPLICAS=0 STUB_RUNNING="Stopped" STUB_HEALTH="None" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "has '0' replicas"
+}
+
+test_healthcheck_allow_zero_replicas_still_needs_a_ready_latest_revision_the_image_and_provisioned() {
+  # latest != latest ready: a failed rollout, the previous revision may still be serving
+  STUB_REPLICAS=0 STUB_LATEST="api--rev2" STUB_LATEST_READY="api--rev1" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+  assert_out_has "latest revision api--rev2 is not the latest ready revision (api--rev1)"
+  # the wrong image
+  STUB_REPLICAS=0 STUB_REV_IMAGE="old" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+  assert_out_has "runs image 'old', expected 'reg.example/sb-api:abc'"
+  # not provisioned
+  STUB_REPLICAS=0 STUB_PROV="Failed" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+  assert_out_has "provisioningState is 'Failed'"
+  assert_out_lacks "scaled to zero"
+}
+
+test_healthcheck_allow_zero_replicas_applies_every_rule_when_a_replica_exists() {
+  # the api woke up (or min is 1): Running, Healthy and traffic 100 are required again
+  STUB_REPLICAS=1 STUB_HEALTH="Unhealthy" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+  assert_out_has "healthState is 'Unhealthy'"
+  STUB_REPLICAS=1 STUB_RUNNING="Failed" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+  assert_out_has "runningState is 'Failed'"
+  STUB_REPLICAS=1 STUB_TRAFFIC="0" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+  assert_out_has "trafficWeight is '0'"
+  STUB_REPLICAS=1 run_health --timeout 0 --allow-zero-replicas
+  assert_rc 0
+  assert_out_lacks "scaled to zero"
+  # a replica count that is not a number is not "zero"
+  STUB_REPLICAS="None" run_health --timeout 0 --allow-zero-replicas
+  assert_rc 1
+}
+
+test_healthcheck_allow_zero_replicas_still_checks_the_url_when_given() {
+  STUB_REPLICAS=0 STUB_CURL_RULES="https://=503" run_health --timeout 0 --allow-zero-replicas --url https://web.example.invalid/api/healthz
+  assert_rc 1
+  assert_out_has "answered '503', expected 200"
+}
+
 test_healthcheck_rejects_bad_usage() {
   run_cmd bash "$scripts_dir/healthcheck.sh" --app api
   assert_rc 1
@@ -1254,7 +1555,7 @@ test_smoke_reports_fail_s4_when_the_worker_has_an_ingress() {
 test_smoke_reports_fail_s2_when_max_replicas_is_3() {
   STUB_SCENARIO=max3 run_smoke rg-test --no-wait
   assert_rc 1
-  assert_out_has "FAIL S2 api scale is min 1 / max 3"
+  assert_out_has "FAIL S2 api scale is min 0 / max 3"
   assert_out_has "PASS S2 web"
   assert_out_has "PASS S2 alerts"
 }
@@ -1336,6 +1637,41 @@ test_smoke_placeholder_fails_when_the_web_root_is_not_200() {
   STUB_CURL_RULES="https://=503 http://=301" run_smoke rg-test --placeholder --no-wait
   assert_rc 1
   assert_out_has "FAIL S3 placeholder web"
+}
+
+test_smoke_s2_follows_api_min() {
+  # --api-min 1: the api must be kept warm
+  STUB_MIN_REPLICAS_API=1 run_smoke rg-test --no-wait --api-min 1
+  assert_rc 0
+  assert_out_has "PASS S2 api scale is min 1 / max 1"
+  # the default is 0, so a warm api is a finding (someone changed it, or the deploy did not take API_MIN_REPLICAS)
+  STUB_MIN_REPLICAS_API=1 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S2 api scale is min 1 / max 1, expected 0 / 1"
+  # and the other way round
+  run_smoke rg-test --no-wait --api-min 1
+  assert_rc 1
+  assert_out_has "FAIL S2 api scale is min 0 / max 1, expected 1 / 1"
+}
+
+test_smoke_reports_fail_s2_when_web_or_the_worker_may_scale_to_zero() {
+  STUB_MIN_REPLICAS_WEB=0 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S2 web scale is min 0 / max 1, expected 1 / 1"
+  assert_out_has "PASS S2 alerts"
+  STUB_MIN_REPLICAS_ALERTS=0 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S2 alerts scale is min 0 / max 1, expected 1 / 1"
+}
+
+test_smoke_rejects_a_bad_api_min() {
+  run_smoke rg-test --no-wait --api-min 2
+  assert_rc 1
+  assert_err_has "--api-min must be 0 or 1"
+  run_smoke rg-test --api-min
+  assert_rc 1
+  assert_err_has "usage"
+  assert_no_az_calls
 }
 
 test_smoke_rejects_bad_usage() {
@@ -1440,6 +1776,119 @@ test_smoke_http_h4_outside_the_window_says_to_run_reset_demo() {
   FAKE_STARTED_AT=2026-06-14T13:30:00Z run_smoke_http
   assert_rc 0
   assert_out_has "PASS H4 replay clock is inside the demo window: 17:30 Asia/Dubai"
+}
+
+test_smoke_http_waits_for_a_cold_api_before_h1() {
+  # the first three reads of /api/v1/health/ready answer 503 (the api is starting): the wait polls until the fourth
+  FAKE_READY_AFTER=3 WAIT_READY_POLL_S=0 FAKE_MAXTIME_LOG="$STUB_STATE_DIR/maxtime.log" run_smoke_http
+  assert_rc 0
+  assert_out_has "NOTE waiting for the api to start (cold start)"
+  assert_out_has "NOTE PASS ready:"
+  assert_out_has "PASS H1"
+  assert_out_has "PASS H2"
+  # three refusals and the answer of the wait, then H2's own read
+  [ "$(bff_count 'GET /api/v1/health/ready')" = "5" ] || fail "expected 5 reads of /api/v1/health/ready, saw $(bff_count 'GET /api/v1/health/ready')"
+  # the wait comes before H1: the first request of the run is the first read of ready
+  [ "$(head -n 1 "$STUB_STATE_DIR/bff.log")" = "GET /api/v1/health/ready" ] || fail "the wait did not come first: $(head -n 1 "$STUB_STATE_DIR/bff.log")"
+  # a wait line is never a check line: the PASS/FAIL H<n> lines are the checks, six passed and H5 skipped
+  [ "$(printf '%s\n' "$out" | grep -c '^PASS H')" = "6" ] || fail "expected 6 passing checks"
+}
+
+test_smoke_http_does_not_announce_a_cold_start_when_the_api_is_already_up() {
+  run_smoke_http
+  assert_rc 0
+  assert_out_lacks "waiting for the api to start"
+  assert_out_has "NOTE PASS ready:"
+  [ "$(bff_count 'GET /api/v1/health/ready')" = "2" ] || fail "expected the wait and H2 only, saw $(bff_count 'GET /api/v1/health/ready')"
+}
+
+test_smoke_http_h2_reports_an_api_that_never_woke_up_after_the_wait_timed_out() {
+  FAKE_READY_AFTER=1000 SMOKE_WARM_TIMEOUT_S=0 WAIT_READY_POLL_S=0 run_smoke_http
+  assert_rc 1
+  assert_out_has "NOTE FAIL ready:"
+  assert_out_has "FAIL H2 GET /api/v1/health/ready through the BFF: expected 200 with status ok, got 503"
+  # the checks that do not need the api still ran
+  assert_out_has "PASS H1"
+}
+
+test_smoke_http_h2_allows_180_seconds_and_the_others_20() {
+  FAKE_MAXTIME_LOG="$STUB_STATE_DIR/maxtime.log" run_smoke_http
+  assert_rc 0
+  local log="$STUB_STATE_DIR/maxtime.log" ready_times
+  ready_times="$(grep '^GET /api/v1/health/ready ' "$log" | awk '{print $3}' | tr '\n' ' ')"
+  # the wait asks with 20, H2 with 180
+  [ "$ready_times" = "20 180 " ] || fail "max-time of the reads of /api/v1/health/ready: '$ready_times', expected '20 180 '"
+  grep -qx 'GET /api/healthz 20' "$log" || fail "H1 did not keep --max-time 20"
+  grep -qx 'POST /api/v1/crews/crew-b/stops 20' "$log" || fail "H3 did not keep --max-time 20"
+}
+
+test_smoke_http_rejects_a_bad_warm_timeout() {
+  SMOKE_WARM_TIMEOUT_S=soon run_smoke_http
+  assert_rc 2
+  assert_err_has "SMOKE_WARM_TIMEOUT_S must be a whole number"
+  [ ! -s "$STUB_STATE_DIR/bff.log" ] || fail "a request was made before the settings were validated"
+}
+
+# ---- wait-ready.sh ------------------------------------------------------------------------------
+
+run_wait() { # <args...>: the real script; curl is the plain stub; no sleeping between polls
+  WAIT_READY_POLL_S=0 run_cmd bash "$scripts_dir/wait-ready.sh" "$@"
+}
+
+test_wait_ready_passes_at_once_when_the_api_answers() {
+  run_wait http://127.0.0.1:8080
+  assert_rc 0
+  assert_out_has "PASS ready: the api answered through http://127.0.0.1:8080 after 0s"
+  assert_out_lacks "waiting for the api"
+  grep -qF "http://127.0.0.1:8080/api/v1/health/ready" "$STUB_STATE_DIR/curl.log" || fail "curl did not ask the ready route through the web"
+  [ "$(wc -l <"$STUB_STATE_DIR/curl.log" | tr -d ' ')" = "1" ] || fail "more than one request for an api that was ready"
+}
+
+test_wait_ready_polls_through_a_cold_start() {
+  STUB_CURL_FAIL_FIRST=2 run_wait https://web.example.invalid/ --timeout 60
+  assert_rc 0
+  assert_out_has "waiting for the api to start (cold start)"
+  assert_out_has "PASS ready:"
+  [ "$(wc -l <"$STUB_STATE_DIR/curl.log" | tr -d ' ')" = "3" ] || fail "expected 3 requests (two refusals and the answer)"
+  # announced once, not on every poll
+  [ "$(printf '%s\n' "$out" | grep -c 'waiting for the api')" = "1" ] || fail "the cold-start line was printed more than once"
+  grep -qF "https://web.example.invalid/api/v1/health/ready" "$STUB_STATE_DIR/curl.log" || fail "a trailing slash on the URL doubled the slash"
+}
+
+test_wait_ready_fails_after_the_timeout() {
+  STUB_CURL_RULES="http://=503" run_wait http://127.0.0.1:8080 --timeout 0
+  assert_rc 1
+  assert_out_has "FAIL ready: GET http://127.0.0.1:8080/api/v1/health/ready answered 503"
+  assert_out_lacks "PASS"
+  STUB_CURL_RULES="http://=000" run_wait http://127.0.0.1:8080 --timeout 0
+  assert_rc 1
+  assert_out_has "answered 000"
+}
+
+test_wait_ready_needs_status_ok_in_the_body_and_not_only_a_200() {
+  STUB_CURL_BODY='{"status":"starting"}' run_wait http://127.0.0.1:8080 --timeout 0
+  assert_rc 1
+  assert_out_has "FAIL ready:"
+  assert_out_has "starting"
+}
+
+test_wait_ready_rejects_bad_usage() {
+  run_cmd bash "$scripts_dir/wait-ready.sh"
+  assert_rc 2
+  assert_err_has "usage"
+  run_cmd bash "$scripts_dir/wait-ready.sh" ftp://host
+  assert_rc 2
+  assert_err_has "must start with http:// or https://"
+  run_cmd bash "$scripts_dir/wait-ready.sh" http://a --timeout soon
+  assert_rc 2
+  assert_err_has "--timeout must be a whole number"
+  run_cmd bash "$scripts_dir/wait-ready.sh" http://a --bogus
+  assert_rc 2
+  assert_err_has "unknown option: --bogus"
+  WAIT_READY_POLL_S=soon run_cmd bash "$scripts_dir/wait-ready.sh" http://a
+  assert_rc 2
+  assert_err_has "WAIT_READY_POLL_S must be a whole number"
+  [ ! -s "$STUB_STATE_DIR/curl.log" ] || fail "curl was called on a usage error"
 }
 
 # ---- restart-apps.sh ----------------------------------------------------------------------------
@@ -1565,6 +2014,34 @@ test_restart_apps_touches_nothing_else() {
   assert_az_count "--image" 0
   assert_az_count "secret" 0
   assert_az_count "--set-env-vars" 0
+}
+
+test_restart_apps_skips_the_api_when_it_has_no_replica() {
+  # the api is scaled to zero: no replica to restart, no secret in memory; its gate allows zero replicas
+  STUB_REPLICAS_ZERO_API=1 STUB_REPLICAS_API=0 run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_az_count "containerapp revision restart -n api" 0
+  assert_az_count "containerapp revision restart -n alerts -g rg-test --revision alerts--rev1" 1
+  assert_az_count "containerapp revision restart -n web -g rg-test --revision web--rev1" 1
+  assert_issued_back_to_back 2
+  assert_err_has "api: skipped, it has no replica (scaled to zero)"
+  assert_out_has "restarted:             alerts web"
+  assert_out_has "skipped:               api (scaled to zero"
+  assert_out_has "PASS healthcheck api"
+  assert_out_has "scaled to zero"
+  assert_out_has "PASS healthcheck alerts"
+  assert_out_has "PASS healthcheck web"
+  assert_out_has "Apps restarted."
+}
+
+test_restart_apps_does_not_excuse_an_api_that_had_a_replica_and_has_none_afterwards() {
+  # the api had a replica, so it is restarted and gated normally: zero replicas after that is a failure, not "scaled to zero"
+  STUB_REPLICAS_API=0 run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
+  assert_out_has "FAIL healthcheck api"
+  assert_out_has "has '0' replicas"
+  assert_out_lacks "scaled to zero"
 }
 
 test_restart_apps_rejects_bad_usage() {
@@ -1759,8 +2236,11 @@ test_reset_demo_rejects_bad_usage() {
 
 # ---- measure-cold-start.sh ----------------------------------------------------------------------
 
-run_cold() { # <args...>: no waiting; today is outside the judging window unless the test says otherwise
-  COLD_START_TODAY="${COLD_START_TODAY:-2026-11-15}" COLD_POLL_S=0 run_cmd bash "$scripts_dir/measure-cold-start.sh" "$@"
+# run_cold <args...>: no waiting; today is outside the judging window unless the test says otherwise; the api's replica goes away
+# after one list call unless the test sets STUB_REPLICA_LIST_EMPTY_AFTER_API (an empty value keeps it forever).
+run_cold() {
+  COLD_START_TODAY="${COLD_START_TODAY:-2026-11-15}" COLD_POLL_S=0 STUB_REPLICA_LIST_EMPTY_AFTER_API="${STUB_REPLICA_LIST_EMPTY_AFTER_API-1}" \
+    run_cmd bash "$scripts_dir/measure-cold-start.sh" "$@"
 }
 
 test_measure_cold_start_refuses_inside_the_judging_window() {
@@ -1777,6 +2257,7 @@ test_measure_cold_start_runs_just_outside_the_window() {
   local day
   for day in 2026-11-19 2026-12-12; do
     : >"$STUB_STATE_DIR/az.log"
+    rm -f "$STUB_STATE_DIR"/replica-list-*
     COLD_START_TODAY="$day" run_cold rg-test
     assert_rc 0
     assert_out_has "COLD START:"
@@ -1790,64 +2271,71 @@ test_measure_cold_start_i_know_overrides_the_window() {
   assert_out_has "COLD START:"
 }
 
-test_measure_cold_start_scales_to_zero_measures_and_restores() {
-  run_cold rg-test
+test_measure_cold_start_waits_for_zero_replicas_then_times_the_first_call_and_changes_nothing() {
+  STUB_REPLICA_LIST_EMPTY_AFTER_API=2 run_cold rg-test
   assert_rc 0
-  assert_out_has "COLD START: 0.123 s to first 200 from https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready"
-  assert_out_has "The api restarted. The replay clock counts from the demo epoch in the database, so it is unchanged and nothing needs restarting."
-  assert_out_lacks "REMINDER"
-  assert_az_count "containerapp update -n web -g rg-test --min-replicas 0" 1
-  assert_az_count "containerapp update -n api -g rg-test --min-replicas 0" 1
-  assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
-  assert_az_count "containerapp update -n api -g rg-test --min-replicas 1" 1
+  assert_out_has "COLD START: 0.123 s to first 200 from https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready (api scaled to zero)"
+  assert_out_has "The api restarted from zero. The replay clock counts from the demo epoch in the database, so it is unchanged and nothing needs restarting."
+  assert_err_has "api has no replica"
+  # it polled until the api was gone: two lists with a replica, a third without
+  assert_az_count "containerapp replica list -n api" 3
+  # nothing is scaled, restarted or updated: the api already scales itself to zero, so there is nothing to restore either
+  assert_az_count "containerapp update" 0
+  assert_az_count "revision restart" 0
+  assert_az_count "--min-replicas" 0
   assert_az_count "alerts" 0
-  # restored only after the zero-wait: the last two updates are the restores
-  local zeros ones
-  zeros="$(az_line "--min-replicas 0" | awk '{print $NF}')"
-  ones="$(az_line "--min-replicas 1" | awk '{print $1}')"
-  [ "$ones" -gt "$zeros" ] || fail "min replicas were restored before the measurement"
-  grep -qF "https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready" "$STUB_STATE_DIR/curl.log" || fail "curl did not call the web URL"
+  grep -qF "https://web.stub.uaenorth.azurecontainerapp" "$STUB_STATE_DIR/curl.log" || fail "curl did not call the web URL"
+  grep -qF -- "--max-time 180" "$STUB_STATE_DIR/curl.log" || fail "the first call did not allow 180 s"
+  [ "$(wc -l <"$STUB_STATE_DIR/curl.log" | tr -d ' ')" = "1" ] || fail "more than one request for a first call that was a 200"
 }
 
-test_measure_cold_start_takes_a_path_and_one_app() {
-  run_cold rg-test /api/healthz web
+test_measure_cold_start_takes_a_path() {
+  run_cold rg-test /api/healthz
   assert_rc 0
-  assert_out_has "https://web.stub.uaenorth.azurecontainerapps.io/api/healthz (scaled to zero: web)"
-  assert_az_count "containerapp update -n api" 0
-  assert_out_has "The api was not scaled."
-  assert_out_lacks "nothing needs restarting"
-  run_cold rg-test /x alerts
+  assert_out_has "https://web.stub.uaenorth.azurecontainerapps.io/api/healthz (api scaled to zero)"
+  # the app argument of the scale-to-zero version of this script is gone: nothing is scaled, so there is nothing to choose
+  run_cold rg-test /x web
   assert_rc 1
-  assert_err_has "must be web or api"
+  assert_err_has "usage"
 }
 
-test_measure_cold_start_restores_when_the_replicas_never_leave() {
-  STUB_REPLICAS_STAY=1 COLD_TIMEOUT_S=0 run_cold rg-test
+test_measure_cold_start_refuses_when_the_api_never_scales_to_zero() {
+  STUB_MIN_REPLICAS_API=1 run_cold rg-test
+  assert_rc 1
+  assert_err_has "never scales to zero"
+  assert_err_has "API_MIN_REPLICAS=0"
+  assert_az_count "replica list" 0
+  [ ! -s "$STUB_STATE_DIR/curl.log" ] || fail "curl was called for an api that cannot be cold"
+}
+
+test_measure_cold_start_gives_up_when_the_replica_never_leaves() {
+  STUB_REPLICA_LIST_EMPTY_AFTER_API="" COLD_TIMEOUT_S=0 run_cold rg-test
   assert_rc 1
   assert_err_has "still has replica(s)"
-  assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
-  assert_az_count "containerapp update -n api -g rg-test --min-replicas 1" 1
   assert_out_lacks "COLD START:"
+  [ ! -s "$STUB_STATE_DIR/curl.log" ] || fail "curl was called while the api still had a replica"
 }
 
-test_measure_cold_start_restores_when_the_request_fails() {
-  STUB_CURL_RULES="https://=503" run_cold rg-test
+test_measure_cold_start_keeps_asking_when_the_first_call_is_cut_off_by_the_bff() {
+  # the BFF gives up on a cold api after 10 s: the first call is a 503 and the page only comes on a later one
+  STUB_CURL_FAIL_FIRST=2 run_cold rg-test
+  assert_rc 0
+  assert_err_has "the first call answered 503"
+  assert_out_has "COLD START:"
+  assert_out_has "after 3 calls (the first answered 503 after 0.123s)"
+  [ "$(wc -l <"$STUB_STATE_DIR/curl.log" | tr -d ' ')" = "3" ] || fail "expected 3 requests"
+}
+
+test_measure_cold_start_is_not_a_measurement_when_no_200_ever_comes() {
+  STUB_CURL_RULES="https://=503" COLD_RETRY_S=0 run_cold rg-test
   assert_rc 1
-  assert_err_has "answered 503"
-  assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
-  assert_az_count "containerapp update -n api -g rg-test --min-replicas 1" 1
+  assert_err_has "not a successful cold start"
+  assert_out_lacks "COLD START:"
   : >"$STUB_STATE_DIR/az.log"
-  STUB_CURL_RULES="https://=000" run_cold rg-test
+  rm -f "$STUB_STATE_DIR"/replica-list-*
+  STUB_CURL_RULES="https://=000" COLD_RETRY_S=0 run_cold rg-test
   assert_rc 1
-  assert_az_count "--min-replicas 1" 2
-}
-
-test_measure_cold_start_restores_the_apps_it_had_touched_when_scaling_fails_midway() {
-  # a failing update on the way down: whatever was touched (including the failed one) is restored, and a failed restore is loud
-  STUB_UPDATE_FAIL=1 run_cold rg-test
-  assert_rc 1
-  assert_err_has "run 'az containerapp update -n web -g rg-test --min-replicas 1' NOW"
-  assert_az_count "--min-replicas 1" 1
+  assert_err_has "not a successful cold start"
 }
 
 test_measure_cold_start_rejects_bad_usage() {
@@ -1857,6 +2345,9 @@ test_measure_cold_start_rejects_bad_usage() {
   run_cold rg-test api/v1
   assert_rc 1
   assert_err_has "must start with /"
+  COLD_TIMEOUT_S=soon run_cold rg-test
+  assert_rc 1
+  assert_err_has "whole numbers"
 }
 
 # ---- runner -------------------------------------------------------------------------------------
@@ -1893,8 +2384,14 @@ tests=(
   test_check_template_c3_fails_on_two_replicas
   test_check_template_c3_fails_on_allow_insecure
   test_check_template_c3_fails_on_multiple_revisions
+  test_check_template_c3_fails_when_the_api_ignores_api_min_replicas
+  test_check_template_c3_fails_when_the_api_default_is_not_zero
+  test_check_template_c3_fails_when_web_may_scale_to_zero
   test_check_template_c4_fails_when_a_pin_is_emitted_empty
   test_check_template_c5_fails_when_the_job_runs_alembic
+  test_check_template_c5_fails_when_the_script_never_activates_the_config
+  test_check_template_c5_fails_when_the_job_does_not_run_the_script_file
+  test_check_template_c5_fails_when_the_steps_are_out_of_order
   test_check_template_c6_fails_when_the_worker_args_are_missing
   test_check_template_c7_fails_when_the_api_gets_the_vapid_key
   test_check_template_c7_fails_when_the_subject_is_sent_without_the_key
@@ -1906,6 +2403,9 @@ tests=(
   test_check_template_c9_fails_when_the_module_misnames_the_secrets
   test_check_template_c11_fails_when_the_module_secrets_are_not_secure
   test_check_template_c11_fails_when_the_job_secrets_are_not_secure
+  test_check_template_c12_fails_when_a_container_is_bigger_than_costed
+  test_check_template_c12_fails_when_the_log_cap_is_off_or_too_big
+  test_check_template_c12_fails_when_the_retention_changes
   test_check_template_b1_fails_when_the_budget_does_not_start_on_the_first
   test_check_template_b1_fails_when_budget_month_is_ignored
   test_check_template_b2_fails_when_the_subject_loses_its_case
@@ -1914,6 +2414,7 @@ tests=(
   test_check_template_b3_fails_when_the_apps_identity_cannot_pull
   test_check_template_b4_fails_when_the_admin_user_is_enabled
   test_check_template_b4_fails_when_the_registry_is_abac
+  test_check_template_b5_fails_when_the_budget_default_changes
   test_check_db_tls_template_passes_on_the_repo_template
   test_check_db_tls_template_fails_on_ssl_require
   test_check_db_tls_template_fails_on_sslmode
@@ -1930,6 +2431,8 @@ tests=(
   test_check_workflow_w4_fails_without_the_restart
   test_check_workflow_w4_fails_without_the_final_reset
   test_check_workflow_w4_fails_without_the_second_what_if
+  test_check_workflow_w4_fails_without_the_cold_start_wait
+  test_check_workflow_w4_fails_when_the_wait_comes_after_the_reset
   test_check_workflow_w5_fails_when_deploy_does_not_wait_for_the_builds
   test_check_workflow_w5_fails_without_the_environment
   test_check_workflow_w6_fails_on_a_secret_in_a_one_line_run
@@ -1937,6 +2440,9 @@ tests=(
   test_check_workflow_w6_accepts_a_secret_under_env
   test_check_workflow_w7_fails_on_a_broader_permission
   test_check_workflow_w7_fails_without_id_token
+  test_check_workflow_w8_fails_without_the_api_min_replicas_variable
+  test_check_workflow_w8_fails_without_the_zero_replica_gate
+  test_check_workflow_w8_fails_when_the_smoke_test_is_not_told_the_api_min
   test_check_db_tls_deployed_passes_when_everything_verifies
   test_check_db_tls_deployed_fails_when_the_secret_lacks_verify_full
   test_check_db_tls_deployed_names_the_one_weak_container
@@ -1972,6 +2478,16 @@ tests=(
   test_run_migrate_uses_the_start_answer_when_the_list_is_unreadable
   test_run_migrate_fails_when_the_job_cannot_be_started
   test_run_migrate_rejects_bad_usage
+  test_migrate_script_runs_the_steps_in_order_and_activates_the_interval
+  test_migrate_script_is_idempotent
+  test_migrate_script_leaves_an_active_interval_of_1_alone_in_either_json_position
+  test_migrate_script_replaces_another_interval_and_does_not_mistake_10_for_1
+  test_migrate_script_survives_a_default_config_checked_out_with_crlf
+  test_migrate_script_fails_when_the_default_has_no_tunables_table
+  test_migrate_script_stops_at_the_first_failing_step
+  test_migrate_script_fails_when_activate_fails_or_does_not_take_effect
+  test_migrate_script_fails_when_propose_prints_no_version
+  test_migrate_script_needs_the_release_sha
   test_healthcheck_passes_on_the_happy_fixture
   test_healthcheck_fails_when_the_active_image_differs
   test_healthcheck_fails_when_latest_ready_differs_from_latest
@@ -1987,6 +2503,10 @@ tests=(
   test_healthcheck_url_passes_and_checks_the_json
   test_healthcheck_only_takes_an_https_url
   test_healthcheck_reports_an_unreadable_revision
+  test_healthcheck_allow_zero_replicas_passes_a_scaled_to_zero_revision
+  test_healthcheck_allow_zero_replicas_still_needs_a_ready_latest_revision_the_image_and_provisioned
+  test_healthcheck_allow_zero_replicas_applies_every_rule_when_a_replica_exists
+  test_healthcheck_allow_zero_replicas_still_checks_the_url_when_given
   test_healthcheck_rejects_bad_usage
   test_smoke_passes_on_the_happy_run
   test_smoke_waits_out_the_rate_limit_window_unless_told_not_to
@@ -2004,6 +2524,9 @@ tests=(
   test_smoke_passes_the_http_failures_through_as_s3_and_s9
   test_smoke_placeholder_runs_only_the_cost_and_reachability_checks
   test_smoke_placeholder_fails_when_the_web_root_is_not_200
+  test_smoke_s2_follows_api_min
+  test_smoke_reports_fail_s2_when_web_or_the_worker_may_scale_to_zero
+  test_smoke_rejects_a_bad_api_min
   test_smoke_rejects_bad_usage
   test_smoke_http_passes_and_never_resets_when_h3_passes
   test_smoke_http_h3_failure_prints_the_recovery_and_resets_nothing_by_default
@@ -2013,6 +2536,16 @@ tests=(
   test_smoke_http_no_reset_when_no_stop_was_created
   test_smoke_http_rejects_an_unknown_option_and_documents_the_flag
   test_smoke_http_h4_outside_the_window_says_to_run_reset_demo
+  test_smoke_http_waits_for_a_cold_api_before_h1
+  test_smoke_http_does_not_announce_a_cold_start_when_the_api_is_already_up
+  test_smoke_http_h2_reports_an_api_that_never_woke_up_after_the_wait_timed_out
+  test_smoke_http_h2_allows_180_seconds_and_the_others_20
+  test_smoke_http_rejects_a_bad_warm_timeout
+  test_wait_ready_passes_at_once_when_the_api_answers
+  test_wait_ready_polls_through_a_cold_start
+  test_wait_ready_fails_after_the_timeout
+  test_wait_ready_needs_status_ok_in_the_body_and_not_only_a_200
+  test_wait_ready_rejects_bad_usage
   test_restart_apps_restarts_api_alerts_and_web_back_to_back_before_any_wait
   test_restart_apps_waits_with_the_healthcheck_conditions
   test_restart_apps_goes_on_after_the_settle_time_when_the_replica_names_do_not_change
@@ -2021,6 +2554,8 @@ tests=(
   test_restart_apps_gates_every_app_even_after_the_first_failure
   test_restart_apps_restarts_nothing_when_an_app_has_no_latest_revision
   test_restart_apps_touches_nothing_else
+  test_restart_apps_skips_the_api_when_it_has_no_replica
+  test_restart_apps_does_not_excuse_an_api_that_had_a_replica_and_has_none_afterwards
   test_restart_apps_rejects_bad_usage
   test_reset_demo_prints_the_epochs_of_a_successful_reset
   test_reset_demo_sends_no_authorization_header_and_posts_to_the_one_route
@@ -2036,11 +2571,12 @@ tests=(
   test_measure_cold_start_refuses_inside_the_judging_window
   test_measure_cold_start_runs_just_outside_the_window
   test_measure_cold_start_i_know_overrides_the_window
-  test_measure_cold_start_scales_to_zero_measures_and_restores
-  test_measure_cold_start_takes_a_path_and_one_app
-  test_measure_cold_start_restores_when_the_replicas_never_leave
-  test_measure_cold_start_restores_when_the_request_fails
-  test_measure_cold_start_restores_the_apps_it_had_touched_when_scaling_fails_midway
+  test_measure_cold_start_waits_for_zero_replicas_then_times_the_first_call_and_changes_nothing
+  test_measure_cold_start_takes_a_path
+  test_measure_cold_start_refuses_when_the_api_never_scales_to_zero
+  test_measure_cold_start_gives_up_when_the_replica_never_leaves
+  test_measure_cold_start_keeps_asking_when_the_first_call_is_cut_off_by_the_bff
+  test_measure_cold_start_is_not_a_measurement_when_no_200_ever_comes
   test_measure_cold_start_rejects_bad_usage
 )
 

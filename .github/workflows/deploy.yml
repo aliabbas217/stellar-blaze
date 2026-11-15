@@ -7,9 +7,16 @@
 #   run-migrate.sh               the api must never start against an unmigrated schema
 #   phase 2 (DEPLOY_APPS=true)   api (private), web (public), alerts (worker)
 # then the checks that the deployment is the code just built: the database TLS settings still verify the server (ADR 0042),
-# a revision gate per app; then restart-apps.sh (a rotated secret VALUE reaches replicas only after a restart), a demo reset
-# (a fresh epoch), the smoke test, and a final demo reset. A step that fails stops the run: nothing rolls back (single-revision
-# mode keeps the old revision serving while a new one is not ready). infra/scripts/check-workflow.sh pins this order.
+# a revision gate per app; then restart-apps.sh (a rotated secret VALUE reaches replicas only after a restart), wait-ready.sh
+# (the api may be cold), a demo reset (a fresh epoch), the smoke test, and a final demo reset. A step that fails stops the run:
+# nothing rolls back (single-revision mode keeps the old revision serving while a new one is not ready).
+# infra/scripts/check-workflow.sh pins this order.
+#
+# CHEAP MODE (architect ruling 2026-11-15): the deployment is cheap by default (infra/bicep/main.bicep has the sizes and the
+# prices). The api is INTERNAL and scales to ZERO when idle (API_MIN_REPLICAS=0, the default), so its first request after about
+# five idle minutes meets a cold start: the gates, restart, reset and smoke test below all allow for it (the api gate takes
+# --allow-zero-replicas, the restart skips an api that has no replica, wait-ready.sh and smoke-http.sh poll until it answers).
+# Set the variable to 1 to keep the api warm.
 #
 # GitHub environment `demo` (Settings > Environments). Its OIDC subject is `repo:<owner>/<repo>:environment:demo`
 # (infra/README.md). Restrict its deployment branches to `main`.
@@ -20,6 +27,7 @@
 #     APPS_IDENTITY_ID                                           resource id of the apps identity (bootstrap output)
 #     POSTGRES_VERSION                                           17 or 18 (infra/scripts/preflight.sh decides)
 #     VAPID_PUBLIC_KEY  VAPID_SUBJECT                            Web Push public key and its mailto: subject
+#     API_MIN_REPLICAS                                           optional; 0 (default, the api scales to zero) or 1 (kept warm)
 #     SB_RULESET_ID  SB_MODEL_ID                                 optional; leave UNSET (the backend refuses both in prod)
 #     NEXT_PUBLIC_SB_DEMO                                        optional; a BUILD argument of the web image. Unset or empty
 #                                                                is demo mode, the safe default: never set it to `0`.
@@ -228,6 +236,7 @@ jobs:
       SB_RULESET_ID: ${{ vars.SB_RULESET_ID }}
       SB_MODEL_ID: ${{ vars.SB_MODEL_ID }}
       TRUSTED_PROXY_HOPS: "1" # Container Apps ingress provides only the rightmost X-Forwarded-For entry
+      API_MIN_REPLICAS: ${{ vars.API_MIN_REPLICAS || '0' }} # 0 = the api scales to zero (cheap mode), 1 = kept warm
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -251,6 +260,7 @@ jobs:
           if [ "$API_IS_PLACEHOLDER" = false ]; then require_env SB_ACCESS_TOKENS; fi
           if [ "$WEB_IS_PLACEHOLDER" = false ]; then require_env DEMO_EMPLOYER_TOKEN; fi
           if [ -n "${VAPID_PRIVATE_KEY:-}" ]; then require_env VAPID_SUBJECT VAPID_PUBLIC_KEY; fi
+          case "$API_MIN_REPLICAS" in 0 | 1) ;; *) die "API_MIN_REPLICAS must be 0 or 1, got '$API_MIN_REPLICAS'" ;; esac
 
       - name: Azure login
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906  # v3.1.0
@@ -347,11 +357,16 @@ jobs:
           esac
           echo "WEB_FQDN=$fqdn" >> "$GITHUB_ENV"
 
-      # The api is PRIVATE (internal ingress): it is gated on its revision state alone, not on an HTTP call from here. The web
-      # gate is the BFF's own health route, which a placeholder web (a quickstart page) does not have.
+      # The api is PRIVATE (internal ingress): it is gated on its revision state alone, not on an HTTP call from here. With
+      # API_MIN_REPLICAS=0 it may have no replica yet: the gate then needs the revision ready, the image and Provisioned (a
+      # failed rollout fails the first two) and prints `scaled to zero`; with a replica every rule applies. The web gate is the
+      # BFF's own health route, which a placeholder web (a quickstart page) does not have.
       - name: Gate api (revision state)
         timeout-minutes: 30
-        run: bash infra/scripts/healthcheck.sh --app api --rg "$AZURE_RESOURCE_GROUP" --image "$API_IMAGE"
+        run: |
+          flags=()
+          if [ "$API_MIN_REPLICAS" = 0 ]; then flags+=(--allow-zero-replicas); fi
+          bash infra/scripts/healthcheck.sh --app api --rg "$AZURE_RESOURCE_GROUP" --image "$API_IMAGE" ${flags[@]+"${flags[@]}"}
 
       - name: Gate web (revision state and /api/healthz)
         timeout-minutes: 30
@@ -369,11 +384,20 @@ jobs:
         run: bash infra/scripts/healthcheck.sh --app alerts --rg "$AZURE_RESOURCE_GROUP" --image "$API_IMAGE" --no-ingress
 
       # Container Apps creates no revision when only secret VALUES change, so a rotated secret reaches the running replicas only
-      # after a restart (restart-apps.sh restarts api, alerts and web together and waits for the revision gates again).
+      # after a restart (restart-apps.sh restarts api, alerts and web together and waits for the revision gates again; an api
+      # that has no replica is skipped: it reads its secrets at its next cold start).
       - name: Restart the apps (rotated secrets reach the replicas only after a restart)
         if: needs.build-api.outputs.placeholder == 'false'
         timeout-minutes: 30
         run: bash infra/scripts/restart-apps.sh "$AZURE_RESOURCE_GROUP"
+
+      # With the api scaled to zero the web BFF answers an error for the first seconds of a request (it gives up on the api
+      # after 10 s), so wait until the api has started before the reset, which goes through the BFF as well. Placeholders have no
+      # such route.
+      - name: Wait for the api to answer through the web (cold start)
+        if: needs.build-api.outputs.placeholder == 'false' && needs.build-web.outputs.placeholder == 'false'
+        timeout-minutes: 10
+        run: bash infra/scripts/wait-ready.sh "https://$WEB_FQDN" --timeout 300
 
       # A fresh demo epoch (through the public web URL, which injects the demo token itself), so the smoke test's replay-clock
       # window check (H4) is meaningful: since B3's epoch clock, `sb-jobs site load` starts the epoch at the FIRST deploy only.
@@ -387,9 +411,9 @@ jobs:
         id: smoke
         timeout-minutes: 30
         run: |
-          flags=()
+          flags=(--api-min "$API_MIN_REPLICAS")
           if [ "$API_IS_PLACEHOLDER" = true ]; then flags+=(--placeholder); fi
-          bash infra/scripts/smoke.sh "$AZURE_RESOURCE_GROUP" ${flags[@]+"${flags[@]}"} | tee "$RUNNER_TEMP/smoke.txt"
+          bash infra/scripts/smoke.sh "$AZURE_RESOURCE_GROUP" "${flags[@]}" | tee "$RUNNER_TEMP/smoke.txt"
 
       # Leaves a clean epoch for whoever opens the demo next: the smoke test's stop and its undo belong to the epoch, and a reset
       # is limited upstream to 1 per 60 s, so a 429 is waited out once. Runs after a failed smoke test as well (its recovery

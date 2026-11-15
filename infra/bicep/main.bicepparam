@@ -12,6 +12,7 @@
 //   SB_ACCESS_TOKENS [''] (secret JSON)  DEMO_EMPLOYER_TOKEN [''] (secret)
 //   SB_RULESET_ID ['']  SB_MODEL_ID ['']  (the backend refuses both in prod: leave unset)
 //   TRUSTED_PROXY_HOPS [1]
+//   API_MIN_REPLICAS [0]  0 or 1: 0 scales the api to zero when idle (cheap, a cold start on the first request), 1 keeps it warm
 // Not read here, so they keep the template defaults: FORECAST_SOURCE (replay), the SB_REPLAY_* values and the sizes.
 
 using 'main.bicep'
@@ -44,3 +45,4 @@ param demoEmployerToken = readEnvironmentVariable('DEMO_EMPLOYER_TOKEN', '')
 param rulesetId = readEnvironmentVariable('SB_RULESET_ID', '')
 param modelId = readEnvironmentVariable('SB_MODEL_ID', '')
 param trustedProxyHops = int(readEnvironmentVariable('TRUSTED_PROXY_HOPS', '1'))
+param apiMinReplicas = int(readEnvironmentVariable('API_MIN_REPLICAS', '0'))

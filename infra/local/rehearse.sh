@@ -12,8 +12,10 @@
 # second unrelated CA, the HBA file and (when the api image can make one) a VAPID key pair, all in a `mktemp -d` directory
 # outside the repository; builds and starts the stack (compose.yaml; the first build of the web image can take ten minutes,
 # the api image is 1.8 GB on disk); then prints one line per check.
-#   R1  the migrate job exited 0                       R2  its log shows the revision and the demo site
-#   R3  api healthy, alerts running and dispatching    R4  infra/scripts/smoke-http.sh passes entirely against the proxy
+#   R1  the migrate job (infra/bicep/scripts/migrate.sh, the file job-migrate runs on Azure) exited 0
+#   R2  its log shows the revision and the demo site
+#   R3  api healthy, alerts running and dispatching, and the dispatch logs interval_minutes 1 (the worker reads the active config)
+#   R4  infra/scripts/smoke-http.sh passes entirely against the proxy
 #   R5  infra/scripts/reset-demo.sh through the proxy: 2xx and a NEW epoch (epoch_id above previous_epoch_id). It runs BEFORE the
 #       smoke test (H6 drains the BFF general bucket that a reset draws on) and is reported after R4. SKIP when the route
 #       answers 404 or 501 (a backend that predates it).
@@ -22,6 +24,13 @@
 #       is at least 90 s old, the api container is restarted, and the second reading must be at or after the first and less
 #       than 10 minutes later. A backend that predates the epoch clock rewinds to the anchor, so it is detected first (the api
 #       image has no stellar_blaze.ports.replay_epoch) and R6 is SKIPPED with that reason, never passed.
+#   R7  after migrate, `sb-jobs config show` has alert_dispatch_interval_minutes 1, and running the migrate service a SECOND time
+#       leaves the activation history unchanged and the value in place (idempotent: a deploy repeated changes nothing).
+#   R8  the cost-design check: ONE `sb-jobs alerts dispatch` in a fresh container of the api image against the migrated database,
+#       with the limits a one-minute Container Apps job would have (0.25 vCPU, 0.5 GiB; the `dispatch-probe` service), timed. A
+#       one-minute cron job needs it under 45 s: PASS says the job design fits. A longer run is a SKIP, not a FAIL, because the
+#       design that ships is the always-on alerts worker (infra/bicep/main.bicep says why); the seconds are printed either way.
+#       A dispatch that fails is a FAIL. Measured 2026-11-15 on the i1 tree: 11-12 s unconstrained, 57-62 s at 0.25 vCPU.
 #   N1..N6 are NEGATIVE checks: each states a behaviour that must hold, and the check FAILs if it does not.
 #     N1  a plaintext database connection is refused
 #     N2  verify-full with an unrelated CA fails closed
@@ -241,20 +250,47 @@ fi
 api_health="$(docker inspect -f '{{.State.Health.Status}}' "$(container_of api)")"
 alerts_id="$(container_of alerts)"
 alerts_state="$(docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' "$alerts_id")"
-# The alerts loop dispatches once at start and then every few minutes; each site of a cycle is a job_run that logs
-# `job.succeeded` (jobs/runner.py). Poll for it for up to 90 s.
+# The alerts loop dispatches once at start and then every max(60 s, alert_dispatch_interval_minutes x 60); each site of a cycle is
+# a job_run that logs `job.succeeded` with the cycle summary (jobs/runner.py), and the summary names the interval the cycle used.
+# Poll for it for up to 90 s. The interval must be 1: the worker started after migrate.sh activated alert_dispatch_interval_minutes = 1,
+# so a 5 (the ruleset default) would mean the config step did not take effect where it matters.
 alerts_cycle=false
+alerts_interval=""
 for _ in $(seq 1 18); do
-  if dc logs --no-log-prefix alerts 2>&1 | grep -q 'job\.succeeded'; then
+  alerts_log="$(dc logs --no-log-prefix alerts 2>&1)"
+  if grep -q 'job\.succeeded' <<<"$alerts_log"; then
     alerts_cycle=true
+    alerts_interval="$(grep 'job\.succeeded' <<<"$alerts_log" | sed -n 's/.*"interval_minutes": *\([0-9][0-9]*\).*/\1/p' | tail -n 1)"
     break
   fi
   sleep 5
 done
-if [ "$api_health" = healthy ] && [ "$alerts_state" = "running restarts=0" ] && [ "$alerts_cycle" = true ]; then
-  record R3 PASS "api healthy; alerts $alerts_state and logged a dispatch cycle (job.succeeded)"
+if [ "$api_health" = healthy ] && [ "$alerts_state" = "running restarts=0" ] && [ "$alerts_cycle" = true ] && [ "$alerts_interval" = 1 ]; then
+  record R3 PASS "api healthy; alerts $alerts_state and logged a dispatch cycle (job.succeeded) with interval_minutes 1"
 else
-  record R3 FAIL "api health '$api_health'; alerts '$alerts_state'; alerts dispatch cycle logged: $alerts_cycle"
+  record R3 FAIL "api health '$api_health'; alerts '$alerts_state'; alerts dispatch cycle logged: $alerts_cycle; interval_minutes in it: '${alerts_interval:-none}' (expected 1)"
+fi
+
+# R7: the runtime config migrate.sh left, and that a second run changes nothing. One-off containers of the migrate service (the
+# same image, mounts and environment; `dc run` with a command replaces the service's own).
+config_show() { MSYS_NO_PATHCONV=1 dc run --rm --no-deps -T migrate sb-jobs config show 2>&1 | mask; }
+config_history_count() { MSYS_NO_PATHCONV=1 dc run --rm --no-deps -T migrate sb-jobs config history --limit 50 2>/dev/null | grep -c '"activated_at"' || true; }
+interval_line='"alert_dispatch_interval_minutes": 1'
+r7_show="$(config_show)"
+history_before="$(config_history_count)"
+r7_rc=0
+MSYS_NO_PATHCONV=1 dc run --rm --no-deps -T migrate >"$tmp/migrate-again.out" 2>&1 || r7_rc=$?
+history_after="$(config_history_count)"
+r7_show_after="$(config_show)"
+if [ "$r7_rc" -eq 0 ] && printf '%s' "$r7_show" | grep -Eq "$interval_line,?[[:space:]]*\$" \
+  && printf '%s' "$r7_show_after" | grep -Eq "$interval_line,?[[:space:]]*\$" \
+  && [ "${history_before:-0}" -ge 2 ] && [ "$history_before" = "$history_after" ] \
+  && grep -q 'already 1' "$tmp/migrate-again.out"; then
+  r7_verdict=PASS
+  r7_what="the active config has alert_dispatch_interval_minutes 1; a second migrate run changed nothing ($history_before activations before and after)"
+else
+  r7_verdict=FAIL
+  r7_what="config: interval 1 after migrate: $(printf '%s' "$r7_show" | grep -c "$interval_line" || true) line(s); second migrate exit $r7_rc; activations $history_before then $history_after (needs 2 or more and equal); last line: $(tail -n 1 "$tmp/migrate-again.out" | mask | cut -c1-200)"
 fi
 
 # R5 runs BEFORE the smoke test and is recorded after R4: a demo reset draws on the BFF general bucket, which smoke H6 drains
@@ -377,8 +413,28 @@ else
   record R6 SKIP "backend predates the epoch clock (ADR 0034 amendment): the image has no stellar_blaze.ports.replay_epoch"
 fi
 
+# R7 was decided right after R3 (before the smoke test) and is recorded here, so the table keeps its order.
+record R7 "$r7_verdict" "$r7_what"
+
+# R8: how long one dispatch takes at the size of a one-minute job (0.25 vCPU / 0.5 GiB), in a fresh container of the api image
+# against the migrated database: the number the job-or-worker decision rests on. Run now, when the rest of the stack is idle.
+printf 'Timing one alerts dispatch at 0.25 vCPU / 0.5 GiB (R8, the dispatch-probe service)\n'
+r8_began="${EPOCHREALTIME:-$SECONDS}"
+r8_rc=0
+MSYS_NO_PATHCONV=1 dc run --rm --no-deps -T dispatch-probe >"$tmp/dispatch-probe.out" 2>&1 || r8_rc=$?
+r8_ended="${EPOCHREALTIME:-$SECONDS}"
+r8_seconds="$(awk -v a="$r8_began" -v b="$r8_ended" 'BEGIN { printf "%.1f", b - a }')"
+if [ "$r8_rc" -ne 0 ]; then
+  record R8 FAIL "the one-off dispatch exited $r8_rc after ${r8_seconds}s: $(mask <"$tmp/dispatch-probe.out" | tail -n 1 | cut -c1-200)"
+elif awk -v s="$r8_seconds" 'BEGIN { exit !(s < 45) }'; then
+  record R8 PASS "one dispatch took ${r8_seconds}s at 0.25 vCPU / 0.5 GiB, under 45 s: a one-minute cron job would fit"
+else
+  record R8 SKIP "one dispatch took ${r8_seconds}s at 0.25 vCPU / 0.5 GiB, over the 45 s a one-minute cron job allows: the always-on alerts worker stands"
+fi
+
 # --- (f) negative checks ---------------------------------------------------------------------------------------------
-migrate_cmd='sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor "deploy:local" --reason "load the synthetic demo site (rehearsal)"'
+# The very script job-migrate runs, mounted by the migrate service; each check changes only the environment around it.
+migrate_cmd='/bin/sh /migrate.sh'
 unrelated_mount="$tmp_win/unrelated-ca:/tls-unrelated:ro"
 db_url_base="postgresql+asyncpg://sbadmin:${pg_password}@"
 db_url_tail=":5432/stellar_blaze"

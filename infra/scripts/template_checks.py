@@ -87,13 +87,19 @@ BASE_ENV: dict[str, str] = {
     "DEMO_EMPLOYER_TOKEN": EMPLOYER_TOKEN,
 }
 # Variables the template reads with a default; a stray value in the caller's shell must not leak into a scenario.
-OPTIONAL_ENV = ("SB_RULESET_ID", "SB_MODEL_ID", "TRUSTED_PROXY_HOPS")
+OPTIONAL_ENV = (
+    "SB_RULESET_ID",
+    "SB_MODEL_ID",
+    "TRUSTED_PROXY_HOPS",
+    "API_MIN_REPLICAS",
+)
 
 SCENARIOS: dict[str, dict[str, str | None]] = {
     "full": {},
     "pins": {"SB_RULESET_ID": "ruleset-test", "SB_MODEL_ID": "model-test"},
     "novapid": {"VAPID_PRIVATE_KEY": None, "VAPID_SUBJECT": None},
     "phase1": {"DEPLOY_APPS": "false"},
+    "apimin1": {"API_MIN_REPLICAS": "1"},
     "placeholder": {
         "API_IMAGE": PLACEHOLDER_IMAGE,
         "API_TARGET_PORT": "80",
@@ -693,6 +699,11 @@ def check_c2(ws: Workspace) -> list[str]:
     return problems
 
 
+def expected_api_min(scenario: str) -> int:
+    """The api's minimum replicas that the scenario's own API_MIN_REPLICAS asks for (unset: the cheap default, 0)."""
+    return int(SCENARIOS[scenario].get("API_MIN_REPLICAS") or 0)
+
+
 def check_c3(ws: Workspace) -> list[str]:
     problems = []
     want_external = {
@@ -700,15 +711,18 @@ def check_c3(ws: Workspace) -> list[str]:
         "web": True,
         "alerts": None,
     }  # None: no ingress at all
-    for scenario in ("full", "placeholder"):
+    for scenario in ("full", "apimin1", "placeholder"):
         found = apps(ws.snapshot(scenario))
         for name, res in found.items():
             where = f"{scenario}/{name}"
             props = res["properties"]
             scale = props["template"]["scale"]
-            if scale.get("minReplicas") != 1 or scale.get("maxReplicas") != 1:
+            # The api scales to zero by default and follows API_MIN_REPLICAS (so it is tried both ways, 0 and 1); web and the
+            # alerts worker are always exactly one replica. The maximum is 1 for all three.
+            want_min = expected_api_min(scenario) if name == "api" else 1
+            if scale.get("minReplicas") != want_min or scale.get("maxReplicas") != 1:
                 problems.append(
-                    f"{where}: replicas are {scale.get('minReplicas')}..{scale.get('maxReplicas')}, not 1..1"
+                    f"{where}: replicas are {scale.get('minReplicas')}..{scale.get('maxReplicas')}, expected {want_min}..1"
                 )
             if props["configuration"].get("activeRevisionsMode") != "Single":
                 problems.append(f"{where}: revision mode is not Single")
@@ -784,12 +798,24 @@ def check_c5(ws: Workspace) -> list[str]:
     script = args[0] if len(args) == 1 and isinstance(args[0], str) else ""
     if not script:
         problems.append(f"args must be one shell string, found {args!r}")
-    if not re.search(
-        r"(^|&& )sb-jobs db upgrade && sb-jobs site load fixtures/demo_site\.toml( |$)",
-        script,
-    ):
+    # The job runs the file scripts/migrate.sh (loadTextContent), and the rehearsal mounts that same file.
+    source = ws.dir / "scripts" / "migrate.sh"
+    if not source.is_file():
+        problems.append("scripts/migrate.sh is missing next to main.bicep")
+    elif script != source.read_text(encoding="utf-8"):
+        problems.append("the job's script is not the text of scripts/migrate.sh")
+    steps = (
+        "sb-jobs db upgrade",
+        "sb-jobs site load fixtures/demo_site.toml",
+        "sb-jobs config activate",
+    )
+    at = [script.find(step) for step in steps]
+    for step, position in zip(steps, at, strict=True):
+        if position < 0:
+            problems.append(f"script does not run '{step}'")
+    if all(position >= 0 for position in at) and at != sorted(at):
         problems.append(
-            "script is not 'sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml ...'"
+            "script runs db upgrade, site load and config activate in the wrong order"
         )
     if "alembic upgrade head" in " ".join([*command, *map(str, args)]):
         problems.append(
@@ -971,6 +997,47 @@ def check_c11(ws: Workspace) -> list[str]:
     return problems
 
 
+def check_c12(ws: Workspace) -> list[str]:
+    """Cheap mode: the container sizes and the Log Analytics cap are the ones the cost estimate rests on."""
+    wanted = {
+        "api": (0.5, "1Gi"),
+        "web": (0.25, "0.5Gi"),
+        "alerts": (0.25, "0.5Gi"),
+    }
+    problems = []
+    found = apps(ws.snapshot("full"))
+    for name, (cpu, memory) in wanted.items():
+        res = found.get(name)
+        if res is None:
+            problems.append(f"full/{name}: missing")
+            continue
+        got = container(res)["resources"]
+        if got.get("cpu") != cpu or got.get("memory") != memory:
+            problems.append(
+                f"full/{name}: size is {got.get('cpu')} vCPU / {got.get('memory')}, expected {cpu} vCPU / {memory}"
+            )
+    spaces = _resources(ws.snapshot("full"), "Microsoft.OperationalInsights/workspaces")
+    if len(spaces) != 1:
+        problems.append(f"expected one Log Analytics workspace, found {len(spaces)}")
+    for name, res in spaces.items():
+        props = res["properties"]
+        quota = props.get("workspaceCapping", {}).get("dailyQuotaGb")
+        # 0.15 GB a day is about 4.5 GB a month, inside the free 5 GB; -1 (no cap) or anything larger is a cost risk.
+        if (
+            isinstance(quota, bool)
+            or not isinstance(quota, int | float)
+            or not 0 < quota <= 0.15
+        ):
+            problems.append(
+                f"{name}: dailyQuotaGb is {quota!r}, expected a cap above 0 and at most 0.15"
+            )
+        if props.get("retentionInDays") != 30:
+            problems.append(
+                f"{name}: retentionInDays is {props.get('retentionInDays')!r}, expected 30"
+            )
+    return problems
+
+
 # ---- bootstrap.bicep (B checks: the subscription-scope template the operator runs once) -------------------------------
 
 ACR_PULL = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
@@ -1031,6 +1098,17 @@ def check_b1(ws: Workspace) -> list[str]:
                 f"{scenario}: budget startDate is {start!r}, expected {wanted} ({how})"
             )
     return problems
+
+
+def check_b5(ws: Workspace) -> list[str]:
+    """Cheap mode: the budget alert defaults to USD 75 (estimate about 45-55 plus margin)."""
+    budgets = _resources(ws.snapshot("boot-bare"), "Microsoft.Consumption/budgets")
+    if len(budgets) != 1:
+        return [f"boot-bare: expected one budget, found {len(budgets)}"]
+    amount = next(iter(budgets.values()))["properties"].get("amount")
+    if amount != 75:
+        return [f"boot-bare: the budget amount is {amount!r}, expected 75"]
+    return []
 
 
 def check_b2(ws: Workspace) -> list[str]:
@@ -1133,12 +1211,12 @@ STATIC_CHECKS: dict[str, tuple[str, Check]] = {
         check_c2,
     ),
     "C3": (
-        "api, web, alerts: 1..1 replicas, Single revision, ingress as designed, allowInsecure false",
+        "web and alerts 1..1, api API_MIN_REPLICAS..1 (0 and 1 both tried), Single revision, api internal, allowInsecure false",
         check_c3,
     ),
     "C4": ("SB_RULESET_ID and SB_MODEL_ID only when set, never empty", check_c4),
     "C5": (
-        "job-migrate runs sb-jobs db upgrade then site load, never alembic upgrade head",
+        "job-migrate runs scripts/migrate.sh: db upgrade, site load, config activate, never alembic upgrade head",
         check_c5,
     ),
     "C6": ("alerts runs exactly sb-jobs alerts run", check_c6),
@@ -1149,6 +1227,10 @@ STATIC_CHECKS: dict[str, tuple[str, Check]] = {
     "C11": (
         "every module parameter that carries a secret value is a securestring or secureObject",
         check_c11,
+    ),
+    "C12": (
+        "cheap mode: container sizes as costed, Log Analytics capped at 0.15 GB a day with 30 days retention",
+        check_c12,
     ),
     "B1": (
         "bootstrap: budget startDate is <yyyy-MM>-01T00:00:00Z, by default and with BUDGET_MONTH",
@@ -1166,6 +1248,7 @@ STATIC_CHECKS: dict[str, tuple[str, Check]] = {
         "bootstrap: registry is LegacyRegistryPermissions, no admin user, no anonymous pull",
         check_b4,
     ),
+    "B5": ("bootstrap: the budget defaults to USD 75 (cheap mode)", check_b5),
 }
 
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Post-deploy smoke test of the Azure deployment. Prints `PASS|FAIL|SKIP S<n> <subject>`, exits 1 on any FAIL.
 #
-#   smoke.sh <resource-group> [--placeholder] [--expect-location uaenorth] [--no-wait]
+#   smoke.sh <resource-group> [--placeholder] [--expect-location uaenorth] [--no-wait] [--api-min 0|1]
 #
 # The api has INTERNAL ingress (architect ruling 2026-11-15), so nothing here calls it over HTTP: it is gated on its own
-# revision state (healthcheck.sh) and exercised through the web BFF, which is also the path a visitor takes.
+# revision state (healthcheck.sh) and exercised through the web BFF, which is also the path a visitor takes. In cheap mode the
+# api scales to zero (API_MIN_REPLICAS=0, the default), so the first request meets a cold start: smoke-http.sh waits for it.
 #   S1  the environment's workload profiles are exactly Consumption, and the group has no private endpoint (cost guard:
 #       a Dedicated profile or a private endpoint adds a USD 0.10/h meter)
-#   S2  min and max replicas are 1 and 1 for api, web and alerts (api and web only with --placeholder)
+#   S2  replicas: web and alerts are min 1 / max 1, the api is min <--api-min> (default 0, the deploy passes its
+#       API_MIN_REPLICAS) / max 1 (api and web only with --placeholder)
 #   S3  the PUBLIC web: /api/healthz is 200 with "status":"ok" and /api/v1/health/ready THROUGH the web is 200 (the H1 and H2
 #       lines of smoke-http.sh). With --placeholder: https://<web fqdn>/ is 200.
 #   S4  the api is NOT public: ingress.external is false for api and true for web, and alerts has no ingress
@@ -30,7 +32,7 @@ scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$scripts_dir/lib.sh"
 
 usage() {
-  printf 'usage: smoke.sh <resource-group> [--placeholder] [--expect-location uaenorth] [--no-wait]\n' >&2
+  printf 'usage: smoke.sh <resource-group> [--placeholder] [--expect-location uaenorth] [--no-wait] [--api-min 0|1]\n' >&2
   exit 1
 }
 
@@ -38,6 +40,7 @@ rg=""
 placeholder=false
 expect_location="uaenorth"
 wait_flag="--wait"
+api_min="0"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --placeholder)
@@ -53,6 +56,11 @@ while [ "$#" -gt 0 ]; do
       expect_location="$2"
       shift 2
       ;;
+    --api-min)
+      [ "$#" -ge 2 ] || usage
+      api_min="$2"
+      shift 2
+      ;;
     -*) usage ;;
     *)
       [ -z "$rg" ] || usage
@@ -62,6 +70,10 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -n "$rg" ] || usage
+case "$api_min" in
+  0 | 1) ;;
+  *) die "--api-min must be 0 or 1, got '$api_min'" ;;
+esac
 
 http_script="${SMOKE_HTTP_SCRIPT:-$scripts_dir/smoke-http.sh}"
 s5_timeout="${SMOKE_S5_TIMEOUT:-120}"
@@ -119,10 +131,14 @@ for app in "${apps[@]}"; do
   min_r=""
   max_r=""
   { read -r min_r || true; read -r max_r || true; } <<<"$scale"
-  if [ "$min_r" = "1" ] && [ "$max_r" = "1" ]; then
-    result PASS S2 "$app scale is min 1 / max 1"
+  want_min=1
+  if [ "$app" = "api" ]; then
+    want_min="$api_min"
+  fi
+  if [ "$min_r" = "$want_min" ] && [ "$max_r" = "1" ]; then
+    result PASS S2 "$app scale is min $want_min / max 1"
   else
-    result FAIL S2 "$app scale is min ${min_r:-?} / max ${max_r:-?}, expected 1 / 1"
+    result FAIL S2 "$app scale is min ${min_r:-?} / max ${max_r:-?}, expected $want_min / 1"
   fi
 done
 

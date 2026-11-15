@@ -13,11 +13,14 @@
 #   FAKE_RESET_BODY      body of a 2xx reset answer (default: a DemoReset with epoch_id 2 and previous_epoch_id 1)
 #   FAKE_RESET_RETRY_AFTER  Retry-After of a 429 reset answer (default 7; "none" sends no header)
 #   FAKE_HEADERS_LOG     when set, every request header given with -H is appended there (one line per header)
+#   FAKE_MAXTIME_LOG     when set, every request is appended there as `METHOD /path <--max-time value>`
+#   FAKE_READY_AFTER     N: the first N reads of GET /api/v1/health/ready answer 503 (the api is cold); needs FAKE_STATE_DIR
 #   FAKE_STARTED_AT      started_at of the created stop                          (default 2026-06-14T06:10:00Z = 10:10 Dubai)
 #   FAKE_STATE_DIR       directory for the day-plan counter (the 3rd day-plan read answers 429 with Retry-After)
 set -euo pipefail
 
 method="GET"
+max_time=""
 outfile=""
 headerfile=""
 format=""
@@ -45,7 +48,11 @@ while [ "$#" -gt 0 ]; do
 ' "$2" >>"$FAKE_HEADERS_LOG"; fi
       shift 2
       ;;
-    --data | -d | --max-time | -m | --connect-timeout)
+    --max-time | -m)
+      max_time="$2"
+      shift 2
+      ;;
+    --data | -d | --connect-timeout)
       shift 2
       ;;
     -*) shift ;;
@@ -59,6 +66,7 @@ done
 path="/${url#*://*/}"
 path="${path%%\?*}"
 printf '%s %s\n' "$method" "$path" >>"${FAKE_CURL_LOG:?FAKE_CURL_LOG is required}"
+if [ -n "${FAKE_MAXTIME_LOG:-}" ]; then printf '%s %s %s\n' "$method" "$path" "${max_time:-none}" >>"$FAKE_MAXTIME_LOG"; fi
 
 code_token='%{http_code}'
 default_timeline='{"hours":[{"crew_level":"green"}]}'
@@ -74,6 +82,17 @@ case "$method $path" in
   "GET /api/v1/health/ready")
     status=200
     body='{"status":"ok"}'
+    if [ -n "${FAKE_READY_AFTER:-}" ]; then
+      counter="${FAKE_STATE_DIR:?FAKE_STATE_DIR is required}/ready-calls"
+      n=0
+      if [ -f "$counter" ]; then read -r n <"$counter" || true; fi
+      n=$((n + 1))
+      printf '%s' "$n" >"$counter"
+      if [ "$n" -le "$FAKE_READY_AFTER" ]; then
+        status=503
+        body='{"status":"starting"}'
+      fi
+    fi
     ;;
   "POST /api/v1/crews/crew-b/stops")
     status="${FAKE_STOP_STATUS:-201}"

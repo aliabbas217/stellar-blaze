@@ -63,6 +63,7 @@ param readyPath string = ''
 @description('Seconds the platform waits for the process to stop before it kills it. Unset keeps the platform default.')
 param terminationGracePeriodSeconds int?
 
+@description('Replicas that always run. 0 lets the app scale to zero when idle (billed nothing then); main.bicep does that for the api by default.')
 @minValue(0)
 param minReplicas int = 1
 

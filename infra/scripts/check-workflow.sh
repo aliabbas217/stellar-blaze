@@ -9,10 +9,13 @@
 #   W1  every `uses:` is pinned to a 40-hex commit SHA (a local `./` action excepted)
 #   W2  no `pull_request_target`; every job guard that mentions workflow_run also requires the triggering event to be `push`
 #   W3  build-api: the step that checks the image's CA bundle (check-db-tls.sh --image) comes BEFORE the step that pushes it
-#   W4  deploy: what-if, create, migrate, TLS and revision gates, restart, reset, smoke test and the final reset run in order
+#   W4  deploy: what-if, create, migrate, TLS and revision gates, restart, wait for the cold api, reset, smoke test and the final
+#       reset run in order
 #   W5  deploy needs build-api and build-web; build-api, build-web and deploy all run in the GitHub environment `demo`
 #   W6  no `${{ secrets.* }}` inside any `run:` block (a secret reaches a script only through `env:`)
 #   W7  `permissions` is exactly contents: read and id-token: write, nothing broader, at the top and in every job
+#   W8  cheap mode: deploy exports API_MIN_REPLICAS from the repository variable (default 0) and uses it: the api gate may be
+#       --allow-zero-replicas and the smoke test gets --api-min "$API_MIN_REPLICAS"
 
 set -euo pipefail
 
@@ -180,6 +183,7 @@ check_w4() {
     "healthcheck.sh gate web"
     "healthcheck.sh gate alerts"
     "restart-apps.sh"
+    "wait-ready.sh (the api may be cold)"
     "reset-demo.sh (before the smoke test)"
     "smoke.sh"
     "reset-demo.sh --retry-after-once (final)"
@@ -197,6 +201,7 @@ check_w4() {
     '--app web'
     'healthcheck[.]sh --app alerts'
     'restart-apps[.]sh'
+    'wait-ready[.]sh'
     'reset-demo[.]sh'
     'smoke[.]sh'
     'reset-demo[.]sh.*--retry-after-once'
@@ -209,7 +214,7 @@ check_w4() {
     fi
     after="$line"
   done
-  report W4 "deploy runs checks, what-if, create, migrate, gates, restart, reset, smoke and a final reset in order" ${problems[@]+"${problems[@]}"}
+  report W4 "deploy runs checks, what-if, create, migrate, gates, restart, cold-start wait, reset, smoke and a final reset in order" ${problems[@]+"${problems[@]}"}
 }
 
 # ---- W5 ---------------------------------------------------------------------------------------------------------------
@@ -303,6 +308,28 @@ check_w7() {
   report W7 "permissions are exactly contents: read and id-token: write" ${problems[@]+"${problems[@]}"}
 }
 
+# ---- W8 ---------------------------------------------------------------------------------------------------------------
+
+check_w8() {
+  local problems=() i
+  local -a labels=(
+    "the job env entry API_MIN_REPLICAS from vars.API_MIN_REPLICAS with a default"
+    "the api gate flag --allow-zero-replicas"
+    "smoke.sh --api-min \"\$API_MIN_REPLICAS\""
+  )
+  local -a patterns=(
+    '^      API_MIN_REPLICAS: [$][{][{] vars[.]API_MIN_REPLICAS [|][|] '
+    '--allow-zero-replicas'
+    '--api-min "[$]API_MIN_REPLICAS"'
+  )
+  for i in "${!patterns[@]}"; do
+    if [ -z "$(first_match deploy "${patterns[$i]}" 0)" ]; then
+      problems+=("deploy lacks ${labels[$i]}")
+    fi
+  done
+  report W8 "deploy takes API_MIN_REPLICAS (default 0) and passes it to the api gate and the smoke test" ${problems[@]+"${problems[@]}"}
+}
+
 check_w1
 check_w2
 check_w3
@@ -310,5 +337,6 @@ check_w4
 check_w5
 check_w6
 check_w7
+check_w8
 
 exit "$failed"

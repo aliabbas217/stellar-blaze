@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Revision-aware health gate for one Container App, used after a deployment and after a restart.
 #
-#   healthcheck.sh --app <name> --rg <resource-group> --image <image> [--no-ingress]
+#   healthcheck.sh --app <name> --rg <resource-group> --image <image> [--no-ingress] [--allow-zero-replicas]
 #                  [--url <https url> [--expect-json-key K --expect-json-value V]] [--timeout 300]
 #
 # Single-revision mode keeps the PREVIOUS revision serving when a new one never becomes ready, so an HTTP 200 alone goes
@@ -13,8 +13,12 @@
 #                                          provisioningState == Provisioned, runningState == Running
 #                                          healthState == Healthy  (--no-ingress: Healthy, None or absent: a worker has no probes)
 #                                          trafficWeight == 100    (skipped with --no-ingress)
-#                                          replicas >= 1
+#                                          replicas >= 1           (see --allow-zero-replicas)
 #   with --url:                            `curl -fsS --max-time 10` answers 200 (and the JSON key/value when asked)
+# --allow-zero-replicas is for an app that may scale to zero (the api, cheap mode: API_MIN_REPLICAS=0). A revision with NO
+# replica cannot be Running or Healthy, so then only the conditions that do not need a replica are required: latest ==
+# latest ready, the image, and provisioningState == Provisioned (a failed rollout fails the first two); it prints `scaled to
+# zero` and passes. A revision WITH a replica (the api woke up, or min is 1) still has to meet every rule above.
 # --url is only ever the PUBLIC web URL (https): the api is private and is gated on its revision state alone.
 # The JSON check is a plain string match on `"key": "value"` (no nesting, string values only).
 #
@@ -28,7 +32,7 @@ scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$scripts_dir/lib.sh"
 
 usage() {
-  printf 'usage: healthcheck.sh --app <name> --rg <resource-group> --image <image> [--no-ingress] [--url <https url> [--expect-json-key K --expect-json-value V]] [--timeout 300]\n' >&2
+  printf 'usage: healthcheck.sh --app <name> --rg <resource-group> --image <image> [--no-ingress] [--allow-zero-replicas] [--url <https url> [--expect-json-key K --expect-json-value V]] [--timeout 300]\n' >&2
   exit 1
 }
 
@@ -36,6 +40,7 @@ app=""
 rg=""
 image=""
 no_ingress=false
+allow_zero=false
 url=""
 json_key=""
 json_value=""
@@ -62,6 +67,10 @@ while [ "$#" -gt 0 ]; do
       no_ingress=true
       shift
       ;;
+    --allow-zero-replicas)
+      allow_zero=true
+      shift
+      ;;
     *) usage ;;
   esac
 done
@@ -86,10 +95,12 @@ tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
 
 problems=()
+scaled_to_zero=false
 
 # check_once: fill $problems with every condition that does not hold right now (empty = healthy).
 check_once() {
   problems=()
+  scaled_to_zero=false
   local raw latest ready rev_image provisioning running health traffic replicas
   local -a lines
 
@@ -122,17 +133,22 @@ check_once() {
 
   [ "$rev_image" = "$image" ] || problems+=("revision $latest runs image '$rev_image', expected '$image'")
   [ "$provisioning" = "Provisioned" ] || problems+=("revision $latest provisioningState is '$provisioning', expected Provisioned")
-  [ "$running" = "Running" ] || problems+=("revision $latest runningState is '$running', expected Running")
-  if [ "$no_ingress" = true ]; then
-    if [ "$health" != "Healthy" ] && ! is_null_value "$health"; then
-      problems+=("revision $latest healthState is '$health', expected Healthy (or None for a worker without probes)")
-    fi
+  if [ "$allow_zero" = true ] && [ "$replicas" = "0" ]; then
+    # No replica, so no runningState or healthState to read: the three conditions above are all there is to check.
+    scaled_to_zero=true
   else
-    [ "$health" = "Healthy" ] || problems+=("revision $latest healthState is '$health', expected Healthy")
-    [ "$traffic" = "100" ] || problems+=("revision $latest trafficWeight is '$traffic', expected 100")
-  fi
-  if ! [[ "$replicas" =~ ^[0-9]+$ ]] || [ "$replicas" -lt 1 ]; then
-    problems+=("revision $latest has '$replicas' replicas, expected at least 1")
+    [ "$running" = "Running" ] || problems+=("revision $latest runningState is '$running', expected Running")
+    if [ "$no_ingress" = true ]; then
+      if [ "$health" != "Healthy" ] && ! is_null_value "$health"; then
+        problems+=("revision $latest healthState is '$health', expected Healthy (or None for a worker without probes)")
+      fi
+    else
+      [ "$health" = "Healthy" ] || problems+=("revision $latest healthState is '$health', expected Healthy")
+      [ "$traffic" = "100" ] || problems+=("revision $latest trafficWeight is '$traffic', expected 100")
+    fi
+    if ! [[ "$replicas" =~ ^[0-9]+$ ]] || [ "$replicas" -lt 1 ]; then
+      problems+=("revision $latest has '$replicas' replicas, expected at least 1")
+    fi
   fi
 
   if [ -n "$url" ]; then
@@ -155,7 +171,11 @@ while true; do
   check_once
   elapsed=$((SECONDS - began))
   if [ "${#problems[@]}" -eq 0 ]; then
-    printf 'PASS healthcheck %s: latest revision ready, image %s, healthy (after %ss)\n' "$app" "$image" "$elapsed"
+    if [ "$scaled_to_zero" = true ]; then
+      printf 'PASS healthcheck %s: latest revision ready, image %s, provisioned, scaled to zero (after %ss)\n' "$app" "$image" "$elapsed"
+    else
+      printf 'PASS healthcheck %s: latest revision ready, image %s, healthy (after %ss)\n' "$app" "$image" "$elapsed"
+    fi
     exit 0
   fi
   for problem in "${problems[@]}"; do

@@ -20,6 +20,11 @@
 # the healthcheck that follows is the gate, not the names). Nothing else is modified: no image, no secret, no scale, no
 # environment.
 #
+# CHEAP MODE: the api scales to zero (API_MIN_REPLICAS=0). An api with NO replica has nothing to restart and holds no secret in
+# memory: it reads its secrets at its next cold start, so its restart is SKIPPED (the script says so) and its gate afterwards
+# is healthcheck.sh --allow-zero-replicas (revision ready, image, provisioned). Whether the api has a replica is read once, before
+# any restart. The alerts worker and web are always one replica and are always restarted.
+#
 # Environment: HEALTH_POLL_S (default 10; also the poll of the replica wait), RESTART_SETTLE_S (default 60; tests 0).
 
 set -euo pipefail
@@ -107,15 +112,27 @@ for app in "${apps[@]}"; do
   old_replicas[$app]="$(replica_names "$app" "${latest[$app]}")"
 done
 
-restarted_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# An api with no replica reads its secrets at its next cold start: nothing to restart (see the header).
+to_restart=()
+api_scaled_to_zero=false
 for app in "${apps[@]}"; do
+  if [ "$app" = "api" ] && [ -z "${old_replicas[$app]}" ]; then
+    api_scaled_to_zero=true
+    log "api: skipped, it has no replica (scaled to zero); it reads its secrets at its next cold start"
+  else
+    to_restart+=("$app")
+  fi
+done
+
+restarted_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+for app in "${to_restart[@]}"; do
   log "restarting $app revision ${latest[$app]}"
   az containerapp revision restart -n "$app" -g "$rg" --revision "${latest[$app]}" >/dev/null
 done
 issued_at=$SECONDS
 
 # ---- only now wait: new replica names or the settle time, then the healthcheck conditions -------------------------------
-for app in "${apps[@]}"; do
+for app in "${to_restart[@]}"; do
   wait_replicas_or_settle "$app" "${old_replicas[$app]}"
 done
 
@@ -130,6 +147,9 @@ for app in "${apps[@]}"; do
   if [ "$app" = "alerts" ]; then
     gate_args+=(--no-ingress)
   fi
+  if [ "$app" = "api" ] && [ "$api_scaled_to_zero" = true ]; then
+    gate_args+=(--allow-zero-replicas)
+  fi
   bash "$scripts_dir/healthcheck.sh" "${gate_args[@]}" || failed=1
 done
 
@@ -140,5 +160,8 @@ fi
 
 printf 'Apps restarted.\n'
 printf '  restart issued at:     %s (UTC)\n' "$restarted_at"
-printf '  restarted:             %s\n' "${apps[*]}"
+printf '  restarted:             %s\n' "${to_restart[*]}"
+if [ "$api_scaled_to_zero" = true ]; then
+  printf '  skipped:               api (scaled to zero: it reads its secrets at its next cold start)\n'
+fi
 printf '  Running replicas have now read the current secret values.\n'

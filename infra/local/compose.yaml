@@ -3,7 +3,8 @@
 #   - the database accepts TLS only (hostssl in pg_hba.conf, like Azure's require_secure_transport) with a server
 #     certificate from a CA generated at run time, and every api/alerts/migrate connection verifies it: `ssl=verify-full`
 #     plus PGSSLROOTCERT (ADR 0042);
-#   - the order db -> migrate (schema, seed, then `site load`) -> api and alerts -> web -> proxy, gated on health;
+#   - the order db -> migrate (infra/bicep/scripts/migrate.sh, the very file job-migrate runs on Azure: schema, seed, `site load`,
+#     then the active runtime config with alert_dispatch_interval_minutes = 1) -> api and alerts -> web -> proxy, gated on health;
 #   - the readiness probe, the replay variables shared by api and alerts (one YAML anchor), the same environment contract;
 #   - a proxy in front of web that APPENDS to X-Forwarded-For like the Container Apps ingress, so TRUSTED_PROXY_HOPS=1
 #     means the same thing here as there, and web and api publish no port.
@@ -87,9 +88,11 @@ services:
       retries: 40
       start_period: 5s
 
-  # The migrate job of the Azure deploy: schema, config seed, then the synthetic demo site. It must finish before api and
-  # alerts start (service_completed_successfully), and a failure here stops the whole stack: the rehearsal's version of
-  # "the old revision keeps serving".
+  # The migrate job of the Azure deploy: infra/bicep/scripts/migrate.sh, mounted read-only and run as `/bin/sh /migrate.sh`. It is
+  # the same file that main.bicep loads into job-migrate (loadTextContent), so what runs here is what runs there: schema, config
+  # seed, the synthetic demo site, then the active runtime config with alert_dispatch_interval_minutes = 1. It must finish before
+  # api and alerts start (service_completed_successfully), and a failure here stops the whole stack: the rehearsal's version of
+  # "the old revision keeps serving". rehearse.sh runs it a second time and requires that nothing changes (R7).
   migrate:
     image: *api-image
     pull_policy: never
@@ -101,10 +104,11 @@ services:
       <<: *sb-env
     volumes:
       - *ca-mount
-    command:
-      - /bin/sh
-      - -c
-      - 'sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor "deploy:local" --reason "load the synthetic demo site (rehearsal)"'
+      - type: bind
+        source: ../bicep/scripts/migrate.sh
+        target: /migrate.sh
+        read_only: true
+    command: ["/bin/sh", "/migrate.sh"]
 
   # Internal only: no published port. web reaches it at http://api:8000 on the compose network.
   api:
@@ -130,7 +134,10 @@ services:
       retries: 30
       start_period: 15s
 
-  # The alerts worker: a separate long-running process, the same SB_REPLAY_* values as api (the anchor above) and no
+  # The alerts worker: a separate long-running process (`sb-jobs alerts run`, one dispatch every max(60 s, alert_dispatch_interval_minutes
+  # x 60) of the ACTIVE config, which migrate.sh sets to 1). It is NOT a one-minute cron job on Azure because one dispatch does
+  # not fit a minute at the size such a job would have: rehearse.sh R8 measures it with the `dispatch-probe` service below. The
+  # same SB_REPLAY_* values as api (the anchor above) and no
   # SB_ACCESS_TOKENS. Compose has no `args`: `entrypoint` and `command` are the equivalents of the
   # explicit `command` and `args` the Container Apps deploy sets (the image CMD is never relied on). The VAPID pair comes
   # from an optional env file so that it is either both set or both absent: an empty SB_VAPID_SUBJECT is a startup error.
@@ -142,6 +149,26 @@ services:
         condition: service_completed_successfully
     entrypoint: ["sb-jobs"]
     command: ["alerts", "run"]
+    environment:
+      <<: *sb-env
+    env_file:
+      - path: ${SB_REHEARSAL_DIR:?run infra/local/rehearse.sh, it creates SB_REHEARSAL_DIR}/vapid.env
+        required: false
+    volumes:
+      - *ca-mount
+
+  # NOT started by `up` (profile `probe`): rehearse.sh R8 runs ONE `sb-jobs alerts dispatch` in it, with the limits a one-minute
+  # Container Apps job would have (0.25 vCPU, 0.5 GiB; docker enforces the CPU as a CFS quota), to time it. The environment is the
+  # alerts worker's, so it is the same dispatch against the same migrated database.
+  dispatch-probe:
+    image: *api-image
+    pull_policy: never
+    profiles: ["probe"]
+    restart: "no"
+    cpus: 0.25
+    mem_limit: 512m
+    entrypoint: ["sb-jobs"]
+    command: ["alerts", "dispatch"]
     environment:
       <<: *sb-env
     env_file:

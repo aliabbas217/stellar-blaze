@@ -5,6 +5,8 @@
 #   curlfail            exit 22 (what `curl -f` returns on an HTTP error), no output
 #   STUB_CURL_RULES     "prefix=code ..." the first rule whose prefix starts the URL decides the status (default 200); 000 means
 #                       the connection was refused (exit 7). Example: "http://=301 https://web.=503"
+#   STUB_CURL_FAIL_FIRST  N: the first N calls of the test answer 503 where the rules would have said 200 (a cold start that
+#                       is over after N tries); the counter lives in $STUB_STATE_DIR/curl-calls
 #   STUB_CURL_BODY      the response body (default {"status":"ok"})
 #   STUB_CURL_LOG       when set, the arguments of each call are appended (one line per call)
 # With -f a status of 400 or more exits 22 (after writing -w output), as the real curl does.
@@ -63,6 +65,15 @@ for rule in ${STUB_CURL_RULES:-}; do
     *) ;;
   esac
 done
+
+if [ -n "${STUB_CURL_FAIL_FIRST:-}" ] && [ "$status" = "200" ]; then
+  counter="${STUB_STATE_DIR:?STUB_STATE_DIR is required}/curl-calls"
+  calls=0
+  if [ -f "$counter" ]; then read -r calls <"$counter" || true; fi
+  calls=$((calls + 1))
+  printf '%s' "$calls" >"$counter"
+  if [ "$calls" -le "$STUB_CURL_FAIL_FIRST" ]; then status="503"; fi
+fi
 
 default_body='{"status":"ok"}'
 body="${STUB_CURL_BODY:-$default_body}"
