@@ -6,6 +6,7 @@ playwright-report
 .lighthouseci
 test-results
 tests
+!tests/e2e/live/env.ts
 *.tsbuildinfo
 next-env.d.ts
 .env*
