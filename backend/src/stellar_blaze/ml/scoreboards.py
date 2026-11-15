@@ -29,10 +29,26 @@ Definitions, all from the pre-registration (and amendment 1):
   interval by the number of season days, so the estimate is exactly the total. Ratios resample (numerator,
   denominator) per day.
   A ratio with no denominator at all (for example FAR of P0, which never warns) is reported as ``value`` 0, ``ci`` null
-  and ``n`` 0; a ratio whose bootstrap replicate has no denominator keeps its value and has ``ci`` null.
-* Verdicts: H4 and H6 are supported only when the paired intervals of EVERY named difference exclude zero in the
-  stated direction. H5's "not more false-alarm hours than P2 + 25%" has no interval rule in the pre-registration and is
-  read as the point estimate FA(P3) <= 1.25 FA(P2) (flagged in the report). H7 follows H6.
+  and ``n`` 0. A bootstrap replicate whose resampled days hold no denominator (a sparse policy: it warned on a few
+  days only) is undefined and is dropped from the percentile interval (ruling R-AQ); the interval is null, with the
+  value kept, when MORE than 5% of the replicates (more than 100 of the 2,000) are undefined. The count of undefined
+  replicates is not written to the file: ``Metric`` has no field for it and adding one would change the contract.
+* The three phrases the pre-registration leaves open are read as follows (the freeze addendum records the readings):
+
+  - H4 and H6 are supported only when the paired interval of EVERY named difference lies wholly below zero (the
+    interval excludes zero in the stated direction, "fewer"); H7 follows H6.
+  - H5's "without more false-alarm hours than P2 + 25%" has no interval rule: it is read as the point estimate
+    FA(P3) <= 1.25 x FA(P2), in addition to the paired interval of the missed hours wholly below zero.
+  - Section 13's "If P2 >= P3" (H4 fails and P2 is shown as the recommended policy) is read as P2 at least as good as P3
+    on BOTH missed and false-alarm hours, by point estimates (equal counts count as at least as good).
+
+* Section 13's "Lead 2 (strict) contradicts lead 1 on H4" needs the H4 verdict AT lead 2: ``warnings_scoreboard``
+  applies the same rule (same paired bootstrap, blocks and seed) to the lead-2 rows and adds the verdict ``H4-lead2``.
+  The stamp "issued by 18:00 GST the evening before" may be carried only when H4 holds at lead 2; where H4 holds at
+  lead 1 but not at lead 2 the text says the stamp is dropped from the video and the strict number is shown. With no
+  scorable lead-2 row (the dev export) there is no ``H4-lead2`` verdict and the lead-2 entry says "not available".
+* The withdrawal "on" cell of the 2 x 2 sensitivity is dry-bulb leg only (> 44 C); no natural wet-bulb source exists,
+  so the second leg of the ADR 0006 rule is not applied.
 """
 
 from collections.abc import Sequence
@@ -78,6 +94,7 @@ from stellar_blaze.domain.scoreboard import (
 )
 from stellar_blaze.domain.validator.validator import validate_plan
 from stellar_blaze.ml import bootstrap
+from stellar_blaze.ml.bootstrap import _layout, _percentile_interval, _replicate_sums
 from stellar_blaze.ml.exporters import github_slug
 from stellar_blaze.ml.twl_rows import SITE_TIMEZONE, frozen_withdrawal
 
@@ -93,6 +110,7 @@ __all__ = [
     "BoardContext",
     "DemoSelection",
     "ban_weights",
+    "fewer_or_more",
     "fill_demo_day",
     "plans_scoreboard",
     "select_demo_day",
@@ -119,11 +137,17 @@ ASSUMED_CREW_SIZE: Final = 20
 CREW_LABEL: Final = "assumed crew of 20 doing heavy work (ASSUMED)"
 WBGT_NAIVE_C: Final = 32.0
 HEADLINE_LEAD: Final = 1
+STRICT_LEAD: Final = 2
 FALSE_ALARM_ALLOWANCE: Final = 1.25
-"""H5: P3 may raise false-alarm hours up to P2 + 25%."""
+"""H5: P3 may raise false-alarm hours up to P2 + 25%, read as the point estimate FA(P3) <= 1.25 x FA(P2) (no interval
+rule is pre-registered for the allowance)."""
+
+BOOTSTRAP_BLOCK_DAYS: Final = 7
+BOOTSTRAP_REPLICATES: Final = 2000
+UNDEFINED_REPLICATE_LIMIT: Final = 0.05
+"""A ratio's interval is null when more than this share of its replicates is undefined (R-AQ)."""
 
 _HOUR: Final = np.timedelta64(1, "h")
-_NOT_ENOUGH: Final = "undefined"
 _LEAD_LABELS: Final = {
     1: "about 24 hours ahead",
     2: "issued by 18:00 GST the evening before",
@@ -278,18 +302,24 @@ def _total(h: _Season, daily: F64, *, n: int, anchor: str, scale: float = 1.0) -
 
 
 def _ratio(h: _Season, numerator: F64, denominator: F64, *, n: int, anchor: str) -> Metric:
-    """``sum(numerator) / sum(denominator)`` with its interval; 0, no interval, ``n`` 0 when there is no denominator."""
+    """``sum(numerator) / sum(denominator)`` with its interval; 0, no interval, ``n`` 0 when there is no denominator.
+
+    The replicates are ``ml.bootstrap``'s own (same layout, blocks and seed, so a dense ratio gets exactly the interval
+    ``block_bootstrap`` would give). A replicate that resampled only days without a denominator is undefined and is
+    dropped; the interval is null (value kept) when more than ``UNDEFINED_REPLICATE_LIMIT`` of them are (R-AQ).
+    """
     if float(denominator.sum()) <= 0.0:
         return Metric(value=0.0, ci=None, n=0, anchor=anchor)
-    try:
-        result = bootstrap.block_bootstrap(
-            _daily_frame(h.dates, numerator, denominator), value="value", weight="weight"
-        )
-    except ValueError as error:
-        if _NOT_ENOUGH not in str(error):
-            raise
-        return Metric(value=float(numerator.sum() / denominator.sum()), ci=None, n=n, anchor=anchor)
-    return Metric(value=result.estimate, ci=Interval(lo=result.lo, hi=result.hi), n=n, anchor=anchor)
+    value = float(numerator.sum() / denominator.sum())
+    layout, matrix = _layout(_daily_frame(h.dates, numerator, denominator), value="value", weight="weight")
+    sums = _replicate_sums(
+        layout, matrix, block_days=BOOTSTRAP_BLOCK_DAYS, n_boot=BOOTSTRAP_REPLICATES, seed=bootstrap.DEFAULT_SEED
+    )
+    defined = sums[:, 1] > 0.0
+    if int((~defined).sum()) > UNDEFINED_REPLICATE_LIMIT * BOOTSTRAP_REPLICATES:
+        return Metric(value=value, ci=None, n=n, anchor=anchor)
+    lo, hi = _percentile_interval(sums[defined, 0] / sums[defined, 1], 0.95)
+    return Metric(value=value, ci=Interval(lo=lo, hi=hi), n=n, anchor=anchor)
 
 
 def _paired_total(h: _Season, a: F64, b: F64, *, n: int, anchor: str) -> Metric:
@@ -379,6 +409,12 @@ def _policy_row(
 def _truth_danger(
     h: _Hours, ruleset: Ruleset, edges: ZoneEdges, *, margin: float, withdrawal: bool
 ) -> NDArray[np.bool_]:
+    """Truth danger hours (High or Red) under one cell of the 2 x 2: ``withdrawal`` applies the dry-bulb leg only.
+
+    The cap of the ruleset's ``[twl_withdrawal]`` applies where the observed dry bulb is above its limit (44 C); no
+    natural wet-bulb source exists, so the second leg of the ADR 0006 rule is not applied. The cap comes first, then
+    the margin (ADR 0047).
+    """
     effective = effective_twl(
         h.truth_twl,
         margin_w_m2=margin,
@@ -415,7 +451,10 @@ def _signed(metric: Metric) -> str:
 
 
 def _fewer(metric: Metric) -> bool:
-    """True when the paired interval lies wholly below zero."""
+    """True when the paired interval lies wholly below zero ("fewer": it excludes zero in the stated direction).
+
+    A favorable point estimate whose interval reaches zero or above is NOT fewer.
+    """
     return metric.ci is not None and metric.ci.hi < 0.0
 
 
@@ -437,8 +476,50 @@ def _compare(
     )
 
 
+def fewer_or_more(value: float, noun: str) -> str:
+    """A signed difference in words: the magnitude with "fewer" or "more" (never a negative count), or "no change"."""
+    magnitude = round(abs(value))
+    if magnitude == 0:
+        return f"no change in {noun}"
+    return f"{magnitude} {'fewer' if value < 0 else 'more'} {noun}"
+
+
 def _pair(metric: str, subject: str, baseline: str, difference: Metric) -> PairedComparison:
     return PairedComparison(metric=metric, subject=subject, baseline=baseline, difference=difference)
+
+
+@dataclass(frozen=True)
+class _H4:
+    """H4 at one lead: P3 minus P0 missed danger hours and P3 minus P1 false-alarm hours, each with its interval."""
+
+    missed_p0: Metric
+    alarms_p1: Metric
+
+    @property
+    def holds(self) -> bool:
+        """Both sides: the P0 side AND the P1 side must be fewer (one side alone is not H4)."""
+        return _fewer(self.missed_p0) and _fewer(self.alarms_p1)
+
+    def failing(self) -> str:
+        sides = []
+        if not _fewer(self.missed_p0):
+            sides.append(f"the P0 side (missed danger hours, P3 minus P0: {_signed(self.missed_p0)})")
+        if not _fewer(self.alarms_p1):
+            sides.append(f"the P1 side (false-alarm hours, P3 minus P1: {_signed(self.alarms_p1)})")
+        return " and ".join(sides)
+
+    def comparisons(self) -> list[PairedComparison]:
+        return [
+            _pair("missed_danger_hours", "P3_protect", "P0", self.missed_p0),
+            _pair("false_alarm_hours", "P3_protect", "P1", self.alarms_p1),
+        ]
+
+
+def _h4(h: _Hours, danger: NDArray[np.bool_], warned: dict[PolicyId, NDArray[np.bool_]]) -> _H4:
+    p3: PolicyId = "P3_protect"
+    missed_p0, _ = _compare(h, danger, warned, p3, "P0")
+    _, alarms_p1 = _compare(h, danger, warned, p3, "P1")
+    return _H4(missed_p0=missed_p0, alarms_p1=alarms_p1)
 
 
 def _verdicts(
@@ -446,27 +527,19 @@ def _verdicts(
 ) -> list[HypothesisVerdict]:
     by_policy = {row.policy: row for row in rows}
     p3: PolicyId = "P3_protect"
-    missed_p0, _ = _compare(h, danger, warned, p3, "P0")
-    _, alarms_p1 = _compare(h, danger, warned, p3, "P1")
+    h4 = _h4(h, danger, warned)
     missed_p2, alarms_p2 = _compare(h, danger, warned, p3, "P2")
 
-    h4_ok = _fewer(missed_p0) and _fewer(alarms_p1)
-    failing = []
-    if not _fewer(missed_p0):
-        failing.append(f"the P0 side (missed danger hours, P3 minus P0: {_signed(missed_p0)})")
-    if not _fewer(alarms_p1):
-        failing.append(f"the P1 side (false-alarm hours, P3 minus P1: {_signed(alarms_p1)})")
-    if h4_ok:
+    if h4.holds:
         h4_text = (
             "H4 supported at lead 1: P3 has fewer missed danger hours than P0 (ban only) "
-            f"({_signed(missed_p0)}) and fewer false-alarm hours than P1 (WBGT >= 32 on raw IFS) "
-            f"({_signed(alarms_p1)})."
+            f"({_signed(h4.missed_p0)}) and fewer false-alarm hours than P1 (WBGT >= 32 on raw IFS) "
+            f"({_signed(h4.alarms_p1)})."
         )
     else:
-        h4_text = (
-            "H4 not supported at lead 1. Failing: " + " and ".join(failing) + ". The scoreboard is shown as it is."
-        )
+        h4_text = "H4 not supported at lead 1. Failing: " + h4.failing() + ". The scoreboard is shown as it is."
         p2, p3_row = by_policy["P2"], by_policy[p3]
+        # Section 13 "If P2 >= P3", read as P2 at least as good on BOTH counts (point estimates; equal counts qualify).
         if (
             p2.missed_danger_hours.value <= p3_row.missed_danger_hours.value
             and p2.false_alarm_hours.value <= p3_row.false_alarm_hours.value
@@ -476,7 +549,7 @@ def _verdicts(
                 "regulator's own zones on held-out data."
             )
     fa_p3, fa_p2 = by_policy[p3].false_alarm_hours.value, by_policy["P2"].false_alarm_hours.value
-    within = fa_p3 <= FALSE_ALARM_ALLOWANCE * fa_p2
+    within = fa_p3 <= FALSE_ALARM_ALLOWANCE * fa_p2  # H5's "+ 25%", read as a point estimate
     h5_ok = _fewer(missed_p2) and within
     h5_text = (
         f"H5 {'supported' if h5_ok else 'not supported'} at lead 1 (secondary): P3 minus P2 missed danger hours "
@@ -489,11 +562,8 @@ def _verdicts(
             primary=True,
             statement="At the demo station, working daytime, lead 1: P3 has fewer missed danger hours than P0 (ban "
             "only) and fewer false-alarm hours than P1 (WBGT >= 32 on raw IFS).",
-            outcome="supported" if h4_ok else "negative",
-            comparisons=[
-                _pair("missed_danger_hours", p3, "P0", missed_p0),
-                _pair("false_alarm_hours", p3, "P1", alarms_p1),
-            ],
+            outcome="supported" if h4.holds else "negative",
+            comparisons=h4.comparisons(),
             text=h4_text,
         ),
         HypothesisVerdict(
@@ -511,6 +581,40 @@ def _verdicts(
     ]
 
 
+def _lead2_verdict(h4: _H4, *, holds_at_lead_1: bool) -> HypothesisVerdict:
+    """Section 13's lead-2 row: the "evening before" stamp may be carried only when H4 holds at lead 2.
+
+    The rule is H4's own (the same paired differences, bootstrap, blocks and seed) on the lead-2 rows. Where H4 holds at
+    lead 1 but not at lead 2 the stamp is dropped from the video and the strict (lead-2) number is shown.
+    """
+    stamp = _LEAD_LABELS[STRICT_LEAD]
+    if h4.holds:
+        text = (
+            f"H4 holds at lead 2 ({stamp}): P3 has fewer missed danger hours than P0 ({_signed(h4.missed_p0)}) and "
+            f'fewer false-alarm hours than P1 ({_signed(h4.alarms_p1)}). The stamp "{stamp}" may be carried.'
+        )
+        if not holds_at_lead_1:
+            text += " H4 does not hold at lead 1, so the lead-1 headline is not supported."
+    else:
+        text = (
+            f'H4 does not hold at lead 2 ({stamp}). Failing: {h4.failing()}. The stamp "{stamp}" is dropped from the '
+            "video, and the strict number is shown."
+        )
+        text += (
+            " H4 holds at lead 1: lead 2 contradicts it." if holds_at_lead_1 else " H4 does not hold at lead 1 either."
+        )
+    return HypothesisVerdict(
+        id="H4-lead2",
+        primary=False,
+        statement=f"At the demo station, working daytime, lead 2 (strict: {stamp}): P3 has fewer missed danger hours "
+        "than P0 (ban only) and fewer false-alarm hours than P1 (WBGT >= 32 on raw IFS). The stamp may be carried "
+        "only when this holds.",
+        outcome="supported" if h4.holds else "negative",
+        comparisons=h4.comparisons(),
+        text=text,
+    )
+
+
 def warnings_scoreboard(
     rows: pl.DataFrame,
     *,
@@ -522,6 +626,8 @@ def warnings_scoreboard(
     leads: tuple[int, ...] = (1, 2, 3, 5, 7),
 ) -> PolicyScoreboard:
     """The Warnings row (pre-registration 7.2) from a scoring frame; leads without rows are listed as not available.
+
+    The verdicts are H4 and H5 at lead 1 and, where lead 2 has rows, ``H4-lead2`` (section 13's lead-2 clause).
 
     Raises:
         ValueError: The frame lacks a column, or has no lead-1 row (the headline lead).
@@ -536,6 +642,7 @@ def warnings_scoreboard(
     results: list[LeadResult] = []
     sensitivity: list[SensitivityCell] = []
     verdicts: list[HypothesisVerdict] = []
+    lead2: _H4 | None = None
     n_days = 0
     for lead in leads:
         h = _hours(rows, lead, context, ruleset)
@@ -565,6 +672,8 @@ def warnings_scoreboard(
                 report_only=report_only,
             )
         )
+        if lead == STRICT_LEAD:
+            lead2 = _h4(h, danger, warned)
         if lead == HEADLINE_LEAD:
             n_days = int(h.daily(h.ok.astype(np.float64)).astype(bool).sum())
             verdicts = _verdicts(h, danger, warned, lead_rows)
@@ -587,6 +696,8 @@ def warnings_scoreboard(
                 )
     if not verdicts:
         raise ValueError("the scoring frame has no lead-1 hour: the headline lead cannot be scored")
+    if lead2 is not None:
+        verdicts.append(_lead2_verdict(lead2, holds_at_lead_1=verdicts[0].outcome == "supported"))
     return PolicyScoreboard(
         evaluation_set=context.evaluation_set,
         evaluation_label=context.evaluation_label,
@@ -1041,7 +1152,9 @@ def plans_scoreboard(
         return _paired_total(h, getattr(acc[a], field), getattr(acc[b], field), n=n_scored, anchor=anchor)
 
     def interval(metric: Metric) -> str:
-        return "no interval" if metric.ci is None else f"95% interval [{metric.ci.lo:+.0f}, {metric.ci.hi:+.0f}]"
+        if metric.ci is None:
+            return "no interval"
+        return f"95% interval of the difference [{metric.ci.lo:+.0f}, {metric.ci.hi:+.0f}]"
 
     h6, h7 = (
         difference("rule_corrected", "ban_only", "violation_minutes"),
@@ -1057,11 +1170,13 @@ def plans_scoreboard(
             outcome="supported" if h6_ok else "negative",
             comparisons=[_pair("violation_minutes_per_season", "rule_corrected", "ban_only", h6)],
             text=(
-                f"H6 supported: the rule plan on the corrected forecast has {h6.value:+.0f} rule-violation minutes per "
-                f"worker-season against ban only ({interval(h6)}). SIMULATED crew, real weather."
+                f"H6 supported: the rule plan on the corrected forecast has "
+                f"{fewer_or_more(h6.value, 'rule-violation minutes')} per worker-season than ban only "
+                f"({interval(h6)}). SIMULATED crew, real weather."
                 if h6_ok
-                else f"H6 not supported ({h6.value:+.0f} rule-violation minutes per worker-season against ban only, "
-                f"{interval(h6)}). The zone engine and validator do the work; the forecast adds the honest range."
+                else f"H6 not supported ({fewer_or_more(h6.value, 'rule-violation minutes')} per worker-season "
+                f"against ban only, {interval(h6)}). The zone engine and validator do the work; the forecast adds the "
+                "honest range."
             ),
         ),
         HypothesisVerdict(
@@ -1072,11 +1187,11 @@ def plans_scoreboard(
             outcome="supported" if h7_ok else "negative",
             comparisons=[_pair("missed_protection_ticks", "rule_corrected", "rule_raw", h7)],
             text=(
-                f"H7 supported (secondary): {h7.value:+.0f} missed-protection ticks against the raw-IFS rule plan "
-                f"({interval(h7)})."
+                f"H7 supported (secondary): {fewer_or_more(h7.value, 'missed-protection ticks')} than the raw-IFS rule "
+                f"plan ({interval(h7)})."
                 if h7_ok
-                else f"H7 not supported (secondary): {h7.value:+.0f} missed-protection ticks against the raw-IFS rule "
-                f"plan, {interval(h7)}; a tie is the expected outcome."
+                else f"H7 not supported (secondary): {fewer_or_more(h7.value, 'missed-protection ticks')} against the "
+                f"raw-IFS rule plan, {interval(h7)}; a tie is the expected outcome."
             ),
         ),
     ]

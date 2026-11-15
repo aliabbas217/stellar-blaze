@@ -15,6 +15,11 @@ the ``SB_*`` environment, which includes ``SB_DATABASE_URL``, though this comman
 The warning thresholds of the freeze addendum (pre-registration 6.5; 2024-2025 out-of-fold samples only)::
 
     sb-jobs freeze theta [--oof PATH] [--ruleset ID] [--out PATH]
+    sb-jobs freeze theta --unweighted [--oof PATH] [--ruleset ID]
+
+``theta.json`` records the ruleset id and SHA-256 and the hour weighting (the 7.2 ban weights, which 6.5 does not
+mention); ``--unweighted`` prints the two thetas with every hour weighing 1.0 and writes nothing, so the addendum can
+show both readings.
 
 The scoreboards on development data, and the roster-frontier static export::
 
@@ -211,12 +216,22 @@ def freeze_theta_command(
     out: Annotated[
         Path | None, typer.Option("--out", help="theta.json (default: artifacts/eval/dev/theta.json at the repo root).")
     ] = None,
+    unweighted: Annotated[
+        bool,
+        typer.Option(
+            "--unweighted",
+            help="Print the two thetas with every hour weighing 1.0 (the other reading of 6.5) and write NOTHING.",
+        ),
+    ] = False,
 ) -> None:
     """Apply pre-registration 6.5 to the out-of-fold samples and write theta_protect, theta_balanced and the grid.
 
     Refuses (exit 2, nothing written) a file with any row of summer 2026, an unknown or draft ruleset, an unreadable
     file, or a set with no truth danger hour. The rule and its one clarification (hours weighted by their non-ban
-    fraction) are in ``stellar_blaze.ml.theta``. Exit codes: 0 written, 1 failed, 2 refused or bad usage.
+    fraction) are in ``stellar_blaze.ml.theta``; ``theta.json`` records them with the ruleset id and SHA-256.
+    ``--unweighted`` computes the same grid with every hour weighing 1.0 and prints only the two thetas: no file is
+    written and the frozen ``theta.json`` is never touched (it refuses ``--out``). Exit codes: 0 written, 1 failed,
+    2 refused or bad usage.
     """
     import hashlib
     from datetime import UTC, datetime
@@ -229,8 +244,12 @@ def freeze_theta_command(
     from stellar_blaze.ml.data import HoldoutViolationError, read_oof_samples
     from stellar_blaze.ml.eval_inputs import frozen_params, load_frozen_ruleset
     from stellar_blaze.ml.exporters import OOF_SAMPLES_FILE, PROTOCOL_PATH, SELECTION_ANCHOR
-    from stellar_blaze.ml.theta import select_theta
+    from stellar_blaze.ml.theta import select_theta, unweighted_thetas
 
+    if unweighted and out is not None:
+        raise typer.BadParameter(
+            "--unweighted prints the two thetas and writes no file: do not pass --out", param_hint="--unweighted"
+        )
     settings = _settings()
     root = repo_root()
     source = oof if oof is not None else root / "artifacts" / "eval" / "dev" / OOF_SAMPLES_FILE
@@ -244,6 +263,14 @@ def freeze_theta_command(
         frame = read_oof_samples(source)
     except (OSError, pl.exceptions.PolarsError) as exc:
         raise typer.BadParameter(f"{source}: {exc}", param_hint="--oof") from None
+    if unweighted:
+        try:
+            protect, balanced = unweighted_thetas(frame, loaded.ruleset, frozen_params(loaded))
+        except (HoldoutViolationError, ValueError) as exc:
+            typer.echo(f"freeze theta refused: {exc}", err=True)
+            raise typer.Exit(2) from None
+        typer.echo(json.dumps({"theta_balanced": balanced, "theta_protect": protect}, sort_keys=True))
+        return
     try:
         git_sha = git_head(root)
     except ReplayBuildError as exc:
@@ -260,7 +287,9 @@ def freeze_theta_command(
         generated_at=datetime.now(UTC),
     )
     try:
-        decision = select_theta(frame, loaded.ruleset, frozen_params(loaded), provenance=provenance)
+        decision = select_theta(
+            frame, loaded.ruleset, frozen_params(loaded), provenance=provenance, ruleset_sha256=loaded.sha256
+        )
     except HoldoutViolationError as exc:
         typer.echo(f"freeze theta refused: {exc}", err=True)
         raise typer.Exit(2) from None
@@ -281,6 +310,25 @@ def freeze_theta_command(
             sort_keys=True,
         )
     )
+
+
+def _non_finite_field(node: object, path: str = "") -> str | None:
+    """The path (``hours[0].truth_wbgt_c``) of the first NaN or infinite float in a dumped artifact, or None."""
+    import math
+
+    if isinstance(node, float):
+        return path if not math.isfinite(node) else None
+    if isinstance(node, dict):
+        for key, value in node.items():
+            found = _non_finite_field(value, f"{path}.{key}" if path else str(key))
+            if found is not None:
+                return found
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found = _non_finite_field(value, f"{path}[{index}]")
+            if found is not None:
+                return found
+    return None
 
 
 @scoreboard_app.command("dev")
@@ -392,6 +440,14 @@ def scoreboard_dev_command(
         evaluation_label=DEV_LABEL,
     )
     try:
+        # The demo day is selected on truth alone and first (pre-registration 7.4): before any P3 output is computed.
+        selection = select_demo_day(
+            inputs.truth_frame(),
+            inputs.present_frame(),
+            loaded.ruleset,
+            params,
+            season=(context.season_start, context.season_end),
+        )
         board = warnings_scoreboard(
             inputs.rows,
             theta_protect=frozen_theta.theta_protect,
@@ -399,13 +455,6 @@ def scoreboard_dev_command(
             ruleset=loaded.ruleset,
             params=params,
             context=context,
-        )
-        selection = select_demo_day(
-            inputs.truth_frame(),
-            inputs.present_frame(),
-            loaded.ruleset,
-            params,
-            season=(context.season_start, context.season_end),
         )
         demo = fill_demo_day(
             selection,
@@ -433,11 +482,23 @@ def scoreboard_dev_command(
     except ValueError as exc:
         typer.echo(f"scoreboard dev refused: {exc}", err=True)
         raise typer.Exit(2) from None
-    files = {
-        f"policy_scoreboard.{summer}.json": render_artifact(board),
-        f"plan_scoreboard.{summer}.json": render_artifact(plans),
-        f"demo_day.{summer}.json": render_artifact(demo),
-    }
+    try:
+        files = {
+            f"policy_scoreboard.{summer}.json": render_artifact(board),
+            f"plan_scoreboard.{summer}.json": render_artifact(plans),
+            f"demo_day.{summer}.json": render_artifact(demo),
+        }
+    except ValueError as exc:
+        # One line, no data: the artifact class and the field that is not a finite number (render_artifact names none).
+        where = next(
+            (
+                f"{type(artifact).__name__}.{path}"
+                for artifact in (board, plans, demo)
+                if (path := _non_finite_field(artifact.model_dump())) is not None
+            ),
+            "an artifact",
+        )
+        _fail(f"scoreboard dev refused: {type(exc).__name__}: {where} is not a finite number (nothing written)")
     directory.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
         (directory / name).write_bytes(content)
@@ -476,7 +537,12 @@ def export_roster_frontier_command(
     the source has one (``--run-date`` otherwise; null if neither). Refuses (exit 2, nothing written) a source that is
     not JSON or whose guard fails: "nothing recommended at 45 min commute, floor 21:30" (no fold changes the legal
     default there).
+
+    ``data`` is verbatim research output: it contains keys such as ``B0_common_practice_non_compliant`` that describe
+    the legality of the pre-existing practice roster; do not render keys as product copy. The provenance records the
+    source path relative to the repository root (the file name only when the source is outside it).
     """
+    from stellar_blaze.jobs.replay_build import repo_root
     from stellar_blaze.jobs.roster_export import RosterExportError, render_roster_frontier
 
     try:
@@ -484,7 +550,7 @@ def export_roster_frontier_command(
     except OSError as exc:
         raise typer.BadParameter(f"{src}: {exc}", param_hint="--src") from None
     try:
-        content = render_roster_frontier(data, source=src.as_posix(), run_date=run_date)
+        content = render_roster_frontier(data, source=repo_relative(src, repo_root()), run_date=run_date)
     except RosterExportError as exc:
         typer.echo(f"export roster-frontier refused: {exc}", err=True)
         raise typer.Exit(2) from None

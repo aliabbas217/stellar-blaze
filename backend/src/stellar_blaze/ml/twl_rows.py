@@ -132,7 +132,11 @@ def truth_raw_twl(frame: pl.DataFrame) -> F64:
 
 
 def frozen_withdrawal(ruleset: Ruleset) -> WithdrawalLimits:
-    """The ruleset's withdrawal limits whatever its ``enabled`` switch says (the sensitivity cell "withdrawal on")."""
+    """The ruleset's withdrawal limits whatever its ``enabled`` switch says (the sensitivity cell "withdrawal on").
+
+    Callers pass no natural wet bulb, so the cap is the dry-bulb leg only (> 44 C): no natural wet-bulb source exists,
+    so the second leg of the ADR 0006 rule is not applied.
+    """
     section = ruleset.twl_withdrawal
     return WithdrawalLimits(
         dry_bulb_c=section.dry_bulb_c, natural_wet_bulb_c=section.natural_wet_bulb_c, cap_w_m2=section.cap_w_m2

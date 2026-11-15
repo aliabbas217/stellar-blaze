@@ -4,8 +4,10 @@
 does not prove that nothing else unlocks 2026: the guarantee also rests on a short list of call sites. This test makes
 that list explicit and fails when it grows without someone deciding it should:
 
-* ``open_gate`` and ``load_test_pairs`` are referenced only by ``ml/protocol_gate.py``, ``ml/data.py`` and
-  ``jobs/evaluate_2026.py`` (the gated evaluation job, Task 15);
+* ``open_gate``, ``load_test_pairs`` and ``read_corrected_series`` (the reader of the 2026 corrected series, which needs
+  a Warnings or Plans token) are referenced only by ``ml/protocol_gate.py``, ``ml/data.py`` and
+  ``jobs/evaluate_2026.py`` (the gated evaluation job, Task 15); ``read_corrected_series`` is reachable only through
+  the job, which holds the gate token;
 * ``evaluate_folds`` and ``evaluate_with_predictor`` (public fold engines of ``ml/evaluate.py`` that, unlike
   ``evaluate_dev``, do not refuse a frame with 2026 rows) are referenced only by ``ml/evaluate.py`` itself and
   ``ml/forecast_test.py`` (which holds a gate token); tests are not scanned here, they are not shipped;
@@ -26,8 +28,10 @@ pytestmark = pytest.mark.unit
 
 SRC = Path(__file__).resolve().parents[3] / "src" / "stellar_blaze"
 
-GATED = frozenset({"open_gate", "load_test_pairs"})
+GATED = frozenset({"open_gate", "load_test_pairs", "read_corrected_series"})
 GATE_USERS = frozenset({"ml/protocol_gate.py", "ml/data.py", "jobs/evaluate_2026.py"})
+SERIES_READER = frozenset({"read_corrected_series"})
+SERIES_READER_USERS = frozenset({"ml/data.py", "jobs/evaluate_2026.py"})
 EVALUATE_2026 = SRC / "jobs" / "evaluate_2026.py"
 
 UNGUARDED_ENGINES = frozenset({"evaluate_folds", "evaluate_with_predictor"})
@@ -107,6 +111,15 @@ def test_the_scan_sees_the_source_tree() -> None:
 def test_only_the_gate_the_loader_and_the_job_reference_the_2026_entry_points() -> None:
     users = {name for name, tree in _python_files().items() if references(tree, GATED)}
     assert users <= GATE_USERS, f"unreviewed references to {sorted(GATED)} in {sorted(users - GATE_USERS)}"
+
+
+def test_the_2026_series_reader_is_reachable_only_through_the_job() -> None:
+    users = {name for name, tree in _python_files().items() if references(tree, SERIES_READER)}
+    assert users >= SERIES_READER_USERS, "the scan must find the reader in its own module and in the job"
+    assert users <= SERIES_READER_USERS, (
+        f"unreviewed references to read_corrected_series in {sorted(users - SERIES_READER_USERS)}: it reads the 2026 "
+        "series"
+    )
 
 
 def test_only_evaluate_and_the_gated_forecast_row_reference_the_unguarded_fold_engines() -> None:
@@ -252,6 +265,10 @@ def test_the_subprocess_git_check_can_fail(source: str, expected: bool) -> None:
         "from stellar_blaze.ml.protocol_gate import open_gate as unlock",
         "gate = protocol_gate.open_gate",
         "fn = getattr(data, 'load_test_pairs')",
+        "series = read_corrected_series(path, manifest, token=t)",
+        "from stellar_blaze.ml.data import read_corrected_series as read",
+        "reader = data.read_corrected_series",
+        "fn = getattr(data, 'read_corrected_series')",
     ],
 )
 def test_the_reference_scan_can_fail(source: str) -> None:

@@ -7,6 +7,10 @@ no number is rounded, reordered or recomputed. The provenance names the script (
 source path and its SHA-256, and the run date. The source records no run date today, so the date is the caller's
 ``run_date`` or null: it is never taken from a clock or a file time (that would make the export differ on every run).
 
+``data`` is verbatim research output: it contains keys such as ``B0_common_practice_non_compliant`` that describe the
+legality of the pre-existing practice roster; do not render keys as product copy. (There is no typed shape for this
+file: the frontend imports it as static JSON, so this sentence and the command's help are where the warning lives.)
+
 One guard is asserted before anything is written: "nothing recommended at 45 min commute, floor 21:30" (the frontier
 chart must not suggest a roster change where the 2024-2026 data support none): the file's bedtime floor is 21:30 and
 in the 45-minute row every fold keeps the legal default and the avoided shares are all zero.

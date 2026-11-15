@@ -14,6 +14,11 @@ Both builders return a ``ScoringInputs`` whose ``rows`` follow the scoring frame
   order (valid time, then lead) and the seed are part of the definition (the Warnings and Plans parts make the same
   call and so see the same samples).
 
+``n_high`` counts the finite samples in the High OR Red zone (amendment 1 section 2.3), so P3 warns on Red samples too.
+
+The draws are one realization per stratum (50 samples, a fixed seed), so a probability from the scoreboard and the live
+product's for the same hour can differ by up to about 0.07 at p = 0.5 (the standard error of a share of 50 samples).
+
 The truth is the observed T, Td and wind with the lead-0 radiation and pressure (assumption A2); a row without a fully
 observed truth has a NaN truth TWL and is never scored, never imputed.
 """

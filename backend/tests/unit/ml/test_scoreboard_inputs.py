@@ -5,6 +5,7 @@ behind the gate); what is pinned here is the wiring: one sampler call for every 
 scorer reads, the missing-grid rows that are never scored, and the reader's token and hash checks.
 """
 
+import dataclasses
 import hashlib
 import json
 from datetime import UTC, date, datetime, time
@@ -113,6 +114,19 @@ def test_the_2026_frame_is_one_sampler_call_over_the_scored_rows_in_series_order
     assert inputs.rows["truth_wbgt_c"].to_list() == [32.5] * inputs.rows.height
     assert inputs.reject_available
     assert "wbgt_obs_reject" in inputs.truth_frame().columns
+
+
+def test_n_high_counts_the_red_samples_too() -> None:
+    # With the Red edge raised to 110 W/m2 the HIGH state (effective about 100) is Red: every sample is Red, none is
+    # High, and amendment 1 section 2.3 reads "High" as "High or Red", so n_high is still 50 of 50.
+    frame = series()
+    raised = dataclasses.replace(default_params(), red_twl_w_m2=110.0)
+
+    inputs = inputs_2026(frame, radiation(frame), SpyCorrector(), released_ruleset(), raised)
+
+    daytime = inputs.rows.filter(pl.col("valid_time").dt.hour() <= 14)
+    assert daytime["n_finite"].to_list() == [50.0] * daytime.height
+    assert daytime["n_high"].to_list() == [50.0] * daytime.height
 
 
 def test_a_row_without_a_grid_has_no_samples_and_is_not_present() -> None:

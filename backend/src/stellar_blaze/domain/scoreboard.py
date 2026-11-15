@@ -32,9 +32,11 @@ class ProvenanceLabel(StrEnum):
 class Provenance(BaseModel):
     """Where an exported number came from: protocol section, script and function, commit, data hash, model, label.
 
-    This is a local stand-in with exactly the fields of B2 Task 13's ``domain/provenance.py``; it is replaced by an
-    import from there when that task is merged. The class and field names stay identical so the OpenAPI component
-    names do not change.
+    B2's ``domain/provenance.py`` has a ``Provenance`` with the same fields. The two JSON schemas differ by the
+    ``pattern`` on ``data_sha256`` (B2's ``Sha256`` type has one; this model keeps a plain string) and by field
+    descriptions, so this model stays: replacing it would change a component of the frozen OpenAPI document that F2
+    types from. ``ml.artifact_io.write_artifact`` converts it to B2's class (``wire_provenance``), which validates the
+    SHA-256, so every file carries B2's block. The class and field names are identical.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -69,7 +71,10 @@ class Metric(ArtifactModel):
     """One number with its uncertainty, sample size and protocol anchor."""
 
     value: float = Field(description="Point estimate, in the unit the field name or description states.")
-    ci: Interval | None = Field(description="95% bootstrap interval; null where none is defined (a total, a constant).")
+    ci: Interval | None = Field(
+        description="95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which "
+        "more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days)."
+    )
     n: int = Field(description="Number of observations behind the value (days, hours or ticks, as the field says).")
     anchor: str = Field(description="Heading slug of the pre-registration section that defines this metric.")
 
@@ -105,10 +110,20 @@ class PairedComparison(ArtifactModel):
 class HypothesisVerdict(ArtifactModel):
     """The pre-registered verdict on one hypothesis. Negative results are shown as they are (section 13)."""
 
-    id: str = Field(description="Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans).")
+    id: str = Field(
+        description="Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans); `H4-lead2` is H4 "
+        "computed on the lead-2 rows (section 13: the stamp `issued by 18:00 GST the evening before` may be carried "
+        "only when it is `supported`). A scoreboard without a lead-2 row has no `H4-lead2` entry."
+    )
     primary: bool = Field(description="True for the one primary hypothesis of the row.")
     statement: str = Field(description="The hypothesis as pre-registered, in words.")
-    outcome: Outcome = Field(description="`supported` when every interval excludes zero in the stated direction.")
+    outcome: Outcome = Field(
+        description="`supported` when the pre-registered rule holds, else `negative`. H4, H4-lead2 and H6: the paired "
+        "interval of every named difference lies wholly below zero. H5: the paired interval of the missed-hours "
+        "difference lies wholly below zero AND the false-alarm hours of P3 are at most 1.25 times those of P2 "
+        "(a point-estimate rule: the pre-registration gives the +25% no interval). H7: the paired interval of "
+        "missed-protection ticks lies wholly below zero."
+    )
     comparisons: list[PairedComparison] = Field(description="The paired differences the verdict is computed from.")
     text: str = Field(
         description="The sentence the scoreboard shows, per section 13 (names the failing side on a negative)."
@@ -124,7 +139,11 @@ class PolicyRow(ArtifactModel):
     policy: PolicyId = Field(description="P0 ban only, P1 raw WBGT >= 32, P2 ADOSH zones on raw, P3 Stellar Blaze.")
     label: str = Field(description="Display name of the policy.")
     rule: str = Field(description="One-line definition of when the policy warns an hour.")
-    theta: float | None = Field(description="Warning threshold on P(High) for the P3 rows; null for P0, P1 and P2.")
+    theta: float | None = Field(
+        description="Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws "
+        "are one realization per stratum (50 samples, fixed seed), so a probability here and the live product's for "
+        "the same hour can differ by up to about 0.07 at p = 0.5."
+    )
     missed_danger_hours: Metric = Field(
         description="Truth-High (or Red) worked hours not warned, weighted by non-ban fraction."
     )
@@ -160,10 +179,17 @@ class LeadResult(ArtifactModel):
 
 
 class SensitivityCell(ArtifactModel):
-    """One cell of the always-reported 2 x 2 truth sensitivity: margin {0, 7} x withdrawal limits {off, on}."""
+    """One cell of the always-reported 2 x 2 truth sensitivity: margin {0, 7} x withdrawal limits {off, on}.
+
+    The withdrawal ``on`` cell is dry-bulb leg only (> 44 C): no natural wet-bulb source exists, so the second leg of
+    the ADR 0006 rule is not applied.
+    """
 
     margin_w_m2: float = Field(description="TWL margin subtracted from the truth TWL, in W/m2 (0 or 7).")
-    withdrawal_limits: bool = Field(description="Whether the withdrawal-limit cap was applied to the truth TWL.")
+    withdrawal_limits: bool = Field(
+        description="Whether the withdrawal-limit cap was applied to the truth TWL: dry-bulb leg only (> 44 C); no "
+        "natural wet-bulb source exists, so the second leg of the ADR 0006 rule is not applied."
+    )
     headline: bool = Field(description="True for the frozen setting (margin 7, withdrawal off): the headline numbers.")
     lead_days: int = Field(description="Lead the cell is scored at (the headline lead, 1).")
     truth_danger_hours: Metric = Field(description="Weighted truth danger hours under this truth definition.")
@@ -186,7 +212,7 @@ class PolicyScoreboard(ArtifactModel):
     season_start: dt.date = Field(description="First local date of the scored season (15 May 2026).")
     season_end: dt.date = Field(description="Last local date of the scored season (30 Sep 2026).")
     working_hours_utc: str = Field(description="Scored working hours, for example `06:00-14:59 UTC (10:00-18:59 GST)`.")
-    n_days: int = Field(description="Days in the scored season with all inputs present.")
+    n_days: int = Field(description="Days in the scored season with at least one scored hour at the headline lead.")
     ruleset_id: str = Field(description="Frozen ruleset id the zones come from.")
     ruleset_sha256: str = Field(description="SHA-256 of that ruleset, as recorded in the freeze addendum.")
     theta_protect: float = Field(
@@ -196,16 +222,23 @@ class PolicyScoreboard(ArtifactModel):
         description="Frozen warning threshold of the balanced P3 policy (maximum Peirce score)."
     )
     margin_w_m2: float = Field(description="Frozen TWL margin in W/m2 (7).")
-    withdrawal_limits: bool = Field(description="Frozen withdrawal-limit switch (off).")
+    withdrawal_limits: bool = Field(
+        description="Frozen withdrawal-limit switch (off); when on, the cap is the dry-bulb leg only (> 44 C)."
+    )
     assumed_crew_size: int = Field(description="Crew size used for worker-hours: 20, ASSUMED, never a measured crew.")
     assumed_crew_label: str = Field(
         description="The words shown next to every worker-hour number, for example `assumed crew of 20`."
     )
     leads: list[LeadResult] = Field(description="One entry per lead 1, 2, 3, 5, 7, in that order.")
     sensitivity: list[SensitivityCell] = Field(
-        description="The four cells of the 2 x 2 truth sensitivity, headline cell included."
+        description="The four cells of the 2 x 2 truth sensitivity, headline cell included. The withdrawal `on` cells "
+        "are dry-bulb leg only (> 44 C); no natural wet-bulb source exists, so the second leg of the ADR 0006 rule is "
+        "not applied."
     )
-    verdicts: list[HypothesisVerdict] = Field(description="H4 (primary) and H5 (secondary) at the headline lead.")
+    verdicts: list[HypothesisVerdict] = Field(
+        description="H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2, which decides "
+        "the `evening before` stamp) where lead 2 has rows."
+    )
     provenance: Provenance = Field(description="Where the numbers in this file came from.")
 
 
@@ -226,7 +259,8 @@ class PlanRow(ArtifactModel):
         description="Share of truth-High-or-Red on-shift heavy ticks whose plan zone is High or worse, 0 to 1."
     )
     missed_protection_ticks: Metric = Field(
-        description="Worked ticks whose plan zone is milder than the truth zone (5-minute ticks)."
+        description="Truth High or Red ticks scheduled at a lighter cycle: worked (WORK) 5-minute ticks of a truth "
+        "High-or-Red tick whose plan zone is milder than the truth zone (pre-registration 7.3, counter 3)."
     )
     rest_minutes_added_vs_naive: Metric = Field(
         description="Rest minutes the plan adds compared with naive, per worker-season (SIMULATED)."
@@ -289,7 +323,9 @@ class DemoDayHour(ArtifactModel):
         description="Corrected WBGT range (5th, 50th, 95th percentile) in degrees Celsius; null when no finite sample."
     )
     p_high: float | None = Field(
-        description="P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample."
+        description="P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws "
+        "are one realization per stratum (50 samples, fixed seed), so this probability and the live product's for the "
+        "same hour can differ by up to about 0.07 at p = 0.5."
     )
     protective_twl_w_m2: float | None = Field(
         description="10th percentile of the corrected effective TWL in W/m2 (the plan quantile)."
@@ -363,5 +399,19 @@ class ThetaDecision(ArtifactModel):
         description="Weighted share of truth hours in Red, 0 to 1 (information only, ADR 0046)."
     )
     n_hours: int = Field(description="Hours in the 2024-2025 selection set.")
+    ruleset_id: str | None = Field(
+        default=None,
+        description="Id of the ruleset whose zone edges, margin and ban window the thresholds were computed with; null "
+        "in a file written before this field existed.",
+    )
+    ruleset_sha256: str | None = Field(
+        default=None,
+        description="SHA-256 of the bytes of that ruleset file; null in a file written before this field existed.",
+    )
+    hour_weighting: str | None = Field(
+        default=None,
+        description="How hours were weighted: the 7.2 ban weights (a clarification; section 6.5 does not mention "
+        "them); null in a file written before this field existed.",
+    )
     rule: Literal["preregistration §6.5"] = Field(description="The rule that produced the thresholds.")
     provenance: Provenance = Field(description="Where the numbers in this file came from.")

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Final
 
+import numpy as np
 import pytest
 from typer.testing import CliRunner, Result
 
@@ -67,11 +68,38 @@ def test_the_guard_refuses_a_frontier_that_recommends_a_change_at_45_minutes() -
         render_roster_frontier(b"not json", source="s.json")
 
 
+def test_a_source_outside_the_repository_is_recorded_by_file_name_only(tmp_path: Path) -> None:
+    copy = tmp_path / "private" / "dir" / "frontier_copy.json"
+    copy.parent.mkdir(parents=True)
+    copy.write_bytes(source_bytes())
+    out = tmp_path / "export.json"
+
+    result = CliRunner().invoke(app, ["export", "roster-frontier", "--src", str(copy), "--out", str(out)])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(out.read_bytes())["provenance"]["source"] == "frontier_copy.json"
+    assert "private" not in out.read_text(encoding="utf-8")  # no directory of the source leaks into the export
+
+
+def test_the_export_says_that_its_keys_are_not_product_copy() -> None:
+    from stellar_blaze.jobs import ml_cli, roster_export
+
+    for text in (roster_export.__doc__, ml_cli.export_roster_frontier_command.__doc__):
+        assert text is not None
+        flat = " ".join(text.split())
+        assert "B0_common_practice_non_compliant" in flat
+        assert "do not render keys as product copy" in flat
+    assert CliRunner().invoke(app, ["export", "roster-frontier", "--help"]).exit_code == 0
+
+
 def test_the_export_command_writes_the_file_and_refuses_a_failed_guard(tmp_path: Path) -> None:
     out = tmp_path / "static" / "roster_frontier.json"
     ok = CliRunner().invoke(app, ["export", "roster-frontier", "--src", str(ROSTER_SOURCE), "--out", str(out)])
     assert ok.exit_code == 0, ok.output
-    assert out.read_bytes() == render_roster_frontier(source_bytes(), source=ROSTER_SOURCE.as_posix())
+    # The provenance names the source relative to the repository root, never an absolute local path.
+    relative = "docs/research/scripts/roster/results/roster_frontier.json"
+    assert out.read_bytes() == render_roster_frontier(source_bytes(), source=relative)
+    assert json.loads(out.read_bytes())["provenance"]["source"] == relative
 
     bad = tmp_path / "bad.json"
     document = json.loads(source_bytes())
@@ -169,3 +197,25 @@ def test_scoreboard_dev_refuses_2026_rows_and_other_summers_and_writes_nothing(e
     assert refused.exit_code == 2
     assert other.exit_code == 2
     assert not out.exists()
+
+
+def test_a_non_finite_truth_wbgt_stops_the_command_with_one_line_and_exit_1(
+    environment: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The truth WBGT of the demo day is not finite: render_artifact refuses it. The command says which artifact and
+    # field (no data) in one line, exits 1 and writes nothing.
+    oof, theta = prepare(environment, synthetic_oof())
+    monkeypatch.setattr(
+        "stellar_blaze.ml.scoreboard_inputs._truth_wbgt", lambda frame, _icao: np.full(frame.height, np.nan)
+    )
+    out = environment / "dev"
+
+    result = run("scoreboard", "dev", "--summer", "2025", "--oof", str(oof), "--theta", str(theta), "--out", str(out))
+
+    assert result.exit_code == 1
+    lines = [line for line in result.output.splitlines() if line.strip()]
+    assert len(lines) == 1
+    assert "ValueError" in lines[0]
+    assert "DemoDay.hours[0].truth_wbgt_c" in lines[0]
+    assert "nan" not in lines[0].lower()
+    assert not out.exists()  # nothing written, not even the directory

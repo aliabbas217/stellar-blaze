@@ -5,6 +5,7 @@ Every expectation below is worked out by hand in the comments (counts of hours a
 
 import dataclasses
 import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final, Literal
@@ -42,7 +43,7 @@ def decide(hours: list[Hour], params: Any = None) -> ThetaDecision:
     return theta.select_theta(oof_frame(hours), released_ruleset(), params or default_params(), provenance=PROVENANCE)
 
 
-def rows(counts: list[int], truth: Literal["high", "low", "none"], start: int) -> list[Hour]:
+def rows(counts: list[int], truth: Literal["high", "red", "low", "none"], start: int) -> list[Hour]:
     return [Hour(off_season(start + i), k, truth) for i, k in enumerate(counts)]
 
 
@@ -66,6 +67,18 @@ def test_the_states_are_what_the_fixture_says() -> None:
     assert set(zone_of(effective[1], edges).tolist()) == {int(Zone.LOW)}
     truth = raw_twl(frame, "obs_t_c", "obs_td_c", "obs_wind_ms", "ref_sw_wm2", "ref_direct_wm2", "ref_pressure_hpa")
     assert zone_of(truth - params.twl_margin_w_m2, edges).tolist() == [int(Zone.HIGH), int(Zone.LOW)]
+
+
+def test_the_red_state_is_red_and_nan_samples_have_no_zone() -> None:
+    params, ruleset = default_params(), released_ruleset()
+    edges = ZoneEdges.from_ruleset(ruleset, params)
+    frame = oof_frame([Hour(off_season(0), 0, "red", k_red=50), Hour(off_season(1), 10, "low", k_nan=5)])
+    samples = np.asarray(frame["samples"].to_numpy(), dtype=np.float64)
+    effective = forward_effective(frame, samples, ruleset=ruleset, params=params)
+    assert set(zone_of(effective[0], edges).tolist()) == {int(Zone.RED)}
+    assert zone_of(effective[1], edges).tolist() == [int(Zone.HIGH)] * 10 + [int(Zone.LOW)] * 35 + [-1] * 5
+    truth = raw_twl(frame, "obs_t_c", "obs_td_c", "obs_wind_ms", "ref_sw_wm2", "ref_direct_wm2", "ref_pressure_hpa")
+    assert zone_of(truth - params.twl_margin_w_m2, edges).tolist() == [int(Zone.RED), int(Zone.LOW)]
 
 
 def test_theta_rule_on_synthetic() -> None:
@@ -116,6 +129,53 @@ def test_a_share_equal_to_theta_warns() -> None:
     assert pod[0.30] == 1.0
     assert pod[0.35] == 0.0
     assert decision.theta_protect == 0.30
+
+
+def test_red_samples_count_towards_p_high() -> None:
+    # Ten truth-High hours, each with 10 HIGH and 10 RED samples of 50: P(High or Red) = 20 / 50 = .40 every hour, so
+    # each warns at theta <= .40 and not at .45: POD is 1.0 up to .40 and 0 above, theta_protect = .40. A forecast side
+    # that counted High samples only would see 10 / 50 = .20 and give .20.
+    hours = [Hour(off_season(i), 10, "high", k_red=10) for i in range(10)] + rows([0] * 5, "low", 10)
+
+    decision = decide(hours)
+
+    by_theta = {point.theta: point for point in decision.grid}
+    assert by_theta[0.40].pod == 1.0
+    assert by_theta[0.45].pod == 0.0
+    assert decision.theta_protect == 0.40
+    assert decision.theta_balanced == 0.05  # PSS is 1.0 on the whole stretch up to .40: the tie goes to the smaller
+
+
+def test_a_truth_red_hour_is_a_danger_hour() -> None:
+    # Eight truth-High hours with P .60 (30 of 50 High samples) and two truth-RED hours nobody warns (P 0), five calm
+    # hours: truth danger is 10, POD at theta <= .60 is 8 / 10 = .8 < .90 and no theta reaches .90, so theta_protect
+    # is the floor .05. If Red were not a danger hour the two would be calm and POD 8 / 8 would give .60. The two
+    # hours are 2 of the 15 weighted hours in Red.
+    hours = rows([30] * 8, "high", 0) + rows([0] * 2, "red", 8) + rows([0] * 5, "low", 10)
+
+    decision = decide(hours)
+
+    assert {p.theta: p.pod for p in decision.grid}[0.60] == pytest.approx(0.8)
+    assert decision.theta_protect == 0.05
+    assert decision.red_hour_share == pytest.approx(2 / 15)
+
+
+def test_p_high_is_the_share_of_the_finite_samples() -> None:
+    # 12 of 50 samples High and 10 NaN: 40 finite, so P = 12 / 40 = .30 (a tie warns at .30); over 50 it would be .24
+    # and warn only up to .20. A row whose 50 samples are all NaN has no finite sample: not scored, not imputed.
+    hours = [
+        Hour(off_season(0), 12, "high", k_nan=10),
+        Hour(off_season(1), 0, "low"),
+        Hour(off_season(2), 20, "high", k_nan=50),
+    ]
+
+    decision = decide(hours)
+
+    by_theta = {point.theta: point for point in decision.grid}
+    assert by_theta[0.30].pod == 1.0
+    assert by_theta[0.35].pod == 0.0
+    assert decision.theta_protect == 0.30
+    assert decision.n_hours == 2
 
 
 @pytest.mark.parametrize(
@@ -215,6 +275,74 @@ def test_output_has_provenance(environment: Path) -> None:
     assert decision.provenance.protocol_anchor == "#6-selection-rules-on-2024-2025-loco-out-of-fold-only"
     assert out.read_bytes().endswith(b"\n")
     assert b"\r" not in out.read_bytes()
+
+
+def test_the_file_records_the_ruleset_and_the_hour_weighting(environment: Path) -> None:
+    oof = environment / "oof.parquet"
+    write_oof(oof, crossing())
+    out = environment / "theta.json"
+
+    assert run_command(oof, out).exit_code == 0
+
+    decision = ThetaDecision.model_validate_json(out.read_bytes())
+    assert decision.ruleset_id == "ae-heat-2026.1"
+    assert decision.ruleset_sha256 == hashlib.sha256((RULESETS_DIR / "ae-heat-2026.1.toml").read_bytes()).hexdigest()
+    assert decision.hour_weighting is not None
+    assert "section 7.2 ban weights" in decision.hour_weighting
+    assert "not in section 6.5" in decision.hour_weighting
+
+
+def test_a_file_without_the_new_fields_still_loads() -> None:
+    # theta.json written before ruleset_id, ruleset_sha256 and hour_weighting existed (the three are optional).
+    decision = decide(crossing())
+    document = decision.model_dump(mode="json", exclude={"ruleset_id", "ruleset_sha256", "hour_weighting"})
+    loaded = ThetaDecision.model_validate(document)
+    assert (loaded.ruleset_id, loaded.ruleset_sha256, loaded.hour_weighting) == (None, None, None)
+
+
+def unweighted_hours() -> list[Hour]:
+    """Four hits at 10 UTC off season and one miss at 09 UTC in July (ban weight 0), three calm hours."""
+    hours = [Hour(off_season(i), 50, "high") for i in range(4)]
+    hours.append(Hour(utc(2025, 7, 1, 9), 0, "high"))
+    hours += [Hour(off_season(20 + i), 0, "low") for i in range(3)]
+    return hours
+
+
+def test_unweighted_prints_the_two_thetas_and_writes_nothing(
+    environment: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Weighted: the 09 UTC miss weighs 0, POD 4 / 4 = 1.0, theta_protect .95. Unweighted (every hour weight 1.0): POD
+    # 4 / 5 = .8 < .90 at every theta, so theta_protect is the floor .05 and PSS .8 at theta <= .95 gives balanced .05.
+    oof = environment / "oof.parquet"
+    write_oof(oof, unweighted_hours())
+    root = environment / "repo"
+    sentinel = root / "artifacts" / "eval" / "dev" / "theta.json"
+    sentinel.parent.mkdir(parents=True)
+    sentinel.write_bytes(b"frozen\n")
+
+    weighted = CliRunner().invoke(app, ["freeze", "theta", "--oof", str(oof), "--out", str(environment / "w.json")])
+    monkeypatch.setattr("stellar_blaze.jobs.replay_build.repo_root", lambda: root)  # the default --out lives here
+    result = CliRunner().invoke(app, ["freeze", "theta", "--oof", str(oof), "--unweighted"])
+
+    assert weighted.exit_code == 0, weighted.output
+    assert ThetaDecision.model_validate_json((environment / "w.json").read_bytes()).theta_protect == 0.95
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == {"theta_balanced": 0.05, "theta_protect": 0.05}
+    assert sentinel.read_bytes() == b"frozen\n"  # the frozen file is never touched
+    assert sorted(p.name for p in sentinel.parent.iterdir()) == ["theta.json"]
+
+
+def test_unweighted_refuses_an_output_path(environment: Path) -> None:
+    oof = environment / "oof.parquet"
+    write_oof(oof, unweighted_hours())
+    out = environment / "theta.json"
+    out.write_bytes(b"frozen\n")
+
+    result = CliRunner().invoke(app, ["freeze", "theta", "--oof", str(oof), "--unweighted", "--out", str(out)])
+
+    assert result.exit_code == 2
+    assert "--unweighted" in result.output
+    assert out.read_bytes() == b"frozen\n"
 
 
 def test_the_command_refuses_2026_rows_and_writes_nothing(environment: Path) -> None:

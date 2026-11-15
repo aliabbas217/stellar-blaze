@@ -618,6 +618,9 @@ def run_warnings(settings: Settings, token: GateToken, root: Path, *, amendment:
     context = _board_context(token, frozen, datetime.now(UTC))
     theta = frozen.theta
     ruleset, params = frozen.loaded.ruleset, frozen.params
+    # Pre-registration 7.4: the day is selected on truth alone (``truth_frame`` and ``present_frame`` hold no forecast
+    # value) and BEFORE any P3 output is computed, so the code reads like the rule.
+    selection = select_demo_day(inputs.truth_frame(), inputs.present_frame(), ruleset, params, season=SEASON_2026)
     board = warnings_scoreboard(
         inputs.rows,
         theta_protect=theta.theta_protect,
@@ -626,7 +629,6 @@ def run_warnings(settings: Settings, token: GateToken, root: Path, *, amendment:
         params=params,
         context=context,
     )
-    selection = select_demo_day(inputs.truth_frame(), inputs.present_frame(), ruleset, params, season=SEASON_2026)
     demo = fill_demo_day(
         selection,
         inputs.rows,

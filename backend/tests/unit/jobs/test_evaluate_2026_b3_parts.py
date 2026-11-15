@@ -7,6 +7,7 @@ world (``tests/fixtures/forecast/gated.py``) and ``jobs/evaluate_2026.py``'s own
 
 import hashlib
 import shutil
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,7 +19,7 @@ from stellar_blaze.config import Settings
 from stellar_blaze.domain.scoreboard import Provenance, ProvenanceLabel, ThetaDecision, ThetaGridPoint
 from stellar_blaze.jobs import evaluate_2026
 from stellar_blaze.ml.artifact_io import write_artifact
-from stellar_blaze.ml.protocol_gate import GateRefusedError, Part
+from stellar_blaze.ml.protocol_gate import GateRefusedError, GateToken, Part
 from tests.fixtures.forecast.gated import GatedWorld, released
 from tests.unit.jobs import test_evaluate_2026_cli as base
 from tests.unit.rules.support import RULESETS_DIR
@@ -75,6 +76,48 @@ def test_parts_refuse_second_run(env: base.Env, part: str) -> None:
 
 def test_the_parts_are_registered_in_order() -> None:
     assert list(evaluate_2026.PART_RUNNERS) == [Part.FORECAST, Part.WARNINGS, Part.PLANS]
+
+
+def test_the_warnings_part_selects_the_demo_day_before_it_scores_the_board(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pre-registration 7.4: the day is chosen on truth alone BEFORE any P3 output is read. Every collaborator is a
+    # recording stub, so only the order of the calls is under test.
+    calls: list[str] = []
+
+    def stub(name: str, result: object = None) -> Callable[..., object]:
+        def call(*_args: object, **_kwargs: object) -> object:
+            calls.append(name)
+            return result
+
+        return call
+
+    frozen = SimpleNamespace(
+        theta=SimpleNamespace(theta_protect=0.1, theta_balanced=0.2), loaded=SimpleNamespace(ruleset="r"), params="p"
+    )
+    inputs = SimpleNamespace(
+        rows="rows",
+        truth_frame=stub("truth_frame", "truth"),
+        present_frame=stub("present_frame", "present"),
+        wbgt=stub("wbgt", "wbgt"),
+    )
+    stubs: dict[str, object] = {
+        "_plan": None,
+        "frozen_inputs": frozen,
+        "_scoring_inputs": inputs,
+        "_board_context": "context",
+        "select_demo_day": SimpleNamespace(date="day"),
+        "warnings_scoreboard": "board",
+        "fill_demo_day": "demo",
+        "render_artifact": b"{}",
+        "_write_part": {},
+    }
+    for name, result in stubs.items():
+        monkeypatch.setattr(evaluate_2026, name, stub(name, result))
+    token, settings = cast(GateToken, SimpleNamespace(part=Part.WARNINGS)), cast(Settings, SimpleNamespace())
+
+    evaluate_2026.run_warnings(settings, token, Path(), amendment=None)
+
+    assert calls.index("select_demo_day") < calls.index("warnings_scoreboard")
+    assert calls.index("select_demo_day") < calls.index("fill_demo_day")
 
 
 # === the freeze inputs ==============================================================================================

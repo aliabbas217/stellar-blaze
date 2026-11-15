@@ -12,7 +12,9 @@ Input: B2's out-of-fold joint samples of the held-out abu_dhabi fold (``oof_samp
   every hour by its non-ban fraction (``hour_ban_weight``, the worked-hour weighting of 7.2), because a warning is only
   worth anything on a worked hour and the 2026 Warnings row counts hours that way. In the ban season the hours 09 and
   10 UTC then weigh 0 and 08 UTC weighs 0.5. This is stated in the freeze addendum; it is the one reading of 6.5 the
-  freeze has to fix.
+  freeze has to fix. ``theta.json`` records it (``hour_weighting``), and ``sb-jobs freeze theta --unweighted``
+  prints the two thetas under the other reading (every hour weight 1.0) so the addendum can show both; it writes
+  nothing.
 * The grid is theta in {0.05, 0.10, ..., 0.95}; a policy warns an hour when ``P(High) >= theta``.
 * theta_protect is the LARGEST theta whose weighted POD is at least 0.90 (0.05 when none is). theta_balanced is the
   theta with the largest Peirce skill score POD - POFD; ties (equal to 12 decimals) go to the smaller theta.
@@ -41,7 +43,16 @@ from stellar_blaze.ml.data import DEV_SUMMERS, TEST_SUMMER, HoldoutViolationErro
 from stellar_blaze.ml.selection import EXPORT_CLUSTER, WORKING_HOURS_UTC
 from stellar_blaze.ml.twl_rows import SITE_TIMEZONE, forward_effective, truth_raw_twl
 
-__all__ = ["POD_TARGET", "THETA_FLOOR", "THETA_GRID", "oof_hours", "select_theta", "theta_grid"]
+__all__ = [
+    "HOUR_WEIGHTING_BAN",
+    "POD_TARGET",
+    "THETA_FLOOR",
+    "THETA_GRID",
+    "oof_hours",
+    "select_theta",
+    "theta_grid",
+    "unweighted_thetas",
+]
 
 THETA_GRID: Final[tuple[float, ...]] = tuple(round(0.05 * k, 2) for k in range(1, 20))
 """The pre-registered grid 0.05, 0.10, ..., 0.95 (each value is the double nearest to its decimal)."""
@@ -50,12 +61,15 @@ POD_TARGET: Final = 0.90
 THETA_FLOOR: Final = 0.05
 """theta_protect when no theta reaches the target POD (the report says so)."""
 
+HOUR_WEIGHTING_BAN: Final = "hours carry the section 7.2 ban weights; not in section 6.5"
 _RULE: Final = "preregistration §6.5"
 _TIE_DECIMALS: Final = 12
 
 
-def oof_hours(oof: pl.DataFrame, ruleset: Ruleset, params: EffectiveParams) -> pl.DataFrame:
+def oof_hours(oof: pl.DataFrame, ruleset: Ruleset, params: EffectiveParams, *, weighted: bool = True) -> pl.DataFrame:
     """The scored hours of the OOF export: ``p_high``, ``truth_high``, ``truth_red`` and the ban ``weight`` per hour.
+
+    ``weighted=False`` gives every hour weight 1.0 (the sensitivity reading of ``freeze theta --unweighted``).
 
     Rows are the abu_dhabi cluster at lead 1, UTC hours 06-14 of 2024 and 2025 (the export already holds only those; the
     filter makes the rule independent of what a caller passes). Columns of the result: ``station``, ``valid_time``,
@@ -98,6 +112,8 @@ def oof_hours(oof: pl.DataFrame, ruleset: Ruleset, params: EffectiveParams) -> p
     if labour is None:
         raise ValueError(f"ruleset {ruleset.meta.id} has no labour section: the ban weights cannot be computed")
     weight = np.array([hour_ban_weight(t.astimezone(UTC), tz, labour) for t in frame["valid_time"].to_list()])
+    if not weighted:
+        weight = np.ones(frame.height)
 
     scored = np.isfinite(p_high) & (truth_zone >= 0)
     if not scored.any():
@@ -150,8 +166,23 @@ def _choose(grid: list[ThetaGridPoint]) -> tuple[float, float]:
     return protect, balanced
 
 
+def unweighted_thetas(oof: pl.DataFrame, ruleset: Ruleset, params: EffectiveParams) -> tuple[float, float]:
+    """``(theta_protect, theta_balanced)`` with every hour weighing 1.0: the sensitivity reading, never written.
+
+    Raises:
+        HoldoutViolationError: The OOF holds a 2026 row.
+        ValueError: As ``oof_hours`` and ``theta_grid``.
+    """
+    return _choose(theta_grid(oof_hours(oof, ruleset, params, weighted=False)))
+
+
 def select_theta(
-    oof: pl.DataFrame, ruleset: Ruleset, params: EffectiveParams, *, provenance: Provenance
+    oof: pl.DataFrame,
+    ruleset: Ruleset,
+    params: EffectiveParams,
+    *,
+    provenance: Provenance,
+    ruleset_sha256: str | None = None,
 ) -> ThetaDecision:
     """Apply pre-registration 6.5 to the OOF export (the module docstring has the rule and its one clarification).
 
@@ -160,6 +191,7 @@ def select_theta(
         ruleset: The frozen ruleset (zone edges, labour ban window, withdrawal switch).
         params: Its effective tunables (the margin 7 and the Red edge 85 of the freeze); ``warning_theta`` is not used.
         provenance: The block the result carries (the caller knows the commit and the data hash).
+        ruleset_sha256: SHA-256 of the bytes of the ruleset file the zones came from, recorded in the result.
 
     Raises:
         HoldoutViolationError: The OOF holds a 2026 row.
@@ -176,6 +208,9 @@ def select_theta(
         grid=grid,
         red_hour_share=red,
         n_hours=int((w > 0).sum()),
+        ruleset_id=ruleset.meta.id,
+        ruleset_sha256=ruleset_sha256,
+        hour_weighting=HOUR_WEIGHTING_BAN,
         rule=_RULE,
         provenance=provenance,
     )
