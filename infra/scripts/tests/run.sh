@@ -80,6 +80,10 @@ assert_err_has() {
   case "$err" in *"$1"*) ;; *) fail "stderr does not contain: $1" ;; esac
 }
 
+assert_err_lacks() {
+  case "$err" in *"$1"*) fail "stderr unexpectedly contains: $1" ;; *) ;; esac
+}
+
 # ---- preflight ----------------------------------------------------------------------------------
 
 test_preflight_passes_on_happy_stub() {
@@ -218,7 +222,10 @@ test_bicep_build_falls_back_to_az() {
     printf 'skip %s (bicep found on the restricted PATH)\n' "${FUNCNAME[0]}"
     return 0
   fi
-  PATH="$restricted" lib_run "bicep_build main.bicep"
+  # env -u BICEP_BIN: a BICEP_BIN exported in the caller's environment would be inherited by the child and win over the az
+  # fallback this test is about (lib_run is the same program as below, with the variable removed)
+  # shellcheck disable=SC2016  # the single-quoted program is meant to expand in the child bash
+  PATH="$restricted" run_cmd env -u BICEP_BIN bash -euo pipefail -c '. "$1"; shift; eval "$1"' _ "$scripts_dir/lib.sh" "bicep_build main.bicep"
   assert_rc 0
   assert_out_has "az-bicep-build"
   assert_out_has "bicep build --file main.bicep --stdout"
@@ -321,7 +328,7 @@ test_check_template_passes_on_the_repo_template() {
   run_cmd bash "$scripts_dir/check-template.sh" "$repo_bicep_dir/main.bicep"
   assert_rc 0
   local id
-  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 B1 B2 B3 B4 B5; do
+  for id in C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 B1 B2 B3 B4 B5; do
     assert_out_has "PASS $id "
   done
   assert_out_lacks "FAIL"
@@ -435,6 +442,24 @@ test_check_template_c12_fails_when_the_log_cap_is_off_or_too_big() {
 test_check_template_c12_fails_when_the_retention_changes() {
   bicep_ready || return 0
   expect_c_fail c12-retention C12 modules/monitoring.bicep 's/^param retentionInDays int = 30/param retentionInDays int = 90/' "retentionInDays is 90"
+}
+
+test_check_template_c13_fails_when_the_read_timeout_is_below_the_safety_timeout() {
+  bicep_ready || return 0
+  expect_c_fail c13-order C13 main.bicep "s/^param webUpstreamReadTimeoutMs int = 45000/param webUpstreamReadTimeoutMs int = 5000/" \
+    "the read timeout (5000) must be greater than the safety timeout (10000)"
+}
+
+test_check_template_c13_fails_when_a_timeout_variable_is_missing() {
+  bicep_ready || return 0
+  expect_c_fail c13-missing C13 main.bicep "/{ name: 'UPSTREAM_READ_TIMEOUT_MS', value: string(webUpstreamReadTimeoutMs) }/d" \
+    "full/web: UPSTREAM_READ_TIMEOUT_MS is missing"
+}
+
+test_check_template_c13_fails_when_the_variable_is_on_the_api() {
+  bicep_ready || return 0
+  expect_c_fail c13-api C13 main.bicep "s/^var apiEnv = concat(coreEnv, runtimeEnv, /var apiEnv = concat(coreEnv, runtimeEnv, [{ name: 'UPSTREAM_TIMEOUT_MS', value: '10000' }], /" \
+    "full/api: has UPSTREAM_TIMEOUT_MS"
 }
 
 test_check_template_b5_fails_when_the_budget_default_changes() {
@@ -644,7 +669,7 @@ test_check_workflow_passes_on_the_repo_workflow() {
   run_cmd bash "$scripts_dir/check-workflow.sh"
   assert_rc 0
   local id
-  for id in W1 W2 W3 W4 W5 W6 W7; do
+  for id in W1 W2 W3 W4 W5 W6 W7 W8 W9; do
     assert_out_has "PASS $id "
   done
   assert_out_lacks "FAIL"
@@ -756,6 +781,36 @@ test_check_workflow_w8_fails_without_the_zero_replica_gate() {
 # shellcheck disable=SC2016  # the sed expression carries literal $VARIABLE text for the workflow
 test_check_workflow_w8_fails_when_the_smoke_test_is_not_told_the_api_min() {
   expect_w_fail w8-smoke W8 's/--api-min "$API_MIN_REPLICAS"/--api-min 0/' "deploy lacks smoke.sh --api-min"
+}
+
+# shellcheck disable=SC2016  # the sed expressions carry literal $VARIABLE text for the workflow
+test_check_workflow_w8_fails_when_the_zero_replica_flag_is_not_conditional_on_api_min_zero() {
+  # the flag is added in every mode: min 1 would then excuse a missing api replica
+  expect_w_fail w8-always W8 's/if \[ "$API_MIN_REPLICAS" = 0 \]; then flags+=(--allow-zero-replicas); fi/flags+=(--allow-zero-replicas)/' \
+    'deploy lacks the conditional if [ "$API_MIN_REPLICAS" = 0 ]'
+}
+
+# shellcheck disable=SC2016  # the sed expressions carry literal $VARIABLE text for the workflow
+test_check_workflow_w8_fails_when_the_conditional_tests_another_value() {
+  # `= 99` never fires: the flag is still in the file, so a plain grep for it passed
+  expect_w_fail w8-value W8 's/if \[ "$API_MIN_REPLICAS" = 0 \]; then flags/if [ "$API_MIN_REPLICAS" = 99 ]; then flags/' \
+    'deploy lacks the conditional if [ "$API_MIN_REPLICAS" = 0 ]'
+}
+
+# shellcheck disable=SC2016  # the sed expressions carry literal $VARIABLE text for the workflow
+test_check_workflow_w8_fails_when_the_flag_sits_outside_the_conditional() {
+  expect_w_fail w8-outside W8 's/if \[ "$API_MIN_REPLICAS" = 0 \]; then flags+=(--allow-zero-replicas); fi/if [ "$API_MIN_REPLICAS" = 0 ]; then :; fi\n          flags+=(--allow-zero-replicas)/' \
+    'deploy lacks the api gate flag --allow-zero-replicas inside if [ "$API_MIN_REPLICAS" = 0 ]'
+}
+
+test_check_workflow_w9_fails_without_always_on_the_final_reset() {
+  # without always() the final reset is skipped after a failed smoke test, which is exactly when a stop is left behind
+  expect_w_fail w9-always W9 's/if: always() && steps.smoke.outcome != .skipped. && needs.build-api/if: steps.smoke.outcome != '"'skipped'"' \&\& needs.build-api/' \
+    "lacks always()"
+}
+
+test_check_workflow_w9_fails_without_an_if_on_the_final_reset() {
+  expect_w_fail w9-noif W9 '/^        if: always() && steps.smoke.outcome != .skipped. && needs.build-api/d' "has no 'if:'"
 }
 
 # ---- check-db-tls.sh --deployed / --image -------------------------------------------------------
@@ -1153,11 +1208,20 @@ migrate_workdir() {
   fi
 }
 
-# run_migrate_script: the real script under `sh` (dash on Ubuntu CI), in $migrate_dir, with SB_GIT_SHA set unless the test says not.
+# The shell the migrate tests run the script under: dash when there is one (Ubuntu CI's /bin/sh, and the busybox ash of the
+# image is the same dialect), else `sh`. In Git Bash `sh` IS bash, so without dash a local run proves nothing about dash.
+if command -v dash >/dev/null 2>&1; then
+  migrate_shell='dash'
+else
+  migrate_shell='sh'
+fi
+printf 'note: the migrate.sh tests run under %s (%s)\n' "$migrate_shell" "$(command -v "$migrate_shell")"
+
+# run_migrate_script: the real script under $migrate_shell, in $migrate_dir, with SB_GIT_SHA set unless the test says not.
 # shellcheck disable=SC2016  # the single-quoted program is meant to expand in the child bash
 run_migrate_script() {
   [ -n "$migrate_dir" ] || migrate_workdir
-  SB_GIT_SHA="${SB_GIT_SHA-abc1234}" run_cmd bash -c 'cd "$1" && exec sh "$2"' _ "$migrate_dir" "$migrate_script"
+  SB_GIT_SHA="${SB_GIT_SHA-abc1234}" run_cmd bash -c 'cd "$1" && exec "$3" "$2"' _ "$migrate_dir" "$migrate_script" "$migrate_shell"
 }
 
 sbjobs_log() { cat "$STUB_STATE_DIR/sbjobs.log" 2>/dev/null || true; }
@@ -1292,7 +1356,8 @@ test_migrate_script_fails_when_propose_prints_no_version() {
 test_migrate_script_needs_the_release_sha() {
   migrate_workdir
   SB_GIT_SHA="" run_migrate_script
-  assert_rc 1
+  # a failed ${VAR:?} expansion exits 2 under dash and 1 under bash: any non-zero status is the refusal
+  [ "$rc" -ne 0 ] || fail "migrate.sh ran without a release sha"
   assert_err_has "SB_GIT_SHA is not set"
   [ -z "$(sbjobs_log)" ] || fail "sb-jobs ran without a release sha: $(sbjobs_log | tr '\n' '|')"
 }
@@ -2034,14 +2099,107 @@ test_restart_apps_skips_the_api_when_it_has_no_replica() {
   assert_out_has "Apps restarted."
 }
 
-test_restart_apps_does_not_excuse_an_api_that_had_a_replica_and_has_none_afterwards() {
-  # the api had a replica, so it is restarted and gated normally: zero replicas after that is a failure, not "scaled to zero"
+test_restart_apps_gates_a_min_zero_api_with_allow_zero_even_when_it_had_a_replica() {
+  # cheap mode: the api had a replica when the restart was issued, and scaled down again (300 s cooldown) before the gate read it.
+  # That is normal for minReplicas 0, not a failure. A replica that IS present would still have to meet every rule.
   STUB_REPLICAS_API=0 run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
+  assert_out_has "PASS healthcheck api"
+  assert_out_has "scaled to zero"
+  assert_out_has "Apps restarted."
+}
+
+test_restart_apps_still_holds_a_present_replica_of_a_min_zero_api_to_every_rule() {
+  # allow-zero excuses an ABSENT replica only: an api with a replica that is not healthy still fails
+  STUB_HEALTH_API="Unhealthy" run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_out_has "FAIL healthcheck api"
+}
+
+test_restart_apps_does_not_excuse_a_min_one_api_that_has_no_replica_afterwards() {
+  # minReplicas 1: the api always has a replica, so zero after the restart is a failure, never "scaled to zero"
+  STUB_MIN_REPLICAS_API=1 STUB_REPLICAS_API=0 run_restart rg-test --timeout 0
   assert_rc 1
   assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
   assert_out_has "FAIL healthcheck api"
   assert_out_has "has '0' replicas"
   assert_out_lacks "scaled to zero"
+}
+
+test_restart_apps_restarts_a_min_one_api_even_when_it_lists_no_replica() {
+  # minReplicas 1 and an empty list is a fault, not scale-to-zero: the api is restarted and gated strictly
+  STUB_MIN_REPLICAS_API=1 STUB_REPLICAS_ZERO_API=1 run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
+  assert_err_lacks "skipped"
+  assert_out_lacks "scaled to zero"
+}
+
+test_restart_apps_tolerates_a_restart_that_fails_because_a_min_zero_api_replica_is_gone() {
+  # the replica was listed, then scaled down before the restart reached it: `restart` fails, the list is now empty
+  STUB_RESTART_FAIL_API=1 STUB_REPLICA_LIST_EMPTY_AFTER_API=1 run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_err_has "api: the restart failed and the api has no replica now"
+  assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
+  assert_out_has "restarted:             alerts web"
+  assert_out_has "skipped:               api (scaled to zero"
+  assert_out_has "PASS healthcheck api"
+  assert_out_has "Apps restarted."
+}
+
+test_restart_apps_still_issues_every_restart_before_the_api_failure_is_looked_at() {
+  # the check of a failed api restart comes AFTER every restart is issued, so it cannot delay alerts or web
+  STUB_RESTART_FAIL_API=1 STUB_REPLICA_LIST_EMPTY_AFTER_API=1 run_restart rg-test --timeout 0
+  assert_rc 0
+  local order
+  order="$(az_log | grep '^containerapp revision restart ' | awk '{print $5}' | tr '\n' ' ')"
+  [ "$order" = "api alerts web " ] || fail "restart order is '$order', expected 'api alerts web '"
+}
+
+test_restart_apps_fails_when_a_min_zero_api_restart_fails_and_the_replica_is_still_there() {
+  # a restart that fails for any other reason is a real failure, even in cheap mode
+  STUB_RESTART_FAIL_API=1 run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "api: the restart failed and the api still has a replica"
+}
+
+test_restart_apps_fails_when_a_min_one_api_restart_fails() {
+  STUB_MIN_REPLICAS_API=1 STUB_RESTART_FAIL_API=1 STUB_REPLICA_LIST_EMPTY_AFTER_API=1 run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "api: the restart failed"
+  assert_out_lacks "Apps restarted."
+}
+
+test_restart_apps_fails_when_the_web_restart_fails() {
+  STUB_RESTART_FAIL_WEB=1 run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "web: the restart failed"
+  assert_out_lacks "Apps restarted."
+}
+
+test_restart_apps_dies_when_the_replica_list_of_a_min_one_api_fails() {
+  # an az error is not "no replica": skipping the restart would leave a rotated secret out of the api
+  STUB_MIN_REPLICAS_API=1 STUB_REPLICA_LIST_FAIL_API=1 run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "api: cannot list its replicas"
+  assert_az_count "revision restart" 0
+}
+
+test_restart_apps_restarts_a_min_zero_api_whose_replica_list_fails() {
+  # state unknown: try the restart (tolerated if the replica is gone) and gate with allow-zero
+  STUB_REPLICA_LIST_FAIL_API=1 run_restart rg-test --timeout 0
+  assert_rc 0
+  assert_err_has "api: cannot list its replicas"
+  assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
+  assert_out_has "PASS healthcheck api"
+}
+
+test_restart_apps_dies_when_the_min_replicas_of_the_api_is_unreadable() {
+  STUB_MIN_REPLICAS_API=None run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "cannot read the minReplicas of the api"
+  assert_az_count "revision restart" 0
 }
 
 test_restart_apps_rejects_bad_usage() {
@@ -2406,6 +2564,9 @@ tests=(
   test_check_template_c12_fails_when_a_container_is_bigger_than_costed
   test_check_template_c12_fails_when_the_log_cap_is_off_or_too_big
   test_check_template_c12_fails_when_the_retention_changes
+  test_check_template_c13_fails_when_the_read_timeout_is_below_the_safety_timeout
+  test_check_template_c13_fails_when_a_timeout_variable_is_missing
+  test_check_template_c13_fails_when_the_variable_is_on_the_api
   test_check_template_b1_fails_when_the_budget_does_not_start_on_the_first
   test_check_template_b1_fails_when_budget_month_is_ignored
   test_check_template_b2_fails_when_the_subject_loses_its_case
@@ -2443,6 +2604,11 @@ tests=(
   test_check_workflow_w8_fails_without_the_api_min_replicas_variable
   test_check_workflow_w8_fails_without_the_zero_replica_gate
   test_check_workflow_w8_fails_when_the_smoke_test_is_not_told_the_api_min
+  test_check_workflow_w8_fails_when_the_zero_replica_flag_is_not_conditional_on_api_min_zero
+  test_check_workflow_w8_fails_when_the_conditional_tests_another_value
+  test_check_workflow_w8_fails_when_the_flag_sits_outside_the_conditional
+  test_check_workflow_w9_fails_without_always_on_the_final_reset
+  test_check_workflow_w9_fails_without_an_if_on_the_final_reset
   test_check_db_tls_deployed_passes_when_everything_verifies
   test_check_db_tls_deployed_fails_when_the_secret_lacks_verify_full
   test_check_db_tls_deployed_names_the_one_weak_container
@@ -2555,7 +2721,18 @@ tests=(
   test_restart_apps_restarts_nothing_when_an_app_has_no_latest_revision
   test_restart_apps_touches_nothing_else
   test_restart_apps_skips_the_api_when_it_has_no_replica
-  test_restart_apps_does_not_excuse_an_api_that_had_a_replica_and_has_none_afterwards
+  test_restart_apps_gates_a_min_zero_api_with_allow_zero_even_when_it_had_a_replica
+  test_restart_apps_still_holds_a_present_replica_of_a_min_zero_api_to_every_rule
+  test_restart_apps_does_not_excuse_a_min_one_api_that_has_no_replica_afterwards
+  test_restart_apps_restarts_a_min_one_api_even_when_it_lists_no_replica
+  test_restart_apps_tolerates_a_restart_that_fails_because_a_min_zero_api_replica_is_gone
+  test_restart_apps_still_issues_every_restart_before_the_api_failure_is_looked_at
+  test_restart_apps_fails_when_a_min_zero_api_restart_fails_and_the_replica_is_still_there
+  test_restart_apps_fails_when_a_min_one_api_restart_fails
+  test_restart_apps_fails_when_the_web_restart_fails
+  test_restart_apps_dies_when_the_replica_list_of_a_min_one_api_fails
+  test_restart_apps_restarts_a_min_zero_api_whose_replica_list_fails
+  test_restart_apps_dies_when_the_min_replicas_of_the_api_is_unreadable
   test_restart_apps_rejects_bad_usage
   test_reset_demo_prints_the_epochs_of_a_successful_reset
   test_reset_demo_sends_no_authorization_header_and_posts_to_the_one_route

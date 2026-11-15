@@ -9,6 +9,8 @@
 #   C11     every module parameter that carries a secret value is a securestring or secureObject (ARM redacts only those from
 #           the deployment history)
 #   C12     cheap mode: container sizes and the Log Analytics daily cap and retention are the ones the cost estimate rests on
+#   C13     web only: UPSTREAM_TIMEOUT_MS (safety routes, 10000) is shorter than UPSTREAM_READ_TIMEOUT_MS (45000, covers an api cold
+#           start), which is below the 240 s ingress request timeout
 #   B1-B5   bootstrap.bicep (next to main.bicep): budget start date, federated credential subject, role assignments, registry,
 #           the budget amount
 # The template directory is COPIED to a temporary directory first (`bicep snapshot` writes a file next to the

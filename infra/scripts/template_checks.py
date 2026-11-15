@@ -1038,6 +1038,53 @@ def check_c12(ws: Workspace) -> list[str]:
     return problems
 
 
+SAFETY_TIMEOUT_MS = "10000"
+READ_TIMEOUT_MS = "45000"
+INGRESS_TIMEOUT_MS = 240000  # the Container Apps ingress request timeout
+
+
+def check_c13(ws: Workspace) -> list[str]:
+    """The web proxy's two upstream timeouts: short for the safety routes, long enough for a cold api for the rest."""
+    problems = []
+    found = apps(ws.snapshot("full"))
+    web = found.get("web")
+    if web is None:
+        return ["full: web is missing"]
+    env = env_of(web)
+    values: dict[str, int] = {}
+    for var, want in (
+        ("UPSTREAM_TIMEOUT_MS", SAFETY_TIMEOUT_MS),
+        ("UPSTREAM_READ_TIMEOUT_MS", READ_TIMEOUT_MS),
+    ):
+        got = env.get(var, {}).get("value")
+        if got is None:
+            problems.append(f"full/web: {var} is missing")
+        else:
+            if got != want:
+                problems.append(f"full/web: {var} is {got!r}, expected {want!r}")
+            if str(got).isdigit():
+                values[var] = int(got)
+    safety = values.get("UPSTREAM_TIMEOUT_MS")
+    read = values.get("UPSTREAM_READ_TIMEOUT_MS")
+    if (
+        safety is not None
+        and read is not None
+        and not safety < read < INGRESS_TIMEOUT_MS
+    ):
+        problems.append(
+            f"full/web: the read timeout ({read}) must be greater than the safety timeout ({safety}) and below {INGRESS_TIMEOUT_MS}"
+        )
+    for name in ("api", "alerts"):
+        other = found.get(name)
+        if other is None:
+            problems.append(f"full: {name} is missing")
+            continue
+        for var in ("UPSTREAM_TIMEOUT_MS", "UPSTREAM_READ_TIMEOUT_MS"):
+            if var in env_of(other):
+                problems.append(f"full/{name}: has {var}, a web-only setting")
+    return problems
+
+
 # ---- bootstrap.bicep (B checks: the subscription-scope template the operator runs once) -------------------------------
 
 ACR_PULL = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
@@ -1231,6 +1278,10 @@ STATIC_CHECKS: dict[str, tuple[str, Check]] = {
     "C12": (
         "cheap mode: container sizes as costed, Log Analytics capped at 0.15 GB a day with 30 days retention",
         check_c12,
+    ),
+    "C13": (
+        "web upstream timeouts: UPSTREAM_TIMEOUT_MS 10000 (safety) < UPSTREAM_READ_TIMEOUT_MS 45000 < 240000, web only",
+        check_c13,
     ),
     "B1": (
         "bootstrap: budget startDate is <yyyy-MM>-01T00:00:00Z, by default and with BUDGET_MONTH",

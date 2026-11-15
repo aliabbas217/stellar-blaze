@@ -194,6 +194,10 @@ services:
       DEMO_EMPLOYER_TOKEN: ${DEMO_EMPLOYER_TOKEN:?run infra/local/rehearse.sh, it generates DEMO_EMPLOYER_TOKEN}
       # One proxy in front, as in Container Apps: the per-client rate limit keys on the rightmost X-Forwarded-For entry.
       TRUSTED_PROXY_HOPS: "1"
+      # The same values the deploy sets (infra/bicep/main.bicep): the safety routes (Stop, unwell actions) wait 10 s; every other
+      # route waits 45 s, which covers the cold start of a scale-to-zero api (measured about 29 s).
+      UPSTREAM_TIMEOUT_MS: "10000"
+      UPSTREAM_READ_TIMEOUT_MS: "45000"
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
     healthcheck:
       test:

@@ -58,6 +58,8 @@ fi
 #                           STUB_REPLICA_LIST_EMPTY_AFTER=N (`replica list` names a replica for its first N calls, then none: the
 #                             app scales down while a script waits; unset = the replica stays) STUB_UPDATE_FAIL=1
 #                           STUB_REPLICAS_STATIC=1 (a restart never replaces the replicas)
+#                           STUB_RESTART_FAIL=1 (`revision restart` fails and restarts nothing)
+#                           STUB_REPLICA_LIST_FAIL=1 (`replica list` fails: an az error, not an empty list)
 # Scenarios dedicated, api_external, max3 and other_region are shortcuts for the smoke tests.
 # shellcheck disable=SC2034  # read through the indirect expansion in knob
 case "$scenario" in
@@ -149,7 +151,10 @@ serve_deploy_call() {
           esac
           local min_r="$REPLY"
           knob MAX_REPLICAS 1
-          printf '%s\n%s\n' "$min_r" "$REPLY"
+          case "$query" in
+            *maxReplicas*) printf '%s\n%s\n' "$min_r" "$REPLY" ;;
+            *) printf '%s\n' "$min_r" ;; # a query for minReplicas alone gets the one value
+          esac
           ;;
         *ingress.external*)
           case "$app_name" in
@@ -204,10 +209,20 @@ serve_deploy_call() {
       ;;
     "containerapp revision restart "*)
       need_state
+      knob RESTART_FAIL 0
+      if [ "$REPLY" = "1" ]; then
+        echo "ERROR: stub restart failure: the replica of $app_name is gone" >&2
+        exit 1
+      fi
       : >"$state_dir/restarted-$app_name"
       ;;
     "containerapp replica list "*)
       need_state
+      knob REPLICA_LIST_FAIL 0
+      if [ "$REPLY" = "1" ]; then
+        echo "ERROR: stub replica list failure for $app_name" >&2
+        exit 1
+      fi
       knob REPLICAS_ZERO 0
       local zero="$REPLY" empty_after="" empty_var="STUB_REPLICA_LIST_EMPTY_AFTER_${app_upper}" listed=0
       empty_after="${!empty_var:-${STUB_REPLICA_LIST_EMPTY_AFTER:-}}"

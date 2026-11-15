@@ -10,7 +10,8 @@
 
       H1  GET /api/healthz is 200 with status ok and a version
       H2  GET /api/v1/health/ready through the BFF is 200 with status ok (curl --max-time 180, the only check with that
-          limit: after idle this call wakes a scaled-to-zero api, and a cold start takes minutes)
+          limit: headroom for a slow first call after idle; with -WaitReady the api has been woken by the wait before H2,
+          and a cold start measured about 30 s locally, longer on Azure)
       H3  Stop work: POST /api/v1/crews/crew-b/stops 201, DELETE the stop 204 inside the 10 s undo window, and the
           crew timeline then holds no "crew_level":"red"
       H4  the replay clock: the stop's started_at plus 4 hours is between 10:00 and 17:30 Asia/Dubai
@@ -32,8 +33,9 @@
 .PARAMETER WaitReady
     Before the checks, wait (up to -WaitSeconds) until /api/healthz answers 200, for a freshly deployed web app, and then (up
     to -ApiWaitSeconds, 5 minutes) until GET /api/v1/health/ready answers 200 THROUGH the web. /api/healthz is answered by the
-    web alone; the second wait is the one that wakes a scaled-to-zero api (cool mode: the first request after idle is held
-    until a replica has started, which takes minutes) and prints "waiting for the api to start (cold start)" while it does.
+    web alone; the second wait is the one that wakes a scaled-to-zero api (cool mode: the first request after idle meets a
+    replica that is not running yet; a cold start measured about 30 s locally, longer on Azure) and prints "waiting for the
+    api to start (cold start)" while it does. Today the web proxy answers 502 after 10 s, and the wait polls through that.
 
 .PARAMETER ApiWaitSeconds
     With -WaitReady: how long to wait for the api to answer ready through the web (default 300).
@@ -175,7 +177,7 @@ function Test-H1 {
 }
 
 function Test-H2 {
-    <# The first call through the BFF after idle may wake a scaled-to-zero api (a cold start takes minutes): --max-time 180, for this check only. #>
+    <# --max-time 180, for this check only: headroom for a slow first call through the BFF after idle (a cold start measured about 30 s locally; longer on Azure). #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Base)
     $response = Invoke-Curl -Url "$Base/api/v1/health/ready" -MaxTime 180
@@ -296,7 +298,7 @@ function Wait-DemoApi {
         Polls GET /api/v1/health/ready THROUGH the web until it answers 200 (true), or gives up at the deadline (false).
     .DESCRIPTION
         /api/healthz is answered by the web alone. With the api scaled to zero, the first request through the web wakes it and
-        is held until a replica is ready (minutes). -OnFirstWait is called once, at the first answer that is not 200.
+        meets a replica that is not ready yet (a cold start measured about 30 s locally; longer on Azure). -OnFirstWait is called once, at the first answer that is not 200.
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Base, [int]$TimeoutSeconds = 300, [int]$IntervalSeconds = 5, [scriptblock]$OnFirstWait = $null)
@@ -331,7 +333,7 @@ if ($WaitReady) {
         exit 1
     }
     # Through the web: with the api scaled to zero, this first request wakes it and is held until it is ready.
-    $announceColdStart = { [Console]::Out.WriteLine("NOTE waiting for the api to start (cold start): a scaled-to-zero api can take a few minutes to answer the first request (up to $ApiWaitSeconds s)") }
+    $announceColdStart = { [Console]::Out.WriteLine("NOTE waiting for the api to start (cold start): a cold start measured about 30 s locally; longer on Azure (waiting up to $ApiWaitSeconds s)") }
     if (-not (Wait-DemoApi -Base $base -TimeoutSeconds $ApiWaitSeconds -IntervalSeconds $PollSeconds -OnFirstWait $announceColdStart)) {
         Write-Output "FAIL H0 $base/api/v1/health/ready (through the web) did not answer 200 within $ApiWaitSeconds s: the api did not start"
         Write-Output 'SMOKE FAILED: 1 check(s) failed'

@@ -14,8 +14,11 @@
 #   W5  deploy needs build-api and build-web; build-api, build-web and deploy all run in the GitHub environment `demo`
 #   W6  no `${{ secrets.* }}` inside any `run:` block (a secret reaches a script only through `env:`)
 #   W7  `permissions` is exactly contents: read and id-token: write, nothing broader, at the top and in every job
-#   W8  cheap mode: deploy exports API_MIN_REPLICAS from the repository variable (default 0) and uses it: the api gate may be
-#       --allow-zero-replicas and the smoke test gets --api-min "$API_MIN_REPLICAS"
+#   W8  cheap mode: deploy exports API_MIN_REPLICAS from the repository variable (default 0) and uses it: the api gate gets
+#       --allow-zero-replicas INSIDE the `if [ "$API_MIN_REPLICAS" = 0 ]` conditional (never in min-1 mode) and the smoke test
+#       gets --api-min "$API_MIN_REPLICAS"
+#   W9  the final reset-demo.sh step of deploy has always() in its `if:` (its recovery for a stop a failed smoke test left
+#       behind must run after that failure)
 
 set -euo pipefail
 
@@ -310,16 +313,32 @@ check_w7() {
 
 # ---- W8 ---------------------------------------------------------------------------------------------------------------
 
+# api_gate_conditional: the text of the first `if [ "$API_MIN_REPLICAS" = 0 ]` conditional of the deploy job, from the `if` up to
+# and including its `fi` (nothing when the job has no such conditional).
+api_gate_conditional() {
+  local bounds
+  bounds="$(job_bounds deploy)"
+  [ -n "$bounds" ] || return 0
+  awk -v lo="${bounds% *}" -v hi="${bounds#* }" '
+    NR <= lo || NR > hi { next }
+    !inif && /if \[ "[$]API_MIN_REPLICAS" = 0 \]/ { inif = 1 }
+    inif {
+      print
+      if ($0 ~ /(^|[[:space:];])fi([[:space:];]|$)/) exit
+    }
+  ' "$clean"
+}
+
 check_w8() {
-  local problems=() i
+  local problems=() i conditional
   local -a labels=(
     "the job env entry API_MIN_REPLICAS from vars.API_MIN_REPLICAS with a default"
-    "the api gate flag --allow-zero-replicas"
+    "the api gate passing its flags array to healthcheck.sh --app api"
     "smoke.sh --api-min \"\$API_MIN_REPLICAS\""
   )
   local -a patterns=(
     '^      API_MIN_REPLICAS: [$][{][{] vars[.]API_MIN_REPLICAS [|][|] '
-    '--allow-zero-replicas'
+    'healthcheck[.]sh --app api .*flags[[]@[]]'
     '--api-min "[$]API_MIN_REPLICAS"'
   )
   for i in "${!patterns[@]}"; do
@@ -327,7 +346,60 @@ check_w8() {
       problems+=("deploy lacks ${labels[$i]}")
     fi
   done
-  report W8 "deploy takes API_MIN_REPLICAS (default 0) and passes it to the api gate and the smoke test" ${problems[@]+"${problems[@]}"}
+  # the flag must be inside the conditional on API_MIN_REPLICAS = 0: a flag anywhere else (or a conditional on another value)
+  # would excuse a missing replica in min-1 mode, or never excuse it in cheap mode
+  conditional="$(api_gate_conditional)"
+  if [ -z "$conditional" ]; then
+    problems+=("deploy lacks the conditional if [ \"\$API_MIN_REPLICAS\" = 0 ] that adds the api gate flag")
+  else
+    case "$conditional" in
+      *"flags+=(--allow-zero-replicas)"*) ;;
+      *) problems+=("deploy lacks the api gate flag --allow-zero-replicas inside if [ \"\$API_MIN_REPLICAS\" = 0 ]") ;;
+    esac
+  fi
+  if [ -z "$(first_match deploy '--allow-zero-replicas' 0)" ]; then
+    problems+=("deploy lacks the api gate flag --allow-zero-replicas")
+  fi
+  report W8 "deploy takes API_MIN_REPLICAS (default 0) and passes it to the api gate (--allow-zero-replicas only when it is 0) and the smoke test" ${problems[@]+"${problems[@]}"}
+}
+
+# ---- W9 ---------------------------------------------------------------------------------------------------------------
+
+# step_if <job> <ERE>: the `if:` text (key line plus continuation lines) of the LAST step of the job that has a line matching
+# <ERE>; nothing when no step matches or the step has no `if:`. Steps start at `      - ` (six spaces), their keys sit at eight.
+step_if() {
+  local bounds
+  bounds="$(job_bounds "$1")"
+  [ -n "$bounds" ] || return 0
+  awk -v lo="${bounds% *}" -v hi="${bounds#* }" -v re="$2" '
+    function indent_of(s) { match(s, /^ */); return RLENGTH }
+    function close_step() { if (hit) result = iftext; hit = 0; iftext = ""; grabbing = 0 }
+    NR <= lo || NR > hi { next }
+    /^      - / { close_step() }
+    grabbing {
+      if ($0 ~ /^[[:space:]]*$/) next
+      if (indent_of($0) > 8) { iftext = iftext " " $0; next }
+      grabbing = 0
+    }
+    /^        if:/ { iftext = $0; grabbing = 1 }
+    $0 ~ re { hit = 1 }
+    END { close_step(); if (result != "") print result }
+  ' "$clean"
+}
+
+check_w9() {
+  local problems=() text
+  if [ -z "$(first_match deploy 'reset-demo[.]sh.*--retry-after-once' 0)" ]; then
+    problems+=("deploy has no final reset-demo.sh --retry-after-once step")
+  else
+    text="$(step_if deploy 'reset-demo[.]sh.*--retry-after-once')"
+    case "$text" in
+      "") problems+=("the final reset-demo.sh step has no 'if:': it would not run after a failed step, and the stop a failed smoke test leaves behind would stay") ;;
+      *"always()"*) ;;
+      *) problems+=("the final reset-demo.sh step's 'if:' lacks always(): it would not run after a failed step ($text)") ;;
+    esac
+  fi
+  report W9 "the final reset of the deploy job runs even after a failed step (if: always() && ...)" ${problems[@]+"${problems[@]}"}
 }
 
 check_w1
@@ -338,5 +410,6 @@ check_w5
 check_w6
 check_w7
 check_w8
+check_w9
 
 exit "$failed"

@@ -41,8 +41,10 @@ envVarGroups:
       - key: DB_PASSWORD
         generateValue: true
 
-  # Identical for api and alerts: the two processes keep separate replay clocks, so they get the same anchor and start together
-  # (backend/README.md "Alerts and the demo replay clock"). Restart both after any change (README, replay clock).
+  # Identical for api and alerts: the replay clock is the SB_REPLAY_NOW anchor plus the wall time since the epoch row in
+  # Postgres, so both get the same anchor and restarting either changes nothing. Reset the demo before every judged session
+  # (`bash infra/scripts/reset-demo.sh https://<sb-web>` or `deploy-local.ps1 -Action ResetDemo`; the window is about 7 h 20 min
+  # per epoch; subscribe phones AFTER the reset). See README, replay clock.
   - name: sb-common
     envVars:
       - key: SB_ENV
@@ -226,7 +228,7 @@ services:
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
     healthCheckPath: /api/healthz
-    autoDeployTrigger: "off" # deploy by hand, so the replay clocks of api and alerts are restarted on purpose
+    autoDeployTrigger: "off" # deploy by hand: nothing redeploys by itself (a restart does not touch the replay clock; a demo reset does)
     # API_ORIGIN must be a full origin; Render cannot compose one in YAML, so the scheme and the port are added here.
     # `PORT=8000` is set on sb-api and uvicorn is told 8000. UNVERIFIED: that this host name is reachable on 8000 over http from
     # sb-web. HOSTNAME=0.0.0.0 is set again because Render may replace the image's value with the instance name, and Next's
@@ -246,6 +248,13 @@ services:
       # only make the per-client bucket stricter). infra/scripts/smoke-http.sh check H6 is the proof on the public URL.
       - key: TRUSTED_PROXY_HOPS
         value: "1"
+      # The same values the Azure deploy sets: the safety routes (Stop, unwell actions) wait 10 s, every other route 45 s. On
+      # Render the api never sleeps, so 45 s is only the shared value (on Azure it covers the cold start of a scale-to-zero api,
+      # measured about 29 s in a local rehearsal at 0.5 vCPU, not yet on Azure).
+      - key: UPSTREAM_TIMEOUT_MS
+        value: "10000"
+      - key: UPSTREAM_READ_TIMEOUT_MS
+        value: "45000"
       - key: API_HOST
         fromService:
           type: pserv

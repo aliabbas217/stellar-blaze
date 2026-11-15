@@ -1133,6 +1133,8 @@ Describe 'Deploy' {
         Get-CallCount -Pattern '^curl.exe .*health/ready' | Should -Be 3
         $ready | Should -BeLessThan (Get-CallIndex -Pattern '^curl.exe .*demo-reset')
         $output | Should -Match 'waiting for the api to start \(cold start\)'
+        $output | Should -Match 'cold start measured about 30 s locally; longer on Azure'
+        $output | Should -Not -Match 'few minutes'
         Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly -ParameterFilter { $Fresh }
     }
     It 'says nothing about a cold start when the api answers ready at once' {
@@ -1500,7 +1502,7 @@ Describe 'ResetDemo (a new demo epoch through the web; it restarts nothing)' {
         $posts.Count | Should -Be 1
         $posts[0] | Should -Match '--request POST'
         $posts[0] | Should -Match '--header Content-Length: 0'
-        # the first request after idle wakes a scaled-to-zero api: minutes, not seconds
+        # the first request after idle wakes a scaled-to-zero api (about 30 s locally, longer on Azure)
         $posts[0] | Should -Match '--max-time 180 '
         $posts[0] | Should -Match 'https://web.test.example/api/v1/sites/site-demo-mussafah/demo-reset$'
         $posts[0] | Should -Not -Match 'Authorization'
@@ -1679,10 +1681,44 @@ Describe 'Warm and Cool (the api mode of a running deployment)' {
         $state['epochId'] | Should -BeExactly '2'
         $output | Should -Match 'Demo reset: epoch 2 started'
     }
-    It 'Warm records the mode BEFORE the reset, so a rate-limited reset leaves the warm state and says to run ResetDemo' {
+    It 'Warm retries its demo reset ONCE on a 429 after the Retry-After (the smoke test drained the BFF bucket a minute ago), then records the mode' {
+        $script:Answers = New-Object System.Collections.Generic.Queue[string]
+        $script:Answers.Enqueue((New-CurlResponseText -Status 429 -Body '{"title":"Rate limited"}' -RetryAfter '42'))
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { if ($script:Answers.Count -gt 0) { return $script:Answers.Dequeue() }; return (New-ResetAnswer) } }) + $script:Responses
+        $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm }
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 2
+        Should -Invoke Start-DeployDelay -Times 1 -Exactly -ParameterFilter { $Seconds -eq 42 }
+        $output | Should -Match 'answered 429.*Retry-After 42 s.*trying once more'
+        $state = Read-StateFile
+        $state['apiMode'] | Should -BeExactly 'warm'
+        $state['epochId'] | Should -BeExactly '2'
+    }
+    It 'Warm records the mode only AFTER the reset succeeded: a reset that stays rate limited fails, says the api IS warm but the mode was not recorded, and names the commands' {
         $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 429 -RetryAfter '42') } }) + $script:Responses
-        { Invoke-ApiMode -Config $script:Config -Mode warm } | Should -Throw '*429*ResetDemo*'
-        (Read-StateFile)['apiMode'] | Should -BeExactly 'warm'
+        $thrown = $null
+        try { Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm } | Out-Null } catch { $thrown = $_.Exception.Message }
+        $thrown | Should -Match '429'
+        $thrown | Should -Match 'api IS warm'
+        $thrown | Should -Match 'mode was NOT recorded'
+        $thrown | Should -Match 'Action Warm'
+        $thrown | Should -Match 'Action ResetDemo'
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 2
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+    }
+    It 'Warm does not record the mode when the reset fails any other way (HTTP 500, no answer)' -ForEach @(
+        @{ Kind = 'status' }, @{ Kind = 'noanswer' }
+    ) {
+        if ($Kind -eq 'status') { $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 500) } }) + $script:Responses }
+        else { $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Throw = 'curl.exe (demo-reset) failed (exit code 7). curl: (7) Failed to connect' }) + $script:Responses }
+        { Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm } } | Should -Throw '*mode was NOT recorded*'
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 1
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+    }
+    It 'Warm prints the next command once, at the end, not between the reset and the mode' {
+        $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm }
+        ([regex]::Matches($output, 'Next:')).Count | Should -Be 1
+        $output.IndexOf('The api is warm') | Should -BeGreaterThan $output.IndexOf('Demo reset: epoch')
+        $output.IndexOf('Next:') | Should -BeGreaterThan $output.IndexOf('The api is warm')
     }
     It 'Cool records apiMode=cool and runs NO demo reset' {
         Save-StateFile -Update @{ apiMode = 'warm' }
@@ -1701,6 +1737,8 @@ Describe 'Warm and Cool (the api mode of a running deployment)' {
         $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode cool }
         $output | Should -Match 'scales to zero'
         $output | Should -Match 'first request after idle is slow'
+        $output | Should -Match 'cold start measured about 30 s locally; longer on Azure'
+        $output | Should -Not -Match 'minutes, not seconds'
         $output | Should -Match 'Action Warm'
     }
     It 'reads the expected image from the app when state.json has none' {
@@ -2475,6 +2513,20 @@ Describe 'Template TLS checks T1-T3 (ADR 0042, on the compiled main.bicep)' {
         $read = @([regex]::Matches($text, "readEnvironmentVariable\('(?<n>[A-Z0-9_]+)'") | ForEach-Object { $_.Groups['n'].Value } | Sort-Object -Unique)
         $read | Should -Be (@($script:ParamEnvNames) | Sort-Object -Unique)
     }
+    It 'the web upstream timeouts (check C13) reach the PowerShell path through the Bicep defaults, not through the environment' {
+        # main.bicepparam reads no UPSTREAM_* variable and this script exports none, so a PowerShell deploy gets exactly the values
+        # main.bicep declares: 10000 ms on the safety routes, 45000 ms on every other route, and both go to the web app only.
+        $bicep = Get-Content -LiteralPath (Join-Path -Path $script:RepoDir -ChildPath 'infra\bicep\main.bicep') -Raw
+        $param = Get-Content -LiteralPath (Join-Path -Path $script:RepoDir -ChildPath 'infra\bicep\main.bicepparam') -Raw
+        $bicep | Should -Match 'param webUpstreamTimeoutMs int = 10000\b'
+        $bicep | Should -Match 'param webUpstreamReadTimeoutMs int = 45000\b'
+        $bicep | Should -Match ([regex]::Escape("{ name: 'UPSTREAM_TIMEOUT_MS', value: string(webUpstreamTimeoutMs) }"))
+        $bicep | Should -Match ([regex]::Escape("{ name: 'UPSTREAM_READ_TIMEOUT_MS', value: string(webUpstreamReadTimeoutMs) }"))
+        $param | Should -Not -Match 'webUpstream' -Because 'an override in main.bicepparam would make the PowerShell path differ from the template check C13'
+        foreach ($name in 'UPSTREAM_TIMEOUT_MS', 'UPSTREAM_READ_TIMEOUT_MS') {
+            $script:ParamEnvNames | Should -Not -Contain $name -Because 'the drift guard above would fail: main.bicepparam does not read it'
+        }
+    }
     It 'Write-GuardResult prints one line per result with the reasons below a FAIL, and returns the number of FAILs' {
         $results = @(
             (New-GuardResult -Status PASS -Id 'T1' -Subject 'fine'),
@@ -2928,6 +2980,14 @@ Describe 'Test-DemoHttp.ps1 (functions, curl.exe mocked)' {
         Mock Invoke-Curl { [pscustomobject]@{ Status = 503; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
         Wait-DemoApi -Base 'https://web.example.test' -TimeoutSeconds 0 | Should -BeFalse
     }
+    It 'no script text or help claims a cold start takes minutes (measured about 30 s locally)' {
+        foreach ($name in @('Test-DemoHttp.ps1', 'DeployLocal.lib.ps1')) {
+            $text = Get-Content -LiteralPath (Join-Path -Path $script:ScriptsDir -ChildPath $name) -Raw
+            $text | Should -Not -Match 'minutes, not seconds'
+            $text | Should -Not -Match 'cold start takes minutes'
+            $text | Should -Not -Match 'a few minutes to answer'
+        }
+    }
     It 'Wait-DemoApi announces nothing when the first answer is already 200' {
         Mock Start-Sleep { }
         Mock Invoke-Curl { [pscustomobject]@{ Status = 200; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
@@ -3070,6 +3130,8 @@ while ($listener.IsListening) {
         $stack = Start-MockStack -Scenario 'cold'
         try { $run = Invoke-SmokeScript -Url $stack.Url -Extra @('-WaitReady', '-PollSeconds', '1') } finally { Stop-MockStack -Stack $stack }
         $run.Text | Should -Match 'waiting for the api to start \(cold start\)'
+        $run.Text | Should -Match 'cold start measured about 30 s locally; longer on Azure'
+        $run.Text | Should -Not -Match 'few minutes'
         $run.Text | Should -Match 'PASS H1 '
         $run.Text | Should -Match 'PASS H2 '
         $run.Text | Should -Match 'SMOKE OK'

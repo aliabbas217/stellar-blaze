@@ -1425,8 +1425,9 @@ function Wait-ApiReady {
         Polls GET /api/v1/health/ready THROUGH the web until it answers 200, for up to TimeoutSeconds (5 minutes).
     .DESCRIPTION
         With the api scaled to zero (cool mode) the first request after idle starts a replica: Container Apps holds it until
-        the replica is ready, which takes minutes, not seconds. /api/healthz answers from the web alone and says nothing
-        about the api, so the wait that matters goes through the web to the api. Says so once, at the first miss.
+        the replica is ready (a cold start measured about 30 s locally; longer on Azure, where the image pull comes on
+        top). /api/healthz answers from the web alone and says nothing about the api, so the wait that matters goes
+        through the web to the api. Says so once, at the first miss.
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$WebUrl, [int]$TimeoutSeconds = 300, [int]$IntervalSeconds = 10, [switch]$NoRevoke)
@@ -1437,7 +1438,7 @@ function Wait-ApiReady {
         $status = Get-HttpStatus -Url $url -NoRevoke:$NoRevoke
         if ($status -eq 200) { return }
         if (-not $announced) {
-            Write-Say '  waiting for the api to start (cold start): a scaled-to-zero api can take a few minutes to answer the first request'
+            Write-Say '  waiting for the api to start (cold start): a cold start measured about 30 s locally; longer on Azure'
             $announced = $true
         }
         if ($waited -ge $TimeoutSeconds) { throw "GET $url answered $status after $TimeoutSeconds s, expected 200: the api did not start behind the web. Look at: az containerapp logs show --name api --resource-group <rg> --type system" }
@@ -2256,7 +2257,7 @@ function Invoke-DemoResetRequest {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$WebUrl, [switch]$NoRevoke)
     $arguments = New-Object System.Collections.Generic.List[string]
-    # --max-time 180: the first request after idle wakes a scaled-to-zero api (a cold start takes minutes, not seconds).
+    # --max-time 180: room for the first request after idle to wake a scaled-to-zero api (a cold start measured about 30 s locally; longer on Azure).
     foreach ($item in @('--silent', '--show-error', '--max-time', '180', '--request', 'POST', '--header', 'Content-Length: 0', '--include', '--write-out', '\n%{http_code}')) { $arguments.Add($item) }
     if ($NoRevoke) { $arguments.Add('--ssl-revoke-best-effort') }
     $arguments.Add("$WebUrl/api/v1/sites/$($script:DemoSiteId)/demo-reset")
@@ -2325,9 +2326,13 @@ function Reset-DemoEpoch {
 }
 
 function Invoke-ResetDemo {
-    <# -Action ResetDemo: a new demo epoch through the web, before every judged session. Restarts nothing. #>
+    <#
+    -Action ResetDemo: a new demo epoch through the web, before every judged session. Restarts nothing.
+    -RetryOnRateLimit: a 429 with a short Retry-After is waited out ONCE (Warm and Deploy use it: a smoke test a minute ago
+    drained the web's general bucket, which the reset draws on). -NoNext: the caller prints the closing "Next:" itself.
+    #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)][hashtable]$Config)
+    param([Parameter(Mandatory)][hashtable]$Config, [switch]$RetryOnRateLimit, [switch]$NoNext)
     $state = Read-StateFile
     if ((Get-StateValue -State $state -Key 'placeholder') -eq 'True') {
         Write-Say 'The last deploy was a placeholder: there is no demo site and no demo day (no real api yet). Nothing to reset.'
@@ -2339,9 +2344,9 @@ function Invoke-ResetDemo {
         $fqdn = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'show', '--name', 'web', '--resource-group', $Config.ResourceGroup, '--query', 'properties.configuration.ingress.fqdn', '-o', 'tsv', '--only-show-errors'))
     }
     if (-not $fqdn) { throw 'No web FQDN known. Deploy first.' }
-    Reset-DemoEpoch -Config $Config -WebUrl "https://$fqdn" | Out-Null
+    Reset-DemoEpoch -Config $Config -WebUrl "https://$fqdn" -RetryOnRateLimit:$RetryOnRateLimit | Out-Null
     Write-Say 'Nothing was restarted: the clock of api and alerts follows the epoch, which the database holds.'
-    Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Status') -Why 'look at the apps again'
+    if (-not $NoNext) { Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Status') -Why 'look at the apps again' }
 }
 
 function Invoke-ApiMode {
@@ -2353,8 +2358,9 @@ function Invoke-ApiMode {
         idle rate while warm). Cool = minReplicas 0 (the api scales to zero when idle: the cheap default; the first request
         after idle is slow). Both keep maxReplicas 1. A scale change makes a new revision, so the revision gate runs after it:
         warm with the WARM rules (a replica must run and be Healthy), cool with the COOL rules (0 replicas is accepted). The
-        app is then read back and its scale must be what was asked for. Only after that is the mode recorded, so a failure
-        leaves the recorded mode as it was. Warm then starts one demo reset: a warm session starts with a fresh epoch.
+        app is then read back and its scale must be what was asked for. Warm then runs one demo reset (a warm session starts
+        with a fresh epoch; a 429 is waited out once, as in Deploy). Only after all of that is the mode recorded, so a failure
+        leaves the recorded mode as it was; a failure of the reset says that the api is already at the new scale.
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][hashtable]$Config, [Parameter(Mandatory)][string]$Mode)
@@ -2378,17 +2384,25 @@ function Invoke-ApiMode {
     if ($scale.Status -ne 'PASS') {
         throw "S2 $($scale.Subject): the app does not show the scale that was asked for, so the mode was NOT recorded (the recorded mode is still $(Get-ApiModeFromState -State $state)). Look at: az containerapp show --name api --resource-group $rg --query properties.template.scale"
     }
+    if ($Mode -eq 'warm') {
+        # The reset comes BEFORE the mode is recorded, and retries once on a 429: right after a smoke test the web's general
+        # bucket is drained (H6) and the reset draws on it. The scale is already changed here, so a reset that still fails says so.
+        Write-Say 'A warm session starts with one demo reset (a new epoch, a fresh replay day); the mode is recorded once it has worked:'
+        try { Invoke-ResetDemo -Config $Config -RetryOnRateLimit -NoNext }
+        catch {
+            throw "The api IS warm now (the scale was changed and checked) but the demo reset failed, so the mode was NOT recorded (it is still $(Get-ApiModeFromState -State $state)). $($_.Exception.Message)`nRun $(Get-EntryScriptCommand -Arguments '-Action Warm') again when the reset can succeed (safe to repeat; it records the mode). $(Get-EntryScriptCommand -Arguments '-Action ResetDemo') alone retries only the reset and does not record the mode."
+        }
+    }
     $now = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
     Save-StateFile -Update @{ apiMode = $Mode; apiModeAt = $now }
     if ($Mode -eq 'warm') {
         Write-Say "The api is warm (recorded at $now): one replica always runs, so there is no cold start."
         Write-Say 'Use warm for judged sessions and for recording. It bills the idle rate of the api while it is warm, so go back to cool when the session is over.'
         Write-Say "Back to cheap with: $(Get-EntryScriptCommand -Arguments '-Action Cool')"
-        Write-Say 'A warm session starts with one demo reset (a new epoch, a fresh replay day):'
-        Invoke-ResetDemo -Config $Config
+        Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Status') -Why 'look at the apps again'
     }
     else {
-        Write-Say "The api is cool (recorded at $now): it now scales to zero when idle, and the first request after idle is slow (a cold start takes minutes, not seconds)."
+        Write-Say "The api is cool (recorded at $now): it now scales to zero when idle, and the first request after idle is slow (a cold start measured about 30 s locally; longer on Azure)."
         Write-Say "Before a judged session or a recording: $(Get-EntryScriptCommand -Arguments '-Action Warm')"
         Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Status') -Why 'look at the apps again'
     }

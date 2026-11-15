@@ -109,6 +109,16 @@ param replayNow string = '2026-06-14T10:10:00+04:00'
 @minValue(0)
 param trustedProxyHops int = 1
 
+@description('How long the web proxy waits for the api on the SAFETY routes (Stop and the unwell actions), in ms. Deliberately short: a person must get an answer or an error fast, never a long spinner.')
+@minValue(1000)
+@maxValue(240000)
+param webUpstreamTimeoutMs int = 10000
+
+@description('How long the web proxy waits for the api on every other route, in ms. Must cover the cold start of the scale-to-zero api (measured about 29 s) and stay below the 240 s Container Apps ingress request timeout.')
+@minValue(1000)
+@maxValue(240000)
+param webUpstreamReadTimeoutMs int = 45000
+
 // ---- sizes -------------------------------------------------------------------------------------------------------------
 
 // api: 0.5 vCPU / 1 GiB. Measured about 205 MiB at rest, so 1 GiB is about 5x headroom for a PHS worker and the model; the
@@ -325,6 +335,10 @@ var webEnv = [
   { name: 'VAPID_PUBLIC_KEY', value: vapidPublicKey }
   { name: 'APP_VERSION', value: gitSha }
   { name: 'TRUSTED_PROXY_HOPS', value: string(trustedProxyHops) }
+  // Cold start of the scale-to-zero api (measured about 29 s) is longer than the BFF's old fixed 10 s, so the read routes get a
+  // longer wait. The safety routes (Stop, unwell actions) keep the short one on purpose: they must fail fast, not hang.
+  { name: 'UPSTREAM_TIMEOUT_MS', value: string(webUpstreamTimeoutMs) }
+  { name: 'UPSTREAM_READ_TIMEOUT_MS', value: string(webUpstreamReadTimeoutMs) }
   { name: 'DEMO_EMPLOYER_TOKEN', secretRef: 'demo-employer-token' }
 ]
 
