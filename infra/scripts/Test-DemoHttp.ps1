@@ -9,7 +9,8 @@
     exits 1 when any check FAILs.
 
       H1  GET /api/healthz is 200 with status ok and a version
-      H2  GET /api/v1/health/ready through the BFF is 200 with status ok
+      H2  GET /api/v1/health/ready through the BFF is 200 with status ok (curl --max-time 180, the only check with that
+          limit: after idle this call wakes a scaled-to-zero api, and a cold start takes minutes)
       H3  Stop work: POST /api/v1/crews/crew-b/stops 201, DELETE the stop 204 inside the 10 s undo window, and the
           crew timeline then holds no "crew_level":"red"
       H4  the replay clock: the stop's started_at plus 4 hours is between 10:00 and 17:30 Asia/Dubai
@@ -29,7 +30,16 @@
     After the checks, sleep 62 s so that the rate-limit window H6 drained is clear again (same as smoke-http.sh --wait).
 
 .PARAMETER WaitReady
-    Before the checks, wait (up to -WaitSeconds) until /api/healthz answers 200, for a freshly deployed web app.
+    Before the checks, wait (up to -WaitSeconds) until /api/healthz answers 200, for a freshly deployed web app, and then (up
+    to -ApiWaitSeconds, 5 minutes) until GET /api/v1/health/ready answers 200 THROUGH the web. /api/healthz is answered by the
+    web alone; the second wait is the one that wakes a scaled-to-zero api (cool mode: the first request after idle is held
+    until a replica has started, which takes minutes) and prints "waiting for the api to start (cold start)" while it does.
+
+.PARAMETER ApiWaitSeconds
+    With -WaitReady: how long to wait for the api to answer ready through the web (default 300).
+
+.PARAMETER PollSeconds
+    With -WaitReady: seconds between two polls (default 5).
 
 .PARAMETER NoRevoke
     Pass --ssl-revoke-best-effort to curl.exe: a certificate whose revocation status cannot be fetched is accepted, a certificate
@@ -42,7 +52,9 @@ param(
     [switch]$Wait,
     [switch]$WaitReady,
     [switch]$NoRevoke,
-    [int]$WaitSeconds = 300
+    [int]$WaitSeconds = 300,
+    [int]$ApiWaitSeconds = 300,
+    [int]$PollSeconds = 5
 )
 
 $ErrorActionPreference = 'Stop'
@@ -163,9 +175,10 @@ function Test-H1 {
 }
 
 function Test-H2 {
+    <# The first call through the BFF after idle may wake a scaled-to-zero api (a cold start takes minutes): --max-time 180, for this check only. #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Base)
-    $response = Invoke-Curl -Url "$Base/api/v1/health/ready"
+    $response = Invoke-Curl -Url "$Base/api/v1/health/ready" -MaxTime 180
     if ($response.Status -ne 200) { return New-HttpResult -Status FAIL -Id 'H2' -Subject "GET /api/v1/health/ready through the BFF: $(Get-Failure -Response $response), expected 200 (the web cannot reach a ready api)" }
     try { $json = $response.Body | ConvertFrom-Json } catch { return New-HttpResult -Status FAIL -Id 'H2' -Subject 'GET /api/v1/health/ready: the body is not JSON' }
     $ready = Get-JsonField -Object $json -Name 'status'
@@ -277,6 +290,30 @@ function Wait-DemoWeb {
     }
 }
 
+function Wait-DemoApi {
+    <#
+    .SYNOPSIS
+        Polls GET /api/v1/health/ready THROUGH the web until it answers 200 (true), or gives up at the deadline (false).
+    .DESCRIPTION
+        /api/healthz is answered by the web alone. With the api scaled to zero, the first request through the web wakes it and
+        is held until a replica is ready (minutes). -OnFirstWait is called once, at the first answer that is not 200.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Base, [int]$TimeoutSeconds = 300, [int]$IntervalSeconds = 5, [scriptblock]$OnFirstWait = $null)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $announced = $false
+    while ($true) {
+        $response = Invoke-Curl -Url "$Base/api/v1/health/ready" -MaxTime 30
+        if ($response.Status -eq 200) { return $true }
+        if (-not $announced -and $null -ne $OnFirstWait) {
+            $announced = $true
+            $null = & $OnFirstWait
+        }
+        if ((Get-Date) -ge $deadline) { return $false }
+        Start-Sleep -Seconds $IntervalSeconds
+    }
+}
+
 # Dot-sourcing (the tests) loads the functions and stops here.
 if ($MyInvocation.InvocationName -eq '.') { return }
 
@@ -288,8 +325,15 @@ if ([string]::IsNullOrWhiteSpace($BaseUrl) -or $BaseUrl -notmatch '^https?://') 
 $base = $BaseUrl.TrimEnd('/')
 $failed = 0
 if ($WaitReady) {
-    if (-not (Wait-DemoWeb -Base $base -TimeoutSeconds $WaitSeconds)) {
+    if (-not (Wait-DemoWeb -Base $base -TimeoutSeconds $WaitSeconds -IntervalSeconds $PollSeconds)) {
         Write-Output "FAIL H0 $base/api/healthz did not answer 200 within $WaitSeconds s"
+        Write-Output 'SMOKE FAILED: 1 check(s) failed'
+        exit 1
+    }
+    # Through the web: with the api scaled to zero, this first request wakes it and is held until it is ready.
+    $announceColdStart = { [Console]::Out.WriteLine("NOTE waiting for the api to start (cold start): a scaled-to-zero api can take a few minutes to answer the first request (up to $ApiWaitSeconds s)") }
+    if (-not (Wait-DemoApi -Base $base -TimeoutSeconds $ApiWaitSeconds -IntervalSeconds $PollSeconds -OnFirstWait $announceColdStart)) {
+        Write-Output "FAIL H0 $base/api/v1/health/ready (through the web) did not answer 200 within $ApiWaitSeconds s: the api did not start"
         Write-Output 'SMOKE FAILED: 1 check(s) failed'
         exit 1
     }

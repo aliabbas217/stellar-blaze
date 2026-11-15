@@ -70,10 +70,11 @@ BeforeAll {
         return $root
     }
 
-    # The az containerapp show document of one app. As designed: api has an internal ingress, web an external one, alerts none.
+    # The az containerapp show document of one app. As designed (cheap mode): api has an internal ingress and scales to zero
+    # (min 0 unless -MinReplicas says otherwise: a warm api), web an external one with min 1, alerts (a worker) no ingress and min 1.
     # -External overrides the ingress (for the tests of the exposure guard); -MaxReplicas the scale (cost guard).
     function New-AppJsonText {
-        param([string]$App, [string]$Image, [Nullable[bool]]$External = $null, [int]$MaxReplicas = 1)
+        param([string]$App, [string]$Image, [Nullable[bool]]$External = $null, [int]$MaxReplicas = 1, [int]$MinReplicas = -1)
         $latest = "$App--r1"
         $configuration = @{}
         if ($App -ne 'alerts' -or $null -ne $External) {
@@ -81,9 +82,11 @@ BeforeAll {
             if ($null -ne $External) { $isExternal = [bool]$External }
             $configuration = @{ ingress = @{ fqdn = "$App.test.example"; external = $isExternal } }
         }
+        $min = $MinReplicas
+        if ($min -lt 0) { if ($App -eq 'api') { $min = $script:ApiMinFixture } else { $min = 1 } }
         $obj = @{ properties = @{
                 latestRevisionName = $latest; latestReadyRevisionName = $latest; provisioningState = 'Succeeded'
-                template = @{ containers = @(@{ image = $Image }); scale = @{ minReplicas = 1; maxReplicas = $MaxReplicas } }
+                template = @{ containers = @(@{ image = $Image }); scale = @{ minReplicas = $min; maxReplicas = $MaxReplicas } }
                 configuration = $configuration
             }
         }
@@ -137,12 +140,15 @@ BeforeAll {
         return (($template | ConvertTo-Json -Depth 30).Replace($apostropheEscape, "'"))
     }
 
+    # The revision of one app. -Replicas 0 is a scaled-to-zero api (its runningState and healthState then say nothing useful).
     function New-RevisionJsonText {
-        param([string]$App, [string]$Image, [string]$Health = 'Healthy')
+        param([string]$App, [string]$Image, [string]$Health = 'Healthy', [int]$Replicas = 1)
+        $running = 'Running'
+        if ($Replicas -eq 0) { $running = 'Stopped'; $Health = 'None' }
         $obj = @{ name = "$App--r1"; properties = @{
                 template = @{ containers = @(@{ image = $Image; env = @(@{ name = 'SB_REPLAY_NOW'; value = '2026-06-14T10:10:00+04:00' }) }) }
-                provisioningState = 'Provisioned'; runningState = 'Running'; healthState = $Health
-                trafficWeight = 100; replicas = 1; createdTime = '2026-11-15T08:00:00Z'
+                provisioningState = 'Provisioned'; runningState = $running; healthState = $Health
+                trafficWeight = 100; replicas = $Replicas; createdTime = '2026-11-15T08:00:00Z'
             }
         }
         return ($obj | ConvertTo-Json -Depth 10)
@@ -193,12 +199,14 @@ BeforeAll {
                             Line = $line; Apps = $env:DEPLOY_APPS; HasPassword = [bool]$env:PG_ADMIN_PASSWORD
                             HasVapid = [bool]$env:VAPID_PRIVATE_KEY; ApiPlaceholder = $env:API_IS_PLACEHOLDER; ApiImage = $env:API_IMAGE
                             WebImage = $env:WEB_IMAGE; ApiPort = $env:API_TARGET_PORT; Hops = $env:TRUSTED_PROXY_HOPS
-                            Ruleset = $env:SB_RULESET_ID; Model = $env:SB_MODEL_ID; GitSha = $env:GIT_SHA
+                            Ruleset = $env:SB_RULESET_ID; Model = $env:SB_MODEL_ID; GitSha = $env:GIT_SHA; MinReplicas = $env:API_MIN_REPLICAS
                         })
                     return ''
                 }
             },
             @{ Pattern = '^az containerapp job show'; Value = { return $script:JobImage } },
+            # the fake az remembers the scale it was given, so the app that is read back afterwards shows it
+            @{ Pattern = '^az containerapp update --name api'; Value = { param($line) if ($line -match '--min-replicas (\d+)') { $script:ApiMinFixture = [int]$Matches[1] }; return '' } },
             @{ Pattern = '^az containerapp job start'; Value = 'job-migrate-x1' },
             @{ Pattern = '^az containerapp job execution show'; Value = 'Succeeded' },
             @{ Pattern = '^az containerapp show --name (api|web|alerts) .* -o json'; Value = {
@@ -249,6 +257,8 @@ BeforeAll {
     $script:Said = New-Object System.Collections.Generic.List[string]
     $script:Epoch = 1
     $script:ImageFor = @{ api = $script:ApiImage; web = $script:WebImage; alerts = $script:ApiImage }
+    # cheap mode by default: the api scales to zero (min 0); a warm api has min 1
+    $script:ApiMinFixture = 0
     $script:JobImage = $script:ApiImage
     $script:StateDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('sb-test-state-' + [guid]::NewGuid().ToString('N'))
     $env:SB_I1_STATE_DIR = $script:StateDir
@@ -328,7 +338,7 @@ Describe 'Get-ImageTag' {
 
 # ======================================================================================================================
 Describe 'Get-GateFailure (Review Focus 1)' {
-    It 'passes the happy fixture for an app with ingress' {
+    It 'passes the happy fixture' {
         @(Get-GateFailure -Snapshot (New-Snapshot) -ExpectedImage $script:ApiImage -Kind Ingress).Count | Should -Be 0
     }
     It 'FAILS when the serving revision runs an older image (a failed rollout keeps the old revision)' {
@@ -360,6 +370,37 @@ Describe 'Get-GateFailure (Review Focus 1)' {
         @(Get-GateFailure -Snapshot (New-Snapshot -Health 'None' -Image 'old:1') -ExpectedImage $script:ApiImage -Kind Worker).Count | Should -BeGreaterThan 0
         @(Get-GateFailure -Snapshot (New-Snapshot -Health 'Unhealthy') -ExpectedImage $script:ApiImage -Kind Worker).Count | Should -BeGreaterThan 0
     }
+    It 'never accepts zero replicas for the worker (the alerts worker always runs one)' {
+        $zero = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None'
+        (@(Get-GateFailure -Snapshot $zero -ExpectedImage $script:ApiImage -Kind Worker) -join "`n") | Should -Match 'replicas'
+    }
+}
+
+Describe 'Get-GateFailure for the api in cool mode (minReplicas 0, -AllowScaleToZero)' {
+    It 'accepts a scaled-to-zero revision (the proof is the web-to-api smoke call, which wakes it)' {
+        $zero = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None'
+        @(Get-GateFailure -Snapshot $zero -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero).Count | Should -Be 0
+    }
+    It 'NEVER accepts zero replicas without -AllowScaleToZero: not for web, not for a warm api' {
+        $zero = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None'
+        $f = @(Get-GateFailure -Snapshot $zero -ExpectedImage $script:ApiImage -Kind Ingress) -join "`n"
+        $f | Should -Match 'replicas'
+        $f | Should -Match 'runningState'
+        $f | Should -Match 'healthState'
+    }
+    It 'still FAILS a scaled-to-zero revision that runs a stale image, is not the latest ready one, or is not provisioned' {
+        $stale = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None' -Image "$script:Registry/sb-api:OLD"
+        (@(Get-GateFailure -Snapshot $stale -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero) -join "`n") | Should -Match "expected '$([regex]::Escape($script:ApiImage))'"
+        $notReady = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None' -Latest 'api--r2' -Ready 'api--r1'
+        (@(Get-GateFailure -Snapshot $notReady -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero) -join "`n") | Should -Match 'latestReadyRevisionName'
+        $notProvisioned = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None' -RevProvisioning 'Failed'
+        (@(Get-GateFailure -Snapshot $notProvisioned -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero) -join "`n") | Should -Match 'provisioningState'
+    }
+    It 'with a replica running it needs runningState Running and healthState Healthy again' {
+        @(Get-GateFailure -Snapshot (New-Snapshot -Replicas 1) -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero).Count | Should -Be 0
+        (@(Get-GateFailure -Snapshot (New-Snapshot -Replicas 1 -Health 'Unhealthy') -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero) -join "`n") | Should -Match 'healthState'
+        (@(Get-GateFailure -Snapshot (New-Snapshot -Replicas 2 -Running 'Degraded') -ExpectedImage $script:ApiImage -Kind Ingress -AllowScaleToZero) -join "`n") | Should -Match 'runningState'
+    }
 }
 
 Describe 'Wait-AppGate' {
@@ -384,6 +425,12 @@ Describe 'Wait-AppGate' {
         }
         { Wait-AppGate -ResourceGroup 'rg' -Target @(@{ App = 'api'; Kind = 'Ingress'; Image = $script:ApiImage }) } | Should -Not -Throw
         Should -Invoke Start-DeployDelay -Times 2 -Exactly
+    }
+    It 'accepts a scaled-to-zero api only for a target marked AllowScaleToZero' {
+        Mock Get-AppSnapshot { New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None' }
+        { Wait-AppGate -ResourceGroup 'rg' -Target @(@{ App = 'api'; Kind = 'Ingress'; Image = $script:ApiImage; AllowScaleToZero = $true }) } | Should -Not -Throw
+        { Wait-AppGate -ResourceGroup 'rg' -Target @(@{ App = 'api'; Kind = 'Ingress'; Image = $script:ApiImage }) -TimeoutSeconds 20 } | Should -Throw '*Revision gate failed*'
+        { Wait-AppGate -ResourceGroup 'rg' -Target @(@{ App = 'web'; Kind = 'Ingress'; Image = $script:ApiImage; AllowScaleToZero = $false }) -TimeoutSeconds 20 } | Should -Throw '*Revision gate failed*'
     }
     It 'treats an unreadable app as a failing condition, not a crash' {
         Mock Get-AppSnapshot { throw 'az containerapp show failed (exit code 3).' }
@@ -596,6 +643,36 @@ Describe 'Get-MainParamValue (contract with main.bicepparam)' {
         $v = Get-MainParamValue -Config $config -Secrets $script:Secrets -State $script:State -Tag 't' -PostgresVersion '18' -DeployApps $true -ApiImage 'a' -WebImage 'w'
         (@($v.Keys) | Sort-Object) | Should -Be (@($script:ParamEnvNames) | Sort-Object)
     }
+    It 'API_MIN_REPLICAS is 0 (cool, scale to zero) by default and is part of the contract; no variable is about an alerts app' {
+        $config = New-DeployConfig -RepoRoot $script:FakeRepo
+        $v = Get-MainParamValue -Config $config -Secrets $script:Secrets -State $script:State -Tag 't' -PostgresVersion '18' -DeployApps $true -ApiImage 'a' -WebImage 'w'
+        $v['API_MIN_REPLICAS'] | Should -BeExactly '0'
+        $script:ParamEnvNames | Should -Contain 'API_MIN_REPLICAS'
+        @($script:ParamEnvNames | Where-Object { $_ -match 'ALERTS' }).Count | Should -Be 0
+    }
+    It 'API_MIN_REPLICAS follows the recorded apiMode (warm 1, cool 0), and an unreadable value means cool' {
+        $config = New-DeployConfig -RepoRoot $script:FakeRepo
+        foreach ($case in @(@{ Mode = 'warm'; Min = '1' }, @{ Mode = 'cool'; Min = '0' }, @{ Mode = ''; Min = '0' }, @{ Mode = 'hot'; Min = '0' })) {
+            $state = [ordered]@{ acrName = 'a'; appsIdentityId = '/x'; apiMode = $case.Mode }
+            $v = Get-MainParamValue -Config $config -Secrets $script:Secrets -State $state -Tag 't' -PostgresVersion '18' -DeployApps $true -ApiImage 'a' -WebImage 'w'
+            $v['API_MIN_REPLICAS'] | Should -BeExactly $case.Min
+        }
+    }
+    It 'API_MIN_REPLICAS: -Warm or -Cool on the config wins over the recorded mode' {
+        $state = [ordered]@{ acrName = 'a'; appsIdentityId = '/x'; apiMode = 'warm' }
+        $v = Get-MainParamValue -Config (New-DeployConfig -RepoRoot $script:FakeRepo -Cool) -Secrets $script:Secrets -State $state -Tag 't' -PostgresVersion '18' -DeployApps $true -ApiImage 'a' -WebImage 'w'
+        $v['API_MIN_REPLICAS'] | Should -BeExactly '0'
+        $state['apiMode'] = 'cool'
+        $v = Get-MainParamValue -Config (New-DeployConfig -RepoRoot $script:FakeRepo -Warm) -Secrets $script:Secrets -State $state -Tag 't' -PostgresVersion '18' -DeployApps $true -ApiImage 'a' -WebImage 'w'
+        $v['API_MIN_REPLICAS'] | Should -BeExactly '1'
+    }
+    It '-Warm and -Cool together are refused, and only Deploy and Validate take them' {
+        { New-DeployConfig -RepoRoot $script:FakeRepo -Warm -Cool } | Should -Throw '*-Warm*-Cool*'
+        $warm = New-DeployConfig -RepoRoot $script:FakeRepo -Warm
+        foreach ($action in 'Deploy', 'Validate') { { Assert-ModeSwitchUse -Action $action -Config $warm } | Should -Not -Throw }
+        foreach ($action in 'Smoke', 'Status', 'ResetDemo', 'Teardown', 'Bootstrap', 'Warm', 'Cool') { { Assert-ModeSwitchUse -Action $action -Config $warm } | Should -Throw '*-Action Warm*' }
+        { Assert-ModeSwitchUse -Action 'Smoke' -Config (New-DeployConfig -RepoRoot $script:FakeRepo) } | Should -Not -Throw
+    }
     It 'Set-ProcessEnvironment removes empty values instead of leaving a stale one' {
         $env:SB_MODEL_ID = 'stale'
         Set-ProcessEnvironment -Value @{ SB_MODEL_ID = '' }
@@ -788,9 +865,10 @@ Describe 'Deploy' {
             acrName = 'acrsbtest123'; acrLoginServer = $script:Registry; resourceGroupName = 'rg-test'; location = 'uaenorth'
             appsIdentityId = '/subscriptions/s/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-sb-apps'
             postgresVersion = '18'; postgresVersionDeployed = ''; placeholder = $false
-        }
+        } -Remove @('apiMode', 'apiModeAt')
         Set-NativeMock
         $script:JobImage = $script:ApiImage
+        $script:ApiMinFixture = 0
         Mock Invoke-Native {
             $line = "$FilePath $($Arguments -join ' ')"
             $script:Calls.Add($line)
@@ -898,9 +976,15 @@ Describe 'Deploy' {
         { Invoke-Deploy -Config $script:Config } | Should -Throw '*Revision gate failed*web*'
         Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
     }
-    It 'gates the alerts worker too' {
+    It 'gates the alerts worker too, after api and before web' {
         Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
         Get-CallCount -Pattern '^az containerapp show --name alerts' | Should -BeGreaterThan 0
+        Get-CallCount -Pattern 'job (show|execution list) --name job-alerts' | Should -Be 0
+    }
+    It 'a worker that never gets ready fails the gate (alerts runs a stale image)' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name alerts'; Value = { return (New-RevisionJsonText -App 'alerts' -Image "$script:Registry/sb-api:OLD") } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*Revision gate failed*alerts*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
     }
     It 'refuses a dirty tree without -AllowDirty before building anything' {
         $script:Responses = @(@{ Pattern = '^git -C .* status'; Value = ' M x' }) + $script:Responses
@@ -1037,12 +1121,47 @@ Describe 'Deploy' {
         Get-CallCount -Pattern 'revision restart|containerapp update' | Should -Be 3
         $api | Should -BeLessThan $firstReset
     }
-    It 'waits for the web before the first reset, and the smoke test runs with the final rate-limit wait' {
-        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+    It 'waits for the web, then for the api THROUGH the web (cold start), before the first reset, and the smoke test runs with the final rate-limit wait' {
+        $script:ReadyAnswers = New-Object System.Collections.Generic.Queue[string]
+        $script:ReadyAnswers.Enqueue('503'); $script:ReadyAnswers.Enqueue('0'); $script:ReadyAnswers.Enqueue('200')
+        $script:Responses = @(@{ Pattern = '^curl.exe .*health/ready'; Value = { if ($script:ReadyAnswers.Count -gt 0) { return $script:ReadyAnswers.Dequeue() }; return '200' } }) + $script:Responses
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
         $healthz = Get-CallIndex -Pattern '^curl.exe .*https://web.test.example/api/healthz' -After (Get-CallIndex -Pattern '^az containerapp revision restart --name web ')
         $healthz | Should -BeGreaterThan -1
-        $healthz | Should -BeLessThan (Get-CallIndex -Pattern '^curl.exe .*demo-reset')
+        $ready = Get-CallIndex -Pattern '^curl.exe .*https://web.test.example/api/v1/health/ready' -After $healthz
+        $ready | Should -BeGreaterThan $healthz
+        Get-CallCount -Pattern '^curl.exe .*health/ready' | Should -Be 3
+        $ready | Should -BeLessThan (Get-CallIndex -Pattern '^curl.exe .*demo-reset')
+        $output | Should -Match 'waiting for the api to start \(cold start\)'
         Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly -ParameterFilter { $Fresh }
+    }
+    It 'says nothing about a cold start when the api answers ready at once' {
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        $output | Should -Not -Match 'cold start\)'
+    }
+    It 'fails with the timeout when the api never answers ready through the web (5 minutes), before any reset' {
+        $script:Responses = @(@{ Pattern = '^curl.exe .*health/ready'; Value = '503' }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*health/ready*503*300 s*'
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 0
+    }
+    It 'skips the api restart (and says so) when the api has 0 replicas, restarts alerts and web, and still passes the gate' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image $script:ApiImage -Replicas 0) } }) + $script:Responses
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        Get-CallCount -Pattern '^az containerapp revision restart --name api ' | Should -Be 0
+        Get-CallCount -Pattern '^az containerapp revision restart --name alerts ' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp revision restart --name web ' | Should -Be 1
+        $output | Should -Match 'api has 0 replicas.*not restarted.*next cold start'
+        Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly
+    }
+    It 'a warm api (min 1) with 0 replicas FAILS the gate: scale to zero is accepted only for the cool api' {
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        $script:ApiMinFixture = 1
+        try {
+            $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image $script:ApiImage -Replicas 0) } }) + $script:Responses
+            { Invoke-Deploy -Config $script:Config } | Should -Throw '*Revision gate failed*api*'
+            Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+        }
+        finally { $script:ApiMinFixture = 0 }
     }
     It 'POSTs the reset to the demo site through the web, and records both epochs in the state' {
         Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
@@ -1097,6 +1216,86 @@ Describe 'Deploy' {
         $script:Responses = @(@{ Pattern = '^az containerapp revision show --name web'; Value = { return (New-RevisionJsonText -App 'web' -Image "$script:Registry/sb-web:OLD") } }) + $script:Responses
         { Invoke-Deploy -Config $script:Config } | Should -Throw '*Revision gate failed*'
         Get-CallCount -Pattern 'revision restart' | Should -Be 0
+    }
+
+    # ---- the api mode: cool (scale to zero) by default, warm on request, never flipped by a re-deploy ------------------------
+    It 'is cool by default: API_MIN_REPLICAS=0 in both phases, and the mode is recorded after the deploy' {
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        foreach ($seen in $script:EnvSeen) { $seen.MinReplicas | Should -BeExactly '0' }
+        $state = Read-StateFile
+        $state['apiMode'] | Should -BeExactly 'cool'
+        $state['apiModeAt'] | Should -Match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+    }
+    It 'a re-deploy keeps the recorded warm mode (API_MIN_REPLICAS=1, S2 expects min 1) and does not flip it' {
+        Save-StateFile -Update @{ apiMode = 'warm'; apiModeAt = '2026-11-14T08:00:00Z' }
+        $script:ApiMinFixture = 1
+        try {
+            $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+            foreach ($seen in $script:EnvSeen) { $seen.MinReplicas | Should -BeExactly '1' }
+            (Read-StateFile)['apiMode'] | Should -BeExactly 'warm'
+            $output | Should -Match 'PASS S2 api scale is min 1 / max 1'
+        }
+        finally { $script:ApiMinFixture = 0 }
+    }
+    It 'a re-deploy keeps the recorded cool mode' {
+        Save-StateFile -Update @{ apiMode = 'cool' }
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        foreach ($seen in $script:EnvSeen) { $seen.MinReplicas | Should -BeExactly '0' }
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+    }
+    It '-Warm on Deploy exports 1, records warm, and the cool-to-warm change is announced' {
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -Warm -RepoRoot $script:FakeRepo
+        $script:ApiMinFixture = 1
+        try {
+            $output = Get-InfoText { Invoke-Deploy -Config $config }
+            foreach ($seen in $script:EnvSeen) { $seen.MinReplicas | Should -BeExactly '1' }
+            (Read-StateFile)['apiMode'] | Should -BeExactly 'warm'
+            $output | Should -Match 'api mode\s*: warm'
+        }
+        finally { $script:ApiMinFixture = 0 }
+    }
+    It '-Cool on Deploy overrides a recorded warm mode: exports 0, records cool' {
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -Cool -RepoRoot $script:FakeRepo
+        Get-InfoText { Invoke-Deploy -Config $config } | Out-Null
+        foreach ($seen in $script:EnvSeen) { $seen.MinReplicas | Should -BeExactly '0' }
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+    }
+    It 'does not record the mode when the deploy stops before the apps are gated (the state keeps what is really deployed)' {
+        Save-StateFile -Update @{ apiMode = 'warm'; apiModeAt = '2026-11-14T08:00:00Z' }
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -Cool -RepoRoot $script:FakeRepo
+        $script:Responses = @(@{ Pattern = '^az deployment group create .*sb-main-p2'; Throw = 'az deployment group create failed (exit code 1). boom' }) + $script:Responses
+        { Invoke-Deploy -Config $config } | Should -Throw '*boom*'
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'warm'
+    }
+    It 'S2 FAILS when the api scale does not match the mode: cool with min 1, and warm with min 0' {
+        $script:ApiMinFixture = 1
+        try { { Invoke-Deploy -Config $script:Config } | Should -Throw '*S2*' } finally { $script:ApiMinFixture = 0 }
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*S2*'
+    }
+    It 'S2 FAILS when the alerts worker may scale to 3 replicas' {
+        $script:Responses = @(@{ Pattern = '^az containerapp show --name alerts .* -o json'; Value = { return (New-AppJsonText -App 'alerts' -Image $script:ApiImage -MaxReplicas 3) } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*S2*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+    }
+    It 'S2 prints the scale of api (min 0 in cool mode), web and the alerts worker, and S4 the ingress of the three' {
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        $output | Should -Match 'PASS S2 api scale is min 0 / max 1'
+        $output | Should -Match 'PASS S2 web scale is min 1 / max 1'
+        $output | Should -Match 'PASS S2 alerts scale is min 1 / max 1'
+        $output | Should -Match 'PASS S4 api ingress is internal'
+        $output | Should -Match 'PASS S4 web ingress is external'
+        $output | Should -Match 'PASS S4 alerts has no ingress'
+    }
+    It 'prints the cost summary (one place) and the teardown date, and never the old USD 60-75' {
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        $output | Should -Match ([regex]::Escape($script:CostSummary))
+        $output | Should -Match 'GITEX'
+        $output | Should -Match '11 December'
+        $output | Should -Match 'Teardown'
+        $output | Should -Not -Match 'USD 60'
+        $output | Should -Not -Match 'USD 75'
     }
 
     # ---- what the state says (ResetDemo, Status and Smoke read it) ---------------------------------------------------------
@@ -1176,7 +1375,8 @@ Describe 'Deploy -Placeholder' {
             acrName = 'acrsbtest123'; acrLoginServer = $script:Registry; resourceGroupName = 'rg-test'; location = 'uaenorth'
             appsIdentityId = '/subscriptions/s/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-sb-apps'
             postgresVersion = '17'; postgresVersionDeployed = ''; placeholder = $false
-        }
+        } -Remove @('apiMode', 'apiModeAt')
+        $script:ApiMinFixture = 0
         Set-NativeMock
         $script:JobImage = $script:ApiImage
         Mock Invoke-Native {
@@ -1229,6 +1429,7 @@ Describe 'Deploy -Placeholder' {
             $seen.ApiPlaceholder | Should -BeExactly 'true'
             $seen.ApiImage | Should -BeExactly $script:Placeholder
             $seen.ApiPort | Should -BeExactly '80'
+            $seen.MinReplicas | Should -BeExactly '0'
         }
         Get-CallCount -Pattern '^az containerapp show --name api' | Should -BeGreaterThan 0
         Get-CallCount -Pattern '^az containerapp show --name alerts' | Should -Be 0
@@ -1299,6 +1500,8 @@ Describe 'ResetDemo (a new demo epoch through the web; it restarts nothing)' {
         $posts.Count | Should -Be 1
         $posts[0] | Should -Match '--request POST'
         $posts[0] | Should -Match '--header Content-Length: 0'
+        # the first request after idle wakes a scaled-to-zero api: minutes, not seconds
+        $posts[0] | Should -Match '--max-time 180 '
         $posts[0] | Should -Match 'https://web.test.example/api/v1/sites/site-demo-mussafah/demo-reset$'
         $posts[0] | Should -Not -Match 'Authorization'
         Get-CallCount -Pattern '^az ' | Should -Be 0
@@ -1400,12 +1603,209 @@ Describe 'ResetDemo (a new demo epoch through the web; it restarts nothing)' {
     }
 }
 
+# ======================================================================================================================
+Describe 'Warm and Cool (the api mode of a running deployment)' {
+    BeforeAll {
+        Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    BeforeEach {
+        $script:Epoch = 1
+        $script:ApiMinFixture = 0
+        Save-StateFile -Update @{
+            placeholder = $false; resourceGroupName = 'rg-test'; webFqdn = 'web.test.example'; apiImage = $script:ApiImage; webImage = $script:WebImage
+            apiMode = 'cool'; apiModeAt = '2026-11-14T08:00:00Z'; epochId = ''; previousEpochId = ''; resetAt = ''
+        }
+        Set-NativeMock
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+        Mock Test-CommandAvailable { $true }
+        Mock Start-DeployDelay { $script:Calls.Add('<wait>') }
+        $script:Config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo
+    }
+
+    It 'Warm runs exactly az containerapp update --min-replicas 1 --max-replicas 1 on the api, and nothing on web or the jobs' {
+        Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm } | Out-Null
+        $updates = @($script:Calls | Where-Object { $_ -match '^az containerapp (job )?update' })
+        $updates.Count | Should -Be 1
+        $updates[0] | Should -BeExactly 'az containerapp update --name api --resource-group rg-test --min-replicas 1 --max-replicas 1 --only-show-errors -o none'
+    }
+    It 'Cool runs exactly az containerapp update --min-replicas 0 --max-replicas 1 on the api' {
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode cool } | Out-Null
+        $updates = @($script:Calls | Where-Object { $_ -match '^az containerapp (job )?update' })
+        $updates.Count | Should -Be 1
+        $updates[0] | Should -BeExactly 'az containerapp update --name api --resource-group rg-test --min-replicas 0 --max-replicas 1 --only-show-errors -o none'
+    }
+    It 'Warm gates with the WARM rules after the update: a scaled-to-zero revision fails it, and the mode is then NOT recorded' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image $script:ApiImage -Replicas 0) } }) + $script:Responses
+        { Invoke-ApiMode -Config $script:Config -Mode warm } | Should -Throw '*Revision gate failed*api*'
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+        Get-CallCount -Pattern '^curl.exe' | Should -Be 0
+    }
+    It 'FAILS, and does not record the mode, when the app read back does not show the scale that was asked for' {
+        $script:Responses = @(@{ Pattern = '^az containerapp update --name api'; Value = '' }) + $script:Responses
+        { Invoke-ApiMode -Config $script:Config -Mode warm } | Should -Throw '*S2*min 0 / max 1*expected 1 / 1*'
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+        Get-CallCount -Pattern '^curl.exe' | Should -Be 0
+    }
+    It 'Warm also fails the gate on a stale image' {
+        Save-StateFile -Update @{ apiImage = "$script:Registry/sb-api:other" }
+        { Invoke-ApiMode -Config $script:Config -Mode warm } | Should -Throw '*Revision gate failed*'
+    }
+    It 'Cool gates with the COOL rules: a scaled-to-zero revision is accepted, an unhealthy running one is not' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image $script:ApiImage -Replicas 0) } }) + $script:Responses
+        { Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode cool } } | Should -Not -Throw
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image $script:ApiImage -Health 'Unhealthy') } }) + $script:Responses
+        { Invoke-ApiMode -Config $script:Config -Mode cool } | Should -Throw '*Revision gate failed*'
+    }
+    It 'Warm records apiMode=warm and the time, then runs ONE ResetDemo (a warm session starts with a demo reset)' {
+        $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm }
+        $state = Read-StateFile
+        $state['apiMode'] | Should -BeExactly 'warm'
+        $state['apiModeAt'] | Should -Match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+        $state['apiModeAt'] | Should -Not -BeExactly '2026-11-14T08:00:00Z'
+        Get-CallCount -Pattern '^curl.exe .*--request POST .*https://web.test.example/api/v1/sites/site-demo-mussafah/demo-reset$' | Should -Be 1
+        (Get-CallIndex -Pattern '^curl.exe .*demo-reset') | Should -BeGreaterThan (Get-CallIndex -Pattern '^az containerapp revision show --name api')
+        $state['epochId'] | Should -BeExactly '2'
+        $output | Should -Match 'Demo reset: epoch 2 started'
+    }
+    It 'Warm records the mode BEFORE the reset, so a rate-limited reset leaves the warm state and says to run ResetDemo' {
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 429 -RetryAfter '42') } }) + $script:Responses
+        { Invoke-ApiMode -Config $script:Config -Mode warm } | Should -Throw '*429*ResetDemo*'
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'warm'
+    }
+    It 'Cool records apiMode=cool and runs NO demo reset' {
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode cool } | Out-Null
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+        Get-CallCount -Pattern '^curl.exe' | Should -Be 0
+    }
+    It 'Warm says when to use it and that it bills the idle rate of the api while warm' {
+        $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm }
+        $output | Should -Match 'judged sessions'
+        $output | Should -Match 'recording'
+        $output | Should -Match 'idle rate'
+        $output | Should -Match 'Action Cool'
+    }
+    It 'Cool says the api now scales to zero and that the first request after idle is slow' {
+        $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode cool }
+        $output | Should -Match 'scales to zero'
+        $output | Should -Match 'first request after idle is slow'
+        $output | Should -Match 'Action Warm'
+    }
+    It 'reads the expected image from the app when state.json has none' {
+        Save-StateFile -Remove @('apiImage')
+        Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode cool } | Out-Null
+        Get-CallCount -Pattern '^az containerapp show --name api ' | Should -BeGreaterThan 0
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'cool'
+    }
+    It 'after a placeholder deploy it changes the scale and the mode, and the reset says there is no demo site' {
+        Save-StateFile -Update @{ placeholder = $true; apiImage = $script:Placeholder; webImage = $script:Placeholder }
+        $script:ImageFor = @{ api = $script:Placeholder; web = $script:Placeholder; alerts = $script:Placeholder }
+        try { $output = Get-InfoText { Invoke-ApiMode -Config $script:Config -Mode warm } }
+        finally { $script:ImageFor = @{ api = $script:ApiImage; web = $script:WebImage; alerts = $script:ApiImage } }
+        (Read-StateFile)['apiMode'] | Should -BeExactly 'warm'
+        Get-CallCount -Pattern '^curl.exe' | Should -Be 0
+        $output | Should -Match 'placeholder'
+    }
+    It 'refuses a mode that is not warm or cool' {
+        { Invoke-ApiMode -Config $script:Config -Mode 'hot' } | Should -Throw '*warm*cool*'
+        Get-CallCount -Pattern '^az containerapp update' | Should -Be 0
+    }
+    It 'says what the mode is, as recorded and as found, in Status; and WARNs when they differ' {
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        $output = Get-InfoText { Invoke-Status -Config $script:Config }
+        $output | Should -Match 'api mode\s*: warm \(recorded'
+        $output | Should -Match 'WARN .*api scale is min 0 / max 1 but the recorded mode is warm'
+        Save-StateFile -Update @{ apiMode = 'cool' }
+        $output = Get-InfoText { Invoke-Status -Config $script:Config }
+        $output | Should -Match 'api mode\s*: cool \(recorded'
+        $output | Should -Not -Match 'WARN .*api scale'
+    }
+}
+
+Describe 'Restart-DemoApps (api, alerts and web back to back; a scaled-to-zero api is skipped)' {
+    BeforeEach {
+        Set-NativeMock
+        $script:ApiMinFixture = 0
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+        Mock Start-DeployDelay { $script:Calls.Add('<wait>') }
+        $script:Targets = @(
+            @{ App = 'api'; Kind = 'Ingress'; Image = $script:ApiImage; AllowScaleToZero = $true },
+            @{ App = 'alerts'; Kind = 'Worker'; Image = $script:ApiImage },
+            @{ App = 'web'; Kind = 'Ingress'; Image = $script:WebImage }
+        )
+    }
+
+    It 'restarts the latest revision of api, alerts and web back to back, then waits for the gate again' {
+        $output = Get-InfoText { Restart-DemoApps -ResourceGroup 'rg-test' -Target $script:Targets }
+        $restarts = @($script:Calls | Where-Object { $_ -match '^az containerapp revision restart' })
+        $restarts.Count | Should -Be 3
+        $restarts[0] | Should -Be 'az containerapp revision restart --name api --resource-group rg-test --revision api--r1 --only-show-errors -o none'
+        $restarts[1] | Should -Be 'az containerapp revision restart --name alerts --resource-group rg-test --revision alerts--r1 --only-show-errors -o none'
+        $restarts[2] | Should -Be 'az containerapp revision restart --name web --resource-group rg-test --revision web--r1 --only-show-errors -o none'
+        $api = Get-CallIndex -Pattern '^az containerapp revision restart --name api '
+        Get-CallIndex -Pattern '^az containerapp revision restart --name alerts ' | Should -Be ($api + 1)
+        Get-CallIndex -Pattern '^az containerapp revision restart --name web ' | Should -Be ($api + 2)
+        (Get-CallIndex -Pattern '^<wait>$') | Should -BeGreaterThan ($api + 2)
+        (Get-CallIndex -Pattern '^az containerapp revision show' -After ($api + 2)) | Should -BeGreaterThan ($api + 2)
+        $output | Should -Not -Match 'not restarted'
+    }
+    It 'skips the api restart, and says why, when the api has 0 replicas; alerts and web are still restarted and the gate still runs for all three' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image $script:ApiImage -Replicas 0) } }) + $script:Responses
+        $output = Get-InfoText { Restart-DemoApps -ResourceGroup 'rg-test' -Target $script:Targets }
+        Get-CallCount -Pattern '^az containerapp revision restart --name api ' | Should -Be 0
+        Get-CallCount -Pattern '^az containerapp revision restart --name alerts ' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp revision restart --name web ' | Should -Be 1
+        $output | Should -Match 'api has 0 replicas: not restarted \(it reads its secrets at the next cold start\)'
+        $output | Should -Match 'PASS gate api'
+        $output | Should -Match 'PASS gate alerts'
+        $output | Should -Match 'PASS gate web'
+    }
+    It 'restarts an api that is running (cool or warm) and any target that is not marked scale-to-zero, even at 0 replicas' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name web'; Value = { return (New-RevisionJsonText -App 'web' -Image $script:WebImage -Replicas 0) } }) + $script:Responses
+        { Restart-DemoApps -ResourceGroup 'rg-test' -Target $script:Targets } | Should -Throw '*Revision gate failed*web*'
+        Get-CallCount -Pattern '^az containerapp revision restart --name web ' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp revision restart --name api ' | Should -Be 1
+    }
+    It 'never skips the alerts worker, which always runs one replica' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name alerts'; Value = { return (New-RevisionJsonText -App 'alerts' -Image $script:ApiImage -Replicas 0) } }) + $script:Responses
+        { Restart-DemoApps -ResourceGroup 'rg-test' -Target $script:Targets } | Should -Throw '*Revision gate failed*alerts*'
+        Get-CallCount -Pattern '^az containerapp revision restart --name alerts ' | Should -Be 1
+    }
+    It 'with only an unrestarted api there is nothing to wait for between restarts, and the gate still decides' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name api'; Value = { return (New-RevisionJsonText -App 'api' -Image "$script:Registry/sb-api:OLD" -Replicas 0) } }) + $script:Responses
+        { Restart-DemoApps -ResourceGroup 'rg-test' -Target $script:Targets } | Should -Throw '*Revision gate failed*api*'
+    }
+}
+
 Describe 'Status' {
     BeforeAll {
         Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
     }
     BeforeEach {
-        Save-StateFile -Update @{ placeholder = $false; resourceGroupName = 'rg-test'; lastTag = 'relcheck-1'; smokePassed = $true; smokeAt = '2026-11-15T10:00:00Z' }
+        Save-StateFile -Update @{ placeholder = $false; resourceGroupName = 'rg-test'; lastTag = 'relcheck-1'; smokePassed = $true; smokeAt = '2026-11-15T10:00:00Z' } -Remove @('apiMode', 'apiModeAt')
+        $script:ApiMinFixture = 0
         Set-NativeMock
         Mock Invoke-Native {
             $line = "$FilePath $($Arguments -join ' ')"
@@ -1445,6 +1845,15 @@ Describe 'Status' {
         Save-StateFile -Update @{ epochId = ''; resetAt = '' }
         $output = Get-InfoText { Invoke-Status -Config $script:Config }
         $output | Should -Match 'has recorded no reset yet'
+    }
+    It 'prints the single cost summary, the teardown date and no number of the old plan' {
+        $output = Get-InfoText { Invoke-Status -Config $script:Config }
+        $output | Should -Match ([regex]::Escape($script:CostSummary))
+        $output | Should -Match 'GITEX'
+        $output | Should -Match '11 December'
+        $output | Should -Not -Match 'USD 60'
+        $output | Should -Not -Match 'USD 75'
+        $output | Should -Not -Match 'three always-on apps'
     }
 }
 
@@ -1486,6 +1895,17 @@ Describe 'Doctor' {
         $output | Should -Match 'PASS PostgreSQL Standard_B1ms offered in uaenorth; a version 18 entry exists'
         ([regex]::Matches($output, 'PASS provider ')).Count | Should -Be 7
         (Read-StateFile)['postgresVersion'] | Should -BeExactly '18'
+    }
+    It 'prints the api mode (cool by default, or the recorded one), the single cost summary and the teardown date; nothing about USD 60-75' {
+        $output = Get-InfoText { Invoke-Doctor -Config $script:Config }
+        $output | Should -Match 'api mode\s*: cool'
+        $output | Should -Match ([regex]::Escape($script:CostSummary))
+        $output | Should -Match 'GITEX'
+        $output | Should -Not -Match 'USD 60'
+        $output | Should -Not -Match 'USD 75'
+        Save-StateFile -Update @{ apiMode = 'warm' }
+        $output = Get-InfoText { Invoke-Doctor -Config $script:Config }
+        $output | Should -Match 'api mode\s*: warm'
     }
     It 'FAILS with a portal hint when the user is not Owner' {
         $script:Responses = @(@{ Pattern = '^az role assignment list'; Value = '' }) + $script:Responses
@@ -1587,6 +2007,15 @@ Describe 'Bootstrap' {
         (Get-CallIndex -Pattern 'sub what-if') | Should -BeLessThan (Get-CallIndex -Pattern 'sub create')
         $output | Should -Match 'WAIT about 10 minutes'
         $output | Should -Match 'retries the migration once'
+    }
+    It 'states no budget amount (the Bicep owns it), and prints the single cost summary and the teardown date' {
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Location 'uaenorth' -Yes -RepoRoot $script:FakeRepo
+        $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+        $output | Should -Not -Match 'USD 75'
+        $output | Should -Not -Match 'USD 60'
+        $output | Should -Match 'monthly budget'
+        $output | Should -Match ([regex]::Escape($script:CostSummary))
+        $output | Should -Match 'GITEX'
     }
     It 'reuses the budget month of the first run and passes -GitHubOwner' {
         Save-StateFile -Update @{ budgetMonth = '2026-10' }
@@ -2032,11 +2461,19 @@ Describe 'Template TLS checks T1-T3 (ADR 0042, on the compiled main.bicep)' {
         $bicep | Should -Match ([regex]::Escape("var pgSslRootCert = '$($script:ExpectedRootCert)'"))
         $bicep | Should -Match ([regex]::Escape("{ name: 'PGSSLROOTCERT', value: pgSslRootCert }"))
         $bicep | Should -Match ([regex]::Escape("{ name: 'SB_DATABASE_URL', secretRef: '$($script:DatabaseUrlSecretName)' }"))
-        $bicep | Should -Match ([regex]::Escape("var databaseUrlSecret = { name: '$($script:DatabaseUrlSecretName)'"))
+        # the secrets are objects (secret name to value) since the secure-object change of the Bicep
+        $bicep | Should -Match ('var databaseUrlSecret = \{\s*' + [regex]::Escape("'$($script:DatabaseUrlSecretName)': databaseUrl"))
         foreach ($target in $script:TlsTargets) {
             $bicep | Should -Match ([regex]::Escape("name: '$($target.Module)'")) -Because "the module of $($target.Name) is named $($target.Module)"
         }
+        # cheap mode: the scale of the api is a parameter (API_MIN_REPLICAS reaches it through main.bicepparam, see the next test)
+        $bicep | Should -Match 'param apiMinReplicas int'
         $bicep | Should -Match 'stellar_blaze\?ssl=verify-full'
+    }
+    It 'main.bicepparam reads every variable this script exports, and no other one (drift guard)' {
+        $text = Get-Content -LiteralPath (Join-Path -Path $script:RepoDir -ChildPath 'infra\bicep\main.bicepparam') -Raw
+        $read = @([regex]::Matches($text, "readEnvironmentVariable\('(?<n>[A-Z0-9_]+)'") | ForEach-Object { $_.Groups['n'].Value } | Sort-Object -Unique)
+        $read | Should -Be (@($script:ParamEnvNames) | Sort-Object -Unique)
     }
     It 'Write-GuardResult prints one line per result with the reasons below a FAIL, and returns the number of FAILs' {
         $results = @(
@@ -2084,6 +2521,7 @@ Describe 'Deployed TLS checks T4 and T5 (ADR 0042, on what was deployed)' {
         Get-CallCount -Pattern '^az containerapp job secret list --name job-migrate .*--show-values' | Should -Be 1
         Get-CallCount -Pattern '^az containerapp job show --name job-migrate .*PGSSLROOTCERT' | Should -Be 1
         Get-CallCount -Pattern '^az containerapp show --name api .*PGSSLROOTCERT' | Should -Be 1
+        Get-CallCount -Pattern 'job-alerts' | Should -Be 0
     }
     It 'never lets the stored URL into the results, the printed lines or a call line' {
         $results = @(Test-DeployedTlsSetting -ResourceGroup 'rg-test')
@@ -2123,8 +2561,8 @@ Describe 'Deployed TLS checks T4 and T5 (ADR 0042, on what was deployed)' {
 Describe 'Exposure and cost guards S1 S2 S4 S6' {
     BeforeAll {
         function New-AppObject {
-            param([string]$App, [Nullable[bool]]$External = $null, [int]$MaxReplicas = 1)
-            return ((New-AppJsonText -App $App -Image 'x' -External $External -MaxReplicas $MaxReplicas) | ConvertFrom-Json)
+            param([string]$App, [Nullable[bool]]$External = $null, [int]$MaxReplicas = 1, [int]$MinReplicas = -1)
+            return ((New-AppJsonText -App $App -Image 'x' -External $External -MaxReplicas $MaxReplicas -MinReplicas $MinReplicas) | ConvertFrom-Json)
         }
         function New-EnvObject {
             param([string]$ProfilesJson)
@@ -2154,20 +2592,50 @@ Describe 'Exposure and cost guards S1 S2 S4 S6' {
         $without = @(ConvertFrom-JsonArray -Text '[{"name":"api","type":"Microsoft.App/containerApps","location":"uaenorth"}]')
         (Test-NoPrivateEndpoint -Resource $without).Status | Should -BeExactly 'PASS'
     }
-    It 'S2 passes at 1 / 1 replicas and FAILS at <Min> / <Max>' -ForEach @(
+    It 'S2 web: passes at min 1 / max 1 and FAILS at <Min> / <Max>' -ForEach @(
         @{ Min = 0; Max = 1 }, @{ Min = 1; Max = 3 }, @{ Min = 2; Max = 2 }
     ) {
-        (Test-AppScale -Name 'api' -App (New-AppObject -App 'api')).Status | Should -BeExactly 'PASS'
-        $app = New-AppObject -App 'api'
+        (Test-AppScale -Name 'web' -App (New-AppObject -App 'web')).Status | Should -BeExactly 'PASS'
+        $app = New-AppObject -App 'web'
         $app.properties.template.scale.minReplicas = $Min
         $app.properties.template.scale.maxReplicas = $Max
-        $r = Test-AppScale -Name 'api' -App $app
+        $r = Test-AppScale -Name 'web' -App $app
         $r.Status | Should -BeExactly 'FAIL'
         $r.Id | Should -BeExactly 'S2'
     }
+    It 'S2 api cool: passes at min 0 / max 1 and FAILS at <Min> / <Max>' -ForEach @(
+        @{ Min = 1; Max = 1 }, @{ Min = 0; Max = 3 }, @{ Min = 2; Max = 2 }
+    ) {
+        (Test-AppScale -Name 'api' -App (New-AppObject -App 'api' -MinReplicas 0) -ExpectedMin 0 -ExpectedMax 1).Status | Should -BeExactly 'PASS'
+        $app = New-AppObject -App 'api' -MinReplicas 0
+        $app.properties.template.scale.minReplicas = $Min
+        $app.properties.template.scale.maxReplicas = $Max
+        (Test-AppScale -Name 'api' -App $app -ExpectedMin 0 -ExpectedMax 1).Status | Should -BeExactly 'FAIL'
+    }
+    It 'S2 api warm: passes at min 1 / max 1 and FAILS at min 0 (scale to zero while the mode says warm)' {
+        (Test-AppScale -Name 'api' -App (New-AppObject -App 'api' -MinReplicas 1) -ExpectedMin 1 -ExpectedMax 1).Status | Should -BeExactly 'PASS'
+        $r = Test-AppScale -Name 'api' -App (New-AppObject -App 'api' -MinReplicas 0) -ExpectedMin 1 -ExpectedMax 1
+        $r.Status | Should -BeExactly 'FAIL'
+        $r.Subject | Should -Match 'min 0 / max 1, expected 1 / 1'
+    }
+    It 'S2 reads a missing minReplicas as 0 (the Container Apps default) only when the scale itself is there' {
+        $noMin = '{"properties":{"template":{"scale":{"maxReplicas":1}}}}' | ConvertFrom-Json
+        (Test-AppScale -Name 'api' -App $noMin -ExpectedMin 0 -ExpectedMax 1).Status | Should -BeExactly 'PASS'
+        (Test-AppScale -Name 'web' -App $noMin).Status | Should -BeExactly 'FAIL'
+    }
     It 'S2 FAILS when the scale cannot be read' {
-        (Test-AppScale -Name 'api' -App ('{"properties":{"template":{}}}' | ConvertFrom-Json)).Status | Should -BeExactly 'FAIL'
-        (Test-AppScale -Name 'api' -App $null).Status | Should -BeExactly 'FAIL'
+        (Test-AppScale -Name 'api' -App ('{"properties":{"template":{}}}' | ConvertFrom-Json) -ExpectedMin 0 -ExpectedMax 1).Status | Should -BeExactly 'FAIL'
+        (Test-AppScale -Name 'api' -App $null -ExpectedMin 0 -ExpectedMax 1).Status | Should -BeExactly 'FAIL'
+        (Test-AppScale -Name 'api' -App ('{"properties":{"template":{"scale":{"minReplicas":0}}}}' | ConvertFrom-Json) -ExpectedMin 0 -ExpectedMax 1).Status | Should -BeExactly 'FAIL'
+    }
+    It 'S2 alerts worker: passes at min 1 / max 1 and FAILS at <Min> / <Max>' -ForEach @(
+        @{ Min = 0; Max = 1 }, @{ Min = 1; Max = 3 }
+    ) {
+        (Test-AppScale -Name 'alerts' -App (New-AppObject -App 'alerts')).Status | Should -BeExactly 'PASS'
+        $app = New-AppObject -App 'alerts'
+        $app.properties.template.scale.minReplicas = $Min
+        $app.properties.template.scale.maxReplicas = $Max
+        (Test-AppScale -Name 'alerts' -App $app).Status | Should -BeExactly 'FAIL'
     }
     It 'S4 passes for the design: api internal, web external, alerts without an ingress' {
         (Test-AppIngress -Name 'api' -App (New-AppObject -App 'api')).Status | Should -BeExactly 'PASS'
@@ -2435,6 +2903,38 @@ Describe 'Test-DemoHttp.ps1 (functions, curl.exe mocked)' {
         Mock Invoke-Curl { [pscustomobject]@{ Status = 503; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
         Wait-DemoWeb -Base 'https://web.example.test' -TimeoutSeconds 0 | Should -BeFalse
     }
+    It 'H2 allows the first call after idle a cold start of the api (--max-time 180); no other check does' {
+        $script:Seen = New-Object System.Collections.Generic.List[string]
+        Mock Invoke-Curl {
+            $script:Seen.Add("$Url|$MaxTime")
+            [pscustomobject]@{ Status = 200; Body = '{"status":"ok","version":"mock-1"}'; Headers = ''; ExitCode = 0; Error = '' }
+        }
+        Test-H1 -Base 'https://web.example.test' | Out-Null
+        Test-H2 -Base 'https://web.example.test' | Out-Null
+        $script:Seen | Should -Contain 'https://web.example.test/api/v1/health/ready|180'
+        @($script:Seen | Where-Object { $_ -match '\|180$' }).Count | Should -Be 1
+    }
+    It 'Wait-DemoApi polls /api/v1/health/ready THROUGH the web until 200, announces the cold start once at the first miss, and gives up at the deadline' {
+        Mock Start-Sleep { }
+        $script:Urls = New-Object System.Collections.Generic.List[string]
+        $script:Answers = New-Object System.Collections.Generic.Queue[int]
+        $script:Answers.Enqueue(503); $script:Answers.Enqueue(0); $script:Answers.Enqueue(502); $script:Answers.Enqueue(200)
+        Mock Invoke-Curl { $script:Urls.Add($Url); [pscustomobject]@{ Status = $script:Answers.Dequeue(); Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
+        $script:Announced = 0
+        Wait-DemoApi -Base 'https://web.example.test' -TimeoutSeconds 60 -OnFirstWait { $script:Announced++ } | Should -BeTrue
+        $script:Announced | Should -Be 1
+        @($script:Urls | Select-Object -Unique) | Should -Be @('https://web.example.test/api/v1/health/ready')
+        $script:Urls.Count | Should -Be 4
+        Mock Invoke-Curl { [pscustomobject]@{ Status = 503; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
+        Wait-DemoApi -Base 'https://web.example.test' -TimeoutSeconds 0 | Should -BeFalse
+    }
+    It 'Wait-DemoApi announces nothing when the first answer is already 200' {
+        Mock Start-Sleep { }
+        Mock Invoke-Curl { [pscustomobject]@{ Status = 200; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
+        $script:Announced = 0
+        Wait-DemoApi -Base 'https://web.example.test' -TimeoutSeconds 60 -OnFirstWait { $script:Announced++ } | Should -BeTrue
+        $script:Announced | Should -Be 0
+    }
     It 'H7 FAILS on 201, 500 and no answer, passes on 401 and 403' {
         Mock Invoke-Curl { [pscustomobject]@{ Status = 201; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
         (Test-H7 -Base 'https://web.example.test').Status | Should -BeExactly 'FAIL'
@@ -2457,6 +2957,7 @@ $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$Port/")
 $listener.Start()
 $plans = 0
+$readyCalls = 0
 while ($listener.IsListening) {
     $context = $listener.GetContext()
     $path = $context.Request.Url.AbsolutePath
@@ -2472,7 +2973,12 @@ while ($listener.IsListening) {
         break
     }
     if ($method -eq 'GET' -and $path -eq '/api/healthz') { $status = 200; $body = '{"status":"ok","version":"mock-1"}' }
-    elseif ($method -eq 'GET' -and $path -eq '/api/v1/health/ready') { $status = 200; $body = '{"status":"ok","checks":{"database":"ok","config":"ok"}}' }
+    elseif ($method -eq 'GET' -and $path -eq '/api/v1/health/ready') {
+        # 'cold': the api behind the web is still starting for the first two calls; 'down': it never starts
+        $readyCalls++
+        $status = 200; $body = '{"status":"ok","checks":{"database":"ok","config":"ok"}}'
+        if (($Scenario -eq 'cold' -and $readyCalls -le 2) -or $Scenario -eq 'down') { $status = 503; $body = '{"title":"starting"}' }
+    }
     elseif ($method -eq 'POST' -and $path -eq '/api/v1/crews/crew-b/stops') { $status = 201; $body = '{"id":"stop-0001","crew_id":"crew-b","started_at":"' + $Started + '","cleared_at":null}' }
     elseif ($method -eq 'DELETE' -and $path -eq '/api/v1/crews/crew-b/stops/stop-0001') { $status = 204; $body = '' }
     elseif ($method -eq 'GET' -and $path -eq '/api/v1/crews/crew-b/timeline') {
@@ -2536,10 +3042,10 @@ while ($listener.IsListening) {
         }
 
         function Invoke-SmokeScript {
-            param([string]$Url)
+            param([string]$Url, [string[]]$Extra = @())
             $previous = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
-            $lines = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path -Path $script:ScriptsDir -ChildPath 'Test-DemoHttp.ps1') -BaseUrl $Url 2>&1)
+            $lines = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path -Path $script:ScriptsDir -ChildPath 'Test-DemoHttp.ps1') -BaseUrl $Url @Extra 2>&1)
             $code = $LASTEXITCODE
             $ErrorActionPreference = $previous
             return [pscustomobject]@{ Code = $code; Text = ($lines | ForEach-Object { "$_" }) -join "`n" }
@@ -2559,6 +3065,35 @@ while ($listener.IsListening) {
         $run.Text | Should -Match 'PASS H6 .*Retry-After 30 at request 21'
         $run.Text | Should -Match 'SMOKE OK'
         $run.Code | Should -Be 0
+    }
+    It 'with -WaitReady waits for the api THROUGH the web (cold start), says so, and then passes H2' {
+        $stack = Start-MockStack -Scenario 'cold'
+        try { $run = Invoke-SmokeScript -Url $stack.Url -Extra @('-WaitReady', '-PollSeconds', '1') } finally { Stop-MockStack -Stack $stack }
+        $run.Text | Should -Match 'waiting for the api to start \(cold start\)'
+        $run.Text | Should -Match 'PASS H1 '
+        $run.Text | Should -Match 'PASS H2 '
+        $run.Text | Should -Match 'SMOKE OK'
+        $run.Code | Should -Be 0
+    }
+    It 'with -WaitReady and an api that is ready at once says nothing about a cold start' {
+        $stack = Start-MockStack
+        try { $run = Invoke-SmokeScript -Url $stack.Url -Extra @('-WaitReady', '-PollSeconds', '1') } finally { Stop-MockStack -Stack $stack }
+        $run.Text | Should -Not -Match 'cold start'
+        $run.Text | Should -Match 'SMOKE OK'
+    }
+    It 'with -WaitReady and an api that never starts FAILS H0 naming the ready path, runs no other check, and exits 1' {
+        $stack = Start-MockStack -Scenario 'down'
+        try { $run = Invoke-SmokeScript -Url $stack.Url -Extra @('-WaitReady', '-PollSeconds', '1', '-ApiWaitSeconds', '2') } finally { Stop-MockStack -Stack $stack }
+        $run.Text | Should -Match 'FAIL H0 .*/api/v1/health/ready.*within 2 s'
+        $run.Text | Should -Not -Match 'PASS H1 '
+        $run.Code | Should -Be 1
+    }
+    It 'without -WaitReady a cold api is not waited for: H2 alone reports it' {
+        $stack = Start-MockStack -Scenario 'down'
+        try { $run = Invoke-SmokeScript -Url $stack.Url } finally { Stop-MockStack -Stack $stack }
+        $run.Text | Should -Not -Match 'cold start'
+        $run.Text | Should -Match 'FAIL H2 '
+        $run.Code | Should -Be 1
     }
     It 'FAILS H3 and exits 1 when the timeline still shows red' {
         $stack = Start-MockStack -Scenario 'red'
