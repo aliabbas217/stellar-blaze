@@ -231,7 +231,9 @@ forbidden_modules = ["stellar_blaze.domain.validator"]
 # types, and starlette is pinned by fastapi==0.162.4; the Web Push channel (Task 11) shares one aiohttp.ClientSession
 # across a dispatch run, and aiohttp is pinned by pywebpush==2.5.0 (which also passes it to its own calls).
 [tool.deptry.per_rule_ignores]
-DEP003 = ["starlette", "aiohttp"]
+DEP003 = ["starlette", "aiohttp", "pydantic_core"]
+# pydantic_core: `api/models.py` annotates pydantic's own `__get_pydantic_json_schema__` hook with `CoreSchema`, a type
+# that pydantic does not re-export; pydantic pins pydantic-core exactly, so it cannot drift from the declared pydantic.
 # Training-group packages (not in the API image): offline training code under stellar_blaze/ml/ imports sklearn,
 # scoringrules and mapie (import-linter contract 6 keeps these three out of the serving layers), and
 # domain/forecast/sampling.py imports scipy, which reaches the API image through lightgbm.
