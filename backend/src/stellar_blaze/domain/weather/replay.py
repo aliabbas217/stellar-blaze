@@ -23,9 +23,18 @@ MANIFEST_FILE: Final = "snapshot.json"
 REQUIRED_FILES: Final = (FORECASTS_FILE, OBSERVATIONS_FILE)
 
 HELD_OUT_SUMMERS: Final = frozenset({2026})
-"""Summers no replay snapshot may hold a row of, until the architect records "2026 go". The one definition: the builder,
-the manifest model and both replay sources use it, so they cannot drift. Unlocking is a deliberate, reviewed one-line
-edit here, never a flag, an environment variable or a command-line option."""
+"""Summers whose information a MODEL must never carry: the model loader refuses a model whose ``params.json`` lists one
+as a training summer or whose fold statistics hold one of these years (``adapters.compute.lgbm_corrector``), and the
+training and gold-data code keeps 2026 as the test summer (``ml.data``). This is permanent for the released model: no
+model may carry 2026. It is NOT the replay lock (``REPLAY_LOCKED_SUMMERS``): replay snapshots are display data and
+never feed a model, a threshold or a selection."""
+
+REPLAY_LOCKED_SUMMERS: Final = frozenset[int]()
+"""Summers no replay snapshot may hold a row of. The one definition for the replay side: the builder, the manifest
+model and both replay sources use it, so they cannot drift. It is empty since the architect's go-ahead of 2026-11-15
+(approved by Ali the same day), so that the demo can replay the real 2026 summer; the guards stay in place and a
+re-lock is a one-line edit here (``frozenset({2026})``), never a flag, an environment variable or a command-line
+option. Nothing under ``ml/`` may read a replay snapshot (``tests/unit/ml/test_replay_isolation.py``)."""
 
 SNAPSHOT_ID_PATTERN: Final = r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$"
 """A snapshot id is a path component: lowercase letters and digits in groups joined by single ``-`` or ``_``."""
@@ -103,10 +112,10 @@ class ReplaySnapshot(BaseModel):
     @model_validator(mode="after")
     def _window_and_files(self) -> Self:
         years = set(range(self.start.astimezone(UTC).year, self.end.astimezone(UTC).year + 1))
-        held_out = sorted(years & HELD_OUT_SUMMERS)  # every year in between, not only the endpoints
-        if held_out:
+        locked = sorted(years & REPLAY_LOCKED_SUMMERS)  # every year in between, not only the endpoints
+        if locked:
             raise ValueError(
-                f"the window {self.start.isoformat()} to {self.end.isoformat()} touches held-out year(s) {held_out}"
+                f"the window {self.start.isoformat()} to {self.end.isoformat()} touches locked year(s) {locked}"
             )
         if self.end < self.start:
             raise ValueError(f"end {self.end.isoformat()} is before start {self.start.isoformat()}")

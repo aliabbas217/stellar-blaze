@@ -6,11 +6,13 @@
 ``snapshot.json`` (a ``ReplaySnapshot`` with the SHA-256 of the two data files). It copies inputs: it never writes a
 corrected forecast or a score.
 
-The 2026 summer is held out (``HELD_OUT_SUMMERS``, defined once in ``domain.weather.replay``): until the architect
-gives the go-ahead, no snapshot of it is built, whatever the arguments. The guard runs before anything is read or
-written, and a second check on the rows about to be written fails closed if a window computation ever let a held-out
-year through. Unlocking is a deliberate edit of that one constant, never a flag, an environment variable or a
-command-line option.
+A summer in ``REPLAY_LOCKED_SUMMERS`` (defined once in ``domain.weather.replay``) is never built, whatever the
+arguments. The set has been empty since the architect's go-ahead of 2026-11-15, so the real 2026 summer can be copied
+for the live demo; the guard still runs before anything is read or written, and a second check on the rows about to be
+written fails closed if a window computation ever let a locked year through. Re-locking is a deliberate edit of that
+one constant, never a flag, an environment variable or a command-line option. The separate ``HELD_OUT_SUMMERS`` is the
+model guard (no model may carry 2026) and is not touched by this module. A snapshot is display data: nothing in
+``ml/`` may read it, so it never feeds a model, a threshold or a selection.
 
 ``ingest-observations --source iem`` is unsupported over the replay source, by design: the port contract needs every
 row's ``source`` to equal the source's ``name`` (``"replay"``) while the silver store needs ``"iem"``, and replay mode
@@ -42,9 +44,9 @@ from stellar_blaze.domain.provenance import Provenance, ProvenanceLabel
 from stellar_blaze.domain.weather.models import LEADS_DAYS, MODEL_SUMMERS, NwpModel, summer_window
 from stellar_blaze.domain.weather.replay import (
     FORECASTS_FILE,
-    HELD_OUT_SUMMERS,
     MANIFEST_FILE,
     OBSERVATIONS_FILE,
+    REPLAY_LOCKED_SUMMERS,
     ReplayFile,
     ReplaySnapshot,
     check_snapshot_id,
@@ -74,33 +76,33 @@ class ReplayBuildError(Exception):
 
 
 class ReplayHoldoutError(ValueError):
-    """The snapshot would hold data of a held-out summer (``HELD_OUT_SUMMERS``). Nothing is written."""
+    """The snapshot would hold data of a locked summer (``REPLAY_LOCKED_SUMMERS``). Nothing is written."""
 
 
 def refuse_held_out(summer: int) -> None:
-    """Raise unless ``summer`` may be built.
+    """Raise unless ``summer`` may be built (the name is kept from the time the whole of 2026 was locked).
 
     Raises:
-        ReplayHoldoutError: ``summer`` is in ``HELD_OUT_SUMMERS``.
+        ReplayHoldoutError: ``summer`` is in ``REPLAY_LOCKED_SUMMERS``.
     """
-    if summer in HELD_OUT_SUMMERS:
+    if summer in REPLAY_LOCKED_SUMMERS:
         raise ReplayHoldoutError(
-            f"summer {summer} is held out: replay snapshots of it stay locked until the architect's go-ahead "
-            "(HELD_OUT_SUMMERS in stellar_blaze/domain/weather/replay.py)"
+            f"summer {summer} is locked for replay snapshots until the architect's go-ahead "
+            "(REPLAY_LOCKED_SUMMERS in stellar_blaze/domain/weather/replay.py)"
         )
 
 
 def _refuse_held_out_rows(forecasts: pl.DataFrame, truth: pl.DataFrame) -> None:
-    """Fail closed if a row about to be written falls in a held-out year, whatever the window computation said.
+    """Fail closed if a row about to be written falls in a locked year, whatever the window computation said.
 
     Raises:
-        ReplayHoldoutError: A forecast or observation ``valid_time`` is in a year of ``HELD_OUT_SUMMERS``.
+        ReplayHoldoutError: A forecast or observation ``valid_time`` is in a year of ``REPLAY_LOCKED_SUMMERS``.
     """
     for label, frame in (("forecasts", forecasts), ("observations", truth)):
-        years = set(frame["valid_time"].dt.year().unique().to_list()) & HELD_OUT_SUMMERS
+        years = set(frame["valid_time"].dt.year().unique().to_list()) & REPLAY_LOCKED_SUMMERS
         if years:
             raise ReplayHoldoutError(
-                f"the {label} to write hold rows of held-out year(s) {sorted(years)}; refusing, nothing was written"
+                f"the {label} to write hold rows of locked year(s) {sorted(years)}; refusing, nothing was written"
             )
 
 
@@ -194,8 +196,8 @@ def build_replay_snapshot(
         The directory written, its manifest and its size.
 
     Raises:
-        ReplayHoldoutError: ``summer`` is in ``HELD_OUT_SUMMERS`` (raised before anything is read or written), or a row
-            to be written falls in a held-out year.
+        ReplayHoldoutError: ``summer`` is in ``REPLAY_LOCKED_SUMMERS`` (raised before anything is read or written), or a
+            row to be written falls in a locked year.
         ReplayBuildError: The id is not a safe slug, no station was named, the summer is not one the archive covers,
             the snapshot directory (or a staging directory of it) already exists, a station has no silver
             forecasts for a model or no observations in the window, or the files together exceed

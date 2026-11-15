@@ -1,7 +1,8 @@
 """A tiny replay snapshot built the way the real one is: synthetic silver files, then ``build_replay_snapshot``.
 
-Three UTC days of July 2025 (the 9th to the 11th), two stations, both models, leads 0 to 7. 2025 dates only: nothing
-here touches the 2026 hold-out, and the data is the synthetic generator's, never the gold file.
+Three UTC days of July of the summer (default 2025; 2026 for the tests of the unlocked replay summer), the 9th to the
+11th, two stations, both models, leads 0 to 7. The data is the synthetic generator's, never the gold file or any real
+2026 data.
 """
 
 from datetime import UTC, datetime
@@ -25,11 +26,11 @@ SUMMER_DAYS: Final = (56, 57, 58)  # day 1 is 15 May, so these are 9, 10 and 11 
 MODELS: Final = (NwpModel.ECMWF_IFS025, NwpModel.GFS_SEAMLESS)
 
 
-def synthetic_pairs(stations: tuple[Station, ...] = FIXTURE_STATIONS) -> pl.DataFrame:
+def synthetic_pairs(stations: tuple[Station, ...] = FIXTURE_STATIONS, *, summer: int = SUMMER) -> pl.DataFrame:
     """The synthetic pair frame of the fixture days (no missing GFS rows, so every hour has every lead)."""
     return make_pairs(
         seed=13,
-        summers=(SUMMER,),
+        summers=(summer,),
         station_bias_c={},
         stations=[s.icao for s in stations],
         leads=range(8),
@@ -38,29 +39,32 @@ def synthetic_pairs(stations: tuple[Station, ...] = FIXTURE_STATIONS) -> pl.Data
     )
 
 
-def seed_silver(root: Path, pairs: pl.DataFrame | None = None) -> ParquetStore:
+def seed_silver(root: Path, pairs: pl.DataFrame | None = None, *, summer: int = SUMMER) -> ParquetStore:
     """Write the frame's forecasts and observations as silver files under ``root`` and return the store."""
-    frame = synthetic_pairs() if pairs is None else pairs
+    frame = synthetic_pairs(summer=summer) if pairs is None else pairs
     store = ParquetStore(root)
     truth = observations_of(frame)
     for icao in frame["station"].unique().sort().to_list():
         for model in MODELS:
             forecasts = forecasts_of(frame, model.value).filter(pl.col("station") == icao)
-            store.write_forecasts(model, SUMMER, icao, forecasts)
-        store.write_observations("iem", SUMMER, icao, truth.filter(pl.col("station") == icao))
+            store.write_forecasts(model, summer, icao, forecasts)
+        store.write_observations("iem", summer, icao, truth.filter(pl.col("station") == icao))
     return store
 
 
 def build_fixture_snapshot(
-    root: Path, *, replay_dir: Path | None = None, store: ParquetStore | None = None
+    root: Path, *, replay_dir: Path | None = None, store: ParquetStore | None = None, summer: int = SUMMER
 ) -> BuiltSnapshot:
-    """Seed silver under ``root`` (unless a ``store`` is given) and build the fixture snapshot under ``replay_dir``."""
+    """Seed silver under ``root`` (unless a ``store`` is given) and build the fixture snapshot under ``replay_dir``.
+
+    The snapshot id is ``fixture-<summer>`` (``SNAPSHOT_ID`` for the default summer).
+    """
     return build_replay_snapshot(
-        store=seed_silver(root) if store is None else store,
+        store=seed_silver(root, summer=summer) if store is None else store,
         replay_dir=root / "replay" if replay_dir is None else replay_dir,
-        summer=SUMMER,
+        summer=summer,
         stations=list(FIXTURE_STATIONS),
-        snapshot_id=SNAPSHOT_ID,
+        snapshot_id=f"fixture-{summer}",
         git_sha=GIT_SHA,
         created_at=CREATED_AT,
     )
