@@ -61,8 +61,14 @@ WORKDIR /app
 # 2026-11-15 with `apt list --upgradable` and a trivy scan of the image): openssl (CVE-2026-84782), libpcre2
 # (CVE-2026-103111), zlib1g (CVE-2026-76844, CVE-2026-85091) and apt (CVE-2026-109518). Only these packages move, not the
 # whole system, and the digest pin above stays. The base image itself is not bumped for them: ADR 0008 keeps python
-# 3.13.15 until the post-submission dependency sweep. Delete the second apt-get when that sweep moves the base image to
-# one that already carries the fixes.
+# 3.13.15 until the post-submission dependency sweep.
+#
+# Cost, accepted 2026-11-16: this step makes the image build depend on the state of the Debian apt repository on the day
+# it runs. The digest pins the base image, not what this step downloads, so two builds of one commit on different days
+# can ship different package versions (a reproducibility cost against the digest pin; the unpinned libgomp1 install
+# above already had a smaller form of it). Removal: when the base image moves to python 3.13.18 or later (new digest,
+# after the submission, in the dependency sweep recorded in docs/parking-lot.md), delete the second apt-get, and run
+# the image scan again.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends libgomp1 \
     && apt-get install --yes --no-install-recommends --only-upgrade \
