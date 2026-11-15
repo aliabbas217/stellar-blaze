@@ -16,9 +16,9 @@ from uvicorn.config import LOGGING_CONFIG
 
 from stellar_blaze.api.app import create_app
 from stellar_blaze.api.deps import SnapshotDep
-from stellar_blaze.composition import build_runtime
+from stellar_blaze.composition import build_runtime, load_runtime_config
 from stellar_blaze.config import Settings
-from stellar_blaze.domain.config.runtime import RuntimeConfig, config_sha256
+from stellar_blaze.domain.config.runtime import config_sha256
 from stellar_blaze.logging import bind_runtime_ids
 from tests.unit.test_logging import json_lines
 from tests.unit.test_logging_uvicorn import serve
@@ -29,6 +29,8 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_MODELS = BACKEND_ROOT / "tests" / "fixtures" / "models"
 FIRST = "corrector-20261111-0000000-000000"
 SECOND = "corrector-20261112-0000000-000001"
+# The sha of the config the app loads at startup: the git default seed (it pins the frozen warning_theta).
+SEED_CONFIG_SHA = config_sha256(load_runtime_config(BACKEND_ROOT / "config" / "runtime" / "default.toml"))
 
 
 @pytest.fixture(autouse=True)
@@ -97,7 +99,7 @@ def test_under_a_real_server_startup_and_every_request_log_carry_the_loaded_ids(
     assert len(ready) == 1
     assert {k: ready[0][k] for k in ids} == ids
     assert ready[0]["config_source"] == "file"
-    assert ready[0]["config_sha256"] == config_sha256(RuntimeConfig())
+    assert ready[0]["config_sha256"] == SEED_CONFIG_SHA
 
     completed = named(lines, "request.completed")
     assert [line["path"] for line in completed] == ["/api/v1/health/live", "/test/decision"]
@@ -110,5 +112,5 @@ def test_under_a_real_server_startup_and_every_request_log_carry_the_loaded_ids(
     # The handler read the snapshot through the dependency, so its identity is on its own lines and on the request's.
     for line in (made[0], completed[1]):
         assert line["config_version"] is None
-        assert line["config_sha256"] == config_sha256(RuntimeConfig())
+        assert line["config_sha256"] == SEED_CONFIG_SHA
     assert "config_sha256" not in completed[0]  # health/live never read the snapshot
