@@ -6,6 +6,9 @@ playwright-report
 .lighthouseci
 test-results
 tests
+# playwright.config.ts imports this file and `next build` type-checks playwright.config.ts: without it the image build fails
+# (TS2307). The rest of tests/ stays out of the build context.
+!tests/e2e/live/env.ts
 *.tsbuildinfo
 next-env.d.ts
 .env*
