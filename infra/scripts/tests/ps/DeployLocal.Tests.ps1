@@ -64,21 +64,77 @@ BeforeAll {
         New-Item -ItemType Directory -Path (Join-Path -Path $root -ChildPath 'infra\bicep') -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path -Path $root -ChildPath 'backend') -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path -Path $root -ChildPath 'frontend') -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path -Path $root -ChildPath 'infra\bicep\main.bicep') -Value '// fake: az bicep build is mocked'
         Set-Content -LiteralPath (Join-Path -Path $root -ChildPath 'infra\bicep\main.bicepparam') -Value "using 'main.bicep'"
         Set-Content -LiteralPath (Join-Path -Path $root -ChildPath 'infra\bicep\bootstrap.bicepparam') -Value "using 'bootstrap.bicep'"
         return $root
     }
 
+    # The az containerapp show document of one app. As designed: api has an internal ingress, web an external one, alerts none.
+    # -External overrides the ingress (for the tests of the exposure guard); -MaxReplicas the scale (cost guard).
     function New-AppJsonText {
-        param([string]$App, [string]$Image)
+        param([string]$App, [string]$Image, [Nullable[bool]]$External = $null, [int]$MaxReplicas = 1)
         $latest = "$App--r1"
+        $configuration = @{}
+        if ($App -ne 'alerts' -or $null -ne $External) {
+            $isExternal = ($App -eq 'web')
+            if ($null -ne $External) { $isExternal = [bool]$External }
+            $configuration = @{ ingress = @{ fqdn = "$App.test.example"; external = $isExternal } }
+        }
         $obj = @{ properties = @{
                 latestRevisionName = $latest; latestReadyRevisionName = $latest; provisioningState = 'Succeeded'
-                template = @{ containers = @(@{ image = $Image }) }
-                configuration = @{ ingress = @{ fqdn = "$App.test.example" } }
+                template = @{ containers = @(@{ image = $Image }); scale = @{ minReplicas = 1; maxReplicas = $MaxReplicas } }
+                configuration = $configuration
             }
         }
         return ($obj | ConvertTo-Json -Depth 10)
+    }
+
+    # The compiled main.bicep (az bicep build --stdout) in the shape Bicep 0.49 really produces it (checked against a real
+    # build): variables with the env arrays, one Microsoft.Resources/deployments per module, the env parameter either an
+    # object with a value or one whole expression string. The switches break exactly one property.
+    function New-CompiledTemplateText {
+        param(
+            [string]$UrlSuffix = '?ssl=verify-full',
+            [string]$RootCert = '/etc/ssl/certs/ca-certificates.crt',
+            [switch]$AlertsWithoutCoreEnv,
+            [switch]$OmitJobModule,
+            [string]$ExtraVariable = ''
+        )
+        $urlExpr = "format('postgresql+asyncpg://sbadmin:{0}@{1}:5432/stellar_blaze$UrlSuffix', parameters('pgAdminPassword'), reference(resourceId('Microsoft.Resources/deployments', 'postgres'), '2025-04-01').outputs.fqdn.value)"
+        $secretsExpr = "[if(parameters('apiIsPlaceholder'), createObject('value', createArray()), createObject('value', createArray(createObject('name', 'sb-database-url', 'value', $urlExpr))))]"
+        $alertsEnv = "[concat(variables('coreEnv'), variables('runtimeEnv'))]"
+        if ($AlertsWithoutCoreEnv) { $alertsEnv = "[variables('runtimeEnv')]" }
+        $variables = [ordered]@{
+            migrateJobName = 'job-migrate'
+            pgSslRootCert  = $RootCert
+            coreEnv        = @(
+                @{ name = 'SB_ENV'; value = 'prod' },
+                @{ name = 'SB_GIT_SHA'; value = "[parameters('gitSha')]" },
+                @{ name = 'SB_DATABASE_URL'; secretRef = 'sb-database-url' },
+                @{ name = 'PGSSLROOTCERT'; value = "[variables('pgSslRootCert')]" }
+            )
+            runtimeEnv     = "[createArray(createObject('name', 'SB_FORECAST_SOURCE', 'value', parameters('forecastSource')))]"
+            apiEnv         = "[concat(variables('coreEnv'), variables('runtimeEnv'), createArray(createObject('name', 'SB_ACCESS_TOKENS', 'secretRef', 'sb-access-tokens')))]"
+            alertsEnv      = $alertsEnv
+        }
+        if ($ExtraVariable) { $variables['note'] = $ExtraVariable }
+        $module = {
+            param($Name, $EnvParam)
+            return @{ type = 'Microsoft.Resources/deployments'; apiVersion = '2025-04-01'; name = $Name; properties = @{ mode = 'Incremental'; parameters = @{ env = $EnvParam; secrets = $secretsExpr } } }
+        }
+        $resources = New-Object System.Collections.Generic.List[object]
+        $resources.Add((& $module 'monitoring' @{ value = 'x' }))
+        if (-not $OmitJobModule) {
+            $resources.Add((& $module 'job-migrate' "[if(parameters('apiIsPlaceholder'), createObject('value', createArray()), createObject('value', variables('coreEnv')))]"))
+        }
+        $resources.Add((& $module 'app-api' "[if(parameters('apiIsPlaceholder'), createObject('value', createArray()), createObject('value', variables('apiEnv')))]"))
+        $resources.Add((& $module 'app-web' @{ value = "[createArray(createObject('name', 'API_ORIGIN', 'value', 'x'))]" }))
+        $resources.Add((& $module 'app-alerts' @{ value = $alertsEnv }))
+        $template = [ordered]@{ '$schema' = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'; contentVersion = '1.0.0.0'; variables = $variables; resources = $resources.ToArray() }
+        # Windows PowerShell 5.1 writes an apostrophe as backslash-u0027; Bicep writes it as it is.
+        $apostropheEscape = '\' + 'u0027'
+        return (($template | ConvertTo-Json -Depth 30).Replace($apostropheEscape, "'"))
     }
 
     function New-RevisionJsonText {
@@ -92,9 +148,35 @@ BeforeAll {
         return ($obj | ConvertTo-Json -Depth 10)
     }
 
+    # The stdout of `curl.exe --include --write-out "\n%{http_code}"` (Invoke-Native has already removed the carriage returns).
+    function New-CurlResponseText {
+        param([int]$Status, [string]$Body = '', [string]$RetryAfter = '')
+        $headers = "HTTP/1.1 $Status Status`nContent-Type: application/json"
+        if ($RetryAfter) { $headers += "`nRetry-After: $RetryAfter" }
+        return ($headers + "`n`n" + $Body + "`n" + $Status)
+    }
+
+    # The answer of POST demo-reset: every call starts the next epoch (the demo site starts in epoch 1, made by the site load).
+    function New-ResetAnswer {
+        $previous = $script:Epoch
+        $script:Epoch = $previous + 1
+        $body = '{"site_id":"site-demo-mussafah","epoch_id":' + $script:Epoch + ',"previous_epoch_id":' + $previous + ',"reset_at":"2026-11-15T09:00:00Z"}'
+        return (New-CurlResponseText -Status 200 -Body $body)
+    }
+
     # The default answers of the fake az, docker, git and curl.exe for a complete REAL deploy. First match wins.
     function Get-DefaultResponse {
         return @(
+            @{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-ResetAnswer) } },
+            # the deployment guards (ADR 0042 and the exposure and cost checks): more specific than the patterns below
+            @{ Pattern = '^az bicep build'; Value = { return $script:CompiledTemplate } },
+            @{ Pattern = '^az containerapp (job )?secret list'; Value = { return $script:DatabaseUrlValue } },
+            @{ Pattern = '^az containerapp (job )?show .*PGSSLROOTCERT'; Value = { return $script:RootCertValue } },
+            @{ Pattern = '^az containerapp env list'; Value = 'cae-test' },
+            @{ Pattern = '^az containerapp env show'; Value = '{"properties":{"workloadProfiles":[{"name":"Consumption","workloadProfileType":"Consumption"}]}}' },
+            @{ Pattern = '^az resource list'; Value = { return $script:ResourceListJson } },
+            @{ Pattern = '^az group exists'; Value = 'true' },
+            @{ Pattern = '^az containerapp revision restart'; Value = '' },
             @{ Pattern = '^icacls '; Value = '' },
             @{ Pattern = '^az account show'; Value = '{"id":"00000000-0000-0000-0000-000000000001","name":"Test Subscription","user":{"name":"ali@example.org"}}' },
             @{ Pattern = '^az extension show'; Value = '1.2.3' },
@@ -160,6 +242,12 @@ BeforeAll {
         return ((@($stream) | ForEach-Object { "$_" }) -join "`n")
     }
 
+    $script:CompiledTemplate = New-CompiledTemplateText
+    $script:RootCertValue = '/etc/ssl/certs/ca-certificates.crt'
+    $script:DatabaseUrlValue = 'postgresql+asyncpg://sbadmin:' + ([guid]::NewGuid().ToString('N')) + '@psql-test.postgres.database.azure.com:5432/stellar_blaze?ssl=verify-full'
+    $script:ResourceListJson = '[{"name":"cae-test","type":"Microsoft.App/managedEnvironments","location":"uaenorth"},{"name":"api","type":"Microsoft.App/containerApps","location":"uaenorth"},{"name":"id-sb-apps","type":"Microsoft.ManagedIdentity/userAssignedIdentities","location":"uaenorth"}]'
+    $script:Said = New-Object System.Collections.Generic.List[string]
+    $script:Epoch = 1
     $script:ImageFor = @{ api = $script:ApiImage; web = $script:WebImage; alerts = $script:ApiImage }
     $script:JobImage = $script:ApiImage
     $script:StateDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('sb-test-state-' + [guid]::NewGuid().ToString('N'))
@@ -374,6 +462,67 @@ Describe 'Invoke-Migration' {
             @{ Pattern = '^az containerapp job execution list'; Value = $list }
         ) + $script:Responses
         Invoke-Migration -ResourceGroup 'rg' -ExpectedImage $script:ApiImage | Should -BeExactly 'job-migrate-abc'
+    }
+    It 'treats the None that -o tsv prints for a null as no execution name (never polls an execution called None)' {
+        $list = '[{"name":"job-migrate-abc","properties":{"startTime":"2026-11-15T09:00:00Z"}}]'
+        $script:Responses = @(
+            @{ Pattern = '^az containerapp job start'; Value = 'None' },
+            @{ Pattern = '^az containerapp job execution list'; Value = $list }
+        ) + $script:Responses
+        Invoke-Migration -ResourceGroup 'rg' -ExpectedImage $script:ApiImage | Should -BeExactly 'job-migrate-abc'
+        Get-CallCount -Pattern 'execution show .*--job-execution-name None' | Should -Be 0
+    }
+    It 'treats a None job image as no image, not as an image called None' {
+        $script:JobImage = 'None'
+        { Invoke-Migration -ResourceGroup 'rg' -ExpectedImage $script:ApiImage } | Should -Throw '*reports no image*'
+        Get-CallCount -Pattern 'job start' | Should -Be 0
+    }
+}
+
+Describe 'ConvertFrom-AzTsv' {
+    It 'maps the None that az prints for a JSON null, and an empty answer, to the empty string' {
+        ConvertFrom-AzTsv -Text 'None' | Should -BeExactly ''
+        ConvertFrom-AzTsv -Text 'none' | Should -BeExactly ''
+        ConvertFrom-AzTsv -Text "None`r`n" | Should -BeExactly ''
+        ConvertFrom-AzTsv -Text '' | Should -BeExactly ''
+        ConvertFrom-AzTsv -Text $null | Should -BeExactly ''
+    }
+    It 'keeps every real value, including one that starts with None' {
+        ConvertFrom-AzTsv -Text 'web.test.example' | Should -BeExactly 'web.test.example'
+        ConvertFrom-AzTsv -Text 'Nonexistent' | Should -BeExactly 'Nonexistent'
+        ConvertFrom-AzTsv -Text 'a b' | Should -BeExactly 'a b'
+    }
+}
+
+Describe 'None from -o tsv in the other readers' {
+    BeforeEach {
+        Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
+        Set-NativeMock
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+        Mock Test-CommandAvailable { $true }
+        Mock Invoke-DemoSmoke { $true }
+        $script:Responses = @(
+            @{ Pattern = '^az containerapp show --name web .*ingress.fqdn'; Value = 'None' },
+            @{ Pattern = '^az deployment group show'; Throw = 'az deployment group show failed (exit code 3).' }
+        ) + $script:Responses
+    }
+    It 'Get-DeployOutput refuses a None ingress FQDN instead of returning https://None' {
+        { Get-DeployOutput -ResourceGroup 'rg' -DeploymentName 'x' } | Should -Throw '*no ingress FQDN*'
+    }
+    It 'the Smoke action refuses a None ingress FQDN instead of smoke testing https://None' {
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo
+        { Invoke-Smoke -Config $config } | Should -Throw '*No web FQDN*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
     }
 }
 
@@ -627,9 +776,14 @@ Describe 'Deploy' {
         $init = New-DeployConfig -VapidSubject 'mailto:ops@acme-demo.dev' -RepoRoot $script:FakeRepo
         Get-InfoText { Initialize-DemoSecret -Config $init } | Out-Null
         $script:PlainSecrets = (Get-Content -LiteralPath (Get-SecretsFilePath) -Raw) | ConvertFrom-Json
+        # The stored database URL as `secret list --show-values` returns it: it carries the REAL password, so a leak is visible.
+        $script:DatabaseUrlValue = "postgresql+asyncpg://sbadmin:$($script:PlainSecrets.pgAdminPassword)@psql-test.postgres.database.azure.com:5432/stellar_blaze?ssl=verify-full"
     }
     BeforeEach {
         $script:SecretValues = @()
+        $script:CompiledTemplate = New-CompiledTemplateText
+        $script:RootCertValue = '/etc/ssl/certs/ca-certificates.crt'
+        $script:Epoch = 1
         Save-StateFile -Update @{
             acrName = 'acrsbtest123'; acrLoginServer = $script:Registry; resourceGroupName = 'rg-test'; location = 'uaenorth'
             appsIdentityId = '/subscriptions/s/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-sb-apps'
@@ -649,8 +803,9 @@ Describe 'Deploy' {
             throw "unexpected native call: $line"
         }
         Mock Test-CommandAvailable { $true }
-        Mock Start-DeployDelay { }
-        Mock Invoke-DemoSmoke { $true }
+        # Markers in the call list make the order of waits and of the smoke test visible next to the az calls.
+        Mock Start-DeployDelay { $script:Calls.Add('<wait>') }
+        Mock Invoke-DemoSmoke { $script:Calls.Add('<smoke>'); $script:StateAtSmoke = Read-StateFile; return $true }
         $script:Config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -RepoRoot $script:FakeRepo
     }
 
@@ -678,7 +833,8 @@ Describe 'Deploy' {
         $gate | Should -BeGreaterThan $phase2
         Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly
         $output | Should -Match 'https://web.test.example'
-        $output | Should -Match 'ResetClock'
+        $output | Should -Match 'ResetDemo'
+        $output | Should -Not -Match 'ResetClock'
         $output | Should -Match 'INTERNAL'
     }
     It 'builds with exactly NEXT_PUBLIC_SB_DEMO= and the commit as APP_VERSION, and never passes 0' {
@@ -774,6 +930,237 @@ Describe 'Deploy' {
         { Invoke-Deploy -Config $config } | Should -Throw '*not in the registry*'
         Get-CallCount -Pattern 'deployment group create' | Should -Be 0
     }
+
+    # ---- the checks deploy.yml runs: ADR 0042 (T1-T5) and the exposure and cost guards (S1 S2 S4 S6) ---------------------
+    It 'checks the compiled template (T1 T2 T3) before anything is logged in to, built or deployed' {
+        Mock Write-Say { $script:Said.Add([string]$Message) }
+        $script:Said.Clear()
+        Invoke-Deploy -Config $script:Config
+        $said = $script:Said -join "`n"
+        $said | Should -Match 'PASS T1 '
+        $said | Should -Match 'PASS T2 '
+        $said | Should -Match 'PASS T3 '
+        $build = Get-CallIndex -Pattern '^az bicep build --file .*main\.bicep --stdout'
+        $build | Should -BeGreaterThan -1
+        $build | Should -BeLessThan (Get-CallIndex -Pattern '^az acr login')
+        $build | Should -BeLessThan (Get-CallIndex -Pattern '^docker build')
+        $build | Should -BeLessThan (Get-CallIndex -Pattern '^az deployment group create')
+    }
+    It 'stops before login, build and phase 1 when a template check FAILs' {
+        $script:CompiledTemplate = New-CompiledTemplateText -AlertsWithoutCoreEnv
+        Mock Write-Say { $script:Said.Add([string]$Message) }
+        $script:Said.Clear()
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*T3*'
+        ($script:Said -join "`n") | Should -Match 'FAIL T3 '
+        Get-CallCount -Pattern '^az acr login' | Should -Be 0
+        Get-CallCount -Pattern '^docker build' | Should -Be 0
+        Get-CallCount -Pattern 'deployment group create' | Should -Be 0
+    }
+    It 'stops the same way when the template cannot be built at all' {
+        $script:Responses = @(@{ Pattern = '^az bicep build'; Throw = 'az bicep build failed (exit code 1). Error BCP018' }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*main.bicep*'
+        Get-CallCount -Pattern '^docker build' | Should -Be 0
+        Get-CallCount -Pattern 'deployment group create' | Should -Be 0
+    }
+    It 'checks ADR 0042 on the deployed api, alerts and job-migrate after phase 2 and before the gates, and never prints the stored URL' {
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        $phase2 = Get-CallIndex -Pattern 'sb-main-p2'
+        $gate = Get-CallIndex -Pattern '^az containerapp revision show'
+        foreach ($pattern in '^az containerapp secret list --name api ', '^az containerapp secret list --name alerts ', '^az containerapp job secret list --name job-migrate ') {
+            $at = Get-CallIndex -Pattern $pattern
+            $at | Should -BeGreaterThan $phase2
+            $at | Should -BeLessThan $gate
+        }
+        Get-CallCount -Pattern '--show-values' | Should -Be 3
+        foreach ($name in 'api', 'alerts', 'job-migrate') {
+            $output | Should -Match "PASS T4 $name stores sb-database-url with ssl=verify-full"
+            $output | Should -Match "PASS T5 $name has PGSSLROOTCERT=/etc/ssl/certs/ca-certificates.crt"
+        }
+        $output.Contains($script:DatabaseUrlValue) | Should -BeFalse
+        $output.Contains($script:PlainSecrets.pgAdminPassword) | Should -BeFalse
+        ($script:Calls -join "`n").Contains($script:PlainSecrets.pgAdminPassword) | Should -BeFalse
+    }
+    It 'stops after phase 2, before the gates, the restart and the smoke test, when a deployed database URL lacks ssl=verify-full' {
+        $script:Responses = @(@{ Pattern = '^az containerapp secret list --name alerts'; Value = 'postgresql+asyncpg://sbadmin:x@h:5432/stellar_blaze?ssl=require' }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*T4*'
+        Get-CallCount -Pattern '^az containerapp revision show' | Should -Be 0
+        Get-CallCount -Pattern 'revision restart' | Should -Be 0
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+    }
+    It 'stops when a deployed app lacks PGSSLROOTCERT' {
+        $script:Responses = @(@{ Pattern = '^az containerapp show --name api .*PGSSLROOTCERT'; Value = 'None' }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*T5*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+    }
+    It 'stops before the restart and the smoke test when the api is public (S4), and has already recorded what is deployed' {
+        $script:Responses = @(@{ Pattern = '^az containerapp show --name api .* -o json'; Value = { return (New-AppJsonText -App 'api' -Image $script:ApiImage -External $true) } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*S4*'
+        Get-CallCount -Pattern 'revision restart' | Should -Be 0
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+        (Read-StateFile)['lastTag'] | Should -BeExactly 'relcheck-1'
+    }
+    It 'stops on a cost guard FAIL (S2: web may scale to 3 replicas)' {
+        $script:Responses = @(@{ Pattern = '^az containerapp show --name web .* -o json'; Value = { return (New-AppJsonText -App 'web' -Image $script:WebImage -MaxReplicas 3) } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*S2*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+    }
+    It 'stops on a cost guard FAIL (S1: a dedicated workload profile exists)' {
+        $script:Responses = @(@{ Pattern = '^az containerapp env show'; Value = '{"properties":{"workloadProfiles":[{"name":"Consumption","workloadProfileType":"Consumption"},{"name":"d4","workloadProfileType":"D4"}]}}' }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*S1*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+    }
+    It 'restarts api, alerts and web together after the gates, then gates again, resets the demo, smoke tests, and resets the demo a last time' {
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        @($script:Calls | Where-Object { $_ -match 'revision restart' }).Count | Should -Be 3
+        $api = Get-CallIndex -Pattern '^az containerapp revision restart --name api '
+        $api | Should -BeGreaterThan -1
+        # issued back to back: nothing (no wait, no gate poll) between the three
+        Get-CallIndex -Pattern '^az containerapp revision restart --name alerts ' | Should -Be ($api + 1)
+        Get-CallIndex -Pattern '^az containerapp revision restart --name web ' | Should -Be ($api + 2)
+        # after the gates (the first revision show is the first gate) ...
+        Get-CallIndex -Pattern '^az containerapp revision show' | Should -BeLessThan $api
+        # ... and all issued before the first wait
+        $firstWait = Get-CallIndex -Pattern '^<wait>$'
+        $firstWait | Should -BeGreaterThan ($api + 2)
+        # the gate runs again on the restarted apps ...
+        $gateAgain = Get-CallIndex -Pattern '^az containerapp revision show' -After ($api + 2)
+        $gateAgain | Should -BeGreaterThan $firstWait
+        # ... then the first demo reset, then the smoke test, then the final reset
+        $firstReset = Get-CallIndex -Pattern '^curl.exe .*--request POST .*demo-reset'
+        $firstReset | Should -BeGreaterThan $gateAgain
+        $smoke = Get-CallIndex -Pattern '^<smoke>$'
+        $smoke | Should -BeGreaterThan $firstReset
+        $lastReset = Get-CallIndex -Pattern '^curl.exe .*demo-reset' -After $smoke
+        $lastReset | Should -BeGreaterThan $smoke
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 2
+        # the resets restart nothing: all three restarts came before the first reset
+        Get-CallCount -Pattern 'revision restart|containerapp update' | Should -Be 3
+        $api | Should -BeLessThan $firstReset
+    }
+    It 'waits for the web before the first reset, and the smoke test runs with the final rate-limit wait' {
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        $healthz = Get-CallIndex -Pattern '^curl.exe .*https://web.test.example/api/healthz' -After (Get-CallIndex -Pattern '^az containerapp revision restart --name web ')
+        $healthz | Should -BeGreaterThan -1
+        $healthz | Should -BeLessThan (Get-CallIndex -Pattern '^curl.exe .*demo-reset')
+        Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly -ParameterFilter { $Fresh }
+    }
+    It 'POSTs the reset to the demo site through the web, and records both epochs in the state' {
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        $resets = @($script:Calls | Where-Object { $_ -match '^curl.exe .*demo-reset' })
+        $resets.Count | Should -Be 2
+        foreach ($call in $resets) {
+            $call | Should -Match '--request POST'
+            $call | Should -Match 'https://web.test.example/api/v1/sites/site-demo-mussafah/demo-reset$'
+        }
+        $state = Read-StateFile
+        $state['epochId'] | Should -BeExactly '3'
+        $state['previousEpochId'] | Should -BeExactly '2'
+        $state['resetAt'] | Should -BeExactly '2026-11-15T09:00:00Z'
+    }
+    It 'waits out a short Retry-After once when the FINAL reset is rate limited, then repeats it' {
+        $script:Answers = New-Object System.Collections.Generic.Queue[string]
+        $script:Answers.Enqueue((New-ResetAnswer))
+        $script:Answers.Enqueue((New-CurlResponseText -Status 429 -Body '{"title":"Rate limited"}' -RetryAfter '7'))
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { if ($script:Answers.Count -gt 0) { return $script:Answers.Dequeue() }; return (New-ResetAnswer) } }) + $script:Responses
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 3
+        Should -Invoke Start-DeployDelay -Times 1 -Exactly -ParameterFilter { $Seconds -eq 7 }
+        $output | Should -Match 'answered 429.*Retry-After 7 s.*trying once more'
+    }
+    It 'fails the deploy, after the smoke test passed, when the FINAL reset is rate limited twice' {
+        $script:Answers = New-Object System.Collections.Generic.Queue[string]
+        $script:Answers.Enqueue((New-ResetAnswer))
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { if ($script:Answers.Count -gt 0) { return $script:Answers.Dequeue() }; return (New-CurlResponseText -Status 429 -RetryAfter '5') } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*429*Retry-After: 5 s*ResetDemo*'
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 3
+        (Read-StateFile)['smokePassed'] | Should -BeTrue
+    }
+    It 'does not wait out a long Retry-After (the 10 per hour limit): it fails and says how long' {
+        $script:Answers = New-Object System.Collections.Generic.Queue[string]
+        $script:Answers.Enqueue((New-ResetAnswer))
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { if ($script:Answers.Count -gt 0) { return $script:Answers.Dequeue() }; return (New-CurlResponseText -Status 429 -RetryAfter '2400') } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*Retry-After: 2400 s*'
+        Should -Invoke Start-DeployDelay -Times 0 -Exactly -ParameterFilter { $Seconds -eq 2400 }
+    }
+    It 'does not smoke test, and does not reset a second time, when the first reset fails' {
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 503) } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*HTTP 503*'
+        Should -Invoke Invoke-DemoSmoke -Times 0 -Exactly
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 1
+    }
+    It 'does not run the final reset after a failed smoke test, and points at ResetDemo for a stop left behind' {
+        Mock Invoke-DemoSmoke { return $false }
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*ResetDemo*'
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 1
+    }
+    It 'does not restart anything, and does not smoke test, when the first gate fails' {
+        $script:Responses = @(@{ Pattern = '^az containerapp revision show --name web'; Value = { return (New-RevisionJsonText -App 'web' -Image "$script:Registry/sb-web:OLD") } }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*Revision gate failed*'
+        Get-CallCount -Pattern 'revision restart' | Should -Be 0
+    }
+
+    # ---- what the state says (ResetDemo, Status and Smoke read it) ---------------------------------------------------------
+    It 'records what is deployed BEFORE the smoke test, so a failed smoke test leaves the state of THIS deploy' {
+        Save-StateFile -Update @{ placeholder = $true; lastTag = 'placeholder'; webFqdn = 'old.test.example'; apiImage = $script:Placeholder; webImage = $script:Placeholder }
+        Mock Invoke-DemoSmoke { $script:StateAtSmoke = Read-StateFile; return $false }
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*demo HTTP checks failed*'
+        $atSmoke = $script:StateAtSmoke
+        $atSmoke['placeholder'] | Should -BeFalse
+        $atSmoke['lastTag'] | Should -BeExactly 'relcheck-1'
+        $state = Read-StateFile
+        $state['placeholder'] | Should -BeFalse
+        $state['lastTag'] | Should -BeExactly 'relcheck-1'
+        $state['webFqdn'] | Should -BeExactly 'web.test.example'
+        $state['apiImage'] | Should -BeExactly $script:ApiImage
+        $state['webImage'] | Should -BeExactly $script:WebImage
+        $state['smokePassed'] | Should -BeFalse
+        $state['smokeAt'] | Should -Match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+    }
+    It 'a smoke test that has not run yet is not recorded as passed, whatever the previous deploy said' {
+        Save-StateFile -Update @{ smokePassed = $true; smokeAt = '2026-11-01T00:00:00Z' }
+        Mock Invoke-DemoSmoke { $script:StateAtSmoke = Read-StateFile; return $true }
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        $script:StateAtSmoke['smokePassed'] | Should -BeFalse
+        $script:StateAtSmoke['smokeAt'] | Should -BeExactly ''
+    }
+    It 'records a passed smoke test with its time' {
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        $state = Read-StateFile
+        $state['smokePassed'] | Should -BeTrue
+        $state['smokeAt'] | Should -Match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+    }
+    It 'the Smoke action after a failed deploy smoke test runs the FULL demo checks, not only GET /, and records the result' {
+        Save-StateFile -Update @{ placeholder = $true; lastTag = 'placeholder'; webFqdn = 'old.test.example' }
+        Mock Invoke-DemoSmoke { return $false }
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*demo HTTP checks failed*'
+        $script:Calls.Clear()
+        Mock Invoke-DemoSmoke { $script:Calls.Add('<smoke again>'); return $true }
+        Get-InfoText { Invoke-Smoke -Config $script:Config } | Out-Null
+        Get-CallCount -Pattern '^<smoke again>$' | Should -Be 1
+        Get-CallCount -Pattern '^curl.exe' | Should -Be 0
+        (Read-StateFile)['smokePassed'] | Should -BeTrue
+    }
+    It 'the Smoke action records a failure too' {
+        Mock Invoke-DemoSmoke { return $false }
+        { Invoke-Smoke -Config $script:Config } | Should -Throw '*Demo HTTP checks failed*'
+        (Read-StateFile)['smokePassed'] | Should -BeFalse
+    }
+
+    # ---- -NoRevoke reaches every HTTP check of the deploy path ---------------------------------------------------------------
+    It 'passes -NoRevoke to the demo smoke test, and only when asked' {
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -NoRevoke -RepoRoot $script:FakeRepo
+        Get-InfoText { Invoke-Deploy -Config $config } | Out-Null
+        Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly -ParameterFilter { $NoRevoke }
+        $script:Calls.Clear()
+        Get-InfoText { Invoke-Deploy -Config $script:Config } | Out-Null
+        Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly -ParameterFilter { -not $NoRevoke }
+    }
+    It 'passes -NoRevoke to the Smoke action' {
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -NoRevoke -RepoRoot $script:FakeRepo
+        Save-StateFile -Update @{ webFqdn = 'web.test.example'; placeholder = $false }
+        Get-InfoText { Invoke-Smoke -Config $config } | Out-Null
+        Should -Invoke Invoke-DemoSmoke -Times 1 -Exactly -ParameterFilter { $NoRevoke }
+    }
 }
 
 Describe 'Deploy -Placeholder' {
@@ -784,6 +1171,7 @@ Describe 'Deploy -Placeholder' {
     }
     BeforeEach {
         $script:SecretValues = @()
+        $script:CompiledTemplate = New-CompiledTemplateText
         Save-StateFile -Update @{
             acrName = 'acrsbtest123'; acrLoginServer = $script:Registry; resourceGroupName = 'rg-test'; location = 'uaenorth'
             appsIdentityId = '/subscriptions/s/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-sb-apps'
@@ -846,15 +1234,48 @@ Describe 'Deploy -Placeholder' {
         Get-CallCount -Pattern '^az containerapp show --name alerts' | Should -Be 0
         Get-CallCount -Pattern '^curl.exe .*https://web.test.example/' | Should -BeGreaterThan 0
     }
+    It 'checks the template and the exposure and cost guards, but not the database TLS of apps that have no database, and restarts nothing' {
+        $output = Get-InfoText { Invoke-Deploy -Config $script:Config }
+        Get-CallCount -Pattern '^az bicep build' | Should -Be 1
+        Get-CallCount -Pattern 'secret list' | Should -Be 0
+        Get-CallCount -Pattern 'PGSSLROOTCERT' | Should -Be 0
+        Get-CallCount -Pattern 'revision restart' | Should -Be 0
+        Get-CallCount -Pattern '^az resource list' | Should -Be 1
+        $output | Should -Match 'PASS T1 '
+        $output | Should -Match 'PASS S1 '
+        $output | Should -Match 'PASS S2 api'
+        $output | Should -Match 'PASS S2 web'
+        $output | Should -Not -Match 'S2 alerts'
+        $output | Should -Match 'SKIP S4 '
+        $output | Should -Match 'PASS S6 '
+    }
+    It 'records the placeholder deploy before its HTTP check, and passes -NoRevoke to it' {
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -Placeholder -NoRevoke -RepoRoot $script:FakeRepo
+        Get-InfoText { Invoke-Deploy -Config $config } | Out-Null
+        @($script:Calls | Where-Object { $_ -match '^curl.exe ' -and $_ -match '--ssl-revoke-best-effort' }).Count | Should -BeGreaterThan 0
+        @($script:Calls | Where-Object { $_ -match '^curl.exe ' -and $_ -match '--ssl-no-revoke' }).Count | Should -Be 0
+        $state = Read-StateFile
+        $state['placeholder'] | Should -BeTrue
+        $state['smokePassed'] | Should -BeTrue
+    }
+    It 'a placeholder HTTP check that fails leaves the placeholder state with the failed smoke result' {
+        $script:Responses = @(@{ Pattern = '^curl.exe '; Value = '503' }) + $script:Responses
+        { Invoke-Deploy -Config $script:Config } | Should -Throw '*answered 503*'
+        $state = Read-StateFile
+        $state['placeholder'] | Should -BeTrue
+        $state['webFqdn'] | Should -BeExactly 'web.test.example'
+        $state['smokePassed'] | Should -BeFalse
+    }
 }
 
 # ======================================================================================================================
-Describe 'ResetClock' {
+Describe 'ResetDemo (a new demo epoch through the web; it restarts nothing)' {
     BeforeAll {
         Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
     }
     BeforeEach {
-        Save-StateFile -Update @{ placeholder = $false; resourceGroupName = 'rg-test' }
+        $script:Epoch = 1
+        Save-StateFile -Update @{ placeholder = $false; resourceGroupName = 'rg-test'; webFqdn = 'web.test.example'; epochId = ''; previousEpochId = ''; resetAt = '' }
         Set-NativeMock
         Mock Invoke-Native {
             $line = "$FilePath $($Arguments -join ' ')"
@@ -869,50 +1290,161 @@ Describe 'ResetClock' {
         }
         Mock Test-CommandAvailable { $true }
         Mock Start-DeployDelay { }
-        $script:Responses = @(
-            @{ Pattern = '^az containerapp revision restart'; Value = '' },
-            @{ Pattern = '^az containerapp update'; Value = '' }
-        ) + $script:Responses
+        $script:Config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo
     }
 
-    It 'restarts the active revision of api and alerts back to back and warns about desynchronised clocks' {
-        $config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo
-        $output = Get-InfoText { Invoke-ResetClock -Config $config }
-        $restarts = @($script:Calls | Where-Object { $_ -match 'revision restart' })
-        $restarts.Count | Should -Be 2
-        $restarts[0] | Should -Match '--name api --resource-group rg-test --revision api--r1'
-        $restarts[1] | Should -Match '--name alerts --resource-group rg-test --revision alerts--r1'
-        # adjacent: nothing else happens between the two restarts
-        (Get-CallIndex -Pattern 'revision restart --name alerts') - (Get-CallIndex -Pattern 'revision restart --name api') | Should -Be 1
-        Get-CallCount -Pattern 'containerapp update' | Should -Be 0
-        $output | Should -Match 'desynchronises'
-        $output | Should -Match 'anchor : 2026-06-14T10:10:00\+04:00'
-        $output | Should -Match 'resets SB_REPLAY_NOW'
+    It 'POSTs the reset of the demo site through the web, prints the new epoch and the day, records it, and restarts nothing' {
+        $output = Get-InfoText { Invoke-ResetDemo -Config $script:Config }
+        $posts = @($script:Calls | Where-Object { $_ -match '^curl.exe ' })
+        $posts.Count | Should -Be 1
+        $posts[0] | Should -Match '--request POST'
+        $posts[0] | Should -Match '--header Content-Length: 0'
+        $posts[0] | Should -Match 'https://web.test.example/api/v1/sites/site-demo-mussafah/demo-reset$'
+        $posts[0] | Should -Not -Match 'Authorization'
+        Get-CallCount -Pattern '^az ' | Should -Be 0
+        Get-CallCount -Pattern 'revision restart|containerapp update|containerapp job' | Should -Be 0
+        $output | Should -Match 'Demo reset: epoch 2 started \(the epoch before was 1\) at 2026-11-15T09:00:00Z'
+        $output | Should -Match 'restarts at the replay anchor'
+        $output | Should -Match 'about 7 h 20 min'
+        $output | Should -Match 'Nothing was restarted'
+        $state = Read-StateFile
+        $state['epochId'] | Should -BeExactly '2'
+        $state['previousEpochId'] | Should -BeExactly '1'
+        $state['resetAt'] | Should -BeExactly '2026-11-15T09:00:00Z'
     }
-    It 'with -ReplayNow sets SB_REPLAY_NOW on both apps instead of restarting' {
-        $config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo -ReplayNow '2026-06-14T12:00:00+04:00' -ReplayNowExplicit $true
-        $output = Get-InfoText { Invoke-ResetClock -Config $config }
-        $updates = @($script:Calls | Where-Object { $_ -match 'containerapp update' })
-        $updates.Count | Should -Be 2
-        $updates[0] | Should -Match '--name api .*--set-env-vars SB_REPLAY_NOW=2026-06-14T12:00:00\+04:00'
-        $updates[1] | Should -Match '--name alerts .*--set-env-vars SB_REPLAY_NOW=2026-06-14T12:00:00\+04:00'
-        Get-CallCount -Pattern 'revision restart' | Should -Be 0
-        $output | Should -Match 'anchor : 2026-06-14T12:00:00\+04:00'
+    It 'passes --ssl-revoke-best-effort with -NoRevoke, and only then' {
+        Get-InfoText { Invoke-ResetDemo -Config $script:Config } | Out-Null
+        Get-CallCount -Pattern 'ssl-revoke' | Should -Be 0
+        $script:Calls.Clear()
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -NoRevoke -RepoRoot $script:FakeRepo
+        Get-InfoText { Invoke-ResetDemo -Config $config } | Out-Null
+        Get-CallCount -Pattern '^curl.exe .*--ssl-revoke-best-effort' | Should -Be 1
+    }
+    It 'on a 429 prints the Retry-After, fails, does not wait and does not touch the recorded epoch' {
+        Save-StateFile -Update @{ epochId = '9'; previousEpochId = '8' }
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 429 -Body '{"title":"Rate limited"}' -RetryAfter '42') } }) + $script:Responses
+        { Invoke-ResetDemo -Config $script:Config } | Should -Throw '*429*Retry-After: 42 s*'
+        Get-CallCount -Pattern '^curl.exe .*demo-reset' | Should -Be 1
+        Should -Invoke Start-DeployDelay -Times 0 -Exactly
+        (Read-StateFile)['epochId'] | Should -BeExactly '9'
+    }
+    It 'on a 429 without a Retry-After header says so' {
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 429) } }) + $script:Responses
+        { Invoke-ResetDemo -Config $script:Config } | Should -Throw '*Retry-After: none*'
+    }
+    It 'fails with the status on any other non-2xx answer' -ForEach @(
+        @{ Status = 401 }, @{ Status = 404 }, @{ Status = 409 }, @{ Status = 500 }, @{ Status = 503 }
+    ) {
+        $script:ResetStatus = $Status
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status $script:ResetStatus -Body '{"title":"x"}') } }) + $script:Responses
+        { Invoke-ResetDemo -Config $script:Config } | Should -Throw "*HTTP $Status*"
+        (Read-StateFile)['epochId'] | Should -BeExactly ''
+    }
+    It 'fails clearly when curl gets no answer at all' {
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Throw = 'curl.exe (demo-reset) failed (exit code 7). curl: (7) Failed to connect' }) + $script:Responses
+        { Invoke-ResetDemo -Config $script:Config } | Should -Throw '*no HTTP answer*Failed to connect*'
+    }
+    It 'accepts a 200 whose body is not JSON, says no epoch is recorded, and records none' {
+        $script:Responses = @(@{ Pattern = '^curl.exe .*demo-reset'; Value = { return (New-CurlResponseText -Status 200 -Body 'ok') } }) + $script:Responses
+        $output = Get-InfoText { Invoke-ResetDemo -Config $script:Config }
+        $output | Should -Match 'no epoch'
+        (Read-StateFile)['epochId'] | Should -BeExactly ''
     }
     It 'does nothing after a placeholder deploy' {
         Save-StateFile -Update @{ placeholder = $true }
-        $config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo
-        $output = Get-InfoText { Invoke-ResetClock -Config $config }
+        $output = Get-InfoText { Invoke-ResetDemo -Config $script:Config }
         $output | Should -Match 'placeholder'
-        Get-CallCount -Pattern 'restart|update' | Should -Be 0
+        Get-CallCount -Pattern '^curl.exe|^az ' | Should -Be 0
     }
-    It 'rejects a -ReplayNow without an offset' {
-        { New-DeployConfig -ReplayNow '2026-06-14T10:10:00' } | Should -Throw '*offset*'
-        { New-DeployConfig -ReplayNow 'tomorrow+04:00' } | Should -Throw '*not a valid*'
+    It 'reads the web FQDN from the app when state.json has none, and refuses a None' {
+        Save-StateFile -Remove @('webFqdn')
+        $script:Responses = @(@{ Pattern = '^az containerapp show --name web .*ingress.fqdn'; Value = 'web.from-az.example' }) + $script:Responses
+        Get-InfoText { Invoke-ResetDemo -Config $script:Config } | Out-Null
+        Get-CallCount -Pattern '^curl.exe .*https://web.from-az.example/api/v1/sites/site-demo-mussafah/demo-reset' | Should -Be 1
+        $script:Responses = @(@{ Pattern = '^az containerapp show --name web .*ingress.fqdn'; Value = 'None' }) + $script:Responses
+        { Invoke-ResetDemo -Config $script:Config } | Should -Throw '*No web FQDN*'
     }
-    It 'estimates a replay clock from the process start' {
-        $estimate = Get-ReplayClockEstimate -Anchor '2026-06-14T10:10:00+04:00' -StartUtc ([datetime]'2026-11-15T08:00:00Z').ToUniversalTime() -NowUtc ([datetime]'2026-11-15T10:30:00Z').ToUniversalTime()
-        $estimate.ToOffset([TimeSpan]::FromHours(4)).ToString('HH:mm') | Should -BeExactly '12:40'
+    It 'ConvertFrom-CurlResponse reads status, Retry-After and body of the FINAL response, after a 100 Continue and with a multi-line body' {
+        $text = "HTTP/1.1 100 Continue`n`nHTTP/2 429`nretry-after: 12`ncontent-type: application/json`n`n{`n`"a`": 1`n}`n429"
+        $parsed = ConvertFrom-CurlResponse -Text $text
+        $parsed.Status | Should -Be 429
+        $parsed.RetryAfter | Should -BeExactly '12'
+        $parsed.Body | Should -Be "{`n`"a`": 1`n}"
+        (ConvertFrom-CurlResponse -Text "HTTP/1.1 204 No Content`n`n204").Body | Should -BeExactly ''
+        (ConvertFrom-CurlResponse -Text '').Status | Should -Be 0
+    }
+    It 'the entry script keeps ResetClock as an alias of ResetDemo and says so' {
+        $stateDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('sb-alias-state-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path -Path $stateDir -ChildPath 'state.json') -Value '{"placeholder":true}'
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $env:SB_I1_STATE_DIR = $stateDir
+        try {
+            $lines = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path -Path $script:ScriptsDir -ChildPath 'deploy-local.ps1') -Action ResetClock 2>&1)
+            $code = $LASTEXITCODE
+            $named = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path -Path $script:ScriptsDir -ChildPath 'deploy-local.ps1') -Action ResetDemo 2>&1)
+            $namedCode = $LASTEXITCODE
+        }
+        finally {
+            $env:SB_I1_STATE_DIR = $script:StateDir
+            $ErrorActionPreference = $previous
+            Remove-Item -LiteralPath $stateDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        $text = ($lines | ForEach-Object { "$_" }) -join "`n"
+        $text | Should -Match 'ResetClock is now called ResetDemo'
+        $text | Should -Match 'placeholder'
+        $code | Should -Be 0
+        (($named | ForEach-Object { "$_" }) -join "`n") | Should -Not -Match 'ResetClock'
+        $namedCode | Should -Be 0
+    }
+}
+
+Describe 'Status' {
+    BeforeAll {
+        Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    BeforeEach {
+        Save-StateFile -Update @{ placeholder = $false; resourceGroupName = 'rg-test'; lastTag = 'relcheck-1'; smokePassed = $true; smokeAt = '2026-11-15T10:00:00Z' }
+        Set-NativeMock
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+        Mock Test-CommandAvailable { $true }
+        $script:Config = New-DeployConfig -ResourceGroup 'rg-test' -RepoRoot $script:FakeRepo
+    }
+    It 'shows the anchor and the last recorded reset, says it cannot see the epoch, and reads no replica' {
+        $hourAgo = (Get-Date).ToUniversalTime().AddHours(-1).ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
+        Save-StateFile -Update @{ epochId = '3'; resetAt = $hourAgo }
+        $output = Get-InfoText { Invoke-Status -Config $script:Config }
+        Get-CallCount -Pattern 'replica' | Should -Be 0
+        $output | Should -Match 'Replay anchor \(SB_REPLAY_NOW\): 2026-06-14T10:10:00\+04:00'
+        $output | Should -Match 'Status cannot see the epoch'
+        $output | Should -Match 'about 7 h 20 min'
+        $output | Should -Match 'Last reset recorded by this script: epoch 3, '
+        $output | Should -Match '\(1\.0 h ago\)'
+        $output | Should -Not -Match 'replay clock (api|alerts)'
+        $output | Should -Not -Match 'WARN'
+        $output | Should -Match 'Last smoke test: passed at 2026-11-15T10:00:00Z'
+    }
+    It 'warns when the recorded reset is older than the demo day' {
+        $old = (Get-Date).ToUniversalTime().AddHours(-9).ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
+        Save-StateFile -Update @{ epochId = '3'; resetAt = $old }
+        $output = Get-InfoText { Invoke-Status -Config $script:Config }
+        $output | Should -Match 'WARN more than about 7 h 20 min since that reset'
+    }
+    It 'says no reset is recorded when there is none' {
+        Save-StateFile -Update @{ epochId = ''; resetAt = '' }
+        $output = Get-InfoText { Invoke-Status -Config $script:Config }
+        $output | Should -Match 'has recorded no reset yet'
     }
 }
 
@@ -1010,7 +1542,7 @@ Describe 'Bootstrap' {
         Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
         Set-NativeMock
         $script:BootstrapEnvSeen = New-Object System.Collections.Generic.List[object]
-        $outputs = '{"acrName":{"value":"acrsbtest123"},"acrLoginServer":{"value":"acrsbtest123.azurecr.io"},"appsIdentityId":{"value":"/subscriptions/s/id-sb-apps"},"resourceGroupName":{"value":"rg-stellarblaze-demo-uaenorth"}}'
+        $outputs = '{"acrName":{"value":"acrsbtest123"},"acrLoginServer":{"value":"acrsbtest123.azurecr.io"},"appsIdentityId":{"value":"/subscriptions/s/id-sb-apps"},"resourceGroupName":{"value":"rg-stellarblaze-demo-uaenorth"},"subscriptionId":{"value":"00000000-0000-0000-0000-000000000001"},"tenantId":{"value":"11111111-2222-3333-4444-555555555555"}}'
         $script:Responses = @(
             @{ Pattern = '^az ad signed-in-user'; Value = '11111111-1111-1111-1111-111111111111' },
             @{ Pattern = '^az deployment sub what-if'; Value = {
@@ -1075,9 +1607,650 @@ Describe 'Bootstrap' {
         Get-CallCount -Pattern 'sub create' | Should -Be 0
         foreach ($name in $script:BootstrapEnvNames) { Test-Path "Env:\$name" | Should -BeFalse }
     }
+
+    # ---- which subscription state.json belongs to ---------------------------------------------------------------------------
+    It 'saves the subscription id and the tenant id of the bootstrap outputs' {
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+        Get-InfoText { Invoke-Bootstrap -Config $config } | Out-Null
+        $state = Read-StateFile
+        $state['subscriptionId'] | Should -BeExactly '00000000-0000-0000-0000-000000000001'
+        $state['tenantId'] | Should -BeExactly '11111111-2222-3333-4444-555555555555'
+    }
+    It 'requires the subscription output, so a state file without it is never written' {
+        $script:Responses = @(@{ Pattern = '^az deployment sub show .*properties.outputs'; Value = '{"acrName":{"value":"a"},"acrLoginServer":{"value":"a.azurecr.io"},"appsIdentityId":{"value":"/x"},"resourceGroupName":{"value":"rg"}}' }) + $script:Responses
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+        { Invoke-Bootstrap -Config $config } | Should -Throw "*no output 'subscriptionId'*"
+    }
+    Context 'deployment keys that belong to an earlier life of the resource group' {
+        BeforeEach {
+            $script:Stale = @{
+                postgresVersionDeployed = '18'; lastTag = 'abc123def456'; placeholder = $false; webFqdn = 'web.old.example'; apiFqdn = 'api.old.example'
+                apiImage = 'old/api:1'; webImage = 'old/web:1'; smokePassed = $true; smokeAt = '2026-11-01T00:00:00Z'
+                subscriptionId = '00000000-0000-0000-0000-000000000001'; budgetMonth = '2026-10'
+            }
+            Save-StateFile -Update $script:Stale
+        }
+        It 'keeps them when the group still exists (a re-run to add -GitHubOwner must not forget the deployed PostgreSQL version)' {
+            $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -GitHubOwner 'AliOrg' -Yes -RepoRoot $script:FakeRepo
+            Get-InfoText { Invoke-Bootstrap -Config $config } | Out-Null
+            $state = Read-StateFile
+            $state['postgresVersionDeployed'] | Should -BeExactly '18'
+            $state['lastTag'] | Should -BeExactly 'abc123def456'
+            $state['webFqdn'] | Should -BeExactly 'web.old.example'
+            $state['smokePassed'] | Should -BeTrue
+            Get-CallCount -Pattern '^az group exists' | Should -Be 1
+        }
+        It 'clears them when the group is gone (after a Teardown)' {
+            $script:Responses = @(@{ Pattern = '^az group exists'; Value = 'false' }) + $script:Responses
+            $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+            $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+            $state = Read-StateFile
+            foreach ($key in 'postgresVersionDeployed', 'lastTag', 'placeholder', 'webFqdn', 'apiFqdn', 'apiImage', 'webImage', 'smokePassed', 'smokeAt') {
+                $state.Contains($key) | Should -BeFalse -Because "$key described the deleted deployment"
+            }
+            # what Bootstrap itself owns is refreshed, and the budget month is kept (the budget outlives the group)
+            $state['acrName'] | Should -BeExactly 'acrsbtest123'
+            $state['budgetMonth'] | Should -BeExactly '2026-10'
+            $output | Should -Match 'earlier deployment'
+        }
+        It 'clears them, and does not refuse, when az is on another subscription than the one state.json was made for' {
+            $script:Responses = @(@{ Pattern = '^az account show'; Value = '{"id":"99999999-9999-9999-9999-999999999999","name":"Other Sub","tenantId":"t","user":{"name":"ali@example.org"}}' }) + $script:Responses
+            $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+            $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+            $state = Read-StateFile
+            $state.Contains('lastTag') | Should -BeFalse
+            $state.Contains('postgresVersionDeployed') | Should -BeFalse
+            $state['subscriptionId'] | Should -BeExactly '00000000-0000-0000-0000-000000000001'
+            $output | Should -Match 'another subscription'
+        }
+    }
+
+    # ---- BUDGET_MONTH when state.json is lost ----------------------------------------------------------------------------------
+    It 'takes -BudgetMonth first, even over the month in state.json' {
+        Save-StateFile -Update @{ budgetMonth = '2026-10' }
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -BudgetMonth '2026-09' -Yes -RepoRoot $script:FakeRepo
+        $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+        $script:BootstrapEnvSeen[0].Month | Should -BeExactly '2026-09'
+        (Read-StateFile)['budgetMonth'] | Should -BeExactly '2026-09'
+        $output | Should -Match 'Budget month: 2026-09 \(-BudgetMonth\)'
+    }
+    It 'without state.json reads the month from the earlier bootstrap deployment record' {
+        $script:Responses = @(@{ Pattern = '^az deployment sub show --name sb-bootstrap --query properties.parameters.budgetMonth.value'; Value = '2026-08' }) + $script:Responses
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+        $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+        $script:BootstrapEnvSeen[0].Month | Should -BeExactly '2026-08'
+        $output | Should -Match 'Budget month: 2026-08 \(the earlier bootstrap deployment\)'
+    }
+    It 'falls back to the current month when there is no deployment record (a first bootstrap), or it holds nothing usable' {
+        foreach ($answer in @('None', '', 'not-a-month')) {
+            $script:BootstrapEnvSeen.Clear()
+            $script:Responses = @(@{ Pattern = '^az deployment sub show --name sb-bootstrap --query properties.parameters.budgetMonth.value'; Value = $answer }) + $script:Responses
+            $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+            $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+            $script:BootstrapEnvSeen[0].Month | Should -Match '^\d{4}-\d{2}$'
+            $output | Should -Match 'Budget month: \d{4}-\d{2} \(this month\)'
+            Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        $script:Responses = @(@{ Pattern = '^az deployment sub show --name sb-bootstrap --query properties.parameters.budgetMonth.value'; Throw = 'az deployment sub show failed (exit code 3). DeploymentNotFound' }) + $script:Responses
+        $script:BootstrapEnvSeen.Clear()
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -Yes -RepoRoot $script:FakeRepo
+        Get-InfoText { Invoke-Bootstrap -Config $config } | Out-Null
+        $script:BootstrapEnvSeen[0].Month | Should -Match '^\d{4}-\d{2}$'
+    }
+    It 'rejects a -BudgetMonth that is not yyyy-MM' {
+        foreach ($bad in '2026-13', '2026-9', '26-09', 'september', '2026-09-01') {
+            { New-DeployConfig -BudgetMonth $bad } | Should -Throw '*yyyy-MM*'
+        }
+        { New-DeployConfig -BudgetMonth '2026-12' } | Should -Not -Throw
+    }
+}
+
+Describe 'Invoke-DoctorLite and the subscription of state.json' {
+    BeforeEach {
+        Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
+        Set-NativeMock
+        $script:Responses = @(@{ Pattern = '^az account show'; Value = '{"id":"AAAAAAAA-0000-0000-0000-000000000001","name":"Real Sub","tenantId":"TTTTTTTT-0000-0000-0000-000000000001","user":{"name":"ali@example.org"}}' }) + $script:Responses
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+        Mock Test-CommandAvailable { $true }
+        Mock Start-DeployDelay { }
+    }
+    It 'passes when state.json was made for this subscription and tenant (GUID case does not matter)' {
+        Save-StateFile -Update @{ subscriptionId = 'aaaaaaaa-0000-0000-0000-000000000001'; tenantId = 'tttttttt-0000-0000-0000-000000000001' }
+        { Invoke-DoctorLite -NeedDocker $false } | Should -Not -Throw
+    }
+    It 'passes for an older state.json that has no subscription id (nothing to compare)' {
+        Save-StateFile -Update @{ acrName = 'x' }
+        { Invoke-DoctorLite -NeedDocker $false } | Should -Not -Throw
+    }
+    It 'REFUSES another subscription, names both, and says how to switch' {
+        Save-StateFile -Update @{ subscriptionId = 'bbbbbbbb-0000-0000-0000-000000000002' }
+        $message = ''
+        try { Invoke-DoctorLite -NeedDocker $false } catch { $message = $_.Exception.Message }
+        $message | Should -Match 'Pre-checks failed'
+        $message | Should -Match 'AAAAAAAA-0000-0000-0000-000000000001'
+        $message | Should -Match 'bbbbbbbb-0000-0000-0000-000000000002'
+        $message | Should -Match 'az account set --subscription bbbbbbbb-0000-0000-0000-000000000002'
+    }
+    It 'REFUSES another tenant' {
+        Save-StateFile -Update @{ subscriptionId = 'aaaaaaaa-0000-0000-0000-000000000001'; tenantId = 'cccccccc-0000-0000-0000-000000000003' }
+        { Invoke-DoctorLite -NeedDocker $false } | Should -Throw '*tenant*cccccccc-0000-0000-0000-000000000003*'
+    }
+    It 'Validate, Status, Smoke and ResetDemo (when it must look up the web) all go through it, so none of them touches the wrong subscription' {
+        Save-StateFile -Update @{ subscriptionId = 'bbbbbbbb-0000-0000-0000-000000000002'; acrName = 'a'; acrLoginServer = 'a.azurecr.io'; appsIdentityId = '/x'; postgresVersion = '17'; placeholder = $false }
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -RepoRoot $script:FakeRepo
+        { Invoke-Validate -Config $config } | Should -Throw '*az account set*'
+        { Invoke-Status -Config $config } | Should -Throw '*az account set*'
+        { Invoke-Smoke -Config $config } | Should -Throw '*az account set*'
+        { Invoke-ResetDemo -Config $config } | Should -Throw '*az account set*'
+        Get-CallCount -Pattern 'deployment group (create|validate|what-if)' | Should -Be 0
+    }
+    It 'Deploy refuses it too (secrets present, so the first thing it reaches is the pre-check)' {
+        Save-StateFile -Update @{ subscriptionId = 'bbbbbbbb-0000-0000-0000-000000000002'; acrName = 'a'; acrLoginServer = 'a.azurecr.io'; appsIdentityId = '/x'; postgresVersion = '17'; placeholder = $false }
+        $init = New-DeployConfig -VapidSubject 'mailto:ops@acme-demo.dev' -RepoRoot $script:FakeRepo
+        Get-InfoText { Initialize-DemoSecret -Config $init } | Out-Null
+        $config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Yes -Placeholder -RepoRoot $script:FakeRepo
+        { Invoke-Deploy -Config $config } | Should -Throw '*az account set*'
+        Get-CallCount -Pattern 'deployment group (create|validate|what-if)' | Should -Be 0
+    }
 }
 
 # ======================================================================================================================
+Describe 'Validate (read-only dry run)' {
+    BeforeAll {
+        Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
+        $init = New-DeployConfig -VapidSubject 'mailto:ops@acme-demo.dev' -RepoRoot $script:FakeRepo
+        Get-InfoText { Initialize-DemoSecret -Config $init } | Out-Null
+        $script:PlainSecrets = (Get-Content -LiteralPath (Get-SecretsFilePath) -Raw) | ConvertFrom-Json
+        $script:WhatIfJson = '{"changes":[{"resourceId":"/a","changeType":"Create"},{"resourceId":"/b","changeType":"Create"},{"resourceId":"/c","changeType":"NoChange"},{"resourceId":"/d","changeType":"Modify"}]}'
+    }
+    BeforeEach {
+        $script:SecretValues = @()
+        Save-StateFile -Update @{
+            acrName = 'acrsbtest123'; acrLoginServer = $script:Registry; resourceGroupName = 'rg-test'; location = 'uaenorth'
+            appsIdentityId = '/subscriptions/s/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-sb-apps'
+            postgresVersion = '18'
+        }
+        Set-NativeMock
+        $script:Responses = @(
+            @{ Pattern = '^az deployment group validate'; Value = {
+                    param($line)
+                    $script:EnvSeen.Add(@{ Kind = 'validate'; Apps = $env:DEPLOY_APPS; ApiImage = $env:API_IMAGE; WebImage = $env:WEB_IMAGE; ApiPlaceholder = $env:API_IS_PLACEHOLDER; Password = $env:PG_ADMIN_PASSWORD; Line = $line })
+                    return ''
+                }
+            },
+            @{ Pattern = '^az deployment group what-if'; Value = {
+                    param($line)
+                    $script:EnvSeen.Add(@{ Kind = 'whatif'; Apps = $env:DEPLOY_APPS; Line = $line })
+                    return $script:WhatIfJson
+                }
+            }
+        ) + (Get-DefaultResponse)
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+        Mock Test-CommandAvailable { $true }
+        $script:Config = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -RepoRoot $script:FakeRepo
+    }
+
+    It 'validates and what-ifs BOTH phases and never calls deployment group create' {
+        $script:Fails = $null
+        $output = Get-InfoText { $script:Fails = Invoke-Validate -Config $script:Config }
+        $script:Fails | Should -Be 0
+        Get-CallCount -Pattern '^az deployment group validate' | Should -Be 2
+        Get-CallCount -Pattern '^az deployment group what-if' | Should -Be 2
+        Get-CallCount -Pattern 'deployment group create' | Should -Be 0
+        Get-CallCount -Pattern 'deployment (sub|group) create|job start|acr login|^docker|revision restart|containerapp update' | Should -Be 0
+        $apps = @($script:EnvSeen | ForEach-Object { $_.Apps })
+        $apps | Should -Be @('false', 'false', 'true', 'true')
+        @($script:EnvSeen | Where-Object { $_.Kind -eq 'validate' } | ForEach-Object { $_.Line }) | ForEach-Object { $_ | Should -Match '-o none' }
+        $output | Should -Match 'PASS phase 1 \(DEPLOY_APPS=false\) template validation by ARM'
+        $output | Should -Match 'PASS phase 2 \(DEPLOY_APPS=true\) template validation by ARM'
+        $output | Should -Match 'what-if: 2 create, 1 modify, 0 delete, 1 no change'
+        $output | Should -Match 'create and change nothing in Azure and cost nothing'
+        $output | Should -Match 'Action Deploy'
+        # the what-if asks for ids and change types only: no property value (no secret) comes back
+        @($script:Calls | Where-Object { $_ -match 'what-if' })[0] | Should -Match '--result-format ResourceIdOnly'
+    }
+    It 'uses the validate image tags by default and the quickstart images with -Placeholder' {
+        Get-InfoText { Invoke-Validate -Config $script:Config } | Out-Null
+        $seen = @($script:EnvSeen | Where-Object { $_.Kind -eq 'validate' })[0]
+        $seen.ApiImage | Should -BeExactly "$script:Registry/sb-api:validate"
+        $seen.WebImage | Should -BeExactly "$script:Registry/sb-web:validate"
+        $seen.ApiPlaceholder | Should -BeExactly 'false'
+        Set-NativeMock
+        $script:Responses = @(
+            @{ Pattern = '^az deployment group validate'; Value = { $script:EnvSeen.Add(@{ Kind = 'validate'; ApiImage = $env:API_IMAGE; ApiPlaceholder = $env:API_IS_PLACEHOLDER }); return '' } },
+            @{ Pattern = '^az deployment group what-if'; Value = '{"changes":[]}' }
+        ) + (Get-DefaultResponse)
+        $placeholder = New-DeployConfig -ResourceGroup 'rg-test' -Location 'uaenorth' -Placeholder -RepoRoot $script:FakeRepo
+        $output = Get-InfoText { Invoke-Validate -Config $placeholder }
+        $script:EnvSeen[0].ApiImage | Should -BeExactly $script:Placeholder
+        $script:EnvSeen[0].ApiPlaceholder | Should -BeExactly 'true'
+        $output | Should -Match 'Action Deploy -Placeholder'
+    }
+    It 'reports a validate error as FAIL with the first lines of the error, still runs the rest, and returns non-zero' {
+        $script:Responses = @(@{ Pattern = '^az deployment group validate'; Throw = "az deployment group validate failed (exit code 1).`nInvalidTemplate: parameter acrName is wrong`nline two" }) + $script:Responses
+        $script:Fails = $null
+        $output = Get-InfoText { $script:Fails = Invoke-Validate -Config $script:Config }
+        $script:Fails | Should -Be 2
+        $output | Should -Match 'FAIL phase 1 \(DEPLOY_APPS=false\) template validation by ARM'
+        $output | Should -Match 'InvalidTemplate: parameter acrName is wrong'
+        $output | Should -Match 'PASS phase 1 \(DEPLOY_APPS=false\) what-if'
+        $output | Should -Match '2 check\(s\) FAILED. Nothing was created'
+        Get-CallCount -Pattern 'deployment group create' | Should -Be 0
+    }
+    It 'reports a what-if error as FAIL' {
+        $script:Responses = @(@{ Pattern = '^az deployment group what-if'; Throw = 'az deployment group what-if failed (exit code 1).' }) + $script:Responses
+        $script:Fails = $null
+        $output = Get-InfoText { $script:Fails = Invoke-Validate -Config $script:Config }
+        $script:Fails | Should -Be 2
+        $output | Should -Match 'FAIL phase 2 \(DEPLOY_APPS=true\) what-if'
+    }
+    It 'uses the secrets file when it exists and prints no secret' {
+        $output = Get-InfoText { Invoke-Validate -Config $script:Config }
+        $password = @($script:EnvSeen | Where-Object { $_.Kind -eq 'validate' })[0].Password
+        $password | Should -BeExactly $script:PlainSecrets.pgAdminPassword
+        foreach ($secret in $script:PlainSecrets.pgAdminPassword, $script:PlainSecrets.demoEmployerToken, $script:PlainSecrets.vapidPrivateKey, $script:PlainSecrets.accessTokens) {
+            $output.Contains($secret) | Should -BeFalse
+            ($script:Calls -join "`n").Contains($secret) | Should -BeFalse
+        }
+        $output | Should -Not -Match '\*\*\*'
+        foreach ($name in $script:ParamEnvNames) { Test-Path "Env:\$name" | Should -BeFalse }
+    }
+    It 'without secrets.json uses random throw-away values, creates no file and prints nothing secret' {
+        Remove-Item -LiteralPath (Get-SecretsFilePath) -Force
+        try {
+            $output = Get-InfoText { Invoke-Validate -Config $script:Config }
+            $password = [string]@($script:EnvSeen | Where-Object { $_.Kind -eq 'validate' })[0].Password
+            $password | Should -Match '^[0-9a-f]{64}$'
+            $output.Contains($password) | Should -BeFalse
+            $output | Should -Match 'random throw-away values'
+            Test-Path -LiteralPath (Get-SecretsFilePath) | Should -BeFalse
+            foreach ($name in $script:ParamEnvNames) { Test-Path "Env:\$name" | Should -BeFalse }
+        }
+        finally {
+            Write-ProtectedFile -Path (Get-SecretsFilePath) -Text (ConvertTo-Json -InputObject $script:PlainSecrets -Depth 5)
+        }
+    }
+    It 'clears the process environment even when az throws something unexpected' {
+        $script:Responses = @(@{ Pattern = '^az deployment group validate'; Value = { throw 'unexpected' } }) + $script:Responses
+        { Get-InfoText { Invoke-Validate -Config $script:Config } } | Should -Not -Throw
+        foreach ($name in $script:ParamEnvNames) { Test-Path "Env:\$name" | Should -BeFalse }
+    }
+    It 'needs Bootstrap first' {
+        Remove-Item -LiteralPath (Get-StateFilePath) -Force
+        { Invoke-Validate -Config $script:Config } | Should -Throw '*Bootstrap*'
+    }
+    It 'counts what-if change types' {
+        $c = Get-WhatIfSummary -Json '{"changes":[{"changeType":"Delete"},{"changeType":"Ignore"},{"changeType":"create"}]}'
+        $c.Create | Should -Be 1
+        $c.Delete | Should -Be 1
+        $c.Other | Should -Be 1
+        (Get-WhatIfSummary -Json '{"changes":[]}').Create | Should -Be 0
+        (Get-WhatIfSummary -Json '').Create | Should -Be 0
+    }
+}
+
+Describe 'deploy-local.ps1 -Action Validate (child process, fake az.cmd on PATH)' {
+    BeforeAll {
+        $script:FakeBin = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('sb-fake-az-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:FakeBin -Force | Out-Null
+        $batch = @'
+@echo off
+if "%1 %2 %3"=="deployment group validate" (echo InvalidTemplate: boom 1>&2 & exit /b 1)
+if "%1 %2 %3"=="deployment group what-if" (echo {"changes":[]}& exit /b 0)
+if "%1 %2"=="account show" (echo {"id":"00000000-0000-0000-0000-000000000001","name":"Fake Sub","user":{"name":"x@y.dev"}}& exit /b 0)
+if "%1 %2"=="extension show" (echo 1.0.0& exit /b 0)
+echo unexpected az call %* 1>&2
+exit /b 9
+'@
+        Set-Content -LiteralPath (Join-Path -Path $script:FakeBin -ChildPath 'az.cmd') -Value $batch -Encoding Ascii
+        $script:ChildState = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('sb-child-state-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:ChildState -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path -Path $script:ChildState -ChildPath 'state.json') -Value '{"acrName":"acrsbtest123","acrLoginServer":"acrsbtest123.azurecr.io","appsIdentityId":"/x","resourceGroupName":"rg-test","location":"uaenorth","postgresVersion":"18"}'
+    }
+    AfterAll {
+        Remove-Item -LiteralPath $script:FakeBin -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $script:ChildState -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    It 'prints FAIL and exits 1 when az validate fails, and never reaches an az create' {
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $savedPath = $env:PATH
+        $env:PATH = $script:FakeBin + ';' + $env:PATH
+        $env:SB_I1_STATE_DIR = $script:ChildState
+        try {
+            $lines = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path -Path $script:ScriptsDir -ChildPath 'deploy-local.ps1') -Action Validate 2>&1)
+            $code = $LASTEXITCODE
+        }
+        finally {
+            $env:PATH = $savedPath
+            $env:SB_I1_STATE_DIR = $script:StateDir
+            $ErrorActionPreference = $previous
+        }
+        $text = ($lines | ForEach-Object { "$_" }) -join "`n"
+        $text | Should -Match 'FAIL phase 1 \(DEPLOY_APPS=false\) template validation'
+        $text | Should -Match 'InvalidTemplate: boom'
+        $text | Should -Match 'PASS phase 1 \(DEPLOY_APPS=false\) what-if: 0 create'
+        $text | Should -Not -Match 'unexpected az call'
+        $code | Should -Be 1
+    }
+}
+
+# ======================================================================================================================
+Describe 'Template TLS checks T1-T3 (ADR 0042, on the compiled main.bicep)' {
+    BeforeAll {
+        function Get-ResultStatus {
+            param($Result, [string]$Id)
+            return @($Result | Where-Object { $_.Id -eq $Id })[0].Status
+        }
+        function Get-ResultReason {
+            param($Result, [string]$Id)
+            return (@($Result | Where-Object { $_.Id -eq $Id })[0].Reason -join "`n")
+        }
+    }
+    It 'passes a template whose URL verifies the server and whose api, alerts and job-migrate carry PGSSLROOTCERT' {
+        $results = @(Get-TemplateTlsResult -TemplateJson (New-CompiledTemplateText))
+        @($results | ForEach-Object { $_.Id }) | Should -Be @('T1', 'T2', 'T3')
+        @($results | ForEach-Object { $_.Status }) | Should -Be @('PASS', 'PASS', 'PASS')
+    }
+    It 'T1 FAILS when the database URL has no ssl=verify-full' {
+        $results = @(Get-TemplateTlsResult -TemplateJson (New-CompiledTemplateText -UrlSuffix '?ssl=require'))
+        Get-ResultStatus -Result $results -Id 'T1' | Should -BeExactly 'FAIL'
+        Get-ResultReason -Result $results -Id 'T1' | Should -Match 'lacks ssl=verify-full'
+    }
+    It 'T1 FAILS when only ONE of the URLs is weak' {
+        $text = New-CompiledTemplateText
+        $at = $text.IndexOf('ssl=verify-full')
+        $weak = $text.Substring(0, $at) + 'ssl=prefer' + $text.Substring($at + 'ssl=verify-full'.Length)
+        $results = @(Get-TemplateTlsResult -TemplateJson $weak)
+        Get-ResultStatus -Result $results -Id 'T1' | Should -BeExactly 'FAIL'
+        Get-ResultStatus -Result $results -Id 'T2' | Should -BeExactly 'FAIL'
+    }
+    It 'T1 FAILS when the template holds no database URL at all' {
+        $results = @(Get-TemplateTlsResult -TemplateJson '{"variables":{},"resources":[]}')
+        Get-ResultStatus -Result $results -Id 'T1' | Should -BeExactly 'FAIL'
+        Get-ResultReason -Result $results -Id 'T1' | Should -Match 'no database URL'
+    }
+    It 'T2 FAILS on <_> anywhere in the template, even when the URL itself is fine' -ForEach @('ssl=require', 'ssl=prefer', 'ssl=allow', 'ssl=disable', 'ssl=false', 'sslmode=require', 'SSLMODE=verify-full', 'SSL=REQUIRE') {
+        $results = @(Get-TemplateTlsResult -TemplateJson (New-CompiledTemplateText -ExtraVariable "postgresql://u@h/db?$_"))
+        Get-ResultStatus -Result $results -Id 'T2' | Should -BeExactly 'FAIL'
+    }
+    It 'T3 FAILS when alerts does not get the core environment (and names alerts)' {
+        $results = @(Get-TemplateTlsResult -TemplateJson (New-CompiledTemplateText -AlertsWithoutCoreEnv))
+        Get-ResultStatus -Result $results -Id 'T3' | Should -BeExactly 'FAIL'
+        $reason = Get-ResultReason -Result $results -Id 'T3'
+        $reason | Should -Match 'alerts'
+        $reason | Should -Not -Match 'api:'
+        $reason | Should -Not -Match 'job-migrate:'
+        Get-ResultStatus -Result $results -Id 'T1' | Should -BeExactly 'PASS'
+    }
+    It 'T3 FAILS when PGSSLROOTCERT points at another file, for all three' {
+        $results = @(Get-TemplateTlsResult -TemplateJson (New-CompiledTemplateText -RootCert '/etc/ssl/other.crt'))
+        Get-ResultStatus -Result $results -Id 'T3' | Should -BeExactly 'FAIL'
+        $reason = Get-ResultReason -Result $results -Id 'T3'
+        foreach ($name in 'api', 'alerts', 'job-migrate') { $reason | Should -Match "$name" }
+        $reason | Should -Match '/etc/ssl/other.crt'
+    }
+    It 'T3 FAILS when a module is missing from the template' {
+        $results = @(Get-TemplateTlsResult -TemplateJson (New-CompiledTemplateText -OmitJobModule))
+        Get-ResultStatus -Result $results -Id 'T3' | Should -BeExactly 'FAIL'
+        Get-ResultReason -Result $results -Id 'T3' | Should -Match 'job-migrate'
+    }
+    It 'T3 reads the entry when the expression builds it with createObject and the path inline' {
+        $entry = "createObject('name', 'PGSSLROOTCERT', 'value', '/etc/ssl/certs/ca-certificates.crt')"
+        $module = { param($Name) @{ type = 'Microsoft.Resources/deployments'; name = $Name; properties = @{ parameters = @{ env = @{ value = "[createArray($entry)]" } } } } }
+        $template = @{ variables = @{}; resources = @((& $module 'app-api'), (& $module 'app-alerts'), (& $module 'job-migrate')) }
+        $results = @(Get-TemplateTlsResult -TemplateJson ($template | ConvertTo-Json -Depth 20))
+        Get-ResultStatus -Result $results -Id 'T3' | Should -BeExactly 'PASS'
+    }
+    It 'T3 FAILS closed, saying why, when the text is not a template' {
+        $results = @(Get-TemplateTlsResult -TemplateJson 'this is not json')
+        Get-ResultStatus -Result $results -Id 'T3' | Should -BeExactly 'FAIL'
+        Get-ResultReason -Result $results -Id 'T3' | Should -Match 'cannot evaluate'
+    }
+    It 'expects what infra/bicep/main.bicep really declares (drift guard)' {
+        $bicep = Get-Content -LiteralPath (Join-Path -Path $script:RepoDir -ChildPath 'infra\bicep\main.bicep') -Raw
+        $bicep | Should -Match ([regex]::Escape("var pgSslRootCert = '$($script:ExpectedRootCert)'"))
+        $bicep | Should -Match ([regex]::Escape("{ name: 'PGSSLROOTCERT', value: pgSslRootCert }"))
+        $bicep | Should -Match ([regex]::Escape("{ name: 'SB_DATABASE_URL', secretRef: '$($script:DatabaseUrlSecretName)' }"))
+        $bicep | Should -Match ([regex]::Escape("var databaseUrlSecret = { name: '$($script:DatabaseUrlSecretName)'"))
+        foreach ($target in $script:TlsTargets) {
+            $bicep | Should -Match ([regex]::Escape("name: '$($target.Module)'")) -Because "the module of $($target.Name) is named $($target.Module)"
+        }
+        $bicep | Should -Match 'stellar_blaze\?ssl=verify-full'
+    }
+    It 'Write-GuardResult prints one line per result with the reasons below a FAIL, and returns the number of FAILs' {
+        $results = @(
+            (New-GuardResult -Status PASS -Id 'T1' -Subject 'fine'),
+            (New-GuardResult -Status FAIL -Id 'T3' -Subject 'broken' -Reason @('alerts: no root', 'api: no root')),
+            (New-GuardResult -Status SKIP -Id 'S4' -Subject 'placeholder')
+        )
+        $script:FailCount = -1
+        $text = Get-InfoText { $script:FailCount = Write-GuardResult -Result $results }
+        $script:FailCount | Should -Be 1
+        $text | Should -Match 'PASS T1 fine'
+        $text | Should -Match 'FAIL T3 broken'
+        $text | Should -Match '  - alerts: no root'
+        $text | Should -Match 'SKIP S4 placeholder'
+    }
+}
+
+Describe 'Deployed TLS checks T4 and T5 (ADR 0042, on what was deployed)' {
+    BeforeEach {
+        $script:SecretValues = @()
+        $password = [guid]::NewGuid().ToString('N')
+        $script:DatabaseUrlValue = "postgresql+asyncpg://sbadmin:$password@psql-test.postgres.database.azure.com:5432/stellar_blaze?ssl=verify-full"
+        $script:RootCertValue = '/etc/ssl/certs/ca-certificates.crt'
+        Register-SecretValue -Value $password
+        Set-NativeMock
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            foreach ($r in $script:Responses) {
+                if ($line -match $r.Pattern) {
+                    if ($r.ContainsKey('Throw')) { throw $r.Throw }
+                    if ($r.Value -is [scriptblock]) { return (& $r.Value $line) } else { return $r.Value }
+                }
+            }
+            throw "unexpected native call: $line"
+        }
+    }
+    AfterEach { $script:SecretValues = @() }
+
+    It 'passes T4 and T5 for api, alerts and job-migrate, reading the job through the job commands' {
+        $results = @(Test-DeployedTlsSetting -ResourceGroup 'rg-test')
+        @($results | ForEach-Object { "$($_.Id) $($_.Status)" }) | Should -Be @('T4 PASS', 'T5 PASS', 'T4 PASS', 'T5 PASS', 'T4 PASS', 'T5 PASS')
+        Get-CallCount -Pattern '^az containerapp secret list --name api .*--show-values' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp secret list --name alerts .*--show-values' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp job secret list --name job-migrate .*--show-values' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp job show --name job-migrate .*PGSSLROOTCERT' | Should -Be 1
+        Get-CallCount -Pattern '^az containerapp show --name api .*PGSSLROOTCERT' | Should -Be 1
+    }
+    It 'never lets the stored URL into the results, the printed lines or a call line' {
+        $results = @(Test-DeployedTlsSetting -ResourceGroup 'rg-test')
+        $text = Get-InfoText { Write-GuardResult -Result $results | Out-Null }
+        $dump = ($results | ConvertTo-Json -Depth 5) + $text + ($script:Calls -join "`n")
+        $dump.Contains($script:DatabaseUrlValue) | Should -BeFalse
+        $dump.Contains('sbadmin') | Should -BeFalse
+        $dump.Contains('psql-test.postgres') | Should -BeFalse
+    }
+    It 'T4 FAILS for the one app whose stored URL lacks ssl=verify-full, and only for it' {
+        $script:Responses = @(@{ Pattern = '^az containerapp secret list --name alerts'; Value = 'postgresql+asyncpg://sbadmin:x@h:5432/stellar_blaze?ssl=require' }) + $script:Responses
+        $results = @(Test-DeployedTlsSetting -ResourceGroup 'rg-test')
+        @($results | Where-Object { $_.Status -eq 'FAIL' } | ForEach-Object { "$($_.Id) $($_.Subject)" }) | Should -Be @('T4 alerts: sb-database-url is missing, unreadable, or lacks ssl=verify-full')
+    }
+    It 'T4 FAILS when the secret is not there (az prints None) or cannot be read, without throwing' {
+        $script:Responses = @(
+            @{ Pattern = '^az containerapp secret list --name api'; Value = 'None' },
+            @{ Pattern = '^az containerapp job secret list'; Throw = 'az containerapp job secret list failed (exit code 1). Forbidden' }
+        ) + $script:Responses
+        $results = @(Test-DeployedTlsSetting -ResourceGroup 'rg-test')
+        @($results | Where-Object { $_.Id -eq 'T4' -and $_.Status -eq 'FAIL' }).Count | Should -Be 2
+        (@($results | Where-Object { $_.Id -eq 'T4' -and $_.Subject -match '^job-migrate' })[0].Reason -join ' ') | Should -Match 'Forbidden'
+    }
+    It 'T5 FAILS when PGSSLROOTCERT differs, is absent (None) or cannot be read' {
+        $script:Responses = @(
+            @{ Pattern = '^az containerapp show --name api .*PGSSLROOTCERT'; Value = '/somewhere/else.crt' },
+            @{ Pattern = '^az containerapp show --name alerts .*PGSSLROOTCERT'; Value = 'None' },
+            @{ Pattern = '^az containerapp job show --name job-migrate .*PGSSLROOTCERT'; Throw = 'az containerapp job show failed (exit code 3).' }
+        ) + $script:Responses
+        $results = @(Test-DeployedTlsSetting -ResourceGroup 'rg-test')
+        @($results | Where-Object { $_.Id -eq 'T5' -and $_.Status -eq 'FAIL' }).Count | Should -Be 3
+        @($results | Where-Object { $_.Id -eq 'T4' -and $_.Status -eq 'FAIL' }).Count | Should -Be 0
+        (@($results | Where-Object { $_.Id -eq 'T5' -and $_.Subject -match '^api' })[0].Subject) | Should -Match '/somewhere/else.crt'
+    }
+}
+
+Describe 'Exposure and cost guards S1 S2 S4 S6' {
+    BeforeAll {
+        function New-AppObject {
+            param([string]$App, [Nullable[bool]]$External = $null, [int]$MaxReplicas = 1)
+            return ((New-AppJsonText -App $App -Image 'x' -External $External -MaxReplicas $MaxReplicas) | ConvertFrom-Json)
+        }
+        function New-EnvObject {
+            param([string]$ProfilesJson)
+            return (('{"properties":{"workloadProfiles":' + $ProfilesJson + '}}') | ConvertFrom-Json)
+        }
+    }
+    It 'S1 passes for exactly one Consumption profile' {
+        $r = Test-WorkloadProfile -Name 'cae' -Environment (New-EnvObject '[{"name":"Consumption","workloadProfileType":"Consumption"}]')
+        $r.Status | Should -BeExactly 'PASS'
+        $r.Id | Should -BeExactly 'S1'
+    }
+    It 'S1 FAILS for a dedicated profile next to Consumption, a dedicated profile alone, a renamed one, or none' -ForEach @(
+        @{ Json = '[{"name":"Consumption","workloadProfileType":"Consumption"},{"name":"d4","workloadProfileType":"D4"}]' },
+        @{ Json = '[{"name":"d4","workloadProfileType":"D4"}]' },
+        @{ Json = '[{"name":"Consumption","workloadProfileType":"D4"}]' },
+        @{ Json = '[{"name":"other","workloadProfileType":"Consumption"}]' },
+        @{ Json = '[]' },
+        @{ Json = 'null' }
+    ) {
+        (Test-WorkloadProfile -Name 'cae' -Environment (New-EnvObject $Json)).Status | Should -BeExactly 'FAIL'
+    }
+    It 'S1 FAILS on a private endpoint in the group (each adds a meter), and passes without one' {
+        $with = @(ConvertFrom-JsonArray -Text '[{"name":"pe-db","type":"Microsoft.Network/privateEndpoints","location":"uaenorth"},{"name":"api","type":"Microsoft.App/containerApps","location":"uaenorth"}]')
+        $r = Test-NoPrivateEndpoint -Resource $with
+        $r.Status | Should -BeExactly 'FAIL'
+        ($r.Reason -join ' ') | Should -Match 'pe-db'
+        $without = @(ConvertFrom-JsonArray -Text '[{"name":"api","type":"Microsoft.App/containerApps","location":"uaenorth"}]')
+        (Test-NoPrivateEndpoint -Resource $without).Status | Should -BeExactly 'PASS'
+    }
+    It 'S2 passes at 1 / 1 replicas and FAILS at <Min> / <Max>' -ForEach @(
+        @{ Min = 0; Max = 1 }, @{ Min = 1; Max = 3 }, @{ Min = 2; Max = 2 }
+    ) {
+        (Test-AppScale -Name 'api' -App (New-AppObject -App 'api')).Status | Should -BeExactly 'PASS'
+        $app = New-AppObject -App 'api'
+        $app.properties.template.scale.minReplicas = $Min
+        $app.properties.template.scale.maxReplicas = $Max
+        $r = Test-AppScale -Name 'api' -App $app
+        $r.Status | Should -BeExactly 'FAIL'
+        $r.Id | Should -BeExactly 'S2'
+    }
+    It 'S2 FAILS when the scale cannot be read' {
+        (Test-AppScale -Name 'api' -App ('{"properties":{"template":{}}}' | ConvertFrom-Json)).Status | Should -BeExactly 'FAIL'
+        (Test-AppScale -Name 'api' -App $null).Status | Should -BeExactly 'FAIL'
+    }
+    It 'S4 passes for the design: api internal, web external, alerts without an ingress' {
+        (Test-AppIngress -Name 'api' -App (New-AppObject -App 'api')).Status | Should -BeExactly 'PASS'
+        (Test-AppIngress -Name 'web' -App (New-AppObject -App 'web')).Status | Should -BeExactly 'PASS'
+        (Test-AppIngress -Name 'alerts' -App (New-AppObject -App 'alerts')).Status | Should -BeExactly 'PASS'
+    }
+    It 'S4 FAILS when the api is public, the web is not, or the worker has an ingress' {
+        $api = Test-AppIngress -Name 'api' -App (New-AppObject -App 'api' -External $true)
+        $api.Status | Should -BeExactly 'FAIL'
+        ($api.Reason -join ' ') | Should -Match 'must not be public'
+        (Test-AppIngress -Name 'web' -App (New-AppObject -App 'web' -External $false)).Status | Should -BeExactly 'FAIL'
+        (Test-AppIngress -Name 'alerts' -App (New-AppObject -App 'alerts' -External $false)).Status | Should -BeExactly 'FAIL'
+        (Test-AppIngress -Name 'api' -App (New-AppObject -App 'alerts')).Status | Should -BeExactly 'FAIL'
+    }
+    It 'S6 passes when every resource is in the region, in any spelling of it' {
+        $resources = @(ConvertFrom-JsonArray -Text '[{"name":"a","type":"t","location":"uaenorth"},{"name":"b","type":"t","location":"UAE North"}]')
+        (Test-ResourceLocation -Resource $resources -Location 'uaenorth').Status | Should -BeExactly 'PASS'
+    }
+    It 'S6 FAILS for a resource in another region, naming it, and for an empty group' {
+        $resources = @(ConvertFrom-JsonArray -Text '[{"name":"a","type":"t","location":"uaenorth"},{"name":"stray","type":"t","location":"westeurope"}]')
+        $r = Test-ResourceLocation -Resource $resources -Location 'uaenorth'
+        $r.Status | Should -BeExactly 'FAIL'
+        ($r.Reason -join ' ') | Should -Match 'stray \(westeurope\)'
+        (Test-ResourceLocation -Resource @() -Location 'uaenorth').Status | Should -BeExactly 'FAIL'
+    }
+}
+
+Describe 'Smoke summary in Status' {
+    It 'says passed, failed or not run, with the time' {
+        Get-SmokeSummary -State ([ordered]@{ smokePassed = $true; smokeAt = '2026-11-15T10:00:00Z' }) | Should -Match 'passed at 2026-11-15T10:00:00Z'
+        Get-SmokeSummary -State ([ordered]@{ smokePassed = $false; smokeAt = '2026-11-15T10:00:00Z' }) | Should -Match 'FAILED at 2026-11-15T10:00:00Z'
+        Get-SmokeSummary -State ([ordered]@{ smokePassed = $false; smokeAt = '' }) | Should -Match 'not run'
+        Get-SmokeSummary -State ([ordered]@{}) | Should -Match 'not run'
+    }
+}
+
+Describe 'NoRevoke through the HTTP helpers of the deploy path' {
+    BeforeEach {
+        Set-NativeMock
+        Mock Invoke-Native {
+            $line = "$FilePath $($Arguments -join ' ')"
+            $script:Calls.Add($line)
+            return '200'
+        }
+        Mock Start-DeployDelay { }
+    }
+    It 'Get-HttpStatus gives curl --ssl-revoke-best-effort (revoked certificates are still refused) only with -NoRevoke' {
+        Get-HttpStatus -Url 'https://web.test.example/' | Should -Be 200
+        Get-CallCount -Pattern 'ssl-revoke|ssl-no-revoke' | Should -Be 0
+        Get-HttpStatus -Url 'https://web.test.example/' -NoRevoke | Should -Be 200
+        Get-CallCount -Pattern '^curl.exe .*--ssl-revoke-best-effort' | Should -Be 1
+        Get-CallCount -Pattern '--ssl-no-revoke' | Should -Be 0
+    }
+    It 'Wait-HttpOk hands it to every poll' {
+        Wait-HttpOk -Url 'https://web.test.example/' -NoRevoke
+        Get-CallCount -Pattern '^curl.exe .*--ssl-revoke-best-effort' | Should -Be 1
+    }
+    It 'Invoke-DemoSmoke hands -NoRevoke, and -WaitReady -Wait for a fresh deploy, to Test-DemoHttp.ps1' {
+        $fake = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('sb-fake-lib-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $fake -Force | Out-Null
+        $marker = Join-Path -Path $fake -ChildPath 'marker.txt'
+        $body = @"
+param([string]`$BaseUrl, [switch]`$Wait, [switch]`$WaitReady, [switch]`$NoRevoke)
+Add-Content -LiteralPath '$marker' -Value ('{0}|{1}|{2}|{3}' -f `$BaseUrl, [bool]`$Wait, [bool]`$WaitReady, [bool]`$NoRevoke)
+exit 0
+"@
+        Set-Content -LiteralPath (Join-Path -Path $fake -ChildPath 'Test-DemoHttp.ps1') -Value $body
+        $saved = $script:LibDir
+        $script:LibDir = $fake
+        try {
+            Invoke-DemoSmoke -BaseUrl 'https://a' | Should -BeTrue
+            Invoke-DemoSmoke -BaseUrl 'https://b' -Fresh -NoRevoke | Should -BeTrue
+            Invoke-DemoSmoke -BaseUrl 'https://c' -NoRevoke | Should -BeTrue
+        }
+        finally {
+            $script:LibDir = $saved
+        }
+        $lines = @(Get-Content -LiteralPath $marker)
+        Remove-Item -LiteralPath $fake -Recurse -Force -ErrorAction SilentlyContinue
+        $lines | Should -Be @('https://a|False|False|False', 'https://b|True|True|True', 'https://c|False|False|True')
+    }
+}
+
 Describe 'ShowSecrets' {
     BeforeAll {
         Remove-Item -LiteralPath $script:StateDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -1127,6 +2300,11 @@ Describe 'Test-DemoHttp.ps1 (functions, curl.exe mocked)' {
         (Test-H4 -StartedAt '').Status | Should -BeExactly 'FAIL'
         (Test-H4 -StartedAt 'not a date').Status | Should -BeExactly 'FAIL'
     }
+    It 'H4 failure says to run ResetDemo (the clock follows the epoch now, a restart no longer moves it)' {
+        $subject = (Test-H4 -StartedAt '2026-06-14T13:30:01Z').Subject
+        $subject | Should -Match 'run: deploy-local\.ps1 -Action ResetDemo'
+        $subject | Should -Not -Match 'ResetClock|restart-replay-clock'
+    }
     It 'H6 FAILS when no 429 arrives and passes at the first 429 with Retry-After' {
         Mock Invoke-Curl { [pscustomobject]@{ Status = 200; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
         $result = Test-H6 -Base 'https://web.example.test'
@@ -1153,11 +2331,95 @@ Describe 'Test-DemoHttp.ps1 (functions, curl.exe mocked)' {
         $script:Seen[0] | Should -BeExactly 'X-Forwarded-For: 203.0.113.1'
         $script:Seen[2] | Should -BeExactly 'X-Forwarded-For: 203.0.113.3'
     }
-    It 'H6 stops at the first request that gets no answer instead of waiting for 30 timeouts' {
+    It 'H6 counts a request that gets no answer and goes on, like smoke-http.sh (a later 429 still passes)' {
         Mock Invoke-Curl { [pscustomobject]@{ Status = 0; Body = ''; Headers = ''; ExitCode = 28; Error = 'timeout' } }
         $result = Test-H6 -Base 'https://web.example.test'
         $result.Status | Should -BeExactly 'FAIL'
-        Should -Invoke Invoke-Curl -Times 1 -Exactly
+        $result.Subject | Should -Match 'no answer x30'
+        Should -Invoke Invoke-Curl -Times 30 -Exactly
+        $script:Count = 0
+        Mock Invoke-Curl {
+            $script:Count++
+            if ($script:Count -eq 1) { return [pscustomobject]@{ Status = 0; Body = ''; Headers = ''; ExitCode = 28; Error = 'timeout' } }
+            if ($script:Count -ge 3) { return [pscustomobject]@{ Status = 429; Body = ''; Headers = "HTTP/1.1 429`r`nRetry-After: 7`r`n`r`n"; ExitCode = 0; Error = '' } }
+            return [pscustomobject]@{ Status = 200; Body = ''; Headers = ''; ExitCode = 0; Error = '' }
+        }
+        $passed = Test-H6 -Base 'https://web.example.test'
+        $passed.Status | Should -BeExactly 'PASS'
+        $passed.Subject | Should -Match 'Retry-After 7 at request 3'
+    }
+    It 'H1 and H2 FAIL with their own id, instead of throwing under strict mode, when the body lacks status, is null, an array or a bare string' -ForEach @(
+        @{ Body = '{}' }, @{ Body = 'null' }, @{ Body = '[]' }, @{ Body = '"ok"' }, @{ Body = '{"version":"1"}' }, @{ Body = '' }
+    ) {
+        $script:Body = $Body
+        Mock Invoke-Curl { [pscustomobject]@{ Status = 200; Body = $script:Body; Headers = ''; ExitCode = 0; Error = '' } }
+        $h1 = & { Set-StrictMode -Version 2.0; Test-H1 -Base 'https://web.example.test' }
+        $h1.Id | Should -BeExactly 'H1'
+        $h1.Status | Should -BeExactly 'FAIL'
+        $h2 = & { Set-StrictMode -Version 2.0; Test-H2 -Base 'https://web.example.test' }
+        $h2.Id | Should -BeExactly 'H2'
+        $h2.Status | Should -BeExactly 'FAIL'
+    }
+    It 'H1 and H2 still pass on a good body under strict mode' {
+        Mock Invoke-Curl { [pscustomobject]@{ Status = 200; Body = '{"status":"ok","version":"mock-1"}'; Headers = ''; ExitCode = 0; Error = '' } }
+        (& { Set-StrictMode -Version 2.0; Test-H1 -Base 'https://web.example.test' }).Status | Should -BeExactly 'PASS'
+        (& { Set-StrictMode -Version 2.0; Test-H2 -Base 'https://web.example.test' }).Status | Should -BeExactly 'PASS'
+    }
+    It 'H3 FAILS when the 201 has no started_at, and still undoes the stop it created' {
+        $script:Seen = New-Object System.Collections.Generic.List[string]
+        Mock Invoke-Curl {
+            $script:Seen.Add("$Method $Url")
+            if ($Method -eq 'POST') { return [pscustomobject]@{ Status = 201; Body = '{"id":"stop-1","crew_id":"crew-b"}'; Headers = ''; ExitCode = 0; Error = '' } }
+            return [pscustomobject]@{ Status = 204; Body = ''; Headers = ''; ExitCode = 0; Error = '' }
+        }
+        $result = & { Set-StrictMode -Version 2.0; Test-H3 -Base 'https://web.example.test' }
+        $result.Status | Should -BeExactly 'FAIL'
+        $result.Id | Should -BeExactly 'H3'
+        $result.Subject | Should -Match 'started_at'
+        $script:Seen | Should -Contain 'DELETE https://web.example.test/api/v1/crews/crew-b/stops/stop-1'
+        $script:Seen | Should -Not -Contain 'GET https://web.example.test/api/v1/crews/crew-b/timeline'
+    }
+    It 'H3 FAILS when the 201 has no id, and has nothing to undo' {
+        $script:Seen = New-Object System.Collections.Generic.List[string]
+        Mock Invoke-Curl {
+            $script:Seen.Add("$Method $Url")
+            return [pscustomobject]@{ Status = 201; Body = '{"started_at":"2026-06-14T06:10:00Z"}'; Headers = ''; ExitCode = 0; Error = '' }
+        }
+        (Test-H3 -Base 'https://web.example.test').Status | Should -BeExactly 'FAIL'
+        @($script:Seen | Where-Object { $_ -like 'DELETE *' }).Count | Should -Be 0
+    }
+    It 'H3 passes, and hands started_at to H4, when id and started_at are there and the undo is in time' {
+        Mock Invoke-Curl {
+            if ($Method -eq 'POST') { return [pscustomobject]@{ Status = 201; Body = '{"id":"stop-1","started_at":"2026-06-14T06:10:03.5Z"}'; Headers = ''; ExitCode = 0; Error = '' } }
+            if ($Method -eq 'DELETE') { return [pscustomobject]@{ Status = 204; Body = ''; Headers = ''; ExitCode = 0; Error = '' } }
+            return [pscustomobject]@{ Status = 200; Body = '{"hours":[]}'; Headers = ''; ExitCode = 0; Error = '' }
+        }
+        $result = Test-H3 -Base 'https://web.example.test'
+        $result.Status | Should -BeExactly 'PASS'
+        $result.StartedAt | Should -BeExactly '2026-06-14T06:10:03.5Z'
+    }
+    It 'H5 keeps a non-default port when it builds the plain http URL, and drops nothing else' {
+        $script:Url = ''
+        Mock Invoke-Curl { $script:Url = $Url; [pscustomobject]@{ Status = 0; Body = ''; Headers = ''; ExitCode = 7; Error = 'refused' } }
+        Test-H5 -Base 'https://web.example.test:8443' | Out-Null
+        $script:Url | Should -BeExactly 'http://web.example.test:8443/api/healthz'
+        Test-H5 -Base 'https://web.example.test' | Out-Null
+        $script:Url | Should -BeExactly 'http://web.example.test/api/healthz'
+    }
+    It 'Get-CurlArgument gives --ssl-revoke-best-effort for -NoRevoke, never --ssl-no-revoke, and puts the URL last' {
+        $with = @(Get-CurlArgument -Method GET -Url 'https://web.example.test/x' -BodyFile 'b.tmp' -HeaderFile 'h.tmp' -NoRevoke $true)
+        $with | Should -Contain '--ssl-revoke-best-effort'
+        $with | Should -Not -Contain '--ssl-no-revoke'
+        $with[$with.Count - 1] | Should -BeExactly 'https://web.example.test/x'
+        $without = @(Get-CurlArgument -Method GET -Url 'https://web.example.test/x' -BodyFile 'b.tmp' -HeaderFile 'h.tmp' -NoRevoke $false)
+        $without | Should -Not -Contain '--ssl-revoke-best-effort'
+        $without | Should -Not -Contain '--ssl-no-revoke'
+    }
+    It 'Get-CurlArgument sends headers and a body from a file' {
+        $arguments = @(Get-CurlArgument -Method POST -Url 'https://x/y' -Header @('Authorization: Bearer x') -BodyFile 'b.tmp' -HeaderFile 'h.tmp' -RequestFile 'r.tmp' -NoRevoke $false)
+        $arguments | Should -Contain 'Authorization: Bearer x'
+        $arguments | Should -Contain '@r.tmp'
+        $arguments | Should -Contain 'Content-Type: application/json'
     }
     It 'H6 FAILS on a 429 without Retry-After' {
         Mock Invoke-Curl { [pscustomobject]@{ Status = 429; Body = ''; Headers = "HTTP/1.1 429`r`n`r`n"; ExitCode = 0; Error = '' } }
@@ -1334,7 +2596,7 @@ while ($listener.IsListening) {
         $run = Invoke-SmokeScript -Url "http://127.0.0.1:$port"
         $run.Text | Should -Match 'FAIL H1 .*no HTTP answer'
         $run.Text | Should -Match 'FAIL H2 '
-        $run.Text | Should -Match 'FAIL H6 .*request 1 got no HTTP answer'
+        $run.Text | Should -Match 'FAIL H6 .*no answer x30'
         $run.Code | Should -Be 1
     }
     It 'exits 2 with a usage line without a URL' {

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "researchedOn": "2026-11-15",
+  "notes": [
+    "Every version, URL and checksum below was looked up on 2026-11-15 from the project's own release page / registry, never from memory. validate-local.ps1 downloads only the URLs below (https, host allow-list in validate-local.lib.ps1), refuses any file whose hash differs from this lock, and refuses an installed binary whose sha256 differs from exeSha256.",
+    "sha256 (binaries) = the published checksum: the GitHub release asset `digest` field of the GitHub API, cross-checked against the release checksums file where the project publishes one (see verifiedBy). exeSha256 = sha256 of the extracted executable, computed once from a download whose archive hash matched, so later runs can re-verify the installed file without re-downloading.",
+    "sha512 (PowerShell modules) = the PackageHash of the PowerShell Gallery feed (base64 SHA512), https://www.powershellgallery.com/api/v2/Packages(Id='<id>',Version='<v>').",
+    "Docker images are pinned by the digest of the multi-platform manifest list on Docker Hub; `docker run <repo>@<digest>` makes Docker verify the content against it.",
+    "Not pinned on purpose: the Trivy vulnerability database (fresh advisory data is the point; trivy downloads it from ghcr.io on first use into the tools directory)."
+  ],
+  "binaries": {
+    "bicep": {
+      "version": "0.49.2",
+      "url": "https://github.com/Azure/bicep/releases/download/v0.49.2/bicep-win-x64.exe",
+      "kind": "exe",
+      "sha256": "acfff0453c9bcf442aa97103acbcd845ef366634e6ea2a2ba5734514409ce9c3",
+      "exe": "bicep.exe",
+      "exeSha256": "acfff0453c9bcf442aa97103acbcd845ef366634e6ea2a2ba5734514409ce9c3",
+      "verifiedBy": "GitHub API asset digest (Azure/bicep v0.49.2, bicep-win-x64.exe); the release publishes no checksums file",
+      "releasePage": "https://github.com/Azure/bicep/releases/tag/v0.49.2"
+    },
+    "shellcheck": {
+      "version": "0.11.0",
+      "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip",
+      "kind": "zip",
+      "sha256": "8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e",
+      "exe": "shellcheck.exe",
+      "exeSha256": "c9e82ada36ef4b8d4caf1f97fa89289048c8f4a33c2c76ffffc88bfe09ff00c5",
+      "verifiedBy": "GitHub API asset digest (koalaman/shellcheck v0.11.0, shellcheck-v0.11.0.zip); the release publishes no checksums file",
+      "releasePage": "https://github.com/koalaman/shellcheck/releases/tag/v0.11.0"
+    },
+    "actionlint": {
+      "version": "1.7.12",
+      "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_windows_amd64.zip",
+      "kind": "zip",
+      "sha256": "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9",
+      "exe": "actionlint.exe",
+      "exeSha256": "54ca21be3de4c7cfa26914aa8b61bd76bf573ef3caac5f80d110558cdf241718",
+      "verifiedBy": "actionlint_1.7.12_checksums.txt of the release AND the GitHub API asset digest (identical)",
+      "releasePage": "https://github.com/rhysd/actionlint/releases/tag/v1.7.12"
+    },
+    "hadolint": {
+      "version": "2.15.1",
+      "url": "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-windows-x86_64.exe",
+      "kind": "exe",
+      "sha256": "01d927294962b5387f9ead4f18679158452be4f17c765ad0bdffe5264b9c7b0a",
+      "exe": "hadolint.exe",
+      "exeSha256": "01d927294962b5387f9ead4f18679158452be4f17c765ad0bdffe5264b9c7b0a",
+      "verifiedBy": "checksums.sha256 of the release AND the GitHub API asset digest (identical)",
+      "releasePage": "https://github.com/hadolint/hadolint/releases/tag/v2.15.1"
+    },
+    "trivy": {
+      "version": "0.76.2",
+      "url": "https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_windows-64bit.zip",
+      "kind": "zip",
+      "sha256": "691f737a7e5566a673c3a74dab9160552ec32101e953b659e5c77443d16dddb6",
+      "exe": "trivy.exe",
+      "exeSha256": "dd07adf881a72b54d1a922191d62fa939938df2155be85a727da93b67b24e617",
+      "verifiedBy": "trivy_0.76.2_checksums.txt of the release AND the GitHub API asset digest (identical)",
+      "releasePage": "https://github.com/aquasecurity/trivy/releases/tag/v0.76.2"
+    },
+    "act": {
+      "version": "0.2.97",
+      "url": "https://github.com/nektos/act/releases/download/v0.2.97/act_Windows_x86_64.zip",
+      "kind": "zip",
+      "sha256": "07cb9bbecc5604452dc50e2a485e17e02e38c3735c47ce8adc8ac550ab968a8a",
+      "exe": "act.exe",
+      "exeSha256": "7475c29a551b809e4a8cd0586eea7feb53648c435ac2bbdcd71da568ba173ef7",
+      "verifiedBy": "checksums.txt of the release AND the GitHub API asset digest (identical)",
+      "releasePage": "https://github.com/nektos/act/releases/tag/v0.2.97"
+    }
+  },
+  "psModules": {
+    "PSRule": {
+      "version": "2.9.0",
+      "url": "https://www.powershellgallery.com/api/v2/package/PSRule/2.9.0",
+      "sha512": "F7Pjubm+Muxmi1lA+2IIysnAMKa2I2QmgiD1BWHOQuDLxB7b4Ybb/IZ1SlqEHEwHE8F6ldJ+eTnwRgLVtDVsCw==",
+      "verifiedBy": "PowerShell Gallery feed PackageHash (SHA512, base64); latest stable, required (>= 2.9.0) by PSRule.Rules.Azure 1.47.0"
+    },
+    "PSRule.Rules.Azure": {
+      "version": "1.47.0",
+      "url": "https://www.powershellgallery.com/api/v2/package/PSRule.Rules.Azure/1.47.0",
+      "sha512": "aW1NQ3wSRH6W3LgoggerVs7fMcRfLpzU+PiyXKPZQtIC2hgSF0Ap8I1lwj53mYLFh/AuA6wIIBe3wg6G0EP+Bw==",
+      "verifiedBy": "PowerShell Gallery feed PackageHash (SHA512, base64); latest stable (GitHub Azure/PSRule.Rules.Azure v1.47.0, 2026-01-08; later 1.48.0-B* builds are prereleases)"
+    },
+    "Pester": {
+      "version": "5.9.1",
+      "url": "https://www.powershellgallery.com/api/v2/package/Pester/5.9.1",
+      "sha512": "Ro5dZIKb89GI4ljjInQc3m6sI74uvph1y4QAqBPZ1Jhg0l1wBv8rT0izkGKbOw2Brzn8rNV2NKpDbyvoi7ARqg==",
+      "verifiedBy": "PowerShell Gallery feed PackageHash (SHA512, base64); latest of the v5 line (v6.2.0 is the newest overall: the repo's tests use the v5 dialect and run-ps-tests.ps1 asks for Pester 5)"
+    },
+    "PSScriptAnalyzer": {
+      "version": "1.25.0",
+      "url": "https://www.powershellgallery.com/api/v2/package/PSScriptAnalyzer/1.25.0",
+      "sha512": "5/tXMmLmBLqymRSuYpIdJLl8L4i1GbQSd7QD72zhY/FLfRs23HNEmmjlrlqNlQKJGxDCZBMf0YE63ym/ExwWYw==",
+      "verifiedBy": "PowerShell Gallery feed PackageHash (SHA512, base64); latest stable"
+    }
+  },
+  "images": {
+    "checkov": {
+      "repository": "bridgecrew/checkov",
+      "tag": "3.4.5",
+      "digest": "sha256:122602cf32cc72286155d39f1f234b7b594818f7b8d7fdf490701620e521368b",
+      "verifiedBy": "Docker Hub tags API (manifest list digest of bridgecrew/checkov:3.4.5, pushed 2026-11-12); GitHub bridgecrewio/checkov latest release 3.4.5"
+    }
+  }
+}

@@ -32,7 +32,8 @@
     Before the checks, wait (up to -WaitSeconds) until /api/healthz answers 200, for a freshly deployed web app.
 
 .PARAMETER NoRevoke
-    Pass --ssl-no-revoke to curl.exe. Only for networks where Windows cannot reach the certificate revocation server.
+    Pass --ssl-revoke-best-effort to curl.exe: a certificate whose revocation status cannot be fetched is accepted, a certificate
+    that IS revoked is still refused. Only for networks where Windows cannot reach the certificate revocation server.
 #>
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'New-HttpResult only builds an in-memory result object.')]
 [CmdletBinding()]
@@ -46,6 +47,32 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:CurlNoRevoke = [bool]$NoRevoke
+
+function Get-CurlArgument {
+    <# The curl.exe arguments of one request, the URL last. Pure, so the tests can read them. #>
+    [CmdletBinding()]
+    param(
+        [string]$Method = 'GET',
+        [Parameter(Mandatory)][string]$Url,
+        [string[]]$Header = @(),
+        [Parameter(Mandatory)][string]$BodyFile,
+        [Parameter(Mandatory)][string]$HeaderFile,
+        [string]$RequestFile = '',
+        [int]$MaxTime = 20,
+        [bool]$NoRevoke = $false
+    )
+    $curlArgs = New-Object System.Collections.Generic.List[string]
+    foreach ($item in @('--silent', '--show-error', '--max-time', "$MaxTime", '--output', $BodyFile, '--dump-header', $HeaderFile, '--write-out', '%{http_code}', '--request', $Method)) { $curlArgs.Add($item) }
+    # A certificate whose revocation status cannot be fetched is accepted; a revoked one is still refused (unlike --ssl-no-revoke).
+    if ($NoRevoke) { $curlArgs.Add('--ssl-revoke-best-effort') }
+    foreach ($line in $Header) { $curlArgs.Add('--header'); $curlArgs.Add($line) }
+    if ($RequestFile) {
+        $curlArgs.Add('--header'); $curlArgs.Add('Content-Type: application/json')
+        $curlArgs.Add('--data-binary'); $curlArgs.Add("@$RequestFile")
+    }
+    $curlArgs.Add($Url)
+    return $curlArgs.ToArray()
+}
 
 function Invoke-Curl {
     <# One request with curl.exe. Status is 0 when curl itself failed (refused, timeout, TLS); the reason is in Error. #>
@@ -61,19 +88,12 @@ function Invoke-Curl {
     $headerFile = [System.IO.Path]::GetTempFileName()
     $requestFile = ''
     try {
-        $curlArgs = New-Object System.Collections.Generic.List[string]
-        foreach ($item in @('--silent', '--show-error', '--max-time', "$MaxTime", '--output', $bodyFile, '--dump-header', $headerFile, '--write-out', '%{http_code}', '--request', $Method)) { $curlArgs.Add($item) }
-        if ($script:CurlNoRevoke) { $curlArgs.Add('--ssl-no-revoke') }
-        foreach ($line in $Header) { $curlArgs.Add('--header'); $curlArgs.Add($line) }
         if ($Body) {
             # The body goes through a file: PowerShell 5.1 strips double quotes from native arguments.
             $requestFile = [System.IO.Path]::GetTempFileName()
             [System.IO.File]::WriteAllText($requestFile, $Body, (New-Object System.Text.UTF8Encoding($false)))
-            $curlArgs.Add('--header'); $curlArgs.Add('Content-Type: application/json')
-            $curlArgs.Add('--data-binary'); $curlArgs.Add("@$requestFile")
         }
-        $curlArgs.Add($Url)
-        $argumentArray = $curlArgs.ToArray()
+        $argumentArray = @(Get-CurlArgument -Method $Method -Url $Url -Header $Header -BodyFile $bodyFile -HeaderFile $headerFile -RequestFile $requestFile -MaxTime $MaxTime -NoRevoke $script:CurlNoRevoke)
         # Native stderr becomes a terminating error in Windows PowerShell 5.1 only under 'Stop'; merge it, then split by type.
         $ErrorActionPreference = 'Continue'
         $everything = @(& curl.exe @argumentArray 2>&1)
@@ -119,15 +139,24 @@ function Get-Failure {
     return "HTTP $($Response.Status)"
 }
 
+function Get-JsonField {
+    <# One top-level field of a parsed JSON body as a string; '' when the body is not an object or lacks the field (safe under strict mode). #>
+    [CmdletBinding()]
+    param($Object, [Parameter(Mandatory)][string]$Name)
+    if ($null -eq $Object) { return '' }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property -or $null -eq $property.Value) { return '' }
+    return [string]$property.Value
+}
+
 function Test-H1 {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Base)
     $response = Invoke-Curl -Url "$Base/api/healthz"
     if ($response.Status -ne 200) { return New-HttpResult -Status FAIL -Id 'H1' -Subject "GET /api/healthz: $(Get-Failure -Response $response), expected 200" }
     try { $json = $response.Body | ConvertFrom-Json } catch { return New-HttpResult -Status FAIL -Id 'H1' -Subject 'GET /api/healthz: the body is not JSON' }
-    $health = [string]$json.status
-    $version = ''
-    if ($null -ne $json.PSObject.Properties['version']) { $version = [string]$json.version }
+    $health = Get-JsonField -Object $json -Name 'status'
+    $version = Get-JsonField -Object $json -Name 'version'
     if ($health -ne 'ok') { return New-HttpResult -Status FAIL -Id 'H1' -Subject "GET /api/healthz: status is '$health', expected ok" }
     if ([string]::IsNullOrWhiteSpace($version)) { return New-HttpResult -Status FAIL -Id 'H1' -Subject 'GET /api/healthz: no version in the body' }
     return New-HttpResult -Status PASS -Id 'H1' -Subject "GET /api/healthz 200, status ok, version $version"
@@ -139,7 +168,8 @@ function Test-H2 {
     $response = Invoke-Curl -Url "$Base/api/v1/health/ready"
     if ($response.Status -ne 200) { return New-HttpResult -Status FAIL -Id 'H2' -Subject "GET /api/v1/health/ready through the BFF: $(Get-Failure -Response $response), expected 200 (the web cannot reach a ready api)" }
     try { $json = $response.Body | ConvertFrom-Json } catch { return New-HttpResult -Status FAIL -Id 'H2' -Subject 'GET /api/v1/health/ready: the body is not JSON' }
-    if ([string]$json.status -ne 'ok') { return New-HttpResult -Status FAIL -Id 'H2' -Subject "GET /api/v1/health/ready: status is '$($json.status)', expected ok" }
+    $ready = Get-JsonField -Object $json -Name 'status'
+    if ($ready -ne 'ok') { return New-HttpResult -Status FAIL -Id 'H2' -Subject "GET /api/v1/health/ready: status is '$ready', expected ok" }
     return New-HttpResult -Status PASS -Id 'H2' -Subject 'GET /api/v1/health/ready through the BFF 200, status ok (web to api works)'
 }
 
@@ -154,9 +184,13 @@ function Test-H3 {
     $idMatch = [regex]::Match($created.Body, '"id"\s*:\s*"([^"]+)"')
     $startedMatch = [regex]::Match($created.Body, '"started_at"\s*:\s*"([^"]+)"')
     if (-not $idMatch.Success) { return New-HttpResult -Status FAIL -Id 'H3' -Subject "$subject (the 201 body has no stop id)" }
-    $startedAt = ''
-    if ($startedMatch.Success) { $startedAt = $startedMatch.Groups[1].Value }
     $stopId = $idMatch.Groups[1].Value
+    if (-not $startedMatch.Success) {
+        # smoke-http.sh fails H3 here too. The stop exists, though, and an active stop leaves crew-b red: undo it before failing.
+        $undone = Invoke-Curl -Method DELETE -Url "$Base/api/v1/crews/crew-b/stops/$stopId"
+        return New-HttpResult -Status FAIL -Id 'H3' -Subject "$subject (the 201 body has no started_at, so the replay clock cannot be read; undoing the stop: $(Get-Failure -Response $undone))"
+    }
+    $startedAt = $startedMatch.Groups[1].Value
     $deleted = Invoke-Curl -Method DELETE -Url "$Base/api/v1/crews/crew-b/stops/$stopId"
     $elapsed = $clock.Elapsed.TotalSeconds
     if ($deleted.Status -ne 204) { return New-HttpResult -Status FAIL -Id 'H3' -Subject "$subject (DELETE: $(Get-Failure -Response $deleted), expected 204; $([math]::Round($elapsed, 1)) s after the POST)" -StartedAt $startedAt }
@@ -183,7 +217,7 @@ function Test-H4 {
     if ($time -ge [TimeSpan]::FromHours(10) -and $time -le [TimeSpan]::FromMinutes(17 * 60 + 30)) {
         return New-HttpResult -Status PASS -Id 'H4' -Subject "replay clock reads $label Asia/Dubai (inside 10:00-17:30)"
     }
-    return New-HttpResult -Status FAIL -Id 'H4' -Subject "replay clock reads $label Asia/Dubai, outside 10:00-17:30: run deploy-local.ps1 -Action ResetClock (or infra/scripts/restart-replay-clock.sh)"
+    return New-HttpResult -Status FAIL -Id 'H4' -Subject "replay clock reads $label Asia/Dubai, outside 10:00-17:30: run: deploy-local.ps1 -Action ResetDemo"
 }
 
 function Test-H5 {
@@ -191,10 +225,12 @@ function Test-H5 {
     param([Parameter(Mandatory)][string]$Base)
     $uri = [uri]$Base
     if ($uri.Scheme -ne 'https') { return New-HttpResult -Status SKIP -Id 'H5' -Subject 'plain http must not answer 200: skipped, the base URL is not https' }
-    $response = Invoke-Curl -Url "http://$($uri.Host)/api/healthz" -MaxTime 15
-    if ($response.Status -eq 200) { return New-HttpResult -Status FAIL -Id 'H5' -Subject "http://$($uri.Host)/api/healthz answered 200 over plain http; it must redirect or refuse" }
-    if ($response.Status -eq 0) { return New-HttpResult -Status PASS -Id 'H5' -Subject "plain http is not served: http://$($uri.Host)/api/healthz gets no answer (refused)" }
-    return New-HttpResult -Status PASS -Id 'H5' -Subject "plain http is not served: http://$($uri.Host)/api/healthz answered $($response.Status)"
+    # The same authority as the https URL (host and any non-default port), like smoke-http.sh: ${base#https://}.
+    $plain = 'http://' + $Base.Substring('https://'.Length)
+    $response = Invoke-Curl -Url "$plain/api/healthz" -MaxTime 15
+    if ($response.Status -eq 200) { return New-HttpResult -Status FAIL -Id 'H5' -Subject "$plain/api/healthz answered 200 over plain http; it must redirect or refuse" }
+    if ($response.Status -eq 0) { return New-HttpResult -Status PASS -Id 'H5' -Subject "plain http is not served: $plain/api/healthz gets no answer (refused)" }
+    return New-HttpResult -Status PASS -Id 'H5' -Subject "plain http is not served: $plain/api/healthz answered $($response.Status)"
 }
 
 function Test-H7 {
@@ -215,10 +251,10 @@ function Test-H6 {
     $seen = @{}
     for ($i = 1; $i -le $Requests; $i++) {
         $response = Invoke-Curl -Url "$Base/api/v1/crews/crew-b/day-plan" -Header @("X-Forwarded-For: 203.0.113.$i") -MaxTime 20
+        # A request that gets no answer is counted and the loop goes on, like smoke-http.sh: a 429 may still come.
         $key = "$($response.Status)"
+        if ($response.Status -eq 0) { $key = 'no answer' }
         if ($seen.ContainsKey($key)) { $seen[$key]++ } else { $seen[$key] = 1 }
-        # No answer at all is not a rate-limit verdict, and 30 timeouts in a row would take minutes: stop at the first.
-        if ($response.Status -eq 0) { return New-HttpResult -Status FAIL -Id 'H6' -Subject "$subject (request $i got $(Get-Failure -Response $response))" }
         if ($response.Status -eq 429) {
             $retry = Get-HeaderValue -RawHeaders $response.Headers -Name 'Retry-After'
             if ([string]::IsNullOrWhiteSpace($retry)) { return New-HttpResult -Status FAIL -Id 'H6' -Subject "$subject (request $i answered 429 without Retry-After)" }

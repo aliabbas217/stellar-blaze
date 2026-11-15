@@ -12,26 +12,34 @@
       .\infra\scripts\deploy-local.ps1 -Action Doctor
       .\infra\scripts\deploy-local.ps1 -Action InitSecrets -VapidSubject mailto:you@your-domain.com
       .\infra\scripts\deploy-local.ps1 -Action Bootstrap -ContactEmail you@your-domain.com
+      .\infra\scripts\deploy-local.ps1 -Action Validate              # read-only dry run: validate + what-if, both phases
       .\infra\scripts\deploy-local.ps1 -Action Deploy -Placeholder      # optional rehearsal of the Azure plumbing
       .\infra\scripts\deploy-local.ps1 -Action Deploy
-      .\infra\scripts\deploy-local.ps1 -Action ResetClock               # before every judged session
+      .\infra\scripts\deploy-local.ps1 -Action ResetDemo                # before every judged session (a new demo epoch)
 
 .PARAMETER Action
-    Doctor | InitSecrets | ShowSecrets | Bootstrap | Deploy | ResetClock | Smoke | Status | Teardown.
+    Doctor | InitSecrets | ShowSecrets | Bootstrap | Validate | Deploy | ResetDemo | Smoke | Status | Teardown.
+    ResetClock is the old name of ResetDemo and still works (it prints a note).
 
 .PARAMETER Placeholder
-    Rehearse the Azure plumbing with the public MCR quickstart images: no build, no push, no migration, no alerts worker.
+    With Validate: use the placeholder image set. With Deploy: rehearse the Azure plumbing with the public MCR quickstart images: no build, no push, no migration, no alerts worker.
 
 .PARAMETER SkipBuild
     Reuse the images already in the registry for this tag (needs a clean working tree).
 
-.PARAMETER ReplayNow
-    ISO 8601 with offset. Used by ResetClock when given: sets SB_REPLAY_NOW on api and alerts.
+.PARAMETER NoRevoke
+    Only for a network where Windows cannot reach the certificate revocation server (curl.exe then fails every https request
+    with CRYPT_E_NO_REVOCATION_CHECK): passes --ssl-revoke-best-effort to every HTTP check of Deploy, Smoke and ResetDemo. A
+    certificate that IS revoked is still refused.
+
+.PARAMETER BudgetMonth
+    Bootstrap only: yyyy-MM of the FIRST Bootstrap, for when state.json is lost. Without it Bootstrap uses state.json, then the
+    parameters of the earlier sb-bootstrap deployment, then this month.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Doctor', 'InitSecrets', 'ShowSecrets', 'Bootstrap', 'Deploy', 'ResetClock', 'Smoke', 'Status', 'Teardown')]
+    [ValidateSet('Doctor', 'InitSecrets', 'ShowSecrets', 'Bootstrap', 'Validate', 'Deploy', 'ResetDemo', 'ResetClock', 'Smoke', 'Status', 'Teardown')]
     [string]$Action,
 
     [string]$Location = 'uaenorth',
@@ -44,7 +52,9 @@ param(
     [switch]$Placeholder,
     [switch]$SkipBuild,
     [switch]$AllowDirty,
-    [string]$ReplayNow = '2026-06-14T10:10:00+04:00',
+    [switch]$NoRevoke,
+    [ValidatePattern('^\d{4}-(0[1-9]|1[0-2])$')]
+    [string]$BudgetMonth,
     [switch]$Yes,
     [switch]$IUnderstand,
     [switch]$Force
@@ -62,13 +72,12 @@ try {
         Placeholder       = [bool]$Placeholder
         SkipBuild         = [bool]$SkipBuild
         AllowDirty        = [bool]$AllowDirty
+        NoRevoke          = [bool]$NoRevoke
         Force             = [bool]$Force
         Yes               = [bool]$Yes
         IUnderstand       = [bool]$IUnderstand
-        ReplayNow         = $ReplayNow
-        ReplayNowExplicit = $PSBoundParameters.ContainsKey('ReplayNow')
     }
-    foreach ($name in 'Location', 'ResourceGroup', 'ContactEmail', 'VapidSubject', 'PostgresVersion', 'GitHubOwner') {
+    foreach ($name in 'Location', 'ResourceGroup', 'ContactEmail', 'VapidSubject', 'PostgresVersion', 'GitHubOwner', 'BudgetMonth') {
         if ($PSBoundParameters.ContainsKey($name)) { $options[$name] = [string]$PSBoundParameters[$name] }
     }
     $config = Resolve-DeployConfig -Config (New-DeployConfig @options)
@@ -78,8 +87,13 @@ try {
         'InitSecrets' { Initialize-DemoSecret -Config $config }
         'ShowSecrets' { Invoke-ShowSecret -Config $config }
         'Bootstrap' { Invoke-Bootstrap -Config $config }
+        'Validate' { if ((Invoke-Validate -Config $config) -gt 0) { $exitCode = 1 } }
         'Deploy' { Invoke-Deploy -Config $config }
-        'ResetClock' { Invoke-ResetClock -Config $config }
+        'ResetDemo' { Invoke-ResetDemo -Config $config }
+        'ResetClock' {
+            Write-Say 'Note: ResetClock is now called ResetDemo. It no longer restarts anything: it starts a new demo epoch through the web.'
+            Invoke-ResetDemo -Config $config
+        }
         'Smoke' { Invoke-Smoke -Config $config }
         'Status' { Invoke-Status -Config $config }
         'Teardown' { Show-Teardown -Config $config }

@@ -29,6 +29,23 @@ $script:JobsPlaceholderImage = 'mcr.microsoft.com/k8se/quickstart-jobs:latest'
 $script:DefaultReplayNow = '2026-06-14T10:10:00+04:00'
 $script:MigrateJobName = 'job-migrate'
 $script:RequiredRootCommonNames = @('DigiCert Global Root G2', 'Microsoft RSA Root Certificate Authority 2017')
+# ADR 0042 (infra/bicep/main.bicep: pgSslRootCert, databaseUrlSecret and the module names). A test reads main.bicep and fails
+# when any of these drifts from it.
+$script:ExpectedRootCert = '/etc/ssl/certs/ca-certificates.crt'
+$script:DatabaseUrlSecretName = 'sb-database-url'
+$script:TlsTargets = @(
+    @{ Name = 'api'; Kind = 'app'; Module = 'app-api' },
+    @{ Name = 'alerts'; Kind = 'app'; Module = 'app-alerts' },
+    @{ Name = 'job-migrate'; Kind = 'job'; Module = 'job-migrate' }
+)
+# What state.json records about a DEPLOYMENT (as opposed to the Bootstrap foundation): dropped when its group is gone.
+$script:DeploymentStateKeys = @(
+    'postgresVersionDeployed', 'lastTag', 'placeholder', 'webFqdn', 'apiFqdn', 'apiImage', 'webImage',
+    'smokePassed', 'smokeAt', 'epochId', 'previousEpochId', 'resetAt'
+)
+# The synthetic demo site, and how long one epoch of the replay clock lasts (ADR 0034 amendment, ADR 0066).
+$script:DemoSiteId = 'site-demo-mussafah'
+$script:DemoDayWindow = 'about 7 h 20 min'
 
 # Every variable infra/bicep/main.bicepparam reads (the contract with the Bicep). Cleared after each deployment.
 $script:ParamEnvNames = @(
@@ -306,10 +323,11 @@ function Read-StateFile {
 
 function Save-StateFile {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][System.Collections.IDictionary]$Update)
+    param([System.Collections.IDictionary]$Update = @{}, [string[]]$Remove = @())
     $path = Get-StateFilePath
     Assert-OutsideRepository -Path $path
     $state = Read-StateFile
+    foreach ($key in $Remove) { if ($state.Contains($key)) { $state.Remove($key) } }
     foreach ($key in $Update.Keys) { $state[$key] = $Update[$key] }
     $directory = Split-Path -Parent $path
     if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory -Force | Out-Null }
@@ -372,43 +390,36 @@ function New-DeployConfig {
         [string]$VapidSubject = '',
         [string]$PostgresVersion = '',
         [string]$GitHubOwner = '',
-        [string]$ReplayNow = '',
-        [bool]$ReplayNowExplicit = $false,
+        [string]$BudgetMonth = '',
         [switch]$Placeholder,
         [switch]$SkipBuild,
         [switch]$AllowDirty,
+        [switch]$NoRevoke,
         [switch]$Force,
         [switch]$Yes,
         [switch]$IUnderstand,
         [string]$RepoRoot = ''
     )
     if (-not $RepoRoot) { $RepoRoot = Get-RepoRoot }
-    if ($ReplayNow) {
-        if ($ReplayNow -notmatch '(Z|[+-]\d{2}:\d{2})$') {
-            throw "-ReplayNow must be ISO 8601 with an offset, for example $script:DefaultReplayNow. Got '$ReplayNow'."
-        }
-        $parsed = [DateTimeOffset]::MinValue
-        if (-not [DateTimeOffset]::TryParse($ReplayNow, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$parsed)) {
-            throw "-ReplayNow '$ReplayNow' is not a valid ISO 8601 date and time."
-        }
+    if ($BudgetMonth -and $BudgetMonth -notmatch '^\d{4}-(0[1-9]|1[0-2])$') {
+        throw "-BudgetMonth must be yyyy-MM, for example 2026-11 (the month of the first Bootstrap). Got '$BudgetMonth'."
     }
-    else { $ReplayNow = $script:DefaultReplayNow }
     return @{
-        Location          = $Location
-        ResourceGroup     = $ResourceGroup
-        ContactEmail      = $ContactEmail
-        VapidSubject      = $VapidSubject
-        PostgresVersion   = $PostgresVersion
-        GitHubOwner       = $GitHubOwner
-        ReplayNow         = $ReplayNow
-        ReplayNowExplicit = $ReplayNowExplicit
-        Placeholder       = [bool]$Placeholder
-        SkipBuild         = [bool]$SkipBuild
-        AllowDirty        = [bool]$AllowDirty
-        Force             = [bool]$Force
-        Yes               = [bool]$Yes
-        IUnderstand       = [bool]$IUnderstand
-        RepoRoot          = $RepoRoot
+        Location        = $Location
+        ResourceGroup   = $ResourceGroup
+        ContactEmail    = $ContactEmail
+        VapidSubject    = $VapidSubject
+        PostgresVersion = $PostgresVersion
+        GitHubOwner     = $GitHubOwner
+        BudgetMonth     = $BudgetMonth
+        Placeholder     = [bool]$Placeholder
+        SkipBuild       = [bool]$SkipBuild
+        AllowDirty      = [bool]$AllowDirty
+        NoRevoke        = [bool]$NoRevoke
+        Force           = [bool]$Force
+        Yes             = [bool]$Yes
+        IUnderstand     = [bool]$IUnderstand
+        RepoRoot        = $RepoRoot
     }
 }
 
@@ -591,9 +602,9 @@ function Invoke-Doctor {
             try {
                 $subscriptionId = [string](Get-JsonValue -InputObject $account -Path 'id')
                 $assignee = ''
-                try { $assignee = Invoke-Native -FilePath 'az' -Arguments @('ad', 'signed-in-user', 'show', '--query', 'id', '-o', 'tsv') } catch { $assignee = '' }
+                try { $assignee = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('ad', 'signed-in-user', 'show', '--query', 'id', '-o', 'tsv')) } catch { $assignee = '' }
                 if (-not $assignee) { $assignee = [string](Get-JsonValue -InputObject $account -Path 'user.name') }
-                $owner = Invoke-Native -FilePath 'az' -Arguments @('role', 'assignment', 'list', '--assignee', $assignee, '--scope', "/subscriptions/$subscriptionId", '--include-inherited', '--query', "[?roleDefinitionName=='Owner'].roleDefinitionName", '-o', 'tsv')
+                $owner = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('role', 'assignment', 'list', '--assignee', $assignee, '--scope', "/subscriptions/$subscriptionId", '--include-inherited', '--query', "[?roleDefinitionName=='Owner'].roleDefinitionName", '-o', 'tsv'))
                 if ($owner) {
                     & $say (New-CheckResult -Status PASS -What 'signed-in user is Owner on the subscription')
                 }
@@ -634,10 +645,38 @@ function Invoke-Doctor {
     return $fails
 }
 
-function Invoke-DoctorLite {
-    <# The checks Deploy and Bootstrap cannot work without. Returns the account object; throws one message listing every problem. #>
+function Test-AccountMatchesState {
+    <# The problems (empty when none) of the az session being on another subscription or tenant than the one state.json was made for. #>
     [CmdletBinding()]
-    param([bool]$NeedDocker = $true)
+    param($Account)
+    $problems = New-Object System.Collections.Generic.List[string]
+    if ($null -eq $Account) { return @() }
+    $state = Read-StateFile
+    $savedSubscription = Get-StateValue -State $state -Key 'subscriptionId'
+    $savedTenant = Get-StateValue -State $state -Key 'tenantId'
+    $currentSubscription = [string](Get-JsonValue -InputObject $Account -Path 'id')
+    $currentTenant = [string](Get-JsonValue -InputObject $Account -Path 'tenantId')
+    $currentName = [string](Get-JsonValue -InputObject $Account -Path 'name')
+    if ($savedSubscription -and $currentSubscription -and ($savedSubscription -ine $currentSubscription)) {
+        $problems.Add("this az session is on subscription '$currentName' ($currentSubscription), but state.json belongs to subscription $savedSubscription (made by Bootstrap). Switch with: az account set --subscription $savedSubscription   (or run Bootstrap here to start over in this subscription)")
+    }
+    elseif ($savedTenant -and $currentTenant -and ($savedTenant -ine $currentTenant)) {
+        $problems.Add("this az session is in tenant $currentTenant, but state.json belongs to tenant $savedTenant (made by Bootstrap). Sign in to that tenant: az login --tenant $savedTenant")
+    }
+    return $problems.ToArray()
+}
+
+function Invoke-DoctorLite {
+    <#
+    .SYNOPSIS
+        The checks Deploy and Bootstrap cannot work without. Returns the account object; throws one message listing every problem.
+    .DESCRIPTION
+        Also refuses an az session that is on another subscription or tenant than the one state.json was made for (its
+        resource group, registry and apps live in that one). Bootstrap passes -AllowSubscriptionChange: it is the action that
+        replaces the state.
+    #>
+    [CmdletBinding()]
+    param([bool]$NeedDocker = $true, [switch]$AllowSubscriptionChange)
     $problems = New-Object System.Collections.Generic.List[string]
     $account = $null
     if (-not (Test-CommandAvailable -Name 'az')) { $problems.Add('az is not on PATH (winget install --exact --id Microsoft.AzureCLI, then a NEW terminal)') }
@@ -646,6 +685,7 @@ function Invoke-DoctorLite {
         catch { $problems.Add('not signed in to az (run: az login)') }
         try { Invoke-Native -FilePath 'az' -Arguments @('extension', 'show', '--name', 'containerapp', '--query', 'version', '-o', 'tsv') | Out-Null }
         catch { $problems.Add('az extension containerapp is missing (run: az extension add --name containerapp --upgrade)') }
+        if (-not $AllowSubscriptionChange) { foreach ($problem in @(Test-AccountMatchesState -Account $account)) { $problems.Add($problem) } }
     }
     if ($NeedDocker) {
         if (-not (Test-CommandAvailable -Name 'docker')) { $problems.Add('docker is not on PATH (start Docker Desktop)') }
@@ -786,26 +826,68 @@ function Invoke-ShowSecret {
 # Bootstrap
 # ---------------------------------------------------------------------------------------------------------------------
 
+function Resolve-BudgetMonth {
+    <#
+    .SYNOPSIS
+        The BUDGET_MONTH of a Bootstrap run: -BudgetMonth, else state.json, else the earlier bootstrap deployment, else this month.
+    .DESCRIPTION
+        The budget starts in the month of the FIRST run and its start cannot move, so a later run must pass the same month.
+        When state.json is lost, the parameters of the earlier `sb-bootstrap` deployment record still hold it.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Config, [Parameter(Mandatory)][System.Collections.IDictionary]$State)
+    if ($Config.BudgetMonth) { return [pscustomobject]@{ Month = $Config.BudgetMonth; Source = '-BudgetMonth' } }
+    $fromState = Get-StateValue -State $State -Key 'budgetMonth'
+    if ($fromState) { return [pscustomobject]@{ Month = $fromState; Source = 'state.json' } }
+    try {
+        $recorded = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('deployment', 'sub', 'show', '--name', 'sb-bootstrap', '--query', 'properties.parameters.budgetMonth.value', '-o', 'tsv', '--only-show-errors'))
+        if ($recorded -match '^\d{4}-(0[1-9]|1[0-2])$') { return [pscustomobject]@{ Month = $recorded; Source = 'the earlier bootstrap deployment' } }
+    }
+    catch { Write-Verbose 'No earlier bootstrap deployment record; this is a first run.' }
+    $current = (Get-Date).ToUniversalTime().ToString('yyyy-MM', [System.Globalization.CultureInfo]::InvariantCulture)
+    return [pscustomobject]@{ Month = $current; Source = 'this month' }
+}
+
 function Invoke-Bootstrap {
     [CmdletBinding()]
     param([Parameter(Mandatory)][hashtable]$Config)
     if ([string]::IsNullOrWhiteSpace($Config.ContactEmail)) {
         throw '-ContactEmail is required: the address that receives the monthly budget alerts.'
     }
-    $account = Invoke-DoctorLite -NeedDocker $false
+    $account = Invoke-DoctorLite -NeedDocker $false -AllowSubscriptionChange
     $state = Read-StateFile
-    $month = Get-StateValue -State $state -Key 'budgetMonth'
-    if (-not $month) { $month = (Get-Date).ToUniversalTime().ToString('yyyy-MM', [System.Globalization.CultureInfo]::InvariantCulture) }
+    $budget = Resolve-BudgetMonth -Config $Config -State $state
+    $month = $budget.Month
     $paramFile = Join-Path -Path $Config.RepoRoot -ChildPath 'infra\bicep\bootstrap.bicepparam'
     if (-not (Test-Path -LiteralPath $paramFile)) { throw "Missing $paramFile. Run this from a checkout of the feat/i1-azure-infra branch." }
 
+    # Facts about a deployment that this script saved are only true while that deployment exists, in that subscription.
+    $newLife = $false
+    $reason = ''
+    $savedSubscription = Get-StateValue -State $state -Key 'subscriptionId'
+    $currentSubscription = [string](Get-JsonValue -InputObject $account -Path 'id')
+    if ($savedSubscription -and $currentSubscription -and ($savedSubscription -ine $currentSubscription)) {
+        $newLife = $true
+        $reason = "state.json was made for another subscription ($savedSubscription), so what it recorded about an earlier deployment is dropped"
+    }
+    else {
+        $groupExists = 'true'
+        try { $groupExists = (Invoke-Native -FilePath 'az' -Arguments @('group', 'exists', '--name', $Config.ResourceGroup)).Trim().ToLowerInvariant() }
+        catch { $groupExists = 'true' }
+        if ($groupExists -eq 'false') {
+            $newLife = $true
+            $reason = "the resource group $($Config.ResourceGroup) does not exist (deleted, or never created), so what state.json recorded about an earlier deployment is dropped"
+        }
+    }
+
     Write-Say "Bootstrap (one time, as Owner): subscription $(Get-JsonValue -InputObject $account -Path 'name'), region $($Config.Location)."
     Write-Say "It creates the resource group $($Config.ResourceGroup), a USD 75 monthly budget alerting $($Config.ContactEmail), two identities, the registry (Basic) and the role assignments."
-    Write-Say "Budget month: $month (a re-run in a later month reuses it from state.json)."
+    Write-Say "Budget month: $month ($($budget.Source)). A re-run in a later month reuses it."
+    if ($newLife) { Write-Say "Note: $reason." }
     if ($Config.GitHubOwner) { Write-Say "GitHub owner: $($Config.GitHubOwner) (a federated credential for repo:$($Config.GitHubOwner)/stellar-blaze:environment:demo is created)." }
     else { Write-Say 'No -GitHubOwner: no federated credential is created (add it later by re-running with -GitHubOwner).' }
 
-    $operator = Invoke-Native -FilePath 'az' -Arguments @('ad', 'signed-in-user', 'show', '--query', 'id', '-o', 'tsv')
+    $operator = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('ad', 'signed-in-user', 'show', '--query', 'id', '-o', 'tsv'))
     if (-not $operator) { throw 'Could not read your object id (az ad signed-in-user show). Sign in again with: az login' }
 
     $values = @{
@@ -834,13 +916,17 @@ function Invoke-Bootstrap {
         acrLoginServer    = [string](Get-JsonValue -InputObject $outputs -Path 'acrLoginServer.value')
         appsIdentityId    = [string](Get-JsonValue -InputObject $outputs -Path 'appsIdentityId.value')
         resourceGroupName = [string](Get-JsonValue -InputObject $outputs -Path 'resourceGroupName.value')
+        subscriptionId    = [string](Get-JsonValue -InputObject $outputs -Path 'subscriptionId.value')
+        tenantId          = [string](Get-JsonValue -InputObject $outputs -Path 'tenantId.value')
         budgetMonth       = $month
         location          = $Config.Location
     }
-    foreach ($required in 'acrName', 'acrLoginServer', 'appsIdentityId', 'resourceGroupName') {
+    foreach ($required in 'acrName', 'acrLoginServer', 'appsIdentityId', 'resourceGroupName', 'subscriptionId', 'tenantId') {
         if (-not $update[$required]) { throw "The bootstrap deployment has no output '$required'. Inspect: az deployment sub show --name sb-bootstrap" }
     }
-    Save-StateFile -Update $update
+    $stale = @()
+    if ($newLife) { $stale = $script:DeploymentStateKeys }
+    Save-StateFile -Update $update -Remove $stale
     Write-Say "Registry: $($update.acrLoginServer)    Resource group: $($update.resourceGroupName)"
     Write-Say 'Saved to state.json (identifiers only, no secrets).'
     Write-Say ''
@@ -1039,7 +1125,7 @@ function Start-MigrationExecution {
        job name itself, falls back to the newest execution in the list. #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$ResourceGroup)
-    $started = Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'job', 'start', '--name', $script:MigrateJobName, '--resource-group', $ResourceGroup, '--query', 'name', '-o', 'tsv', '--only-show-errors')
+    $started = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'job', 'start', '--name', $script:MigrateJobName, '--resource-group', $ResourceGroup, '--query', 'name', '-o', 'tsv', '--only-show-errors'))
     if ($started -and $started -ne $script:MigrateJobName) { return $started }
     $listJson = Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'job', 'execution', 'list', '--name', $script:MigrateJobName, '--resource-group', $ResourceGroup, '-o', 'json', '--only-show-errors')
     $items = @(ConvertFrom-JsonArray -Text $listJson)
@@ -1068,7 +1154,7 @@ function Invoke-Migration {
     )
     $jobImage = ''
     try {
-        $jobImage = Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'job', 'show', '--name', $script:MigrateJobName, '--resource-group', $ResourceGroup, '--query', 'properties.template.containers[0].image', '-o', 'tsv', '--only-show-errors')
+        $jobImage = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'job', 'show', '--name', $script:MigrateJobName, '--resource-group', $ResourceGroup, '--query', 'properties.template.containers[0].image', '-o', 'tsv', '--only-show-errors'))
     }
     catch {
         throw "The migration job '$script:MigrateJobName' cannot be read in resource group '$ResourceGroup'. Phase 1 of the deployment creates it, so a real deploy must not continue without it.`n$($_.Exception.Message)"
@@ -1214,11 +1300,14 @@ function Wait-AppGate {
 }
 
 function Get-HttpStatus {
+    <# -NoRevoke: curl --ssl-revoke-best-effort (a certificate whose revocation status cannot be fetched is accepted; a revoked one is still refused). #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Url)
+    param([Parameter(Mandatory)][string]$Url, [switch]$NoRevoke)
     $text = ''
+    $arguments = @('--silent', '--max-time', '15', '--output', 'NUL', '--write-out', '%{http_code}')
+    if ($NoRevoke) { $arguments += '--ssl-revoke-best-effort' }
     try {
-        $text = Invoke-Native -FilePath 'curl.exe' -Arguments @('--silent', '--max-time', '15', '--output', 'NUL', '--write-out', '%{http_code}', $Url) -Label 'curl.exe'
+        $text = Invoke-Native -FilePath 'curl.exe' -Arguments ($arguments + $Url) -Label 'curl.exe'
     }
     catch { return 0 }
     $code = 0
@@ -1228,11 +1317,11 @@ function Get-HttpStatus {
 
 function Wait-HttpOk {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Url, [int]$TimeoutSeconds = 120, [int]$IntervalSeconds = 10)
+    param([Parameter(Mandatory)][string]$Url, [int]$TimeoutSeconds = 120, [int]$IntervalSeconds = 10, [switch]$NoRevoke)
     $waited = 0
     $status = 0
     while ($true) {
-        $status = Get-HttpStatus -Url $Url
+        $status = Get-HttpStatus -Url $Url -NoRevoke:$NoRevoke
         if ($status -eq 200) { return }
         if ($waited -ge $TimeoutSeconds) { throw "GET $Url answered $status after $TimeoutSeconds s, expected 200." }
         Write-Say "  GET $Url answered $status; waiting"
@@ -1242,12 +1331,15 @@ function Wait-HttpOk {
 }
 
 function Invoke-DemoSmoke {
-    [CmdletBinding()]
     <# -Fresh: a just-deployed web app (wait for /api/healthz first, and sleep 62 s at the end so the rate limit H6 drained is clear). #>
-    param([Parameter(Mandatory)][string]$BaseUrl, [switch]$Fresh)
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$BaseUrl, [switch]$Fresh, [switch]$NoRevoke)
     $script = Join-Path -Path $script:LibDir -ChildPath 'Test-DemoHttp.ps1'
+    $splat = @{ BaseUrl = $BaseUrl }
+    if ($Fresh) { $splat['WaitReady'] = $true; $splat['Wait'] = $true }
+    if ($NoRevoke) { $splat['NoRevoke'] = $true }
     $global:LASTEXITCODE = 0
-    if ($Fresh) { & $script -BaseUrl $BaseUrl -WaitReady -Wait | Out-Host } else { & $script -BaseUrl $BaseUrl | Out-Host }
+    & $script @splat | Out-Host
     return ($LASTEXITCODE -eq 0)
 }
 
@@ -1264,7 +1356,7 @@ function Get-DeployOutput {
     }
     catch { Write-Say 'Could not read the deployment outputs; reading the apps instead.' }
     if (-not $webFqdn) {
-        $webFqdn = Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'show', '--name', 'web', '--resource-group', $ResourceGroup, '--query', 'properties.configuration.ingress.fqdn', '-o', 'tsv', '--only-show-errors')
+        $webFqdn = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'show', '--name', 'web', '--resource-group', $ResourceGroup, '--query', 'properties.configuration.ingress.fqdn', '-o', 'tsv', '--only-show-errors'))
     }
     if (-not $webFqdn) { throw 'The web app has no ingress FQDN.' }
     return [pscustomobject]@{ WebFqdn = $webFqdn; ApiFqdn = $apiFqdn }
@@ -1273,7 +1365,7 @@ function Get-DeployOutput {
 function Invoke-Deploy {
     [CmdletBinding()]
     param([Parameter(Mandatory)][hashtable]$Config)
-    $total = 12
+    $total = 18
     $state = Read-StateFile
     foreach ($required in 'acrName', 'acrLoginServer', 'appsIdentityId') {
         if (-not (Get-StateValue -State $state -Key $required)) {
@@ -1283,6 +1375,7 @@ function Invoke-Deploy {
     $secrets = Read-SecretFile
     $registry = Get-StateValue -State $state -Key 'acrLoginServer'
     $placeholder = [bool]$Config.Placeholder
+    $noRevoke = [bool]$Config.NoRevoke
 
     Write-Say "[1/$total] pre-checks"
     $account = Invoke-DoctorLite -NeedDocker (-not $placeholder)
@@ -1314,53 +1407,66 @@ function Invoke-Deploy {
     if ($placeholder -and (Get-StateValue -State $state -Key 'lastTag') -and (Get-StateValue -State $state -Key 'placeholder') -eq 'False') {
         Write-Say '  WARNING      : a real deployment exists; -Placeholder REPLACES its apps with the public quickstart images (the database is kept).'
     }
+
+    Write-Say "[3/$total] template checks (ADR 0042: the database client must verify the server)"
+    Invoke-TemplateTlsCheck -Config $Config
     if (-not (Confirm-Action -Prompt 'This creates billable Azure resources (see the cost note in infra/README.md).' -Yes $Config.Yes)) {
         throw 'Cancelled by the operator. Nothing was created.'
     }
 
     if (-not $placeholder) {
-        Write-Say "[3/$total] registry login"
+        Write-Say "[4/$total] registry login"
         Invoke-Native -FilePath 'az' -Arguments @('acr', 'login', '--name', (Get-StateValue -State $state -Key 'acrName'), '--only-show-errors') | Out-Null
         if ($Config.SkipBuild) {
-            Write-Say "[4/$total] -SkipBuild: checking that both images exist in the registry for tag $tag"
+            Write-Say "[5/$total] -SkipBuild: checking that both images exist in the registry for tag $tag"
             foreach ($repo in @("sb-api:$tag", "sb-web:$tag")) {
                 try { Invoke-Native -FilePath 'az' -Arguments @('acr', 'repository', 'show', '--name', (Get-StateValue -State $state -Key 'acrName'), '--image', $repo, '--query', 'name', '-o', 'tsv', '--only-show-errors') | Out-Null }
                 catch { throw "Image $repo is not in the registry. Run Deploy without -SkipBuild." }
             }
-            Write-Say "[5/$total] root-store check skipped: the image was not built here (it was checked when it was built)"
-            Write-Say "[6/$total] nothing to push"
+            Write-Say "[6/$total] root-store check skipped: the image was not built here (it was checked when it was built)"
+            Write-Say "[7/$total] nothing to push"
         }
         else {
-            Write-Say "[4/$total] building"
+            Write-Say "[5/$total] building"
             Invoke-ImageBuild -Config $Config -Registry $registry -Tag $tag | Out-Null
-            Write-Say "[5/$total] root-store check of the api image (ADR 0042)"
+            Write-Say "[6/$total] root-store check of the api image (ADR 0042)"
             Test-ApiImageRootStore -Image $apiImage
             Write-Say '  PASS the image trusts both Azure PostgreSQL roots'
-            Write-Say "[6/$total] pushing"
+            Write-Say "[7/$total] pushing"
             Push-DeployImage -Image @($apiImage, $webImage)
         }
     }
     else {
-        Write-Say "[3/$total] [4/$total] [5/$total] [6/$total] placeholder: no login, build, root-store check or push"
+        Write-Say "[4/$total] to [7/$total] placeholder: no login, build, root-store check or push"
     }
 
     $baseArgs = @{ Config = $Config; Secrets = $secrets; State = $state; Tag = $tag; PostgresVersion = $pgVersion; ApiImage = $apiImage; WebImage = $webImage }
-    Write-Say "[7/$total] phase 1: environment, Postgres and the migration job (Postgres creation takes 5 to 15 minutes; nothing prints until it ends)"
+    Write-Say "[8/$total] phase 1: environment, Postgres and the migration job (Postgres creation takes 5 to 15 minutes; nothing prints until it ends)"
     Invoke-MainDeployment -Config $Config -Name "sb-main-p1-$tag" -ParamValue (Get-MainParamValue @baseArgs -DeployApps $false)
     Save-StateFile -Update @{ postgresVersionDeployed = $pgVersion }
 
     if ($placeholder) {
-        Write-Say "[8/$total] placeholder: no migration"
+        Write-Say "[9/$total] placeholder: no migration"
     }
     else {
-        Write-Say "[8/$total] migration (job-migrate runs the image just built)"
+        Write-Say "[9/$total] migration (job-migrate runs the image just built)"
         Invoke-Migration -ResourceGroup $Config.ResourceGroup -ExpectedImage $apiImage | Out-Null
     }
 
-    Write-Say "[9/$total] phase 2: the apps"
+    Write-Say "[10/$total] phase 2: the apps"
     Invoke-MainDeployment -Config $Config -Name "sb-main-p2-$tag" -ParamValue (Get-MainParamValue @baseArgs -DeployApps $true)
 
-    Write-Say "[10/$total] revision gates (up to 300 s)"
+    Write-Say "[11/$total] database TLS as deployed (ADR 0042)"
+    if ($placeholder) { Write-Say '  skipped: a placeholder app has neither the database secret nor the root file' }
+    else {
+        $tlsResults = @(Test-DeployedTlsSetting -ResourceGroup $Config.ResourceGroup)
+        if ((Write-GuardResult -Result $tlsResults) -gt 0) {
+            $failed = (@($tlsResults | Where-Object { $_.Status -eq 'FAIL' } | ForEach-Object { $_.Id }) | Select-Object -Unique) -join ', '
+            throw "The deployed database TLS check FAILED ($failed, see the FAIL lines above): an app or the job would not verify the database server (ADR 0042). The apps are deployed but were not gated; fix the cause and run Deploy again."
+        }
+    }
+
+    Write-Say "[12/$total] revision gates (up to 300 s)"
     if ($placeholder) {
         $targets = @(
             @{ App = 'api'; Kind = 'Ingress'; Image = $script:PlaceholderImage },
@@ -1368,43 +1474,81 @@ function Invoke-Deploy {
         )
     }
     else {
+        # The order is the order of the restart below: api and alerts first, together.
         $targets = @(
             @{ App = 'api'; Kind = 'Ingress'; Image = $apiImage },
-            @{ App = 'web'; Kind = 'Ingress'; Image = $webImage },
-            @{ App = 'alerts'; Kind = 'Worker'; Image = $apiImage }
+            @{ App = 'alerts'; Kind = 'Worker'; Image = $apiImage },
+            @{ App = 'web'; Kind = 'Ingress'; Image = $webImage }
         )
     }
     Wait-AppGate -ResourceGroup $Config.ResourceGroup -Target $targets
     $outputs = Get-DeployOutput -ResourceGroup $Config.ResourceGroup -DeploymentName "sb-main-p2-$tag"
     $webUrl = "https://$($outputs.WebFqdn)"
 
-    Write-Say "[11/$total] HTTP check"
+    # What is deployed NOW, before anything after the gates can fail: Smoke, Status and ResetDemo read this, and after a failed
+    # smoke test the advised retry must test THIS deployment. The smoke result is recorded separately and starts as not run.
+    Save-StateFile -Update @{
+        lastTag     = $tag
+        placeholder = $placeholder
+        webFqdn     = $outputs.WebFqdn
+        apiFqdn     = $outputs.ApiFqdn
+        apiImage    = $(if ($placeholder) { $script:PlaceholderImage } else { $apiImage })
+        webImage    = $(if ($placeholder) { $script:PlaceholderImage } else { $webImage })
+        smokePassed = $false
+        smokeAt     = ''
+    }
+
+    Write-Say "[13/$total] exposure and cost checks (the api is private, one replica each, Consumption only, one region)"
+    Invoke-PostDeployCheck -Config $Config -Placeholder $placeholder
+
+    Write-Say "[14/$total] restart api, alerts and web together (Container Apps makes no revision when only secret values change, so rotated secrets reach running replicas only after a restart)"
+    if ($placeholder) { Write-Say '  placeholder: the quickstart apps have no secrets, nothing to restart' }
+    else { Restart-DemoApps -ResourceGroup $Config.ResourceGroup -Target $targets }
+
+    Write-Say "[15/$total] new demo epoch, so the replay clock of the smoke test is fresh"
+    if ($placeholder) { Write-Say '  placeholder: there is no demo site yet' }
+    else {
+        Wait-HttpOk -Url "$webUrl/api/healthz" -NoRevoke:$noRevoke
+        Reset-DemoEpoch -Config $Config -WebUrl $webUrl -RetryOnRateLimit | Out-Null
+    }
+
+    Write-Say "[16/$total] HTTP check"
     if ($placeholder) {
-        Wait-HttpOk -Url "$webUrl/"
+        try {
+            Wait-HttpOk -Url "$webUrl/" -NoRevoke:$noRevoke
+        }
+        catch {
+            Save-SmokeResult -Passed $false
+            throw
+        }
+        Save-SmokeResult -Passed $true
         Write-Say "  PASS GET $webUrl/ answered 200 (the demo smoke test is skipped for placeholders)"
     }
     else {
-        if (-not (Invoke-DemoSmoke -BaseUrl $webUrl -Fresh)) {
-            throw "The demo HTTP checks failed (see the FAIL lines above). Re-run them with: $(Get-EntryScriptCommand -Arguments '-Action Smoke')"
+        $smokePassed = $false
+        try { $smokePassed = Invoke-DemoSmoke -BaseUrl $webUrl -Fresh -NoRevoke:$noRevoke }
+        catch {
+            Save-SmokeResult -Passed $false
+            throw
+        }
+        Save-SmokeResult -Passed $smokePassed
+        if (-not $smokePassed) {
+            throw "The demo HTTP checks failed (see the FAIL lines above). Re-run them with: $(Get-EntryScriptCommand -Arguments '-Action Smoke'). If H3 failed after it created a stop, run $(Get-EntryScriptCommand -Arguments '-Action ResetDemo') to start a clean epoch."
         }
     }
 
-    Save-StateFile -Update @{
-        lastTag      = $tag
-        placeholder  = $placeholder
-        webFqdn      = $outputs.WebFqdn
-        apiFqdn      = $outputs.ApiFqdn
-        apiImage     = $(if ($placeholder) { $script:PlaceholderImage } else { $apiImage })
-        webImage     = $(if ($placeholder) { $script:PlaceholderImage } else { $webImage })
-    }
-    Write-Say "[12/$total] done"
+    Write-Say "[17/$total] final demo epoch (a clean epoch and a fresh clock for the first session)"
+    if ($placeholder) { Write-Say '  placeholder: there is no demo site yet' }
+    else { Reset-DemoEpoch -Config $Config -WebUrl $webUrl -RetryOnRateLimit | Out-Null }
+
+    Write-Say "[18/$total] done"
     Write-Say ''
     Write-Say "Web (public) : $webUrl"
     if ($outputs.ApiFqdn) { Write-Say "Api (INTERNAL, not reachable from the internet; web calls it): https://$($outputs.ApiFqdn)" }
     if (-not $placeholder) {
         Write-Say ''
-        Write-Say 'Replay clock: in replay mode api and alerts each start their clock at the anchor (10:10 Asia/Dubai) when they start, and it then runs at real speed, so a demo left running walks through the whole replay day in about 8 hours. Run ResetClock before EVERY judged session (it restarts both together).'
-        Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action ResetClock') -Why 'before every judged session'
+        Write-Say "Demo day: Deploy ended with a new epoch, so the replay day starts at the anchor (10:10 Asia/Dubai) now and lasts $script:DemoDayWindow, whether or not anyone looks. Run ResetDemo before EVERY judged session (it starts a new epoch; it restarts nothing; upstream limit 1 per 60 s and 10 per hour)."
+        Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action ResetDemo') -Why 'before every judged session'
         Write-Say ('  then: ' + (Get-EntryScriptCommand -Arguments '-Action Status') + '   to look again, or   ' + (Get-EntryScriptCommand -Arguments '-Action Teardown') + '   to see how to delete everything.')
     }
     else {
@@ -1413,17 +1557,8 @@ function Invoke-Deploy {
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Replay clock, status, smoke, teardown
+# Status, smoke, teardown
 # ---------------------------------------------------------------------------------------------------------------------
-
-function Get-ReplayClockEstimate {
-    <# anchor + (now - start): what a replay-mode process that started at StartUtc believes the time is. #>
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Anchor, [Parameter(Mandatory)][datetime]$StartUtc, [Parameter(Mandatory)][datetime]$NowUtc)
-    $anchorTime = [DateTimeOffset]::Parse($Anchor, [System.Globalization.CultureInfo]::InvariantCulture)
-    $elapsed = $NowUtc.ToUniversalTime() - $StartUtc.ToUniversalTime()
-    return $anchorTime.Add($elapsed)
-}
 
 function Get-AppEnvValue {
     [CmdletBinding()]
@@ -1435,56 +1570,6 @@ function Get-AppEnvValue {
     return ''
 }
 
-function Invoke-ResetClock {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][hashtable]$Config)
-    $state = Read-StateFile
-    if ((Get-StateValue -State $state -Key 'placeholder') -eq 'True') {
-        Write-Say 'The last deploy was a placeholder: there is no replay clock (no api or alerts yet). Nothing to reset.'
-        return
-    }
-    Invoke-DoctorLite -NeedDocker $false | Out-Null
-    $rg = $Config.ResourceGroup
-    $apps = @('api', 'alerts')
-    $snapshots = @{}
-    foreach ($app in $apps) { $snapshots[$app] = Get-AppSnapshot -App $app -ResourceGroup $rg }
-    $targets = @()
-    foreach ($app in $apps) {
-        $image = [string](Get-JsonValue -InputObject $snapshots[$app].App -Path 'properties.template.containers[0].image')
-        $targets += @{ App = $app; Kind = $(if ($app -eq 'api') { 'Ingress' } else { 'Worker' }); Image = $image }
-    }
-    $currentAnchor = Get-AppEnvValue -Snapshot $snapshots['api'] -Name 'SB_REPLAY_NOW'
-    $stamps = @{}
-    if ($Config.ReplayNowExplicit) {
-        Write-Say "Setting SB_REPLAY_NOW=$($Config.ReplayNow) on api and alerts (each change creates a new revision, so each restarts)."
-        foreach ($app in $apps) {
-            Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'update', '--name', $app, '--resource-group', $rg, '--set-env-vars', "SB_REPLAY_NOW=$($Config.ReplayNow)", '--only-show-errors', '-o', 'none') | Out-Null
-            $stamps[$app] = (Get-Date).ToUniversalTime()
-        }
-        $anchor = $Config.ReplayNow
-    }
-    else {
-        Write-Say 'Restarting the active revision of api and alerts back to back...'
-        foreach ($app in $apps) {
-            $revision = [string](Get-JsonValue -InputObject $snapshots[$app].App -Path 'properties.latestRevisionName')
-            Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'revision', 'restart', '--name', $app, '--resource-group', $rg, '--revision', $revision, '--only-show-errors', '-o', 'none') | Out-Null
-            $stamps[$app] = (Get-Date).ToUniversalTime()
-        }
-        $anchor = $currentAnchor
-        if (-not $anchor) { $anchor = $Config.ReplayNow }
-    }
-    Start-DeployDelay -Seconds 15
-    Write-Say 'Waiting for both to be healthy again (up to 300 s)...'
-    Wait-AppGate -ResourceGroup $rg -Target $targets
-    Write-Say ''
-    Write-Say "Replay clock anchor : $anchor"
-    foreach ($app in $apps) { Write-Say "  $app restarted at $($stamps[$app].ToString('HH:mm:ss')) UTC" }
-    Write-Say 'Both clocks now start from the anchor within seconds of each other and run at real speed (about 8 hours cover the whole replay day).'
-    Write-Say 'Restarting only ONE of the two desynchronises their clocks (api and alerts would disagree by hours): always restart both, as this action does.'
-    Write-Say 'The next Bicep deploy (Deploy) resets SB_REPLAY_NOW to the template value (10:10), whatever -ReplayNow set here.'
-    Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Status') -Why 'confirm both clocks'
-}
-
 function Invoke-Status {
     [CmdletBinding()]
     param([Parameter(Mandatory)][hashtable]$Config)
@@ -1492,6 +1577,7 @@ function Invoke-Status {
     $state = Read-StateFile
     $rg = $Config.ResourceGroup
     Write-Say "Resource group: $rg ($($Config.Location))    last tag: $(Get-StateValue -State $state -Key 'lastTag')"
+    Write-Say "Last smoke test: $(Get-SmokeSummary -State $state)"
     $webFqdn = Get-StateValue -State $state -Key 'webFqdn'
     $apiFqdn = Get-StateValue -State $state -Key 'apiFqdn'
     if ($webFqdn) { Write-Say "Web (public) : https://$webFqdn" }
@@ -1517,36 +1603,28 @@ function Invoke-Status {
         Write-Say "       image=$image"
         foreach ($failure in $failures) { Write-Say "       - $failure" }
     }
-    # The replay clock: what each process believes the time is, from when its replica started (field names unverified).
-    if ($snapshots.ContainsKey('api') -and $snapshots.ContainsKey('alerts')) {
+    # The demo day. The clock of api and alerts is the anchor plus the time since the current EPOCH started, and the epoch is a
+    # row in the database: Status cannot see it. All it can show is the anchor and the last reset this script recorded.
+    if ($snapshots.ContainsKey('api')) {
         $anchor = Get-AppEnvValue -Snapshot $snapshots['api'] -Name 'SB_REPLAY_NOW'
-        if (-not $anchor) { $anchor = $Config.ReplayNow }
-        $now = (Get-Date).ToUniversalTime()
-        $estimates = @{}
-        foreach ($app in 'api', 'alerts') {
-            try {
-                $revision = [string](Get-JsonValue -InputObject $snapshots[$app].App -Path 'properties.latestRevisionName')
-                $replicaJson = Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'replica', 'list', '--name', $app, '--resource-group', $rg, '--revision', $revision, '-o', 'json', '--only-show-errors')
-                $replicas = @(ConvertFrom-JsonArray -Text $replicaJson)
-                $start = $null
-                if ($replicas.Count -gt 0) { $start = ConvertTo-UtcDateTime -Value (Get-JsonValue -InputObject $replicas[0] -Path 'properties.createdTime') }
-                if ($null -eq $start) { $start = ConvertTo-UtcDateTime -Value (Get-RevisionValue -Revision $snapshots[$app].Revision -Path 'createdTime') }
-                if ($null -ne $start) { $estimates[$app] = Get-ReplayClockEstimate -Anchor $anchor -StartUtc $start -NowUtc $now }
+        if (-not $anchor) { $anchor = $script:DefaultReplayNow }
+        Write-Say ''
+        Write-Say "Replay anchor (SB_REPLAY_NOW): $anchor. The demo day starts there when an epoch starts (Deploy, or ResetDemo) and lasts $script:DemoDayWindow."
+        Write-Say 'Status cannot see the epoch (it is a row in the database), so it cannot tell where the clock is now.'
+        $epoch = Get-StateValue -State $state -Key 'epochId'
+        $resetAt = Get-StateValue -State $state -Key 'resetAt'
+        if ($resetAt) {
+            $since = $null
+            try { $since = (Get-Date).ToUniversalTime() - (ConvertTo-UtcDateTime -Value $resetAt) } catch { $since = $null }
+            $shownEpoch = ''
+            if ($epoch) { $shownEpoch = "epoch $epoch, " }
+            if ($null -ne $since) {
+                Write-Say ("Last reset recorded by this script: {0}{1} ({2:N1} h ago)." -f $shownEpoch, $resetAt, $since.TotalHours)
+                if ($since.TotalMinutes -gt (7 * 60 + 20)) { Write-Say "WARN more than $script:DemoDayWindow since that reset: the demo day is probably over. Run ResetDemo before the next session." }
             }
-            catch { Write-Say "replay clock of $app : could not be read ($(($_.Exception.Message -split "`n")[0]))" }
+            else { Write-Say "Last reset recorded by this script: $shownEpoch$resetAt." }
         }
-        foreach ($app in $estimates.Keys) {
-            $local = $estimates[$app].ToOffset([TimeSpan]::FromHours(4))
-            $inside = ($local.TimeOfDay -ge [TimeSpan]::FromHours(10)) -and ($local.TimeOfDay -le [TimeSpan]::FromMinutes(17 * 60 + 30))
-            $note = 'inside the 10:00-17:30 demo window'
-            if (-not $inside) { $note = 'OUTSIDE the 10:00-17:30 window: run ResetClock' }
-            Write-Say "replay clock $app : about $($local.ToString('HH:mm:ss')) Asia/Dubai ($note)"
-        }
-        if ($estimates.ContainsKey('api') -and $estimates.ContainsKey('alerts')) {
-            $delta = [math]::Abs(($estimates['api'] - $estimates['alerts']).TotalSeconds)
-            if ($delta -gt 120) { Write-Say "WARN api and alerts clocks differ by $([math]::Round($delta)) s: run ResetClock (it restarts both)." }
-            else { Write-Say "api and alerts clocks agree within $([math]::Round($delta)) s." }
-        }
+        else { Write-Say 'This script has recorded no reset yet.' }
     }
     Write-Say ''
     Write-Say 'Cost reminder: three always-on apps plus Postgres B1ms bill by the hour for as long as they exist (the plan estimates roughly USD 60 to 75 a month; the alerts worker may push it above the USD 75 budget alert). Delete everything when the demo is over.'
@@ -1560,19 +1638,712 @@ function Invoke-Smoke {
     $fqdn = Get-StateValue -State $state -Key 'webFqdn'
     if (-not $fqdn) {
         Invoke-DoctorLite -NeedDocker $false | Out-Null
-        $fqdn = Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'show', '--name', 'web', '--resource-group', $Config.ResourceGroup, '--query', 'properties.configuration.ingress.fqdn', '-o', 'tsv', '--only-show-errors')
+        $fqdn = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'show', '--name', 'web', '--resource-group', $Config.ResourceGroup, '--query', 'properties.configuration.ingress.fqdn', '-o', 'tsv', '--only-show-errors'))
     }
     if (-not $fqdn) { throw 'No web FQDN known. Deploy first.' }
     $url = "https://$fqdn"
+    $noRevoke = [bool]$Config.NoRevoke
     if ((Get-StateValue -State $state -Key 'placeholder') -eq 'True') {
         Write-Say 'The last deploy was a placeholder: only GET / is checked.'
-        Wait-HttpOk -Url "$url/" -TimeoutSeconds 30
+        try { Wait-HttpOk -Url "$url/" -TimeoutSeconds 30 -NoRevoke:$noRevoke }
+        catch {
+            Save-SmokeResult -Passed $false
+            throw
+        }
+        Save-SmokeResult -Passed $true
         Write-Say "PASS GET $url/ answered 200"
         return
     }
-    if (-not (Invoke-DemoSmoke -BaseUrl $url)) { throw 'Demo HTTP checks failed (see the FAIL lines above).' }
-    Write-Say 'All demo HTTP checks passed. Note: the last check uses up the rate limit of the demo token for about a minute.'
-    Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action ResetClock') -Why 'before every judged session'
+    $passed = $false
+    try { $passed = Invoke-DemoSmoke -BaseUrl $url -NoRevoke:$noRevoke }
+    catch {
+        Save-SmokeResult -Passed $false
+        throw
+    }
+    Save-SmokeResult -Passed $passed
+    if (-not $passed) { throw 'Demo HTTP checks failed (see the FAIL lines above).' }
+    Write-Say 'All demo HTTP checks passed. Note: the last check uses up the rate limit of the demo token for about a minute, and a demo reset is counted in it: wait a minute before ResetDemo.'
+    Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action ResetDemo') -Why 'before every judged session (the smoke test leaves its own traces in the epoch)'
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Guards: what deploy.yml checks (ADR 0042 and the exposure and cost checks), as PASS or FAIL lines that stop the deploy
+# ---------------------------------------------------------------------------------------------------------------------
+
+function ConvertFrom-AzTsv {
+    <# `az -o tsv` prints a JSON null as None and an empty result as nothing: both mean absent, so both become ''. #>
+    [CmdletBinding()]
+    param([AllowEmptyString()][AllowNull()][string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+    if ($Text.Trim() -ieq 'none') { return '' }
+    return $Text
+}
+
+function New-GuardResult {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][ValidateSet('PASS', 'FAIL', 'SKIP')][string]$Status,
+        [Parameter(Mandatory)][string]$Id,
+        [Parameter(Mandatory)][string]$Subject,
+        [string[]]$Reason = @()
+    )
+    return [pscustomobject]@{ Status = $Status; Id = $Id; Subject = $Subject; Reason = @($Reason) }
+}
+
+function Write-GuardResult {
+    <# Prints `PASS|FAIL|SKIP <id> <subject>` with the reasons under a FAIL. Returns the number of FAILs. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Result)
+    foreach ($item in $Result) {
+        Write-Say ('{0} {1} {2}' -f $item.Status, $item.Id, $item.Subject)
+        foreach ($reason in $item.Reason) { Write-Say "  - $reason" }
+    }
+    return @($Result | Where-Object { $_.Status -eq 'FAIL' }).Count
+}
+
+function Get-FirstLine {
+    [CmdletBinding()]
+    param([AllowEmptyString()][string]$Text, [int]$Count = 3)
+    return @(($Text -split "`r?`n") | Where-Object { $_.Trim() } | Select-Object -First $Count)
+}
+
+# ---- ADR 0042 on the compiled template (T1 T2 T3 of check-db-tls.sh --template) ----------------------------------------
+
+function ConvertTo-ArmText {
+    <# One value of a compiled template as text: a string as it is, anything else as compact JSON with apostrophes as Bicep writes them. #>
+    [CmdletBinding()]
+    param($Value)
+    if ($null -eq $Value) { return '' }
+    if ($Value -is [string]) { return $Value }
+    $apostropheEscape = '\' + 'u0027'
+    return ((ConvertTo-Json -InputObject $Value -Compress -Depth 30).Replace($apostropheEscape, "'"))
+}
+
+function Get-ArmVariableText {
+    [CmdletBinding()]
+    param($Variables, [Parameter(Mandatory)][string]$Name)
+    if ($null -eq $Variables) { return $null }
+    $property = $Variables.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
+function Get-ArmRootCertValue {
+    <#
+    .SYNOPSIS
+        Every PGSSLROOTCERT value that an environment expression of a compiled template can reach.
+    .DESCRIPTION
+        Bicep compiles `var coreEnv = [ { name: 'PGSSLROOTCERT', value: pgSslRootCert } ]` into a variable that holds a JSON
+        array, and `concat(coreEnv, ...)` into an expression string that names the variable. This reads the text of the
+        expression and then, transitively, the text of every variable it names (so it never needs the parameter values), and
+        collects the value of each PGSSLROOTCERT entry: written as a JSON object or built by createObject(...). A value that is
+        itself a reference to a string variable is resolved; anything else is returned as it stands, so a mismatch shows.
+    #>
+    [CmdletBinding()]
+    param([AllowEmptyString()][string]$Text, $Variables)
+    $found = New-Object System.Collections.Generic.List[string]
+    $queue = New-Object System.Collections.Generic.Queue[string]
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+    $queue.Enqueue($Text)
+    $resolve = {
+        param([string]$Raw)
+        $reference = [regex]::Match($Raw, "^\[?variables\('(?<n>[^']+)'\)\]?$")
+        if ($reference.Success) {
+            $variable = Get-ArmVariableText -Variables $Variables -Name $reference.Groups['n'].Value
+            if ($variable -is [string]) { return $variable }
+        }
+        return $Raw
+    }
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        $built = "createObject\(\s*'name'\s*,\s*'PGSSLROOTCERT'\s*,\s*'value'\s*,\s*(?:'(?<lit>[^']*)'|variables\('(?<var>[^']+)'\))"
+        foreach ($match in [regex]::Matches($current, $built)) {
+            if ($match.Groups['lit'].Success) { $found.Add($match.Groups['lit'].Value) }
+            else { $found.Add((& $resolve "variables('$($match.Groups['var'].Value)')")) }
+        }
+        foreach ($match in [regex]::Matches($current, '\{[^{}]*"name"\s*:\s*"PGSSLROOTCERT"[^{}]*\}')) {
+            $value = [regex]::Match($match.Value, '"value"\s*:\s*"(?<v>(?:[^"\\]|\\.)*)"')
+            if ($value.Success) { $found.Add((& $resolve $value.Groups['v'].Value)) }
+        }
+        foreach ($match in [regex]::Matches($current, "variables\('(?<n>[^']+)'\)")) {
+            $name = $match.Groups['n'].Value
+            if ($seen.Add($name)) {
+                $variable = Get-ArmVariableText -Variables $Variables -Name $name
+                if ($null -ne $variable) { $queue.Enqueue((ConvertTo-ArmText -Value $variable)) }
+            }
+        }
+    }
+    return $found.ToArray()
+}
+
+function Test-TemplateRootCert {
+    <# T3: PGSSLROOTCERT is defined, with the expected path, for api, alerts and job-migrate. Returns the failure reasons. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)]$Template)
+    $reasons = New-Object System.Collections.Generic.List[string]
+    $variables = Get-JsonValue -InputObject $Template -Path 'variables'
+    $resources = Get-JsonValue -InputObject $Template -Path 'resources'
+    $items = @()
+    if ($resources -is [array]) { $items = $resources }
+    elseif ($null -ne $resources) { $items = @($resources.PSObject.Properties | ForEach-Object { $_.Value }) }
+    foreach ($target in $script:TlsTargets) {
+        $module = @($items | Where-Object { "$(Get-JsonValue -InputObject $_ -Path 'name')" -ceq $target.Module }) | Select-Object -First 1
+        if ($null -eq $module) {
+            $reasons.Add("$($target.Name): the template has no module deployment named '$($target.Module)'")
+            continue
+        }
+        $envParameter = Get-JsonValue -InputObject $module -Path 'properties.parameters.env'
+        if ($null -eq $envParameter) {
+            $reasons.Add("$($target.Name): the module has no env parameter")
+            continue
+        }
+        $values = @(Get-ArmRootCertValue -Text (ConvertTo-ArmText -Value $envParameter) -Variables $variables)
+        if ($values.Count -eq 0) { $reasons.Add("$($target.Name): PGSSLROOTCERT is not defined for it") }
+        else {
+            foreach ($value in ($values | Select-Object -Unique)) {
+                if ($value -cne $script:ExpectedRootCert) { $reasons.Add("$($target.Name): PGSSLROOTCERT is '$value', expected $($script:ExpectedRootCert)") }
+            }
+        }
+    }
+    return $reasons.ToArray()
+}
+
+function Get-TemplateTlsResult {
+    <#
+    .SYNOPSIS
+        T1 T2 T3 of check-db-tls.sh --template, on the text of the compiled infra/bicep/main.bicep (no Azure, no secret).
+    .DESCRIPTION
+        T1 every database URL in the template has ssl=verify-full, and there is one. T2 no weaker ssl mode (require, prefer,
+        allow, disable, false) and no sslmode= anywhere. T3 PGSSLROOTCERT is defined for api, alerts and job-migrate with the
+        expected path. T1 and T2 are the same text searches as template_checks.py. T3 reads the compiled expressions (see
+        Get-ArmRootCertValue) where template_checks.py evaluates the template with dummy parameters; it is therefore a check
+        that the entry is reachable, and T5 proves the deployed value.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$TemplateJson)
+    $results = New-Object System.Collections.Generic.List[object]
+
+    $urls = @([regex]::Matches($TemplateJson, 'postgres(?:ql)?(?:\+\w+)?://[^"\\]*') | ForEach-Object { $_.Value })
+    $weakUrls = @($urls | Where-Object { -not $_.Contains('ssl=verify-full') })
+    $subject = 'the database URL secret expression contains ssl=verify-full'
+    if ($urls.Count -eq 0) { $results.Add((New-GuardResult -Status FAIL -Id 'T1' -Subject $subject -Reason @('no database URL found in the template'))) }
+    elseif ($weakUrls.Count -gt 0) {
+        $reasons = @($weakUrls | ForEach-Object { "a database URL lacks ssl=verify-full (it ends ...$($_.Substring([math]::Max(0, $_.Length - 24))))" })
+        $results.Add((New-GuardResult -Status FAIL -Id 'T1' -Subject $subject -Reason $reasons))
+    }
+    else { $results.Add((New-GuardResult -Status PASS -Id 'T1' -Subject $subject)) }
+
+    $weak = @([regex]::Matches($TemplateJson, 'ssl=(?:require|prefer|allow|disable|false)|sslmode=', 'IgnoreCase') | ForEach-Object { $_.Value.ToLowerInvariant() } | Select-Object -Unique)
+    $subject = 'no weaker ssl mode and no sslmode= anywhere in the template'
+    if ($weak.Count -gt 0) { $results.Add((New-GuardResult -Status FAIL -Id 'T2' -Subject $subject -Reason @("the template contains $($weak -join ', ')"))) }
+    else { $results.Add((New-GuardResult -Status PASS -Id 'T2' -Subject $subject)) }
+
+    $subject = 'PGSSLROOTCERT is defined for api, alerts and job-migrate'
+    try {
+        $template = $TemplateJson | ConvertFrom-Json
+        $reasons = @(Test-TemplateRootCert -Template $template)
+    }
+    catch { $reasons = @("cannot evaluate: $(($_.Exception.Message -split "`n")[0])") }
+    if ($reasons.Count -gt 0) { $results.Add((New-GuardResult -Status FAIL -Id 'T3' -Subject $subject -Reason $reasons)) }
+    else { $results.Add((New-GuardResult -Status PASS -Id 'T3' -Subject $subject)) }
+    return $results.ToArray()
+}
+
+function Invoke-TemplateTlsCheck {
+    <# Builds main.bicep with `az bicep build --stdout`, prints T1 T2 T3 and throws on any FAIL (nothing is built or created yet). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Config)
+    $file = Join-Path -Path $Config.RepoRoot -ChildPath 'infra\bicep\main.bicep'
+    if (-not (Test-Path -LiteralPath $file)) { throw "Missing $file. Run this from a checkout of the feat/i1-azure-infra branch." }
+    try {
+        $json = Invoke-Native -FilePath 'az' -Arguments @('bicep', 'build', '--file', $file, '--stdout')
+    }
+    catch {
+        Write-GuardResult -Result @(New-GuardResult -Status FAIL -Id 'T0' -Subject 'main.bicep builds' -Reason (Get-FirstLine -Text $_.Exception.Message)) | Out-Null
+        throw "main.bicep does not build, so the template checks could not run. Nothing was built or created. Install or repair Bicep with: az bicep install"
+    }
+    $results = @(Get-TemplateTlsResult -TemplateJson $json)
+    if ((Write-GuardResult -Result $results) -gt 0) {
+        $ids = (@($results | Where-Object { $_.Status -eq 'FAIL' } | ForEach-Object { $_.Id }) -join ', ')
+        throw "Template checks FAILED ($ids): the database client would not verify the server, or an app would lack the root file (ADR 0042). Nothing was built or created."
+    }
+}
+
+# ---- ADR 0042 on what was deployed (T4 T5 of check-db-tls.sh --deployed) -------------------------------------------------
+
+function Test-DeployedTlsSetting {
+    <#
+    .SYNOPSIS
+        T4: the stored sb-database-url secret of api, alerts and job-migrate has ssl=verify-full. T5: each one's PGSSLROOTCERT
+        environment entry has the expected path. Catches a secret or an entry changed outside the template.
+    .DESCRIPTION
+        The secret is read with `secret list --show-values` (`secret show` does not print a value), held in one local variable
+        only long enough to search it, and never printed, stored or put in a message: the errors of Invoke-Native name the
+        command and show masked stderr, never an argument or stdout.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$ResourceGroup)
+    $results = New-Object System.Collections.Generic.List[object]
+    foreach ($target in $script:TlsTargets) {
+        $name = $target.Name
+        $jobWord = @()
+        if ($target.Kind -eq 'job') { $jobWord = @('job') }
+
+        $secretOk = $false
+        $secretReason = @()
+        try {
+            $secretArguments = @('containerapp') + $jobWord + @('secret', 'list', '--name', $name, '--resource-group', $ResourceGroup, '--show-values', '--query', "[?name=='$($script:DatabaseUrlSecretName)'].value | [0]", '-o', 'tsv', '--only-show-errors')
+            $stored = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments $secretArguments)
+            $secretOk = $stored.Contains('ssl=verify-full')
+            $stored = $null
+        }
+        catch { $secretReason = @(Get-FirstLine -Text $_.Exception.Message -Count 2) }
+        if ($secretOk) { $results.Add((New-GuardResult -Status PASS -Id 'T4' -Subject "$name stores $($script:DatabaseUrlSecretName) with ssl=verify-full")) }
+        else { $results.Add((New-GuardResult -Status FAIL -Id 'T4' -Subject "${name}: $($script:DatabaseUrlSecretName) is missing, unreadable, or lacks ssl=verify-full" -Reason $secretReason)) }
+
+        $found = ''
+        $certReason = @()
+        try {
+            $certArguments = @('containerapp') + $jobWord + @('show', '--name', $name, '--resource-group', $ResourceGroup, '--query', "properties.template.containers[0].env[?name=='PGSSLROOTCERT'].value | [0]", '-o', 'tsv', '--only-show-errors')
+            $found = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments $certArguments)
+        }
+        catch { $certReason = @(Get-FirstLine -Text $_.Exception.Message -Count 2) }
+        if ($found -ceq $script:ExpectedRootCert) { $results.Add((New-GuardResult -Status PASS -Id 'T5' -Subject "$name has PGSSLROOTCERT=$($script:ExpectedRootCert)")) }
+        else {
+            $shown = $found
+            if (-not $shown) { $shown = '<unset>' }
+            $results.Add((New-GuardResult -Status FAIL -Id 'T5' -Subject "${name}: PGSSLROOTCERT is '$shown', expected $($script:ExpectedRootCert)" -Reason $certReason))
+        }
+    }
+    return $results.ToArray()
+}
+
+# ---- exposure and cost (S1 S2 S4 S6 of smoke.sh) -------------------------------------------------------------------------
+
+function Test-WorkloadProfile {
+    <# S1 (cost): the environment's workload profiles are exactly one, Consumption (a Dedicated profile is billed while idle). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name, $Environment)
+    $value = Get-JsonValue -InputObject $Environment -Path 'properties.workloadProfiles'
+    $profiles = @()
+    if ($null -ne $value) { $profiles = @($value) }
+    $shown = @($profiles | ForEach-Object { "$(Get-JsonValue -InputObject $_ -Path 'name')/$(Get-JsonValue -InputObject $_ -Path 'workloadProfileType')" })
+    if ($profiles.Count -eq 1 -and "$(Get-JsonValue -InputObject $profiles[0] -Path 'name')" -ceq 'Consumption' -and "$(Get-JsonValue -InputObject $profiles[0] -Path 'workloadProfileType')" -ceq 'Consumption') {
+        return (New-GuardResult -Status PASS -Id 'S1' -Subject "environment $Name has only the Consumption profile")
+    }
+    if ($shown.Count -eq 0) { $shown = @('none') }
+    return (New-GuardResult -Status FAIL -Id 'S1' -Subject "environment $Name workload profiles are [$($shown -join ', ')], expected exactly Consumption" -Reason @('a Dedicated profile is billed while idle'))
+}
+
+function Test-NoPrivateEndpoint {
+    <# S1 (cost): the group has no private endpoint (each adds a USD 0.10/h meter). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Resource)
+    $endpoints = @($Resource | Where-Object { "$(Get-JsonValue -InputObject $_ -Path 'type')" -ieq 'Microsoft.Network/privateEndpoints' } | ForEach-Object { "$(Get-JsonValue -InputObject $_ -Path 'name')" })
+    if ($endpoints.Count -eq 0) { return (New-GuardResult -Status PASS -Id 'S1' -Subject 'the group has no private endpoint') }
+    return (New-GuardResult -Status FAIL -Id 'S1' -Subject 'the group has a private endpoint' -Reason @("$($endpoints -join ', ') (each adds a USD 0.10/h meter)"))
+}
+
+function Test-AppScale {
+    <# S2 (cost): min and max replicas are both 1. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name, $App)
+    $min = Get-JsonValue -InputObject $App -Path 'properties.template.scale.minReplicas'
+    $max = Get-JsonValue -InputObject $App -Path 'properties.template.scale.maxReplicas'
+    if ($min -eq 1 -and $max -eq 1) { return (New-GuardResult -Status PASS -Id 'S2' -Subject "$Name scale is min 1 / max 1") }
+    $shownMin = '?'
+    $shownMax = '?'
+    if ($null -ne $min) { $shownMin = "$min" }
+    if ($null -ne $max) { $shownMax = "$max" }
+    return (New-GuardResult -Status FAIL -Id 'S2' -Subject "$Name scale is min $shownMin / max $shownMax, expected 1 / 1")
+}
+
+function Test-AppIngress {
+    <# S4 (exposure): api ingress is internal, web is external, alerts has no ingress at all. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][ValidateSet('api', 'web', 'alerts')][string]$Name, $App)
+    $ingress = Get-JsonValue -InputObject $App -Path 'properties.configuration.ingress'
+    $external = Get-JsonValue -InputObject $ingress -Path 'external'
+    $shown = 'unreadable'
+    if ($external -is [bool]) { $shown = "$external".ToLowerInvariant() }
+    switch ($Name) {
+        'api' {
+            if ($external -is [bool] -and -not $external) { return (New-GuardResult -Status PASS -Id 'S4' -Subject 'api ingress is internal (not public)') }
+            return (New-GuardResult -Status FAIL -Id 'S4' -Subject "api ingress.external is '$shown', expected false" -Reason @('the api must not be public'))
+        }
+        'web' {
+            if ($external -is [bool] -and $external) { return (New-GuardResult -Status PASS -Id 'S4' -Subject 'web ingress is external') }
+            return (New-GuardResult -Status FAIL -Id 'S4' -Subject "web ingress.external is '$shown', expected true")
+        }
+        default {
+            if ($null -eq $ingress) { return (New-GuardResult -Status PASS -Id 'S4' -Subject 'alerts has no ingress') }
+            return (New-GuardResult -Status FAIL -Id 'S4' -Subject "alerts has an ingress (external=$shown), expected none")
+        }
+    }
+}
+
+function Test-ResourceLocation {
+    <# S6: every resource of the group is in the expected region (a display name such as UAE North matches uaenorth). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Resource, [Parameter(Mandatory)][string]$Location)
+    if ($Resource.Count -eq 0) { return (New-GuardResult -Status FAIL -Id 'S6' -Subject 'no resource is listed in the group, so the region cannot be confirmed') }
+    $want = ConvertTo-LocationKey -Text $Location
+    $misplaced = @($Resource | Where-Object { (ConvertTo-LocationKey -Text "$(Get-JsonValue -InputObject $_ -Path 'location')") -ne $want } | ForEach-Object { "$(Get-JsonValue -InputObject $_ -Path 'name') ($(Get-JsonValue -InputObject $_ -Path 'location'))" })
+    if ($misplaced.Count -eq 0) { return (New-GuardResult -Status PASS -Id 'S6' -Subject "all $($Resource.Count) resources are in $Location") }
+    return (New-GuardResult -Status FAIL -Id 'S6' -Subject "resources outside ${Location}" -Reason @($misplaced))
+}
+
+function Read-AzJson {
+    <# `az ... -o json` parsed, or $null when the command fails (the caller turns that into a FAIL). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string[]]$Argument)
+    try { return ((Invoke-Native -FilePath 'az' -Arguments $Argument) | ConvertFrom-Json) }
+    catch { return $null }
+}
+
+function Invoke-PostDeployCheck {
+    <# S1 S2 S4 S6 after the gates: prints every result and throws when any is a FAIL. The apps are deployed by then. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Config, [Parameter(Mandatory)][bool]$Placeholder)
+    $rg = $Config.ResourceGroup
+    $results = New-Object System.Collections.Generic.List[object]
+
+    $environmentText = ''
+    try { $environmentText = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'env', 'list', '--resource-group', $rg, '--query', '[].name', '-o', 'tsv', '--only-show-errors')) }
+    catch { $environmentText = '' }
+    $environmentNames = @(($environmentText -split "`n") | ForEach-Object { ConvertFrom-AzTsv -Text $_ } | Where-Object { $_ })
+    if ($environmentNames.Count -eq 0) { $results.Add((New-GuardResult -Status FAIL -Id 'S1' -Subject "no Container Apps environment found in $rg")) }
+    foreach ($environmentName in $environmentNames) {
+        $environment = Read-AzJson -Argument @('containerapp', 'env', 'show', '--name', $environmentName, '--resource-group', $rg, '-o', 'json', '--only-show-errors')
+        $results.Add((Test-WorkloadProfile -Name $environmentName -Environment $environment))
+    }
+
+    $resources = Read-AzJson -Argument @('resource', 'list', '--resource-group', $rg, '--query', '[].{name:name,type:type,location:location}', '-o', 'json', '--only-show-errors')
+    $resourceList = @()
+    if ($null -ne $resources) { $resourceList = @($resources | ForEach-Object { $_ }) }
+    $results.Add((Test-NoPrivateEndpoint -Resource $resourceList))
+
+    $apps = @('api', 'web')
+    if (-not $Placeholder) { $apps += 'alerts' }
+    foreach ($app in $apps) {
+        $document = Read-AzJson -Argument @('containerapp', 'show', '--name', $app, '--resource-group', $rg, '-o', 'json', '--only-show-errors')
+        if ($null -eq $document) {
+            $results.Add((New-GuardResult -Status FAIL -Id 'S2' -Subject "${app}: the app cannot be read"))
+            if (-not $Placeholder) { $results.Add((New-GuardResult -Status FAIL -Id 'S4' -Subject "${app}: the app cannot be read")) }
+            continue
+        }
+        $results.Add((Test-AppScale -Name $app -App $document))
+        if (-not $Placeholder) { $results.Add((Test-AppIngress -Name $app -App $document)) }
+    }
+    if ($Placeholder) { $results.Add((New-GuardResult -Status SKIP -Id 'S4' -Subject 'placeholder: the ingress of the quickstart apps is not checked')) }
+    $results.Add((Test-ResourceLocation -Resource $resourceList -Location $Config.Location))
+
+    if ((Write-GuardResult -Result $results.ToArray()) -gt 0) {
+        $ids = (@($results | Where-Object { $_.Status -eq 'FAIL' } | ForEach-Object { $_.Id }) | Select-Object -Unique) -join ', '
+        throw "Post-deploy checks FAILED ($ids): see the FAIL lines above. The apps are deployed; do not hand out the URL until this is fixed. Fix it and run Deploy again, or delete everything (Teardown prints the command)."
+    }
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Restart of the apps, and the demo epoch (ResetDemo)
+# ---------------------------------------------------------------------------------------------------------------------
+
+function Restart-DemoApps {
+    <#
+    .SYNOPSIS
+        Restarts the active revision of every target back to back, then waits for the revision gate again.
+    .DESCRIPTION
+        Container Apps creates no revision when only the VALUES of secrets change, so rotated secrets reach running replicas
+        only after a restart. All restarts are issued before the first wait. Every target is a hashtable of App, Kind, Image
+        (the same targets Wait-AppGate takes), in the order they are restarted.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'It restarts a set of apps; the name was agreed with the other deploy lanes.')]
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$ResourceGroup, [Parameter(Mandatory)][object[]]$Target)
+    $revisions = [ordered]@{}
+    foreach ($item in $Target) {
+        $snapshot = Get-AppSnapshot -App $item.App -ResourceGroup $ResourceGroup
+        $revisions[$item.App] = [string](Get-JsonValue -InputObject $snapshot.App -Path 'properties.latestRevisionName')
+    }
+    foreach ($app in $revisions.Keys) {
+        Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'revision', 'restart', '--name', $app, '--resource-group', $ResourceGroup, '--revision', $revisions[$app], '--only-show-errors', '-o', 'none') | Out-Null
+    }
+    Start-DeployDelay -Seconds 15
+    Write-Say 'Waiting for every restarted app to pass the revision gate again (up to 300 s)...'
+    Wait-AppGate -ResourceGroup $ResourceGroup -Target $Target
+}
+
+function ConvertFrom-CurlResponse {
+    <# The text of `curl.exe --include --write-out "\n%{http_code}"`: status, the headers of the final response, and its body. #>
+    [CmdletBinding()]
+    param([AllowEmptyString()][string]$Text)
+    $lines = @($Text -split "`n")
+    $status = 0
+    if ($lines.Count -gt 0 -and -not [int]::TryParse($lines[$lines.Count - 1].Trim(), [ref]$status)) { $status = 0 }
+    $response = @()
+    if ($lines.Count -gt 1) { $response = @($lines[0..($lines.Count - 2)]) }
+    $start = -1
+    for ($i = 0; $i -lt $response.Count; $i++) { if ($response[$i] -match '^HTTP/\d') { $start = $i } }
+    $headers = @()
+    $body = ''
+    if ($start -ge 0) {
+        $end = $start + 1
+        while ($end -lt $response.Count -and $response[$end].Trim() -ne '') { $end++ }
+        if ($end -gt $start + 1) { $headers = @($response[($start + 1)..($end - 1)] | Where-Object { $_ }) }
+        if ($end + 1 -lt $response.Count) { $body = ($response[($end + 1)..($response.Count - 1)] -join "`n") }
+    }
+    else { $body = ($response -join "`n") }
+    $retry = ''
+    foreach ($header in $headers) { if ($header -match '^retry-after:\s*(?<v>.*?)\s*$') { $retry = $Matches['v'] } }
+    return [pscustomobject]@{ Status = $status; Headers = $headers; RetryAfter = $retry; Body = $body.Trim() }
+}
+
+function Invoke-DemoResetRequest {
+    <# POST /api/v1/sites/site-demo-mussafah/demo-reset through the web (the BFF injects the demo token). Never throws on an HTTP answer. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$WebUrl, [switch]$NoRevoke)
+    $arguments = New-Object System.Collections.Generic.List[string]
+    foreach ($item in @('--silent', '--show-error', '--max-time', '30', '--request', 'POST', '--header', 'Content-Length: 0', '--include', '--write-out', '\n%{http_code}')) { $arguments.Add($item) }
+    if ($NoRevoke) { $arguments.Add('--ssl-revoke-best-effort') }
+    $arguments.Add("$WebUrl/api/v1/sites/$($script:DemoSiteId)/demo-reset")
+    try { $text = Invoke-Native -FilePath 'curl.exe' -Arguments $arguments.ToArray() -Label 'curl.exe (demo-reset)' }
+    catch { return [pscustomobject]@{ Status = 0; Headers = @(); RetryAfter = ''; Body = ''; Error = (Get-FirstLine -Text $_.Exception.Message -Count 2) -join ' ' } }
+    $parsed = ConvertFrom-CurlResponse -Text $text
+    return [pscustomobject]@{ Status = $parsed.Status; Headers = $parsed.Headers; RetryAfter = $parsed.RetryAfter; Body = $parsed.Body; Error = '' }
+}
+
+function Reset-DemoEpoch {
+    <#
+    .SYNOPSIS
+        Starts a new epoch of the demo site and records it in state.json. Throws unless the answer is 2xx.
+    .DESCRIPTION
+        A reset starts a NEW epoch: the demo day restarts at the SB_REPLAY_NOW anchor (the clock of api and alerts is the anchor
+        plus the time since the epoch started, read from the database, so the two always agree) and lasts about 7 h 20 min.
+        Stops, sign-offs and push subscriptions belong to the epoch, so a reset drops them. Nothing is deleted and no process is
+        restarted. Rate limits upstream: 1 per 60 s and 10 per hour; the general bucket of the web is charged too. A 429 fails
+        with its Retry-After, unless -RetryOnRateLimit: then a short Retry-After is waited out ONCE and the request is repeated.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Config, [Parameter(Mandatory)][string]$WebUrl, [switch]$RetryOnRateLimit)
+    $attempt = 1
+    while ($true) {
+        Write-Say "POST $WebUrl/api/v1/sites/$($script:DemoSiteId)/demo-reset"
+        $answer = Invoke-DemoResetRequest -WebUrl $WebUrl -NoRevoke:([bool]$Config.NoRevoke)
+        if ($answer.Status -ge 200 -and $answer.Status -lt 300) { break }
+        if ($answer.Status -eq 0) { throw "demo-reset got no HTTP answer ($($answer.Error)). Nothing was changed that this script knows of. Check the web app, then run: $(Get-EntryScriptCommand -Arguments '-Action ResetDemo')" }
+        if ($answer.Status -ne 429) { throw "demo-reset answered HTTP $($answer.Status), expected 200. The demo clock was not restarted. Look at the web and api logs, then run: $(Get-EntryScriptCommand -Arguments '-Action ResetDemo')" }
+        $seconds = 0
+        $known = [int]::TryParse($answer.RetryAfter, [ref]$seconds)
+        $shown = 'none'
+        if ($answer.RetryAfter) { $shown = "$($answer.RetryAfter) s" }
+        if ($RetryOnRateLimit -and $attempt -lt 2 -and ($known -or -not $answer.RetryAfter) -and $seconds -le 120) {
+            if (-not $known) { $seconds = 60 }
+            Write-Say "demo-reset answered 429 (rate limited; Retry-After $shown). Waiting $seconds s and trying once more."
+            Start-DeployDelay -Seconds $seconds
+            $attempt++
+            continue
+        }
+        throw "demo-reset answered 429: it is rate limited (1 per 60 s and 10 per hour upstream, and the general bucket of the web is charged too). Retry-After: $shown. Run $(Get-EntryScriptCommand -Arguments '-Action ResetDemo') again after that."
+    }
+    $epoch = ''
+    $previous = ''
+    $resetAt = ''
+    try {
+        $document = $answer.Body | ConvertFrom-Json
+        $epoch = "$(Get-JsonValue -InputObject $document -Path 'epoch_id')"
+        $previous = "$(Get-JsonValue -InputObject $document -Path 'previous_epoch_id')"
+        # PowerShell 7 turns an ISO date into a DateTime, Windows PowerShell 5.1 keeps the string.
+        $rawResetAt = Get-JsonValue -InputObject $document -Path 'reset_at'
+        if ($rawResetAt -is [datetime]) { $resetAt = $rawResetAt.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture) }
+        elseif ($null -ne $rawResetAt) { $resetAt = [string]$rawResetAt }
+    }
+    catch { Write-Say 'The answer was not JSON; the epoch ids are not recorded.' }
+    if (-not $resetAt) { $resetAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture) }
+    if ($epoch) {
+        $line = "Demo reset: epoch $epoch started"
+        if ($previous) { $line += " (the epoch before was $previous)" }
+        Write-Say "$line at $resetAt."
+    }
+    else { Write-Say "Demo reset answered 200 at $resetAt but the answer has no epoch_id, so no epoch is recorded." }
+    Write-Say "The demo day restarts at the replay anchor (SB_REPLAY_NOW, 10:10 Asia/Dubai) and lasts $script:DemoDayWindow. Stops, sign-offs and push subscriptions of the earlier epoch no longer show."
+    Save-StateFile -Update @{ epochId = $epoch; previousEpochId = $previous; resetAt = $resetAt }
+    return [pscustomobject]@{ EpochId = $epoch; PreviousEpochId = $previous; ResetAt = $resetAt }
+}
+
+function Invoke-ResetDemo {
+    <# -Action ResetDemo: a new demo epoch through the web, before every judged session. Restarts nothing. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Config)
+    $state = Read-StateFile
+    if ((Get-StateValue -State $state -Key 'placeholder') -eq 'True') {
+        Write-Say 'The last deploy was a placeholder: there is no demo site and no demo day (no real api yet). Nothing to reset.'
+        return
+    }
+    $fqdn = Get-StateValue -State $state -Key 'webFqdn'
+    if (-not $fqdn) {
+        Invoke-DoctorLite -NeedDocker $false | Out-Null
+        $fqdn = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('containerapp', 'show', '--name', 'web', '--resource-group', $Config.ResourceGroup, '--query', 'properties.configuration.ingress.fqdn', '-o', 'tsv', '--only-show-errors'))
+    }
+    if (-not $fqdn) { throw 'No web FQDN known. Deploy first.' }
+    Reset-DemoEpoch -Config $Config -WebUrl "https://$fqdn" | Out-Null
+    Write-Say 'Nothing was restarted: the clock of api and alerts follows the epoch, which the database holds.'
+    Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Status') -Why 'look at the apps again'
+}
+
+function Get-SmokeSummary {
+    <# One line for Status: did the last smoke test pass, and when. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][System.Collections.IDictionary]$State)
+    $at = Get-StateValue -State $State -Key 'smokeAt'
+    if (-not $at) { return 'not run yet for the last deploy' }
+    if ((Get-StateValue -State $State -Key 'smokePassed') -eq 'True') { return "passed at $at" }
+    return "FAILED at $at"
+}
+
+function Save-SmokeResult {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][bool]$Passed)
+    $now = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
+    Save-StateFile -Update @{ smokePassed = $Passed; smokeAt = $now }
+}
+
+function Get-WhatIfSummary {
+    <# Counts of the change types in a `what-if --result-format ResourceIdOnly -o json` answer. Only ids and change types are read. #>
+    [CmdletBinding()]
+    param([AllowEmptyString()][AllowNull()][string]$Json)
+    $summary = [ordered]@{ Create = 0; Modify = 0; Delete = 0; NoChange = 0; Other = 0 }
+    if ([string]::IsNullOrWhiteSpace($Json)) { return $summary }
+    $document = $Json | ConvertFrom-Json
+    $changes = @(Get-JsonValue -InputObject $document -Path 'changes' | ForEach-Object { $_ })
+    foreach ($change in $changes) {
+        $type = [string](Get-JsonValue -InputObject $change -Path 'changeType')
+        switch ($type.ToLowerInvariant()) {
+            'create' { $summary.Create++ }
+            'modify' { $summary.Modify++ }
+            'delete' { $summary.Delete++ }
+            'nochange' { $summary.NoChange++ }
+            default { $summary.Other++ }
+        }
+    }
+    return $summary
+}
+
+function New-ValidationSecret {
+    <# Throw-away values for a dry run when secrets.json does not exist yet. Never stored, never printed. #>
+    [CmdletBinding()]
+    param()
+    $token = New-RandomHex -ByteCount 32
+    $map = [ordered]@{}
+    $map[(Get-Sha256Hex -Text $token)] = [ordered]@{ actor = 'demo-bff'; role = 'employer'; employer_id = 'emp-demo' }
+    $vapid = New-VapidKeyPair
+    $secrets = [pscustomobject]@{
+        pgAdminPassword   = (New-RandomHex -ByteCount 32)
+        demoEmployerToken = $token
+        accessTokens      = (ConvertTo-Json -InputObject $map -Compress -Depth 5)
+        vapidPublicKey    = $vapid.Public
+        vapidPrivateKey   = $vapid.Private
+        vapidSubject      = 'mailto:validate@invalid.example'
+    }
+    Register-SecretValue -Value @($secrets.pgAdminPassword, $secrets.demoEmployerToken, $secrets.vapidPrivateKey)
+    return $secrets
+}
+
+function Invoke-ValidatePhase {
+    <# One phase: `az deployment group validate`, then `what-if`. Both are read-only. Returns the number of FAILs. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][hashtable]$Config,
+        [Parameter(Mandatory)][string]$Label,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$ParamValue
+    )
+    $paramFile = Join-Path -Path $Config.RepoRoot -ChildPath 'infra\bicep\main.bicepparam'
+    if (-not (Test-Path -LiteralPath $paramFile)) { throw "Missing $paramFile. Run this from a checkout of the feat/i1-azure-infra branch." }
+    $fails = 0
+    Set-ProcessEnvironment -Value $ParamValue
+    try {
+        try {
+            Invoke-Native -FilePath 'az' -Arguments @('deployment', 'group', 'validate', '--resource-group', $Config.ResourceGroup, '--parameters', $paramFile, '--only-show-errors', '-o', 'none') | Out-Null
+            Write-Say "PASS $Label template validation by ARM (az deployment group validate)"
+        }
+        catch {
+            $fails++
+            Write-Say "FAIL $Label template validation by ARM (az deployment group validate)"
+            foreach ($line in @(($_.Exception.Message -split "`r?`n") | Select-Object -First 8)) { Write-Say "     $line" }
+        }
+        try {
+            # ResourceIdOnly: ids and change types, no property values (so no secret value comes back).
+            $json = Invoke-Native -FilePath 'az' -Arguments @('deployment', 'group', 'what-if', '--resource-group', $Config.ResourceGroup, '--parameters', $paramFile, '--result-format', 'ResourceIdOnly', '--no-pretty-print', '--only-show-errors', '-o', 'json')
+            $counts = Get-WhatIfSummary -Json $json
+            $other = ''
+            if ($counts.Other -gt 0) { $other = ", $($counts.Other) other" }
+            Write-Say ("PASS $Label what-if: {0} create, {1} modify, {2} delete, {3} no change{4}" -f $counts.Create, $counts.Modify, $counts.Delete, $counts.NoChange, $other)
+        }
+        catch {
+            $fails++
+            Write-Say "FAIL $Label what-if (az deployment group what-if)"
+            foreach ($line in @(($_.Exception.Message -split "`r?`n") | Select-Object -First 8)) { Write-Say "     $line" }
+        }
+    }
+    finally {
+        Clear-ProcessEnvironment -Name $script:ParamEnvNames
+    }
+    return $fails
+}
+
+function Invoke-Validate {
+    <#
+    .SYNOPSIS
+        Read-only dry run of both deployment phases against the resource group from state. Returns the number of FAILs.
+    .DESCRIPTION
+        Runs `az deployment group validate` and `what-if` for phase 1 (DEPLOY_APPS=false) and phase 2 (DEPLOY_APPS=true) with
+        the same environment Deploy builds. Creates and changes nothing and costs nothing; `deployment group create` is never
+        called. The images need not exist. A secret that does not exist yet (no secrets.json) is replaced by a random
+        throw-away value that is neither stored nor printed.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Config)
+    $state = Read-StateFile
+    foreach ($required in 'acrName', 'acrLoginServer', 'appsIdentityId') {
+        if (-not (Get-StateValue -State $state -Key $required)) {
+            throw "state.json has no '$required': run $(Get-EntryScriptCommand -Arguments '-Action Bootstrap -ContactEmail <your email>') first."
+        }
+    }
+    $account = Invoke-DoctorLite -NeedDocker $false
+    if (Test-Path -LiteralPath (Get-SecretsFilePath)) {
+        $secrets = Read-SecretFile
+        $secretNote = 'secrets.json'
+    }
+    else {
+        $secrets = New-ValidationSecret
+        $secretNote = 'random throw-away values (no secrets.json yet)'
+    }
+    $pgVersion = $Config.PostgresVersion
+    if (-not $pgVersion) { $pgVersion = Get-StateValue -State $state -Key 'postgresVersion' }
+    if (-not $pgVersion) { $pgVersion = '17' }
+    $registry = Get-StateValue -State $state -Key 'acrLoginServer'
+    $tag = 'validate'
+    $apiImage = "$registry/sb-api:$tag"
+    $webImage = "$registry/sb-web:$tag"
+    Write-Say "Validate: subscription $(Get-JsonValue -InputObject $account -Path 'name'), resource group $($Config.ResourceGroup), PostgreSQL $pgVersion."
+    if ($Config.Placeholder) { Write-Say '  images : the public quickstart placeholders' } else { Write-Say "  images : $apiImage and $webImage (they need not exist)" }
+    Write-Say "  secrets: $secretNote"
+    Write-Say 'This is READ-ONLY: validate and what-if create and change nothing in Azure and cost nothing.'
+    Write-Say ''
+    $baseArgs = @{ Config = $Config; Secrets = $secrets; State = $state; Tag = $tag; PostgresVersion = $pgVersion; ApiImage = $apiImage; WebImage = $webImage }
+    $fails = 0
+    $fails += Invoke-ValidatePhase -Config $Config -Label 'phase 1 (DEPLOY_APPS=false)' -ParamValue (Get-MainParamValue @baseArgs -DeployApps $false)
+    $fails += Invoke-ValidatePhase -Config $Config -Label 'phase 2 (DEPLOY_APPS=true)' -ParamValue (Get-MainParamValue @baseArgs -DeployApps $true)
+    Write-Say ''
+    Write-Say 'Phase 2 may list the job and PostgreSQL as no change or as create: that is what a deployment on top of phase 1 would do.'
+    if ($fails -eq 0) {
+        Write-Say 'Validate: all checks passed.'
+        if ($Config.Placeholder) { Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Deploy -Placeholder') -Why 'rehearse the Azure plumbing (creates billable resources)' }
+        else { Write-Next -Command (Get-EntryScriptCommand -Arguments '-Action Deploy') -Why 'the real deploy (creates billable resources)' }
+    }
+    else {
+        Write-Say "Validate: $fails check(s) FAILED. Nothing was created. Fix the cause above (the first lines of the error are shown), then run Validate again."
+    }
+    return $fails
 }
 
 function Show-Teardown {
