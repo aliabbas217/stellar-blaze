@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import en from "../../messages/en.json";
+import { STOP_OUTBOX_DB } from "../../src/features/supervisor/stop-outbox.ts";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 import { loadControlled } from "./helpers/service-worker.ts";
 
@@ -42,6 +43,15 @@ async function resetEpoch(page: Page): Promise<void> {
   }
   throw new Error("demo-reset kept answering 429");
 }
+
+/**
+ * Pages of the tests that act on the demo site (a stop, a sign-off, a request): their state is reset in `afterEach`, so a failure half way
+ * cannot leave stops and sign-offs in the shared mock state for the tests after it. (Reads need no reset, and a reset is rate limited.)
+ */
+const acted = new WeakSet<Page>();
+test.afterEach(async ({ page }) => {
+  if (acted.has(page)) await resetEpoch(page);
+});
 
 /** Every entry of every Cache Storage cache, as "<cache> <path+query>". */
 async function cacheEntries(page: Page): Promise<string[]> {
@@ -93,6 +103,7 @@ async function cachedBodiesHoldToken(page: Page): Promise<boolean> {
 const stopBar = (page: Page) => page.locator("[data-emergency]");
 
 test("offline f2: no employer route is cached, after a journey through every F2 operation with the service worker active", async ({ page }) => {
+  acted.add(page);
   // Today (the forecast and the policy are the only things that may stay), under the worker's control.
   await loadControlled(page, TODAY);
   await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(1);
@@ -159,8 +170,6 @@ test("offline f2: no employer route is cached, after a journey through every F2 
   expect(forbidden(await cacheEntries(page)), "the scan finds a planted day plan").toEqual(["canary-probe /api/v1/crews/crew-a/day-plan"]);
   await page.evaluate(() => caches.delete("canary-probe"));
   expect(forbidden(await cacheEntries(page))).toEqual([]);
-
-  await resetEpoch(page);
 });
 
 /** The judge pages: each is visited once with the worker in control, then opened with no network. */
@@ -267,9 +276,11 @@ test("offline f2: offline supervisor shows the notice, no data, and a Stop outbo
   // No data: the crews list is online-only (D2), so there are no crews, and the screen says so rather than showing old numbers.
   await expect(stopBar(page)).toBeVisible();
   await expect(page.locator("[data-crew]")).toHaveCount(0);
+  acted.add(page);
   await expect(page.getByRole("button", { name: /^Stop work/ })).toBeEnabled();
-  // The screen tells the supervisor it cannot reach the API.
-  await expect(page.locator("main")).toContainText(/offline|could not|no signal|did not load/i);
+  // The screen tells the supervisor it cannot reach the API: the crews list's own error state (the crews view's "ready" state is the
+  // only one with an offline banner, and offline there is no ready state), worded from the catalogue.
+  await expect(page.locator("main")).toContainText(en.supervisor.crews.error.title);
 
   // Stop work pressed with no signal: kept, and never reported as sent.
   await page.getByRole("button", { name: /^Stop work/ }).click();
@@ -303,18 +314,102 @@ test("offline f2: offline supervisor shows the notice, no data, and a Stop outbo
   await expect(stopBar(page)).toContainText("Work stopped", { timeout: 20_000 });
   expect(forbidden(await cacheEntries(page))).toEqual([]);
 
-  await resetEpoch(page);
+/**
+ * Seeds the Stop outbox the way an earlier visit would have left it. The database and store names are stop-outbox.ts's
+ * (`STOP_OUTBOX_DB`, store `stops`, auto-increment `key`); a row is the crew id, the crew's name as the button showed it, and the phone's time.
+ */
+async function seedOutbox(page: Page, rows: readonly { crewId: string; crewName: string; clientTime: string }[]): Promise<void> {
+  await page.evaluate(
+    ({ name, seeded }) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open(name, 1);
+        open.onupgradeneeded = () => {
+          open.result.createObjectStore("stops", { keyPath: "key", autoIncrement: true });
+        };
+        open.onerror = () => {
+          reject(open.error ?? new Error("open failed"));
+        };
+        open.onsuccess = () => {
+          const transaction = open.result.transaction("stops", "readwrite");
+          for (const row of seeded) transaction.objectStore("stops").add(row);
+          transaction.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          transaction.onerror = () => {
+            reject(transaction.error ?? new Error("write failed"));
+          };
+        };
+      }),
+    { name: STOP_OUTBOX_DB, seeded: rows },
+  );
+}
+
+const minutesAgoIso = (minutes: number): string => new Date(Date.now() - minutes * 60_000).toISOString();
+const expiredNotice = (crew: string): string => en.supervisor.stop.expired.replace("<bdi>{crew}</bdi>", crew);
+
+/** Every stop request the page makes (the mock records a stop on `POST .../stops`). */
+function watchStopRequests(page: Page): string[] {
+  const seen: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && /\/stops$/.test(new URL(request.url()).pathname)) seen.push(request.url());
+  });
+  return seen;
+}
+
+test("offline f2: a stop kept 61 minutes ago is never sent: the page says it expired, Stop work is idle, the notice outlives a reload until it is closed", async ({ page }) => {
+  const stopRequests = watchStopRequests(page);
+  await page.goto("/en/replay");
+  await seedOutbox(page, [{ crewId: "crew-a", crewName: "Crew A", clientTime: minutesAgoIso(61) }]);
+
+  await page.goto("/en/supervisor");
+  await page.locator("[data-crew]").first().waitFor();
+  const notice = page.locator('[data-expired-stop="crew-a"]');
+  await expect(notice).toContainText(expiredNotice("Crew A"));
+  await expect(stopBar(page)).toHaveAttribute("data-stop-state", "idle");
+  await expect(stopBar(page)).not.toContainText(/Not sent|kept on this phone/);
+  await expect(page.getByRole("button", { name: stopLabel("Crew A") })).toBeEnabled();
+
+  // Durable: a reload does not lose it. Closing it removes it for good.
+  await page.reload();
+  await page.locator("[data-crew]").first().waitFor();
+  await expect(notice).toContainText(expiredNotice("Crew A"));
+  await notice.getByRole("button", { name: en.shell.close }).click();
+  await expect(notice).toHaveCount(0);
+  await page.reload();
+  await page.locator("[data-crew]").first().waitFor();
+  await expect(notice).toHaveCount(0);
+
+  expect(stopRequests, "an expired stop is never sent, not at app open and not later").toEqual([]);
 });
 
 test("offline f2: the alert card's shell is precached: it opens offline for a warning this phone never opened", async ({ page, context }) => {
   await loadControlled(page, "/en/worker");
-  await expect.poll(() => cacheEntries(page).then((entries) => entries.some((entry) => entry.includes("/en/worker/alert")))).toBe(true);
+  // The exact path: `/en/worker/alerts` (the list) must not stand in for `/en/worker/alert` (the card).
+  await expect.poll(() => cacheEntries(page).then((entries) => entries.some((entry) => entryPath(entry) === "/en/worker/alert"))).toBe(true);
 
   await context.setOffline(true);
+});
   await page.goto(ALERT_UNVISITED);
 
   await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
   await expect(page.getByText(en.states.offlineBanner.title)).toBeVisible();
+test("offline f2: a stop that expired for Crew A is told on Crew B's page too, and nothing is sent", async ({ page }) => {
+  const stopRequests = watchStopRequests(page);
+  await page.goto("/en/replay");
+  await seedOutbox(page, [{ crewId: "crew-a", crewName: "Crew A", clientTime: minutesAgoIso(61) }]);
+
+  await page.goto("/en/supervisor/crews/crew-b");
+  await expect(page.getByRole("button", { name: stopLabel("Crew B") })).toBeEnabled();
+  await expect(page.locator('[data-expired-stop="crew-a"]')).toContainText(expiredNotice("Crew A"));
+  await expect(stopBar(page)).toHaveAttribute("data-stop-state", "idle");
+  await expect(stopBar(page)).not.toContainText(/Not sent|kept on this phone/);
+  expect(stopRequests, "an expired stop is never sent").toEqual([]);
+});
+
+/** The path of a Cache Storage entry listed as "<cache> <path+query>" (no query). */
+const entryPath = (entry: string): string => (entry.slice(entry.indexOf(" ") + 1).split("?")[0]) ?? "";
+
   // The page is the alert card, not the offline fallback.
   await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(en.offline.title);
 });

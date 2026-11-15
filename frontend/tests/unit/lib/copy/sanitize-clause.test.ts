@@ -165,8 +165,20 @@ describe("sanitizeClause: a rule id never swallows the sentence's own full stop 
     expect(sanitizeClause("It is a product rule ADR 0011 P-H5.ban_season, not law.")).toBe("It is a product rule, not law.");
   });
 
-  it("does not take a sentence-final full stop with a leading rule id either", () => {
+  it("a leading rule id followed by a space is stripped, and the clause after it is untouched", () => {
     expect(sanitizeClause("P-H10 No added minutes: a plan never extends the shift.")).toBe("No added minutes: a plan never extends the shift.");
-    expect(sanitizeClause("P-H10. No added minutes.")).toBe("P-H10. No added minutes.");
+  });
+
+  it("a LEADING rule id followed by a full stop and a space is stripped with its period (the period is the separator), so no internal id shows", () => {
+    const out = sanitizeClause("P-H10. No added minutes.");
+
+    expect(out).toBe("No added minutes.");
+    noJargon(out);
+    expect(out).not.toMatch(/P-H\d/);
+  });
+
+  it("a dot INSIDE a leading id stays part of the id, and a sentence-final period elsewhere stays", () => {
+    expect(sanitizeClause("P-H2.daily Rest is counted per shift. Next sentence.")).toBe("Rest is counted per shift. Next sentence.");
+    expect(sanitizeClause("P-H10. No added minutes. A plan never extends the shift.")).toBe("No added minutes. A plan never extends the shift.");
   });
 });

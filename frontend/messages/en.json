@@ -768,7 +768,7 @@
       "queuedDetail": "The stop for <bdi>{crew}</bdi> is kept on this phone and sent when it is back online.",
       "failed": "Not sent. Tell the crew now.",
       "failedDetail": "Press Stop work to try again.",
-      "expired": "A stop from <bdi>{time}</bdi> was never sent and has expired. If it still applies, press Stop work.",
+      "expired": "Stop for <bdi>{crew}</bdi> was not sent. It waited 60 minutes without a connection and has expired. Tell the crew now, by voice or radio, and press Stop again when you are online.",
       "noCrew": "The crew list did not load. Tell the crew to stop work now.",
       "noCrews": "There are no crews at this site to stop."
     }

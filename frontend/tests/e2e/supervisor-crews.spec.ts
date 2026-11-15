@@ -270,7 +270,8 @@ test("supervisor crews: a stop pressed with no signal reads Not sent, is kept on
       }),
   );
   expect(rows).toHaveLength(1);
-  expect(Object.keys(rows[0] as object).sort()).toEqual(["clientTime", "crewId", "key"]);
+  // The crew id, the crew's name as the button shows it (so an expiry notice can name the crew after a reload), the phone's time: no person.
+  expect(Object.keys(rows[0] as object).sort()).toEqual(["clientTime", "crewId", "crewName", "key"]);
 
   await context.setOffline(false);
   await expect(bar(page)).toContainText("Work stopped", { timeout: 15_000 });

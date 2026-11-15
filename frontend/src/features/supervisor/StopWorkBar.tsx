@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/states/Spinner";
 import { ACTION_SECONDARY } from "@/components/states/actions";
 import { useClock } from "@/features/demo/useClock";
-import { NOTIFY_WINDOW_MS, type StopWorkOf } from "@/features/supervisor/useStopWork";
+import { NOTIFY_WINDOW_MS, type StopNotices, type StopWorkOf } from "@/features/supervisor/useStopWork";
 import { useTimeFormat } from "@/lib/time/use-time-format";
 
 /*
@@ -131,11 +131,58 @@ export interface StopWorkBarProps {
   readonly crewName: string | null;
   /** The stop state of the crew; null when there is no crew to stop (the list did not load, or the site has no crews). */
   readonly work: StopWorkOf | null;
+  /**
+   * The expiry notices (of every crew, not only the bar's) and how to dismiss one. Separate from `work` because a notice is told on every
+   * screen that has the bar, including when there is no crew to stop.
+   */
+  readonly notices: StopNotices;
   /** What to say when there is no crew to stop. */
   readonly noCrew: "unavailable" | "none";
 }
 
-export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
+const NOTICE_LIGHT = { text: "text-ink-2", close: `${ACTION_SECONDARY} min-h-11 shrink-0 px-4 text-base` } as const;
+const NOTICE_DARK = {
+  text: "text-ground",
+  close:
+    "flex min-h-11 shrink-0 touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-base font-semibold text-ground",
+} as const;
+
+/**
+ * The stops that expired unsent, one notice per crew, until dismissed. The status region is ALWAYS mounted (empty when there is
+ * nothing to say): a live region that is inserted already filled is not announced, one that is filled after it exists is. "Close"
+ * is the shell's existing label; each button is described by its own notice so a screen reader hears which one it closes.
+ */
+function ExpiredNotices({ notices, tone }: { notices: StopNotices; tone: typeof NOTICE_LIGHT | typeof NOTICE_DARK }) {
+  const t = useTranslations("supervisor.stop");
+  const shell = useTranslations("shell");
+  const prefix = useId();
+  return (
+    <div role="status" data-expired-stops="" className={notices.expired.length === 0 ? undefined : "flex flex-col gap-3 pb-3"}>
+      {notices.expired.map((notice) => {
+        const id = `${prefix}-${notice.crewId}`;
+        return (
+          <div key={notice.crewId} data-expired-stop={notice.crewId} className="flex items-start justify-between gap-3">
+            <p id={id} className={`text-base leading-(--sign-leading-text) ${tone.text}`}>
+              {t.rich("expired", { crew: notice.crewName, bdi })}
+            </p>
+            <button
+              type="button"
+              aria-describedby={id}
+              onClick={() => {
+                notices.dismissExpired(notice.crewId);
+              }}
+              className={tone.close}
+            >
+              {shell("close")}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProps) {
   const t = useTranslations("supervisor.stop");
   const time = useTimeFormat();
   const [confirming, setConfirming] = useState(false);
@@ -152,6 +199,7 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
     return (
       <div data-emergency="" className={BAR}>
         <div className={`${INNER} bg-ground`}>
+          <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} />
           <p role="status" className="py-2 text-lg font-semibold text-ink">
             {noCrew === "none" ? t("noCrews") : t("noCrew")}
           </p>
@@ -167,6 +215,7 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
     return (
       <div data-emergency="" data-stop-state={undoOpen ? "undo" : "stopped"} className={BAR}>
         <div className={`${INNER} border-ink bg-ink text-ground`}>
+          <ExpiredNotices notices={notices} tone={NOTICE_DARK} />
           <div role="status" className="flex flex-col gap-1 pb-3">
             {undoOpen ? (
               <p className="text-lg font-semibold leading-(--sign-leading-text)">{t.rich("recorded", { crew: label, time: at, bdi })}</p>
@@ -221,11 +270,7 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
   return (
     <div data-emergency="" data-stop-state={work.state} className={BAR}>
       <div className={`${INNER} bg-ground`}>
-        {work.expiredAt !== null ? (
-          <p role="status" data-expired-stop="" className="pb-3 text-base leading-(--sign-leading-text) text-ink-2">
-            {t.rich("expired", { time: time(new Date(work.expiredAt)), bdi })}
-          </p>
-        ) : null}
+        <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} />
         {work.state === "queued" ? (
           <div role="alert" className="flex flex-col gap-1 pb-3 text-ink">
             <p className="text-lg font-semibold leading-(--sign-leading-text)">{t("queued")}</p>
@@ -247,7 +292,7 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
             {t("noActiveStop")}
           </p>
         ) : null}
-        <button type="button" aria-busy={work.state === "sending"} onClick={work.stop} className={PRESS}>
+        <button type="button" aria-busy={work.state === "sending" || work.busy} onClick={work.stop} className={PRESS}>
           <span className={PRESS_FRAME}>
             {work.state === "sending" ? <Spinner className="size-7" /> : <StopMark />}
             <span>{t.rich("button", { crew: label, bdi })}</span>

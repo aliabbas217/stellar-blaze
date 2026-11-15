@@ -35,7 +35,8 @@ const ADR_REF_ONCE = new RegExp(ADR_REF);
 const DANGLING = /\b(?:in|of|per|under|see|by|to|as|from|at|the|is|are)\s*$/i;
 
 const LABEL = /PROTECTIVE READINGS?/g;
-const LEADING_RULE_ID = /^P-H\d+[A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*\s+(?=[A-Z])/;
+/** A rule id at the very start, with the separator after it: spaces, or a full stop and spaces ("P-H10. No added minutes"): after a LEADING id the period is the separator, not part of a sentence. */
+const LEADING_RULE_ID = /^P-H\d+[A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*\.?\s+(?=[A-Z])/;
 const ARTICLE = /\bArt\.\s*\d+(?:\(\d+\))*(?:\([a-z]\))*/;
 
 /** Separators a removal can leave at the ends of what it was inside of. */
