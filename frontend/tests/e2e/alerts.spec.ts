@@ -21,12 +21,16 @@ import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 // `channel` forces a new worker, so it applies to the whole file (it cannot be set in a describe group).
 test.use({ channel: "chromium" });
 
-const ENDPOINT = "https://push.example/send/e2e-endpoint";
+// An allow-listed push-service host (ADR 0067): the mock API refuses any other with 422 `endpoint-host-not-allowed`, as the real one does.
+const ENDPOINT = "https://fcm.googleapis.com/fcm/send/e2e-endpoint";
+const DISALLOWED_ENDPOINT = "https://push.example/send/e2e-endpoint";
 const SUBSCRIBED_TIMEOUT_MS = 20_000;
 
 interface PushStubs {
   /** What the permission prompt answers when the worker taps Enable. */
   readonly answer: "granted" | "denied";
+  /** The endpoint the browser's push service "returns"; an allow-listed host by default. */
+  readonly endpoint?: string;
 }
 
 /** Makes the page think it can do push: a permission prompt that answers `answer` and a PushManager that "subscribes". */
@@ -55,7 +59,7 @@ async function stubPush(page: Page, stubs: PushStubs): Promise<void> {
       };
       PushManager.prototype.getSubscription = () => Promise.resolve(current as PushSubscription | null);
     },
-    { answer: stubs.answer, endpoint: ENDPOINT },
+    { answer: stubs.answer, endpoint: stubs.endpoint ?? ENDPOINT },
   );
 }
 
@@ -155,6 +159,29 @@ test.describe("alerts page states", () => {
     // What the real-phone spike relies on: the browser's subscription is there even though the API said no.
     await expect(page.getByRole("textbox", { name: en.alerts.debug.heading })).toHaveValue(new RegExp(ENDPOINT));
     await expect(enable(page)).toBeVisible();
+  });
+
+  // B3 ba912f3 (ADR 0067): a browser whose push service is not on the API's allow-list gets a 422 `endpoint-host-not-allowed`. The
+  // screen says so plainly (not the generic "try again"), shows the request id, offers Enable again, stores nothing, and the page raises
+  // no error of its own (the browser's console logs the failed request itself, which is not the page's).
+  test("a push service the API does not allow is said plainly, with the request id, and nothing is stored", async ({ page }) => {
+    await stubPush(page, { answer: "granted", endpoint: DISALLOWED_ENDPOINT });
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/en/worker/alerts?debug=push");
+    await untilControlled(page);
+    const answered = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/push/subscriptions"));
+    await enable(page).click();
+
+    expect((await answered).status()).toBe(422);
+    await expect(page.getByText(en.alerts.state.hostNotAllowed)).toBeVisible({ timeout: SUBSCRIBED_TIMEOUT_MS });
+    await expect(page.getByText(en.alerts.state.error)).toHaveCount(0);
+    await expect(page.getByText(en.states.error.requestId.replace("{id}", "mock-req-1"))).toBeVisible();
+    await expect(enable(page)).toBeVisible();
+    const stored = JSON.parse((await page.evaluate(() => localStorage.getItem("sb-profile-v1"))) ?? "null") as { state?: { push?: unknown } } | null;
+    expect(stored?.state?.push ?? null, "no registration is kept for a refused endpoint").toBeNull();
+    expect(pageErrors).toEqual([]);
   });
 
   test("turning alerts off deletes the registration and forgets it", async ({ page }) => {

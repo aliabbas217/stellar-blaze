@@ -523,6 +523,7 @@ export function crewTimeline(crewId: string, date: string, options: DayOptions =
     suppressed: isSuppressed(seed, options),
     k: riskPolicy.k_suppression,
     forecast_status: statusOf(options),
+    mode: "replay",
     ban_window: banWindow(date),
     shift:
       options.noShift === true
@@ -731,6 +732,7 @@ export function crewDayPlan(crewId: string, date: string, options: DayOptions = 
     signed_at: state === "unsigned" ? null : (signedAt.get(seed.id) ?? SEED_SIGNED_AT),
     signed_by_role: state === "unsigned" ? null : "supervisor",
     forecast_status: statusOf(options),
+    mode: "replay",
     ban_window: banWindow(date),
     policy_version: MOCK_POLICY_VERSION,
     config_version: MOCK_CONFIG_VERSION,
@@ -740,13 +742,12 @@ export function crewDayPlan(crewId: string, date: string, options: DayOptions = 
 
 export type SignOffOutcome =
   | { kind: "signed"; signOff: Schemas["PlanSignOff"] }
-  | { kind: "review-required"; missing: string[] }
-  | { kind: "unknown-items"; unknown: { id: string; index: number }[] };
+  | { kind: "review-required"; missing: string[] };
 
 /**
  * Signs the crew's day plan off (B3 Task 17). Every Medium, High and Red item must be acknowledged; a plan with none
  * signs with an empty list. Signing never touches a stop, and an already signed plan answers the recorded sign-off
- * again. Unknown crew: undefined.
+ * again; an id that is not an item of the plan is ignored. Unknown crew: undefined.
  */
 export function signOffDayPlan(
   crewId: string,
@@ -757,10 +758,10 @@ export function signOffDayPlan(
 ): SignOffOutcome | undefined {
   const plan = crewDayPlan(crewId, date, options);
   if (plan === undefined) return undefined;
-  const known = new Set(plan.ack_items.map((item) => item.id));
-  const unknown = acknowledged.flatMap((id, index) => (known.has(id) ? [] : [{ id, index }]));
-  if (unknown.length > 0) return { kind: "unknown-items", unknown };
-  const missing = plan.ack_items.map((item) => item.id).filter((id) => !acknowledged.includes(id));
+  // The real B3 ignores an id that is not an item of the plan (live run, ba912f3): the required items decide, and only the plan's own
+  // items are recorded, in the plan's order.
+  const required = plan.ack_items.map((item) => item.id);
+  const missing = required.filter((id) => !acknowledged.includes(id));
   if (missing.length > 0) return { kind: "review-required", missing };
   const wasSigned = signoffs.get(crewId) === "signed";
   signoffs.set(crewId, "signed");
@@ -773,7 +774,7 @@ export function signOffDayPlan(
       signoff_state: "signed",
       signed_at: wasSigned ? SEED_SIGNED_AT : REPLAY_INSTANT,
       signed_by_role: "supervisor",
-      acknowledged_items: [...acknowledged],
+      acknowledged_items: required,
       deviation_reason_code: deviationReasonCode,
     },
   };

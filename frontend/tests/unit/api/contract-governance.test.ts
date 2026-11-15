@@ -33,6 +33,8 @@ const CREW_ALLOWED = new Set([
   "shift",
   "signoff_state",
   "forecast_status",
+  // ba912f3: whether the day was computed against the live clock or the fixed replay snapshot; a property of the run, not of a person.
+  "mode",
 ]);
 const PERSONAL_NAME = /worker|member_id|name_of|employee|heart|symptom/i;
 /**
@@ -48,7 +50,15 @@ const PERSONAL_NAME_EXCEPTIONS = new Set(["crew_name", "worker_ref"]);
 const B3_WIDE_PATTERN = /worker|member|employee|heart|symptom|acclimat|juvenile/i;
 const B3_WIDE_PATTERN_KNOWN = ["acclimatisation_days_required", "acclimatised", "member_count", "worker_ref"];
 /** The problem family is open on purpose (RFC 9457 allows extension members); every other object forbids extras. */
-const PROBLEM_FAMILY = ["Problem", "ValidationProblem", "ReviewRequiredProblem", "RosterInvalidProblem", "ShiftNotLegalProblem"];
+const PROBLEM_FAMILY = [
+  "Problem",
+  "ValidationProblem",
+  "ReviewRequiredProblem",
+  "RosterInvalidProblem",
+  "ShiftNotLegalProblem",
+  // ba912f3 (ADR 0067): the 422 of create_push_subscription for a push-service host that is not on the allow-list.
+  "EndpointHostNotAllowedProblem",
+];
 const OPERATION_IDS = [
   "create_crew_stop",
   "create_data_request",
@@ -270,6 +280,16 @@ describe("contract governance", () => {
       .filter((operation) => isObject(operation.responses) && "501" in operation.responses)
       .map(describeOperation);
     expect(with501).toEqual([]);
+  });
+
+  it("answers endpoint-host-not-allowed (an EndpointHostNotAllowedProblem next to the framework 422) on create_push_subscription (ADR 0067)", () => {
+    const operation = operationsOf(spec).find((candidate) => describeOperation(candidate) === "create_push_subscription");
+    const responses = operation?.responses;
+    const unprocessable = isObject(responses) ? responses["422"] : undefined;
+    const content = isObject(unprocessable) && isObject(unprocessable.content) ? unprocessable.content["application/problem+json"] : undefined;
+    expect(isObject(content) ? referencedSchemas(content.schema).sort() : [], "422 of create_push_subscription").toEqual(["EndpointHostNotAllowedProblem", "ValidationProblem"]);
+    const type = (schemas(spec).EndpointHostNotAllowedProblem?.properties as JsonObject | undefined)?.type;
+    expect(isObject(type) ? type.const : null).toBe("urn:stellar-blaze:problem:endpoint-host-not-allowed");
   });
 
   it("lists create_crew_stop in its own rate-limit bucket, apart from every other employer operation", () => {

@@ -406,7 +406,8 @@
       "idle": "التنبيهات متوقفة.",
       "subscribed": "التنبيهات مفعّلة لهذا الموقع.",
       "error": "تعذّر تفعيل التنبيهات. حاول مرة أخرى بعد قليل.",
-      "disableError": "تعذّر إيقاف التنبيهات. حاول مرة أخرى بعد قليل."
+      "disableError": "تعذّر إيقاف التنبيهات. حاول مرة أخرى بعد قليل.",
+      "hostNotAllowed": "This browser's push service is not supported, so alerts cannot be turned on here."
     },
     "unsupported": {
       "title": "التنبيهات غير متاحة على هذا الهاتف",

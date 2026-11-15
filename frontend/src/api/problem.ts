@@ -63,6 +63,13 @@ function readViolations(value: unknown): ShiftViolation[] | undefined {
 /** The BFF proxy could not get an answer from the API (unconfigured, unreachable, timed out). */
 export const UPSTREAM_UNAVAILABLE_TYPE = "urn:stellar-blaze:problem:upstream-unavailable";
 
+/**
+ * The 422 of `create_push_subscription` when the endpoint's host is not a push service on the API's allow-list (ADR 0067,
+ * contract schema `EndpointHostNotAllowedProblem`; its `type` is a constant, so a client tells it from the framework's
+ * validation 422, whose type is `about:blank`).
+ */
+export const ENDPOINT_HOST_NOT_ALLOWED_TYPE = "urn:stellar-blaze:problem:endpoint-host-not-allowed";
+
 /** The browser could not reach the BFF at all (offline). Never sent over the wire, so it has no request_id. */
 export const NETWORK_ERROR_TYPE = "urn:stellar-blaze:problem:network-error";
 

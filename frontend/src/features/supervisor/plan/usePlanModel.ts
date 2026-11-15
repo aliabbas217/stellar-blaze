@@ -155,7 +155,8 @@ export function usePlanModel(crewId: string): PlanScreen {
     zone,
     now,
     offline,
-    mode: forecast?.mode ?? null,
+    // The plan says what it is (B3 ba912f3: `mode` on DayPlan and CrewTimeline, optional); when it is not served the timeline's, then the forecast's.
+    mode: plan?.mode ?? timeline?.mode ?? forecast?.mode ?? null,
     crews,
     crewsUpdatedAt: crewsQuery.dataUpdatedAt,
     crew,

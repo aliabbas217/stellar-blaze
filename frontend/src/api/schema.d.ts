@@ -71,11 +71,18 @@ export interface paths {
          * Stop work for a crew
          * @description Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.
          *
-         *     Stop recorded. It is visible on the next read; push alerts follow within one dispatch interval of the stop when
-         *     the alert dispatch job is running.
+         *     Stop recorded. It is visible on the next read. Push alerts follow when the alert dispatch job is running: within
+         *     one dispatch interval of the stop plus the time the cycle itself takes (the forecast fetch is cut at 30 s and a
+         *     push at 12 s), about 5 min 42 s with the default 5-minute interval. A push that fails with a transient error
+         *     (a 5xx, a 429 with a short Retry-After, a timeout) is tried once more inside that 12 s; no other push is tried
+         *     twice.
          *
          *     Idempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch
          *     returns that stop (201, same body, no second row, no second audit row).
+         *
+         *     Undo window: a stop cleared by `delete_crew_stop` within 10 seconds of being recorded leaves no trace in levels or
+         *     plans; both audit rows stay. An active stop covers the crew's levels and plan from its start to the end of the
+         *     crew's shift for the day, and a cleared stop only until it was cleared.
          *
          *     Known edge (not changed): the warning levels cover the working day 06:00 to 20:00 site-local, so a stop recorded
          *     outside it changes no warning level, and a stop that was never cleared is read again by the next day's runs only
@@ -104,8 +111,11 @@ export interface paths {
          * Clear a crew stop
          * @description Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.
          *
-         *     Resume recorded. A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it
-         *     elapsing.
+         *     A stop cleared within 10 seconds of being recorded (the undo) leaves no trace in levels or plans; both audit rows
+         *     stay. After that, the stop covers the levels and the plan only until it was cleared.
+         *
+         *     Resume recorded. A de-escalation alert follows after the de-escalation dwell, at the next alert dispatch cycle
+         *     once the dwell has elapsed (one dispatch interval at most, plus the time the cycle itself takes).
          *
          *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
@@ -221,6 +231,11 @@ export interface paths {
          *     endpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at
          *     most 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, "too many subscriptions"). The body
          *     holds no worker identifier by design.
+         *
+         *     The endpoint's host must belong to a push service, else 422 `endpoint-host-not-allowed` (the allow-list: Google FCM
+         *     `fcm.googleapis.com`, Mozilla autopush `updates.push.services.mozilla.com`, Apple Web Push `*.push.apple.com` and
+         *     Windows WNS `*.notify.windows.com`). The operator can extend the list in the runtime configuration without a
+         *     restart; a self-hosted push service works only once it is added. The answer names neither the endpoint nor its host.
          *
          *     If the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data
          *     (the endpoint and keys are never echoed back or logged); retry later.
@@ -710,6 +725,7 @@ export interface components {
          *         }
          *       ],
          *       "k": 5,
+         *       "mode": "replay",
          *       "shift": [
          *         {
          *           "ends_at": "2026-07-01T07:00:00Z",
@@ -754,6 +770,12 @@ export interface components {
              * @description The suppression threshold in force (`k_exposure`, ADR 0050).
              */
             k: number;
+            /**
+             * Mode
+             * @description Whether the day was computed against the live clock and live forecasts or the fixed replay snapshot.
+             * @enum {string}
+             */
+            mode?: "replay" | "live";
             /**
              * Shift
              * @description The crew's published shift blocks on this date as UTC instants, in time order.
@@ -828,6 +850,7 @@ export interface components {
          *       "crew_id": "crew-b",
          *       "date": "2026-07-01",
          *       "forecast_status": "fresh",
+         *       "mode": "replay",
          *       "model_id": "corrector-20261112-0000000-000001",
          *       "policy_version": "ae-heat-2026.1",
          *       "restricted_headcount": 0,
@@ -915,6 +938,12 @@ export interface components {
              * @enum {string}
              */
             forecast_status: "fresh" | "stale" | "fallback";
+            /**
+             * Mode
+             * @description Whether the day was computed against the live clock and live forecasts or the fixed replay snapshot.
+             * @enum {string}
+             */
+            mode?: "replay" | "live";
             /**
              * Model Id
              * @description Id of the corrector model behind the zones; null in fallback.
@@ -1072,7 +1101,7 @@ export interface components {
             corrected_wbgt_c: components["schemas"]["WbgtQuantiles"] | null;
             /**
              * P High
-             * @description P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws are one realization per stratum (50 samples, fixed seed), so this probability and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.
+             * @description P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws are one realization per stratum (50 samples, fixed seed): one standard error of a share of 50 samples is about 0.07 at p = 0.5, and two independent draws (this scoreboard and the live product) differ by about 0.10 (one standard deviation) for the same hour.
              */
             p_high: number | null;
             /**
@@ -1154,6 +1183,42 @@ export interface components {
             site_id: string;
         };
         /**
+         * EndpointHostNotAllowedProblem
+         * @description The 422 problem of `create_push_subscription` when the endpoint's host is not on the allow-list of push services
+         *     (Google FCM, Mozilla autopush, Apple Web Push, Windows WNS, plus what the operator added): nothing of the request is
+         *     echoed. The member `type` is a constant, so a client tells this problem from the framework's validation problem.
+         * @example {
+         *       "detail": "The endpoint host is not on the allow-list of push services.",
+         *       "instance": "/api/v1/push/subscriptions",
+         *       "request_id": "00000000-0000-4000-8000-000000000001",
+         *       "status": 422,
+         *       "title": "Endpoint host not allowed",
+         *       "type": "urn:stellar-blaze:problem:endpoint-host-not-allowed"
+         *     }
+         */
+        EndpointHostNotAllowedProblem: {
+            /**
+             * Detail
+             * @default null
+             */
+            detail: string;
+            /** Instance */
+            instance: string;
+            /** Request Id */
+            request_id: string;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "urn:stellar-blaze:problem:endpoint-host-not-allowed";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * HourForecast
          * @example {
          *       "action_codes": [
@@ -1204,7 +1269,7 @@ export interface components {
             comparisons: components["schemas"]["PairedComparison"][];
             /**
              * Id
-             * @description Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans); `H4-lead2` is H4 computed on the lead-2 rows (section 13: the stamp `issued by 18:00 GST the evening before` may be carried only when it is `supported`). A scoreboard without a lead-2 row has no `H4-lead2` entry.
+             * @description Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans); `H4-lead2` is H4 computed on the lead-2 rows (section 13 and amendment 3: the stamp `issued by 18:00 GST the evening before` may be carried only when H4 is `supported` at lead 1 AND `H4-lead2` is `supported`; its `text` says whether the stamp is carried). A scoreboard without a lead-2 row has no `H4-lead2` entry.
              */
             id: string;
             /**
@@ -1297,7 +1362,7 @@ export interface components {
              * @description Heading slug of the pre-registration section that defines this metric.
              */
             anchor: string;
-            /** @description 95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days). */
+            /** @description 95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days). A lead with no rows carries ci null and n 0 on its truth_danger_hours. */
             ci: components["schemas"]["Interval"] | null;
             /**
              * N
@@ -1768,7 +1833,7 @@ export interface components {
             rule: string;
             /**
              * Theta
-             * @description Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws are one realization per stratum (50 samples, fixed seed), so a probability here and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.
+             * @description Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws are one realization per stratum (50 samples, fixed seed): one standard error of a share of 50 samples is about 0.07 at p = 0.5, and two independent draws (the scoreboard and the live product) differ by about 0.10 (one standard deviation) for the same hour.
              */
             theta: number | null;
         };
@@ -1860,7 +1925,7 @@ export interface components {
             theta_protect: number;
             /**
              * Verdicts
-             * @description H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2, which decides the `evening before` stamp) where lead 2 has rows.
+             * @description H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2; with H4 at lead 1 it decides the `evening before` stamp, carried only when both are `supported`) where lead 2 has rows.
              */
             verdicts: components["schemas"]["HypothesisVerdict"][];
             /**
@@ -3510,13 +3575,13 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            /** @description Validation failed: A path, query or body member is missing or malformed. Endpoint host not allowed: The push endpoint's host is not on the allow-list of push services: Google FCM (`fcm.googleapis.com`), Mozilla autopush (`updates.push.services.mozilla.com`), Apple Web Push (`*.push.apple.com`) and Windows WNS (`*.notify.windows.com`), plus any host the operator added to the runtime configuration. Nothing of the request is echoed. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                    "application/problem+json": components["schemas"]["ValidationProblem"] | components["schemas"]["EndpointHostNotAllowedProblem"];
                 };
             };
             /** @description Any other problem (RFC 9457). */

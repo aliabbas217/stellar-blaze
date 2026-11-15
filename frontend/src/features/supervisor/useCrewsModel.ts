@@ -173,7 +173,8 @@ export function useCrewsModel(): { readonly model: CrewsModel; readonly siteId: 
       nowHour,
       ban,
       heat,
-      mode: forecast?.mode ?? null,
+      // The crews' own data says what it is (B3 ba912f3: `mode` on CrewTimeline, optional); the forecast beside it is the fallback.
+      mode: Object.values(timelines).find((timeline) => timeline?.mode !== undefined)?.mode ?? forecast?.mode ?? null,
       protective,
       offline,
       suppressedNames: crews.filter((crew) => crew.suppressed).map((crew) => crew.crew.name),

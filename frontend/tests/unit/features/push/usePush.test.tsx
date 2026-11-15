@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw/http";
+import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
 import { useProfile } from "@/features/profile/store";
 import { markRevokeIncomplete, readRevokeIncomplete, clearRevokeIncomplete } from "@/features/profile/revoke-marker";
 import { PENDING_DELETE_KEY } from "@/features/push/pending-delete";
@@ -14,7 +15,7 @@ import { server } from "@/mocks/node";
  * the API's registration id is remembered on the device and re-made when the browser's subscription changed.
  */
 
-const ENDPOINT = "https://push.example/send/abc123";
+const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc123";
 const CONFIG: PushConfig = { vapidPublicKey: Buffer.from(new Uint8Array(65).fill(4)).toString("base64url"), siteId: "site-demo-mussafah" };
 
 function browserSubscription(endpoint = ENDPOINT, unsubscribe = vi.fn(() => Promise.resolve(true))): SubscriptionLike {
@@ -167,6 +168,23 @@ describe("usePush: enable", () => {
     expect(result.current.failure).toBe("enable");
     expect(result.current.problem).toMatchObject({ status: 502, request_id: "mock-req-1" });
     expect(result.current.subscription?.endpoint).toBe(ENDPOINT);
+    expect(useProfile.getState().push).toBeNull();
+  });
+
+  // B3 ba912f3 (ADR 0067): a push service that is not on the allow-list gets a 422 `endpoint-host-not-allowed` at subscribe time. It
+  // is an ordinary refusal: the state is error, the problem is kept for the screen to explain, nothing is stored, nothing rejects.
+  it("ends in error with the endpoint-host-not-allowed problem, and stores nothing, when the push service is not allowed", async () => {
+    const { platform, subscribe } = fakePlatform();
+    subscribe.mockResolvedValueOnce(browserSubscription("https://push.example/send/not-allowed"));
+    const { result } = renderHook(() => usePush(CONFIG, platform));
+
+    await act(async () => {
+      await result.current.enable();
+    });
+
+    expect(result.current.state).toBe("error");
+    expect(result.current.failure).toBe("enable");
+    expect(result.current.problem).toMatchObject({ status: 422, type: ENDPOINT_HOST_NOT_ALLOWED_TYPE, request_id: "mock-req-1" });
     expect(useProfile.getState().push).toBeNull();
   });
 

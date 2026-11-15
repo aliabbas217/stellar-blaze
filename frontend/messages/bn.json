@@ -406,7 +406,8 @@
       "idle": "সতর্কতা বন্ধ আছে।",
       "subscribed": "এই সাইটের জন্য সতর্কতা চালু আছে।",
       "error": "আমরা সতর্কতা চালু করতে পারিনি। একটু পরে আবার চেষ্টা করুন।",
-      "disableError": "আমরা সতর্কতা বন্ধ করতে পারিনি। একটু পরে আবার চেষ্টা করুন।"
+      "disableError": "আমরা সতর্কতা বন্ধ করতে পারিনি। একটু পরে আবার চেষ্টা করুন।",
+      "hostNotAllowed": "This browser's push service is not supported, so alerts cannot be turned on here."
     },
     "unsupported": {
       "title": "এই ফোনে সতর্কতা পাওয়া যায় না",

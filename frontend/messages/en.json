@@ -406,7 +406,8 @@
       "idle": "Alerts are off.",
       "subscribed": "Alerts are on for this site.",
       "error": "We could not turn alerts on. Try again in a moment.",
-      "disableError": "We could not turn alerts off. Try again in a moment."
+      "disableError": "We could not turn alerts off. Try again in a moment.",
+      "hostNotAllowed": "This browser's push service is not supported, so alerts cannot be turned on here."
     },
     "unsupported": {
       "title": "Alerts are not available on this phone",

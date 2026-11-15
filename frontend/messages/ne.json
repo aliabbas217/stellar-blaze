@@ -406,7 +406,8 @@
       "idle": "अलर्ट बन्द छन्।",
       "subscribed": "यो साइटका लागि अलर्ट खुला छन्।",
       "error": "हामीले अलर्ट खोल्न सकेनौं। केही बेरपछि फेरि प्रयास गर्नुहोस्।",
-      "disableError": "हामीले अलर्ट बन्द गर्न सकेनौं। केही बेरपछि फेरि प्रयास गर्नुहोस्।"
+      "disableError": "हामीले अलर्ट बन्द गर्न सकेनौं। केही बेरपछि फेरि प्रयास गर्नुहोस्।",
+      "hostNotAllowed": "This browser's push service is not supported, so alerts cannot be turned on here."
     },
     "unsupported": {
       "title": "यो फोनमा अलर्ट उपलब्ध छैन",

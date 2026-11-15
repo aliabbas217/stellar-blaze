@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
 import en from "../../../../../messages/en.json";
 import { apiClient } from "@/api/client";
-import { crewDayPlan, crewStops, listCrews, REPLAY_DATE, SITE_DEMO } from "@/mocks/fixtures";
+import { crewDayPlan, crewStops, crewTimeline, forecastToday, listCrews, REPLAY_DATE, SITE_DEMO } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
 import { installSupervisorTestEnvironment, renderPlan, stopBar, textOf } from "../support";
 
@@ -72,6 +72,87 @@ const pageSays = (text: string | RegExp) =>
   });
 const heading = (name: string) => screen.findByRole("heading", { level: 2, name });
 const rows = () => [...document.querySelectorAll<HTMLElement>("[data-block]")];
+
+describe("the plan screen: the replay stamp follows the plan's own mode", () => {
+  // B3 ba912f3: DayPlan and CrewTimeline carry `mode` (optional in the contract). The plan's own wins, then the timeline's, then
+  // the forecast's, which is what the screen used before the contract had the member.
+  const FORECAST = "*/api/v1/sites/:site_id/forecast/today";
+  const TIMELINE = "*/api/v1/crews/:crew_id/timeline";
+  let forecastServed = false;
+  beforeEach(() => {
+    forecastServed = false;
+  });
+  const planWith = (mode: "live" | "replay" | undefined) =>
+    http.get(DAY_PLAN, ({ params }) => {
+      const plan = crewDayPlan(String(params["crew_id"]), REPLAY_DATE);
+      if (plan === undefined) throw new Error("fixture");
+      const served: Record<string, unknown> = { ...plan, mode };
+      if (mode === undefined) delete served["mode"];
+      return HttpResponse.json(served);
+    });
+  const timelineWith = (mode: "live" | "replay" | undefined) =>
+    http.get(TIMELINE, ({ params }) => {
+      const timeline = crewTimeline(String(params["crew_id"]), REPLAY_DATE);
+      if (timeline === undefined) throw new Error("fixture");
+      const served: Record<string, unknown> = { ...timeline, mode };
+      if (mode === undefined) delete served["mode"];
+      return HttpResponse.json(served);
+    });
+  const forecastWith = (mode: "live" | "replay") =>
+    http.get(FORECAST, ({ params }) => {
+      const day = forecastToday(String(params["site_id"]), { now: new Date("2026-09-03T07:10:00Z") });
+      if (day === undefined) throw new Error("fixture");
+      forecastServed = true;
+      return HttpResponse.json({ ...day, mode });
+    });
+  const stamp = () => document.querySelector("[data-mode-stamp]");
+  /** The plan is drawn and the forecast has been read and applied: an absent stamp is then an answer, not a wait. */
+  const settled = async () => {
+    await heading("Crew B plan");
+    await waitFor(() => {
+      expect(rows().length).toBeGreaterThan(0);
+      expect(forecastServed).toBe(true);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  };
+
+  it("a live plan carries no Replay stamp, although the forecast says replay", async () => {
+    server.use(planWith("live"), forecastWith("replay"));
+    renderPlan("crew-b");
+    await settled();
+    expect(stamp()).toBeNull();
+  });
+
+  it("a replay plan carries the Replay stamp, although the forecast says live", async () => {
+    server.use(planWith("replay"), forecastWith("live"));
+    renderPlan("crew-b");
+    await settled();
+    expect(stamp()).not.toBeNull();
+  });
+
+  it("a plan with no mode falls back to the timeline's, then the forecast's", async () => {
+    // Neither the plan nor the timeline says: the forecast's mode stands (replay stamped, live not).
+    server.use(planWith(undefined), timelineWith(undefined), forecastWith("replay"));
+    const replay = renderPlan("crew-b");
+    await settled();
+    expect(stamp()).not.toBeNull();
+    replay.unmount();
+
+    forecastServed = false;
+    server.use(planWith(undefined), timelineWith(undefined), forecastWith("live"));
+    const live = renderPlan("crew-b");
+    await settled();
+    expect(stamp()).toBeNull();
+    live.unmount();
+
+    // The timeline says live, the forecast replay: the timeline is read before the forecast.
+    forecastServed = false;
+    server.use(planWith(undefined), timelineWith("live"), forecastWith("replay"));
+    renderPlan("crew-b");
+    await settled();
+    expect(stamp()).toBeNull();
+  });
+});
 
 describe("the plan screen: the ideal state", () => {
   it("leads with the crew and its level, draws the plan with a slot and the stamp, and lists every block", async () => {
@@ -259,6 +340,49 @@ describe("the plan screen: sign-off", () => {
     expect(boxes[1]).not.toBeChecked();
     expect(boxes[1]).toHaveFocus();
     expect(boxes[0]).toBeChecked();
+    expect(screen.queryByText(/^Signed/)).toBeNull();
+  });
+
+  // Live run against B3 ba912f3: the plan can change under the supervisor (a stop cleared after the undo window brings work, and its items,
+  // back), and the 409 then names ids the screen never listed. They must become boxes to tick: the screen re-reads the plan, or the
+  // supervisor is told what to tick and given nothing to tick.
+  it("a 409 for items the screen did not list re-reads the plan: the new items appear unticked, named, the first focused", async () => {
+    const plan = crewDayPlan("crew-b", REPLAY_DATE);
+    if (plan === undefined) throw new Error("fixture");
+    const added = plan.ack_items[plan.ack_items.length - 1];
+    if (added === undefined) throw new Error("fixture");
+    let reads = 0;
+    server.use(
+      http.get(DAY_PLAN, () => {
+        reads += 1;
+        // The first read is the plan as it was; every later one has the item the plan gained.
+        return HttpResponse.json(reads === 1 ? { ...plan, ack_items: plan.ack_items.slice(0, -1) } : plan);
+      }),
+      http.post(SIGN_OFF, () => json(409, problemBody({ type: "urn:stellar-blaze:problem:review-required", status: 409, missing_items: [added.id] }))),
+    );
+    const user = userEvent.setup();
+    renderPlan("crew-b");
+    await screen.findByRole("button", { name: "Sign off" });
+    const before = screen.getAllByRole("checkbox");
+    expect(before).toHaveLength(plan.ack_items.length - 1);
+    for (const box of before) await user.click(box);
+
+    await user.click(screen.getByRole("button", { name: "Sign off" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("checkbox")).toHaveLength(plan.ack_items.length);
+    });
+    const boxes = screen.getAllByRole("checkbox");
+    const gained = boxes.find((box) => (box as HTMLInputElement).value === added.id);
+    expect(gained).toBeDefined();
+    expect(gained).not.toBeChecked();
+    await waitFor(() => {
+      expect(gained).toHaveFocus();
+    });
+    expect(boxes.filter((box) => (box as HTMLInputElement).checked)).toHaveLength(plan.ack_items.length - 1);
+    // named by what it is (zone and times), never by its id
+    const message = await screen.findByText(/^These items still need a tick: /);
+    expect(message.textContent).not.toContain(added.id);
     expect(screen.queryByText(/^Signed/)).toBeNull();
   });
 

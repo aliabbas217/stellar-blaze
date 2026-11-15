@@ -41,8 +41,9 @@ type specimen is at `/en/dev/specimen` (any language prefix works; it returns 40
 
 MSW (`pnpm mock:api`) stays the default backend for `pnpm dev`, `pnpm e2e` and Lighthouse CI. The `live` project runs a few
 specs against the real B3 backend in replay mode, to prove the app reads what the API really serves: the worker's Today level
-equals the `site_level` of the forecast hour the replay clock is in, the alert card names it, and the governance refusal is
-answered 403 and written to the log. Every site id, date and level in those specs comes from the API's own answers.
+equals the `site_level` of the forecast hour the replay clock is in, the alert card names it, the governance refusal is
+answered 403 and written to the log, Stop then Undo leaves the crew's hour as it was, the plan is signed by ticking the server's own `ack_items`
+(201, and the real 409 when an item is left out), and try-a-plan shows the real validator's answer. Every site id, date and level in those specs comes from the API's own answers.
 
 **This repository never starts B3.** The operator starts it (a Postgres database, the commands below, run in B3's own checkout:
 branch `feat/b3-warnings-planner`, `backend/`), runs the specs, and stops it:
@@ -51,16 +52,17 @@ branch `feat/b3-warnings-planner`, `backend/`), runs the specs, and stops it:
    `uv run sb-jobs site load backend/fixtures/demo_site.toml --actor <actor> --reason <reason>`.
 2. A replay snapshot under `SB_REPLAY_DIR` (default `replay/`), built with `uv run sb-jobs replay build --summer <year> --station OMAA --snapshot-id <id>`;
    the directory is empty in a fresh checkout.
-3. API environment: `SB_FORECAST_SOURCE=replay`, `SB_REPLAY_SNAPSHOT_ID=<id>`, `SB_REPLAY_DEFAULT_DATE=2025-07-10`,
+3. API environment: `SB_FORECAST_SOURCE=replay`, `SB_REPLAY_SNAPSHOT_ID=<id>`, `SB_REPLAY_DEFAULT_DATE=2026-06-14` (B3's committed snapshot `replay/demo-omaa-2026/`, README "Run recipe: the real OMAA day of 2026-06-14"; with `SB_REPLAY_SNAPSHOT_ID=demo-omaa-2026`),
    `SB_ACCESS_TOKENS` as JSON `{"<sha256 of the token>": {"actor": "...", "role": "employer", "employer_id": "emp-demo"}}`.
    The replay clock starts at `SB_REPLAY_NOW` when set, else the replay date at 11:10 Asia/Dubai, and runs at real speed. 11:10 is crew B's midday
-   break, so for a live stop set `SB_REPLAY_NOW` near 10:10 at the site.
+   break, so for a live stop set `SB_REPLAY_NOW` near 10:10 at the site (`2026-06-14T10:10:00+04:00`).
 4. Serve it: `uv run uvicorn stellar_blaze.api.app:create_app --factory --port 8000`, then wait until `GET /api/v1/risk-policy` reports
    `config_version` 1 or more: outside prod the API serves the file snapshot (version 0) until its first poll (up to 5 s) finds the
    database activation, and sign-off answers 503 meanwhile although `/health/ready` is already 200.
-5. The default config pins no model, so the replay serves the UNCORRECTED forecast: no spread (`p05 = p50 = p95`) and 2025-07-10 is
-   Green all day. With the corrector pinned (`sb-jobs config propose` a file holding `model_id = "<id in backend/models>"`, then `config activate`)
-   the same day is Amber and Orange from 10:00. The first live run (task-24b-report.md) covers both.
+5. A FRESH `db upgrade` seeds the config with the released model and the pre-registered theta pinned (B3 ba912f3, `backend/README.md`, "An already
+   seeded database keeps its config"), so the replay serves the CORRECTED forecast: 2026-06-14 is green 06-07, amber 08, orange 09-16, amber 17, green 18-19 (Dubai) with a real spread and is
+   not flat. A database seeded before that keeps its old config (no model: the uncorrected forecast, Green all day, `p05 = p50 = p95`); move
+   it with `sb-jobs config propose config/runtime/default.toml` then `config activate <N>`. The live specs assert the demo day is not Green all day.
 
 Then, here, from `frontend/` (a production build first, `pnpm build`; the token is the plain bearer whose SHA-256 is in `SB_ACCESS_TOKENS`):
 

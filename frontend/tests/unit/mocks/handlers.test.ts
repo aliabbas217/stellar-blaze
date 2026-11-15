@@ -380,6 +380,14 @@ describe("get_crew_timeline", () => {
   });
 });
 
+// B3 ba912f3: CrewTimeline and DayPlan carry `mode` (optional in the contract; the real API sets it). The mock's days are replays.
+describe("mode on the crew day views", () => {
+  it("is replay on the crew timeline and on the day plan", async () => {
+    expect((await timeline("crew-b")).mode).toBe("replay");
+    expect((await dayPlan("crew-b")).mode).toBe("replay");
+  });
+});
+
 describe("get_crew_day_plan", () => {
   it("answers 401 with WWW-Authenticate without a bearer token", async () => {
     const res = await get("/api/v1/crews/crew-b/day-plan");
@@ -533,10 +541,34 @@ describe("sign_off_day_plan", () => {
     expect((await json<Schemas["PlanSignOff"]>(again)).signed_at).toBe("2026-09-03T01:40:00Z");
   });
 
-  it("answers 422 for an item that is not in the plan, a bad reason code and a body outside the contract", async () => {
-    const unknown = await signOff("crew-b", { acknowledged_items: ["high-0000"] });
-    expect(unknown.status).toBe(422);
-    expect(await unknown.json()).toMatchObject({ errors: [{ loc: ["body", "acknowledged_items", 0] }] });
+  // Real B3 (live run, ba912f3): an id that is not an item of the plan is no error. The required items decide: left out is 409
+  // review-required (the unknown id changes nothing), and a sign-off that covers them all is 201 and records the plan's own items only.
+  it("ignores an item that is not in the plan: 409 while a real item is missing, 201 with the plan's own items once they are all there", async () => {
+    const ids = (await dayPlan("crew-c")).ack_items.map((item) => item.id);
+
+    const missing = await signOff("crew-c", { acknowledged_items: [...ids.slice(0, -1), "high-9999"] });
+    expect(missing.status).toBe(409);
+    expect(await missing.json()).toMatchObject({ type: `${PROBLEM_TYPE}review-required`, missing_items: [ids.at(-1)] });
+
+    const signed = await signOff("crew-c", { acknowledged_items: ["high-9999", ...ids] });
+    expect(signed.status).toBe(201);
+    expect((await json<Schemas["PlanSignOff"]>(signed)).acknowledged_items).toEqual(ids);
+  });
+
+  // The contract: at most 40 ids of at most 32 characters each (PlanSignOffRequest).
+  it("takes up to 40 ids of up to 32 characters, and answers 422 beyond", async () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `high-${String(i).padStart(4, "0")}`);
+    expect((await signOff("crew-b", { acknowledged_items: ids(40) })).status).toBe(409);
+    expect((await signOff("crew-b", { acknowledged_items: ids(41) })).status).toBe(422);
+    expect((await signOff("crew-b", { acknowledged_items: ["x".repeat(33)] })).status).toBe(422);
+  });
+
+  it("says Medium, High and Red in the 409 (the real wording)", async () => {
+    const missing = await signOff("crew-b", { acknowledged_items: [] });
+    expect(await json<{ detail: string }>(missing)).toMatchObject({ detail: "Every Medium, High and Red item must be acknowledged before signing." });
+  });
+
+  it("answers 422 for a bad reason code and a body outside the contract", async () => {
     expect((await signOff("crew-b", { acknowledged_items: [], deviation_reason_code: "Bad Code" })).status).toBe(422);
     expect((await signOff("crew-b", {})).status).toBe(422);
     expect((await signOff("crew-b", { acknowledged_items: [], extra: 1 })).status).toBe(422);
@@ -630,7 +662,7 @@ describe("validate_plan", () => {
 
 describe("push subscriptions", () => {
   const body = {
-    subscription: { endpoint: "https://push.example/abc", expirationTime: null, keys: { p256dh: "k", auth: "a" } },
+    subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/abc", expirationTime: null, keys: { p256dh: "k", auth: "a" } },
     site_id: DEMO_SITE,
     crew_id: null,
   };
@@ -657,8 +689,49 @@ describe("push subscriptions", () => {
 
   // Real B3 (first live run): the endpoint must be an https URL ("endpoint must be an https URL" is its 422).
   it("answers 422 for a push endpoint that is not https", async () => {
-    const insecure = await send("POST", "/api/v1/push/subscriptions", { ...body, subscription: { ...body.subscription, endpoint: "http://push.example/abc" } });
+    const insecure = await send("POST", "/api/v1/push/subscriptions", { ...body, subscription: { ...body.subscription, endpoint: "http://fcm.googleapis.com/abc" } });
     expect(insecure.status).toBe(422);
+  });
+
+  // B3 ba912f3 (ADR 0067): the endpoint's host must be a push service, else 422 `endpoint-host-not-allowed`. Exact hosts match
+  // only themselves; the Apple and Windows suffixes match any host with one more label in front, never the bare suffix.
+  describe("endpoint host allow-list (ADR 0067)", () => {
+    const post = (endpoint: string) => send("POST", "/api/v1/push/subscriptions", { ...body, subscription: { ...body.subscription, endpoint } });
+
+    it.each([
+      "https://fcm.googleapis.com/fcm/send/abc",
+      "https://fcm.googleapis.com/wp/abc",
+      "https://updates.push.services.mozilla.com/wpush/v2/abc",
+      "https://web.push.apple.com/abc",
+      "https://eu.notify.windows.com/abc",
+    ])("accepts %s", async (endpoint) => {
+      expect((await post(endpoint)).status).toBe(201);
+    });
+
+    it.each([
+      "https://push.example/abc",
+      "https://a.fcm.googleapis.com/abc",
+      "https://push.services.mozilla.com/abc",
+      "https://push.apple.com/abc",
+      "https://notify.windows.com/abc",
+      "https://evilpush.apple.com.example/abc",
+      "https://xpush.apple.com/abc",
+    ])("answers 422 endpoint-host-not-allowed for %s, echoing neither the endpoint nor its host", async (endpoint) => {
+      const res = await post(endpoint);
+
+      expect(res.status).toBe(422);
+      expect(res.headers.get("content-type")).toBe("application/problem+json");
+      const text = await res.text();
+      expect(JSON.parse(text)).toMatchObject({
+        type: "urn:stellar-blaze:problem:endpoint-host-not-allowed",
+        title: "Endpoint host not allowed",
+        status: 422,
+        detail: "The endpoint host is not on the allow-list of push services.",
+        instance: "/api/v1/push/subscriptions",
+        request_id: "mock-req-1",
+      });
+      expect(text).not.toContain(new URL(endpoint).hostname);
+    });
   });
 });
 

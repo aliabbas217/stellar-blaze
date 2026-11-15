@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
 import { crewTimeline, forecastToday, listCrews, REPLAY_DATE, SITE_DEMO, STALE_AGE_MS } from "@/mocks/fixtures";
@@ -97,10 +97,17 @@ describe("Crews: ready", () => {
     expect(screen.getByText(/Bar height is the crew's level/)).toBeInTheDocument();
   });
 
-  it("a live forecast carries no Replay stamp", async () => {
+  it("a live day (the forecast and the crews' timelines both live) carries no Replay stamp", async () => {
     const day = forecastToday(SITE_DEMO, { now: new Date("2026-09-03T07:10:00Z") });
     if (day === undefined) throw new Error("fixture");
-    server.use(http.get("*/api/v1/sites/:site_id/forecast/today", () => HttpResponse.json({ ...day, mode: "live" })));
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", () => HttpResponse.json({ ...day, mode: "live" })),
+      http.get("*/api/v1/crews/:crew_id/timeline", ({ params }) => {
+        const timeline = crewTimeline(String(params["crew_id"]), REPLAY_DATE);
+        if (timeline === undefined) throw new Error("fixture");
+        return HttpResponse.json({ ...timeline, mode: "live" });
+      }),
+    );
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-03T07:10:00Z"));
     try {
@@ -110,6 +117,66 @@ describe("Crews: ready", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // B3 ba912f3: CrewTimeline carries its own `mode` (optional in the contract). When it is there the stamp follows the crews' own data,
+  // not the forecast beside it; when it is absent the forecast's mode stands, as before.
+  describe("the stamp follows the crews' own mode when the timelines carry one", () => {
+    let forecastServed = false;
+    beforeEach(() => {
+      forecastServed = false;
+    });
+    const timelineWith = (mode: "live" | "replay" | undefined) =>
+      http.get("*/api/v1/crews/:crew_id/timeline", ({ params }) => {
+        const timeline = crewTimeline(String(params["crew_id"]), REPLAY_DATE);
+        if (timeline === undefined) throw new Error("fixture");
+        const served: Record<string, unknown> = { ...timeline, mode };
+        if (mode === undefined) delete served["mode"];
+        return HttpResponse.json(served);
+      });
+    const forecastWith = (mode: "live" | "replay") =>
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => {
+        const day = forecastToday(String(params["site_id"]), { now: new Date("2026-09-03T07:10:00Z") });
+        if (day === undefined) throw new Error("fixture");
+        forecastServed = true;
+        return HttpResponse.json({ ...day, mode });
+      });
+    /** The screen has its crews and the forecast has been read and applied: an absent stamp is then an answer, not a wait. */
+    const settled = async () => {
+      await focal();
+      await waitFor(() => {
+        expect(forecastServed).toBe(true);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    };
+
+    it("a live timeline carries no Replay stamp, although the forecast says replay", async () => {
+      server.use(timelineWith("live"), forecastWith("replay"));
+      renderCrews();
+      await settled();
+      expect(document.querySelector("[data-mode-stamp]")).toBeNull();
+    });
+
+    it("a replay timeline carries the Replay stamp, although the forecast says live", async () => {
+      server.use(timelineWith("replay"), forecastWith("live"));
+      renderCrews();
+      await settled();
+      expect(within(document.querySelector("[data-mode-stamp]") as HTMLElement).getByRole("note")).toHaveTextContent("Replay");
+    });
+
+    it("a timeline with no mode falls back to the forecast's: replay is stamped, live is not", async () => {
+      server.use(timelineWith(undefined), forecastWith("replay"));
+      const replay = renderCrews();
+      await settled();
+      expect(document.querySelector("[data-mode-stamp]")).not.toBeNull();
+      replay.unmount();
+
+      forecastServed = false;
+      server.use(timelineWith(undefined), forecastWith("live"));
+      renderCrews();
+      await settled();
+      expect(document.querySelector("[data-mode-stamp]")).toBeNull();
+    });
   });
 });
 

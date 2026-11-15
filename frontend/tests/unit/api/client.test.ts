@@ -26,7 +26,7 @@ it("posts a JSON body and gets the 201 body back", async () => {
   const result = await call(
     apiClient.POST("/api/v1/push/subscriptions", {
       body: {
-        subscription: { endpoint: "https://push.example/abc", expirationTime: null, keys: { p256dh: "k", auth: "a" } },
+        subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/abc", expirationTime: null, keys: { p256dh: "k", auth: "a" } },
         site_id: "site-demo-mussafah",
         crew_id: null,
       },

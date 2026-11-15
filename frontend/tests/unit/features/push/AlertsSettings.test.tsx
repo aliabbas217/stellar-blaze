@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
+import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
 import { CONSENT_VERSION } from "@/features/profile/profile-shape";
 import { PROFILE_STORAGE_KEY, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { AlertsSettings, type AlertsSettingsProps } from "@/features/push/AlertsSettings";
@@ -162,6 +163,31 @@ describe("AlertsSettings: supported", () => {
     expect(screen.getByText(en.alerts.state.error)).toBeInTheDocument();
     expect(screen.getByText(en.states.error.requestId.replace("{id}", "req-42"))).toBeInTheDocument();
     expect(enable()).toBeEnabled();
+  });
+
+  // B3 ba912f3 (ADR 0067): the push service of this browser is not on the API's allow-list. Said plainly, not as a generic failure
+  // to try again; the request id still shows, and nothing throws.
+  it("error while turning on because the push service is not allowed: says so plainly, with the request id", () => {
+    setup({}, { state: "error", failure: "enable", problem: { type: ENDPOINT_HOST_NOT_ALLOWED_TYPE, title: "Endpoint host not allowed", status: 422, request_id: "req-43" } });
+    expect(screen.getByText(en.alerts.state.hostNotAllowed)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.state.error)).not.toBeInTheDocument();
+    expect(screen.getByText(en.states.error.requestId.replace("{id}", "req-43"))).toBeInTheDocument();
+  });
+
+  it("an ordinary 422 while turning on is still the generic failure", () => {
+    setup({}, { state: "error", failure: "enable", problem: { type: "about:blank", title: "Unprocessable Content", status: 422, request_id: "req-44" } });
+    expect(screen.getByText(en.alerts.state.error)).toBeInTheDocument();
+    expect(screen.queryByText(en.alerts.state.hostNotAllowed)).not.toBeInTheDocument();
+  });
+
+  it("says the push service is not allowed in Arabic from the Arabic messages", () => {
+    setup(
+      {},
+      { state: "error", failure: "enable", problem: { type: ENDPOINT_HOST_NOT_ALLOWED_TYPE, title: "Endpoint host not allowed", status: 422 } },
+      {},
+      "ar",
+    );
+    expect(screen.getByText(ar.alerts.state.hostNotAllowed)).toBeInTheDocument();
   });
 
   it("error while turning off: says so, and offers Turn off again", () => {

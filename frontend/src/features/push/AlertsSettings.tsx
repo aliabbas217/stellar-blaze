@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
+import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
 import {
   readRevokeActive,
   readRevokeIncomplete,
@@ -302,7 +303,12 @@ function Controls({ push, siteId }: { push: ReturnType<typeof usePush>; siteId: 
   let status: string;
   if (push.state === "subscribed") status = t("state.subscribed");
   else if (push.state === "requesting") status = t("working");
-  else if (push.state === "error") status = push.failure === "disable" ? t("state.disableError") : t("state.error");
+  else if (push.state === "error") {
+    if (push.failure === "disable") status = t("state.disableError");
+    // The API refused this browser's push service (ADR 0067): retrying cannot help, so say what is wrong, not "try again".
+    else if (push.problem?.type === ENDPOINT_HOST_NOT_ALLOWED_TYPE) status = t("state.hostNotAllowed");
+    else status = t("state.error");
+  }
   else status = t("state.idle");
 
   return (

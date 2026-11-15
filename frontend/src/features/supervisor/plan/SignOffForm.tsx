@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode, type SubmitEvent } from "react";
 import { signOffMutation } from "@/api/queries";
 import { queryKeys } from "@/api/query-keys";
 import { ApiProblem, type Problem } from "@/api/problem";
@@ -94,6 +94,18 @@ export default function SignOffForm({ crewId, date, items, zone }: SignOffFormPr
     if (first !== undefined) boxes.current.get(first)?.focus();
   };
 
+  // The server's missing ids may name items this screen has not listed yet (the plan changed since it was read): the plan is read again
+  // (onError below), and the first missing item takes the focus once its box exists. Once per refusal: a later refresh of the plan
+  // never moves the focus again.
+  const focusedFor = useRef<Outcome | null>(null);
+  useEffect(() => {
+    if (outcome.kind !== "missing" || focusedFor.current === outcome) return;
+    const first = outcome.ids.find((id) => boxes.current.has(id));
+    if (first === undefined) return;
+    focusedFor.current = outcome;
+    boxes.current.get(first)?.focus();
+  }, [outcome, items]);
+
   const submit = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (sending.current) return;
@@ -127,7 +139,8 @@ export default function SignOffForm({ crewId, date, items, zone }: SignOffFormPr
             // The server says these are not acknowledged: they are unticked, whatever this form held.
             setTicked((held) => new Set([...held].filter((id) => !ids.includes(id))));
             setOutcome({ kind: "missing", ids });
-            focusFirst(ids);
+            // Read the plan again: an id the screen does not list becomes a box to tick when the new plan arrives.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.crewDayPlan(crewId) });
           } else if (isShiftNotLegal(problem)) {
             setOutcome({ kind: "not-legal", problem });
           } else {

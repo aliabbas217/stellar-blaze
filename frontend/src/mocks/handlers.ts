@@ -131,6 +131,24 @@ function bodyProblem(request: Request, error: z.ZodError): Response {
   return validationProblem(request, errors);
 }
 
+/*
+ * B3's built-in push-service allow-list (ADR 0067, backend/src/stellar_blaze/ports/push_endpoint.py at ba912f3): two exact hosts, and
+ * two suffixes that match any host with at least one more label in front (never the bare suffix). The operator's extra hosts are
+ * not modelled.
+ */
+const PUSH_EXACT_HOSTS = ["fcm.googleapis.com", "updates.push.services.mozilla.com"];
+const PUSH_SUFFIXES = ["push.apple.com", "notify.windows.com"];
+
+function pushHostAllowed(endpoint: string): boolean {
+  let host: string;
+  try {
+    host = new URL(endpoint).hostname.replace(/\.$/, "").toLowerCase();
+  } catch {
+    return false;
+  }
+  return PUSH_EXACT_HOSTS.includes(host) || PUSH_SUFFIXES.some((suffix) => host.endsWith(`.${suffix}`));
+}
+
 function scenarioOf(request: Request): Scenario | null {
   const value = request.headers.get(MOCK_SCENARIO_HEADER);
   return value === "error" ||
@@ -266,7 +284,7 @@ const DataRequestCreateSchema = z.strictObject({
 const CrewStopCreateSchema = z.strictObject({ reason_code: z.enum(["heat", "worker_unwell", "other"]) });
 
 const PlanSignOffRequestSchema = z.strictObject({
-  acknowledged_items: z.array(z.string().min(1)).max(32),
+  acknowledged_items: z.array(z.string().min(1).max(32)).max(40),
   deviation_reason_code: z
     .string()
     .regex(/^[a-z][a-z0-9_]{0,39}$/)
@@ -365,18 +383,12 @@ export const handlers = [
       if (!parsed.success) return bodyProblem(request, parsed.error);
       const outcome = signOffDayPlan(crewId, parsed.data.acknowledged_items, parsed.data.deviation_reason_code ?? null, dayOptions(scenario), date);
       if (outcome === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
-      if (outcome.kind === "unknown-items") {
-        return validationProblem(
-          request,
-          outcome.unknown.map(({ id, index }) => ({ loc: ["body", "acknowledged_items", index], msg: `${id} is not an item of this plan`, type: "value_error" })),
-        );
-      }
       if (outcome.kind === "review-required") {
         return problem(request, {
           status: 409,
           type: `${PROBLEM_PREFIX}review-required`,
           title: "Review required",
-          detail: "Every Medium and High item must be acknowledged before signing.",
+          detail: "Every Medium, High and Red item must be acknowledged before signing.",
           extra: { missing_items: outcome.missing },
         });
       }
@@ -419,6 +431,15 @@ export const handlers = [
       if (!sites.some((site) => site.id === siteId)) return mockProblem(request, 404, `No site ${siteId}.`);
       if (crewId !== null && !(listCrews(siteId)?.some((crew) => crew.id === crewId) ?? false)) {
         return mockProblem(request, 404, `No crew ${crewId} at ${siteId}.`);
+      }
+      // ADR 0067 (B3 ba912f3): checked after the site and crew, as B3 does; the answer names neither the endpoint nor its host.
+      if (!pushHostAllowed(parsed.data.subscription.endpoint)) {
+        return problem(request, {
+          status: 422,
+          type: `${PROBLEM_PREFIX}endpoint-host-not-allowed`,
+          title: "Endpoint host not allowed",
+          detail: "The endpoint host is not on the allow-list of push services.",
+        });
       }
       const created: Schemas["PushSubscriptionCreated"] = { id: "sub-mock-1" };
       return HttpResponse.json(created, { status: 201 });
