@@ -1,0 +1,169 @@
+# Stellar Blaze demo on Render, Frankfurt: the fallback of ADR 0001 (ladder step 2). Use it only when the Azure account is not
+# working (the architect decides; the trigger date in the runbook is Mon 16 Nov 22:00 Karachi).
+#
+# STATE: written from the Render documentation of 2026-11-15 (render.com/schema/render.yaml.json, /docs/blueprint-spec,
+# /docs/deploys, /docs/private-network, /docs/postgresql-creating-connecting). It has NEVER been applied. Every line that
+# rests on an assumption carries "UNVERIFIED" below; infra/render/README.md lists them and says what to check first.
+#
+# The same contract as infra/bicep/main.bicep: web (public) -> api (private to web by design) -> Postgres; an `alerts` worker
+# (a long-running loop, not a cron job) with the SAME SB_REPLAY_* values as the api (group sb-common); migrate and the demo
+# site load run BEFORE the api serves (preDeployCommand: a failure keeps the previous deploy running).
+#
+# TWO DEVIATIONS from the Azure deploy, both forced by Render, both for the architect to rule on:
+#  1. Database TLS. Render documents that INTERNAL connections "do not support sslmode=verify-ca or sslmode=verify-full" (their
+#     certificates are self-signed). ADR 0042's `ssl=verify-full` cannot be met here, so the URL ends `?ssl=require`: encrypted,
+#     server not authenticated, on Render's private network. PGSSLROOTCERT is NOT set. This breaks ADR 0042 on purpose; it
+#     needs an amendment before the fallback goes live (infra/render/README.md).
+#  2. Render does no variable interpolation in a Blueprint, so SB_DATABASE_URL (needs the `postgresql+asyncpg://` driver prefix)
+#     and API_ORIGIN (needs `http://`) are composed in the start command from the pieces Render supplies.
+#
+# Secrets are `sync: false`: the dashboard asks for them once, when the Blueprint is first created, and ignores them later.
+# Nothing secret is in this file. Apply it with: Dashboard > New > Blueprint > pick the repository, branch and the file path
+# infra/render/render.yaml (dockerfilePath and dockerContext below are relative to the repository root).
+
+databases:
+  - name: sb-db
+    region: frankfurt
+    plan: 0.5c-1g # smallest paid plan with 1 GB RAM (USD 19/month on 2026-11-15); the free one expires after 30 days
+    postgresMajorVersion: "18" # cannot be changed after creation. UNVERIFIED: that 18 is offered in Frankfurt (use "17" if not)
+    databaseName: stellar_blaze
+    user: sbadmin
+    ipAllowList: [] # UNVERIFIED: believed to leave only same-region internal connections; check Info > Access Control
+
+envVarGroups:
+  # Identical for api and alerts: the two processes keep separate replay clocks, so they must get the same anchor and start
+  # together (backend/README.md "Alerts and the demo replay clock"). Restart both after any change, see the runbook.
+  - name: sb-common
+    envVars:
+      - key: SB_ENV
+        value: prod
+      - key: SB_LOG_FORMAT
+        value: json
+      - key: SB_LOG_LEVEL
+        value: INFO
+      - key: SB_GIT_SHA
+        value: render-fallback
+      - key: SB_FORECAST_SOURCE
+        value: replay
+      - key: SB_REPLAY_SNAPSHOT_ID
+        value: demo-omaa-2026
+      - key: SB_REPLAY_DEFAULT_DATE
+        value: "2026-06-14"
+      - key: SB_REPLAY_NOW
+        value: "2026-06-14T10:10:00+04:00"
+
+services:
+  # --- web: the only public entry. Next.js standalone; its server-side proxy (BFF) holds the demo token and calls the api. ---
+  - type: web
+    name: sb-web
+    runtime: docker
+    region: frankfurt
+    plan: 0.5c-512mb # UNVERIFIED that 512 MB is enough for the Next.js server; raise to 1c-2g if it is killed
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /api/healthz
+    autoDeployTrigger: "off" # deploy by hand, so the replay clocks of api and alerts are restarted deliberately
+    # API_ORIGIN must be a full origin and Render cannot compose one in YAML: take the api's private host name and add the
+    # scheme and port here. UNVERIFIED: that `host` is reachable on port 8000 over http on the private network.
+    # NEXT_PUBLIC_SB_DEMO is a BUILD argument; Render passes service env vars to the build, so never set it here (empty is demo mode).
+    dockerCommand: sh -c 'export API_ORIGIN="http://${API_HOST}:8000"; exec node server.js'
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: APP_VERSION
+        value: render-fallback
+      - key: TRUSTED_PROXY_HOPS
+        value: "2" # UNVERIFIED, inferred: Cloudflare then Render's proxy both append to X-Forwarded-For
+      - key: API_HOST
+        fromService:
+          type: web
+          name: sb-api
+          property: host
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: DEMO_EMPLOYER_TOKEN
+        sync: false
+
+  # --- api: FastAPI. A `web` service (not `pserv`) because only web services get an HTTP health check, and the readiness
+  # path must gate the deploy. Browsers are meant to reach only sb-web. ---
+  - type: web
+    name: sb-api
+    runtime: docker
+    region: frankfurt
+    plan: 1c-2g # the smallest plan with 2 GB RAM (USD 25/month); the Azure app has 1 vCPU / 2 GiB too
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health/ready
+    autoDeployTrigger: "off"
+    # Migrate-first. The command runs on a separate instance after the build and before the new deploy takes traffic; if it
+    # fails the deploy fails and the previous one keeps serving. Paid plans only. UNVERIFIED: that it receives this service's
+    # env vars and reaches the database, and that `sh -c` is honoured. If the first deploy shows otherwise, move the same
+    # line in front of `exec uvicorn` in dockerCommand (it is idempotent) and say so in the deploy log.
+    preDeployCommand: sh -c 'export SB_DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?ssl=require"; sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor "deploy:${SB_GIT_SHA}" --reason "load the synthetic demo site at deploy ${SB_GIT_SHA}"'
+    # The image CMD, with the database URL composed first (backend/Dockerfile CMD; keep the two in step).
+    dockerCommand: sh -c 'export SB_DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?ssl=require"; exec uvicorn stellar_blaze.api.app:create_app --factory --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "*"'
+    envVars:
+      - fromGroup: sb-common
+      - key: PORT
+        value: "8000"
+      - key: DB_HOST
+        fromDatabase:
+          name: sb-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: sb-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: sb-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: sb-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: sb-db
+          property: database
+      # JSON {"<sha256 of the demo token>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}} (ADR 0062).
+      - key: SB_ACCESS_TOKENS
+        sync: false
+
+  # --- alerts: `sb-jobs alerts run`, a loop, no HTTP port. It sends the Web Push, so it alone holds the VAPID private key. ---
+  - type: worker
+    name: sb-alerts
+    runtime: docker
+    region: frankfurt
+    plan: 1c-2g # the smallest worker plan with 1 GB or more is 2 GB (USD 25/month); there is no 1 GB tier
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: "off"
+    dockerCommand: sh -c 'export SB_DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?ssl=require"; exec sb-jobs alerts run'
+    envVars:
+      - fromGroup: sb-common
+      - key: DB_HOST
+        fromDatabase:
+          name: sb-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: sb-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: sb-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: sb-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: sb-db
+          property: database
+      - key: SB_VAPID_PRIVATE_KEY
+        sync: false
+      # mailto:<a real, monitored address>; both VAPID values or neither (backend Settings refuses one without the other).
+      - key: SB_VAPID_SUBJECT
+        sync: false

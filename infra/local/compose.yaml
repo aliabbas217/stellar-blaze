@@ -1,0 +1,92 @@
+# The whole demo stack on one machine: the same images and the same environment contract as the Azure deploy
+# (infra/bicep/main.bicep), minus TLS to the database (the database is on a private compose network, so SB_DATABASE_URL has
+# no `ssl` here; ADR 0042 applies to managed databases) and minus the public ingress. This is the ADR 0001 "floor": the demo
+# can run from this file when no hosted deployment exists, and it is how the deploy's HTTP smoke test is validated offline.
+#
+# Needs two values in the environment or in infra/local/.env (git-ignored), see infra/README.md "Run the stack locally":
+#   DEMO_EMPLOYER_TOKEN  a throwaway string
+#   SB_ACCESS_TOKENS     {"<sha256 of that string>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}}
+#
+#   docker compose -f infra/local/compose.yaml up -d --build
+#   bash infra/scripts/smoke-http.sh http://127.0.0.1:3000
+#   docker compose -f infra/local/compose.yaml down -v
+name: sb-local
+
+x-api-env: &api-env
+  SB_ENV: prod
+  SB_LOG_FORMAT: json
+  SB_LOG_LEVEL: INFO
+  SB_GIT_SHA: local
+  SB_DATABASE_URL: postgresql+asyncpg://sb:sb@db:5432/stellar_blaze
+  SB_FORECAST_SOURCE: replay
+  SB_REPLAY_SNAPSHOT_ID: demo-omaa-2026
+  SB_REPLAY_DEFAULT_DATE: "2026-06-14"
+  SB_REPLAY_NOW: "2026-06-14T10:10:00+04:00"
+
+services:
+  db:
+    image: postgres:18.6
+    environment:
+      POSTGRES_USER: sb
+      POSTGRES_PASSWORD: sb
+      POSTGRES_DB: stellar_blaze
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sb -d stellar_blaze"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The migrate job of the Azure deploy: schema, config seed, synthetic demo site. Must finish before api and alerts start.
+  migrate:
+    build: ../../backend
+    image: stellar-blaze-api:local
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+    command:
+      - /bin/sh
+      - -c
+      - sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor deploy:local --reason "load the synthetic demo site (local compose)"
+
+  api:
+    image: stellar-blaze-api:local
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *api-env
+      SB_ACCESS_TOKENS: ${SB_ACCESS_TOKENS:?set SB_ACCESS_TOKENS, see infra/README.md}
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  # The alerts worker: a separate process with its own replay clock. Same SB_REPLAY_* values as api, started with it.
+  alerts:
+    image: stellar-blaze-api:local
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *api-env
+    command: ["sb-jobs", "alerts", "run"]
+
+  web:
+    build:
+      context: ../../frontend
+      args:
+        APP_VERSION: local
+        # Empty is demo mode, the safe default (frontend/Dockerfile).
+        NEXT_PUBLIC_SB_DEMO: ""
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      API_ORIGIN: http://api:8000
+      APP_VERSION: local
+      DEMO_EMPLOYER_TOKEN: ${DEMO_EMPLOYER_TOKEN:?set DEMO_EMPLOYER_TOKEN, see infra/README.md}
+      TRUSTED_PROXY_HOPS: "1"
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+    ports:
+      - "127.0.0.1:3000:3000"
