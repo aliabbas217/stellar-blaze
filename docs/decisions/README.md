@@ -72,6 +72,7 @@ Process: [ADR 0012](0012-decision-record-process.md). Accepted ADRs are never de
 | [0066](0066-demo-reset-is-a-new-epoch-audit-stays-append-only.md) | Demo reset is a new epoch of the synthetic site; reads are scoped to it; the hash-chained audit stays append-only and records `demo_reset`; deleting rows and restoring a snapshot rejected | Proposed (awaiting Ali) (2026-11-14); B3 Tasks 0, 7, 10, 11, 17 carry it (epoch design and rate-limit values in the 2026-11-14 amendment); epoch key still Proposed | 2026-11-14 | Settles 0062 decision 3 and Consequences (b), and the reset part of (a) |
 | [0067](0067-push-endpoint-host-allow-list.md) | Web Push subscription endpoints must be on an allow-list of push-service hosts (default on, overridable); un-parks the allow-list | Accepted by the architect (Ali informed 2026-11-15) | 2026-11-15 | Amends 0058 decision 3 |
 | [0068](0068-defer-worker-card-aside.md) | Defer the day-view worker-card aside (F2 Task 9): no level in the exported day, no invented wording | Accepted by the architect (Ali informed 2026-11-15) | 2026-11-15 | Cut order item 6; narrows 0045 |
+| [0069](0069-per-route-budget-exception-for-data-routes.md) | Per-route budget exception for the five data routes (worker and supervisor): 195 KiB build-failing cap, separate Lighthouse terms for worker and supervisor routes | Accepted by the architect (Ali informed 2026-11-15) | 2026-11-15 | Narrows the F1 budget; option B parked |
 
 ## Decisions recorded inside earlier ADRs (linked, not duplicated)
 | Cut / park / defer | Where decided |
