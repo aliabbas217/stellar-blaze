@@ -39,3 +39,11 @@ The honest constraint: two training summers, one test summer, eight airports (no
 
 ## What must exist by Wed 18 Nov 12:00 to tell this story
 Landing hero (3D with 2D fallback); the 2026 data swap; the live backend on a public HTTPS URL (Azure UAE North, or the Render fallback after the Monday 22:00 trigger); a real-phone push check (Ali's phone with the installed PWA); the Urdu and Arabic layouts; the deck; the recorded video on Thu 19 Nov.
+
+## Concerns we share openly (the deck's "limits" slide; the full list is in ADR 0072 and the evaluation report)
+- Evidence: one test summer, one site-summer (OMAA), airports not worksites, derived heat-stress truth, no worker-outcome data; our event probabilities are overstated, and the warning policy trades more false alarms for fewer misses than raw ADOSH zones.
+- Review: not clinically reviewed; machine translations await a native review; the PDPL position awaits counsel.
+- Hosting: cost-minimal on purpose (a cold start on the first live request, no high availability, hardening deferred, no GPU, so no voice).
+
+## What a budget buys (the right-hand column of the roadmap slide)
+Always-on replicas and zone-redundant Postgres; private networking, Key Vault and managed-identity database access; monitoring and on-call; a UAE GPU for self-hosted speech and language models; on-site WBGT sensors and a pilot with real outcomes; more summers and the summer-rotated model; native-language and clinical reviews; a counsel review.
