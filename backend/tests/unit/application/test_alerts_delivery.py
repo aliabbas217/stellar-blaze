@@ -5,6 +5,7 @@ them, with deadlines of a few hundredths of a second (no sleeps of ours; the ass
 """
 
 import asyncio
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -47,11 +48,13 @@ class HangingSiteChannel(RecordingPushChannel):
         super().__init__()
         self.started: list[tuple[str, OutboundMessage]] = []
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
         self.started.append((sub.id, message))
         if message.audience.value == "site":
             await asyncio.Event().wait()
-        return await super().send_to(sub, message)
+        return await super().send_to(sub, message, extra_host_suffixes=extra_host_suffixes)
 
 
 async def run_with(w: World, channel: Any, now: datetime, limits: DeliveryLimits) -> Any:
@@ -253,13 +256,15 @@ class LaneProbeChannel(RecordingPushChannel):
         self.in_flight = 0
         self.peak = 0
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
         self.in_flight += 1
         self.peak = max(self.peak, self.in_flight)
         try:
             if message.audience.value == "crew" and sub.endpoint != self.real:
                 await asyncio.Event().wait()
-            return await super().send_to(sub, message)
+            return await super().send_to(sub, message, extra_host_suffixes=extra_host_suffixes)
         finally:
             self.in_flight -= 1
 
@@ -311,7 +316,9 @@ class OriginProbeChannel(RecordingPushChannel):
         self.cancelled = 0
         self.started_at_cancel_count: dict[str, int] = {}
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
         self.in_flight += 1
         self.peak = max(self.peak, self.in_flight)
         try:
@@ -323,7 +330,7 @@ class OriginProbeChannel(RecordingPushChannel):
                 except asyncio.CancelledError:
                     self.cancelled += 1
                     raise
-            return await super().send_to(sub, message)
+            return await super().send_to(sub, message, extra_host_suffixes=extra_host_suffixes)
         finally:
             self.in_flight -= 1
 
@@ -336,7 +343,9 @@ class HangingEverywhereChannel(RecordingPushChannel):
         self.in_flight = 0
         self.peak = 0
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
         self.in_flight += 1
         self.peak = max(self.peak, self.in_flight)
         try:

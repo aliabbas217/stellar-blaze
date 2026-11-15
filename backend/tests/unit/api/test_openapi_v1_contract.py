@@ -23,6 +23,7 @@ from stellar_blaze.api.models import (
     RESPONSE_MODELS,
     AckItem,
     DayPlan,
+    EndpointHostNotAllowedProblem,
     PlanValidateRequest,
     PlanValidateResponse,
     PushSubscriptionCreate,
@@ -125,6 +126,7 @@ OPEN_PROBLEM_SCHEMAS = {
     "RosterInvalidProblem",
     "ReviewRequiredProblem",
     "ShiftNotLegalProblem",
+    "EndpointHostNotAllowedProblem",
 }
 
 # (schema, property) pairs that match the member-like regex and are allowed. Nothing else may.
@@ -314,6 +316,27 @@ def test_problem_extension_shapes_are_components(spec: dict[str, Any]) -> None:
     assert {ref_name(s) for s in one_of} == {"ValidationProblem", "RosterInvalidProblem"}
     review = operations(spec)["sign_off_day_plan"][2]["responses"]["409"]["content"][PROBLEM_JSON]["schema"]
     assert ref_name(review) == "ReviewRequiredProblem"
+
+
+@pytest.mark.unit
+def test_the_push_subscription_422_adds_endpoint_host_not_allowed_additively(spec: dict[str, Any]) -> None:
+    """ADR 0067: a new 422 problem type next to the framework's, declared on ``create_push_subscription`` only; the
+    status set of the operation is unchanged and the description names the accepted services and the override."""
+    operation = operations(spec)["create_push_subscription"][2]
+    response = operation["responses"]["422"]
+    one_of = response["content"][PROBLEM_JSON]["schema"]["oneOf"]
+
+    assert {ref_name(s) for s in one_of} == {"ValidationProblem", "EndpointHostNotAllowedProblem"}
+    assert set(response["content"][PROBLEM_JSON]["examples"]) == {"validation-failed", "endpoint-host-not-allowed"}
+    problem = schemas(spec)["EndpointHostNotAllowedProblem"]
+    assert problem["properties"]["type"]["const"] == "urn:stellar-blaze:problem:endpoint-host-not-allowed"
+    assert problem["additionalProperties"] is True
+    text = operation["description"] + response["description"]
+    for phrase in ("Google FCM", "Mozilla", "Apple", "Windows", "allow-list", "operator", "endpoint-host-not-allowed"):
+        assert phrase in text, phrase
+    for other, (_, _, op) in operations(spec).items():
+        if other != "create_push_subscription":
+            assert "EndpointHostNotAllowedProblem" not in str(op["responses"]), other
 
 
 @pytest.mark.unit
@@ -707,6 +730,7 @@ def test_every_problem_type_has_a_valid_example() -> None:
         "roster-invalid",
         "review-required",
         "shift-not-legal",
+        "endpoint-host-not-allowed",
         "individual-data-refused",
         "forbidden-employer",
         "unauthorized",
@@ -725,6 +749,7 @@ def test_every_problem_type_has_a_valid_example() -> None:
         "roster-invalid": RosterInvalidProblem,
         "review-required": ReviewRequiredProblem,
         "shift-not-legal": ShiftNotLegalProblem,
+        "endpoint-host-not-allowed": EndpointHostNotAllowedProblem,
     }
     for key, example in PROBLEM_EXAMPLES.items():
         own_models.get(key, Problem).model_validate(example)
@@ -763,6 +788,7 @@ def test_problem_type_constants() -> None:
         "RATE_LIMITED": "rate-limited",
         "NOT_A_DEMO_SITE": "not-a-demo-site",
         "SHIFT_NOT_LEGAL": "shift-not-legal",
+        "ENDPOINT_HOST_NOT_ALLOWED": "endpoint-host-not-allowed",
     }
     for name, kebab in expected.items():
         assert getattr(errors, name) == f"urn:stellar-blaze:problem:{kebab}"

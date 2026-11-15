@@ -7,6 +7,7 @@ import ipaddress
 import json
 import logging
 import socket
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -32,16 +33,20 @@ from stellar_blaze.ports.push import CONNECTION_LIMIT, NewSubscription, Subscrip
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
-ENDPOINT = "https://push.example/send/SECRET-ENDPOINT-TOKEN"
+# A host of the built-in allow-list (ADR 0067), so these tests need no allowance: the channel refuses any other host.
+ENDPOINT = "https://fcm.googleapis.com/fcm/send/SECRET-ENDPOINT-TOKEN"
+# The explicit TEST allowance for a host that is not on the list: the SAME mechanism the operator's override uses.
+FAKE_DNS_HOSTS = ("push.example.test",)
 P256DH = "BP-secret-public-key-material"
 AUTH = "secret-auth-bytes"
 VALID_FROM = datetime(2026, 11, 11, 9, 0, tzinfo=UTC)
 SUBJECT = "mailto:ops@example.org"
 
 
-def allow_any_endpoint(endpoint: str) -> str:
+def allow_any_endpoint(endpoint: str, extra_host_suffixes: Sequence[str] = ()) -> str:
     """The explicit TEST allowance for the send-time endpoint check (``WebPushChannel(endpoint_check=...)``): a test
-    server is a localhost ``http`` URL, which the production check refuses. Production never passes it."""
+    server is a localhost ``http`` URL, which the production check (syntax AND host allow-list) refuses. Production
+    never passes it."""
     return endpoint
 
 
@@ -439,7 +444,9 @@ async def test_a_name_that_resolves_to_an_embedding_address_is_blocked_before_an
     record = await _record_for(store, "https://push.example.test/send", p256dh, auth)
     channel = WebPushChannel(secret, SUBJECT, store, resolver=PublicOnlyResolver(dns))
     try:
-        result = await channel.send_to(record, message())
+        # The production check, with the host let through the allow-list as an operator's override would: the refusal
+        # that remains is the RESOLVER's (the fake DNS is asked exactly once), not the allow-list's.
+        result = await channel.send_to(record, message(), extra_host_suffixes=FAKE_DNS_HOSTS)
     finally:
         await channel.aclose()
 

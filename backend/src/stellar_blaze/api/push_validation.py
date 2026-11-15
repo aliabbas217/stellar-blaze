@@ -6,7 +6,8 @@ syntactic, so an IP literal in any notation, a single-label or reserved internal
 non-443 port are all refused. The functions raise ``ValueError`` with a message that never contains the checked value
 (pydantic puts that message into the 422 body and the logs): they add no JSON-schema constraint, so the frozen
 ``/api/v1`` contract is unchanged. ``check_endpoint`` itself lives in ``ports.push_endpoint`` (the Web Push channel
-applies it again at send time) and is re-exported here.
+applies it again at send time) and is re-exported here. It is SYNTACTIC only: the HOST allow-list (ADR 0067) needs the
+active config, so the route applies ``check_endpoint_host`` itself and answers ``endpoint-host-not-allowed``.
 """
 
 import math

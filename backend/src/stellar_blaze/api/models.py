@@ -36,7 +36,7 @@ from stellar_blaze.api.push_validation import check_endpoint, check_expiration, 
 from stellar_blaze.api.schemas import ResponseModel
 from stellar_blaze.domain.risk.levels import AlertLevel
 from stellar_blaze.domain.scoreboard import WbgtQuantiles
-from stellar_blaze.errors import REVIEW_REQUIRED, ROSTER_INVALID, SHIFT_NOT_LEGAL, Problem
+from stellar_blaze.errors import ENDPOINT_HOST_NOT_ALLOWED, REVIEW_REQUIRED, ROSTER_INVALID, SHIFT_NOT_LEGAL, Problem
 
 Level = AlertLevel
 """The heat level code of every wire contract: ``green``, ``amber``, ``orange``, ``red`` (never colour alone)."""
@@ -1102,6 +1102,16 @@ SHIFT_NOT_LEGAL_EXAMPLE: dict[str, Any] = {
 }
 
 
+ENDPOINT_HOST_NOT_ALLOWED_EXAMPLE: dict[str, Any] = {
+    "type": ENDPOINT_HOST_NOT_ALLOWED,
+    "title": "Endpoint host not allowed",
+    "status": 422,
+    "detail": "The endpoint host is not on the allow-list of push services.",
+    "instance": "/api/v1/push/subscriptions",
+    "request_id": REQUEST_ID,
+}
+
+
 class ValidationProblem(Problem):
     """The 422 problem of a request that fails validation: `errors` lists where and why (never the input value)."""
 
@@ -1145,6 +1155,16 @@ class ShiftNotLegalProblem(Problem):
     violations: list[ShiftViolation] = Field(description="Every shift rule the published shift breaks.")
 
 
+class EndpointHostNotAllowedProblem(Problem):
+    """The 422 problem of `create_push_subscription` when the endpoint's host is not on the allow-list of push services
+    (Google FCM, Mozilla autopush, Apple Web Push, Windows WNS, plus what the operator added): nothing of the request is
+    echoed. The member `type` is a constant, so a client tells this problem from the framework's validation problem."""
+
+    model_config = ConfigDict(extra="allow", json_schema_extra={"examples": [ENDPOINT_HOST_NOT_ALLOWED_EXAMPLE]})
+
+    type: Literal["urn:stellar-blaze:problem:endpoint-host-not-allowed"]  # = errors.ENDPOINT_HOST_NOT_ALLOWED
+
+
 REQUEST_MODELS: list[type[BaseModel]] = [
     PlanSignOffRequest,
     PlanCrewInput,
@@ -1179,4 +1199,5 @@ PROBLEM_MODELS: list[type[Problem]] = [
     RosterInvalidProblem,
     ReviewRequiredProblem,
     ShiftNotLegalProblem,
+    EndpointHostNotAllowedProblem,
 ]

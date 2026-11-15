@@ -89,6 +89,36 @@ uv run sb-jobs config history --limit 20                      # newest first, on
 - **The hash.** `config_version.sha256` is the SHA-256 of the canonical JSON (sorted keys, compact) of the **stored** body, never of a model dumped again on read, so adding a tunable later does not change the hash of a version that already exists. Proposing the same config twice is one version; a version written before a new tunable existed and the same config proposed after it are two versions with the same meaning.
 - **Not yet.** The activating process swaps its own snapshot at once; other processes take up to one poll interval. The model is loaded from the image and checked against its manifest, with no smoke prediction until B2 has a predictor. The HTTP admin routes, the governance audit events and bearer-token actors are B3 (`ConfigService` is what they will call).
 
+## Push subscription hosts: the allow-list and its override (ADR 0067)
+
+`POST /api/v1/push/subscriptions` is public (the demo token is public by design), and the alert dispatch then POSTs to the endpoint the client supplied. So the endpoint's **host** must belong to a push service, or the route answers 422 `urn:stellar-blaze:problem:endpoint-host-not-allowed` (the syntactic checks, https only, port 443, a DNS name, no credentials, still answer `validation-failed` first). The send path checks again for every send, so a row stored earlier from another host fails at once with `blocked` and never occupies a send lane. Without this, hundreds of hanging public subscriptions starve the 16-slot send lane and a real subscriber's event is lost for good; the allow-list closes that flood, the response-bomb class and the SSRF class at the one place a URL is accepted.
+
+The **built-in list** (`ports/push_endpoint.py`; each entry cites its vendor document in the code):
+
+| Service | Host | Match |
+|---|---|---|
+| Google FCM (Chrome and Chromium browsers) | `fcm.googleapis.com` | exactly that host, any path (`/fcm/send/...` and `/wp/...`) |
+| Mozilla autopush (Firefox) | `updates.push.services.mozilla.com` | exactly that host |
+| Apple Web Push (Safari, iOS) | `*.push.apple.com` | any subdomain, not `push.apple.com` itself |
+| Windows WNS (Edge, inferred) | `*.notify.windows.com` | any subdomain, not `notify.windows.com` itself |
+
+Matching is on DNS labels: the host is lowercased and one trailing dot is dropped; `evilpush.apple.com`, `push.apple.com.evil.example`, `x.fcm.googleapis.com` and any non-ASCII spelling are refused. Not on the list, on purpose: the Chromium staging host `jmt17.google.com`, Mozilla stage and dev (`*.stage.mozaws.net`, `*.dev.mozaws.net`), the legacy `android.googleapis.com/gcm/send`, and `push.services.mozilla.com` (the Firefox client's websocket). **Unverified:** Samsung Internet, Opera, UC, Huawei and Edge on Android or macOS (no vendor document names a host; they are expected to use FCM), and that Edge on Windows uses WNS. A host missing from the list is a loud 422 at subscribe time; the real-phone spike is the check.
+
+**The override** is a runtime-config field, not a ruleset tunable (the rulesets are frozen and hashed), so it needs no restart and no release: `push_extra_host_suffixes`, a list of at most 20 domain names in the body of a config version.
+
+```toml
+# proposal.toml: everything else as in config/runtime/default.toml
+push_extra_host_suffixes = ["ntfy.example.org"]   # allows ntfy.example.org and any subdomain, e.g. eu.ntfy.example.org
+```
+
+```bash
+uv run sb-jobs config validate proposal.toml
+uv run sb-jobs config propose proposal.toml --actor ali --reason "pilot uses a self-hosted push service"
+uv run sb-jobs config activate N --actor ali --reason "allow the pilot push host"   # the API and the dispatch follow with no restart
+```
+
+It only **extends** the built-in list; it can never remove an entry, and it never loosens the syntactic checks (https, port 443, no IP literal, no credentials), the send-time DNS refusal of non-public addresses, the redirect refusal or the response cap. Each entry is a lowercase ASCII DNS name of at least two labels (no scheme, port, path, wildcard or IP literal, no trailing dot); an entry matches that host and its subdomains on label boundaries, so `ntfy.example.org` does not allow `evilntfy.example.org`. An entry that is a public suffix anyone can register under is refused (`co.uk`, `com.au`, `github.io`, `appspot.com`, ...); that refusal is a **small explicit list** (the registry labels of the country domains and about thirty well-known shared-hosting domains), **not the Public Suffix List**, so choosing a domain you control is yours to get right. An invalid entry is refused at `validate` and `propose` and, for a row inserted by hand, at `activate` (`invalid-config`, path `push_extra_host_suffixes.<n>`), so it never becomes the active config. The API reads the active list on every subscribe request (with no config loaded, the built-in list applies), and the dispatch reads it once per run and passes it to the channel. An empty value is left out of the stored body, so a config that does not use it keeps its hash; `config/runtime/default.toml` does not carry it.
+
 ## Alerts and the demo replay clock
 
 `sb-jobs alerts dispatch` runs one cycle and `sb-jobs alerts run` loops (`--help` has the SLA and the lanes); the API serves the

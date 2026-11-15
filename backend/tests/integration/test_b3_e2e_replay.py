@@ -174,7 +174,9 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
             "/api/v1/push/subscriptions",
             json={
                 "subscription": {
-                    "endpoint": "https://push.example/send/crew-b-phone",
+                    # A host of the built-in allow-list (ADR 0067): the route refuses any other, and this flow runs on
+                    # the default config. The recording channel below stands in for the push service itself.
+                    "endpoint": "https://fcm.googleapis.com/fcm/send/crew-b-phone",
                     "expirationTime": None,
                     "keys": {"p256dh": "BP-key", "auth": "auth-secret"},
                 },

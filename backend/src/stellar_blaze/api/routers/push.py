@@ -9,13 +9,14 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Path, Response
 
-from stellar_blaze.api.deps import ServicesDep
+from stellar_blaze.api.deps import RuntimeDep, ServicesDep
 from stellar_blaze.api.models import PushSubscriptionCreate, PushSubscriptionCreated
 from stellar_blaze.api.rate_limits import MAX_SUBSCRIPTIONS_PER_CREW, MAX_SUBSCRIPTIONS_PER_SITE
 from stellar_blaze.api.responses import problem_responses
-from stellar_blaze.api.views import not_found, site_or_404, validation_failed
+from stellar_blaze.api.views import endpoint_host_not_allowed, not_found, site_or_404, validation_failed
 from stellar_blaze.errors import DomainProblem
 from stellar_blaze.ports.push import NewSubscription, PushStoreError, SubscriptionCapError
+from stellar_blaze.ports.push_endpoint import EndpointHostNotAllowedError, check_endpoint_host
 
 router = APIRouter(tags=["push"])
 logger = structlog.stdlib.get_logger(__name__)
@@ -25,9 +26,11 @@ logger = structlog.stdlib.get_logger(__name__)
     "/push/subscriptions",
     summary="Register a Web Push subscription",
     status_code=201,
-    responses=problem_responses("not-found", "validation-failed"),
+    responses=problem_responses("not-found", "validation-failed", "endpoint-host-not-allowed"),
 )
-async def create_push_subscription(payload: PushSubscriptionCreate, services: ServicesDep) -> PushSubscriptionCreated:
+async def create_push_subscription(
+    payload: PushSubscriptionCreate, services: ServicesDep, runtime: RuntimeDep
+) -> PushSubscriptionCreated:
     """Register the browser's subscription for site alerts and, optionally, one crew's alerts.
 
     The endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted
@@ -36,9 +39,24 @@ async def create_push_subscription(payload: PushSubscriptionCreate, services: Se
     most 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, "too many subscriptions"). The body
     holds no worker identifier by design.
 
+    The endpoint's host must belong to a push service, else 422 `endpoint-host-not-allowed` (the allow-list: Google FCM
+    `fcm.googleapis.com`, Mozilla autopush `updates.push.services.mozilla.com`, Apple Web Push `*.push.apple.com` and
+    Windows WNS `*.notify.windows.com`). The operator can extend the list in the runtime configuration without a
+    restart; a self-hosted push service works only once it is added. The answer names neither the endpoint nor its host.
+
     If the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data
     (the endpoint and keys are never echoed back or logged); retry later.
     """
+    # The active config is read through ``peek``: with none loaded the built-in list applies (this route never turns
+    # into a 503 for want of a config, as it never was one).
+    snapshot = runtime.config.peek()
+    try:
+        check_endpoint_host(
+            payload.subscription.endpoint, () if snapshot is None else snapshot.config.push_extra_host_suffixes
+        )
+    except EndpointHostNotAllowedError:
+        logger.info("push.endpoint_host_refused", site_id=payload.site_id)  # never the endpoint or its host
+        raise endpoint_host_not_allowed() from None
     site = await site_or_404(services, payload.site_id)
     if payload.crew_id is not None:
         crew = await services.sites.get_crew(payload.crew_id)

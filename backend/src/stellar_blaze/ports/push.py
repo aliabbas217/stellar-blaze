@@ -123,7 +123,14 @@ class PushChannel(Protocol):
         """The longest one ``send_to`` may take: the dispatch bounds every send by this plus a margin."""
         ...
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult: ...
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
+        """Deliver ``message`` to ``sub``. ``extra_host_suffixes`` is the operator's extension of the endpoint host
+        allow-list (``RuntimeConfig.push_extra_host_suffixes`` of the config the run holds, ADR 0067): a channel that
+        reaches an endpoint over the network refuses, FAILED ``blocked``, a host that is on neither the built-in list
+        (``ports.push_endpoint``) nor these suffixes, before any connection is made."""
+        ...
 
     async def aclose(self) -> None:
         """Release what the channel holds (an HTTP session); safe to call twice."""

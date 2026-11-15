@@ -2,9 +2,9 @@
 
 import hashlib
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -23,6 +23,7 @@ from stellar_blaze.application.runtime_config import ConfigSnapshot
 from stellar_blaze.application.services import Services
 from stellar_blaze.composition import load_site_fixture
 from stellar_blaze.config import Settings
+from stellar_blaze.domain.config.runtime import RuntimeConfig, config_body
 from stellar_blaze.ports.corrector import ForecastCorrector
 from tests.alembic_support import BACKEND_DIR
 from tests.unit.application import serving_support as serving
@@ -133,12 +134,24 @@ def db_snapshot() -> ConfigSnapshot:
 
 
 @contextmanager
-def client_for(world: World, *, database_config: bool = False) -> Iterator[TestClient]:
-    """The app over ``world``; ``database_config`` swaps in a DB-sourced snapshot (needed to record a sign-off)."""
+def client_for(world: World, *, database_config: bool = False, push_hosts: Sequence[str] = ()) -> Iterator[TestClient]:
+    """The app over ``world``; ``database_config`` swaps in a DB-sourced snapshot (needed to record a sign-off).
+
+    ``push_hosts`` is the explicit TEST allowance of the push endpoint host allow-list (ADR 0067): the active config
+    names these hosts in ``push_extra_host_suffixes``, exactly as an operator's override does. Production code is not
+    loosened: without it only the built-in push services are accepted.
+    """
     app = create_app(world.settings, services=world.services)
     with TestClient(app, raise_server_exceptions=False) as client:
         if database_config:
             app.state.runtime.config.swap(db_snapshot())
+        if push_hosts:
+            holder = app.state.runtime.config
+            current = holder.current()
+            allowed = RuntimeConfig.model_validate(
+                {**config_body(current.config), "push_extra_host_suffixes": list(push_hosts)}
+            )
+            holder.swap(replace(current, config=allowed))
         yield client
 
 

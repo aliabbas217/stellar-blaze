@@ -8,14 +8,16 @@ protective than the ruleset in force today: not on a floor, and not on the range
 
 import dataclasses
 import hashlib
+import ipaddress
 import itertools
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import Literal
+from typing import Annotated, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, field_validator
 
 from stellar_blaze.domain.config.models import ModelRegistry
 from stellar_blaze.domain.rules.catalog import RulesetCatalog
@@ -70,14 +72,101 @@ class RuntimeFlags(_Model):
     """Flags that are safe to flip live. None in B1: each flag is added together with the code it gates."""
 
 
+MAX_PUSH_EXTRA_HOST_SUFFIXES: Final = 20
+
+_DNS_LABEL: Final = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
+_DNS_TLD: Final = re.compile(r"[a-z]{2,63}|xn--[a-z0-9-]{1,59}")
+# The push host override must not name a suffix that anyone can register under: that would let any stranger put a
+# push endpoint on the list. This is NOT the Public Suffix List (about 10,000 rows), only a small explicit refusal list
+# of the cases a pilot is most likely to mistype or be talked into: the second-level registry labels of the country
+# domains (`co.uk`, `com.au`, `org.pk`: a registry label then a two-letter country code, which is the shape of most
+# ICANN rows of that kind) and the best known free-subdomain hosts. Every name below is a row of the PRIVATE section
+# of the Public Suffix List of 2026-11-14 (https://publicsuffix.org/list/public_suffix_list.dat), except
+# `amazonaws.com`, which is not a row but is one domain shared by every customer of one cloud: the same exposure.
+_REGISTRY_LABELS: Final = frozenset(
+    {"com", "net", "org", "edu", "gov", "mil", "int", "co", "ac", "or", "ne", "go", "gob", "gouv", "nom", "info", "biz"}
+    | {"name", "sch", "web", "asso", "med", "id", "art", "coop", "pro", "tm", "me", "tv"}
+)
+_SHARED_HOSTING_DOMAINS: Final = frozenset(
+    {
+        "github.io", "gitlab.io", "appspot.com", "googleapis.com", "cloudfunctions.net", "web.app", "firebaseapp.com",
+        "herokuapp.com", "cloudfront.net", "azurewebsites.net", "azureedge.net", "amazonaws.com", "s3.amazonaws.com",
+        "vercel.app", "now.sh", "netlify.app", "pages.dev", "workers.dev", "fly.dev", "onrender.com", "surge.sh",
+        "blogspot.com", "myshopify.com", "ngrok.io", "ngrok-free.app", "trycloudflare.com", "duckdns.org", "no-ip.org",
+        "ddns.net", "dyndns.org",
+    }
+)  # fmt: skip
+
+
+def check_push_host_suffix(value: str) -> str:
+    """One entry of ``RuntimeConfig.push_extra_host_suffixes``: a lowercase ASCII DNS name of at least two labels.
+
+    Refused: an uppercase or non-ASCII character, a wildcard (the entry already matches its subdomains), an IP
+    literal, a URL, port or path, a single label, a name that is not DNS-shaped (labels of 1 to 63 characters, 253 in
+    all, a TLD of letters or punycode), and a bare public suffix (``_REGISTRY_LABELS`` and
+    ``_SHARED_HOSTING_DOMAINS``: a small explicit list, not the full Public Suffix List). The message never contains
+    the value.
+
+    Raises:
+        ValueError: The entry is refused.
+    """
+    if not value.isascii() or value != value.lower():
+        msg = "must be lowercase ASCII"
+        raise ValueError(msg)
+    try:
+        ipaddress.ip_address(value.strip("[]"))
+    except ValueError:
+        pass
+    else:
+        msg = "must be a DNS name, not an IP address"
+        raise ValueError(msg)
+    if "*" in value:
+        msg = "must not contain a wildcard: an entry already matches its subdomains"
+        raise ValueError(msg)
+    labels = value.split(".")
+    if (
+        len(value) > 253
+        or len(labels) < 2
+        or not all(_DNS_LABEL.fullmatch(label) for label in labels)
+        or not _DNS_TLD.fullmatch(labels[-1])
+    ):
+        msg = "must be a DNS name of at least two labels (no scheme, port, path or trailing dot)"
+        raise ValueError(msg)
+    if value in _SHARED_HOSTING_DOMAINS or (len(labels) == 2 and labels[0] in _REGISTRY_LABELS and len(labels[1]) == 2):
+        msg = "must not be a public suffix that anyone can register under"
+        raise ValueError(msg)
+    return value
+
+
 class RuntimeConfig(_Model):
-    """What can change at runtime, without a restart."""
+    """What can change at runtime, without a restart.
+
+    ``push_extra_host_suffixes`` (ADR 0067, ADR 0010) EXTENDS the built-in allow-list of Web Push endpoint hosts
+    (``ports.push_endpoint``: Google FCM, Mozilla autopush, Apple Web Push, Windows WNS); it can never remove one.
+    Each entry names a domain; it matches that host and its subdomains on DNS label boundaries (``ntfy.example.org``
+    allows ``ntfy.example.org`` and ``eu.ntfy.example.org``, not ``evilntfy.example.org``). At most 20 entries, each a
+    lowercase ASCII DNS name of at least two labels, no wildcard, no IP literal, not a bare public suffix
+    (``check_push_host_suffix``). It is not a ruleset tunable: the rulesets are frozen and hashed, and a host is not a
+    number in a range. An EMPTY value is left out of the stored body, so it changes the hash of no config that does
+    not use it.
+    """
 
     schema_version: Literal[1] = 1
     ruleset_pin: str | None = None  # None resolves the ruleset by date
     model_id: str | None = None  # None serves the uncorrected forecast
     tunables: Tunables = Field(default_factory=Tunables)
     flags: RuntimeFlags = Field(default_factory=RuntimeFlags)
+    push_extra_host_suffixes: tuple[Annotated[str, AfterValidator(check_push_host_suffix)], ...] = Field(
+        default=(), max_length=MAX_PUSH_EXTRA_HOST_SUFFIXES, exclude_if=lambda value: not value
+    )
+
+    @field_validator("push_extra_host_suffixes")
+    @classmethod
+    def _no_duplicate_hosts(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(set(value)) != len(value):
+            msg = "must not hold duplicate entries"
+            raise ValueError(msg)
+        return value
 
 
 def body_sha256(body: Mapping[str, JsonValue]) -> str:

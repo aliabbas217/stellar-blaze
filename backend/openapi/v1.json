@@ -1205,6 +1205,59 @@
         "title": "DemoReset",
         "type": "object"
       },
+      "EndpointHostNotAllowedProblem": {
+        "additionalProperties": true,
+        "description": "The 422 problem of `create_push_subscription` when the endpoint's host is not on the allow-list of push services\n(Google FCM, Mozilla autopush, Apple Web Push, Windows WNS, plus what the operator added): nothing of the request is\nechoed. The member `type` is a constant, so a client tells this problem from the framework's validation problem.",
+        "examples": [
+          {
+            "detail": "The endpoint host is not on the allow-list of push services.",
+            "instance": "/api/v1/push/subscriptions",
+            "request_id": "00000000-0000-4000-8000-000000000001",
+            "status": 422,
+            "title": "Endpoint host not allowed",
+            "type": "urn:stellar-blaze:problem:endpoint-host-not-allowed"
+          }
+        ],
+        "properties": {
+          "detail": {
+            "default": null,
+            "title": "Detail",
+            "type": "string"
+          },
+          "instance": {
+            "title": "Instance",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "status": {
+            "maximum": 599,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "urn:stellar-blaze:problem:endpoint-host-not-allowed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "instance",
+          "request_id"
+        ],
+        "title": "EndpointHostNotAllowedProblem",
+        "type": "object"
+      },
       "HourForecast": {
         "additionalProperties": false,
         "examples": [
@@ -5356,7 +5409,7 @@
     },
     "/api/v1/push/subscriptions": {
       "post": {
-        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted\nagainst the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The\nendpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at\nmost 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, \"too many subscriptions\"). The body\nholds no worker identifier by design.\n\nIf the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data\n(the endpoint and keys are never echoed back or logged); retry later.",
+        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted\nagainst the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The\nendpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at\nmost 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, \"too many subscriptions\"). The body\nholds no worker identifier by design.\n\nThe endpoint's host must belong to a push service, else 422 `endpoint-host-not-allowed` (the allow-list: Google FCM\n`fcm.googleapis.com`, Mozilla autopush `updates.push.services.mozilla.com`, Apple Web Push `*.push.apple.com` and\nWindows WNS `*.notify.windows.com`). The operator can extend the list in the runtime configuration without a\nrestart; a self-hosted push service works only once it is added. The answer names neither the endpoint nor its host.\n\nIf the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data\n(the endpoint and keys are never echoed back or logged); retry later.",
         "operationId": "create_push_subscription",
         "requestBody": {
           "content": {
@@ -5406,6 +5459,17 @@
             "content": {
               "application/problem+json": {
                 "examples": {
+                  "endpoint-host-not-allowed": {
+                    "summary": "Endpoint host not allowed",
+                    "value": {
+                      "detail": "The endpoint host is not on the allow-list of push services.",
+                      "instance": "/api/v1/push/subscriptions",
+                      "request_id": "00000000-0000-4000-8000-000000000001",
+                      "status": 422,
+                      "title": "Endpoint host not allowed",
+                      "type": "urn:stellar-blaze:problem:endpoint-host-not-allowed"
+                    }
+                  },
                   "validation-failed": {
                     "summary": "Validation failed",
                     "value": {
@@ -5429,11 +5493,18 @@
                   }
                 },
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationProblem"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EndpointHostNotAllowedProblem"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation failed: A path, query or body member is missing or malformed."
+            "description": "Validation failed: A path, query or body member is missing or malformed. Endpoint host not allowed: The push endpoint's host is not on the allow-list of push services: Google FCM (`fcm.googleapis.com`), Mozilla autopush (`updates.push.services.mozilla.com`), Apple Web Push (`*.push.apple.com`) and Windows WNS (`*.notify.windows.com`), plus any host the operator added to the runtime configuration. Nothing of the request is echoed."
           },
           "default": {
             "content": {

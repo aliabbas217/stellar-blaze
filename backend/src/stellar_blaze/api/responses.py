@@ -12,6 +12,7 @@ from typing import Any, NamedTuple
 from fastapi.responses import JSONResponse
 
 from stellar_blaze.api.models import (
+    ENDPOINT_HOST_NOT_ALLOWED_EXAMPLE,
     REQUEST_ID,
     REVIEW_REQUIRED_EXAMPLE,
     ROSTER_INVALID_EXAMPLE,
@@ -20,6 +21,7 @@ from stellar_blaze.api.models import (
 )
 from stellar_blaze.errors import (
     DEPENDENCY_UNAVAILABLE,
+    ENDPOINT_HOST_NOT_ALLOWED,
     FORBIDDEN_EMPLOYER,
     INDIVIDUAL_DATA_REFUSED,
     NOT_A_DEMO_SITE,
@@ -79,6 +81,15 @@ SPECS: dict[str, ProblemSpec] = {
         "Shift not legal",
         "The crew's published shift breaks a shift rule by itself (hours, juvenile rules); `violations` lists them.",
     ),
+    "endpoint-host-not-allowed": ProblemSpec(
+        422,
+        "EndpointHostNotAllowedProblem",
+        "Endpoint host not allowed",
+        "The push endpoint's host is not on the allow-list of push services: Google FCM (`fcm.googleapis.com`), "
+        "Mozilla autopush (`updates.push.services.mozilla.com`), Apple Web Push (`*.push.apple.com`) and Windows "
+        "WNS (`*.notify.windows.com`), plus any host the operator added to the runtime configuration. Nothing of "
+        "the request is echoed.",
+    ),
     "review-required": ProblemSpec(
         409,
         "ReviewRequiredProblem",
@@ -123,6 +134,7 @@ TYPES = {
     "not-a-demo-site": NOT_A_DEMO_SITE,
     "rate-limited": RATE_LIMITED,
     "shift-not-legal": SHIFT_NOT_LEGAL,
+    "endpoint-host-not-allowed": ENDPOINT_HOST_NOT_ALLOWED,
     "plan-invalid": PLAN_INVALID,
     "not-implemented": NOT_IMPLEMENTED,
     "dependency-unavailable": DEPENDENCY_UNAVAILABLE,
@@ -163,6 +175,7 @@ PROBLEM_EXAMPLES: dict[str, dict[str, Any]] = {
     "roster-invalid": ROSTER_INVALID_EXAMPLE,
     "review-required": REVIEW_REQUIRED_EXAMPLE,
     "shift-not-legal": SHIFT_NOT_LEGAL_EXAMPLE,
+    "endpoint-host-not-allowed": ENDPOINT_HOST_NOT_ALLOWED_EXAMPLE,
     "not-a-demo-site": _example(
         "not-a-demo-site",
         "/api/v1/sites/site-prod-1/demo-reset",

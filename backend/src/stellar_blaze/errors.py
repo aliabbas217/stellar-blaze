@@ -35,6 +35,8 @@ REVIEW_REQUIRED = "urn:stellar-blaze:problem:review-required"  # 409, sign-off w
 NOT_A_DEMO_SITE = "urn:stellar-blaze:problem:not-a-demo-site"  # 409, reset of a site that is not synthetic
 RATE_LIMITED = "urn:stellar-blaze:problem:rate-limited"  # 429, with a Retry-After header
 SHIFT_NOT_LEGAL = "urn:stellar-blaze:problem:shift-not-legal"  # 422, the published shift breaks a shift rule itself
+# 422, the host of a push endpoint is not on the allow-list of push services (ADR 0067)
+ENDPOINT_HOST_NOT_ALLOWED = "urn:stellar-blaze:problem:endpoint-host-not-allowed"
 
 logger = structlog.stdlib.get_logger(__name__)
 

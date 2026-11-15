@@ -42,6 +42,7 @@ from stellar_blaze.domain.risk.levels import Zone
 from stellar_blaze.domain.rules.catalog import NoRulesetError, PinOutOfRangeError
 from stellar_blaze.domain.validator.validator import ValidationResult
 from stellar_blaze.errors import (
+    ENDPOINT_HOST_NOT_ALLOWED,
     FORBIDDEN_EMPLOYER,
     NOT_FOUND,
     PLAN_INVALID,
@@ -67,6 +68,16 @@ def forbidden_employer() -> DomainProblem:
         title="Forbidden",
         status=403,
         detail="This resource belongs to another employer.",
+    )
+
+
+def endpoint_host_not_allowed() -> DomainProblem:
+    """The 422 of a push endpoint whose host is not on the allow-list (ADR 0067); it carries nothing of the request."""
+    return DomainProblem(
+        type_=ENDPOINT_HOST_NOT_ALLOWED,
+        title="Endpoint host not allowed",
+        status=422,
+        detail="The endpoint host is not on the allow-list of push services.",
     )
 
 

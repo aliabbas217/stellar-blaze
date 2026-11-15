@@ -17,7 +17,8 @@ against the installed 2.5.0 source and by ``test_the_real_library_accepts_these_
   subscription id and class names only.
 
 One ``aiohttp.ClientSession`` serves every send of the channel (closed by ``aclose``). Endpoints are public input, so
-the session is hardened against server-side request forgery (the host allow-list stays parked):
+the session is hardened against server-side request forgery, and the host of every endpoint must be on the allow-list
+of push services (ADR 0067), which is what keeps a hostile or hanging host out of the send lanes in the first place:
 
 * a REDIRECT is never followed: a ``TraceConfig`` raises ``RedirectRefusedError`` on the first one (FAILED
   ``redirect``); the response that asked for it is the only request that reaches that server;
@@ -25,9 +26,12 @@ the session is hardened against server-side request forgery (the host allow-list
   to an IPv6 address inside a refused transition network (IPv4-mapped, IPv4-compatible, NAT64, 6to4, Teredo:
   ``_REFUSED_V6_NETWORKS``) is refused by ``PublicOnlyResolver`` before a connection is made (FAILED ``blocked``). An
   IP literal is not resolved by aiohttp: the subscribe route refuses those (``api.push_validation``);
-* the endpoint is checked at SEND time (``ports.push_endpoint.check_endpoint``, the route's own check): aiohttp does not
-  resolve an IP literal, so the resolver alone would let a stored row reach ``http://127.0.0.1:...`` (FAILED
-  ``blocked``, no connection; a test names a looser check through ``endpoint_check``);
+* the endpoint is checked at SEND time (``ports.push_endpoint.check_send_endpoint``, the route's own checks): the
+  syntactic check, because aiohttp does not resolve an IP literal, so the resolver alone would let a stored row reach
+  ``http://127.0.0.1:...``, and the HOST ALLOW-LIST (ADR 0067: the built-in push services plus the
+  ``extra_host_suffixes`` the dispatch passes from the active config), so a row stored from any other host (before the
+  list existed, or by a path that is not the API) is FAILED ``blocked`` with no connection and no wait; a test names a
+  looser check through ``endpoint_check``;
 * the RESPONSE is bounded: pywebpush reads the whole body (``await resp.text()``) and aiohttp inflates a gzip body while
   reading it, so a hostile endpoint could cost gigabytes of memory per send (a 1 MB gzip body inflated to 1 GB in the
   reviewer's probe). The session therefore never decompresses (``auto_decompress=False``) and asks for
@@ -43,7 +47,7 @@ the session is hardened against server-side request forgery (the host allow-list
 import ipaddress
 import json
 import socket
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC
 from types import SimpleNamespace
 from typing import Any, Final, cast
@@ -55,7 +59,7 @@ from pywebpush import WebPushException, webpush_async
 
 from stellar_blaze.ports.notifications import DeliveryResult, DeliveryStatus, OutboundMessage
 from stellar_blaze.ports.push import CONNECTION_LIMIT, PushSubscriptionStore, SubscriptionRecord
-from stellar_blaze.ports.push_endpoint import check_endpoint
+from stellar_blaze.ports.push_endpoint import check_send_endpoint
 
 __all__ = [
     "MAX_RESPONSE_BYTES",
@@ -227,8 +231,9 @@ async def _refuse_redirect(
 
 class WebPushChannel:
     """``PushChannel`` for Web Push. ``sender`` replaces ``webpush_async`` in tests; ``resolver`` replaces the
-    public-only resolver (a test names a fake DNS); ``endpoint_check`` replaces the production endpoint check (a test
-    that serves a localhost ``http`` endpoint names a looser one: production never passes it)."""
+    public-only resolver (a test names a fake DNS); ``endpoint_check`` replaces the production endpoint check, which is
+    ``check_send_endpoint(endpoint, extra_host_suffixes)``: the syntactic check and the host allow-list (a test that
+    serves a localhost ``http`` endpoint names a looser one: production never passes it)."""
 
     name = "webpush"
 
@@ -242,7 +247,7 @@ class WebPushChannel:
         sender: Sender | None = None,
         resolver: AbstractResolver | None = None,
         connection_limit: int = CONNECTION_LIMIT,
-        endpoint_check: Callable[[str], str] = check_endpoint,
+        endpoint_check: Callable[[str, Sequence[str]], str] = check_send_endpoint,
     ) -> None:
         self._key = vapid_private_key
         self._subject = vapid_subject
@@ -263,9 +268,11 @@ class WebPushChannel:
         """The timeout every ``webpush_async`` call gets; the dispatch adds a hard deadline of its own on top."""
         return self._timeout_s
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
         try:
-            self._endpoint_check(sub.endpoint)
+            self._endpoint_check(sub.endpoint, extra_host_suffixes)
         except ValueError:  # the message never holds the endpoint; neither does the log line
             logger.warning("webpush.blocked", subscription_id=sub.id, error="EndpointRefused")
             return self._result("blocked")

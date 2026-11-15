@@ -1,6 +1,6 @@
 """In-memory notification channels for tests: one that delivers and remembers, one that always fails."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from stellar_blaze.ports.notifications import DeliveryResult, DeliveryStatus, OutboundMessage
 from stellar_blaze.ports.push import SubscriptionRecord
@@ -38,7 +38,8 @@ class FailingChannel:
 class RecordingPushChannel:
     """A ``PushChannel`` for tests and the replay demo: delivers to every subscription and keeps ``(subscription id,
     message)`` in ``sent``; ``results`` overrides the result of a subscription id, ``raises`` makes ids raise (a channel
-    that breaks its contract), ``closed`` says ``aclose`` ran."""
+    that breaks its contract), ``closed`` says ``aclose`` ran, ``extras_seen`` holds the ``extra_host_suffixes`` every
+    ``send_to`` call received (the dispatch passes the active config's)."""
 
     name = "recording"
     timeout_s = 10.0
@@ -47,9 +48,13 @@ class RecordingPushChannel:
         self.results: Mapping[str, DeliveryResult] = results or {}
         self.raises: set[str] = raises or set()
         self.sent: list[tuple[str, OutboundMessage]] = []
+        self.extras_seen: list[tuple[str, ...]] = []
         self.closed = False
 
-    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+    async def send_to(
+        self, sub: SubscriptionRecord, message: OutboundMessage, *, extra_host_suffixes: Sequence[str] = ()
+    ) -> DeliveryResult:
+        self.extras_seen.append(tuple(extra_host_suffixes))
         if sub.id in self.raises:
             raise RuntimeError("injected channel fault")
         self.sent.append((sub.id, message))

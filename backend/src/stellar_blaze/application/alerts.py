@@ -42,7 +42,11 @@ recipients send at once and neither public subscriptions that hang nor another c
 or delay them. The residual: a forecast-driven crew red is an ordinary-lane event and CAN be delayed (it waits its turn
 behind hanging sends, up to one delivery deadline per batch of 16); an operator stop cannot. The connector of a pooling
 channel is provisioned for the ordinary lane plus ``SIMULTANEOUS_STOPS_PROVISIONED`` stop lanes (``ports.push``).
-Each send
+Which hosts a push may go to is decided where the URL is accepted and again at send time (ADR 0067): the channel
+refuses an endpoint whose host is not on the allow-list of push services at once (FAILED ``blocked``, no connection),
+so hanging subscriptions on arbitrary hosts cannot occupy a lane (the residual above is then only a push service that
+really hangs). ``deliver`` hands every send the ACTIVE snapshot's ``push_extra_host_suffixes`` (the operator's
+extension of the list), read per run. Each send
 is under a hard per-delivery deadline (the channel's timeout plus a margin) and the whole run under a per-run deadline
 anchored at the START OF THE CYCLE (``period - margin``, phase A counts against it): a send that times out, or that
 cannot start before the run deadline, counts as ``failed`` with detail ``deadline``, and the event row is still
@@ -458,14 +462,20 @@ async def deliver(
     gate = asyncio.Semaphore(bounds.concurrency)
 
     async def send(
-        active: PushChannel, sub: SubscriptionRecord, message: OutboundMessage, lane: asyncio.Semaphore
+        active: PushChannel,
+        sub: SubscriptionRecord,
+        message: OutboundMessage,
+        lane: asyncio.Semaphore,
+        extra_hosts: Sequence[str],
     ) -> DeliveryResult:
         async with lane:
             remaining = run_deadline - mono()
             if remaining <= 0:
                 return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
             try:
-                result = await asyncio.wait_for(active.send_to(sub, message), timeout=min(per_send, remaining))
+                result = await asyncio.wait_for(
+                    active.send_to(sub, message, extra_host_suffixes=extra_hosts), timeout=min(per_send, remaining)
+                )
             except TimeoutError:
                 logger.error("alerts.send_deadline", subscription_id=sub.id)
                 return DeliveryResult(channel=active.name, status=DeliveryStatus.FAILED, detail="deadline")
@@ -488,8 +498,11 @@ async def deliver(
         # One lane PER operator stop: a stop has at most ``stop_concurrency`` (the per-crew cap) recipients, so its own
         # semaphore never makes one of them wait, and no other stop or event can take a slot of it.
         lane = asyncio.Semaphore(bounds.stop_concurrency) if _is_stop(item) else gate
+        # The endpoint host allow-list (ADR 0067) is the built-in list plus what the ACTIVE config of this run adds
+        # (``push_extra_host_suffixes``): the channel refuses any other host at send time, at once (FAILED ``blocked``).
+        extra_hosts = prepared[i].snapshot.config.push_extra_host_suffixes
         sends[(i, j)] = (
-            [asyncio.create_task(send(channel, sub, item.message, lane)) for sub in item.recipients]
+            [asyncio.create_task(send(channel, sub, item.message, lane, extra_hosts)) for sub in item.recipients]
             if channel is not None
             else []
         )

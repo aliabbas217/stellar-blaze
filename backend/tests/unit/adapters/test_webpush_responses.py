@@ -15,7 +15,7 @@ import logging
 import os
 import tracemalloc
 import zlib
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, MutableMapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, MutableMapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -153,9 +153,11 @@ async def send(
     return result, high, store, record
 
 
-def allow_any_endpoint(endpoint: str) -> str:
-    """The explicit TEST allowance (``WebPushChannel(endpoint_check=...)``): the production check refuses a localhost
-    ``http`` endpoint, which is the only kind a test server can serve. Production never passes it."""
+def allow_any_endpoint(endpoint: str, extra_host_suffixes: Sequence[str] = ()) -> str:
+    """The explicit TEST allowance (``WebPushChannel(endpoint_check=...)``): the production check (syntax AND the host
+    allow-list of ADR 0067) refuses a localhost ``http`` endpoint, which is the only kind a test server can serve. It
+    lets each of these tests reach the layer it is about (the response cap, the redirect refusal). Production never
+    passes it."""
     return endpoint
 
 

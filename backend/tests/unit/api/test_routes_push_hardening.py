@@ -14,6 +14,9 @@ from tests.unit.api.support import SITE, build_world, client_for
 pytestmark = [pytest.mark.unit]
 
 ENDPOINT = "https://push.example/send/abc123"
+# The explicit TEST allowance of the push host allow-list (ADR 0067): the active config of these routes names the host
+# of the made-up endpoints, as an operator's `push_extra_host_suffixes` does. Production code is not loosened.
+PUSH_HOSTS = ("push.example",)
 SECRET_ENDPOINT = "https://push.example/send/SECRETENDPOINT"  # noqa: S105  (a made-up value the tests hunt for)
 URL = "/api/v1/push/subscriptions"
 BAD_ENDPOINTS = [
@@ -57,7 +60,7 @@ def body(*, crew: str | None = None, endpoint: str = ENDPOINT, keys: dict[str, s
 @pytest.mark.parametrize("endpoint", BAD_ENDPOINTS)
 async def test_a_non_public_endpoint_is_422_and_nothing_is_stored(settings: Settings, endpoint: str) -> None:
     world = await build_world(settings)
-    with client_for(world) as client:
+    with client_for(world, push_hosts=PUSH_HOSTS) as client:
         response = client.post(URL, json=body(endpoint=endpoint))
 
     assert response.status_code == 422, endpoint
@@ -81,7 +84,7 @@ async def test_a_non_public_endpoint_is_422_and_nothing_is_stored(settings: Sett
 )
 async def test_bad_keys_are_422(settings: Settings, keys: dict[str, str]) -> None:
     world = await build_world(settings)
-    with client_for(world) as client:
+    with client_for(world, push_hosts=PUSH_HOSTS) as client:
         response = client.post(URL, json=body(keys=keys))
 
     assert response.status_code == 422
@@ -95,7 +98,7 @@ async def test_a_bad_expiration_time_is_422(settings: Settings, expiry: str) -> 
     raw = f'{{"subscription": {{"endpoint": "{SECRET_ENDPOINT}", "expirationTime": {expiry}, "keys": {keys}}}, '
     raw += f'"site_id": "{SITE}", "crew_id": null}}'
     world = await build_world(settings)
-    with client_for(world) as client:
+    with client_for(world, push_hosts=PUSH_HOSTS) as client:
         response = client.post(URL, content=raw, headers={"content-type": "application/json"})
 
     assert response.status_code == 422
@@ -107,7 +110,7 @@ async def test_a_valid_expiration_time_is_stored(settings: Settings) -> None:
     payload = body()
     payload["subscription"]["expirationTime"] = 1_893_456_000_000
     world = await build_world(settings)
-    with client_for(world) as client:
+    with client_for(world, push_hosts=PUSH_HOSTS) as client:
         assert client.post(URL, json=payload).status_code == 201
 
     [record] = await world.services.subs.for_site(SITE, 1)
@@ -117,7 +120,11 @@ async def test_a_valid_expiration_time_is_stored(settings: Settings) -> None:
 @pytest.mark.asyncio
 async def test_bad_inputs_never_reach_a_log_line(settings: Settings, caplog: pytest.LogCaptureFixture) -> None:
     world = await build_world(settings)
-    with caplog.at_level(logging.DEBUG), structlog.testing.capture_logs() as captured, client_for(world) as client:
+    with (
+        caplog.at_level(logging.DEBUG),
+        structlog.testing.capture_logs() as captured,
+        client_for(world, push_hosts=PUSH_HOSTS) as client,
+    ):
         for endpoint in ("http://169.254.169.254/SECRETENDPOINT", "https://push.example/SECRETENDPOINT\x00"):
             client.post(URL, json=body(endpoint=endpoint))
         client.post(
@@ -145,7 +152,11 @@ async def test_a_store_error_with_parameters_never_reaches_a_log_line(
 
     monkeypatch.setattr(world.services.subs, "upsert_by_endpoint", failing)
     payload = body(endpoint=SECRET_ENDPOINT, keys={"p256dh": "P256DHSECRET", "auth": "AUTHSECRET"})
-    with caplog.at_level(logging.DEBUG), structlog.testing.capture_logs() as captured, client_for(world) as client:
+    with (
+        caplog.at_level(logging.DEBUG),
+        structlog.testing.capture_logs() as captured,
+        client_for(world, push_hosts=PUSH_HOSTS) as client,
+    ):
         response = client.post(URL, json=payload)
 
     assert response.status_code == 500
@@ -161,7 +172,7 @@ async def test_the_site_cap_is_422_and_a_repeat_endpoint_at_the_cap_still_answer
 ) -> None:
     monkeypatch.setattr("stellar_blaze.api.routers.push.MAX_SUBSCRIPTIONS_PER_SITE", 3)
     world = await build_world(settings)
-    with client_for(world) as client:
+    with client_for(world, push_hosts=PUSH_HOSTS) as client:
         ids = [client.post(URL, json=body(endpoint=f"{ENDPOINT}-{n}")).json()["id"] for n in range(3)]
         over = client.post(URL, json=body(endpoint=f"{ENDPOINT}-new"))
         repeat = client.post(URL, json=body(endpoint=f"{ENDPOINT}-1"))
@@ -180,7 +191,7 @@ async def test_the_site_cap_is_422_and_a_repeat_endpoint_at_the_cap_still_answer
 async def test_the_crew_cap_is_per_crew_and_per_epoch(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("stellar_blaze.api.routers.push.MAX_SUBSCRIPTIONS_PER_CREW", 2)
     world = await build_world(settings)
-    with client_for(world) as client:
+    with client_for(world, push_hosts=PUSH_HOSTS) as client:
         for n in range(2):
             assert client.post(URL, json=body(crew="crew-b", endpoint=f"{ENDPOINT}-{n}")).status_code == 201
         over = client.post(URL, json=body(crew="crew-b", endpoint=f"{ENDPOINT}-over"))
