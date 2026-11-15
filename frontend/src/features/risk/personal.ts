@@ -6,8 +6,8 @@ import { isMetabolicRate, ral, rel } from "./niosh";
 
 /*
  * Tier B: the worker's personal level, worked out on the phone (ADR 0004: the profile and the result never leave the
- * device). It mirrors B3's engine; parity is pinned later by a shared vector file that B3 publishes, and until then the
- * tests use ADR 0006's NIOSH vectors.
+ * device). It mirrors B3's engine; parity is pinned by the vector file B3 publishes
+ * (tests/fixtures/risk/personal_level_vectors.json, tests/unit/features/risk/personal-vectors.test.ts) and by ADR 0006's NIOSH vectors.
  *
  *   1. NIOSH limit for the workload's metabolic rate: REL when acclimatised, RAL when not.
  *   2. The forecast quantiles are shifted up by the clothing option's adjustment (degrees C).
@@ -50,8 +50,8 @@ export function daysBetween(from: string, to: string): number {
   return dayNumber(to) - dayNumber(from);
 }
 
-/** The level of the band with the highest minimum at or below `probability`; the more severe one when minimums tie. */
-function bandLevel(bands: RiskPolicy["bands"], probability: number): Level | null {
+/** The level of the band with the highest minimum at or below `probability`; the more severe one when minimums tie. Exported for the parity vectors. */
+export function bandLevel(bands: RiskPolicy["bands"], probability: number): Level | null {
   let level: Level | null = null;
   let highestMin = Number.NEGATIVE_INFINITY;
   for (const { level: candidate, min_exceedance_probability: min } of bands) {

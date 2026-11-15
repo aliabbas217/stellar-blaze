@@ -198,6 +198,11 @@ export function forecastToday(
   };
 }
 
+/** The violations of the `shift-not-legal` scenario: the contract's own example (a published shift past the daily hours cap). */
+export const SHIFT_VIOLATIONS: Schemas["ShiftViolation"][] = [
+  { rule_id: "P-H2.daily", clause: "Art. 17(1): maximum normal working hours are eight hours per day.", source_id: "fdl-33-2021" },
+];
+
 export const riskPolicy: Schemas["RiskPolicy"] = {
   version: MOCK_POLICY_VERSION,
   config_version: MOCK_CONFIG_VERSION,
@@ -205,12 +210,12 @@ export const riskPolicy: Schemas["RiskPolicy"] = {
   k_health: 10,
   // The placeholder: Task 9's on-device tests count 10 days since heat-work start as acclimatised and 2 days as not.
   acclimatisation_days_required: 7,
-  // Placeholders until the real API's cut-offs arrive (ADR 0049: 0.10, 0.50, 0.90); F1's vectors are pinned to these.
+  // The cut-offs B3 serves in `RiskPolicy.bands` (ADR 0049: 0.10, 0.50, 0.90); F1's tests are pinned to these.
   bands: [
     { level: "green", min_exceedance_probability: 0 },
     { level: "amber", min_exceedance_probability: 0.1 },
-    { level: "orange", min_exceedance_probability: 0.3 },
-    { level: "red", min_exceedance_probability: 0.6 },
+    { level: "orange", min_exceedance_probability: 0.5 },
+    { level: "red", min_exceedance_probability: 0.9 },
   ],
   // ADR 0006 test-vector metabolic rates.
   workload_classes: [

@@ -37,7 +37,7 @@ function serveLegacyDay(ageMs?: number) {
 }
 const FROZEN_NOW = "2026-11-11T09:30:00Z";
 
-// The Task 9 vector: moderate, 10 days into heat work, the 13:00 hour {26, 28, 30}: orange, from the person.
+// The Task 9 vector: moderate, 10 days into heat work, the 13:00 hour {26, 28, 30}: amber from the person under B3's bands, orange from the site.
 const profile: Profile = {
   consentVersion: CONSENT_VERSION,
   consentedAt: "2026-11-11T08:30:00.000Z",
@@ -104,7 +104,7 @@ afterEach(() => {
 });
 
 describe("useSiteToday: success", () => {
-  it("starts loading, then gives the Task 9 vector: displayed orange, from the worker's own level", async () => {
+  it("starts loading, then gives the Task 9 vector: the worker's own level amber, displayed orange from the site", async () => {
     const { result } = mount();
     expect(result.current.status).toBe("loading");
 
@@ -118,7 +118,7 @@ describe("useSiteToday: success", () => {
     expect(view.siteLevel).toBe("orange");
     // The site's level is there at once; the worker's own follows the on-device code (a dynamic import after the first paint).
     await waitFor(() => {
-      expect(viewOf(result.current).personal).toMatchObject({ status: "available", value: { level: "orange" } });
+      expect(viewOf(result.current).personal).toMatchObject({ status: "available", value: { level: "amber" } });
     });
     expect(viewOf(result.current).displayed).toEqual({ level: "orange", source: "site" });
     expect(viewOf(result.current).versions).toEqual({

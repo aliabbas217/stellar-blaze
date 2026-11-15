@@ -892,6 +892,19 @@
             "title": "Date",
             "type": "string"
           },
+          "evaluation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words shown with a development file, \"DEV 2025, LOCO out-of-fold: not the result\"; null for the scored 2026 file.",
+            "title": "Evaluation Label"
+          },
           "evaluation_set": {
             "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
             "enum": [
@@ -1560,6 +1573,19 @@
             "title": "Crew Label",
             "type": "string"
           },
+          "evaluation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words shown with a development file, \"DEV 2025, LOCO out-of-fold: not the result\"; null for the scored 2026 file.",
+            "title": "Evaluation Label"
+          },
           "evaluation_set": {
             "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
             "enum": [
@@ -2165,6 +2191,19 @@
             "title": "Assumed Crew Size",
             "type": "integer"
           },
+          "evaluation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Words shown with a development file, \"DEV 2025, LOCO out-of-fold: not the result\"; null for the scored 2026 file.",
+            "title": "Evaluation Label"
+          },
           "evaluation_set": {
             "description": "`scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled \"DEV 2025, LOCO out-of-fold: not the result\".",
             "enum": [
@@ -2489,7 +2528,7 @@
         ],
         "properties": {
           "endpoint": {
-            "description": "The browser's push endpoint. A per-device address stored for delivery only, never logged.",
+            "description": "The browser's push endpoint. A per-device address stored for delivery only, never logged. It must be an https URL of a public host: no IP address, no internal name, no credentials.",
             "maxLength": 2048,
             "title": "Endpoint",
             "type": "string"
@@ -2996,6 +3035,102 @@
           "rows"
         ],
         "title": "SensitivityCell",
+        "type": "object"
+      },
+      "ShiftNotLegalProblem": {
+        "additionalProperties": true,
+        "description": "The 422 problem of the day plan and sign-off when the crew's published shift is itself not legal (hours or\njuvenile rules): the planner cannot fix it, so no plan is served; fix the shift.",
+        "examples": [
+          {
+            "detail": "The published shift breaks a shift rule by itself; no plan can fix it.",
+            "instance": "/api/v1/crews/crew-b/day-plan",
+            "request_id": "00000000-0000-4000-8000-000000000001",
+            "status": 422,
+            "title": "Shift not legal",
+            "type": "urn:stellar-blaze:problem:shift-not-legal",
+            "violations": [
+              {
+                "clause": "Art. 17(1): maximum normal working hours are eight hours per day.",
+                "rule_id": "P-H2.daily",
+                "source_id": "fdl-33-2021"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "detail": {
+            "default": null,
+            "title": "Detail",
+            "type": "string"
+          },
+          "instance": {
+            "title": "Instance",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "status": {
+            "maximum": 599,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "violations": {
+            "description": "Every shift rule the published shift breaks.",
+            "items": {
+              "$ref": "#/components/schemas/ShiftViolation"
+            },
+            "title": "Violations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "instance",
+          "request_id",
+          "violations"
+        ],
+        "title": "ShiftNotLegalProblem",
+        "type": "object"
+      },
+      "ShiftViolation": {
+        "additionalProperties": false,
+        "description": "One shift rule the published shift breaks by itself.",
+        "properties": {
+          "clause": {
+            "description": "Text of the clause the rule comes from, from the ruleset.",
+            "title": "Clause",
+            "type": "string"
+          },
+          "rule_id": {
+            "description": "Id of the violated rule, for example `P-H2.daily`.",
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "source_id": {
+            "description": "Id of the legal or policy source of the clause.",
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "clause",
+          "source_id"
+        ],
+        "title": "ShiftViolation",
         "type": "object"
       },
       "ShiftWindow": {
@@ -3779,7 +3914,7 @@
   "paths": {
     "/api/v1/crews/{crew_id}/day-plan": {
       "get": {
-        "description": "The rule plan for the crew's site-local day, checked by the independent validator. Employer token, own crew only.\n\nEvery plan carries the floor banner code, and is `unsigned` until `sign_off_day_plan`. A plan the validator\nrejects is never served: the answer is the `plan-invalid` problem (500).\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "The rule plan for the crew's site-local day, checked by the independent validator. Employer token, own crew only.\n\nEvery plan carries the floor banner code, and is `unsigned` until `sign_off_day_plan`. A plan the validator\nrejects is never served: the answer is the `plan-invalid` problem (500). A crew whose published shift is itself\nillegal (hours, juvenile rules) is answered `shift-not-legal` (422) with the violated clauses.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "get_crew_day_plan",
         "parameters": [
           {
@@ -3899,6 +4034,24 @@
             "content": {
               "application/problem+json": {
                 "examples": {
+                  "shift-not-legal": {
+                    "summary": "Shift not legal",
+                    "value": {
+                      "detail": "The published shift breaks a shift rule by itself; no plan can fix it.",
+                      "instance": "/api/v1/crews/crew-b/day-plan",
+                      "request_id": "00000000-0000-4000-8000-000000000001",
+                      "status": 422,
+                      "title": "Shift not legal",
+                      "type": "urn:stellar-blaze:problem:shift-not-legal",
+                      "violations": [
+                        {
+                          "clause": "Art. 17(1): maximum normal working hours are eight hours per day.",
+                          "rule_id": "P-H2.daily",
+                          "source_id": "fdl-33-2021"
+                        }
+                      ]
+                    }
+                  },
                   "validation-failed": {
                     "summary": "Validation failed",
                     "value": {
@@ -3922,11 +4075,18 @@
                   }
                 },
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationProblem"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ShiftNotLegalProblem"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation failed: A path, query or body member is missing or malformed."
+            "description": "Validation failed: A path, query or body member is missing or malformed. Shift not legal: The crew's published shift breaks a shift rule by itself (hours, juvenile rules); `violations` lists them."
           },
           "429": {
             "content": {
@@ -3983,29 +4143,6 @@
             },
             "description": "Plan invalid: The independent validator rejected the planner's own plan. A bug, never served as a plan; the incident is audited."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "503": {
             "content": {
               "application/problem+json": {
@@ -4060,7 +4197,7 @@
     },
     "/api/v1/crews/{crew_id}/day-plan/sign-off": {
       "post": {
-        "description": "Record a named supervisor's acknowledgement of the day plan. Employer token, own crew only.\n\nAnswers `review-required` (409, with `missing_items`) unless every Medium, High and Red item of `ack_items` is\nacknowledged. Sign-off is independent of stops and of the warning dispatch job: it never delays either. Signing a\nplan that is already signed answers 201 with the\nrecorded sign-off again.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Record a named supervisor's acknowledgement of the day plan. Employer token, own crew only.\n\nAnswers `review-required` (409, with `missing_items`) unless every Medium, High and Red item of `ack_items` is\nacknowledged. Sign-off is independent of stops and of the warning dispatch job: it never delays either. Signing a\nplan that is already signed answers 201 with the\nrecorded sign-off again. A sign-off is recorded against a database configuration version: with none loaded the\nanswer is `dependency-unavailable` (503).\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "sign_off_day_plan",
         "parameters": [
           {
@@ -4216,6 +4353,24 @@
             "content": {
               "application/problem+json": {
                 "examples": {
+                  "shift-not-legal": {
+                    "summary": "Shift not legal",
+                    "value": {
+                      "detail": "The published shift breaks a shift rule by itself; no plan can fix it.",
+                      "instance": "/api/v1/crews/crew-b/day-plan",
+                      "request_id": "00000000-0000-4000-8000-000000000001",
+                      "status": 422,
+                      "title": "Shift not legal",
+                      "type": "urn:stellar-blaze:problem:shift-not-legal",
+                      "violations": [
+                        {
+                          "clause": "Art. 17(1): maximum normal working hours are eight hours per day.",
+                          "rule_id": "P-H2.daily",
+                          "source_id": "fdl-33-2021"
+                        }
+                      ]
+                    }
+                  },
                   "validation-failed": {
                     "summary": "Validation failed",
                     "value": {
@@ -4239,11 +4394,18 @@
                   }
                 },
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationProblem"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ShiftNotLegalProblem"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation failed: A path, query or body member is missing or malformed."
+            "description": "Validation failed: A path, query or body member is missing or malformed. Shift not legal: The crew's published shift breaks a shift rule by itself (hours, juvenile rules); `violations` lists them."
           },
           "429": {
             "content": {
@@ -4300,29 +4462,6 @@
             },
             "description": "Plan invalid: The independent validator rejected the planner's own plan. A bug, never served as a plan; the incident is audited."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "503": {
             "content": {
               "application/problem+json": {
@@ -4377,7 +4516,7 @@
     },
     "/api/v1/crews/{crew_id}/stops": {
       "post": {
-        "description": "Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.\n\nStop recorded. It takes effect on the crew's plan and level immediately; push alerts are sent by the alert\ndispatch job, not by this call.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.\n\nStop recorded. It is visible on the next read; push alerts follow within one dispatch interval of the stop when\nthe alert dispatch job is running.\n\nIdempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch\nreturns that stop (201, same body, no second row, no second audit row).\n\nKnown edge (not changed): the warning levels cover the working day 06:00 to 20:00 site-local, so a stop recorded\noutside it changes no warning level, and a stop that was never cleared is read again by the next day's runs only\nthrough the stops of that day's window.\n\nRate limit, per access token: 30 per 60 s. The stop has its own bucket, independent of every other employer operation: no other limit can block it. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "create_crew_stop",
         "parameters": [
           {
@@ -4549,29 +4688,6 @@
               }
             }
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -4594,7 +4710,8 @@
         ],
         "x-rate-limit": [
           {
-            "limit": 60,
+            "bucket": "stop",
+            "limit": 30,
             "window_seconds": 60
           }
         ]
@@ -4602,7 +4719,7 @@
     },
     "/api/v1/crews/{crew_id}/stops/{stop_id}": {
       "delete": {
-        "description": "Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.\n\nResume recorded. A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it\nelapsing.\n\nRate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "delete_crew_stop",
         "parameters": [
           {
@@ -4770,29 +4887,6 @@
               }
             }
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -4926,29 +5020,6 @@
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "503": {
             "content": {
               "application/problem+json": {
@@ -5080,7 +5151,7 @@
     },
     "/api/v1/plans/validate": {
       "post": {
-        "description": "Run the independent validator on a roster given as text or as segments, for a hypothetical crew.\n\nNothing is stored. A roster that does not parse is `roster-invalid` (422, `errors` with 1-based line numbers).",
+        "description": "Run the independent validator on a roster given as text or as segments, for a hypothetical crew.\n\nNothing is stored. A roster that does not parse is `roster-invalid` (422, `errors` with 1-based line numbers).\nThe violations are the answer: an illegal roster is never an error status.",
         "operationId": "validate_plan",
         "requestBody": {
           "content": {
@@ -5183,29 +5254,6 @@
             },
             "description": "Validation failed: A path, query or body member is missing or malformed. Roster invalid: The roster text or segments could not be read; `errors` names the lines."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "503": {
             "content": {
               "application/problem+json": {
@@ -5249,7 +5297,7 @@
     },
     "/api/v1/push/subscriptions": {
       "post": {
-        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown\n`site_id` or `crew_id` is `not-found`. The body holds no worker identifier by design.",
+        "description": "Register the browser's subscription for site alerts and, optionally, one crew's alerts.\n\nThe endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted\nagainst the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The\nendpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at\nmost 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, \"too many subscriptions\"). The body\nholds no worker identifier by design.\n\nIf the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data\n(the endpoint and keys are never echoed back or logged); retry later.",
         "operationId": "create_push_subscription",
         "requestBody": {
           "content": {
@@ -5328,29 +5376,6 @@
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -5424,29 +5449,6 @@
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -5478,29 +5480,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
           },
           "503": {
             "content": {
@@ -5561,29 +5540,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
           },
           "default": {
             "content": {
@@ -5711,19 +5667,20 @@
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
           },
-          "501": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
+                  "dependency-unavailable": {
+                    "summary": "Dependency unavailable",
                     "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
+                      "dependency": "config",
+                      "detail": "The active configuration is not loaded.",
+                      "instance": "/api/v1/risk-policy",
                       "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
+                      "status": 503,
+                      "title": "Dependency unavailable",
+                      "type": "urn:stellar-blaze:problem:dependency-unavailable"
                     }
                   }
                 },
@@ -5732,7 +5689,7 @@
                 }
               }
             },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
+            "description": "Dependency unavailable: A required dependency (the database or the active configuration) is down."
           },
           "default": {
             "content": {
@@ -5915,29 +5872,6 @@
               }
             }
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "503": {
             "content": {
               "application/problem+json": {
@@ -5992,7 +5926,7 @@
     },
     "/api/v1/sites/{site_id}/demo-reset": {
       "post": {
-        "description": "Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.\n\nA reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events\nand push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not\nepoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic\nanswers `not-a-demo-site` (409).\n\nRate limit, per access token: 1 per 60 s, 10 per 3600 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
+        "description": "Start a new demo epoch of a synthetic site. Own employer only; guarded and rate-limited.\n\nA reset starts a new epoch (`epoch_id` increases by one). Plans, sign-offs, stop events, data requests, alert events\nand push subscriptions are scoped to the current epoch and resolved server-side; the audit chain is not\nepoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic\nanswers `not-a-demo-site` (409).\n\nRate limit, per access token: 1 per 60 s, 10 per 3600 s, 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).",
         "operationId": "reset_demo_site",
         "parameters": [
           {
@@ -6199,29 +6133,6 @@
             },
             "description": "Internal server error: An unexpected failure; nothing internal is revealed. Quote `request_id`."
           },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
-          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -6250,6 +6161,10 @@
           {
             "limit": 10,
             "window_seconds": 3600
+          },
+          {
+            "limit": 60,
+            "window_seconds": 60
           }
         ]
       }
@@ -6358,29 +6273,6 @@
               }
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
-          },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
           },
           "503": {
             "content": {
@@ -6508,29 +6400,6 @@
               }
             },
             "description": "Validation failed: A path, query or body member is missing or malformed."
-          },
-          "501": {
-            "content": {
-              "application/problem+json": {
-                "examples": {
-                  "not-implemented": {
-                    "summary": "Not implemented",
-                    "value": {
-                      "detail": "This route is not built yet.",
-                      "instance": "/api/v1/sites",
-                      "request_id": "00000000-0000-4000-8000-000000000001",
-                      "status": 501,
-                      "title": "Not implemented",
-                      "type": "urn:stellar-blaze:problem:not-implemented"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not implemented: The route exists in the contract but is not built yet."
           },
           "default": {
             "content": {

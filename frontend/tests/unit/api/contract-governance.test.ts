@@ -48,7 +48,7 @@ const PERSONAL_NAME_EXCEPTIONS = new Set(["crew_name", "worker_ref"]);
 const B3_WIDE_PATTERN = /worker|member|employee|heart|symptom|acclimat|juvenile/i;
 const B3_WIDE_PATTERN_KNOWN = ["acclimatisation_days_required", "acclimatised", "member_count", "worker_ref"];
 /** The problem family is open on purpose (RFC 9457 allows extension members); every other object forbids extras. */
-const PROBLEM_FAMILY = ["Problem", "ValidationProblem", "ReviewRequiredProblem", "RosterInvalidProblem"];
+const PROBLEM_FAMILY = ["Problem", "ValidationProblem", "ReviewRequiredProblem", "RosterInvalidProblem", "ShiftNotLegalProblem"];
 const OPERATION_IDS = [
   "create_crew_stop",
   "create_data_request",
@@ -255,6 +255,32 @@ describe("contract governance", () => {
     expect(propertyNames(spec, "DayPlan")).toEqual(expect.arrayContaining(["ack_items", "signoff_state", "signoff_label_code", "signed_at", "signed_by_role"]));
     expect(propertyNames(spec, "Site")).toEqual(expect.arrayContaining(["supervisor_phone", "first_aider_phone", "epoch_id"]));
     expect(propertyNames(spec, "DemoReset").sort()).toEqual(["epoch_id", "previous_epoch_id", "reset_at", "site_id"]);
+  });
+
+  it("answers shift-not-legal (a ShiftNotLegalProblem next to the framework 422) on the day plan and the sign-off, and has no 501 left", () => {
+    const byId = new Map(operationsOf(spec).map((operation) => [describeOperation(operation), operation]));
+    for (const id of ["get_crew_day_plan", "sign_off_day_plan"]) {
+      const responses = byId.get(id)?.responses;
+      const unprocessable = isObject(responses) ? responses["422"] : undefined;
+      const content = isObject(unprocessable) && isObject(unprocessable.content) ? unprocessable.content["application/problem+json"] : undefined;
+      const names = isObject(content) ? referencedSchemas(content.schema).sort() : [];
+      expect(names, `422 of ${id}`).toEqual(["ShiftNotLegalProblem", "ValidationProblem"]);
+    }
+    const with501 = operationsOf(spec)
+      .filter((operation) => isObject(operation.responses) && "501" in operation.responses)
+      .map(describeOperation);
+    expect(with501).toEqual([]);
+  });
+
+  it("lists create_crew_stop in its own rate-limit bucket, apart from every other employer operation", () => {
+    const bucketsOf = (id: string): Json[] => {
+      const operation = operationsOf(spec).find((candidate) => describeOperation(candidate) === id);
+      const limits = operation?.["x-rate-limit"];
+      return Array.isArray(limits) ? limits.map((entry) => (isObject(entry) ? (entry.bucket ?? null) : null)) : [];
+    };
+
+    expect(bucketsOf("create_crew_stop")).toEqual(["stop"]);
+    for (const id of EMPLOYER_OPERATIONS.filter((candidate) => candidate !== "create_crew_stop")) expect(bucketsOf(id), id).not.toContain("stop");
   });
 
   it("makes a push subscription carry exactly the browser subscription, a site id and an optional crew id", () => {

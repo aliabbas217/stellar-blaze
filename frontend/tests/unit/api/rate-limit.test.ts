@@ -181,7 +181,7 @@ describe("trustedProxyHops", () => {
 interface SpecOperation {
   operationId: string;
   security?: unknown[];
-  "x-rate-limit"?: { limit: number; window_seconds: number }[];
+  "x-rate-limit"?: { bucket?: string; limit: number; window_seconds: number }[];
 }
 
 function employerOperations(): SpecOperation[] {
@@ -193,26 +193,38 @@ function employerOperations(): SpecOperation[] {
     .filter((operation) => (operation.security?.length ?? 0) > 0);
 }
 
-/** The strictest per-minute equivalent of an operation's limits: a limit L per W seconds is L / W * 60 a minute. */
-function strictestPerMinute(operation: SpecOperation): number {
-  const windows = operation["x-rate-limit"] ?? [];
-  if (windows.length === 0) throw new Error(`${operation.operationId} lists no x-rate-limit`);
+/** The strictest per-minute equivalent of some limits: a limit L per W seconds is L / W * 60 a minute. */
+function strictestPerMinute(operationId: string, windows: { limit: number; window_seconds: number }[]): number {
+  if (windows.length === 0) throw new Error(`${operationId} lists no x-rate-limit`);
   return Math.min(...windows.map((entry) => (entry.limit / entry.window_seconds) * 60));
 }
 
 /**
- * What the contract allows, per minute, from `x-rate-limit`. `shared` is the strictest of the employer operations that
- * make up the shared pool (every one except demo-reset), counting every window an operation lists. `reset` is demo-reset's
- * own: it lists 1 per 60 s AND 10 per 3600 s, strictest 10 an hour, much tighter than the pool. The BFF cannot be held to
- * it (it keeps no counter for reset besides the general one) and upstream enforces it with its own 429; it is read here
- * so that a change to it shows up, and so that it is never mistaken for the pool's quota.
+ * What the contract allows, per minute, from `x-rate-limit`.
+ *
+ * - `stop` is the named bucket "stop" (create_crew_stop; B3: "no other limit can block it"), counting every window the
+ *   operations in it list.
+ * - `shared` is the strictest of the unnamed limits of the employer operations that make up the shared pool: every
+ *   employer operation's windows without a bucket, demo-reset aside. delete_crew_stop is in it (it names no bucket).
+ * - `reset` is demo-reset's own: it lists 1 per 60 s AND 10 per 3600 s, strictest 10 an hour, much tighter than the
+ *   pool. The BFF cannot be held to it (it keeps no counter for reset besides the general one) and upstream enforces it
+ *   with its own 429; it is read here so that a change to it shows up, and so that it is never mistaken for the pool's quota.
  */
-function contractQuotas(): { shared: number; reset: number } {
+function contractQuotas(): { shared: number; stop: number; reset: number } {
   const operations = employerOperations();
   const reset = operations.find((operation) => operation.operationId === "reset_demo_site");
   if (reset === undefined) throw new Error("the contract has no reset_demo_site");
-  const shared = operations.filter((operation) => operation !== reset).map(strictestPerMinute);
-  return { shared: Math.min(...shared), reset: strictestPerMinute(reset) };
+  const windows = (operation: SpecOperation, bucket: string | undefined) =>
+    (operation["x-rate-limit"] ?? []).filter((entry) => entry.bucket === bucket);
+  const stopWindows = operations.flatMap((operation) => windows(operation, "stop"));
+  const shared = operations
+    .filter((operation) => operation !== reset && windows(operation, undefined).length > 0)
+    .map((operation) => strictestPerMinute(operation.operationId, windows(operation, undefined)));
+  return {
+    shared: Math.min(...shared),
+    stop: strictestPerMinute("the stop bucket", stopWindows),
+    reset: strictestPerMinute(reset.operationId, windows(reset, undefined)),
+  };
 }
 
 function contractQuotaPerMinute(): number {
@@ -242,6 +254,21 @@ describe("the BFF write limits against the contract's upstream quota", () => {
 
     expect(limits.general.global + limits.stop.global).toBeLessThanOrEqual(contractQuotaPerMinute());
     expect(UPSTREAM_QUOTA_PER_MIN).toBeLessThanOrEqual(contractQuotaPerMinute());
+  });
+
+  it("reads the stop bucket from the contract: create_crew_stop has its own, the BFF's stop reserve fits inside it and is not what the pool arithmetic counts on", () => {
+    const { stop, shared } = contractQuotas();
+
+    const bucketOf = (id: string) => employerOperations().find((operation) => operation.operationId === id)?.["x-rate-limit"]?.map((entry) => entry.bucket);
+    expect(bucketOf("create_crew_stop")).toEqual(["stop"]);
+    // Clearing a stop names no bucket, so it draws on the shared pool: the reserve is counted against the pool as if all clears.
+    expect(bucketOf("delete_crew_stop")).toEqual([undefined]);
+    expect(stop).toBe(30);
+    expect(stop).toBeLessThan(shared);
+    // A stop creation never draws on the shared pool, so its bucket only has to hold the BFF's whole stop class.
+    expect(resolveLimits({}).stop.global).toBeLessThanOrEqual(stop);
+    expect(resolveLimits(HUGE).stop.global).toBeLessThanOrEqual(stop);
+    expect(STOP_RESERVE_PER_MIN).toBeLessThanOrEqual(stop);
   });
 
   it("keeps a reserve for Stop work that general traffic can never claim, and a per-client limit never above its bucket", () => {
@@ -321,6 +348,7 @@ describe("the BFF write limits against the contract's upstream quota", () => {
     const quota = contractQuotaPerMinute();
     expect(maxInAnyWindow(admittedGeneral, 60_000)).toBeLessThanOrEqual(limits.general.global);
     expect(maxInAnyWindow(admittedStop, 60_000)).toBeLessThanOrEqual(limits.stop.global);
+    expect(maxInAnyWindow(admittedStop, 60_000)).toBeLessThanOrEqual(contractQuotas().stop);
     expect(maxInAnyWindow(admittedAll, 60_000)).toBeLessThanOrEqual(quota);
     // The limits are used, not just respected: flat out, the two classes together reach the quota.
     expect(maxInAnyWindow(admittedAll, 60_000)).toBe(limits.general.global + limits.stop.global);

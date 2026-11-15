@@ -17,7 +17,8 @@ type SiteForecastToday = components["schemas"]["SiteForecastToday"];
 const NOW = new Date("2026-11-11T09:30:00Z"); // 13:30 at Asia/Dubai
 const HOUR = 60 * 60 * 1000;
 
-// The Task 9 vector: a moderate worker, 10 days into heat work (acclimatised), at the 13:00 hour {26, 28, 30}: orange.
+// The Task 9 vector: a moderate worker, 10 days into heat work (acclimatised), at the 13:00 hour {26, 28, 30}: P is 0.452, amber
+// under B3's bands (0.10, 0.50, 0.90); the fixture's site level for that hour is orange.
 const profile: Profile = {
   consentVersion: CONSENT_VERSION,
   consentedAt: "2026-11-11T08:30:00.000Z",
@@ -50,13 +51,13 @@ function hour(startsAt: string, level: HourForecast["site_level"], wbgt: HourFor
 const THIRTEEN_HUNDRED = "2026-11-11T09:00:00Z";
 
 describe("selectTodayViewModel: a fresh forecast and the matching policy", () => {
-  it("gives the worker's own level; at the same level as the site's the site is the source (its run is known)", () => {
+  it("gives the worker's own level; the site's is the more severe one here, so it leads", () => {
     const view = select();
 
     expect(view.freshness).toBe("fresh");
     expect(view.currentHour?.starts_at).toBe(THIRTEEN_HUNDRED);
     expect(view.siteLevel).toBe("orange");
-    expect(view.personal).toMatchObject({ status: "available", value: { level: "orange", acclimatised: true } });
+    expect(view.personal).toMatchObject({ status: "available", value: { level: "amber", acclimatised: true } });
     expect(view.displayed).toEqual({ level: "orange", source: "site" });
     expect(view.needsPolicyRefetch).toBe(false);
   });
@@ -101,7 +102,11 @@ describe("selectTodayViewModel: which level leads (displayedLevel) and where it 
   });
 
   it("credits the site's level when both agree: 'Your level now' and a dropped 'until' would claim more than the phone knows (W1 F1)", () => {
-    expect(select().displayed).toEqual({ level: "orange", source: "site" });
+    // A heavy, acclimatised worker: REL 26.6 gives P 0.8167, orange under B3's bands, the same as the site's.
+    const view = select({ profile: { ...profile, workloadClass: "heavy" } });
+
+    expect(view.personal).toMatchObject({ status: "available", value: { level: "orange" } });
+    expect(view.displayed).toEqual({ level: "orange", source: "site" });
   });
 
   it("leads with the worker's own level when the site has none for this hour", () => {
@@ -109,7 +114,7 @@ describe("selectTodayViewModel: which level leads (displayedLevel) and where it 
     const view = select({ forecast });
 
     expect(view.siteLevel).toBeNull();
-    expect(view.displayed).toEqual({ level: "orange", source: "personal" });
+    expect(view.displayed).toEqual({ level: "amber", source: "personal" });
   });
 });
 

@@ -1,5 +1,6 @@
 {
   "evaluation_set": "dev_2025",
+  "evaluation_label": "DEV 2025, LOCO out-of-fold: not the result",
   "station": "OMAA",
   "date": "2025-07-06",
   "score": 4.5,

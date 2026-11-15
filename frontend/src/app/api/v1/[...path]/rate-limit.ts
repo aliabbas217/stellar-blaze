@@ -104,18 +104,23 @@ export function trustedProxyHops(raw: string | undefined): number {
  *
  * INVARIANT: no rate limit on another operation may block the safety path (stop work, the unwell call actions).
  *
- * The API limits employer operations per access token (`x-rate-limit` in openapi/stellar-blaze.openapi.json: 60 per 60 s),
- * and the contract does not say whether that is one quota per operation or one for all of them. The demo has ONE
- * shared token, so the BFF assumes the worse reading: every token-bearing request of every visitor draws on one quota of
- * `UPSTREAM_QUOTA_PER_MIN` per window. It splits that quota into two sliding-window limits that ADD UP to it: a reserve
- * for Stop work that no other traffic can touch (`STOP_RESERVE_PER_MIN`) and the rest for everything else that carries the
- * token (day-plan reads, sign-off, data requests, demo reset). Each limit is exact (at most N admitted in any window), so
- * general plus stop admit at most the quota in any window and the BFF never sends upstream more than it allows: general
- * traffic is refused here, with the BFF's own 429, once its slice is spent, and a stop is only ever refused by its own
- * reserve. The window the BFF counts is the upstream's plus `UPSTREAM_WINDOW_MARGIN_MS`, because two requests admitted
- * here can reach upstream out of order or a little late, and the margin keeps them apart.
- * tests/unit/api/rate-limit.test.ts reads the quota from the contract, drives every limit flat out on an injected clock
- * and fails if more than the quota is admitted in any 60 s window.
+ * The API limits employer operations per access token (`x-rate-limit` in openapi/stellar-blaze.openapi.json). Since the d80b65a freeze
+ * (B3 f193302) the contract names two upstream pools: create_crew_stop has its OWN bucket (`"bucket": "stop"`, 30 per 60 s,
+ * "no other limit can block it"), and every other employer operation, delete_crew_stop included, lists 60 per 60 s without
+ * a bucket name. The contract does not say whether the unnamed limits are one pool per operation or one for all of them,
+ * and the demo has ONE shared token, so the BFF assumes the worse reading: every token-bearing request of every visitor
+ * except a stop creation draws on one pool of `UPSTREAM_QUOTA_PER_MIN` per window. It splits that into two sliding-window
+ * limits that ADD UP to it: a reserve for Stop work (create AND clear a stop, `STOP_RESERVE_PER_MIN`) that no other
+ * traffic can touch, and the rest for everything else that carries the token (day-plan reads, sign-off, data requests,
+ * demo reset). The reserve is counted as if every one of its requests were a clear (a clear draws on the shared pool), so
+ * general plus stop never exceed the pool, and it stays below the stop bucket's 30 (a creation never meets the limit of
+ * the other operations, and a reserve up to 30 would also be legal for the bucket; the conservative 20 is kept because
+ * the pool arithmetic is the binding one). Each limit is exact (at most N admitted in any window), so the BFF never
+ * sends upstream more than it allows: general traffic is refused here, with the BFF's own 429, once its slice is spent,
+ * and a stop is only ever refused by its own reserve. The window the BFF counts is the upstream's plus
+ * `UPSTREAM_WINDOW_MARGIN_MS`, because two requests admitted here can reach upstream out of order or a little late, and
+ * the margin keeps them apart. tests/unit/api/rate-limit.test.ts reads both quotas from the contract, drives every limit
+ * flat out on an injected clock and fails if more than the pool, or more than the stop bucket, is admitted in any 60 s window.
  *
  * demo-reset has a tighter limit of its own upstream (1 per 60 s, 10 per hour). The BFF keeps no counter for it beyond
  * the general one; upstream answers 429 with Retry-After when it is exceeded, the BFF passes that through, and the screen

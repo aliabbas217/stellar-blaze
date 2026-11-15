@@ -35,6 +35,43 @@ type specimen is at `/en/dev/specimen` (any language prefix works; it returns 40
 | `pnpm api:gen` | Regenerates `src/api/schema.d.ts` from `openapi/stellar-blaze.openapi.json` |
 | `pnpm api:check` | `api:gen`, then fails if `schema.d.ts` differs from the committed file (it needs the file to be tracked: an untracked one passes) |
 | `pnpm mock:api` | The MSW handlers behind <http://127.0.0.1:4010> (the mock API; used by e2e and Lighthouse CI). Ctrl+C stops it |
+| `pnpm e2e:live` | The `live` Playwright project (`tests/e2e/live`) against a REAL B3 backend in replay mode, not the mock. It never starts the backend; with `E2E_API_ORIGIN` unset every spec skips with a message. See "Running F2 against the real B3" below |
+
+## Running F2 against the real B3
+
+MSW (`pnpm mock:api`) stays the default backend for `pnpm dev`, `pnpm e2e` and Lighthouse CI. The `live` project runs a few
+specs against the real B3 backend in replay mode, to prove the app reads what the API really serves: the worker's Today level
+equals the `site_level` of the forecast hour the replay clock is in, the alert card names it, and the governance refusal is
+answered 403 and written to the log. Every site id, date and level in those specs comes from the API's own answers.
+
+**This repository never starts B3.** The operator starts it (a Postgres database, the commands below, run in B3's own checkout:
+branch `feat/b3-warnings-planner`, `backend/`), runs the specs, and stops it:
+
+1. Database and demo site: `SB_DATABASE_URL=<postgres url> uv run sb-jobs db upgrade`, then
+   `uv run sb-jobs site load backend/fixtures/demo_site.toml --actor <actor> --reason <reason>`.
+2. A replay snapshot under `SB_REPLAY_DIR` (default `replay/`), built with `uv run sb-jobs replay build --summer <year> --station OMAA --snapshot-id <id>`;
+   the directory is empty in a fresh checkout.
+3. API environment: `SB_FORECAST_SOURCE=replay`, `SB_REPLAY_SNAPSHOT_ID=<id>`, `SB_REPLAY_DEFAULT_DATE=2025-07-10`,
+   `SB_ACCESS_TOKENS` as JSON `{"<sha256 of the token>": {"actor": "...", "role": "employer", "employer_id": "emp-demo"}}`.
+   The replay clock starts at `SB_REPLAY_NOW` when set, else the replay date at 11:10 Asia/Dubai, and runs at real speed. 11:10 is crew B's midday
+   break, so for a live stop set `SB_REPLAY_NOW` near 10:10 at the site.
+4. Serve it: `uv run uvicorn stellar_blaze.api.app:create_app --factory --port 8000`.
+
+Then, here, from `frontend/` (a production build first, `pnpm build`; the token is the plain bearer whose SHA-256 is in `SB_ACCESS_TOKENS`):
+
+```sh
+E2E_API_ORIGIN=http://127.0.0.1:8000 E2E_DEMO_EMPLOYER_TOKEN=<token> pnpm e2e:live
+```
+
+| Variable | What it is |
+|---|---|
+| `E2E_API_ORIGIN` | The running B3's origin, no path. Unset: every live spec skips with "Live project skipped: E2E_API_ORIGIN is not set" |
+| `E2E_DEMO_EMPLOYER_TOKEN` | The employer token the web server's BFF holds (`DEMO_EMPLOYER_TOKEN` there); never printed. Unset: the specs that need it skip |
+
+`pnpm e2e:live` starts only the web server, wired to that origin, with no mock switch (`SB_MOCK_SCENARIOS` is forced off, so no
+`x-sb-mock-scenario` header reaches the real API) and the BFF's real write limits. Ports: 3000 must be free. The run records,
+as annotations in the report, whether the app drew the replay forecast as live or as last known (its three-hour freshness rule
+compares the forecast's `generated_at` with the replay clock). A plain `pnpm e2e` never runs this project.
 
 ## Runtime configuration
 

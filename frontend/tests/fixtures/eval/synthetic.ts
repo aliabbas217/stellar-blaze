@@ -31,6 +31,9 @@ const PROVENANCE: Schemas["Provenance"] = {
   generated_at: "2026-11-14T00:00:00Z",
 };
 
+/** The words the exporter sends with a development file (schema `evaluation_label`). */
+const DEV_LABEL = "DEV 2025, LOCO out-of-fold: not the result";
+
 const N_DAYS = 10;
 const CREW = 20;
 const TRUTH_DANGER_HOURS = 38.5;
@@ -109,6 +112,7 @@ export function syntheticPolicy(): Schemas["PolicyScoreboard"] {
   const truth = metric(TRUTH_DANGER_HOURS, N_DAYS * 9, "#72-warnings-row");
   return {
     evaluation_set: "dev_2025",
+    evaluation_label: DEV_LABEL,
     station: "OMAA",
     season_start: "2025-07-01",
     season_end: "2025-07-10",
@@ -187,6 +191,7 @@ function planRow(plan: PlanId, label: string, violation: number, cycled: number,
 export function syntheticPlans(): Schemas["PlanScoreboard"] {
   return {
     evaluation_set: "dev_2025",
+    evaluation_label: DEV_LABEL,
     station: "OMAA",
     site_id: "site-demo-mussafah",
     crew_id: "crew-b",
@@ -238,6 +243,7 @@ const HOURS: readonly {
 export function syntheticDay(): Schemas["DemoDay"] {
   return {
     evaluation_set: "dev_2025",
+    evaluation_label: DEV_LABEL,
     station: "OMAA",
     date: "2025-07-06",
     score: 4.5,

@@ -12,7 +12,7 @@ type SiteForecastToday = components["schemas"]["SiteForecastToday"];
 /*
  * On-device personal risk (Tier B, ADR 0004 and 0006): NIOSH limit for the worker's workload and acclimatisation, then the
  * probability that the hour's WBGT exceeds it, then the policy band. The policy is the mock one (src/mocks/fixtures.ts):
- * bands 0 / 0.10 / 0.30 / 0.60, 7 acclimatisation days, workloads 180 / 300 / 415 W, one clothing option with adjustment 0.
+ * bands 0 / 0.10 / 0.50 / 0.90 (what B3 serves in RiskPolicy.bands, ADR 0049), 7 acclimatisation days, workloads 180 / 300 / 415 W, one clothing option with adjustment 0.
  */
 
 const TODAY = "2026-11-11";
@@ -70,13 +70,13 @@ describe("daysBetween", () => {
 
 describe("personalLevel", () => {
   describe("moderate work (300 W) from ADR 0006's vectors", () => {
-    it("acclimatised (10 days, 7 required): the REL, 28.21, gives p of about 0.452 and orange", () => {
+    it("acclimatised (10 days, 7 required): the REL, 28.21, gives p of about 0.452 and amber", () => {
       const result = personalLevel({ hour: mid, profile, policy: riskPolicy, today: TODAY });
       expect(result).not.toBeNull();
       expect(result?.acclimatised).toBe(true);
       expect(result?.limitC).toBeCloseTo(28.21, 2);
       expect(result?.probability).toBeCloseTo(0.452, 3);
-      expect(result?.level).toBe("orange");
+      expect(result?.level).toBe("amber");
     });
 
     it("not acclimatised (2 days): the RAL, 24.97, is below p05, so p is 0.95 and red", () => {
@@ -93,10 +93,10 @@ describe("personalLevel", () => {
     const newStart = "2026-11-09";
     it.each<[string, "light" | "moderate" | "heavy", string, number, Level]>([
       ["light, acclimatised", "light", acclimatisedStart, 0.05, "green"],
-      ["light, new", "light", newStart, 0.4774, "orange"],
-      ["moderate, acclimatised", "moderate", acclimatisedStart, 0.4521, "orange"],
+      ["light, new", "light", newStart, 0.4774, "amber"],
+      ["moderate, acclimatised", "moderate", acclimatisedStart, 0.4521, "amber"],
       ["moderate, new", "moderate", newStart, 0.95, "red"],
-      ["heavy, acclimatised", "heavy", acclimatisedStart, 0.8167, "red"],
+      ["heavy, acclimatised", "heavy", acclimatisedStart, 0.8167, "orange"],
       ["heavy, new", "heavy", newStart, 0.95, "red"],
     ])("%s against q {26, 28, 30}", (_name, workloadClass, heatWorkStartDate, probability, level) => {
       const result = personalLevel({ hour: mid, profile: { ...profile, workloadClass, heatWorkStartDate }, policy: riskPolicy, today: TODAY });
@@ -136,12 +136,12 @@ describe("personalLevel", () => {
       clothing_options: [...riskPolicy.clothing_options, { code: "test_adjustment_plus_one", adjustment_c: 1, source: "test" }],
     };
 
-    it("shifts every quantile up by adjustment_c, which moves orange to red", () => {
+    it("shifts every quantile up by adjustment_c, which moves amber to orange", () => {
       const plain = personalLevel({ hour: mid, profile, policy: withGear, today: TODAY });
       const adjusted = personalLevel({ hour: mid, profile: { ...profile, clothingCode: "test_adjustment_plus_one" }, policy: withGear, today: TODAY });
-      expect(plain?.level).toBe("orange");
+      expect(plain?.level).toBe("amber");
       expect(adjusted?.probability).toBeCloseTo(0.6771, 3);
-      expect(adjusted?.level).toBe("red");
+      expect(adjusted?.level).toBe("orange");
     });
 
     it("leaves the NIOSH limit itself unadjusted", () => {
@@ -153,7 +153,7 @@ describe("personalLevel", () => {
   describe("bands", () => {
     it("picks the band with the highest minimum at or below p, whatever order the policy lists them in", () => {
       const shuffled: RiskPolicy = { ...riskPolicy, bands: [...riskPolicy.bands].reverse() };
-      expect(personalLevel({ hour: mid, profile, policy: shuffled, today: TODAY })?.level).toBe("orange");
+      expect(personalLevel({ hour: mid, profile, policy: shuffled, today: TODAY })?.level).toBe("amber");
     });
 
     it("includes a band whose minimum equals p exactly", () => {
@@ -247,9 +247,9 @@ describe("personalLevel", () => {
       return found;
     }
 
-    it("reads the 13:00 local hour (quantiles 26, 28, 30) as orange", () => {
+    it("reads the 13:00 local hour (quantiles 26, 28, 30) as amber", () => {
       const result = personalLevel({ hour: hourAt("2026-11-11T09:00:00Z"), profile, policy: riskPolicy, today: TODAY });
-      expect(result?.level).toBe("orange");
+      expect(result?.level).toBe("amber");
     });
 
     it("has no personal level for the 19:00 local hour, which has no data", () => {

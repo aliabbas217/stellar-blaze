@@ -1,5 +1,6 @@
 {
   "evaluation_set": "dev_2025",
+  "evaluation_label": "DEV 2025, LOCO out-of-fold: not the result",
   "station": "OMAA",
   "site_id": "site-demo-mussafah",
   "crew_id": "crew-b",

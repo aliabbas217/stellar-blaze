@@ -1,5 +1,6 @@
 {
   "evaluation_set": "dev_2025",
+  "evaluation_label": "DEV 2025, LOCO out-of-fold: not the result",
   "station": "OMAA",
   "season_start": "2025-07-01",
   "season_end": "2025-07-10",

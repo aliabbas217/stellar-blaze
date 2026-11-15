@@ -19,6 +19,7 @@ import {
   parseRoster,
   resetDemoState,
   riskPolicy,
+  SHIFT_VIOLATIONS,
   signOffDayPlan,
   sites,
   transparencyLog,
@@ -45,6 +46,10 @@ import {
  *   suppressed  every crew is below k: timelines say suppressed, day plans hide the restricted headcount
  *   offseason   the forecast and the crew timeline default to 24 Sep 2026, after the ban season: no ban instants, no slot
  *   noshift     the crew timelines publish no shift for the day
+ *   shift-not-legal  the day plan and the sign-off answer 422 `shift-not-legal`: the crew's published shift breaks a shift
+ *               rule by itself, so no plan is served (violations in the problem body)
+ *   unavailable the operations that list a 503 in the contract (every read of the day views, the day plan, the sign-off,
+ *               the data request, plan validation) answer 503 `dependency-unavailable`
  * Any other value is ignored. The employer routes answer 401 without an `Authorization: Bearer` header (the BFF adds
  * the demo token on its allow-list); the mock accepts any non-empty token. It does not rate limit: the BFF does.
  *
@@ -53,7 +58,7 @@ import {
  */
 
 type Schemas = components["schemas"];
-type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift";
+type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift" | "shift-not-legal" | "unavailable";
 type Info = Parameters<HttpResponseResolver>[0];
 
 const MOCK_REQUEST_ID = "mock-req-1";
@@ -132,7 +137,9 @@ function scenarioOf(request: Request): Scenario | null {
     value === "fallback" ||
     value === "suppressed" ||
     value === "offseason" ||
-    value === "noshift"
+    value === "noshift" ||
+    value === "shift-not-legal" ||
+    value === "unavailable"
     ? value
     : null;
 }
@@ -142,14 +149,42 @@ function pathParam(params: Info["params"], name: string): string {
   return typeof value === "string" ? value : "";
 }
 
-/** A resolver that answers the `error` scenario itself and hands every other request, and its scenario, on. */
+/** The 503 of an operation whose dependency (the database, the active configuration) is down; B3's contract example adds `dependency`. */
+function unavailableProblem(request: Request): Response {
+  return problem(request, {
+    status: 503,
+    type: `${PROBLEM_PREFIX}dependency-unavailable`,
+    title: "Dependency unavailable",
+    detail: "The active configuration is not loaded.",
+    extra: { dependency: "config" },
+  });
+}
+
+/**
+ * A resolver that answers the `error` scenario itself and hands every other request, and its scenario, on. An
+ * operation that lists a 503 in the contract passes `lists503`, so the `unavailable` scenario answers it too.
+ */
 function withScenario(
   resolve: (info: Info, scenario: Scenario | null) => Response | Promise<Response>,
+  { lists503 = false }: { lists503?: boolean } = {},
 ): HttpResponseResolver {
   return (info) => {
     const scenario = scenarioOf(info.request);
-    return scenario === "error" ? mockProblem(info.request, 500) : resolve(info, scenario);
+    if (scenario === "error") return mockProblem(info.request, 500);
+    if (scenario === "unavailable" && lists503) return unavailableProblem(info.request);
+    return resolve(info, scenario);
   };
+}
+
+/** The 422 of `get_crew_day_plan` and `sign_off_day_plan` for a shift that is not legal by itself (the `shift-not-legal` scenario). */
+function shiftNotLegalProblem(request: Request): Response {
+  return problem(request, {
+    status: 422,
+    type: `${PROBLEM_PREFIX}shift-not-legal`,
+    title: "Shift not legal",
+    detail: "The published shift breaks a shift rule by itself; no plan can fix it.",
+    extra: { violations: SHIFT_VIOLATIONS },
+  });
 }
 
 /** The 401 an employer route gives a request with no bearer token. Any non-empty token passes in the mock. */
@@ -255,12 +290,12 @@ export const handlers = [
       const date = dateOf(request, scenario);
       if (date === null) return badDate(request);
       return forecastResponse(request, pathParam(params, "site_id"), date, scenario);
-    }),
+    }, { lists503: true }),
   ),
 
   http.get(
     "*/api/v1/risk-policy",
-    withScenario(() => HttpResponse.json(riskPolicy)),
+    withScenario(() => HttpResponse.json(riskPolicy), { lists503: true }),
   ),
 
   http.get(
@@ -271,7 +306,7 @@ export const handlers = [
       const found = listCrews(siteId, dayOptions(scenario));
       if (found === undefined) return mockProblem(request, 404, `No site ${siteId}.`);
       return HttpResponse.json(scenario === "empty" ? [] : found);
-    }),
+    }, { lists503: true }),
   ),
 
   http.get(
@@ -283,7 +318,7 @@ export const handlers = [
       const timeline = crewTimeline(crewId, date, dayOptions(scenario));
       if (timeline === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
       return HttpResponse.json(scenario === "empty" ? { ...timeline, hours: [] } : timeline);
-    }),
+    }, { lists503: true }),
   ),
 
   http.get(
@@ -294,10 +329,11 @@ export const handlers = [
       const date = dateOf(request);
       if (date === null) return badDate(request);
       const crewId = pathParam(params, "crew_id");
+      if (scenario === "shift-not-legal" && crewExists(crewId)) return shiftNotLegalProblem(request);
       const plan = crewDayPlan(crewId, date, dayOptions(scenario));
       if (plan === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
       return HttpResponse.json(scenario === "empty" ? { ...plan, segments: [], zone_hours: [], ack_items: [] } : plan);
-    }),
+    }, { lists503: true }),
   ),
 
   http.post(
@@ -309,6 +345,7 @@ export const handlers = [
       if (!crewExists(crewId)) return mockProblem(request, 404, `No crew ${crewId}.`);
       const date = dateOf(request);
       if (date === null) return badDate(request);
+      if (scenario === "shift-not-legal") return shiftNotLegalProblem(request);
       const parsed = PlanSignOffRequestSchema.safeParse(await jsonBody(request));
       if (!parsed.success) return bodyProblem(request, parsed.error);
       const outcome = signOffDayPlan(crewId, parsed.data.acknowledged_items, parsed.data.deviation_reason_code ?? null, dayOptions(scenario), date);
@@ -329,7 +366,7 @@ export const handlers = [
         });
       }
       return HttpResponse.json(outcome.signOff, { status: 201 });
-    }),
+    }, { lists503: true }),
   ),
 
   http.post(
@@ -355,7 +392,7 @@ export const handlers = [
         });
       }
       return HttpResponse.json(validateTyped({ date, segments: roster.segments }, dayOptions(scenario)));
-    }),
+    }, { lists503: true }),
   ),
 
   http.post(
@@ -395,7 +432,7 @@ export const handlers = [
         title: "Individual data refused",
         detail: "Individual health data is not held by this service and is never released to an employer (ADR 0004).",
       });
-    }),
+    }, { lists503: true }),
   ),
 
   http.get(

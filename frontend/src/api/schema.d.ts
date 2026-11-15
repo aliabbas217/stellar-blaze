@@ -16,7 +16,8 @@ export interface paths {
          * @description The rule plan for the crew's site-local day, checked by the independent validator. Employer token, own crew only.
          *
          *     Every plan carries the floor banner code, and is `unsigned` until `sign_off_day_plan`. A plan the validator
-         *     rejects is never served: the answer is the `plan-invalid` problem (500).
+         *     rejects is never served: the answer is the `plan-invalid` problem (500). A crew whose published shift is itself
+         *     illegal (hours, juvenile rules) is answered `shift-not-legal` (422) with the violated clauses.
          *
          *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
@@ -45,7 +46,8 @@ export interface paths {
          *     Answers `review-required` (409, with `missing_items`) unless every Medium, High and Red item of `ack_items` is
          *     acknowledged. Sign-off is independent of stops and of the warning dispatch job: it never delays either. Signing a
          *     plan that is already signed answers 201 with the
-         *     recorded sign-off again.
+         *     recorded sign-off again. A sign-off is recorded against a database configuration version: with none loaded the
+         *     answer is `dependency-unavailable` (503).
          *
          *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
@@ -69,10 +71,17 @@ export interface paths {
          * Stop work for a crew
          * @description Record a crew-lead stop now. Employer token, own crew only. Never waits for sign-off, validation or a forecast.
          *
-         *     Stop recorded. It takes effect on the crew's plan and level immediately; push alerts are sent by the alert
-         *     dispatch job, not by this call.
+         *     Stop recorded. It is visible on the next read; push alerts follow within one dispatch interval of the stop when
+         *     the alert dispatch job is running.
          *
-         *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
+         *     Idempotent while a stop is active: a second POST for a crew that already has an active stop in the active epoch
+         *     returns that stop (201, same body, no second row, no second audit row).
+         *
+         *     Known edge (not changed): the warning levels cover the working day 06:00 to 20:00 site-local, so a stop recorded
+         *     outside it changes no warning level, and a stop that was never cleared is read again by the next day's runs only
+         *     through the stops of that day's window.
+         *
+         *     Rate limit, per access token: 30 per 60 s. The stop has its own bucket, independent of every other employer operation: no other limit can block it. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
         post: operations["create_crew_stop"];
         delete?: never;
@@ -94,6 +103,9 @@ export interface paths {
         /**
          * Clear a crew stop
          * @description Clear a stop. Employer token, own crew only. Idempotent: clearing a stop that is already cleared is also 204.
+         *
+         *     Resume recorded. A de-escalation alert follows after the de-escalation dwell, within one dispatch interval of it
+         *     elapsing.
          *
          *     Rate limit, per access token: 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
@@ -182,6 +194,7 @@ export interface paths {
          * @description Run the independent validator on a roster given as text or as segments, for a hypothetical crew.
          *
          *     Nothing is stored. A roster that does not parse is `roster-invalid` (422, `errors` with 1-based line numbers).
+         *     The violations are the answer: an illegal roster is never an error status.
          */
         post: operations["validate_plan"];
         delete?: never;
@@ -203,8 +216,14 @@ export interface paths {
          * Register a Web Push subscription
          * @description Register the browser's subscription for site alerts and, optionally, one crew's alerts.
          *
-         *     The endpoint is the natural key: a repeat registration returns the existing id (201, same body). An unknown
-         *     `site_id` or `crew_id` is `not-found`. The body holds no worker identifier by design.
+         *     The endpoint is the natural key: a repeat registration returns the existing id (201, same body, not counted
+         *     against the caps). An unknown `site_id` or `crew_id`, or a crew that is not of that site, is `not-found`. The
+         *     endpoint must be an https URL of a public host and the keys base64url (else `validation-failed`); a site holds at
+         *     most 500 subscriptions and a crew 200 per epoch (over that: `validation-failed`, "too many subscriptions"). The body
+         *     holds no worker identifier by design.
+         *
+         *     If the subscription cannot be stored the answer is a 500 `problem+json` that carries none of the submitted data
+         *     (the endpoint and keys are never echoed back or logged); retry later.
          */
         post: operations["create_push_subscription"];
         delete?: never;
@@ -342,7 +361,7 @@ export interface paths {
          *     epoch-scoped and records `demo_reset` (not visible to workers). Nothing is deleted. Any site that is not synthetic
          *     answers `not-a-demo-site` (409).
          *
-         *     Rate limit, per access token: 1 per 60 s, 10 per 3600 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
+         *     Rate limit, per access token: 1 per 60 s, 10 per 3600 s, 60 per 60 s. When exceeded: 429 with `Retry-After`. Limits are keyed per access token. The public demo uses ONE shared demo token (ADR 0062), so per token means one global ceiling for all visitors; a per-visitor limit is the proxy's job (per IP, owned by the frontend).
          */
         post: operations["reset_demo_site"];
         delete?: never;
@@ -978,6 +997,12 @@ export interface components {
              */
             date: string;
             /**
+             * Evaluation Label
+             * @description Words shown with a development file, "DEV 2025, LOCO out-of-fold: not the result"; null for the scored 2026 file.
+             * @default null
+             */
+            evaluation_label: string | null;
+            /**
              * Evaluation Set
              * @description `scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".
              * @enum {string}
@@ -1383,6 +1408,12 @@ export interface components {
              */
             crew_label: string;
             /**
+             * Evaluation Label
+             * @description Words shown with a development file, "DEV 2025, LOCO out-of-fold: not the result"; null for the scored 2026 file.
+             * @default null
+             */
+            evaluation_label: string | null;
+            /**
              * Evaluation Set
              * @description `scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".
              * @enum {string}
@@ -1757,6 +1788,12 @@ export interface components {
              */
             assumed_crew_size: number;
             /**
+             * Evaluation Label
+             * @description Words shown with a development file, "DEV 2025, LOCO out-of-fold: not the result"; null for the scored 2026 file.
+             * @default null
+             */
+            evaluation_label: string | null;
+            /**
              * Evaluation Set
              * @description `scored_2026` for the pre-registered held-out run; `dev_2025` for the 2025 out-of-fold development run, which must be labelled "DEV 2025, LOCO out-of-fold: not the result".
              * @enum {string}
@@ -1976,7 +2013,7 @@ export interface components {
         PushSubscriptionDetails: {
             /**
              * Endpoint
-             * @description The browser's push endpoint. A per-device address stored for delivery only, never logged.
+             * @description The browser's push endpoint. A per-device address stored for delivery only, never logged. It must be an https URL of a public host: no IP address, no internal name, no credentials.
              */
             endpoint: string;
             /**
@@ -2309,6 +2346,71 @@ export interface components {
              * @description Whether the withdrawal-limit cap was applied to the truth TWL.
              */
             withdrawal_limits: boolean;
+        };
+        /**
+         * ShiftNotLegalProblem
+         * @description The 422 problem of the day plan and sign-off when the crew's published shift is itself not legal (hours or
+         *     juvenile rules): the planner cannot fix it, so no plan is served; fix the shift.
+         * @example {
+         *       "detail": "The published shift breaks a shift rule by itself; no plan can fix it.",
+         *       "instance": "/api/v1/crews/crew-b/day-plan",
+         *       "request_id": "00000000-0000-4000-8000-000000000001",
+         *       "status": 422,
+         *       "title": "Shift not legal",
+         *       "type": "urn:stellar-blaze:problem:shift-not-legal",
+         *       "violations": [
+         *         {
+         *           "clause": "Art. 17(1): maximum normal working hours are eight hours per day.",
+         *           "rule_id": "P-H2.daily",
+         *           "source_id": "fdl-33-2021"
+         *         }
+         *       ]
+         *     }
+         */
+        ShiftNotLegalProblem: {
+            /**
+             * Detail
+             * @default null
+             */
+            detail: string;
+            /** Instance */
+            instance: string;
+            /** Request Id */
+            request_id: string;
+            /** Status */
+            status: number;
+            /** Title */
+            title: string;
+            /** Type */
+            type: string;
+            /**
+             * Violations
+             * @description Every shift rule the published shift breaks.
+             */
+            violations: components["schemas"]["ShiftViolation"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ShiftViolation
+         * @description One shift rule the published shift breaks by itself.
+         */
+        ShiftViolation: {
+            /**
+             * Clause
+             * @description Text of the clause the rule comes from, from the ruleset.
+             */
+            clause: string;
+            /**
+             * Rule Id
+             * @description Id of the violated rule, for example `P-H2.daily`.
+             */
+            rule_id: string;
+            /**
+             * Source Id
+             * @description Id of the legal or policy source of the clause.
+             */
+            source_id: string;
         };
         /** ShiftWindow */
         ShiftWindow: {
@@ -2841,13 +2943,13 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            /** @description Validation failed: A path, query or body member is missing or malformed. Shift not legal: The crew's published shift breaks a shift rule by itself (hours, juvenile rules); `violations` lists them. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                    "application/problem+json": components["schemas"]["ValidationProblem"] | components["schemas"]["ShiftNotLegalProblem"];
                 };
             };
             /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
@@ -2863,15 +2965,6 @@ export interface operations {
             };
             /** @description Plan invalid: The independent validator rejected the planner's own plan. A bug, never served as a plan; the incident is audited. */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2963,13 +3056,13 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ReviewRequiredProblem"];
                 };
             };
-            /** @description Validation failed: A path, query or body member is missing or malformed. */
+            /** @description Validation failed: A path, query or body member is missing or malformed. Shift not legal: The crew's published shift breaks a shift rule by itself (hours, juvenile rules); `violations` lists them. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ValidationProblem"];
+                    "application/problem+json": components["schemas"]["ValidationProblem"] | components["schemas"]["ShiftNotLegalProblem"];
                 };
             };
             /** @description Rate limited: Too many requests; wait `Retry-After` seconds before trying again. */
@@ -2985,15 +3078,6 @@ export interface operations {
             };
             /** @description Plan invalid: The independent validator rejected the planner's own plan. A bug, never served as a plan; the incident is audited. */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3093,15 +3177,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Any other problem (RFC 9457). */
             default: {
                 headers: {
@@ -3181,15 +3256,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Any other problem (RFC 9457). */
             default: {
                 headers: {
@@ -3241,15 +3307,6 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ValidationProblem"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
@@ -3379,15 +3436,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ValidationProblem"] | components["schemas"]["RosterInvalidProblem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
             503: {
                 headers: {
@@ -3448,15 +3496,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ValidationProblem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Any other problem (RFC 9457). */
             default: {
                 headers: {
@@ -3496,15 +3535,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ValidationProblem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Any other problem (RFC 9457). */
             default: {
                 headers: {
@@ -3532,15 +3562,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RiskPolicy"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
@@ -3579,15 +3600,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Site"][];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Any other problem (RFC 9457). */
@@ -3643,8 +3655,8 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ValidationProblem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
+            /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3720,15 +3732,6 @@ export interface operations {
                 headers: {
                     /** @description Seconds to wait before the request may be repeated. */
                     "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
                     [name: string]: unknown;
                 };
                 content: {
@@ -3841,15 +3844,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Any other problem (RFC 9457). */
             default: {
                 headers: {
@@ -3901,15 +3895,6 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ValidationProblem"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Dependency unavailable: A required dependency (the database or the active configuration) is down. */
@@ -3969,15 +3954,6 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ValidationProblem"];
-                };
-            };
-            /** @description Not implemented: The route exists in the contract but is not built yet. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Any other problem (RFC 9457). */

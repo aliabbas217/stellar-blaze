@@ -1,6 +1,6 @@
 /*
  * Test-only switch: the mock API (src/mocks/handlers.ts) answers differently when a request carries
- * `x-sb-mock-scenario: error | stale | empty | fallback | suppressed | offseason | noshift`. e2e runs against the standalone mock server with no per-test
+ * `x-sb-mock-scenario: error | stale | empty | fallback | suppressed | offseason | noshift | shift-not-legal | unavailable`. e2e runs against the standalone mock server with no per-test
  * handler overrides, so a Playwright test sets the header (`page.setExtraHTTPHeaders`) and the BFF proxy and
  * serverApiClient carry it through. Real deployments must never forward it.
  *

@@ -238,7 +238,7 @@ describe("get_site_forecast_today", () => {
 });
 
 describe("get_risk_policy", () => {
-  it("returns the placeholder policy under version mock-0 and config_version 1, k_health 10", async () => {
+  it("returns the mock policy under version mock-0 and config_version 1, k_health 10, with the bands B3 serves (0, 0.10, 0.50, 0.90)", async () => {
     const policy = await json<Schemas["RiskPolicy"]>(await get("/api/v1/risk-policy"));
 
     expect(policy.version).toBe("mock-0");
@@ -246,8 +246,8 @@ describe("get_risk_policy", () => {
     expect(policy.bands).toEqual([
       { level: "green", min_exceedance_probability: 0 },
       { level: "amber", min_exceedance_probability: 0.1 },
-      { level: "orange", min_exceedance_probability: 0.3 },
-      { level: "red", min_exceedance_probability: 0.6 },
+      { level: "orange", min_exceedance_probability: 0.5 },
+      { level: "red", min_exceedance_probability: 0.9 },
     ]);
     expect(policy.workload_classes).toEqual([
       { code: "light", metabolic_rate_w: 180 },
@@ -846,6 +846,77 @@ describe("x-sb-mock-scenario", () => {
     expect(await crewList("empty")).toEqual([]);
     expect((await forecast(DEMO_SITE, "empty")).hours).toEqual([]);
     expect((await timeline("crew-b", "", "empty")).hours).toEqual([]);
+  });
+
+  it("shift-not-legal answers the day plan and the sign-off with a 422 ShiftNotLegalProblem that lists the violated clauses", async () => {
+    const reads = await get("/api/v1/crews/crew-b/day-plan", "shift-not-legal", EMPLOYER);
+    const signs = await fetch(`${ORIGIN}/api/v1/crews/crew-b/day-plan/sign-off`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-sb-mock-scenario": "shift-not-legal", ...EMPLOYER },
+      body: JSON.stringify({ acknowledged_items: [] }),
+    });
+
+    for (const res of [reads, signs]) {
+      expect(res.status).toBe(422);
+      expect(res.headers.get("content-type")).toBe("application/problem+json");
+      const body = await json<Schemas["ShiftNotLegalProblem"]>(res);
+      expect(body).toMatchObject({ status: 422, type: `${PROBLEM_TYPE}shift-not-legal`, title: "Shift not legal", request_id: "mock-req-1" });
+      expect(body.violations.length).toBeGreaterThan(0);
+      for (const violation of body.violations) expect(Object.keys(violation).sort()).toEqual(["clause", "rule_id", "source_id"]);
+    }
+  });
+
+  it("shift-not-legal leaves every other operation alone, and a stop is never refused for it", async () => {
+    expect((await get("/api/v1/crews/crew-b/timeline", "shift-not-legal")).status).toBe(200);
+    expect((await get(`/api/v1/sites/${DEMO_SITE}/crews`, "shift-not-legal")).status).toBe(200);
+    const stop = await fetch(`${ORIGIN}/api/v1/crews/crew-b/stops`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-sb-mock-scenario": "shift-not-legal", ...EMPLOYER },
+      body: JSON.stringify({ reason_code: "heat" }),
+    });
+    expect(stop.status).toBe(201);
+  });
+
+  it.each([
+    ["GET", `/api/v1/sites/${DEMO_SITE}/crews`],
+    ["GET", `/api/v1/sites/${DEMO_SITE}/forecast/today`],
+    ["GET", "/api/v1/risk-policy"],
+    ["GET", "/api/v1/crews/crew-b/timeline"],
+    ["GET", "/api/v1/crews/crew-b/day-plan"],
+    ["POST", "/api/v1/crews/crew-b/day-plan/sign-off"],
+    ["POST", "/api/v1/plans/validate"],
+    ["POST", `/api/v1/sites/${DEMO_SITE}/data-requests`],
+  ])("unavailable answers %s %s with the 503 dependency-unavailable problem the contract lists for it", async (method, path) => {
+    const res = await fetch(`${ORIGIN}${path}`, {
+      method,
+      headers: { "content-type": "application/json", "x-sb-mock-scenario": "unavailable", ...EMPLOYER },
+      ...(method === "GET" ? {} : { body: "{}" }),
+    });
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(await json<Schemas["Problem"] & { dependency?: string }>(res)).toMatchObject({
+      status: 503,
+      type: `${PROBLEM_TYPE}dependency-unavailable`,
+      title: "Dependency unavailable",
+      dependency: "config",
+      request_id: "mock-req-1",
+    });
+  });
+
+  it.each([
+    ["GET", "/api/v1/sites"],
+    ["POST", "/api/v1/crews/crew-b/stops"],
+    ["DELETE", "/api/v1/crews/crew-b/stops/stop-0001"],
+    ["GET", `/api/v1/sites/${DEMO_SITE}/transparency-log`],
+  ])("unavailable leaves %s %s alone: the contract lists no 503 for it", async (method, path) => {
+    const res = await fetch(`${ORIGIN}${path}`, {
+      method,
+      headers: { "content-type": "application/json", "x-sb-mock-scenario": "unavailable", ...EMPLOYER },
+      ...(method === "POST" ? { body: JSON.stringify({ reason_code: "heat" }) } : {}),
+    });
+
+    expect(res.status).toBeLessThan(300);
   });
 
   it("ignores an unknown scenario", async () => {
