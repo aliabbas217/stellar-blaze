@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.json_schema import SkipJsonSchema
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from stellar_blaze.application.replay_clock import ReplayClockUnavailableError
 from stellar_blaze.logging import mark_exception_reported
 
 PROBLEM_JSON = "application/problem+json"
@@ -133,6 +134,16 @@ def install_problem_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainProblem)
     async def on_domain(request: Request, exc: DomainProblem) -> JSONResponse:
         return _respond(request, exc.problem, headers=exc.headers)
+
+    @app.exception_handler(ReplayClockUnavailableError)
+    async def on_replay_clock(request: Request, exc: ReplayClockUnavailableError) -> JSONResponse:
+        # Replay mode reads its time from the demo epoch row: with that row unreadable there is no time, and none is
+        # made up. The same 503 as any other unreachable dependency, wherever in a route the clock was read.
+        # model_validate, not keywords: mypy's pydantic plugin forbids the extension member `dependency` as a kwarg.
+        problem = ProblemDraft.model_validate(
+            {"type": DEPENDENCY_UNAVAILABLE, "title": "Dependency unavailable", "status": 503, "dependency": "database"}
+        )
+        return _respond(request, problem)
 
     @app.exception_handler(RequestValidationError)
     async def on_validation(request: Request, exc: RequestValidationError) -> JSONResponse:

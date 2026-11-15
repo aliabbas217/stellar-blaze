@@ -46,12 +46,20 @@ def get_config_poller(request: Request) -> ConfigPoller:
     return poller
 
 
-def get_services(request: Request) -> Services:
-    """The ports and sources the application lifespan built (``composition.build_api_services``)."""
+async def get_services(request: Request) -> Services:
+    """The ports and sources the application lifespan built (``composition.build_api_services``).
+
+    In replay mode the domain clock counts from the current demo epoch's start in Postgres, read into a cache of a few
+    seconds. It is refreshed here, at the entry of the request, because the clock itself is read synchronously
+    (``services.clock()``) and cannot query. A refresh never raises: a route that never reads the clock must not fail
+    for it, and one that does gets the 503 ``dependency-unavailable`` (``dependency: database``) from the clock itself.
+    ``async`` on purpose, as ``get_snapshot``: it awaits.
+    """
     services: Services | None = getattr(request.app.state, "services", None)
     if services is None:
         msg = "No services: they are built by the application lifespan. Run the app through its lifespan."
         raise RuntimeError(msg)
+    await services.refresh_clock()
     return services
 
 

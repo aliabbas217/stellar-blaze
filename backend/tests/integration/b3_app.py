@@ -132,11 +132,12 @@ def running_app(
 ) -> Iterator[TestClient]:
     """The app with the real Postgres services (``build_api_services``); the lifespan runs on enter and exit.
 
-    ``wall`` is the injected REAL clock (audit rows, rate limiter); in replay mode the domain clock is built by the
-    production path (``domain_clock``: a ``ReplayClock`` that starts on the replay day and follows ``wall``), so a stop
-    recorded in the demo lands on the replay day with nothing swapped by hand. ``wait_for_database_config`` waits for
-    the config poller to replace the seed snapshot with the one activated in the database (``version_id`` not None),
-    which sign-off needs.
+    ``wall`` is the injected REAL clock (audit rows, epoch starts, rate limiter); in replay mode the domain clock is
+    built by the production path (``domain_clock``: an ``EpochReplayClock`` that reads the replay anchor at the start of
+    the current ``site_epoch`` and follows ``wall``), so a stop recorded in the demo lands on the replay day with
+    nothing swapped by hand. Start ``wall`` at the epoch's ``started_at`` for exact replay times.
+    ``wait_for_database_config`` waits for the config poller to replace the seed snapshot with the one activated in the
+    database (``version_id`` not None), which sign-off needs.
     """
     app = create_app(settings, wall=wall)
     with TestClient(app, raise_server_exceptions=False) as client:

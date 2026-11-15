@@ -43,14 +43,29 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+class RefreshClock(Protocol):
+    """``Services.refresh_clock``: awaited at the entry of a request or a job cycle, before the domain clock is read."""
+
+    async def __call__(self, *, force: bool = False) -> None: ...
+
+
+async def _no_refresh(*, force: bool = False) -> None:
+    """The refresh of a domain clock that needs none (the wall clock): every mode but replay."""
+
+
 @dataclass(frozen=True)
 class Services:
     """The ports of the core-path routes.
 
     ``clock`` is the DOMAIN "now" (UTC): the stamps of crew stops and sign-offs, the ``now`` of ``site_day`` and the
-    use cases. In replay mode it is a ``ReplayClock`` on the replay day (``application.replay_clock``); otherwise it is
-    the wall clock. ``wall_clock`` is always the real time, for the rate limiter and anything that records when
-    something really happened (the audit log stamps its own rows with the real clock too)."""
+    use cases. In replay mode it is an ``EpochReplayClock`` on the replay day, counted from the start of the current
+    demo epoch in Postgres (``application.replay_clock``); otherwise it is the wall clock. ``wall_clock`` is always the
+    real time, for the rate limiter and anything that records when something really happened (the audit log stamps
+    its own rows with the real clock too).
+
+    ``refresh_clock`` is what a request (``api.deps.get_services``) and an alerts cycle await before reading ``clock``:
+    in replay mode it refreshes the cached epoch start (``force=True`` right after a demo reset); in every other mode
+    it is a no-op. It never raises."""
 
     sites: SiteRepository
     epochs: EpochStore
@@ -65,5 +80,6 @@ class Services:
     correctors: CorrectorSource
     clock: Callable[[], datetime] = utc_now
     wall_clock: Callable[[], datetime] = utc_now
+    refresh_clock: RefreshClock = _no_refresh
     # Small TTL cache of ``site_day`` results (``api.views.load_site_day``): 60 s, at most 32 entries, one per process.
     day_cache: dict[tuple[Any, ...], tuple[datetime, Any]] = field(default_factory=dict)

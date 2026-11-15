@@ -11,7 +11,7 @@ the next run after the stop, which creates crew B's red event (a recording chann
 
 import logging
 from collections.abc import Mapping
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -44,8 +44,9 @@ DATE = {"date": REPLAY_DATE.isoformat()}
 WORKER_REF = "staff-no-4471-AliKhan"
 B0_ROSTER = "06:00-12:30 work\n15:00-17:00 work"
 BANNER = "plan.floor_banner"
-# The replay clock starts at 11:10 Asia/Dubai (07:10Z) on the replay day and then follows the real clock, which the test
-# moves by hand: sign-off after 5 minutes, stop after 5 more, resume after 10 more.
+# The replay clock reads 11:10 Asia/Dubai (07:10Z) on the replay day at the START OF THE CURRENT EPOCH (the
+# `site_epoch` row) and then follows the real clock, which the test moves by hand: sign-off after 5 minutes, stop after
+# 5 more, resume after 10 more. (It used to count from the api process start; now the row is the base, see `wall`.)
 SIGNED_AT = "2025-07-10T07:15:00Z"
 STOP_AT = "2025-07-10T07:20:00Z"
 CLEARED_AT = "2025-07-10T07:30:00Z"
@@ -92,8 +93,11 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
     [activation] = rows(settings, "SELECT id, config_version_id FROM config_activation ORDER BY id")
     assert activation["config_version_id"] is not None
 
-    # The REAL clock is injected (it starts at the real now, after the CLI rows); the replay clock is production code.
-    wall = ManualWall(datetime.now(UTC))
+    # The REAL clock is injected and starts exactly at the epoch's `started_at` (the row `site load` wrote through the
+    # CLI, with the real clock): replay time is `anchor + (wall - epoch start)`, so SIGNED_AT, STOP_AT and CLEARED_AT
+    # are exact (07:10Z + 5 min, + 10 min, + 20 min). The replay clock itself is production code.
+    [first_epoch] = rows(settings, "SELECT started_at FROM site_epoch")
+    wall = ManualWall(first_epoch["started_at"])
     started_wall = wall.now
     app_cfg = app_settings(settings, replay_dir=replay_dir, snapshot_id=SNAPSHOT_ID)
     with caplog.at_level(logging.DEBUG), running_app(app_cfg, wall=wall, wait_for_database_config=True) as client:
@@ -105,6 +109,8 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         assert day["config_version"] == activation["config_version_id"]  # a database config, not the file seed
         assert len(day["hours"]) == 14
         assert all(h["site_level"] in ("green", "amber", "orange", "red") for h in day["hours"])
+
+        baseline_timeline = client.get("/api/v1/crews/crew-b/timeline", params=DATE).json()  # before any stop
 
         # --- crew B's validated day plan ------------------------------------------------------------------------
         plan_response = client.get("/api/v1/crews/crew-b/day-plan", params=DATE, headers=bearer())
@@ -282,6 +288,10 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         fresh = client.get("/api/v1/crews/crew-b/day-plan", params=DATE, headers=bearer()).json()
         assert fresh["signoff_state"] == "unsigned"  # the sign-off belonged to epoch 1
         assert fresh["segments"] == plan["segments"]  # no stop of epoch 1 carries over
+        fresh_timeline = client.get("/api/v1/crews/crew-b/timeline", params=DATE).json()
+        assert fresh_timeline["hours"] == baseline_timeline["hours"]  # the stop's Red is not in epoch 2's timeline
+        [second_epoch] = rows(settings, "SELECT started_at FROM site_epoch WHERE epoch_id = 2")
+        assert second_epoch["started_at"] == wall.now  # the reset's epoch starts at the real clock: re-anchored
 
     verified = sb_jobs("audit", "verify")
     assert verified.exit_code == 0, verified.output

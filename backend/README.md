@@ -122,11 +122,18 @@ It only **extends** the built-in list; it can never remove an entry, and it neve
 ## Alerts and the demo replay clock
 
 `sb-jobs alerts dispatch` runs one cycle and `sb-jobs alerts run` loops (`--help` has the SLA and the lanes); the API serves the
-reads and records stops but never sends a push (ADR 0058 decision 5). They are SEPARATE processes with their own clocks: in
-replay mode (`SB_FORECAST_SOURCE=replay`, anchored by `SB_REPLAY_NOW` or `SB_REPLAY_DEFAULT_DATE`) each process starts its
-"now" at the anchor and runs at real speed from its own start, so a stop recorded through the API and the alert loop agree on
-the replay day only when both processes get the same anchor and start together (start them together, or restart both after a
-reset). With another forecast source both use the real clock.
+reads and records stops but never sends a push (ADR 0058 decision 5). They are SEPARATE processes that agree on time through
+Postgres: in replay mode (`SB_FORECAST_SOURCE=replay`, anchored by `SB_REPLAY_NOW` or `SB_REPLAY_DEFAULT_DATE`) the domain
+"now" is `replay anchor + (real time now - start of the current epoch)`, where the epoch start is the `started_at` of the
+latest `site_epoch` row of the synthetic sites (ADR 0034 amendment of 2026-11-15). Both processes read that row (cached for
+5 seconds, refreshed at the entry of every API request and every alerts cycle), so a restart of either changes nothing, and
+they need the same `SB_REPLAY_*` values but need not start together. A demo reset (ADR 0066) starts a new epoch and so
+re-anchors the clock to `SB_REPLAY_NOW`: the API at once (the reset route refreshes), the worker at its next cycle. The window
+is about 7 h 20 min per epoch (replay time passes 17:30 Dubai), after which a reset is needed. The real clock still drives the
+rate limiter, `reset_at` and the audit `at`. If the epoch row cannot be read (the database is down, or no synthetic site was
+loaded) there is no replay time: a route that reads the clock answers 503 `dependency-unavailable` (`dependency: database`),
+an alerts cycle fails and the loop tries again next cycle; a last good read is served for at most 30 seconds. With another
+forecast source both use the real clock.
 
 A crew-lead stop makes the crew's levels and plan Red from `started_at` to `cleared_at`, or, while it is active, to the end of
 the crew's shift for the day (never beyond). A stop cleared within `STOP_UNDO_WINDOW_S` (10 s, the F2 undo) is ignored entirely
@@ -157,9 +164,17 @@ uv run uvicorn stellar_blaze.api.app:create_app --factory --host 127.0.0.1 --por
 `<sha256 of your demo token>` is `python -c "import hashlib; print(hashlib.sha256(b'YOUR-TOKEN').hexdigest())"`; send the
 token as `Authorization: Bearer YOUR-TOKEN`. The demo site is `site-demo-mussafah`; the crew of the demo is `crew-b`. Wait
 about 5 seconds after start before the first sign-off (the config poller replaces the seed snapshot with the database
-version, which sign-off needs). `sb-jobs alerts run` must get the SAME `SB_REPLAY_*` values and start together with the
-API (separate processes, separate clocks: see above); after a `demo-reset`, restart both so that their replay clocks agree
-again (the reset itself needs no restart).
+version, which sign-off needs). `sb-jobs alerts run` must get the SAME `SB_REPLAY_*` values; it need not start with the API
+(both read the epoch row, see above), and neither is restarted after a reset.
+
+The replay clock starts at the epoch row's `started_at`, which `sb-jobs site load` wrote when it created the site. So after a
+deploy run ONE reset with the employer token, which begins a fresh epoch at that moment (11:10 Dubai on the replay day, then
+real speed), and reset again before each judged session; the window is about 7 h 20 min per epoch (until 17:30 Dubai replay
+time):
+
+```bash
+curl -X POST -H "Authorization: Bearer $DEMO_TOKEN" http://127.0.0.1:8123/api/v1/sites/site-demo-mussafah/demo-reset
+```
 
 What the day shows (checked through the real routes on 2026-11-15; times are Asia/Dubai, the API returns UTC instants):
 `forecast_status` is `fresh`, `mode` is `replay`, `model_id` is the released model (pinned in the seed), and the crew
