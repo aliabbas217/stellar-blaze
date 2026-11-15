@@ -48,6 +48,8 @@ export interface TableText {
   /** What a number is, for its proof chip: `metric` is a `PolicyMetric` or `PlanMetric` key. */
   readonly what: (metric: string, rowLabel: string) => string;
   readonly interval: (lo: string, hi: string) => string;
+  /** Shown instead of an interval on the baseline row whose bootstrap interval is a single point ("baseline, no interval"). */
+  readonly baselineNoInterval?: string;
   /** What a metric counts ("hours", "of danger hours were warned"), for the proof sheet. Optional. */
   readonly unit?: (metric: string) => string;
 }
@@ -97,10 +99,14 @@ interface Shown {
   readonly interval: string | null;
 }
 
-function shown(metric: Metric, scale: number, show: (v: number) => string, text: TableText): Shown {
+function shown(metric: Metric, scale: number, show: (v: number) => string, text: TableText, baseline: boolean): Shown {
+  // A baseline that never warns has a degenerate interval (the bootstrap of a constant): it is not a measured uncertainty, so it is
+  // not printed as one.
+  const point = metric.ci !== null && metric.ci.lo === metric.ci.hi && metric.ci.lo === metric.value;
   return {
     value: show(metric.value * scale),
-    interval: metric.ci === null ? null : text.interval(show(metric.ci.lo * scale), show(metric.ci.hi * scale)),
+    interval:
+      metric.ci === null ? null : baseline && point && text.baselineNoInterval !== undefined ? text.baselineNoInterval : text.interval(show(metric.ci.lo * scale), show(metric.ci.hi * scale)),
   };
 }
 
@@ -121,9 +127,10 @@ function cell(
   provenance: Schemas["Provenance"],
   ctx: AdapterContext,
   metricKey: string,
+  baseline = false,
 ): ScoreCell {
   if (notComputed(metric)) return { value: "", what, proof: null, notComputed: true };
-  const { value, interval } = shown(metric, scale, show, ctx.text);
+  const { value, interval } = shown(metric, scale, show, ctx.text, baseline);
   const proof: Proof | null = proofFromProvenance(provenance, metric.anchor, what, ctx.file, { claim });
   const unit = ctx.text.unit?.(metricKey);
   return { value, ...(unit === undefined ? {} : { unit }), ...(interval === null ? {} : { interval }), what, proof };
@@ -141,7 +148,7 @@ export function toPolicyRows(sb: PolicyScoreboard, lead: PolicyLead, ctx: Adapte
   return result.rows.map((row) => {
     const { label, sub } = ctx.text.row(row.policy);
     const at = (key: PolicyMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key, lead), sb.provenance, ctx, key);
+      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key, lead), sb.provenance, ctx, key, row.policy === "P0");
     return {
       id: row.policy,
       label,

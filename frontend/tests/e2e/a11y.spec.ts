@@ -20,8 +20,8 @@ interface PageUnderTest {
 }
 
 const pages: PageUnderTest[] = [
-  { path: "/en", heading: en.shell.roleChooser.title },
-  { path: "/ar", heading: ar.shell.roleChooser.title },
+  { path: "/en", heading: en.judge.landing.title },
+  { path: "/ar", heading: ar.judge.landing.title },
   { path: "/en/worker", heading: en.worker.today.title },
   { path: "/en/worker/alerts", heading: en.alerts.title, enable: en.alerts.enable },
   { path: "/ur/worker/alerts", heading: ur.alerts.title, enable: ur.alerts.enable },

@@ -115,7 +115,7 @@ function Timeline({ claim, source }: { readonly claim: Claim; readonly source: E
     { id: "forecast", note: kind === "analysis" ? t("notes.notAForecast") : t("notes.forecastAhead") },
     {
       id: "protocol",
-      note: kind === "scored" ? t("notes.protocolCommitted") : kind === "forecast" ? t("notes.noProtocolForecast") : t("notes.noProtocolAnalysis"),
+      note: kind === "scored" ? (claim.proof.evaluation === undefined ? t("notes.protocolDev") : t("notes.protocolCommitted", { commit: claim.proof.evaluation.protocolCommit.slice(0, 7) })) : kind === "forecast" ? t("notes.noProtocolForecast") : t("notes.noProtocolAnalysis"),
     },
     {
       id: "run",

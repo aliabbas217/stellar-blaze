@@ -37,6 +37,9 @@ export const CEILINGS: Readonly<Record<string, number>> = {
 
 /** Routes the rulings name: each must be in the build's stats, or a rename has silently dropped its limit. */
 export const REQUIRED: readonly string[] = [
+  // The landing page is in the default 174,080 B class: it is not in ADR 0069's exception list, and its live field (island and,
+  // later, the WebGL scene) loads after first paint (Lighthouse still counts it: see the Task 11/12 report).
+  "/[locale]",
   "/[locale]/worker",
   "/[locale]/worker/alerts",
   "/[locale]/worker/alert",

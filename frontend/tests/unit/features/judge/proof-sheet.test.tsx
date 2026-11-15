@@ -65,6 +65,24 @@ const all: Claim[] = [
   ),
 ];
 
+describe("the protocol line of the timeline comes from the evaluation record", () => {
+  it("names the commit of the record, not a typed one", () => {
+    const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
+    if (claim === undefined) throw new Error("no claim");
+    const evaluation = {
+      lockSha256: "a".repeat(64),
+      protocolCommit: "abcdef0123456789abcdef0123456789abcdef01",
+      amendments: [{ path: "docs/research/x-amendment-1.md", commit: "1".repeat(40), sha256: "2".repeat(64) }],
+      freeze: { path: "docs/research/x-freeze.md", commit: "3".repeat(40), sha256: "4".repeat(64) },
+    };
+    const withRecord: Claim = { ...claim, proof: { ...claim.proof, evaluation } };
+    renderWithIntl(<ProofSheet claim={withRecord} source="2026" />);
+    expect(screen.getByText("The pre-registration, commit abcdef0, before 2026 was scored.")).toBeInTheDocument();
+    expect(screen.getByText("x-amendment-1.md (1111111)")).toBeInTheDocument();
+    expect(screen.getByText("x-freeze.md (3333333)")).toBeInTheDocument();
+  });
+});
+
 describe("claims", () => {
   it("have unique stable ids, each with a proof that names its own sheet", () => {
     const ids = all.map((c) => c.id);
@@ -114,7 +132,8 @@ describe("ProofSheet", () => {
       "shown",
     ]);
     expect(screen.getByText("About 24 hours ahead of each day, by the ECMWF model.")).toBeInTheDocument();
-    expect(screen.getByText("The pre-registration, commit 661b373, before 2026 was scored.")).toBeInTheDocument();
+    // these claims carry no evaluation record: the sheet does not say a protocol was committed before a held-out run
+    expect(screen.getByText("The pre-registration. This is a development run: it is not the held-out result.")).toBeInTheDocument();
     expect(screen.getByText("The single scoring run wrote this file.")).toBeInTheDocument();
     expect(screen.getByText(claim.proof.protocol)).toBeInTheDocument();
     expect(screen.getByText(claim.proof.file)).toBeInTheDocument();

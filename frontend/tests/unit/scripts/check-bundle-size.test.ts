@@ -98,8 +98,9 @@ describe("check-bundle-size cannot pass vacuously (W4 I2)", () => {
     expect(problems[0]).toContain(`${route} is not in the build stats`);
   });
 
-  it("names the unwell sheet, the three worker data screens and both supervisor routes", () => {
+  it("names the landing page, the unwell sheet, the three worker data screens and both supervisor routes", () => {
     expect([...REQUIRED].sort()).toEqual([
+      "/[locale]",
       "/[locale]/supervisor",
       "/[locale]/supervisor/crews/[crewId]",
       "/[locale]/worker",

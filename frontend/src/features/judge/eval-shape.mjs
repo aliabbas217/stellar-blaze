@@ -123,6 +123,8 @@ export function sha256Hex(bytes) {
 
 /** @type {readonly string[]} */
 export const EVALUATION_RECORD_KEYS = [
+  "amendments",
+  "freeze",
   "evaluation_set",
   "lock_sha256",
   "go_sha256",
@@ -154,16 +156,26 @@ export function checkEvaluationRecord(value) {
   }
   const commit = record["protocol_commit"];
   if (typeof commit !== "string" || !HEX40.test(commit)) return "protocol_commit is not a commit id";
+  const amendments = record["amendments"];
+  if (!Array.isArray(amendments)) return "amendments is not a list";
+  for (const [i, entry] of [...amendments, record["freeze"]].entries()) {
+    const label = i < amendments.length ? `amendments[${String(i)}]` : "freeze";
+    if (typeof entry !== "object" || entry === null) return `${label} is not an object`;
+    const { path: file, commit: at, sha256 } = /** @type {Record<string, unknown>} */ (entry);
+    if (typeof file !== "string" || file === "") return `${label} has no path`;
+    if (typeof at !== "string" || !HEX40.test(at)) return `${label} has no commit id`;
+    if (typeof sha256 !== "string" || !HEX64.test(sha256)) return `${label} has no SHA-256`;
+  }
   return null;
 }
 
 /**
  * The record from the run's own artifacts. Throws (with the reason) when the go-ahead marker is not the one the run hashed
  * (`run_meta.go_sha256`), or when the marker has no `lock_sha256`: a lock hash that cannot be tied to the run is never shown.
- * @param {{ runMeta: Record<string, unknown>, goBytes: Uint8Array, files: Record<string, { commit: string, sha256: string }>, prior: { outcome: string, commit: string } }} input
+ * @param {{ runMeta: Record<string, unknown>, goBytes: Uint8Array, files: Record<string, { commit: string, sha256: string }>, prior: { outcome: string, commit: string }, freeze: { path: string, commit: string, sha256: string } }} input
  * @returns {Record<string, unknown>}
  */
-export function buildEvaluationRecord({ runMeta, goBytes, files, prior }) {
+export function buildEvaluationRecord({ runMeta, goBytes, files, prior, freeze }) {
   const goSha = sha256Hex(goBytes);
   if (runMeta["go_sha256"] !== goSha) {
     throw new Error(`the go-ahead marker hashes to ${goSha}, not run_meta.go_sha256 ${String(runMeta["go_sha256"])}: it is not the marker the run used`);
@@ -178,6 +190,10 @@ export function buildEvaluationRecord({ runMeta, goBytes, files, prior }) {
     protocol_commit: runMeta["protocol_commit"],
     protocol_sha256: runMeta["protocol_sha256"],
     model_id: runMeta["model_id"],
+    // The amendments the run lists (each committed after the protocol and before 2026 was scored) and the freeze addendum: the
+    // disclosure is generated from the run's own record, never typed.
+    amendments: runMeta["amendments"],
+    freeze,
     files,
     prior_run: { evaluation_set: "dev_2025", h4_outcome: prior.outcome, commit: prior.commit },
   };

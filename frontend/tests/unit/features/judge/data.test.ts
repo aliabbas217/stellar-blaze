@@ -199,10 +199,10 @@ describe("the data root and the evaluation record", () => {
   it("carries the lock of a valid record onto every 2026 file it drew, and onto no dev file", async () => {
     put("eval/2026/policy_scoreboard.json", scored("policy_scoreboard"));
     const lock = "a".repeat(64);
-    const record = { evaluation_set: "scored_2026", lock_sha256: lock, go_sha256: "b".repeat(64), protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", files: {}, prior_run: { evaluation_set: "dev_2025", h4_outcome: "negative", commit: "e".repeat(40) } };
+    const record = { evaluation_set: "scored_2026", lock_sha256: lock, go_sha256: "b".repeat(64), protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", files: {}, prior_run: { evaluation_set: "dev_2025", h4_outcome: "negative", commit: "e".repeat(40) }, amendments: [{ path: "docs/a1.md", commit: "1".repeat(40), sha256: "2".repeat(64) }], freeze: { path: "docs/freeze.md", commit: "3".repeat(40), sha256: "4".repeat(64) } };
     put("eval/2026/evaluation_record.json", JSON.stringify(record));
     const heldOut = await loadEval({ dataRoot: root, fixturesRoot: fixtures, production: true });
-    expect(heldOut.files.policy?.evaluation).toEqual({ lockSha256: lock, protocolCommit: "c".repeat(40) });
+    expect(heldOut.files.policy?.evaluation).toEqual({ lockSha256: lock, protocolCommit: "c".repeat(40), amendments: record.amendments, freeze: record.freeze });
     expect(heldOut.record?.prior_run.h4_outcome).toBe("negative");
     rmSync(path.join(root, "eval", "2026"), { recursive: true });
     putDev("policy_scoreboard");

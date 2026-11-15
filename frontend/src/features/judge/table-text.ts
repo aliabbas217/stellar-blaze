@@ -29,7 +29,11 @@ export function policyTableText(t: JudgeT): TableText {
   const ban = { start: SEASON_BAN.start, end: SEASON_BAN.end };
   return {
     row: (id) =>
-      isPolicyId(id) ? { label: t(`warnings.policies.${id}.label`), sub: t(`warnings.policies.${id}.sub`, ban) } : { label: id, sub: "" },
+      // The code (P0, P1, P2, P3) is in the row's description: the runner's verdict sentences name policies by it, and a reader
+      // must be able to decode them from the table.
+      isPolicyId(id)
+        ? { label: t(`warnings.policies.${id}.label`), sub: t("warnings.rowSub", { code: t(`warnings.policies.${id}.code`), sub: t(`warnings.policies.${id}.sub`, ban) }) }
+        : { label: id, sub: "" },
     what: (metric, row) => {
       const values = { policy: row };
       if (metric === "missed_danger_hours") return t("warnings.whatMissed", values);
@@ -38,6 +42,7 @@ export function policyTableText(t: JudgeT): TableText {
       return t("warnings.whatFalseShare", values);
     },
     interval: (lo, hi) => t("table.interval", { lo, hi }),
+    baselineNoInterval: t("table.baselineNoInterval"),
     unit: (metric) => (isUnitKey(metric) ? t(`units.${metric}`) : ""),
   };
 }

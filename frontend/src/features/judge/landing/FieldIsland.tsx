@@ -1,0 +1,112 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { FieldCanvas2D, type FieldCanvasHandle } from "./FieldCanvas2D";
+import type { FieldCanvasGLProps } from "./FieldCanvasGL";
+import { readingAt } from "./field-data";
+import type { LoadedField } from "./field-load";
+import { FieldReadout, readoutText } from "./FieldReadout";
+import type { FieldPanelProps } from "./FieldPoster";
+import { FieldStage } from "./FieldStage";
+import { HourScrubber } from "./HourScrubber";
+import { useFieldClock } from "./useFieldClock";
+import { canUpgrade, detectEnv, whenIdle } from "./webgl-support";
+
+/*
+ * The live hero: the field drawn from the recorded grid, the readout and the hour scrubber, driven by one clock. Loaded after
+ * first paint (FieldGate) and never rendered on the server. The day plays once from the hottest hour, round the clock and back,
+ * unless the reader prefers reduced motion; then it rests on the hottest hour and the scrubber is the control.
+ *
+ * The field is the 2D canvas first. When the page is idle and the browser has what the scene needs (webgl-support.ts), the WebGL
+ * scene is imported (this route only, never a data route) and takes over once its first frame is drawn; if it gives itself up
+ * (no WebGL, a lost context, under 30 frames per second for 2 seconds) the 2D canvas, which never stopped being correct, is drawn
+ * again at the current hour. `data-field-path` on the stage says which one is showing.
+ */
+
+const REDUCED = "(prefers-reduced-motion: reduce)";
+
+type Mode = "2d" | "webgl";
+
+export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; readonly data: LoadedField }) {
+  const t = useTranslations("judge.landing.field");
+  const flat = useRef<FieldCanvasHandle>(null);
+  const gl = useRef<FieldCanvasHandle>(null);
+  const [calm] = useState(() => window.matchMedia(REDUCED).matches);
+  const [position, setPosition] = useState(panel.peakHour);
+  const [mode, setMode] = useState<Mode>("2d");
+  const modeRef = useRef<Mode>("2d");
+  const hourRef = useRef(panel.peakHour);
+  const [scene, setScene] = useState<{ readonly Scene: ComponentType<FieldCanvasGLProps>; readonly hour: number } | null>(null);
+
+  const clock = useFieldClock(panel.peakHour, !calm, (hour, playing) => {
+    hourRef.current = hour;
+    gl.current?.draw(hour, playing);
+    if (modeRef.current === "2d") flat.current?.draw(hour, playing);
+    setPosition(hour);
+  });
+  const reading = useMemo(() => readingAt(data.grid, panel.omaa, clock.hour), [data.grid, panel.omaa, clock.hour]);
+  const text = readoutText(reading);
+
+  // After the page is idle, and only where the browser can: import the WebGL scene. A browser that cannot never downloads it.
+  useEffect(() => {
+    if (!canUpgrade(detectEnv())) return;
+    let live = true;
+    const cancel = whenIdle(() => {
+      import("./FieldCanvasGL").then(
+        (module) => {
+          // The hour the day is at when the scene arrives: it starts there, not at the peak.
+          if (live) setScene({ Scene: module.FieldCanvasGL, hour: hourRef.current });
+        },
+        () => undefined, // the chunk did not load: the 2D field stays, which is the fallback anyway
+      );
+    });
+    return () => {
+      live = false;
+      cancel();
+    };
+  }, []);
+
+  const ready = useCallback(() => {
+    modeRef.current = "webgl";
+    setMode("webgl");
+  }, []);
+  const gaveUp = useCallback(() => {
+    modeRef.current = "2d";
+    setMode("2d");
+    setScene(null);
+    // The 2D canvas stopped drawing while the scene was up: bring it to the hour the day is at now.
+    flat.current?.draw(hourRef.current, false);
+  }, []);
+
+  return (
+    <>
+      <FieldStage path={mode}>
+        <div className={mode === "webgl" ? "invisible absolute inset-0" : "absolute inset-0"}>
+          <FieldCanvas2D grid={data.grid} coast={data.coast} initialHour={panel.peakHour} rtl={panel.dir === "rtl"} handleRef={flat} />
+        </div>
+        {scene === null ? null : <scene.Scene grid={data.grid} coast={data.coast} initialHour={scene.hour} handleRef={gl} onReady={ready} onFail={gaveUp} />}
+      </FieldStage>
+      <FieldReadout
+        reading={reading}
+        live={!clock.playing}
+        proof={panel.proof}
+        source={t(panel.highestOfSeason ? "sourcePeak" : "sourcePlain", { day: panel.dayLabel })}
+      />
+      <HourScrubber
+        values={panel.omaa}
+        ban={panel.ban}
+        position={clock.playing ? position : clock.hour}
+        hour={clock.hour}
+        dir={panel.dir}
+        dayLabel={panel.dayLabel}
+        valueText={t("scrubber.valueText", { hour: text.hour, hottest: text.hottest, station: text.station })}
+        interactive
+        playing={clock.playing}
+        calm={calm}
+        onSeek={clock.seek}
+        onToggle={clock.playing ? clock.pause : clock.play}
+      />
+    </>
+  );
+}

@@ -87,7 +87,7 @@ test("governance refusal visible in the worker log: send, see the 403 and the ne
   // the new audit row and the worker's list: the sentence is the site's, not "about you"
   await expect(page.locator("[data-audit=shown]")).toContainText("Refused");
   const phone = page.locator("[data-log-source=live]");
-  await expect(phone.locator("[data-access-row]").first()).toContainText("An employer request for individual data at this site was refused");
+  await expect(phone.locator("[data-access-row]").first()).toContainText("A request for a worker's health data was refused");
   // step 4 is the API's own log now (newest three): at least the row just written, never the recorded row stacked on top
   const after = await phone.locator("[data-access-row]").count();
   expect(after).toBeGreaterThanOrEqual(1);
@@ -101,7 +101,7 @@ test("governance refusal visible in the worker log: send, see the 403 and the ne
   const block = page.locator("[data-live-rows]");
   await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
   await expect.poll(() => block.locator("[data-access-row]").count()).toBeGreaterThanOrEqual(after);
-  await expect(block.locator("[data-access-row]").first()).toContainText("An employer request for individual data at this site was refused");
+  await expect(block.locator("[data-access-row]").first()).toContainText("A request for a worker's health data was refused");
   await expect(page.locator("[data-log-source=recorded] [data-access-row]")).toHaveCount(1);
 });
 

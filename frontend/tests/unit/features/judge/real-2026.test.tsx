@@ -174,7 +174,7 @@ describe("ScoreboardView on the real 2026 data", () => {
     expect(policyProof?.label).toBe("REAL");
     expect(planProof?.label).toBe("REAL weather + assumed crew");
     for (const proof of [policyProof, planProof]) {
-      expect(proof?.evaluation).toEqual({ lockSha256: record.lock_sha256, protocolCommit: record.protocol_commit });
+      expect(proof?.evaluation).toEqual({ lockSha256: record.lock_sha256, protocolCommit: record.protocol_commit, amendments: record.amendments, freeze: record.freeze });
       expect(proof?.file).toMatch(/^eval\/2026\//);
     }
     if (policyProof === undefined) throw new Error("no proof");
@@ -187,20 +187,25 @@ describe("ScoreboardView on the real 2026 data", () => {
 });
 
 describe("DayView on the real 2026 day", () => {
-  it("draws the day the file says, with five counters (both thetas) each with a proof, and no pending copy", () => {
+  it("draws the day the file says, with six counters (both thetas) each with a proof, and no pending copy", () => {
     const { container } = renderWithIntl(<DayView data={data} hourly={hourly} />);
     expect(container.querySelector("[data-day-shown=scored]")?.textContent).toContain("Sun 14 Jun");
     expect(container.querySelector("h1")?.textContent).toBe("One day, hour by hour, chosen by a rule before we looked");
     const ids = [...container.querySelectorAll("[data-counter-id]")].map((el) => el.getAttribute("data-counter-id"));
-    expect(ids).toEqual(["high", "outside", "raw", "ours", "balanced"]);
+    expect(ids).toEqual(["high", "outside", "p1", "raw", "ours", "balanced"]);
     for (const el of container.querySelectorAll("[data-counter-id]")) expect(el.querySelector("[data-proof-id]")).not.toBeNull();
     const counter = (id: string) => container.querySelector(`[data-counter-id=${id}]`)?.textContent ?? "";
-    expect(counter("high")).toContain("7.0");
-    expect(counter("raw")).toContain("5.0");
-    expect(counter("ours")).toContain("6.0");
-    expect(counter("balanced")).toContain("5.0");
+    // whole hours, out of the 7 the station recorded (never "7.0"); P1 called all 7, the ADOSH zones 5, protective 6, balanced 5
+    expect(counter("high")).toContain("7");
+    expect(counter("p1")).toContain("7 of 7");
+    expect(counter("raw")).toContain("5 of 7");
+    expect(counter("ours")).toContain("6 of 7");
+    expect(counter("balanced")).toContain("5 of 7");
+    expect(counter("raw")).toContain("ADOSH zones");
+    expect(hitsBy(day, "P1")).toBe(7);
     const text = container.textContent;
     expect(text).not.toMatch(/added by the scoring run|###|DEV 2025/);
+    expect(container.querySelector("[data-day-counters]")?.textContent).not.toMatch(/[0-9]\.0(?![0-9])/);
     expect(text).not.toMatch(FORBIDDEN);
   });
 
@@ -228,8 +233,8 @@ describe("no forbidden phrase anywhere in the English catalogue", () => {
     expect(strings.filter((s) => FORBIDDEN.test(s))).toEqual([]);
   });
 
-  it("the day builder's counters are the five claim ids the proof sheet serves", () => {
+  it("the day builder's counters are the six claim ids the proof sheet serves", () => {
     const model = buildDay({ day, dayFile: data.files.day, hourly, locale: "en", t: ((key: string) => key) as never });
-    expect(model.counters?.map((c) => c.proof?.claim)).toEqual(["day.high", "day.outside", "day.raw", "day.ours", "day.balanced"]);
+    expect(model.counters?.map((c) => c.proof?.claim)).toEqual(["day.high", "day.outside", "day.p1", "day.raw", "day.ours", "day.balanced"]);
   });
 });

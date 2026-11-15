@@ -165,7 +165,12 @@ export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActio
       checkFired.current = false;
       return;
     }
-    if (waiting || checkFired.current) return;
+    // Still waiting: nothing has fired, so a check that queues itself again in the same batch is not left behind a stale flag.
+    if (waiting) {
+      checkFired.current = false;
+      return;
+    }
+    if (checkFired.current) return;
     checkFired.current = true;
     checkRef.current();
   }, [queued, waiting]);

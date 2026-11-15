@@ -19,7 +19,7 @@
 // LF, copied unchanged so the file hashes the proof shows are the run's own), the go-ahead marker `backend/training/2026-go.toml`
 // at --go-rev and the 2025 development run's policy file (its H4 outcome is the "prior run"). It writes the three 2026 files as
 // above plus `evaluation_record.json` (eval-shape.mjs, `buildEvaluationRecord`): the lock hash from the marker, which is only
-// accepted when the marker hashes to `run_meta.go_sha256`, the protocol commit and hash, and the commit that introduced each file.
+// accepted when the marker hashes to `run_meta.go_sha256`, the protocol commit and hash, the amendments the run lists and the freeze addendum (path, commit, SHA-256), and the commit that introduced each file.
 //
 // A file's `evaluation_set` must match where it sits (scored_2026 in 2026/, dev_2025 in dev/): a development export
 // dropped into 2026/ is refused, never shown as the result.
@@ -37,6 +37,7 @@ const SETS = [
 const ARTIFACTS = "artifacts/eval/2026";
 const GO_MARKER = "backend/training/2026-go.toml";
 const DEV_POLICY = "artifacts/eval/dev/policy_scoreboard.2025.json";
+const FREEZE = "docs/research/2026-11-15-preregistration-freeze.md";
 
 function parseArgs(argv) {
   const args = { source: process.env.SB_EVAL_ARTIFACTS || "", git: "", rev: "", goRev: "", root: path.join(path.dirname(fileURLToPath(import.meta.url)), "..") };
@@ -119,6 +120,7 @@ function fromGit(repo, rev, goRev, root, errors) {
       goBytes,
       files,
       prior: { outcome: h4.outcome, commit: gitFileCommit(repo, rev, DEV_POLICY) },
+      freeze: { path: FREEZE, commit: gitFileCommit(repo, rev, FREEZE), sha256: sha256Hex(gitShow(repo, rev, FREEZE)) },
     });
     const bytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`, "utf8");
     plan.push({ bytes, to: path.join(root, "data/eval/2026", "evaluation_record.json"), copyTo: path.join(root, "public/data/eval/2026", "evaluation_record.json") });

@@ -2,6 +2,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { components } from "@/api/schema";
+import type { EvaluationInfo } from "@/components/provenance/proof";
 import { checkEvalShape, checkEvaluationRecord, EVAL_FILES, EVAL_KINDS, sha256Hex, type EvalKind, type EvaluationSet } from "./eval-shape.mjs";
 import { parseRosterFrontier, type RosterFrontier } from "./roster-frontier";
 
@@ -43,6 +44,9 @@ export interface EvaluationRecord {
   readonly files: Readonly<Record<string, { readonly commit: string; readonly sha256: string }>>;
   /** The 2025 development run: its primary hypothesis (H4) outcome, the "prior run". */
   readonly prior_run: { readonly evaluation_set: "dev_2025"; readonly h4_outcome: string; readonly commit: string };
+  /** The amendments the run lists and the freeze addendum, each with the commit that wrote it and its SHA-256. */
+  readonly amendments: readonly { readonly path: string; readonly commit: string; readonly sha256: string }[];
+  readonly freeze: { readonly path: string; readonly commit: string; readonly sha256: string };
 }
 
 /** A file the page drew: its path relative to `data/` (what the proof drawer shows) and the SHA-256 of its bytes. */
@@ -50,7 +54,7 @@ export interface EvalFileInfo {
   readonly path: string;
   readonly sha256: string;
   /** The lock and protocol commit of the held-out run, on a 2026 file; the proof drawer shows them. */
-  readonly evaluation?: { readonly lockSha256: string; readonly protocolCommit: string };
+  readonly evaluation?: EvaluationInfo;
 }
 
 export interface EvalData {
@@ -229,7 +233,7 @@ export async function loadScored(options: LoadEvalOptions = {}): Promise<ScoredD
   }
   // The held-out files carry the lock they were scored under, so every proof of a 2026 number can show it.
   const withLock = (read: Read<unknown> | null): EvalFileInfo | null =>
-    read === null ? null : record === null ? read.info : { ...read.info, evaluation: { lockSha256: record.lock_sha256, protocolCommit: record.protocol_commit } };
+    read === null ? null : record === null ? read.info : { ...read.info, evaluation: { lockSha256: record.lock_sha256, protocolCommit: record.protocol_commit, amendments: record.amendments, freeze: record.freeze } };
 
   return {
     // The shape was checked against the contract's required keys in readTier; the generated type is the contract.

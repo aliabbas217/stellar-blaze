@@ -33,7 +33,10 @@ jobs:
       # Regenerates src/api/schema.d.ts from the OpenAPI source and fails when it differs from the committed file.
       - run: pnpm api:check
       - run: pnpm test
+      # SB_REQUIRE_SCORED=1: a build without the held-out 2026 files (or with an evaluation record that does not name them) fails here, not on the live site.
       - run: pnpm build
+        env:
+          SB_REQUIRE_SCORED: "1"
       # Reads the build output: 174,080 B gzip of first-load script per route, 199,680 B for /worker and /worker/alerts only (architect, F2 W3.1).
       - run: pnpm bundle:check
       # The full Chromium (not the headless shell): the push tests need a browser that honours a notification permission grant.

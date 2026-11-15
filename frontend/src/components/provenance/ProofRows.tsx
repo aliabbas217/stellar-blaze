@@ -47,6 +47,17 @@ export function ProofRows({ proof }: { readonly proof: Proof }) {
           </span>
         </Row>
       )}
+      {proof.evaluation === undefined ? null : (
+        <Row name={t("rows.amendments")}>
+          <span className="flex flex-col gap-3" data-amendments="">
+            <span className="text-base text-ink">{t("lock.amendmentsNote")}</span>
+            {proof.evaluation.amendments.map((amendment) => (
+              <Hash key={amendment.path} caption={`${amendment.path.split("/").pop() ?? amendment.path} (${amendment.commit.slice(0, 7)})`} value={amendment.sha256} />
+            ))}
+            <Hash caption={`${proof.evaluation.freeze.path.split("/").pop() ?? proof.evaluation.freeze.path} (${proof.evaluation.freeze.commit.slice(0, 7)})`} value={proof.evaluation.freeze.sha256} />
+          </span>
+        </Row>
+      )}
       <Row name={t("rows.model")} code>
         {proof.modelId ?? none}
       </Row>

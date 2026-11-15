@@ -97,7 +97,7 @@ for (const [name, viewport] of [
     expect(report.failures).toEqual([]);
     expect(report.axeViolations).toEqual([]);
     if (viewport === JUDGE) expect(report.heroShare ?? 0).toBeGreaterThanOrEqual(0.35);
-    await expect(page.locator("[data-counter-id]")).toHaveCount(5);
+    await expect(page.locator("[data-counter-id]")).toHaveCount(6);
     await expect(page.locator("[data-counter-pending]")).toHaveCount(0);
     await shot(page, "ideal", viewport);
   });
@@ -105,11 +105,15 @@ for (const [name, viewport] of [
   test(`day page counters carry both thetas and the not-in-force outline is named in words, ${name} wide`, async ({ page }) => {
     await open(page, viewport);
     const counters = page.locator("[data-day-counters]");
-    await expect(counters.locator("[data-counter-id=high]")).toContainText("7.0");
-    await expect(counters.locator("[data-counter-id=raw]")).toContainText("5.0");
-    await expect(counters.locator("[data-counter-id=ours]")).toContainText("6.0");
-    await expect(counters.locator("[data-counter-id=balanced]")).toContainText("5.0");
-    for (const id of ["high", "outside", "raw", "ours", "balanced"]) await expect(counters.locator(`[data-counter-id=${id}] [data-proof-id]`)).toHaveCount(1);
+    // whole hours, out of the 7 the station recorded; the label names the policy (P1 called all 7, the ADOSH zones 5)
+    await expect(counters.locator("[data-counter-id=high]")).toContainText("7");
+    await expect(counters.locator("[data-counter-id=p1]")).toContainText("7 of 7");
+    await expect(counters.locator("[data-counter-id=raw]")).toContainText("5 of 7");
+    await expect(counters.locator("[data-counter-id=raw]")).toContainText("ADOSH zones on the raw forecast");
+    await expect(counters.locator("[data-counter-id=ours]")).toContainText("6 of 7");
+    await expect(counters.locator("[data-counter-id=balanced]")).toContainText("5 of 7");
+    await expect(counters).not.toContainText(/\d\.0(?!\d)/);
+    for (const id of ["high", "outside", "p1", "raw", "ours", "balanced"]) await expect(counters.locator(`[data-counter-id=${id}] [data-proof-id]`)).toHaveCount(1);
     // the break is not in force on 14 June: a dashed outline, named in the legend where a phone can read it
     await expect(page.locator("[data-slot=outline]")).toHaveCount(1);
     await expect(page.locator("[data-legend-item=outline]")).toContainText("Midday break by law: not in force until 15 Jun");

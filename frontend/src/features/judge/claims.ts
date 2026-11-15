@@ -10,7 +10,7 @@ import type { RosterFrontier } from "./roster-frontier";
  * (`/replay/proof/<claim>`) is addressed by it. A claim is built here from the same data and the same proofs the tables and
  * counters use, so the sheet can never say something the page did not. The ids:
  *   policy.<p0|p1|p2|p3|p3_balanced>.<metric>          a Warnings cell at lead 1 (adapters.ts, `policyClaim`); policy.lead2.<p>.<metric> at lead 2
- *   day.<high|outside|raw|ours|balanced>                the scored day's counters (day-view.ts)
+ *   day.<high|outside|p1|raw|ours|balanced>              the scored day's counters (day-view.ts)
  *   plan.<plan>.<metric>                                a Plans cell (`planClaim`)
  *   forecast.<days_over_limit|hours_over_limit|hours_in_break>
  *                                                       the season counts, from the recorded forecast file
@@ -85,7 +85,7 @@ export function rowClaims(rows: readonly ScoreRow[]): Claim[] {
   );
 }
 
-/** The scored day's counters (`day.<high|outside|raw|ours|balanced>`): each with its proof, from the same model the day page draws. */
+/** The scored day's counters (`day.<high|outside|p1|raw|ours|balanced>`): each with its proof, from the same model the day page draws. */
 export function dayClaims(counters: readonly DayCounter[] | null): Claim[] {
   return (counters ?? []).flatMap((counter): Claim[] =>
     counter.proof === null ? [] : [{ id: `day.${counter.id}`, what: counter.label, value: counter.value, unit: counter.unit, kind: "scored", proof: counter.proof }],

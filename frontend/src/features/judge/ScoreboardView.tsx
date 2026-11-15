@@ -16,6 +16,7 @@ import { VerdictList } from "./VerdictList";
 import type { EvalData } from "./data";
 import type { HourlyData } from "./hourly";
 import { buildSeasonView } from "./season-view";
+import { policyTradeoff } from "./policy-tradeoff";
 import { planTableText, policyTableText } from "./table-text";
 
 /**
@@ -112,7 +113,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
 
   // The held-out run's own label and lock, through the proof chip (the drawer shows the lock hash and the protocol commit).
   const evaluationProof =
-    data?.source === "2026" && policy !== null && files?.policy != null ? proofFromProvenance(policy.provenance, "", t("evaluation.what"), files.policy) : null;
+    data?.source === "2026" && data.record !== null && policy !== null && files?.policy != null ? proofFromProvenance(policy.provenance, "", t("evaluation.what"), files.policy) : null;
 
   // The truth-based figure: the station's own danger hours (value and interval read from the Warnings file), with its definition.
   const truthMetric = policy?.leads.find((lead) => lead.lead_days === 1)?.truth_danger_hours ?? null;
@@ -128,6 +129,10 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
       : null;
   const truthProof =
     policy !== null && truthMetric !== null && files?.policy != null ? proofFromProvenance(policy.provenance, truthMetric.anchor, t("warnings.truthWhat"), files.policy) : null;
+
+  // The trade-off paragraph: every number and every "fewer" or "more" from the Warnings rows (policy-tradeoff.ts).
+  const warningsTradeoff = policy === null ? null : policyTradeoff(policy, 1, format, t);
+  const lead2Tradeoff = policy === null ? null : policyTradeoff(policy, 2, format, t);
 
   const noScoredFile = policy === null && plans === null;
   // The held-out claim describes the 2026 run (or the protocol before it has run); beside a dev or shape-fixture stamp it would read
@@ -192,6 +197,11 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
                 {truthProof === null ? null : <ProofChip proof={truthProof} />}
               </p>
             )}
+            {warningsTradeoff === null ? null : (
+              <p className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="">
+                {warningsTradeoff}
+              </p>
+            )}
             {policy === null ? <PendingBanner what={t("warnings.pending")} /> : null}
             <ScoreboardTable
               caption={t("warnings.caption")}
@@ -207,6 +217,11 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
               <div className="flex flex-col gap-4 border-t border-hair pt-6" data-lead="2">
                 <h3 className="text-lg font-semibold text-ink">{t("warnings.lead2.heading")}</h3>
                 <p className="max-w-(--measure) text-base text-ink-2">{t("warnings.lead2.sub")}</p>
+                {lead2Tradeoff === null ? null : (
+                  <p className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="2">
+                    {lead2Tradeoff}
+                  </p>
+                )}
                 <ScoreboardTable caption={t("warnings.lead2.caption")} rowHeading={t("warnings.columns.policy")} columns={policyColumns} rows={lead2Rows} />
                 <VerdictList heading={t("verdict.lead2")} items={lead2Verdicts} proof={policyProof} what={t("verdict.lead2")} />
               </div>

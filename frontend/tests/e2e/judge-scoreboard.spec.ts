@@ -28,8 +28,13 @@ async function shot(page: Page, view: string, name: string, viewport: { width: n
   if (dir === undefined || dir === "") return;
   const wide = viewport.width === JUDGE.width ? "1440" : "390";
   mkdirSync(path.join(dir, view), { recursive: true });
-  const height = await page.evaluate(() => document.documentElement.scrollHeight);
-  await page.screenshot({ path: path.join(dir, view, `${name}-${wide}-night.png`), clip: { x: 0, y: 0, width: viewport.width, height: Math.min(height, wide === "390" ? 3000 : 1800) }, fullPage: true });
+  // The whole page (never clipped: review item I5 found P3, lead 2, H5, Plans and the limits line missing from clipped PNGs) and one
+  // PNG per section, so each card is legible at full size. The gate run shrinks any file over 450 KB to a 256-colour palette.
+  await page.screenshot({ path: path.join(dir, view, `${name}-${wide}-night.png`), fullPage: true });
+  for (const section of view === "scoreboard" ? ["warnings", "plans", "frontier"] : []) {
+    const target = page.locator(`#${section}`);
+    if ((await target.count()) > 0) await target.screenshot({ path: path.join(dir, view, `${name}-${section}-${wide}-night.png`) });
+  }
 }
 
 async function open(page: Page, path: string, viewport = JUDGE): Promise<string[]> {
@@ -230,7 +235,7 @@ test("proof sheet serves the lead 2 and day counter claims, with the lock", asyn
   await expect(page.locator("[data-sheet-number]")).toBeVisible();
   await expect(page.locator("dt", { hasText: "Pre-registration" })).toBeVisible();
   await open(page, "/en/replay/proof/day.balanced");
-  await expect(page.locator("[data-sheet-number]")).toContainText("5.0");
+  await expect(page.locator("[data-sheet-number]")).toContainText("5 of 7");
   await open(page, "/en/replay/proof/policy.p3.pod");
   const record = JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", "evaluation_record.json"), "utf8")) as { lock_sha256: string };
   await expect(page.getByText(record.lock_sha256)).toBeVisible();

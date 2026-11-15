@@ -40,7 +40,7 @@ function stageRecord(overrides: Record<string, unknown> = {}): void {
   const files = Object.fromEntries(NAMES.map((name) => [`${name}.json`, { commit: "a".repeat(40), sha256: sha(readFileSync(path.join(dir, `${name}.json`))) }]));
   write(
     path.join(dir, "evaluation_record.json"),
-    `${JSON.stringify({ evaluation_set: "scored_2026", lock_sha256: LOCK, go_sha256: "b".repeat(64), protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", files, prior_run: { evaluation_set: "dev_2025", h4_outcome: "negative", commit: "e".repeat(40) }, ...overrides }, null, 2)}\n`,
+    `${JSON.stringify({ evaluation_set: "scored_2026", lock_sha256: LOCK, go_sha256: "b".repeat(64), protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", files, prior_run: { evaluation_set: "dev_2025", h4_outcome: "negative", commit: "e".repeat(40) }, amendments: [{ path: "docs/a1.md", commit: "1".repeat(40), sha256: "2".repeat(64) }], freeze: { path: "docs/freeze.md", commit: "3".repeat(40), sha256: "4".repeat(64) }, ...overrides }, null, 2)}\n`,
   );
   for (const name of [...NAMES.map((n) => `${n}.json`), "evaluation_record.json"]) {
     mkdirSync(path.join(root, "public", "data", "eval", "2026"), { recursive: true });
@@ -157,10 +157,11 @@ describe("sync-eval-data.mjs --git: the run's own objects", () => {
     for (const name of NAMES) write(path.join(repo, "artifacts", "eval", "2026", `${name}.json`), scored(name));
     write(
       path.join(repo, "artifacts", "eval", "2026", "run_meta.json"),
-      `${JSON.stringify({ protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", ...runMeta })}\n`,
+      `${JSON.stringify({ protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", amendments: [{ commit: "1".repeat(40), path: "docs/a1.md", sha256: "2".repeat(64) }], ...runMeta })}\n`,
     );
     write(path.join(repo, "artifacts", "eval", "dev", "policy_scoreboard.2025.json"), `${JSON.stringify({ verdicts: [{ id: "H4", outcome: "negative" }] })}\n`);
     write(path.join(repo, "backend", "training", "2026-go.toml"), goText);
+    write(path.join(repo, "docs", "research", "2026-11-15-preregistration-freeze.md"), "freeze addendum\n");
     git(repo, ["add", "-A"]);
     git(repo, ["commit", "-q", "-m", "run"]);
     return repo;
