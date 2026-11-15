@@ -56,7 +56,10 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
         {/* reloadOnOnline off: the default reloads the page whenever the connection returns, which would wipe a
             half-filled profile form on a patchy site connection; TanStack Query already refetches on reconnect. */}
         <SerwistProvider swUrl="/serwist/sw.js" reloadOnOnline={false}>
-          <NextIntlClientProvider>
+          <NextIntlClientProvider messages={{}}>
+            {/* No messages here on purpose: each route group wraps its children in `ClientMessages` (src/i18n/ClientMessages.tsx) with
+                the namespaces its client components read. The provider with no `messages` prop put the whole catalogue (16 KB gzip) in
+                the flight payload of every page. */}
             {/* Leaves the language for the service worker, which shows push notifications with no page open. */}
             <LocalePrefs />
             {/* Sun mode is reset to night by the field shell when it unmounts (FieldShell.tsx), not by a guard here: a guard

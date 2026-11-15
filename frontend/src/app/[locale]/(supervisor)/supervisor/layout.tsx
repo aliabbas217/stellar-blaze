@@ -1,4 +1,6 @@
 import { DemoProvider } from "@/features/demo/DemoProvider";
+import { ClientMessages } from "@/i18n/ClientMessages";
+import { SUPERVISOR_NAMESPACES } from "@/i18n/client-namespaces";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { SupervisorFrame } from "./SupervisorFrame";
 
@@ -9,10 +11,12 @@ import { SupervisorFrame } from "./SupervisorFrame";
  */
 export default function SupervisorLayout({ children }: LayoutProps<"/[locale]/supervisor">) {
   return (
-    <QueryProvider>
-      <DemoProvider>
-        <SupervisorFrame>{children}</SupervisorFrame>
-      </DemoProvider>
-    </QueryProvider>
+    <ClientMessages paths={SUPERVISOR_NAMESPACES}>
+      <QueryProvider>
+        <DemoProvider>
+          <SupervisorFrame>{children}</SupervisorFrame>
+        </DemoProvider>
+      </QueryProvider>
+    </ClientMessages>
   );
 }

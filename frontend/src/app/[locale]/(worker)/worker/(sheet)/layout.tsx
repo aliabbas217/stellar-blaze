@@ -1,3 +1,5 @@
+import { ClientMessages } from "@/i18n/ClientMessages";
+import { WORKER_SHEET_NAMESPACES } from "@/i18n/client-namespaces";
 import { SheetFrame } from "./SheetFrame";
 
 /*
@@ -7,5 +9,9 @@ import { SheetFrame } from "./SheetFrame";
  * nothing is logged or sent, and it works with no signal. The URL is unchanged (`/worker/unwell`); a route group is not a segment.
  */
 export default function WorkerSheetLayout({ children }: LayoutProps<"/[locale]/worker">) {
-  return <SheetFrame>{children}</SheetFrame>;
+  return (
+    <ClientMessages paths={WORKER_SHEET_NAMESPACES}>
+      <SheetFrame>{children}</SheetFrame>
+    </ClientMessages>
+  );
 }

@@ -8,8 +8,8 @@ export interface StaleBannerProps {
   /** How long ago that was, already worded for the locale ("5 h"). The banner adds "ago". */
   readonly ageLabel: string;
   /**
-   * Replaces the heading ("Last known level") with another one. Today says "No fresh forecast: protective plan" there: the sign
-   * above already reads "Last known level", so the banner's own heading would only repeat it and cost a line of the first fold.
+   * Replaces the heading ("Last known level") with another one. Today no longer uses this banner: its not-live states lead with the
+   * protective-plan lead (features/today/ProtectiveLead.tsx, F2 W3.2). The alert card and the kit still do.
    */
   readonly title?: string;
 }

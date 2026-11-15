@@ -1,6 +1,6 @@
 import type { components } from "@/api/schema";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
-import { describeToday, type DescribeInput } from "@/features/today/describe";
+import { describeToday, PROTECTIVE_LEVEL, type DescribeInput } from "@/features/today/describe";
 import { selectWithProfile as selectTodayViewModel } from "./select-with-profile";
 import { banWindow, riskPolicy, SITE_DEMO } from "@/mocks/fixtures";
 
@@ -109,17 +109,22 @@ describe("describeToday", () => {
     expect(shown.banner).toBeNull();
   });
 
-  it("test_stale_and_fallback_are_not_live: a stale forecast is the last known level, with its time and age, never a live one", () => {
+  it("test_stale_and_fallback_are_not_live: a stale forecast shows the PROTECTIVE level (High, orange: ADR 0058); the last known level is secondary", () => {
     const shown = describeWith({ forecast: forecast({ forecast_status: "stale", generated_at: "2026-09-02T05:00:00Z" }) });
-    expect(shown.levelKind).toBe("stale");
-    expect(shown.kicker).toBe("stale");
+    expect(shown.notLive).toBe(true);
+    expect(shown.level).toBe(PROTECTIVE_LEVEL);
+    expect(shown.levelKind).toBe("fallback"); // dashed: a plan, not a live reading
+    expect(shown.kicker).toBe("protective");
+    expect(shown.lastKnownLevel).toBe("orange"); // the hour's own level in the fixture
+    expect(shown.untilAt).toBeNull();
     expect(shown.banner).toMatchObject({ kind: "stale" });
     expect(shown.banner?.updatedAt.toISOString()).toBe("2026-09-02T05:00:00.000Z");
   });
 
   it("a live forecast older than three hours is stale on its own account, whatever the API's status says", () => {
     const shown = describeWith({ forecast: forecast({ mode: "live", generated_at: "2026-09-03T03:00:00Z" }) });
-    expect(shown.levelKind).toBe("stale");
+    expect(shown.notLive).toBe(true);
+    expect(shown.level).toBe(PROTECTIVE_LEVEL);
     expect(shown.banner?.kind).toBe("stale");
   });
 
@@ -131,18 +136,21 @@ describe("describeToday", () => {
     expect(shown.cells.some((cell) => cell.wbgtC !== null)).toBe(true);
   });
 
-  it("test_stale_and_fallback_are_not_live: a fallback forecast has no level at all, only the site rules", () => {
+  it("test_stale_and_fallback_are_not_live: a fallback forecast shows the protective level and has no last known one", () => {
     const shown = describeWith({ forecast: forecast({ forecast_status: "fallback" }) });
-    expect(shown.level).toBeNull();
+    expect(shown.notLive).toBe(true);
+    expect(shown.level).toBe(PROTECTIVE_LEVEL);
     expect(shown.levelKind).toBe("fallback");
-    expect(shown.kicker).toBe("fallback");
+    expect(shown.kicker).toBe("protective");
+    expect(shown.lastKnownLevel).toBeNull();
     expect(shown.protective).toBe(true);
     expect(shown.untilAt).toBeNull();
   });
 
-  it("offline with a level in hand: last known level and the offline banner, with the time and age of the forecast", () => {
+  it("offline with a level in hand: the protective level, the last known level secondary, and the offline notice with the time and age of the forecast", () => {
     const shown = describeWith({ offline: true, deviceNow: new Date("2026-09-03T08:20:00Z") });
-    expect(shown.levelKind).toBe("stale");
+    expect(shown.level).toBe(PROTECTIVE_LEVEL);
+    expect(shown.lastKnownLevel).not.toBeNull();
     expect(shown.banner).toMatchObject({ kind: "offline" });
     expect(shown.banner?.updatedAt.toISOString()).toBe("2026-09-03T06:50:00.000Z");
     expect(shown.banner?.ageMs).toBe(90 * 60_000);
@@ -182,12 +190,14 @@ describe("describeToday", () => {
     it.each(NOT_LIVE.filter(([name]) => name !== "fallback"))("%s: last known, no line at now, no Now waypoint, no promise of how long it holds", (_name, input) => {
       const shown = describeWith(input);
       expect(shown.lastKnown).toBe(true);
-      expect(shown.levelKind).toBe("stale");
+      expect(shown.notLive).toBe(true);
+      expect(shown.levelKind).toBe("fallback");
       expect(shown.nowHour).toBeNull();
       expect(shown.waypoints.some((spec) => spec.kind === "now")).toBe(false);
       expect(shown.untilAt).toBeNull();
-      // The sign still says the last known level, dimmed: that is the secondary information.
-      expect(shown.level).not.toBeNull();
+      // The sign says the protective level; the last known one is secondary information (shown dashed beside it).
+      expect(shown.level).toBe(PROTECTIVE_LEVEL);
+      expect(shown.lastKnownLevel).not.toBeNull();
     });
 
     it("the clock's own waypoints (the break, the shift's end) stay on a last known day: they do not come from the forecast", () => {

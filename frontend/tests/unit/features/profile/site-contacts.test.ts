@@ -3,6 +3,7 @@ import { PROFILE_STORAGE_KEY, readSitePin, resetSitePinForTests, sameContacts, t
 import { createProfileStore, useProfile, type ProfileEffects } from "@/features/profile/store";
 import { clearRevokeIncomplete, endRevokeActivity, readRevokeActive } from "@/features/profile/revoke-marker";
 import { useDeviceSite } from "@/features/profile/useDeviceSite";
+import * as chooseSite from "@/features/profile/choose-site";
 import { contactsOf, useSiteContactsSync } from "@/features/profile/useSiteContactsSync";
 import { forgetPendingDelete, readPendingDeletes } from "@/features/push/pending-delete";
 
@@ -167,6 +168,43 @@ describe("useSiteContactsSync", () => {
     const savedAt = useProfile.getState().site?.contacts?.savedAt ?? "";
     expect(Date.parse(savedAt)).not.toBeNaN();
     expect(Math.abs(Date.now() - Date.parse(savedAt))).toBeLessThan(60_000);
+  });
+
+  it("W2: a phone pinned before the date was recorded gets one (contacts with no savedAt, numbers unchanged), so the offline line can show", async () => {
+    useProfile.getState().chooseSite({ siteId: site.id, crewId: "crew-b", contacts: CONTACTS });
+    expect(useProfile.getState().site?.contacts?.savedAt).toBeUndefined();
+    renderHook(() => {
+      useSiteContactsSync([site]);
+    });
+    await waitFor(() => {
+      expect(Date.parse(useProfile.getState().site?.contacts?.savedAt ?? "")).not.toBeNaN();
+    });
+    expect(useProfile.getState().site?.contacts).toMatchObject(CONTACTS);
+    expect(useProfile.getState().site?.crewId).toBe("crew-b");
+  });
+
+  it("W2: a date that is there is kept: an unchanged number does not rewrite it on every visit", async () => {
+    const savedAt = "2026-11-01T08:00:00.000Z";
+    useProfile.getState().chooseSite({ siteId: site.id, crewId: null, contacts: { ...CONTACTS, savedAt } });
+    renderHook(() => {
+      useSiteContactsSync([site]);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(useProfile.getState().site?.contacts?.savedAt).toBe(savedAt);
+  });
+
+  it("W2: a store chunk that cannot load does not throw from the background sync (the pin keeps what it had)", async () => {
+    useProfile.getState().chooseSite({ siteId: site.id, crewId: null, contacts: CONTACTS });
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    vi.spyOn(chooseSite, "chooseDeviceSite").mockRejectedValue(new Error("Loading chunk failed"));
+    renderHook(() => {
+      useSiteContactsSync([{ ...site, first_aider_phone: null }]);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(useProfile.getState().site?.contacts).toMatchObject(CONTACTS);
   });
 
   it("refreshes a number the site has changed, and records that a site has none as null (not as unknown)", async () => {

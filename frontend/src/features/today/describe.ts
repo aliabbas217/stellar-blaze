@@ -43,7 +43,7 @@ export interface DescribeInput {
   readonly locale: string;
 }
 
-export type Kicker = "site" | "personal" | "stale" | "fallback" | "noHour";
+export type Kicker = "site" | "personal" | "protective" | "noHour";
 
 export interface Banner {
   readonly kind: "stale" | "offline";
@@ -61,8 +61,16 @@ export interface BanNote {
   readonly resumes: string | null;
 }
 
+/**
+ * The level the sign shows while the forecast is not live: High, which the level vocabulary writes "orange" (ADR 0046 decision 3:
+ * Low green, Medium amber, High orange, Red red). ADR 0058 decision 4 and its 2026-11-15 clarification: with no usable forecast
+ * (fallback) or a stale one, the plan treats every on-shift tick as High, "the most severe workable zone; never less protective
+ * than the ban", and labels it "No fresh forecast: protective plan". The sign says the same level the plan uses.
+ */
+export const PROTECTIVE_LEVEL: Level = "orange";
+
 export interface TodayDescription {
-  /** The level on the sign; null shows "Site rules" with no marker. */
+  /** The level on the sign: the protective level in a not-live state; null shows "Site rules" with no marker (live, no hour now). */
   readonly level: Level | null;
   readonly levelKind: LevelKind;
   readonly kicker: Kicker;
@@ -75,6 +83,10 @@ export interface TodayDescription {
   readonly banner: Banner | null;
   /** The forecast on screen is last known, not live (stale, or the phone is offline): nothing is drawn from it as current. */
   readonly lastKnown: boolean;
+  /** No live forecast to act on: stale, offline or fallback. The protective-plan lead is the hero of the screen (F2 W3.2). */
+  readonly notLive: boolean;
+  /** The last known level of a stale or offline forecast: shown secondary and dashed beside the protective sign, never as current. */
+  readonly lastKnownLevel: Level | null;
   /** There is no level to act on, or only a last known one: the lead is the protective site rules, in fixed words. */
   readonly protective: boolean;
   readonly plan: ActionPlan;
@@ -130,21 +142,16 @@ export function describeToday(input: DescribeInput): TodayDescription {
   const displayed = fallback ? null : view.displayed;
   // Offline is only a lower bound on "not live" (see useOffline), and a stale forecast is never live: either way it is last known.
   const lastKnown = stale || offline;
-  const level = displayed?.level ?? null;
-  const levelKind: LevelKind = level === null ? "fallback" : lastKnown ? "stale" : "live";
-  const kicker: Kicker = fallback
-    ? "fallback"
-    : level === null
-      ? "noHour"
-      : lastKnown
-        ? "stale"
-        : displayed?.source === "personal"
-          ? "personal"
-          : "site";
+  const notLive = fallback || lastKnown;
+  const lastKnownLevel = lastKnown && !fallback ? (displayed?.level ?? null) : null;
+  // Not live: the sign shows the PROTECTIVE level (what the plan uses), dashed; the level the forecast last gave is secondary.
+  const level = notLive ? PROTECTIVE_LEVEL : (displayed?.level ?? null);
+  const levelKind: LevelKind = notLive || level === null ? "fallback" : "live";
+  const kicker: Kicker = notLive ? "protective" : level === null ? "noHour" : displayed?.source === "personal" ? "personal" : "site";
 
-  const run = displayed?.source === "site" && !lastKnown ? levelRun(forecast.hours, now) : null;
+  const run = displayed?.source === "site" && !notLive ? levelRun(forecast.hours, now) : null;
   const personalHigher =
-    !lastKnown &&
+    !notLive &&
     level !== null &&
     view.personal.status === "available" &&
     view.siteLevel !== null &&
@@ -180,7 +187,9 @@ export function describeToday(input: DescribeInput): TodayDescription {
     personalUnavailable,
     banner,
     lastKnown,
-    protective: level === null || lastKnown,
+    notLive,
+    lastKnownLevel,
+    protective: level === null || notLive,
     // The hour's codes are read only from a live forecast (a fallback one has no level to act on either): no codes is "Follow the
     // site rules" and no extra lines.
     plan: actionPlan(lastKnown || fallback ? [] : (view.currentHour?.action_codes ?? [])),

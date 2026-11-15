@@ -1,3 +1,5 @@
+import { WORKER_APP_NAMESPACES } from "@/i18n/client-namespaces";
+import { ClientMessages } from "@/i18n/ClientMessages";
 import { DemoProvider } from "@/features/demo/DemoProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { WorkerFrame } from "./WorkerFrame";
@@ -13,10 +15,12 @@ import { WorkerFrame } from "./WorkerFrame";
  */
 export default function WorkerLayout({ children }: LayoutProps<"/[locale]/worker">) {
   return (
-    <QueryProvider>
-      <DemoProvider>
-        <WorkerFrame>{children}</WorkerFrame>
-      </DemoProvider>
-    </QueryProvider>
+    <ClientMessages paths={WORKER_APP_NAMESPACES}>
+      <QueryProvider>
+        <DemoProvider>
+          <WorkerFrame>{children}</WorkerFrame>
+        </DemoProvider>
+      </QueryProvider>
+    </ClientMessages>
   );
 }

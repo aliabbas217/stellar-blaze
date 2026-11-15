@@ -8,15 +8,13 @@ import { FieldLink } from "@/components/shell/FieldLink";
 import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ErrorState } from "@/components/states/ErrorState";
-import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { LevelSignSkeleton, Skeleton } from "@/components/states/Skeletons";
-import { StaleBanner } from "@/components/states/StaleBanner";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import { ActionLead } from "@/features/today/ActionLead";
 import { LevelHeader } from "@/features/today/LevelHeader";
+import { ProtectiveLead } from "@/features/today/ProtectiveLead";
 import { ShiftSpine, spineHeight } from "@/features/today/ShiftSpine";
 import { SiteEntry } from "@/features/today/SiteEntry";
-import { useAgeLabel, useTimeFormat } from "@/features/today/labels";
 import { useTodayModel, type TodayModel } from "@/features/today/useTodayModel";
 
 /*
@@ -48,11 +46,11 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
   const t = useTranslations("worker.today");
   const partial = useTranslations("today.hero")("personalUnavailable");
   const levels = useTranslations("levels");
-  const time = useTimeFormat();
-  const ageLabel = useAgeLabel();
-  const { description: d, forecast, synthetic, pushOff } = model;
+  const entry = useTranslations("worker.today.entry");
+  const { description: d, forecast, synthetic, pushOff, pinFailed } = model;
 
-  const levelName = d.level === null ? null : levels(`name.${d.level}`);
+  // The protective level of a not-live state is the plan's, not a reading: no "Why <level>?" and no proof of it (site rules instead).
+  const levelName = d.level === null || d.notLive ? null : levels(`name.${d.level}`);
   // The chip's accessible name is the plain words (a <bdi> is markup, an accessible name is text); its visible words wrap the level in <bdi>.
   const plainWhy = (level: string) => t.markup("why.level", { level, bdi: (chunks) => chunks });
   const proof =
@@ -62,6 +60,22 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
 
   return (
     <div className="flex flex-col gap-3 pb-6">
+      {d.notLive ? (
+        <ProtectiveLead
+          description={d}
+          mode={forecast.mode}
+          updatedAt={d.banner === null ? null : d.banner.updatedAt}
+          ageMs={d.banner === null ? null : d.banner.ageMs}
+          offline={d.banner?.kind === "offline"}
+        />
+      ) : null}
+      {pinFailed ? (
+        <div className="px-4">
+          <Banner>
+            <p>{entry("pinFailed")}</p>
+          </Banner>
+        </div>
+      ) : null}
       {d.personalUnavailable ? (
         <div className="px-4">
           <Banner>
@@ -69,17 +83,8 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
           </Banner>
         </div>
       ) : null}
-      {d.banner === null ? null : (
-        <div className="px-4">
-          {d.banner.kind === "stale" ? (
-            <StaleBanner updatedAt={time(d.banner.updatedAt)} ageLabel={ageLabel(d.banner.ageMs)} title={t("kicker.fallback")} />
-          ) : (
-            <OfflineBanner updatedAt={time(d.banner.updatedAt)} ageLabel={ageLabel(d.banner.ageMs)} />
-          )}
-        </div>
-      )}
 
-      <LevelHeader description={d} mode={forecast.mode} />
+      {d.notLive ? null : <LevelHeader description={d} mode={forecast.mode} />}
 
       {d.noShift ? (
         <div className="px-4">
@@ -92,7 +97,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
         </div>
       ) : (
         <>
-          <ActionLead lead={d.plan.lead} protective={d.protective} />
+          {d.notLive ? null : <ActionLead lead={d.plan.lead} protective={d.protective} />}
           <ShiftSpine description={d} />
         </>
       )}

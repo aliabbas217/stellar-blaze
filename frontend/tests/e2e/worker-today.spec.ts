@@ -111,20 +111,22 @@ test("the Today level is the site's, live, with the action and the draft label (
   await expect(page.locator("[data-emergency]")).toHaveCount(1);
 });
 
-test("Today shows a stale forecast as the last known level, never as live (Today)", async ({ page }) => {
+test("Today shows a stale forecast as the protective plan, with the last known level secondary, never as live (Today)", async ({ page }) => {
   await openToday(page, { scenario: "stale" });
-  // The banner says it in words, with the time and the age (its heading is B3's "No fresh forecast: protective plan": the sign
-  // below it already reads "Last known level"); the sign is dashed and carries a clock.
+  // The lead is the hero (F2 W3.2): B3's "No fresh forecast: protective plan", a polite status region. The sign shows the protective
+  // level, dashed; the level the forecast last gave is a dashed mini sign inside the lead with its time and age.
   await expect(page.getByRole("status").filter({ hasText: en.worker.today.kicker.fallback })).toBeVisible();
-  await expect(page.locator('[data-level-sign][data-kind="stale"]').getByText(en.worker.today.kicker.stale)).toBeVisible();
-  await expect(page.getByText(/This may be out of date/)).toBeVisible();
+  await expect(page.locator('[data-protective-lead] [data-level-sign][data-kind="stale"]').getByText(en.worker.today.kicker.stale)).toBeVisible();
+  await expect(page.locator('[data-protective-lead] [data-level-sign][data-size="hero"] [data-level-word]')).toHaveText(en.levels.name.orange);
+  await expect(page.getByText(/Updated .* ago\./)).toBeVisible();
   await expect(page.locator('[data-level-sign][data-kind="stale"]')).toHaveCount(1);
   await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(0);
 });
 
-test("Today shows the site rules, and no level, for a fallback forecast (Today)", async ({ page }) => {
+test("Today shows the protective plan and the protective level for a fallback forecast, never a live level (Today)", async ({ page }) => {
   await openToday(page, { scenario: "fallback" });
-  await expect(page.getByRole("heading", { name: en.levels.siteRules, level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: en.worker.today.kicker.fallback, level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: en.levels.name.orange, level: 2 })).toBeVisible();
   await expect(page.getByText(en.worker.today.lead.protective)).toBeVisible();
   await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(0);
 });
@@ -197,34 +199,8 @@ for (const { name, scenario, hero, spine } of GATED) {
   });
 }
 
-// Urdu, the last known states (F2 W1, I6): every check except the hero's share. A stale or offline day carries a banner (two to three
-// rows), the sign, the protective rules and the draft note above the spine, and every row of Urdu text is 2.5 lines tall (40 px at
-// 16): the spine starts below the first fold and its share is 11.6 % (stale) and 6.9 % (offline) at 390 x 844 against the 35 % floor,
-// which no compaction of those rows reaches without dropping content. Measured, printed, and reported for a ruling (hero element
-// of a not-live state); the English states below ARE held to the floor.
-test("Today passes the design gate at 390: stale, ur, night and sun (all but the hero share, see above)", async ({ page }) => {
-  for (const theme of ["night", "sun"] as const) {
-    const errors = await openToday(page, { locale: "ur", theme, scenario: "stale" });
-    await expect(page.locator('[data-level-sign][data-kind="stale"]')).toHaveCount(1);
-    await page.waitForLoadState("networkidle");
-    const report = await gate(page, errors, { hero: false, spine: true, locale: "ur" }, `stale-ur-${theme}`);
-    expect(report.heroShare ?? 0, "a spine is in the fold at all").toBeGreaterThan(0.05);
-  }
-});
-
-test("Today passes the design gate at 390: offline, en (held to the hero floor) and ur (all but the hero share), night and sun", async ({ page, context }) => {
-  for (const locale of ["ur", "en"] as const) {
-    for (const theme of ["night", "sun"] as const) {
-      const errors = await openToday(page, { locale, theme });
-      await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(1);
-      await context.setOffline(true);
-      await expect(page.locator('[data-level-sign][data-kind="stale"]')).toHaveCount(1);
-      // English is held to the floor; Urdu is not (see the stale Urdu test above for the measurement and why).
-      await gate(page, errors, { hero: locale === "en", spine: true, locale }, `offline-${locale}-${theme}`);
-      await context.setOffline(false);
-    }
-  }
-});
+// The not-live states (stale, offline, fallback) in all six locales, including their hero floor, are in worker-today-notlive.spec.ts
+// (F2 W3.2): the protective-plan lead is their hero. The Urdu exceptions that were recorded here are replaced there.
 
 test("Today puts the action lead directly under the sign, in the first fold, in English and Urdu (Today)", async ({ page }) => {
   for (const locale of ["en", "ur"] as const) {

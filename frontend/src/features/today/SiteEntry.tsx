@@ -18,8 +18,11 @@ export function SiteEntry({
   onDemoYard,
   onRetry,
 }: {
-  /** `ready`: a demo site is known. `loading`: the site list has not answered. `unavailable`: it failed, or it has no demo site. */
-  readonly status: "ready" | "loading" | "unavailable";
+  /**
+   * `ready`: a demo site is known. `loading`: the site list has not answered. `unavailable`: it failed, or it has no demo site.
+   * `failed`: the choice could not be saved on this phone (a stale chunk, no signal): the same button, tried again.
+   */
+  readonly status: "ready" | "loading" | "unavailable" | "failed";
   readonly onDemoYard: () => void;
   readonly onRetry: () => void;
 }) {
@@ -38,6 +41,13 @@ export function SiteEntry({
         <div role="status" aria-busy="true" className="flex w-full flex-col gap-2">
           <Skeleton height="var(--target)" width="12rem" />
           <span className="sr-only">{t("loading")}</span>
+        </div>
+      ) : status === "failed" ? (
+        <div role="alert" className="flex flex-col items-start gap-3">
+          <p className="text-base text-ink-2">{t("chooseFailed")}</p>
+          <button type="button" data-primary="" onClick={onDemoYard} className={`${ACTION_PRIMARY} touch-manipulation`}>
+            {retry}
+          </button>
         </div>
       ) : (
         <div role="alert" className="flex flex-col items-start gap-3">

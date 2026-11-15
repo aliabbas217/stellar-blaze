@@ -11,6 +11,7 @@
     "prebuild": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-sw-strings.ts && node scripts/build-data-manifest.mjs",
     "build": "next build",
     "start": "next start",
+    "bundle:check": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-bundle-size.ts",
     "start:standalone": "node scripts/start-standalone.mjs",
     "lint": "next typegen && eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",

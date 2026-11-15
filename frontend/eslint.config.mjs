@@ -132,8 +132,12 @@ const routeGroupIsolation = [
   isolation(["src/app/[[]locale]/(supervisor)/**"], [forbidWorkerCode], { fieldLinks: true }),
   isolation(["src/app/[[]locale]/(hse)/**"], [forbidWorkerCode]),
   isolation(["src/features/supervisor/**"], [forbidWorkerCode, forbidParentRelative], { fieldLinks: true }),
-  isolation(["src/app/[[]locale]/(judge)/**", "src/app/[[]locale]/page.tsx"], [forbidRoleCode]),
-  isolation(["src/features/judge/**", "src/features/demo/**"], [forbidRoleCode, forbidParentRelative]),
+  // The judge pages are measured against the route JS budget, and a prefetching link ships its target page's script
+  // (F2 Part G1: the desk header alone cost 16 KB on /replay/governance), so the judge group and feature use FieldLink too.
+  isolation(["src/app/[[]locale]/(judge)/**"], [forbidRoleCode], { fieldLinks: true }),
+  isolation(["src/app/[[]locale]/page.tsx"], [forbidRoleCode]),
+  isolation(["src/features/judge/**"], [forbidRoleCode, forbidParentRelative], { fieldLinks: true }),
+  isolation(["src/features/demo/**"], [forbidRoleCode, forbidParentRelative]),
   isolation(
     SHARED_DIRS.map((name) => `src/${name}/**`),
     [forbidFeatureCode],

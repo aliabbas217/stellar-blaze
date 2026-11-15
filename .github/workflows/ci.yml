@@ -34,6 +34,8 @@ jobs:
       - run: pnpm api:check
       - run: pnpm test
       - run: pnpm build
+      # Reads the build output: 174,080 B gzip of first-load script per route, 199,680 B for /worker and /worker/alerts only (architect, F2 W3.1).
+      - run: pnpm bundle:check
       # The full Chromium (not the headless shell): the push tests need a browser that honours a notification permission grant.
       - run: pnpm exec playwright install --with-deps chromium
       # Starts the mock API and the standalone production server itself (webServer in playwright.config.ts).

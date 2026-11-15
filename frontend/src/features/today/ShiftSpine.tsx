@@ -11,7 +11,8 @@ import { dirFor } from "@/i18n/direction";
 /*
  * The hero of Today: the shift as a vertical time spine (the heat level in each hour's cell, the recessed slot only where the
  * midday break is in force, the line at now), with the waypoints worded. The spine is the biggest thing on the screen on
- * purpose (`data-hero`: at least 35 % of the first fold, the design gate).
+ * purpose (`data-hero`: at least 35 % of the first fold, the design gate) while the forecast is live. In a not-live state the
+ * protective-plan lead above it is the hero (ProtectiveLead.tsx) and the spine keeps its place without the attribute.
  */
 
 /** One text row of the spine, as TimeSpine sets it (the 16 px field label at the locale's line height). */
@@ -62,7 +63,7 @@ export function ShiftSpine({ description }: { readonly description: TodayDescrip
   const aria = t("aria", { from: formatClock(from), to: formatClock(to), waypoints: spoken });
 
   return (
-    <section data-hero="" aria-label={heading} className="px-2">
+    <section {...(description.notLive ? {} : { "data-hero": "" })} aria-label={heading} className="px-2">
       <TimeSpine
         orientation="v"
         surface="field"

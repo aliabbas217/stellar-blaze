@@ -188,7 +188,8 @@
         "personal": "Your level now",
         "stale": "Last known level",
         "fallback": "No fresh forecast: protective plan",
-        "noHour": "No forecast for this hour"
+        "noHour": "No forecast for this hour",
+        "protective": "Protective level"
       },
       "until": "until <bdi>{time}</bdi>",
       "personalHigher": "Your own level is higher than the site level.",
@@ -233,7 +234,9 @@
         "reason": "Point your camera at the poster on site, or open the link in your crew's group. No account, nothing to type.",
         "demo": "See the demo yard",
         "loading": "Finding the demo yard",
-        "unavailable": "The demo yard could not be loaded. Check your connection and try again."
+        "unavailable": "The demo yard could not be loaded. Check your connection and try again.",
+        "chooseFailed": "Your choice could not be saved on this phone. Try again.",
+        "pinFailed": "This phone could not save the site. Reload the page to try again."
       },
       "noShift": {
         "title": "No shift for {crew} today",

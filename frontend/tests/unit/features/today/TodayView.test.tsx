@@ -8,6 +8,7 @@ import { FieldHeadingContext, type FieldHeadingSlot } from "@/components/shell/F
 import { DemoProvider } from "@/features/demo/DemoProvider";
 import { DEMO_CREW_ID } from "@/features/demo/constants";
 import { CONSENT_VERSION, type Profile } from "@/features/profile/profile-shape";
+import * as chooseSite from "@/features/profile/choose-site";
 import { resetSitePinForTests } from "@/features/profile/site-pin";
 import { useProfile } from "@/features/profile/store";
 import { TodayView } from "@/features/today/TodayView";
@@ -75,8 +76,74 @@ beforeEach(() => {
 const DEMO_CONTACTS = { supervisorPhone: "+12025550143", firstAiderPhone: "+12025550144" };
 
 const orange = () => screen.findByRole("heading", { name: "Orange" });
+const LEAD = "No fresh forecast: protective plan";
+/** The lead of a not-live state: found by its heading (the live-state `orange()` would match two "Orange" signs here). */
+const protectiveLead = () => screen.findByRole("heading", { name: LEAD });
+
+/** The first non-empty text of the rendered screen, in reading (DOM) order. */
+function firstText(root: HTMLElement): string {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    const text = node.textContent?.trim() ?? "";
+    if (text !== "") return text;
+  }
+  return "";
+}
+
+/**
+ * F2 W3.2 (architect ruling b): in a stale, offline or fallback state the protective-plan lead is the HERO (`data-hero`, one
+ * element, the spine drops the attribute), the FIRST text in reading order, and the sign shows the protective level (High, drawn
+ * orange and dashed). Called by every not-live test below.
+ */
+async function expectProtectiveLead(container: HTMLElement): Promise<HTMLElement> {
+  const heading = await protectiveLead();
+  expect(firstText(container)).toBe(LEAD);
+  const heroes = document.querySelectorAll("[data-hero]");
+  expect(heroes).toHaveLength(1);
+  const lead = heroes[0] as HTMLElement;
+  expect(lead.hasAttribute("data-protective-lead")).toBe(true);
+  expect(lead.contains(heading)).toBe(true);
+  // The spine stays on screen, but it is not the hero while the forecast is not live.
+  expect(document.querySelector("[data-spine]")).not.toBeNull();
+  expect(document.querySelector("[data-spine][data-hero]")).toBeNull();
+  // The sign shows the protective level, dashed (kind "fallback"), never a live one.
+  const sign = lead.querySelector('[data-level-sign][data-size="hero"]');
+  expect(sign?.getAttribute("data-kind")).toBe("fallback");
+  expect(sign?.querySelector("[data-level-word]")?.textContent).toBe("Orange");
+  expect(document.querySelector('[data-level-sign][data-kind="live"]')).toBeNull();
+  return lead;
+}
 
 describe("Today: no site yet", () => {
+  afterEach(() => {
+    vi.restoreAllMocks(); // the W2 tests below make the store chunk fail: that must not leak into the next test
+  });
+
+  it("W2: a demo-yard tap whose store chunk cannot load says so and offers the tap again, then works when the chunk loads", async () => {
+    const chunk = vi.spyOn(chooseSite, "chooseDeviceSite").mockRejectedValueOnce(new Error("Loading chunk failed"));
+    renderToday();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "See the demo yard" }));
+    expect(await screen.findByText("Your choice could not be saved on this phone. Try again.")).toBeInTheDocument();
+    expect(useProfile.getState().site).toBeNull();
+
+    // The retry is the same tap, and it is a real button of the same size, not a dead end.
+    chunk.mockRestore();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await orange()).toBeInTheDocument();
+    expect(useProfile.getState().site).toMatchObject({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID });
+  });
+
+  it("W2: a site in the link that cannot be saved on the phone still shows the level, with one calm line", async () => {
+    search = `?site=${SITE_DEMO}&crew=${DEMO_CREW_ID}`;
+    vi.spyOn(chooseSite, "chooseDeviceSite").mockRejectedValue(new Error("Loading chunk failed"));
+    renderToday();
+
+    expect(await orange()).toBeInTheDocument();
+    expect(await screen.findByText("This phone could not save the site. Reload the page to try again.")).toBeInTheDocument();
+  });
+
   it("test_demo_yard_entry_pins_site_and_crew: the demo yard is one tap, and it shows a level", async () => {
     renderToday();
 
@@ -201,21 +268,23 @@ describe("Today: a pinned phone", () => {
 });
 
 describe("Today: states", () => {
-  it("test_stale_and_fallback_are_not_live: a stale forecast reads 'Last known level' with its time and age", async () => {
+  it("test_stale_and_fallback_are_not_live: a stale forecast leads with the protective plan; the last known level is secondary and dashed, with its time and age", async () => {
     server.use(
       http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) =>
         HttpResponse.json(forecastToday(String(params["site_id"]), { ageMs: STALE_AGE_MS, status: "stale" })),
       ),
     );
     pin();
-    renderToday();
+    const { container } = renderToday();
 
-    await orange();
-    expect(screen.getAllByText("Last known level").length).toBeGreaterThan(0);
+    const lead = await expectProtectiveLead(container);
     expect(screen.queryByText("Site level now")).toBeNull();
-    expect(screen.getByText(/This may be out of date/)).toBeInTheDocument();
-    expect(document.querySelector('[data-kind="stale"]')).not.toBeNull();
-    expect(document.querySelector('[data-kind="live"]')).toBeNull();
+    expect(screen.getByText("Protective level")).toBeInTheDocument();
+    // The last known level: a mini sign, dashed, inside the lead, with when it was written.
+    const lastKnown = lead.querySelector('[data-level-sign][data-kind="stale"][data-size="mini"]');
+    expect(lastKnown?.textContent).toContain("Last known level");
+    expect(lastKnown?.querySelector("[data-level-word]")?.textContent).toBe("Orange");
+    expect(lead.textContent).toMatch(/Updated .* ago\./);
   });
 
   it("test_stale_and_fallback_are_not_live (I2): a last known level is secondary: the lead is the protective plan, the spine has no heat and no line at now", async () => {
@@ -225,8 +294,8 @@ describe("Today: states", () => {
       ),
     );
     pin();
-    renderToday();
-    await orange();
+    const { container } = renderToday();
+    await expectProtectiveLead(container);
 
     // The lead says there is no fresh forecast and gives the site rules, never the stale hour's own cycle or its extra lines.
     const lead = document.querySelector("[data-action-lead]") as HTMLElement;
@@ -253,21 +322,56 @@ describe("Today: states", () => {
     expect(screen.queryByText("No fresh forecast: protective plan")).toBeNull();
   });
 
-  it("a fallback forecast shows no level: the fixed site rules, in every hour", async () => {
+  it("a fallback forecast leads with the protective plan and shows the protective level, with no last known level", async () => {
     server.use(
       http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) =>
         HttpResponse.json(forecastToday(String(params["site_id"]), { status: "fallback" })),
       ),
     );
     pin();
-    renderToday();
+    const { container } = renderToday();
 
-    expect(await screen.findByRole("heading", { name: "Site rules" })).toBeInTheDocument();
-    expect(screen.getByText("No fresh forecast: protective plan")).toBeInTheDocument();
+    const lead = await expectProtectiveLead(container);
     expect(screen.getByText("Site rules: rest in shade every hour, drink water")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Orange" })).toBeNull();
-    expect(document.querySelector('[data-kind="live"]')).toBeNull();
+    // No forecast was ever read: nothing to show as "last known", and no updated line.
+    expect(lead.querySelector('[data-kind="stale"]')).toBeNull();
+    expect(lead.textContent).not.toMatch(/Updated/);
     expect(await screen.findByRole("button", { name: "Why site rules?" })).toBeInTheDocument();
+  });
+
+  it("an offline phone leads with the protective plan and says why, with the saved level secondary and dashed", async () => {
+    pin();
+    const online = vi.spyOn(window.navigator, "onLine", "get");
+    online.mockReturnValue(true);
+    const { container } = renderToday();
+    await orange();
+    // The phone loses its signal after the level was read: the same screen turns into the protective lead.
+    online.mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    const lead = await expectProtectiveLead(container);
+    expect(lead.textContent).toContain("You are offline");
+    expect(lead.textContent).toContain("Showing what this phone saved.");
+    expect(lead.querySelector('[data-level-sign][data-kind="stale"][data-size="mini"]')).not.toBeNull();
+    expect(screen.getByText("Site rules: rest in shade every hour, drink water")).toBeInTheDocument();
+    // TanStack Query's online manager is a module singleton that listens to these events: put it back for the tests that follow.
+    online.mockRestore();
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+  });
+
+  it("a live day has no protective lead: the spine is the hero and the sign is live", async () => {
+    pin();
+    renderToday();
+    await orange();
+    expect(screen.queryByRole("heading", { name: LEAD })).toBeNull();
+    expect(document.querySelector("[data-protective-lead]")).toBeNull();
+    expect(document.querySelectorAll("[data-hero]")).toHaveLength(1);
+    expect(document.querySelector("[data-hero] [data-spine]")).not.toBeNull();
+    expect(document.querySelector('[data-level-sign][data-kind="live"]')).not.toBeNull();
   });
 
   it("an error shows the site rules, a retry and the request id: never a dead end", async () => {
@@ -446,9 +550,9 @@ describe("Today: replay mode (Part S0, review focus 6)", () => {
     phoneClockAtReplayMoment();
     serveDay((day) => ({ ...day, mode: "live" }), 20 * 60 * 60 * 1000);
     pin();
-    renderToday();
+    const { container } = renderToday();
 
-    await orange();
+    await expectProtectiveLead(container);
     expect(screen.getAllByText("Last known level").length).toBeGreaterThan(0);
     expect(document.querySelector('[data-kind="live"]')).toBeNull();
   });

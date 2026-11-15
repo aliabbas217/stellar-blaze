@@ -30,7 +30,13 @@ export function useSiteContactsSync(sites: readonly SiteRecord[]): void {
     const site = sites.find((candidate) => candidate.id === siteId);
     if (site === undefined) return;
     const next = contactsOf(site);
-    // Dated when written: the sheet says how old the numbers are when it is offline (CallActions).
-    if (!sameContacts(contacts, next)) void chooseDeviceSite(siteId, crewId, { ...next, savedAt: new Date().toISOString() });
+    // Written when the numbers differ, AND when the phone holds numbers with no date (pinned before the date was recorded): the
+    // sheet says "Numbers saved on ..." only for a dated pin, so an undated one would never show the line offline (F2 W2).
+    const undated = contacts !== undefined && contacts.savedAt === undefined;
+    if (sameContacts(contacts, next) && !undated) return;
+    // Dated when written: the sheet says how old the numbers are when it is offline (CallActions). A store chunk that cannot load
+    // (a stale chunk after a deploy, no signal) leaves the pin as it was: the numbers already on the phone still serve the sheet,
+    // and the next visit tries again. Quiet on purpose: this is background work, not a tap.
+    chooseDeviceSite(siteId, crewId, { ...next, savedAt: new Date().toISOString() }).catch(() => undefined);
   }, [sites, siteId, crewId, contacts]);
 }

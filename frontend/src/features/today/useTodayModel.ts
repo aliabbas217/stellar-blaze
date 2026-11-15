@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTimeZone } from "next-intl";
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { crewTimelineQueryOptions } from "@/api/queries";
 import { queryKeys } from "@/api/query-keys";
 import type { Problem } from "@/api/problem";
@@ -47,7 +47,8 @@ export type TodayModel =
   | { readonly status: "starting" }
   | {
       readonly status: "no-site";
-      readonly entry: "ready" | "loading" | "unavailable";
+      /** `failed`: the choice could not be saved on this phone (the store chunk did not load): a calm retry, never a button that does nothing. */
+      readonly entry: "ready" | "loading" | "unavailable" | "failed";
       /** Pins the phone to the demo site and its scored crew. */
       readonly demoYard: () => void;
       readonly retrySites: () => void;
@@ -62,6 +63,8 @@ export type TodayModel =
       readonly synthetic: boolean | null;
       /** No push registration on this phone: "Turn on warnings" is the one primary action. */
       readonly pushOff: boolean;
+      /** The site in the link could not be saved on this phone (the screen still works from the link): said in one line. */
+      readonly pinFailed: boolean;
     };
 
 export function useTodayModel(): TodayModel {
@@ -86,9 +89,21 @@ export function useTodayModel(): TodayModel {
 
   // `?site=` pins the phone (and `?crew=`, or none): the URL is how a link or an e2e chooses. The profile store that writes the
   // pin is loaded by the first choice, not by this screen (see features/profile/choose-site.ts).
+  // The import can fail (a stale chunk after a deploy, no signal): the failure is kept and said, never dropped (F2 W2).
+  const [chooseFailed, setChooseFailed] = useState(false);
+  const choose = useCallback((id: string, crew: string | null) => {
+    chooseDeviceSite(id, crew).then(
+      () => {
+        setChooseFailed(false);
+      },
+      () => {
+        setChooseFailed(true);
+      },
+    );
+  }, []);
   useEffect(() => {
-    if (siteParam !== null && (pinnedSite !== siteParam || pinnedCrew !== crewParam)) void chooseDeviceSite(siteParam, crewParam);
-  }, [siteParam, crewParam, pinnedSite, pinnedCrew]);
+    if (siteParam !== null && (pinnedSite !== siteParam || pinnedCrew !== crewParam)) choose(siteParam, crewParam);
+  }, [siteParam, crewParam, pinnedSite, pinnedCrew, choose]);
 
   const clock = useClock();
   const enabled = hydrated && siteId !== null;
@@ -109,15 +124,16 @@ export function useTodayModel(): TodayModel {
   );
 
   const demoYard = useCallback(() => {
-    if (demoSite !== null) void chooseDeviceSite(demoSite.id, DEMO_CREW_ID);
-  }, [demoSite]);
+    if (demoSite !== null) choose(demoSite.id, DEMO_CREW_ID);
+  }, [demoSite, choose]);
   const retrySites = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.sites() });
   }, [queryClient]);
 
   if (!hydrated) return { status: "starting" };
   if (siteId === null) {
-    return { status: "no-site", entry: demoSite !== null ? "ready" : siteStatus === "loading" ? "loading" : "unavailable", demoYard, retrySites };
+    const entry = chooseFailed ? "failed" : demoSite !== null ? "ready" : siteStatus === "loading" ? "loading" : "unavailable";
+    return { status: "no-site", entry, demoYard, retrySites };
   }
   if (today.status === "error") return { status: "error", problem: today.problem, retry: today.refetch };
   if (description === null || view === null) return { status: "loading" };
@@ -127,5 +143,6 @@ export function useTodayModel(): TodayModel {
     forecast: view.forecast,
     synthetic: sites.find((site) => site.id === siteId)?.synthetic ?? null,
     pushOff,
+    pinFailed: chooseFailed,
   };
 }

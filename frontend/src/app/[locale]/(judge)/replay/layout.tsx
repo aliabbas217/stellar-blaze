@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { DeskShell } from "@/components/shell/DeskShell";
+import { ClientMessages } from "@/i18n/ClientMessages";
 
 /*
  * The judge shell: the desk header (wordmark and menu), night only. Static: no TanStack Query and no demo context here,
@@ -22,5 +23,9 @@ export default async function ReplayLayout({ children }: { children: ReactNode }
     { href: "/supervisor", label: t("crews") },
   ];
 
-  return <DeskShell items={items}>{children}</DeskShell>;
+  return (
+    <ClientMessages>
+      <DeskShell items={items}>{children}</DeskShell>
+    </ClientMessages>
+  );
 }

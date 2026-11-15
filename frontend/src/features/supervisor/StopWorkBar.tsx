@@ -1,8 +1,8 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Spinner } from "@/components/states/Spinner";
 import { ACTION_SECONDARY } from "@/components/states/actions";
 import type { StopWork } from "@/features/supervisor/useStopWork";
 import { useTimeFormat } from "@/lib/time/use-time-format";
@@ -172,7 +172,7 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
           </p>
         )}
         <button type="button" aria-busy={work.state === "sending"} onClick={work.stop} className={PRESS}>
-          {work.state === "sending" ? <LoaderCircle aria-hidden="true" className="size-6 animate-spin" /> : null}
+          {work.state === "sending" ? <Spinner className="size-6" /> : null}
           <span>{crewName === null ? t("buttonGeneric") : t.rich("button", { crew: crewName, bdi })}</span>
         </button>
       </div>

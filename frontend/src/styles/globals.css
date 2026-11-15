@@ -265,7 +265,9 @@
     --sign-leading-text: var(--leading-ur);
     --sign-leading-word: var(--leading-ur);
     --sign-word-size: var(--t-64);
-    --sign-word-trim: calc(var(--t-64) * 0.5);
+    /* 0.75 em, measured on the face that ships (Noto Nastaliq Urdu, F2 W2): the nearest ink of the four level words is 10 px from the
+       row above or below (tests/e2e/worker-today-notlive.spec.ts keeps it at 8 px or more). 0.5 em was measured in the fallback Naskh. */
+    --sign-word-trim: calc(var(--t-64) * 0.75);
   }
 
   :lang(hi),

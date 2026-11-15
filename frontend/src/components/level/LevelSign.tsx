@@ -59,9 +59,11 @@ const WORD_LINE = {
 /*
  * Arabic-script words are set at line height 2.5 (the marks clip below about 2), which leaves about a line of blank above and
  * below a 64 px word. The hero trims part of it from the layout (a negative block margin on the word row, `--sign-word-trim`:
- * zero in every other language, 0.5 em in ur whose line height is 2.5 and 0.15 em in ar whose line height is 1.8): the line height itself is unchanged and nothing is clipped, the blank just
- * overlaps the gap around the row instead of pushing the lead and the spine down the fold. The ink of the four Urdu level words
- * in the shipped fallback font reaches 53 px above the baseline and 13 px below it at 64 px; the row keeps 1.5 em (96 px).
+ * zero in every other language, 0.75 em in ur whose line height is 2.5 and 0.15 em in ar whose line height is 1.8): the line height itself is unchanged and nothing is clipped, the blank just
+ * overlaps the gap around the row instead of pushing the lead and the spine down the fold. Measured on the Urdu face that ships (Noto
+ * Nastaliq Urdu, in Chromium, canvas ink against the DOM baseline; F2 W2): the four level words reach 46 px above the baseline and 13
+ * px below it at 64 px, and at 0.75 em the nearest ink is 10 px from the row above or below it (0.5 em leaves 26 px; 0.9 em would
+ * touch). The row keeps 64 px of layout height.
  */
 const WORD_TRIM = "var(--sign-word-trim)";
 
