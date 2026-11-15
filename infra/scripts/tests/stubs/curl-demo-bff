@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Stub for curl that plays the demo's web BFF, used by the smoke-http.sh tests in infra/scripts/tests/run.sh (the harness copies
+# it to a directory of its own under the name `curl`). Never touches the network. Unlike the plain curl stub it answers by METHOD
+# and PATH, and it writes the response headers (-D). The replies are INVENTED to exercise the script, not captured from a real
+# deployment. Every call is recorded as `METHOD /path` in $FAKE_CURL_LOG (one line per call).
+# Knobs (environment):
+#   FAKE_STOP_STATUS     status of POST /api/v1/crews/crew-b/stops (201 creates stop-1; anything else creates nothing)
+#   FAKE_UNDO_STATUS     status of DELETE /api/v1/crews/crew-b/stops/<id>        (default 204)
+#   FAKE_TIMELINE        body of GET /api/v1/crews/crew-b/timeline               (default: one green hour)
+#   FAKE_TIMELINE_STATUS status of that GET                                      (default 200)
+#   FAKE_RESET_STATUS    status of POST /api/v1/sites/site-demo-mussafah/demo-reset (default 200)
+#   FAKE_RESET_STATUSES  the statuses of the 1st, 2nd, ... reset call, space separated (the last repeats); needs FAKE_STATE_DIR
+#   FAKE_RESET_BODY      body of a 2xx reset answer (default: a DemoReset with epoch_id 2 and previous_epoch_id 1)
+#   FAKE_RESET_RETRY_AFTER  Retry-After of a 429 reset answer (default 7; "none" sends no header)
+#   FAKE_HEADERS_LOG     when set, every request header given with -H is appended there (one line per header)
+#   FAKE_MAXTIME_LOG     when set, every request is appended there as `METHOD /path <--max-time value>`
+#   FAKE_READY_AFTER     N: the first N reads of GET /api/v1/health/ready answer 503 (the api is cold); needs FAKE_STATE_DIR
+#   FAKE_STARTED_AT      started_at of the created stop                          (default 2026-06-14T06:10:00Z = 10:10 Dubai)
+#   FAKE_STATE_DIR       directory for the day-plan counter (the 3rd day-plan read answers 429 with Retry-After)
+set -euo pipefail
+
+method="GET"
+max_time=""
+outfile=""
+headerfile=""
+format=""
+url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -X)
+      method="$2"
+      shift 2
+      ;;
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    -D)
+      headerfile="$2"
+      shift 2
+      ;;
+    -w)
+      format="$2"
+      shift 2
+      ;;
+    -H)
+      if [ -n "${FAKE_HEADERS_LOG:-}" ]; then printf '%s
+' "$2" >>"$FAKE_HEADERS_LOG"; fi
+      shift 2
+      ;;
+    --max-time | -m)
+      max_time="$2"
+      shift 2
+      ;;
+    --data | -d | --connect-timeout)
+      shift 2
+      ;;
+    -*) shift ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+
+path="/${url#*://*/}"
+path="${path%%\?*}"
+printf '%s %s\n' "$method" "$path" >>"${FAKE_CURL_LOG:?FAKE_CURL_LOG is required}"
+if [ -n "${FAKE_MAXTIME_LOG:-}" ]; then printf '%s %s %s\n' "$method" "$path" "${max_time:-none}" >>"$FAKE_MAXTIME_LOG"; fi
+
+code_token='%{http_code}'
+default_timeline='{"hours":[{"crew_level":"green"}]}'
+default_reset='{"site_id":"site-demo-mussafah","epoch_id":2,"previous_epoch_id":1,"reset_at":"2026-06-14T06:10:00Z"}'
+status="404"
+body='{"error":"not found"}'
+headers=""
+case "$method $path" in
+  "GET /api/healthz")
+    status=200
+    body='{"status":"ok","version":"stub-1"}'
+    ;;
+  "GET /api/v1/health/ready")
+    status=200
+    body='{"status":"ok"}'
+    if [ -n "${FAKE_READY_AFTER:-}" ]; then
+      counter="${FAKE_STATE_DIR:?FAKE_STATE_DIR is required}/ready-calls"
+      n=0
+      if [ -f "$counter" ]; then read -r n <"$counter" || true; fi
+      n=$((n + 1))
+      printf '%s' "$n" >"$counter"
+      if [ "$n" -le "$FAKE_READY_AFTER" ]; then
+        status=503
+        body='{"status":"starting"}'
+      fi
+    fi
+    ;;
+  "POST /api/v1/crews/crew-b/stops")
+    status="${FAKE_STOP_STATUS:-201}"
+    if [ "$status" = "201" ]; then
+      body="{\"id\":\"stop-1\",\"started_at\":\"${FAKE_STARTED_AT:-2026-06-14T06:10:00Z}\"}"
+    else
+      body='{"error":"stop refused"}'
+    fi
+    ;;
+  "DELETE /api/v1/crews/crew-b/stops/stop-1")
+    status="${FAKE_UNDO_STATUS:-204}"
+    body=""
+    ;;
+  "GET /api/v1/crews/crew-b/timeline")
+    status="${FAKE_TIMELINE_STATUS:-200}"
+    body="${FAKE_TIMELINE:-$default_timeline}"
+    ;;
+  "POST /api/v1/sites/site-demo-mussafah/demo-reset")
+    status="${FAKE_RESET_STATUS:-200}"
+    if [ -n "${FAKE_RESET_STATUSES:-}" ]; then
+      counter="${FAKE_STATE_DIR:?FAKE_STATE_DIR is required}/reset-calls"
+      n=0
+      if [ -f "$counter" ]; then read -r n <"$counter" || true; fi
+      n=$((n + 1))
+      printf '%s' "$n" >"$counter"
+      read -r -a sequence <<<"$FAKE_RESET_STATUSES"
+      if [ "$n" -gt "${#sequence[@]}" ]; then n="${#sequence[@]}"; fi
+      status="${sequence[$((n - 1))]}"
+    fi
+    case "$status" in
+      2[0-9][0-9]) body="${FAKE_RESET_BODY-$default_reset}" ;;
+      409) body='{"type":"https://stellar-blaze.example/problems/not-a-demo-site","title":"Not a demo site","status":409}' ;;
+      429)
+        body='{"error":"rate limited"}'
+        if [ "${FAKE_RESET_RETRY_AFTER:-7}" != "none" ]; then headers="Retry-After: ${FAKE_RESET_RETRY_AFTER:-7}"; fi
+        ;;
+      *) body='{"error":"reset failed"}' ;;
+    esac
+    ;;
+  "POST /api/v1/crews/crew-z/stops")
+    status=403
+    body='{"error":"forbidden"}'
+    ;;
+  "GET /api/v1/crews/crew-b/day-plan")
+    counter="${FAKE_STATE_DIR:?FAKE_STATE_DIR is required}/day-plan-calls"
+    n=0
+    if [ -f "$counter" ]; then read -r n <"$counter" || true; fi # no trailing newline: read returns 1 at EOF
+    n=$((n + 1))
+    printf '%s' "$n" >"$counter"
+    if [ "$n" -ge 3 ]; then
+      status=429
+      body='{"error":"rate limited"}'
+      headers="Retry-After: 5"
+    else
+      status=200
+      body='{"items":[]}'
+    fi
+    ;;
+  *) ;;
+esac
+
+if [ -n "$headerfile" ]; then
+  printf 'HTTP/1.1 %s\r\n' "$status" >"$headerfile"
+  if [ -n "$headers" ]; then printf '%s\r\n' "$headers" >>"$headerfile"; fi
+fi
+if [ -n "$outfile" ]; then
+  printf '%s' "$body" >"$outfile"
+fi
+if [ -n "$format" ]; then
+  printf '%s' "${format//"$code_token"/$status}"
+fi

@@ -1,0 +1,16 @@
+# PSRule for Azure options for infra/scripts/validate-local.ps1 (step psrule). Offline: the Bicep CLI pinned in
+# tools.lock.json expands the .bicepparam files; PSRule.Rules.Azure evaluates the expanded resources. The baseline is the
+# module default (Azure.Default). Findings are not suppressed here: a deliberate exception goes into accepted-risks.json,
+# one entry per rule id and resource, with a written reason.
+configuration:
+  # Expansion of .bicepparam files is on by default (v1.34+); stated so a reader does not have to look it up.
+  AZURE_BICEP_PARAMS_FILE_EXPANSION: true
+  # Per-file Bicep build timeout in seconds (default 5): main.bicep compiles seven nested modules.
+  AZURE_BICEP_FILE_EXPANSION_TIMEOUT: 60
+  # Refuse an old Bicep CLI: the parameter files and templates use `import`, user-defined types and safe access.
+  AZURE_BICEP_CHECK_TOOL: true
+  AZURE_BICEP_MINIMUM_VERSION: '0.49.2'
+
+input:
+  pathIgnore:
+    - 'bicepconfig.json'

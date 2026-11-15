@@ -212,9 +212,111 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # infra: the I1 plan adds this job (Task 5; docs/superpowers/plans/2026-11-11-i1-azure-infra.md): ubuntu-24.04, every PR
-  # and push, no Azure login. It checks out, installs Bicep (az bicep install --version v0.49.2), builds and lints both
-  # entry points (infra/bicep/bootstrap.bicep and main.bicep), runs build-params with a dummy environment, shellcheck on
-  # infra/scripts, bash infra/scripts/tests/run.sh, check-db-tls.sh --template on main.bicep, and actionlint v1.7.12 on
-  # .github/workflows/*.yml. It is NOT defined yet: infra/ does not exist on this branch. Do not edit the backend or
-  # frontend jobs from the I1 plan, and add the job here, as a sibling, when infra/ lands.
+  # Static checks of the hosting code (I1; docs/superpowers/plans/2026-11-11-i1-azure-infra.md Task 5). No Azure login and no
+  # secret: permissions are the workflow's read-only ones, and every value below is dummy and drawn at run time. The deploy is
+  # CHEAP BY DEFAULT (api scale to zero, small containers, capped logs): check-template.sh C3 and C12 hold those settings.
+  # Deliberately NOT run here: the docker rehearsal (`bash infra/local/rehearse.sh`, about 6 minutes plus the image builds; it
+  # is the manual rehearsal before a deploy), and the Pester suite (infra/scripts/tests/ps): it tests deploy-local.ps1, the
+  # native Windows path (LOCALAPPDATA, icacls, cmd.exe, backslash paths), so it cannot run on this Linux runner.
+  infra:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pinned, and checked against the digest GitHub publishes for the v0.49.2 asset bicep-linux-x64 (GitHub API, taken on
+      # 2026-11-15; Bicep publishes no checksums file). `az bicep install` does not verify what it downloads. BICEP_BIN makes
+      # the infra scripts use this copy and not the one the runner image happens to carry on PATH. Change the version and
+      # the sha256 together, and the same pair in .github/workflows/deploy.yml.
+      - name: Install Bicep (pinned, checksum verified)
+        run: |
+          sha256=0ab9de90c2493f206f8281bae74f9ee2d5ed3605548dab1adf41fef185e1f7c5
+          az bicep install --version v0.49.2
+          echo "${sha256}  ${HOME}/.azure/bin/bicep" | sha256sum -c -
+          echo "BICEP_BIN=${HOME}/.azure/bin/bicep" >> "$GITHUB_ENV"
+          az bicep version
+
+      - name: Bicep build and lint (bootstrap.bicep, main.bicep)
+        run: |
+          for template in bootstrap main; do
+            az bicep build --file "infra/bicep/${template}.bicep" --stdout > /dev/null
+            az bicep lint --file "infra/bicep/${template}.bicep"
+          done
+
+      # The parameter files read their values from the environment (readEnvironmentVariable), so they only evaluate with
+      # one. Random values, never literals: a secret scanner cannot tell a dummy literal from a real one.
+      - name: Bicep build-params (bootstrap, main phase 1, main phase 2)
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/params"
+          mkdir -p "$out"
+          acr="acrsbdummy"
+          subscription="00000000-0000-0000-0000-000000000000"
+          export BUDGET_CONTACT_EMAIL="ops@example.org"
+          az bicep build-params --file infra/bicep/bootstrap.bicepparam --outfile "$out/bootstrap.json"
+          export ACR_NAME="$acr"
+          export APPS_IDENTITY_ID="/subscriptions/${subscription}/resourceGroups/rg-dummy/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-dummy"
+          export POSTGRES_VERSION=18
+          PG_ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          VAPID_PRIVATE_KEY="$(openssl rand -hex 32)"
+          SB_ACCESS_TOKENS="$(printf '{"%s":{"actor":"demo-bff","role":"employer","employer_id":"emp-demo"}}' "$(openssl rand -hex 32)")"
+          DEMO_EMPLOYER_TOKEN="$(openssl rand -hex 32)"
+          export PG_ADMIN_PASSWORD VAPID_PRIVATE_KEY SB_ACCESS_TOKENS DEMO_EMPLOYER_TOKEN
+          export GIT_SHA="$GITHUB_SHA"
+          export API_IMAGE="${acr}.azurecr.io/sb-api:dummy" API_TARGET_PORT=8000 API_LIVE_PATH=/api/v1/health/live API_READY_PATH=/api/v1/health/ready API_IS_PLACEHOLDER=false
+          export WEB_IMAGE="${acr}.azurecr.io/sb-web:dummy" WEB_TARGET_PORT=3000 WEB_HEALTH_PATH=/api/healthz WEB_IS_PLACEHOLDER=false
+          export JOBS_IMAGE=mcr.microsoft.com/k8se/quickstart-jobs:latest
+          export VAPID_PUBLIC_KEY=dummy-vapid-public-key VAPID_SUBJECT=mailto:ops@example.org
+          for phase in false true; do
+            DEPLOY_APPS="$phase" az bicep build-params --file infra/bicep/main.bicepparam --outfile "$out/main-apps-${phase}.json"
+          done
+          # Cheap mode: the api scales to zero by default, and API_MIN_REPLICAS=1 keeps it warm. Both must evaluate.
+          export DEPLOY_APPS=true
+          for api_min in 0 1; do
+            API_MIN_REPLICAS="$api_min" az bicep build-params --file infra/bicep/main.bicepparam --outfile "$out/main-api-min-${api_min}.json"
+          done
+
+      # runner-provided shellcheck. The stubs have no extension, so they are listed by directory. infra/bicep/scripts/migrate.sh
+      # is the text of job-migrate (loaded into main.bicep), so it is checked as the file it is.
+      - name: ShellCheck
+        run: |
+          shopt -s nullglob
+          files=(infra/scripts/*.sh infra/scripts/tests/*.sh infra/scripts/tests/stubs/* infra/local/*.sh infra/render/*.sh infra/bicep/scripts/*.sh)
+          printf '%s\n' "${files[@]}"
+          shellcheck "${files[@]}"
+
+      # CI=true: a test that needs bicep fails here and does not skip (as it does on a machine without it).
+      - name: Self-tests of the infra scripts
+        env:
+          CI: "true"
+        run: bash infra/scripts/tests/run.sh
+
+      - name: Template assertions (check-template.sh)
+        run: bash infra/scripts/check-template.sh infra/bicep/main.bicep
+
+      - name: Database TLS in the template (check-db-tls.sh, ADR 0042)
+        run: bash infra/scripts/check-db-tls.sh --template infra/bicep/main.bicep
+
+      # The deploy workflow's own invariants (pinned actions, the push guard, image check before push, step order, no secret
+      # in a run block, minimal permissions). Line based: actionlint below is the syntax check.
+      - name: Deploy workflow invariants (check-workflow.sh)
+        run: bash infra/scripts/check-workflow.sh .github/workflows/deploy.yml
+
+      # A release binary whose sha256 is pinned here, in the repository, and not read from the checksums file served next to it
+      # (see the gitleaks step in `backend`). Taken on 2026-11-15 from actionlint_1.7.12_checksums.txt of the v1.7.12 release
+      # (v1.7.12, 2026-03-30, is the latest release); the release asset's `digest` in the GitHub API says the same. Change
+      # `version` and `sha256` together. It runs the runner's shellcheck over the `run:` blocks as well.
+      - name: Lint the workflows (actionlint)
+        run: |
+          version=1.7.12
+          sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          url="https://github.com/rhysd/actionlint/releases/download/v${version}"
+          tool_dir="$RUNNER_TEMP/actionlint"
+          mkdir -p "$tool_dir"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
+          (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" actionlint)
+          "$tool_dir/actionlint" -color .github/workflows/*.yml

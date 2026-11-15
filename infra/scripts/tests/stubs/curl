@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Stub for curl, used by infra/scripts/tests/run.sh. Never touches the network.
+# Understands -o <file>, -w <format> (%{http_code}, %{time_total}) and -f; every other option is ignored.
+# Behaviour is chosen by $STUB_SCENARIO and these knobs:
+#   curlfail            exit 22 (what `curl -f` returns on an HTTP error), no output
+#   STUB_CURL_RULES     "prefix=code ..." the first rule whose prefix starts the URL decides the status (default 200); 000 means
+#                       the connection was refused (exit 7). Example: "http://=301 https://web.=503"
+#   STUB_CURL_FAIL_FIRST  N: the first N calls of the test answer 503 where the rules would have said 200 (a cold start that
+#                       is over after N tries); the counter lives in $STUB_STATE_DIR/curl-calls
+#   STUB_CURL_BODY      the response body (default {"status":"ok"})
+#   STUB_CURL_LOG       when set, the arguments of each call are appended (one line per call)
+# With -f a status of 400 or more exits 22 (after writing -w output), as the real curl does.
+set -euo pipefail
+
+if [ -n "${STUB_CURL_LOG:-}" ]; then
+  printf '%s\n' "$*" >>"$STUB_CURL_LOG"
+fi
+if [ "${STUB_SCENARIO:-ok}" = "curlfail" ]; then
+  exit 22
+fi
+
+code_token='%{http_code}'
+time_token='%{time_total}'
+outfile=""
+format=""
+fail_on_error=false
+url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    -w)
+      format="$2"
+      shift 2
+      ;;
+    -D | -X | -H | --max-time | -m | --max-redirs | --data | -d | --connect-timeout)
+      shift 2
+      ;;
+    --fail)
+      fail_on_error=true
+      shift
+      ;;
+    -[a-zA-Z]*)
+      case "$1" in *f*) fail_on_error=true ;; *) ;; esac
+      shift
+      ;;
+    -*) shift ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+
+status="200"
+for rule in ${STUB_CURL_RULES:-}; do
+  prefix="${rule%=*}"
+  case "$url" in
+    "$prefix"*)
+      status="${rule##*=}"
+      break
+      ;;
+    *) ;;
+  esac
+done
+
+if [ -n "${STUB_CURL_FAIL_FIRST:-}" ] && [ "$status" = "200" ]; then
+  counter="${STUB_STATE_DIR:?STUB_STATE_DIR is required}/curl-calls"
+  calls=0
+  if [ -f "$counter" ]; then read -r calls <"$counter" || true; fi
+  calls=$((calls + 1))
+  printf '%s' "$calls" >"$counter"
+  if [ "$calls" -le "$STUB_CURL_FAIL_FIRST" ]; then status="503"; fi
+fi
+
+default_body='{"status":"ok"}'
+body="${STUB_CURL_BODY:-$default_body}"
+if [ "$status" = "000" ]; then
+  if [ -n "$format" ]; then
+    printf '%s' "${format//"$code_token"/000}"
+  fi
+  exit 7
+fi
+
+if [ -n "$outfile" ]; then
+  if [ "$outfile" != "/dev/null" ]; then printf '%s\n' "$body" >"$outfile"; fi
+elif [ -z "$format" ]; then
+  printf '%s\n' "$body"
+fi
+if [ -n "$format" ]; then
+  out="${format//"$code_token"/$status}"
+  out="${out//"$time_token"/0.123}"
+  printf '%s' "$out"
+fi
+if [ "$fail_on_error" = true ] && [ "$status" -ge 400 ]; then
+  exit 22
+fi
