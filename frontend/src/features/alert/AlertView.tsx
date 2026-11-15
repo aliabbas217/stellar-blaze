@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { ViewTransition, type ReactNode } from "react";
 import { LevelSign } from "@/components/level/LevelSign";
-import { Pictogram } from "@/components/level/Pictogram";
+import { Pictogram, type PictogramName } from "@/components/level/Pictogram";
 import { ModeStamp } from "@/components/provenance/ModeStamp";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { proofFromForecast } from "@/components/provenance/proof";
@@ -20,7 +20,7 @@ import { ACTION_PRIMARY } from "@/components/states/actions";
 import type { AlertParams } from "@/features/alert/alert-params";
 import { ChangedBracket } from "@/features/alert/ChangedBracket";
 import { useAlertModel } from "@/features/alert/useAlertModel";
-import type { Lead } from "@/features/today/action-codes";
+import { alsoPictogram, type Lead } from "@/features/today/action-codes";
 import { isolateTime, useAgeLabel, useTimeFormat } from "@/features/today/labels";
 import { dirFor } from "@/i18n/direction";
 import "@/styles/view-transitions.css";
@@ -123,9 +123,9 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
 
   const { window: run, plan } = model;
   const levelName = levels(`name.${run.level}`);
-  const lines: { key: string; icon: "shade" | "water" | "buddy"; text: string }[] = [
+  const lines: { key: string; icon: PictogramName; text: string }[] = [
     { key: "lead", icon: "shade", text: leadText(plan.lead) },
-    ...plan.also.map((item) => ({ key: item, icon: item === "water" ? ("water" as const) : ("buddy" as const), text: today(`also.${item}`) })),
+    ...plan.also.map((item) => ({ key: item, icon: alsoPictogram(item), text: today(`also.${item}`) })),
   ];
   const waypoints: SpineWaypoint[] = [
     ...(model.nowHour === null ? [] : [{ at: model.nowHour, title: t("spine.now") }]),

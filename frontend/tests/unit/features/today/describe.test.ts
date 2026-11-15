@@ -187,6 +187,12 @@ describe("describeToday", () => {
       expect(shown.cells.every((cell) => cell.wbgtC === null)).toBe(true);
     });
 
+    it.each(NOT_LIVE)("%s: no line at now and no Now waypoint (W4 I1: the protective lead's contract, the fallback included)", (_name, input) => {
+      const shown = describeWith(input);
+      expect(shown.nowHour).toBeNull();
+      expect(shown.waypoints.some((spec) => spec.kind === "now")).toBe(false);
+    });
+
     it.each(NOT_LIVE.filter(([name]) => name !== "fallback"))("%s: last known, no line at now, no Now waypoint, no promise of how long it holds", (_name, input) => {
       const shown = describeWith(input);
       expect(shown.lastKnown).toBe(true);

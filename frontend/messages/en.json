@@ -189,7 +189,8 @@
         "stale": "Last known level",
         "fallback": "No fresh forecast: protective plan",
         "noHour": "No forecast for this hour",
-        "protective": "Protective level"
+        "protective": "Protective level",
+        "lastKnownHigher": "Last known level: <bdi>{level}</bdi>"
       },
       "until": "until <bdi>{time}</bdi>",
       "personalHigher": "Your own level is higher than the site level.",
@@ -204,7 +205,11 @@
       "also": {
         "heading": "Also now",
         "water": "Drink water",
-        "buddy": "Never work alone"
+        "buddy": "Never work alone",
+        "selfPaced": "Self-paced work: workers must be allowed to adjust their work rate according to environmental conditions.",
+        "noUnacclimatised": "No unacclimatised person to work",
+        "induction": "High Risk induction required emphasising hydration and identifying signs of heat strain",
+        "bottle": "Provide personal water bottle (2 litre capacity) on-site at all times"
       },
       "why": {
         "level": "Why <bdi>{level}</bdi>?",
@@ -536,21 +541,120 @@
         "primary": "Back to the start"
       }
     },
+    "plan": {
+      "pageTitle": "Crew plan",
+      "back": "All crews",
+      "title": "<bdi>{crew}</bdi> plan",
+      "titleGeneric": "Crew plan",
+      "kicker": "Crew level now",
+      "workload": {
+        "light": "light work",
+        "moderate": "moderate work",
+        "heavy": "heavy work"
+      },
+      "people": "<bdi>{count}</bdi> people",
+      "peopleHidden": "fewer than <bdi>{k}</bdi> people, health detail hidden",
+      "restrictions": {
+        "one": "restrictions declared for <bdi>1</bdi> member",
+        "many": "restrictions declared for <bdi>{count}</bdi> members"
+      },
+      "unsigned": "Not signed. Crews see the rule plan, labelled unsigned fallback. Alerts and Stop work do not wait for you.",
+      "changed": "Changed since signed at <bdi>{time}</bdi>. Crews see the current rule plan, labelled changed since signed. Alerts and Stop work do not wait for you.",
+      "changedNoTime": "Changed since signed. Crews see the current rule plan, labelled changed since signed. Alerts and Stop work do not wait for you.",
+      "floorBanner": "Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.",
+      "strip": {
+        "aria": "Plan for {crew}, {from} to {to}, against the heat of the day. Every block is listed below the chart.",
+        "slot": "Midday break",
+        "outline": "Midday break by law: not in force until {date}",
+        "outlineUnknown": "Midday break by law: not in force",
+        "heatNote": "Colour behind the bars is the forecast heat of each hour."
+      },
+      "legend": {
+        "work": "Work",
+        "rest": "Rest in shade",
+        "art18": "Art. 18 break",
+        "ban": "Midday break",
+        "stopped": "Stop work",
+        "now": "Now"
+      },
+      "state": {
+        "work": "Work",
+        "adoshRest": "Rest in shade",
+        "art18Break": "Art. 18 break",
+        "ban": "Midday break",
+        "stopped": "Stop work",
+        "off": "Off shift"
+      },
+      "blocks": {
+        "heading": "Every block, and why it is there",
+        "range": "<bdi>{from}</bdi> to <bdi>{to}</bdi>",
+        "now": "Now",
+        "rule": "Rule",
+        "noClause": "No clause text came with this block."
+      },
+      "zone": {
+        "medium": "Medium",
+        "high": "High",
+        "red": "Red"
+      },
+      "signOff": {
+        "heading": "Sign off today's plan",
+        "intro": "Medium, High and Red items need a tick each. Signing never delays an alert or a stop.",
+        "none": "No item on this plan needs a tick.",
+        "itemsOne": "1 item needs a tick: {list}.",
+        "items": "{count} items need a tick: {list}.",
+        "item": "<bdi>{zone}</bdi>, <bdi>{from}</bdi> to <bdi>{to}</bdi>",
+      "itemText": "{zone}, {from} to {to}",
+        "tickOne": "Tick 1 more item to sign",
+        "tickMany": "Tick {count} more items to sign",
+        "submit": "Sign off",
+        "sending": "Signing off",
+        "missing": "These items still need a tick: {list}.",
+        "failed": "Sign-off was not recorded. Try again. Alerts and Stop work do not wait for it.",
+        "offline": "No signal. Sign-off was not sent. Alerts and Stop work do not wait for it.",
+        "signed": "Signed <bdi>{time}</bdi> by the site supervisor. Crews see this plan."
+      },
+      "loading": "Loading the plan",
+      "empty": {
+        "title": "No plan for this crew today",
+        "reason": "There are no shift hours to plan. Alerts and Stop work are not affected.",
+        "primary": "All crews"
+      },
+      "error": {
+        "title": "The plan did not load",
+        "detail": "Crews see the rule plan meanwhile. Alerts and Stop work are not affected."
+      },
+      "invalid": {
+        "title": "This plan failed the rule check and is not shown.",
+        "detail": "Crews see the site-rules fallback, never less protective than the midday ban. Sign-off is off until a plan passes."
+      },
+      "notLegal": {
+        "title": "This shift is not legal as planned",
+        "detail": "The crew's published shift breaks a shift rule by itself, so no plan can be made until the shift is fixed. Alerts and Stop work are not affected.",
+        "rules": "Rules the shift breaks"
+      },
+      "notFound": {
+        "title": "This crew was not found",
+        "reason": "No crew with this link is at this site.",
+        "primary": "All crews"
+      }
+    },
     "stop": {
       "region": "Stop work",
       "button": "Stop work, <bdi>{crew}</bdi>",
       "sending": "Sending the stop",
-      "recorded": "<bdi>{crew}</bdi> stopped <bdi>{time}</bdi>. Stop recorded. Tell the crew now.",
+      "recorded": "<bdi>{crew}</bdi> stopped <bdi>{time}</bdi>. Stop recorded. Crews are notified within about six minutes. Tell the crew now.",
       "undo": "Undo ({seconds} s)",
       "undoFailed": "Undo was not sent. Try again, or use Resume work.",
       "stoppedBar": "Work stopped <bdi>{time}</bdi>",
-      "stoppedDetail": "<bdi>{crew}</bdi>. Stop recorded. Tell the crew now.",
+      "stoppedDetail": "<bdi>{crew}</bdi>. Stop recorded. Crews are notified within about six minutes. Tell the crew now.",
       "resume": "Resume work",
       "resumeTitle": "Resume work for <bdi>{crew}</bdi>?",
       "resumeBody": "This ends the stop recorded at <bdi>{time}</bdi>.",
       "resumeConfirm": "Resume work",
       "resumeCancel": "Keep work stopped",
       "resumeFailed": "Resume was not sent. Try again.",
+      "noActiveStop": "No active stop found for this crew (already resumed, or the demo was reset).",
       "queued": "Not sent: no signal. Tell the crew now.",
       "queuedDetail": "The stop for <bdi>{crew}</bdi> is kept on this phone and sent when it is back online.",
       "failed": "Not sent. Tell the crew now.",

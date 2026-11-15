@@ -173,9 +173,10 @@ export function describeToday(input: DescribeInput): TodayDescription {
     wbgtC: fallback || lastKnown ? null : hour.wbgt_c.p50,
   }));
   // The waypoints that come from the clock and the day's own rules (the break, the shift's end) stay; "Now" is a claim about the
-  // hour's heat on a forecast that no longer vouches for it, so it goes with the line.
+  // hour's heat on a forecast that no longer vouches for it, so it goes with the line: in EVERY not-live state, the fallback's
+  // included (a fallback has no last-known level, but it has no hour to point at either: F2 W4 I1).
   const waypoints = waypointSpecs({ nowHour, ban, shiftEndHour: span.endHour, from: span.from, to: span.to }).filter(
-    (spec) => !(lastKnown && spec.kind === "now"),
+    (spec) => !(notLive && spec.kind === "now"),
   );
 
   return {
@@ -196,7 +197,7 @@ export function describeToday(input: DescribeInput): TodayDescription {
     cells,
     from: span.from,
     to: span.to,
-    nowHour: lastKnown ? null : nowHour,
+    nowHour: notLive ? null : nowHour,
     ban,
     banNote: banNoteOf(forecast, ban),
     waypoints,

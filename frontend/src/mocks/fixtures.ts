@@ -341,6 +341,8 @@ function seedSignoffs(): Map<string, SignoffState> {
 }
 
 let signoffs: Map<string, SignoffState> = seedSignoffs();
+/** When a sign-off made in this epoch was recorded, so the plan reads the same time the 201 gave (B3 does: the plan carries the real `signed_at`). */
+let signedAt = new Map<string, string>();
 
 function seedOf(crewId: string): CrewSeed | undefined {
   return CREW_SEEDS.find((seed) => seed.id === crewId);
@@ -440,6 +442,7 @@ export function resetDemoState(siteId: string, now: Date = new Date()): Schemas[
   const previous = epoch;
   stops = [];
   signoffs = seedSignoffs();
+  signedAt = new Map();
   epoch += 1;
   return { site_id: siteId, epoch_id: epoch, previous_epoch_id: previous, reset_at: now.toISOString() };
 }
@@ -448,6 +451,7 @@ export function resetDemoState(siteId: string, now: Date = new Date()): Schemas[
 export function resetDemoStateHard(): void {
   stops = [];
   signoffs = seedSignoffs();
+  signedAt = new Map();
   epoch = 1;
   stopCounter = 0;
   log = [];
@@ -724,7 +728,7 @@ export function crewDayPlan(crewId: string, date: string, options: DayOptions = 
     restricted_headcount: suppressed ? null : seed.restrictedHeadcount,
     // A suppressed crew shows no restriction codes either: a code on a small crew can single a member out.
     restrictions: suppressed ? [] : seed.restrictions,
-    signed_at: state === "unsigned" ? null : SEED_SIGNED_AT,
+    signed_at: state === "unsigned" ? null : (signedAt.get(seed.id) ?? SEED_SIGNED_AT),
     signed_by_role: state === "unsigned" ? null : "supervisor",
     forecast_status: statusOf(options),
     ban_window: banWindow(date),
@@ -760,6 +764,7 @@ export function signOffDayPlan(
   if (missing.length > 0) return { kind: "review-required", missing };
   const wasSigned = signoffs.get(crewId) === "signed";
   signoffs.set(crewId, "signed");
+  if (!wasSigned) signedAt.set(crewId, REPLAY_INSTANT);
   return {
     kind: "signed",
     signOff: {

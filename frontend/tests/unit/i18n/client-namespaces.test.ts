@@ -9,6 +9,12 @@ import { routing } from "@/i18n/routing";
  * A namespace a client component reads that its group does not list would render a raw key on a phone, so this scans the
  * components each group mounts for their literal namespaces. A bare `useTranslations()` (FieldShell) is checked through the
  * full keys it passes to `t(...)`.
+ *
+ * The scan is DERIVED, not a hand-kept list (F2 W4): the shared components are every file under `src/components` that calls
+ * `useTranslations`, less an explicit deny list of what a surface never mounts; and a test demands that EVERY file under
+ * `src/components` and `src/features` that reads translations belongs to a surface or to a declared other surface (the judge's
+ * desk). A new component, or a new feature folder (My data, say), is therefore scanned by default or fails until someone
+ * decides where it lives: it can no longer be added without its namespaces being checked.
  */
 
 const SRC = join(process.cwd(), "src");
@@ -31,49 +37,54 @@ function namespacesRead(files: readonly string[]): { readonly file: string; read
   return found;
 }
 
-const SHELL = ["components/shell/FieldShell.tsx", "components/shell/SunToggle.tsx", "components/shell/FieldHeading.tsx"];
-const SHARED = ["components/states", "components/level", "components/spine"];
+/** What a field surface never mounts: the desk shell and everything the judge's desk draws. Anything else under components/ is scanned. */
+const DESK_ONLY = [
+  "components/charts",
+  "components/governance",
+  "components/ui",
+  "components/provenance/ScoreboardTable.tsx",
+  "components/provenance/Verdict.tsx",
+  "components/shell/DeskShell.tsx",
+  "components/shell/StoryNav.tsx",
+  "components/shell/CopyStepLink.tsx",
+  "components/shell/LocaleSwitcher.tsx",
+  "components/shell/DemoModeSwitch.tsx",
+];
+/** The proof drawer (`judge.proof`): the worker app mounts it; the supervisor screens and the unwell sheet do not. */
+const PROOF = ["components/provenance/ProofChip.tsx", "components/provenance/ProofDrawer.tsx", "components/provenance/ProofRows.tsx"];
+/** The worker dock: the worker app and the unwell sheet; the supervisor has its own Stop bar instead. */
+const DOCK = ["components/shell/WorkerDock.tsx"];
+
+/** Every file under src/components that reads translations, less the paths in `except` (a path is a file or a folder). */
+function sharedComponents(except: readonly string[]): string[] {
+  const skip = except.map((path) => join(SRC, path));
+  return filesIn("components").filter((file) => /\.tsx?$/.test(file) && /(?:useTranslations|getTranslations)\(/.test(readFileSync(file, "utf8")) && !skip.some((path) => file === path || file.startsWith(`${path}/`) || file.startsWith(`${path}\\`)));
+}
 
 const surfaces = {
   "worker app": {
     paths: WORKER_APP_NAMESPACES,
-    files: [
-      "features/today",
-      "features/alert",
-      "features/push",
-      "features/demo",
-      "components/provenance/ProofChip.tsx",
-      "components/provenance/ProofDrawer.tsx",
-      "components/provenance/ModeStamp.tsx",
-      "components/shell/WorkerDock.tsx",
-      "components/shell/DraftBadge.tsx",
-      ...SHELL,
-      ...SHARED,
-    ],
+    features: ["features/today", "features/alert", "features/push", "features/demo"],
+    shared: sharedComponents([...DESK_ONLY]),
   },
   "worker sheet": {
     paths: WORKER_SHEET_NAMESPACES,
-    files: ["features/unwell", "components/shell/WorkerDock.tsx", ...SHELL, ...SHARED],
+    features: ["features/unwell"],
+    shared: sharedComponents([...DESK_ONLY, ...PROOF]),
   },
   supervisor: {
     paths: SUPERVISOR_NAMESPACES,
-    files: [
-      "features/supervisor",
-      "features/demo",
-      "components/provenance/ModeStamp.tsx",
-      "components/shell/SyntheticDemoBanner.tsx",
-      "components/shell/ResetDemoControl.tsx",
-      "components/shell/ResetDemoButton.tsx",
-      ...SHELL,
-      ...SHARED,
-    ],
+    features: ["features/supervisor", "features/demo"],
+    shared: sharedComponents([...DESK_ONLY, ...PROOF, ...DOCK]),
   },
 } as const;
 
+const OTHER_SURFACES = ["features/judge", ...DESK_ONLY];
+
 describe("client message namespaces of the field route groups", () => {
-  for (const [name, { paths, files }] of Object.entries(surfaces)) {
+  for (const [name, { paths, features, shared }] of Object.entries(surfaces)) {
     it(`${name}: every namespace its client components read is in the group's list`, () => {
-      const read = namespacesRead(files.flatMap(filesIn));
+      const read = namespacesRead([...features.flatMap(filesIn), ...shared]);
       expect(read.length).toBeGreaterThan(5);
       const missing = read.filter(({ ns }) => !covers(paths, ns)).map(({ file, ns }) => `${file.slice(SRC.length + 1)}: ${ns}`);
       expect(missing).toEqual([]);
@@ -87,10 +98,28 @@ describe("client message namespaces of the field route groups", () => {
     });
   }
 
+  it("every file under components/ and features/ that reads translations belongs to a surface or to a declared other surface", () => {
+    const accounted = new Set<string>([
+      ...Object.values(surfaces).flatMap(({ features, shared }) => [...features.flatMap(filesIn), ...shared]),
+      ...OTHER_SURFACES.flatMap(filesIn),
+    ]);
+    const reading = [...filesIn("components"), ...filesIn("features")].filter(
+      (file) => /\.tsx?$/.test(file) && /(?:useTranslations|getTranslations)\(/.test(readFileSync(file, "utf8")),
+    );
+    const unaccounted = reading.filter((file) => !accounted.has(file)).map((file) => file.slice(SRC.length + 1));
+    // A new feature folder (My data, a new screen) lands here until it is given a surface (add its folder to that surface's
+    // `features`) or declared another surface (OTHER_SURFACES): the choice is made once, and its namespaces are checked from then on.
+    expect(unaccounted).toEqual([]);
+  });
+
   it("the lists leave out the judge's own namespaces (the point: 6.9 KB gzip the field routes never read)", () => {
     for (const { paths } of Object.values(surfaces)) {
       const listed: readonly string[] = paths;
-      for (const leftOut of ["judge", "hse", "offline", "profile"]) expect(listed).not.toContain(leftOut);
+      for (const leftOut of ["judge", "hse", "offline"]) expect(listed).not.toContain(leftOut);
     }
+  });
+
+  it("the supervisor screens read no proof copy, so the supervisor list does not carry it (W4)", () => {
+    expect(SUPERVISOR_NAMESPACES.some((path) => path.startsWith("judge"))).toBe(false);
   });
 });

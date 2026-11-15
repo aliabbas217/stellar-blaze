@@ -519,6 +519,8 @@ describe("sign_off_day_plan", () => {
     });
     expect((await timeline("crew-b")).signoff_state).toBe("signed");
     expect((await dayPlan("crew-b")).signoff_label_code).toBeNull();
+    // The plan reads the time the 201 gave (as the real API does), not the seed's: a screen that refetches after signing must not flip it.
+    expect((await dayPlan("crew-b")).signed_at).toBe("2026-09-03T07:10:00Z");
   });
 
   it("moves crew-c from changed_since_signed to signed, and answers a signed plan with its recorded sign-off again", async () => {

@@ -11,6 +11,7 @@ import { ErrorState } from "@/components/states/ErrorState";
 import { LevelSignSkeleton, Skeleton } from "@/components/states/Skeletons";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import { ActionLead } from "@/features/today/ActionLead";
+import { ALSO_NEEDS_DRAFT_MARKER, alsoPictogram } from "@/features/today/action-codes";
 import { LevelHeader } from "@/features/today/LevelHeader";
 import { ProtectiveLead } from "@/features/today/ProtectiveLead";
 import { ShiftSpine, spineHeight } from "@/features/today/ShiftSpine";
@@ -113,11 +114,16 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
                 key={item}
                 className="grid grid-cols-[2.5rem_1fr] items-center gap-3 border-b border-hair py-3 text-xl leading-(--sign-leading-text) font-medium text-ink"
               >
-                <Pictogram name={item === "water" ? "water" : "buddy"} className="size-10" />
+                <Pictogram name={alsoPictogram(item)} className="size-10" />
                 <span>{t(`also.${item}`)}</span>
               </li>
             ))}
           </ol>
+          {d.plan.also.some((item) => ALSO_NEEDS_DRAFT_MARKER.has(item)) ? (
+            <p data-draft-wording="" className="text-base leading-(--sign-leading-text) text-ink-2">
+              {t("draftWording")}
+            </p>
+          ) : null}
         </section>
       )}
 

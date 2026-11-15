@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
 import en from "../../../../messages/en.json";
 import { enqueueStop, pendingStops } from "@/features/supervisor/stop-outbox";
-import { createStop, crewStops } from "@/mocks/fixtures";
+import { createStop, crewStops, resetDemoState } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
 import { renderCrews, stopBar, textOf, installSupervisorTestEnvironment } from "./support";
 
@@ -47,8 +47,17 @@ const problem429 = (): Response =>
     { status: 429, headers: { "content-type": "application/problem+json", "retry-after": "5" } },
   );
 
-/** Words the bar must never use: the API records a stop, it alerts nobody (ADR 0058). */
-const DELIVERY_CLAIM = /alerted|alerting|notified|notifying|phones|delivered|informed|reached/i;
+/**
+ * The one sentence about when crews hear of a stop (ADR 0058, second entry: the default dispatch cadence, a promise about WHEN and
+ * never a delivery claim). Every other sentence is held to the delivery words below.
+ */
+const NOTIFY_WINDOW = "Crews are notified within about six minutes.";
+
+/** Words the bar must never use: the API records a stop, it alerts nobody itself, and nothing is "immediate" (ADR 0058). */
+const DELIVERY_CLAIM = /alerted|alerting|notified|notifying|phones|delivered|informed|reached|immediately|instantly|right away/i;
+
+/** `text` without the one allowed sentence, for the delivery-word checks. */
+const withoutWindow = (text: string): string => text.replaceAll(NOTIFY_WINDOW, "");
 
 function barText(): string {
   return textOf(stopBar());
@@ -130,13 +139,13 @@ describe("Stop work: structure", () => {
 });
 
 describe("Stop work: recorded, undo, resume", () => {
-  it("records the stop and says so in the words of the ruling: 'Stop recorded' and 'Tell the crew now', with a 10 s Undo", async () => {
+  it("records the stop and says so in the words of the ruling: 'Stop recorded.', the six-minute window, 'Tell the crew now.', with a 10 s Undo", async () => {
     const user = userEvent.setup();
     renderCrews();
 
     await user.click(await press());
 
-    await barSays("Crew A stopped 11:10. Stop recorded. Tell the crew now.");
+    await barSays("Crew A stopped 11:10. Stop recorded. Crews are notified within about six minutes. Tell the crew now.");
     expect(screen.getByRole("button", { name: "Undo (10 s)" })).toBeInTheDocument();
     expect(crewStops("crew-a")).toHaveLength(1);
     expect(stopBar()).toHaveAttribute("data-stop-state", "undo");
@@ -236,6 +245,65 @@ describe("Stop work: recorded, undo, resume", () => {
   });
 });
 
+describe("Stop work: a resume or undo that finds no stop (404)", () => {
+  const gone = () =>
+    HttpResponse.json(
+      { type: "urn:stellar-blaze:problem:not-found", title: "Not found", status: 404, request_id: "req-404" },
+      { status: 404, headers: { "content-type": "application/problem+json" } },
+    );
+
+  it("test_resume_404_is_neutral_and_refetches: 'No active stop found', never 'Resumed', and the crew list is asked again", async () => {
+    createStop("crew-a");
+    let crewListRequests = 0;
+    server.events.on("request:start", ({ request }) => {
+      if (/\/api\/v1\/sites\/[^/]+\/crews$/.test(new URL(request.url).pathname)) crewListRequests += 1;
+    });
+    const user = userEvent.setup();
+    renderCrews();
+    await user.click(await within(await waitForBar()).findByRole("button", { name: "Resume work" }));
+    const before = crewListRequests;
+    // The stop vanished on the server (a demo reset starts a new epoch): the DELETE answers 404 and the list no longer shows it.
+    resetDemoState("site-demo-mussafah");
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Resume work" }));
+
+    await barSays("No active stop found for this crew (already resumed, or the demo was reset)");
+    // Server truth: the refetched list says nothing is stopped, so the bar is the Stop work button again, with the notice beside it.
+    expect(await press()).toBeEnabled();
+    expect(crewListRequests).toBeGreaterThan(before);
+    expect(screen.queryByRole("button", { name: "Resume work" })).toBeNull();
+    expect(barText()).toContain("No active stop found for this crew");
+    // The notice is not a failure message and not a success message.
+    expect(barText()).not.toContain("Resume was not sent");
+    expect(barText()).not.toMatch(/\bResumed\b/);
+  });
+
+  it("an undo that finds no stop reads the same neutral line, not 'Undo was not sent'", async () => {
+    server.use(http.delete("*/api/v1/crews/:crew_id/stops/:stop_id", gone));
+    const user = userEvent.setup();
+    renderCrews();
+    await user.click(await press());
+    await user.click(await screen.findByRole("button", { name: /^Undo/ }));
+
+    await barSays("No active stop found for this crew");
+    expect(barText()).not.toContain("Undo was not sent");
+  });
+
+  it("the notice is for the stop that is gone: a new Stop press clears it", async () => {
+    createStop("crew-a");
+    const user = userEvent.setup();
+    renderCrews();
+    await user.click(await within(await waitForBar()).findByRole("button", { name: "Resume work" }));
+    resetDemoState("site-demo-mussafah");
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Resume work" }));
+    await barSays("No active stop found for this crew");
+
+    await user.click(await press());
+
+    await barSays("Stop recorded.");
+    expect(barText()).not.toContain("No active stop found");
+  });
+});
+
 async function waitForBar(): Promise<HTMLElement> {
   await waitFor(() => {
     expect(barText()).toContain("Work stopped");
@@ -258,9 +326,35 @@ describe("Stop work: never shown as delivered when it was not", () => {
     await barSays("Not sent. Tell the crew now.");
     states.push(barText());
 
-    for (const text of states) expect(text).not.toMatch(DELIVERY_CLAIM);
+    for (const text of states) expect(withoutWindow(text)).not.toMatch(DELIVERY_CLAIM);
     // And the catalogue itself, every string the bar can say.
-    for (const [key, value] of Object.entries(en.supervisor.stop)) expect(value, `supervisor.stop.${key}`).not.toMatch(DELIVERY_CLAIM);
+    for (const [key, value] of Object.entries(en.supervisor.stop)) {
+      expect(withoutWindow(value), `supervisor.stop.${key}`).not.toMatch(DELIVERY_CLAIM);
+    }
+  });
+
+  it("test_stop_copy_names_the_six_minute_window: 'Stop recorded.' then the window then 'Tell the crew now.', in the undo window and after it, never 'immediately'", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-09-03T07:10:00Z"));
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+    renderCrews();
+    await user.click(await press());
+    await screen.findByRole("button", { name: /^Undo/ });
+    const order = /Stop recorded\. Crews are notified within about six minutes\. Tell the crew now\./;
+    expect(barText()).toMatch(order);
+
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(barText()).toContain("Work stopped 11:10");
+    });
+    expect(barText()).toMatch(order);
+    expect(barText()).not.toMatch(/immediately|instantly|alerted|delivered/i);
+    // The catalogue: the window is in exactly the two lines that say a stop was recorded, with the same words.
+    expect(en.supervisor.stop.recorded).toContain(NOTIFY_WINDOW);
+    expect(en.supervisor.stop.stoppedDetail).toContain(NOTIFY_WINDOW);
   });
 
   it("test_offline_stop_goes_to_outbox_and_reads_not_sent: no request is made, the row is the crew id and time, the words are 'Not sent: no signal'", async () => {
@@ -282,7 +376,9 @@ describe("Stop work: never shown as delivered when it was not", () => {
     await barSays("Not sent: no signal. Tell the crew now.");
     expect(barText()).toContain("The stop for Crew A is kept on this phone and sent when it is back online.");
     expect(barText()).not.toMatch(/Stop recorded|stopped/i);
-    expect(barText()).not.toMatch(DELIVERY_CLAIM);
+    expect(withoutWindow(barText())).not.toMatch(DELIVERY_CLAIM);
+    // Nothing was recorded, so nothing is promised: the six-minute window belongs to a recorded stop only.
+    expect(barText()).not.toContain("six minutes");
     expect(posts).toBe(0);
     const rows = await pendingStops(factory);
     expect(rows).toHaveLength(1);

@@ -10,4 +10,4 @@ export const WORKER_APP_NAMESPACES = ["_meta", "common", "shell", "worker", "tod
 export const WORKER_SHEET_NAMESPACES = ["_meta", "common", "shell", "worker", "states", "levels"] as const;
 
 /** The supervisor crews and plan screens. */
-export const SUPERVISOR_NAMESPACES = ["_meta", "common", "shell", "supervisor", "states", "levels", "judge.proof"] as const;
+export const SUPERVISOR_NAMESPACES = ["_meta", "common", "shell", "supervisor", "states", "levels"] as const;

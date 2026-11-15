@@ -25,6 +25,39 @@ export interface Problem {
   detail?: string | undefined;
   instance?: string | undefined;
   request_id?: string | undefined;
+  /**
+   * The shift rules a crew's published shift breaks by itself (the 422 `shift-not-legal` of the day plan and the sign-off,
+   * ShiftNotLegalProblem). Present only when the body carries a well-formed list; the plan screen shows each as a row.
+   */
+  violations?: ShiftViolation[] | undefined;
+  /** The ack item ids a sign-off left out (the 409 `review-required`, ReviewRequiredProblem). Present only when well formed. */
+  missing_items?: string[] | undefined;
+}
+
+/** One rule a shift breaks (contract schema `ShiftViolation`). `clause` may be empty: the screen shows it only when it is not. */
+export interface ShiftViolation {
+  rule_id: string;
+  clause: string;
+  source_id: string;
+}
+
+/** A list of strings, or undefined (a malformed list is dropped, the problem itself is still read). */
+function readStrings(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return (value as unknown[]).every((item) => typeof item === "string") ? (value as string[]).slice() : undefined;
+}
+
+/** A well-formed `violations` list, or undefined: a malformed one is dropped, the problem itself is still read. */
+function readViolations(value: unknown): ShiftViolation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: ShiftViolation[] = [];
+  for (const item of value as unknown[]) {
+    if (typeof item !== "object" || item === null) return undefined;
+    const { rule_id, clause, source_id } = item as Record<string, unknown>;
+    if (typeof rule_id !== "string" || typeof clause !== "string" || typeof source_id !== "string") return undefined;
+    out.push({ rule_id, clause, source_id });
+  }
+  return out;
 }
 
 /** The BFF proxy could not get an answer from the API (unconfigured, unreachable, timed out). */
@@ -52,6 +85,10 @@ function readProblemBody(body: unknown): Problem | undefined {
     if (typeof value !== "string") return undefined;
     problem[key] = value;
   }
+  const violations = readViolations(members["violations"]);
+  if (violations !== undefined) problem.violations = violations;
+  const missing = readStrings(members["missing_items"]);
+  if (missing !== undefined) problem.missing_items = missing;
   return problem;
 }
 

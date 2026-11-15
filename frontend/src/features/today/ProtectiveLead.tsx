@@ -3,8 +3,9 @@
 import { useTranslations } from "next-intl";
 import type { components } from "@/api/schema";
 import { LevelSign } from "@/components/level/LevelSign";
+import { levelIndex } from "@/components/level/level";
 import { ActionLead } from "@/features/today/ActionLead";
-import type { TodayDescription } from "@/features/today/describe";
+import { PROTECTIVE_LEVEL, type TodayDescription } from "@/features/today/describe";
 import { LevelHeader } from "@/features/today/LevelHeader";
 import { useAgeLabel, useTimeFormat } from "@/features/today/labels";
 
@@ -43,7 +44,11 @@ export function ProtectiveLead({
   const offlineWords = useTranslations("states.offlineBanner");
   const time = useTimeFormat();
   const ageLabel = useAgeLabel();
+  const levels = useTranslations("levels");
   const { lastKnownLevel } = description;
+  // The protective plan is High (Orange). When the last known level was ABOVE it (Red: a stop level), the plan the sign shows is
+  // not the worst the forecast last said, and the lead says so in words (F2 W4 I5, interim until the architect rules).
+  const lastKnownHigher = lastKnownLevel !== null && levelIndex(lastKnownLevel) > levelIndex(PROTECTIVE_LEVEL) ? lastKnownLevel : null;
 
   return (
     <section data-hero="" data-protective-lead="" aria-labelledby="protective-lead" className="flex flex-col gap-3 pt-3">
@@ -55,6 +60,11 @@ export function ProtectiveLead({
         >
           {t("kicker.fallback")}
         </h2>
+        {lastKnownHigher === null ? null : (
+          <p data-last-known-higher="" className="text-lg font-semibold leading-(--sign-leading-text) text-ink">
+            {t.rich("kicker.lastKnownHigher", { level: levels(`name.${lastKnownHigher}`), bdi: (chunks) => <bdi>{chunks}</bdi> })}
+          </p>
+        )}
         {offline ? (
           <p className="text-lg leading-(--sign-leading-text) text-ink-2">
             <strong className="block font-medium text-ink">{offlineWords("title")}</strong>

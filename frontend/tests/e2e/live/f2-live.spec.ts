@@ -301,7 +301,8 @@ test.describe("F2 against the real B3: the supervisor's crews and Stop work", ()
     await stopButton(page).click();
     await expect(bar(page)).toContainText(`${crewName} stopped 10:`);
     await expect(bar(page)).toContainText("Stop recorded");
-    await expect(bar(page)).not.toContainText(/alerted|phones|notified/i);
+    await expect(bar(page)).toContainText("Crews are notified within about six minutes.");
+    await expect(bar(page)).not.toContainText(/immediately|alerted|phones|delivered/i);
     const afterStop = (await readCrews(request, site.id)).find((candidate) => candidate.id === crew.id);
     expect(afterStop?.stopped, "the API records the stop").toBe(true);
     expect(afterStop?.active_stop_id, "and names it").toBeTruthy();

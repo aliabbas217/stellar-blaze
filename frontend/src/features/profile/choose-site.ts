@@ -13,6 +13,13 @@ import { nextSitePin, readSitePin, type SiteContacts } from "@/features/profile/
  * revoke, this tab's or another's); if a revoke happened before the choice was written the pin is NOT written (the worker took
  * their data back, and a choice that was still resolving must not bring it back). It resolves `true` when it wrote the pin and
  * `false` when it was overtaken. A phone whose store has not been loaded yet cannot have been revoked in this tab: nothing to compare.
+ *
+ * KNOWN LIMIT (F2 W4): the guard is INACTIVE for the first call of a page load. `epochAtStart` is read from the loaded store, and
+ * on the first call there is none, so a revoke that lands while that first import is still resolving is not seen and the pin is
+ * written. The window is the length of one chunk fetch, on the demo-yard tap or the `?site=` link of a page that has just opened.
+ * Closing it needs the epoch from a marker light enough to read without the store (a one-key localStorage value written by
+ * `revoke`); not done, because the pin it could resurrect is a site id and a crew id on the device, not personal data, and a later
+ * revoke clears it. Revisit when a revoke marker is wanted for another reason.
  */
 type StoreModule = typeof import("@/features/profile/store");
 let loaded: StoreModule | null = null;

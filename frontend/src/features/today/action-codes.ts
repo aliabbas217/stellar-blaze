@@ -10,6 +10,8 @@
  * (`rest_in_shade`, `water_every_15_min`). Water is only ever "Drink water": no litres, no interval (clinical review pending).
  */
 
+import type { PictogramName } from "@/components/level/Pictogram";
+
 /** What the worker is told to do now: one verb, with its numbers when the code has them. */
 export type Lead =
   | { readonly kind: "stop" }
@@ -17,8 +19,31 @@ export type Lead =
   | { readonly kind: "shade" }
   | { readonly kind: "siteRules" };
 
-/** The list under "Also now": only what a known code asks for. */
-export type AlsoNow = "water" | "buddy";
+/**
+ * The list under "Also now": only what a known code asks for. The last four are the ruleset's codes that had no wording until the
+ * architect's ruling of 2026-11-15: each is the ADOSH Technical Guideline Table 1 text the ruleset's own clause cites, verbatim where
+ * possible (messages `worker.today.also.*`; the (code, wording, clause) log is in the F2 Task 20 report for the clinical review pack).
+ * They stay under the draft marker ("Draft wording, awaiting clinical review"): nothing here is reviewed.
+ */
+export type AlsoNow = "water" | "buddy" | "selfPaced" | "noUnacclimatised" | "induction" | "bottle";
+
+/** The pictogram drawn beside an "Also now" line (decorative: the words carry the meaning). */
+export function alsoPictogram(item: AlsoNow): PictogramName {
+  switch (item) {
+    case "water":
+    case "bottle":
+      return "water";
+    case "selfPaced":
+      return "clock";
+    case "buddy":
+    case "noUnacclimatised":
+    case "induction":
+      return "buddy";
+  }
+}
+
+/** The lines that carry clinical wording of their own (everything but the two older, simpler prompts): the draft marker follows them. */
+export const ALSO_NEEDS_DRAFT_MARKER: ReadonlySet<AlsoNow> = new Set<AlsoNow>(["selfPaced", "noUnacclimatised", "induction", "bottle"]);
 
 export interface ActionPlan {
   readonly lead: Lead;
@@ -39,6 +64,10 @@ function cycle(code: string): Lead | null {
 
 function alsoOf(code: string): AlsoNow | null {
   if (code === "no-lone-work") return "buddy";
+  if (code === "self-paced-work") return "selfPaced";
+  if (code === "no-unacclimatised") return "noUnacclimatised";
+  if (code === "high-risk-induction") return "induction";
+  if (code === "personal-water-bottle-2l") return "bottle";
   if (code.startsWith("fluids.") || code.startsWith("water")) return "water";
   return null;
 }

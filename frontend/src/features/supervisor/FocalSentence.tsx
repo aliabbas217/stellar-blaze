@@ -30,7 +30,16 @@ export function useDurationLabel(): (minutes: number) => string {
   );
 }
 
-export function FocalSentence({ focal, breakInMinutes }: { readonly focal: CrewStripModel; readonly breakInMinutes: number | null }) {
+export function FocalSentence({
+  focal,
+  breakInMinutes,
+  kicker,
+}: {
+  readonly focal: CrewStripModel;
+  readonly breakInMinutes: number | null;
+  /** The line above the sentence; the crews screen's own ("Needs you first") unless the plan screen says what the sentence is. */
+  readonly kicker?: string;
+}) {
   const t = useTranslations("supervisor.crews");
   const levels = useTranslations("levels");
   const time = useTimeFormat();
@@ -62,7 +71,7 @@ export function FocalSentence({ focal, breakInMinutes }: { readonly focal: CrewS
     <section aria-labelledby="focal" className="flex flex-col gap-2 px-4 pt-3">
       <p className="flex items-center gap-2 text-base text-ink-2">
         {focal.level === null ? null : <LevelMark level={focal.level} />}
-        {t("kicker")}
+        {kicker ?? t("kicker")}
       </p>
       <h2 id="focal" className="font-display text-xl font-medium leading-(--sign-leading-text) text-ink">
         {sentence}

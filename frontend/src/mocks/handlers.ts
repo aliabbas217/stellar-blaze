@@ -48,6 +48,8 @@ import {
  *   noshift     the crew timelines publish no shift for the day
  *   shift-not-legal  the day plan and the sign-off answer 422 `shift-not-legal`: the crew's published shift breaks a shift
  *               rule by itself, so no plan is served (violations in the problem body)
+ *   plan-invalid the day plan answers 500 `plan-invalid`: the independent validator rejected the planner's own plan, so no plan is
+ *               served (the contract's "validator-failed" state; every other operation is unaffected)
  *   unavailable the operations that list a 503 in the contract (every read of the day views, the day plan, the sign-off,
  *               the data request, plan validation) answer 503 `dependency-unavailable`
  * Any other value is ignored. The employer routes answer 401 without an `Authorization: Bearer` header (the BFF adds
@@ -58,7 +60,7 @@ import {
  */
 
 type Schemas = components["schemas"];
-type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift" | "shift-not-legal" | "unavailable";
+type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift" | "shift-not-legal" | "plan-invalid" | "unavailable";
 type Info = Parameters<HttpResponseResolver>[0];
 
 const MOCK_REQUEST_ID = "mock-req-1";
@@ -139,6 +141,7 @@ function scenarioOf(request: Request): Scenario | null {
     value === "offseason" ||
     value === "noshift" ||
     value === "shift-not-legal" ||
+    value === "plan-invalid" ||
     value === "unavailable"
     ? value
     : null;
@@ -184,6 +187,16 @@ function shiftNotLegalProblem(request: Request): Response {
     title: "Shift not legal",
     detail: "The published shift breaks a shift rule by itself; no plan can fix it.",
     extra: { violations: SHIFT_VIOLATIONS },
+  });
+}
+
+/** The 500 of `get_crew_day_plan` when the independent validator rejected the planner's own plan (the `plan-invalid` scenario). */
+function planInvalidProblem(request: Request): Response {
+  return problem(request, {
+    status: 500,
+    type: `${PROBLEM_PREFIX}plan-invalid`,
+    title: "Plan invalid",
+    detail: "The independent validator rejected the planner's own plan; it is not served.",
   });
 }
 
@@ -331,6 +344,7 @@ export const handlers = [
       if (date === null) return badDate(request);
       const crewId = pathParam(params, "crew_id");
       if (scenario === "shift-not-legal" && crewExists(crewId)) return shiftNotLegalProblem(request);
+      if (scenario === "plan-invalid" && crewExists(crewId)) return planInvalidProblem(request);
       const plan = crewDayPlan(crewId, date, dayOptions(scenario));
       if (plan === undefined) return mockProblem(request, 404, `No crew ${crewId}.`);
       return HttpResponse.json(scenario === "empty" ? { ...plan, segments: [], zone_hours: [], ack_items: [] } : plan);

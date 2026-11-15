@@ -187,8 +187,9 @@ test("supervisor crews: stop work then undo", async ({ page }) => {
 
   await page.getByRole("button", { name: stopLabel("Crew A") }).click();
 
-  await expect(bar(page)).toContainText("Crew A stopped 11:10. Stop recorded. Tell the crew now.");
-  await expect(bar(page)).not.toContainText(/alerted|phones|notified/i);
+  // The architect's ruling (ADR 0058, second entry): a promise about WHEN (the default dispatch cadence), never "immediately", never a delivery.
+  await expect(bar(page)).toContainText("Crew A stopped 11:10. Stop recorded. Crews are notified within about six minutes. Tell the crew now.");
+  await expect(bar(page)).not.toContainText(/immediately|alerted|phones|delivered/i);
   await expect(page.getByRole("button", { name: /^Undo \(\d+ s\)$/ })).toBeVisible();
   // The API now has the stop: the list says so (the row names the time), and the focal sentence follows.
   await expect(page.getByRole("heading", { level: 2 })).toContainText("Crew A stopped work at 11:10");

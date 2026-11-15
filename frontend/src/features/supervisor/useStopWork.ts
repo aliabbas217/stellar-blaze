@@ -17,7 +17,9 @@ import { drainStopOutbox, enqueueStop, outboxAvailable, type SendResult } from "
  *    words are "Stop recorded" (the API records a stop; it does not alert anyone, ADR 0058). With no signal the stop is kept
  *    in the outbox and the state is "queued", which the screen words "Not sent". A refusal (429, a server failure, a stop
  *    that could not even be kept) is "failed", worded "Not sent".
- *  - It has a 10 second undo, which calls `delete_crew_stop`, and a later "resume", the same call.
+ *  - It has a 10 second undo, which calls `delete_crew_stop`, and a later "resume", the same call. Neither is shown as done
+ *    unless the API answered 2xx. A 404 (the stop is gone: already resumed elsewhere, or a demo reset started a new epoch) is a
+ *    neutral "no active stop found" and a refetch of the crew: the server's answer decides what the bar reads next.
  *
  * The server's own view of the crew (`server`, from the crews list) is merged in: a stop that is active after a reload, or
  * recorded by another phone, reads "stopped" here too, without an undo window.
@@ -50,6 +52,8 @@ export interface StopWork {
   /** The last undo or resume was not sent: say so, the stop still stands. */
   readonly undoFailed: boolean;
   readonly resumeFailed: boolean;
+  /** The last undo or resume found no stop to clear (404): said neutrally until the crew list says otherwise. */
+  readonly noActiveStop: boolean;
   readonly stop: () => void;
   readonly undo: () => void;
   readonly resume: () => void;
@@ -117,6 +121,8 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
   // A resume the crews list has not caught up with yet: until a list newer than this arrives, a server "stopped" is stale.
   const [resumed, setResumed] = useState<{ readonly crewId: string | null; readonly at: number } | null>(null);
   const resumedAt = resumed !== null && resumed.crewId === crewId ? resumed.at : null;
+  // The crew an undo or resume found no stop for (404), and when: shown until a crew list newer than that says the crew is stopped again.
+  const [gone, setGone] = useState<{ readonly crewId: string | null; readonly at: number } | null>(null);
   const sending = useRef(false);
 
   const stopMutationOptions = useMemo(() => stopMutation(crewId ?? ""), [crewId]);
@@ -138,6 +144,7 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
     setUndoFailedFor(null);
     setResumeFailedFor(null);
     setResumed(null);
+    setGone(null);
     const pressedAt = new Date();
 
     const queue = async (): Promise<void> => {
@@ -179,6 +186,8 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
   const local: LocalState = stored.crewId === crewId ? settled(stored, server) : IDLE;
 
   const stale = resumedAt !== null && server !== null && server.asOf <= resumedAt;
+  // Said while the crew list has not yet answered after the 404, and after it only while it agrees that nothing is stopped.
+  const noActiveStop = gone !== null && gone.crewId === crewId && !(server !== null && server.stopped && server.asOf > gone.at);
   const serverStopId = server !== null && server.stopped && !stale ? server.activeStopId : null;
 
   const currentStopId = local.kind === "stopped" ? local.stopId : serverStopId;
@@ -189,7 +198,13 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
       await sendClear(currentStopId);
       onDone();
       refresh();
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiProblem && error.problem.status === 404) {
+        // No such stop: never "resumed" (the API did not clear anything). Ask the server what the crew's state is now.
+        setGone({ crewId, at: Date.now() });
+        refresh();
+        return;
+      }
       onFail();
     }
   };
@@ -197,6 +212,7 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
   const undo = (): void => {
     if (local.kind !== "stopped" || Date.now() >= local.undoUntil) return;
     setUndoFailedFor(null);
+    setGone(null);
     void clear(
       () => {
         setLocal({ kind: "idle" });
@@ -210,6 +226,7 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
 
   const resume = (): void => {
     setResumeFailedFor(null);
+    setGone(null);
     void clear(
       () => {
         setLocal({ kind: "idle" });
@@ -282,12 +299,13 @@ export function useStopWork(candidateId: string | null, serverOf: (crewId: strin
       failure: null,
       undoFailed,
       resumeFailed,
+      noActiveStop,
       stop,
       undo,
       resume,
     };
   }
-  const base = { crewId, stopId: null, undoSecondsLeft: 0, undoFailed: false, resumeFailed, stop, undo, resume } as const;
+  const base = { crewId, stopId: null, undoSecondsLeft: 0, undoFailed: false, resumeFailed, noActiveStop, stop, undo, resume } as const;
   if (local.kind === "sending") return { ...base, state: "sending", at: null, failure: null };
   if (local.kind === "queued") return { ...base, state: "queued", at: local.at, failure: null };
   if (local.kind === "failed") return { ...base, state: "failed", at: null, failure: local.reason };

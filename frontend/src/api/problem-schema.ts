@@ -13,4 +13,9 @@ export const ProblemSchema = z.object({
   detail: z.string().optional(),
   instance: z.string().optional(),
   request_id: z.string().optional(),
+  // ShiftNotLegalProblem.violations. The hand reader keeps it only when every entry is well formed and otherwise drops just this
+  // member (it never rejects the whole problem for it): the parity test pins both behaviours.
+  // ReviewRequiredProblem.missing_items, read under the same rule as `violations`.
+  missing_items: z.array(z.string()).optional(),
+  violations: z.array(z.object({ rule_id: z.string(), clause: z.string(), source_id: z.string() })).optional(),
 });

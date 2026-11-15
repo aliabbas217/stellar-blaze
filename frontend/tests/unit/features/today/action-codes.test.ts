@@ -1,4 +1,4 @@
-import { actionPlan } from "@/features/today/action-codes";
+import { ALSO_NEEDS_DRAFT_MARKER, actionPlan, alsoPictogram } from "@/features/today/action-codes";
 
 /*
  * What an hour's action codes become on the Today screen (F2 Task 16). The words are messages; here only the meaning: which
@@ -51,6 +51,43 @@ describe("actionPlan", () => {
     // equal work minutes cannot differ in rest (a cycle is one hour), and a cycle still beats shade and loses to a stop
     expect(actionPlan(["rest_in_shade", light, heavy, "stop-work"]).lead).toEqual({ kind: "stop" });
     expect(actionPlan(["rest_in_shade", light, heavy]).lead).toEqual({ kind: "cycle", workMinutes: 20, restMinutes: 40 });
+  });
+
+  // The four codes B3's real ruleset sends that had no wording (found in the first live run, F2 Task 24b item 9). Each is now the
+  // ADOSH Table 1 text the ruleset's clause cites, verbatim; the lines are under the draft marker and add no advice of their own.
+  it.each([
+    ["self-paced-work", "selfPaced"],
+    ["no-unacclimatised", "noUnacclimatised"],
+    ["high-risk-induction", "induction"],
+    ["personal-water-bottle-2l", "bottle"],
+  ] as const)("test_four_ruleset_codes_have_a_line: %s is the '%s' line, leads nothing, and wears the draft marker", (code, item) => {
+    expect(actionPlan([code])).toEqual({ lead: { kind: "siteRules" }, also: [item] });
+    expect(ALSO_NEEDS_DRAFT_MARKER.has(item)).toBe(true);
+    // never mistaken for the water prompt (the bottle code contains the word "water"; the line is the bottle duty, not a quantity to drink)
+    if (code === "personal-water-bottle-2l") expect(actionPlan([code]).also).not.toContain("water");
+  });
+
+  it("an Orange hour of the real ruleset lists every code once, in the ruleset's order", () => {
+    const orange = [
+      "cycle.high.light.45-15",
+      "cycle.high.heavy.20-40",
+      "no-lone-work",
+      "no-unacclimatised",
+      "fluids.over-1.2l",
+      "high-risk-induction",
+      "personal-water-bottle-2l",
+    ];
+    expect(actionPlan(orange)).toEqual({
+      lead: { kind: "cycle", workMinutes: 20, restMinutes: 40 },
+      also: ["buddy", "noUnacclimatised", "water", "induction", "bottle"],
+    });
+    expect(actionPlan(["self-paced-work", "fluids.light.600ml-1l"]).also).toEqual(["selfPaced", "water"]);
+  });
+
+  it("every line has a pictogram, and the older two keep theirs", () => {
+    expect(alsoPictogram("water")).toBe("water");
+    expect(alsoPictogram("buddy")).toBe("buddy");
+    expect(alsoPictogram("bottle")).toBe("water");
   });
 
   it("an unknown code beside known ones is ignored, and the list has each item once", () => {

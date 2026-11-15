@@ -15,8 +15,9 @@ import { useTimeFormat } from "@/lib/time/use-time-format";
  *    sign-off in flight) and in every state of the stop itself. The press button is never `disabled`; a press while a send is
  *    in flight is ignored by the hook, not by the button.
  *  - never inside a form (there is none on this screen), no confirm dialog to STOP (ink, one press, a 10 s undo).
- *  - never claims a delivery: "Stop recorded" and "Tell the crew now." The API records a stop; it sends no alert (ADR 0058,
- *    pushes follow within one dispatch interval). With no signal it reads "Not sent: no signal.", and a refusal "Not sent."
+ *  - never claims a delivery: "Stop recorded.", "Crews are notified within about six minutes." (the default dispatch cadence,
+ *    ADR 0058: a promise about when, never "immediately" and never "alerted") and "Tell the crew now." The API records a stop; it
+ *    sends no alert itself. With no signal it reads "Not sent: no signal.", and a refusal "Not sent."
  *  - `data-emergency` marks it for the design gate: it is never the page's one primary action.
  *
  * Resuming is the opposite risk (a crew back in the heat), so it sits behind a confirm dialog, with "Keep work stopped" as the
@@ -119,6 +120,7 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
             )}
             {work.undoFailed ? <p className="text-base font-semibold leading-(--sign-leading-text)">{t("undoFailed")}</p> : null}
             {work.resumeFailed ? <p className="text-base font-semibold leading-(--sign-leading-text)">{t("resumeFailed")}</p> : null}
+            {work.noActiveStop ? <p className="text-base leading-(--sign-leading-text)">{t("noActiveStop")}</p> : null}
           </div>
           {undoOpen ? (
             <button type="button" onClick={work.undo} className={GHOST}>
@@ -171,6 +173,12 @@ export function StopWorkBar({ crewName, work, noCrew }: StopWorkBarProps) {
             {work.state === "sending" ? t("sending") : ""}
           </p>
         )}
+        {/* A resume that found no stop (404) is neither "resumed" nor a failure: the crew list decides what the bar reads. */}
+        {work.noActiveStop ? (
+          <p role="status" data-no-active-stop="" className="pb-3 text-base leading-(--sign-leading-text) text-ink-2">
+            {t("noActiveStop")}
+          </p>
+        ) : null}
         <button type="button" aria-busy={work.state === "sending"} onClick={work.stop} className={PRESS}>
           {work.state === "sending" ? <Spinner className="size-6" /> : null}
           <span>{crewName === null ? t("buttonGeneric") : t.rich("button", { crew: crewName, bdi })}</span>

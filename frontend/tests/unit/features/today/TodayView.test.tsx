@@ -106,6 +106,8 @@ async function expectProtectiveLead(container: HTMLElement): Promise<HTMLElement
   // The spine stays on screen, but it is not the hero while the forecast is not live.
   expect(document.querySelector("[data-spine]")).not.toBeNull();
   expect(document.querySelector("[data-spine][data-hero]")).toBeNull();
+  // No line at "now" through a spine that no forecast vouches for (W4 I1: the fallback state drew one).
+  expect(document.querySelectorAll("[data-spine] [data-now]")).toHaveLength(0);
   // The sign shows the protective level, dashed (kind "fallback"), never a live one.
   const sign = lead.querySelector('[data-level-sign][data-size="hero"]');
   expect(sign?.getAttribute("data-kind")).toBe("fallback");
@@ -210,6 +212,30 @@ describe("Today: a pinned phone", () => {
     expect(document.body.textContent).not.toMatch(/litre|1\.2/i);
   });
 
+  it("test_four_ruleset_codes_are_shown_in_the_rulesets_own_words_under_the_draft_marker: the Orange hour of the real ruleset", async () => {
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => {
+        const forecast = forecastToday(String(params["site_id"]));
+        if (forecast === undefined) return new HttpResponse(null, { status: 404 });
+        const orangeCodes = ["cycle.high.heavy.20-40", "no-lone-work", "no-unacclimatised", "fluids.over-1.2l", "high-risk-induction", "personal-water-bottle-2l"];
+        return HttpResponse.json({ ...forecast, hours: forecast.hours.map((hour) => ({ ...hour, action_codes: orangeCodes })) });
+      }),
+    );
+    pin();
+    renderToday();
+
+    expect(await orange()).toBeInTheDocument();
+    const also = screen.getByRole("heading", { name: "Also now" }).closest("section") as HTMLElement;
+    // Verbatim ADOSH Table 1 text, as the ruleset's clause cites it; nothing added.
+    expect(within(also).getByText("No unacclimatised person to work")).toBeInTheDocument();
+    expect(within(also).getByText("High Risk induction required emphasising hydration and identifying signs of heat strain")).toBeInTheDocument();
+    expect(within(also).getByText("Provide personal water bottle (2 litre capacity) on-site at all times")).toBeInTheDocument();
+    // The unreviewed marker follows the list as well as the lead.
+    expect(within(also).getByText("Draft wording, awaiting clinical review")).toBeInTheDocument();
+    // "Drink water" is still only that: the bottle's capacity is the duty's own words, never a quantity to drink.
+    expect(within(also).getByText("Drink water")).toBeInTheDocument();
+  });
+
   it("test_primary_action_is_turn_on_warnings_when_push_off: one primary action, to Alerts; none once push is on", async () => {
     pin();
     renderToday();
@@ -285,6 +311,33 @@ describe("Today: states", () => {
     expect(lastKnown?.textContent).toContain("Last known level");
     expect(lastKnown?.querySelector("[data-level-word]")?.textContent).toBe("Orange");
     expect(lead.textContent).toMatch(/Updated .* ago\./);
+  });
+
+  it("W4 I5: a last known level ABOVE the protective Orange (Red) is said in the lead's own words, and an Orange or lower one is not", async () => {
+    const stale = (): void => {
+      server.use(
+        http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) =>
+          HttpResponse.json(forecastToday(String(params["site_id"]), { ageMs: STALE_AGE_MS, status: "stale" })),
+        ),
+      );
+    };
+    // 14:30 is the Red hour of the mock's placeholder levels
+    search = "at=14:30";
+    stale();
+    pin();
+    const red = renderToday();
+    const lead = await expectProtectiveLead(red.container);
+    expect(lead.querySelector("[data-last-known-higher]")?.textContent).toBe("Last known level: Red");
+    expect(lead.querySelector('[data-level-sign][data-kind="stale"][data-size="mini"] [data-level-word]')?.textContent).toBe("Red");
+    // the protective sign itself is still Orange and dashed: the sentence is added, nothing is hidden
+    expect(lead.querySelector('[data-level-sign][data-size="hero"] [data-level-word]')?.textContent).toBe("Orange");
+    red.unmount();
+
+    search = "at=11:10";
+    pin();
+    const orange = renderToday();
+    const orangeLead = await expectProtectiveLead(orange.container);
+    expect(orangeLead.querySelector("[data-last-known-higher]")).toBeNull();
   });
 
   it("test_stale_and_fallback_are_not_live (I2): a last known level is secondary: the lead is the protective plan, the spine has no heat and no line at now", async () => {

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { apiClient } from "@/api/client";
 import { DemoProvider } from "@/features/demo/DemoProvider";
 import { CrewsView } from "@/features/supervisor/CrewsView";
+import { PlanView } from "@/features/supervisor/plan/PlanView";
 import { resetDemoStateHard } from "@/mocks/fixtures";
 import { renderWithIntl } from "../../../utils/intl";
 
@@ -39,6 +40,18 @@ export function renderCrews(): RenderResult {
     <QueryClientProvider client={client}>
       <DemoProvider>
         <CrewsView />
+      </DemoProvider>
+    </QueryClientProvider>
+  );
+  return renderWithIntl(view);
+}
+
+export function renderPlan(crewId: string): RenderResult {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const view: ReactNode = (
+    <QueryClientProvider client={client}>
+      <DemoProvider>
+        <PlanView crewId={crewId} />
       </DemoProvider>
     </QueryClientProvider>
   );

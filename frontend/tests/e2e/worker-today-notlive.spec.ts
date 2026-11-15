@@ -30,14 +30,14 @@ type Locale = (typeof LOCALES)[number];
 const CATALOGUE = { en, ar, ur, hi, bn, ne } as const;
 type Theme = "night" | "sun";
 
-async function openToday(page: Page, locale: Locale, theme: Theme, scenario: Scenario | null): Promise<string[]> {
+async function openToday(page: Page, locale: Locale, theme: Theme, scenario: Scenario | null, at?: string): Promise<string[]> {
   const errors = watchConsole(page);
   await page.setViewportSize(PHONE);
   await withScenario(page, scenario);
   await page.addInitScript((chosen) => {
     localStorage.setItem("sb-theme", JSON.stringify({ theme: chosen, until: Date.now() + 6 * 3_600_000 }));
   }, theme);
-  await page.goto(`/${locale}/worker${PIN}`);
+  await page.goto(`/${locale}/worker${PIN}${at === undefined ? "" : `&at=${at}`}`);
   await expect(page.getByRole("heading", { level: 1, name: CATALOGUE[locale].worker.today.title })).toBeAttached();
   return errors;
 }
@@ -78,6 +78,8 @@ async function expectProtectiveLead(page: Page, locale: Locale, label: string): 
   await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(0);
   await expect(page.locator("[data-spine]")).toHaveCount(1);
   await expect(page.locator("[data-spine]").locator("xpath=ancestor-or-self::*[@data-hero]")).toHaveCount(0);
+  // No line at "now" on a spine no forecast vouches for (W4 I1: the fallback state drew one).
+  await expect(page.locator("[data-spine] [data-now]"), `${label}: no now line`).toHaveCount(0);
 }
 
 for (const locale of LOCALES) {
@@ -121,6 +123,38 @@ for (const locale of LOCALES) {
       await expect(page.locator("[data-protective-lead]")).toHaveCount(0);
     });
   }
+}
+
+// W4 I5 (interim, until the architect rules): the protective sign is Orange, but when the forecast LAST said Red the lead says so in
+// words, and the dashed last-known mini sign is not hidden behind the worker dock: scrolled to, it is the element under its own point.
+for (const locale of ["en", "ar", "ur"] as const) {
+  test(`Today says 'Last known level: Red' in the lead and the last-known sign can be reached above the dock: stale, ${locale}`, async ({ page }) => {
+    await openToday(page, locale, "night", "stale", "14:30");
+    await expect(page.locator("[data-protective-lead]")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    const words = CATALOGUE[locale];
+    const higher = page.locator("[data-protective-lead] [data-last-known-higher]");
+    await expect(higher).toHaveCount(1);
+    await expect(higher).toContainText(words.levels.name.red);
+    await expect(higher).toBeVisible();
+    // the lead's own sign is still the protective Orange
+    await expect(page.locator('[data-protective-lead] [data-level-sign][data-size="hero"] [data-level-word]')).toHaveText(words.levels.name.orange);
+
+    const mini = page.locator('[data-protective-lead] [data-level-sign][data-kind="stale"][data-size="mini"]');
+    await expect(mini).toHaveCount(1);
+    // Scrolled to the way a reader would (centred): the minimal scroll of scrollIntoViewIfNeeded parks it on the very edge, under the dock.
+    await mini.evaluate((element) => {
+      element.scrollIntoView({ block: "center" });
+    });
+    const covered = await mini.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const dock = document.querySelector("[data-emergency]");
+      return { onTop: top !== null && element.contains(top), bottom: rect.bottom, dockTop: dock === null ? null : dock.getBoundingClientRect().top, viewport: window.innerHeight };
+    });
+    expect(covered.onTop, `${locale}: the last-known sign is under its own point once scrolled to`).toBe(true);
+    if (covered.dockTop !== null) expect(covered.bottom, `${locale}: it ends above the dock`).toBeLessThanOrEqual(covered.dockTop + 1);
+  });
 }
 
 test("Today shows the emergency control and the protective lead together when offline (Today)", async ({ page, context }) => {
