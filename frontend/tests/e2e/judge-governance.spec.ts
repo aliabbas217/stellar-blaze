@@ -77,7 +77,6 @@ const withoutDataRequest = (errors: readonly string[]) => errors.filter((message
 
 test("governance refusal visible in the worker log: send, see the 403 and the new row, reload and see it in the log", async ({ page }) => {
   await open(page);
-  const before = await rows(page).count();
   await page.getByRole("button", { name: SEND }).click();
 
   await expect(state(page)).toHaveAttribute("data-governance", "live");
@@ -87,17 +86,21 @@ test("governance refusal visible in the worker log: send, see the 403 and the ne
   await expect(page.getByText("Live.")).toBeVisible();
   // the new audit row and the worker's list: the sentence is the site's, not "about you"
   await expect(page.locator("[data-audit=shown]")).toContainText("Refused");
-  await expect(rows(page).first()).toContainText("An employer request for individual health data at this site was refused");
-  const after = await rows(page).count();
-  // the live log replaces the recorded row (1 row at first paint), so this is the API's own count: at least the row just written
-  expect(after).toBeGreaterThanOrEqual(Math.max(1, before));
+  const phone = page.locator("[data-log-source=live]");
+  await expect(phone.locator("[data-access-row]").first()).toContainText("An employer request for individual data at this site was refused");
+  // step 4 is the API's own log now (newest three): at least the row just written, never the recorded row stacked on top
+  const after = await phone.locator("[data-access-row]").count();
+  expect(after).toBeGreaterThanOrEqual(1);
   await expect(page.locator("main")).not.toContainText(/about you|ADR|PDPL|purpose/i);
 
-  // reload: the live log is read again after hydration and the row is still there
+  // reload: the sequence is the recorded run again; the rows the API already has sit in their own labelled block
   await page.reload();
   await expect(page.getByRole("button", { name: "Reset demo site" })).toBeVisible();
-  await expect.poll(() => rows(page).count()).toBeGreaterThanOrEqual(after);
-  await expect(rows(page).first()).toContainText("An employer request for individual health data at this site was refused");
+  const block = page.locator("[data-live-rows]");
+  await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
+  await expect.poll(() => block.locator("[data-access-row]").count()).toBeGreaterThanOrEqual(after);
+  await expect(block.locator("[data-access-row]").first()).toContainText("An employer request for individual data at this site was refused");
+  await expect(page.locator("[data-log-source=recorded] [data-access-row]")).toHaveCount(1);
 });
 
 test("governance first paint is the recorded run, with nothing sent, and it needs no API", async ({ page }) => {
@@ -116,6 +119,25 @@ test("governance first paint is the recorded run, with nothing sent, and it need
   await expect(rows(page)).toHaveCount(1);
   await page.waitForTimeout(500);
   expect(posts).toEqual([]);
+});
+
+test("governance live rows the API already has sit in their own block and never replace the recorded step 4", async ({ page }) => {
+  const entry = (at: string) => ({ at, kind: "data_request.refused", outcome: "refused", actor_role: "employer", rule: "r", policy_version: "p", config_version: 1, model_id: null });
+  await page.route("**/api/v1/sites/*/transparency-log", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ site_id: "site-demo-mussafah", entries: [entry("2026-11-15T09:00:02Z"), entry("2026-11-15T09:00:01Z")] }),
+    }),
+  );
+  await open(page);
+  const block = page.locator("[data-live-rows]");
+  await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
+  await expect(block.locator("[data-access-row]")).toHaveCount(2);
+  // step 4 is still the recorded run's own row, and the sequence is still labelled recorded
+  await expect(page.locator("[data-log-source=recorded] [data-access-row]")).toHaveCount(1);
+  await expect(state(page)).toHaveAttribute("data-governance", "recorded");
+  await expect(page.locator("[data-notice=recorded]")).toContainText("Recorded against the demo mock, not the live service.");
 });
 
 test("governance 429 is 'Not sent. Try again in a minute.' and the page never retries", async ({ page }) => {

@@ -166,6 +166,22 @@ describe("SeasonPlayer", () => {
     expect(screen.getByRole("button", { name: "Play the season" })).toBeInTheDocument();
   });
 
+  it("a frame stamped before the click (a browser stamps a frame at its START) never moves the season before day 0", () => {
+    // The flake of the scoreboard Play e2e: `now - last` was negative, the position went below 0, `days[-1]` was undefined and
+    // the date label threw "Invalid time value", which put the whole page on its error boundary.
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => frames.push(callback));
+    mockMotion(false);
+    const { container } = renderWithIntl(player());
+    fireEvent.click(screen.getByRole("button", { name: "Play the season" }));
+    act(() => {
+      frames.shift()?.(performance.now() - 16);
+    });
+    expect(container.querySelector("figure[data-upto]")?.getAttribute("data-upto")).toBe("0");
+    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   it("with reduced motion, Play stays on the final frame and says the animation is off", () => {
     mockMotion(true);
     const { container } = renderWithIntl(player());

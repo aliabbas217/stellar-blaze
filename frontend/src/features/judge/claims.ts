@@ -19,9 +19,35 @@ import type { RosterFrontier } from "./roster-frontier";
 
 export type ClaimKind = "scored" | "forecast" | "analysis";
 
-/** The id families that come from the scored exporter files: an id in one of them with an unreadable file is a read failure, not an unknown number. */
-export const SCORED_CLAIM_PREFIXES: readonly string[] = ["policy.", "plan."];
-export const isScoredClaimId = (id: string): boolean => SCORED_CLAIM_PREFIXES.some((prefix) => id.startsWith(prefix));
+/**
+ * Which loader each claim-id family comes from. A claim is missing for one of two reasons: no such number exists (an unknown
+ * id) or the file behind it could not be read; the second is told apart by WHICH LOADER failed, never by guessing from the id.
+ *   scored    policy.* and plan.*   the scored exporter files (`loadScored`)
+ *   frontier  frontier.*            the roster-frontier file (`loadFrontier`)
+ *   forecast  forecast.*            the recorded hourly forecast (`loadHourly`)
+ */
+export type ClaimLoader = "scored" | "frontier" | "forecast";
+
+const CLAIM_FAMILIES: readonly (readonly [prefix: string, loader: ClaimLoader])[] = [
+  ["policy.", "scored"],
+  ["plan.", "scored"],
+  ["frontier.", "frontier"],
+  ["forecast.", "forecast"],
+];
+
+/** The loader a claim id belongs to, or null for an id of no known family. */
+export function loaderOfClaim(id: string): ClaimLoader | null {
+  return CLAIM_FAMILIES.find(([prefix]) => id.startsWith(prefix))?.[1] ?? null;
+}
+
+/**
+ * Whether the proof page says "the file could not be read" (true) or "no provenance recorded" (false) for an id with no
+ * claim: only when the loader that owns the id's family failed. An id of an unknown family is never a read failure.
+ */
+export function isUnreadableClaim(id: string, failed: readonly ClaimLoader[]): boolean {
+  const loader = loaderOfClaim(id);
+  return loader !== null && failed.includes(loader);
+}
 
 export interface Claim {
   readonly id: string;

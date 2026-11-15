@@ -1,5 +1,5 @@
 import type { Problem } from "@/api/problem";
-import type { RefusalAnswer } from "./recorded";
+import type { RefusalAnswer } from "./recorded-view";
 
 /*
  * What the page makes of the API's answer to the employer's request. The only answer that means "refused" is the 403 whose
@@ -8,6 +8,13 @@ import type { RefusalAnswer } from "./recorded";
  */
 
 export const REFUSED_TYPE = "urn:stellar-blaze:problem:individual-data-refused";
+
+/**
+ * The class of data this page asks for. The page chooses it, so it is the one place the word "health" belongs: the request
+ * card shows it and the request body carries it (one constant, so what is shown is what is sent). A log row carries no class,
+ * so every sentence derived from a row says "individual data".
+ */
+export const REQUEST_DATA_CLASS = "health" as const;
 
 /** A made-up example reference: the API validates it and discards it (ADR 0054), so nothing about a person is ever sent. */
 export const SYNTHETIC_WORKER_REF = "synthetic-example-worker";

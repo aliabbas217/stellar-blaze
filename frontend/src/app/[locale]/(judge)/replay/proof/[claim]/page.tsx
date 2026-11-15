@@ -3,7 +3,7 @@ import { hasLocale } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
-import { isScoredClaimId } from "@/features/judge/claims";
+import { isUnreadableClaim } from "@/features/judge/claims";
 import { loadClaims } from "@/features/judge/proof-claims";
 import { ProofSheet } from "@/features/judge/ProofSheet";
 
@@ -18,7 +18,9 @@ import { ProofSheet } from "@/features/judge/ProofSheet";
  * 02-route-segment-config/dynamicParams.md; `dynamicParams = false` would answer 404 instead, and there is no way to make
  * only the unknown ids dynamic: `connection()` in the fallback render fails with React error 441, found by the e2e).
  * (2) The read-failure state must reflect the file as it is NOW, which a build-time render cannot. The cost is reading the
- * small recorded files on each request; the page is still server HTML with no API call.
+ * small recorded files on each request; the page is still server HTML with no API call. A file that cannot be read at
+ * request time (missing, replaced by a bad one) is the read-failure state of the loader that owns the id's family (claims.ts
+ * `isUnreadableClaim`), never a 500. Parked trade-off: docs/parking-lot.md ("static proof route").
  */
 export const dynamic = "force-dynamic";
 
@@ -33,5 +35,5 @@ export default async function ProofPage(props: PageProps<"/[locale]/replay/proof
   const id = decodeURIComponent(raw);
   const { claims, source, unreadable } = await loadClaims(locale);
   const claim = claims.find((candidate) => candidate.id === id) ?? null;
-  return <ProofSheet claim={claim} source={source} unreadable={claim === null && unreadable && isScoredClaimId(id)} />;
+  return <ProofSheet claim={claim} source={source} unreadable={claim === null && isUnreadableClaim(id, unreadable)} />;
 }

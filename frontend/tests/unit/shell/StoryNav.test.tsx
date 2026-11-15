@@ -8,8 +8,9 @@ import { isDeferredRoute } from "@/components/states/deferred-routes";
 import { renderWithIntl } from "../../utils/intl";
 
 vi.mock("@/i18n/navigation", () => ({
-  Link: ({ href, children, className, ...rest }: { href: string; children: ReactNode; className?: string }) => (
-    <a href={href} className={className} {...rest}>
+  Link: ({ href, children, className, prefetch, ...rest }: { href: string; children: ReactNode; className?: string; prefetch?: boolean }) => (
+    // The router would receive `prefetch`; the DOM gets it as an attribute so a test can read what was passed down.
+    <a href={href} className={className} data-prefetch={prefetch === undefined ? "default" : String(prefetch)} {...rest}>
       {children}
     </a>
   ),
@@ -27,6 +28,15 @@ function pagePatterns(dir = APP, prefix = ""): RegExp[] {
     return entry.name === "page.tsx" ? [new RegExp(`^${prefix === "" ? "/" : prefix}$`)] : [];
   });
 }
+
+describe("StoryNav prefetch", () => {
+  it("no link prefetches: a prefetched route's script would count against this page's JS budget", () => {
+    const { container } = renderWithIntl(<StoryNav current="proof" />);
+    const links = [...container.querySelectorAll("a")];
+    expect(links.length).toBeGreaterThan(2);
+    for (const link of links) expect(link.getAttribute("data-prefetch")).toBe("false");
+  });
+});
 
 describe("StoryNav steps", () => {
   const patterns = pagePatterns();

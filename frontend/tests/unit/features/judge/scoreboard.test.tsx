@@ -183,7 +183,7 @@ describe("ScoreboardView", () => {
   it("has the frontier section with its sentence, and the story footer for this step", () => {
     view(ideal);
     // the heading is generated from the export at the slider's commute (default 45): see frontier.test.tsx for every commute
-    expect(screen.getByRole("heading", { name: /^Beyond a 15 minute commute, no roster shape outruns the heat under law, sleep and commute\./ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^At a 45 minute commute the analysis finds no gain on top of the legal default\./ })).toBeInTheDocument();
     expect(document.getElementById("frontier")).not.toBeNull();
     expect(screen.getByRole("link", { name: "Scoreboard" })).toHaveAttribute("aria-current", "step");
   });
@@ -193,6 +193,16 @@ describe("ScoreboardView", () => {
     const text = container.textContent;
     expect(text).not.toMatch(/ADR \d|HANDOFF|\bB[123]\b/);
     expect(text).not.toMatch(/[–—]/);
+  });
+
+  it("prints no data-export key anywhere (copy rule: every visible label comes from messages, never a snake_case key)", () => {
+    for (const data of [ideal, empty]) {
+      const { container, unmount } = view(data);
+      const text = container.textContent.replaceAll(/https?:\S+/g, "");
+      expect(text).not.toMatch(/[a-z][a-z0-9]*_[a-z0-9_]+/);
+      expect(text).not.toMatch(/B[01]_|P[0-3]_|folds_no_change|b1_passes/);
+      unmount();
+    }
   });
 
   it("keeps Western digits in Arabic", () => {

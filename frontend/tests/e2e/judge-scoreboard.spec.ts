@@ -46,6 +46,8 @@ test("scoreboard Play runs the season, Pause stops it, and reduced motion lands 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await open(page, "/en/replay");
   const ribbon = page.locator("figure[data-ribbon]").first();
+  // Pressing Play before React is attached does nothing (the flake): wait for the island to say it has hydrated.
+  await expect(page.locator("[data-primary][data-hydrated=true]")).toBeVisible();
   await page.getByRole("button", { name: "Play the season" }).click();
   await expect(page.getByRole("button", { name: "Pause" })).not.toHaveAttribute("aria-pressed");
   await expect.poll(async () => Number(await ribbon.getAttribute("data-upto")), { timeout: 4000 }).toBeLessThan(SEASON_DAYS - 1);
@@ -58,6 +60,7 @@ test("scoreboard Play runs the season, Pause stops it, and reduced motion lands 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator("[data-primary][data-hydrated=true]")).toBeVisible();
   await page.getByRole("button", { name: "Play the season" }).click();
   await expect(ribbon).toHaveAttribute("data-upto", String(SEASON_DAYS - 1));
   await expect(page.getByText("Animation is off on this device, so the whole season is shown.")).toBeVisible();
@@ -125,7 +128,7 @@ test("scoreboard frontier commute lives in the URL and survives a reload", async
   // the default commute leaves the URL clean
   await page.getByRole("slider", { name: "One-way commute" }).fill("45");
   await expect(page).not.toHaveURL(/commute=/);
-  await expect(page.getByRole("heading", { name: /^Beyond a 15 minute commute, no roster shape outruns the heat/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^At a 45 minute commute the analysis finds no gain on top of the legal default./ })).toBeVisible();
 });
 
 test("scoreboard story footer links only to routes that exist and Next goes to the proof sheet", async ({ page }) => {

@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/states/Skeletons";
-import type { AuditRow } from "./recorded";
+import type { AuditRow } from "./recorded-view";
 
 export interface AuditCardProps {
   /** The newest row of the log, or null when the log has none. */

@@ -23,7 +23,7 @@ vi.mock("@/i18n/navigation", () => ({
   getPathname: ({ href, locale }: { href: string; locale: string }) => `/${locale}${href}`,
   Link: ({ href, children, ...props }: { href: string; children: ReactNode; transitionTypes?: string[]; prefetch?: boolean }) => (
     // transitionTypes and prefetch are for the router, not the DOM.
-    <a href={`/en${href}`} {...Object.fromEntries(Object.entries(props).filter(([key]) => key !== "transitionTypes" && key !== "prefetch"))}>
+    <a href={`/en${href}`} data-prefetch={String(props.prefetch)} {...Object.fromEntries(Object.entries(props).filter(([key]) => key !== "transitionTypes" && key !== "prefetch"))}>
       {children}
     </a>
   ),
@@ -198,6 +198,19 @@ describe("DeskShell", () => {
     { href: "/replay", label: "Scoreboard" },
     { href: "/replay/day", label: "One day" },
   ];
+
+  it("no header link prefetches: a prefetched route's script would count against this page's JS budget", () => {
+    pathname = "/en/replay";
+    chrome();
+    renderWithIntl(
+      <DeskShell items={items}>
+        <main>page</main>
+      </DeskShell>,
+    );
+    const links = within(screen.getByRole("banner")).getAllByRole("link");
+    expect(links).toHaveLength(items.length + 1);
+    for (const link of links) expect(link).toHaveAttribute("data-prefetch", "false");
+  });
 
   it("header: the wordmark and a menu of links, with the current page marked", () => {
     pathname = "/en/replay/day";

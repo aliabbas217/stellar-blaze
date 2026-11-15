@@ -1,12 +1,14 @@
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { FieldLink } from "@/components/shell/FieldLink";
 import { CopyStepLink } from "./CopyStepLink";
 import { STORY_STEPS, type StoryStepId } from "./story-steps";
 
 /**
  * The footer of every judge page: where this page sits in the five-step story, links to the steps that exist, Back and Next
  * (skipping a step whose view is not built, see story-steps.ts), and "Copy link to this step". Every target is 48 px. The
- * current step is `aria-current="step"`; a step that is not built is text, never a dead link.
+ * current step is `aria-current="step"`; a step that is not built is text, never a dead link. No link prefetches (`FieldLink`):
+ * on a short page (the proof sheet's empty state) the footer is in view, and a prefetch pulled the next page's script into the
+ * route's own budget (Lighthouse counted 223 KB on it).
  */
 export function StoryNav({ current }: { readonly current: StoryStepId }) {
   const t = useTranslations("judge.story");
@@ -25,13 +27,13 @@ export function StoryNav({ current }: { readonly current: StoryStepId }) {
         {STORY_STEPS.map((step) => (
           <li key={step.id}>
             {step.built ? (
-              <Link
+              <FieldLink
                 href={step.href}
                 aria-current={step.id === current ? "step" : undefined}
                 className="inline-flex min-h-12 items-center rounded-sign border border-transparent px-3 text-base text-ink-2 no-underline hover:text-ink aria-[current=step]:border-ink aria-[current=step]:font-semibold aria-[current=step]:text-ink"
               >
                 {label(step.id)}
-              </Link>
+              </FieldLink>
             ) : (
               <span className="inline-flex min-h-12 items-center px-3 text-base text-ink-3">{label(step.id)}</span>
             )}
@@ -40,14 +42,14 @@ export function StoryNav({ current }: { readonly current: StoryStepId }) {
       </ol>
       <div className="flex flex-wrap items-center gap-3">
         {previous === undefined ? null : (
-          <Link href={previous.href} rel="prev" className={action}>
+          <FieldLink href={previous.href} rel="prev" className={action}>
             {t("back", { label: label(previous.id) })}
-          </Link>
+          </FieldLink>
         )}
         {next === undefined ? null : (
-          <Link href={next.href} rel="next" data-story-next="" className={action}>
+          <FieldLink href={next.href} rel="next" data-story-next="" className={action}>
             {t("next", { label: label(next.id) })}
-          </Link>
+          </FieldLink>
         )}
         <CopyStepLink />
       </div>

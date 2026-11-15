@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/states/Skeletons";
 import { REFUSED_TYPE } from "./answer";
-import type { RefusalAnswer } from "./recorded";
+import type { RefusalAnswer } from "./recorded-view";
 
 export interface AnswerCardProps {
   /** The answer to show: the live one, or the recorded one before any call. Null when there is none. */

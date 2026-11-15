@@ -14,9 +14,9 @@ import { useDemo } from "@/features/demo/DemoProvider";
 import { AnswerCard } from "./AnswerCard";
 import { AuditCard } from "./AuditCard";
 import { RequestCard } from "./RequestCard";
-import { outcomeOf, SYNTHETIC_WORKER_REF, type Outcome } from "./answer";
+import { outcomeOf, REQUEST_DATA_CLASS, SYNTHETIC_WORKER_REF, type Outcome } from "./answer";
 import { clockTime, dayAndTime } from "./clock";
-import { toAuditRow, type AuditRow, type RecordedView, type RefusalAnswer } from "./recorded";
+import { toAuditRow, type AuditRow, type RecordedView, type RefusalAnswer } from "./recorded-view";
 
 /*
  * The governance refusal, `/replay/governance`: a four-step sequence in time order (the employer's request, the service's
@@ -27,9 +27,9 @@ import { toAuditRow, type AuditRow, type RecordedView, type RefusalAnswer } from
  * each send is a visible audit row for every worker of the site. A 429 is shown and never retried.
  *
  * What is drawn is decided in one place (below):
- *   steps 1 to 3 are ONE run: the one this page just made once there is one, the recorded run before;
- *   step 4 is the log as a worker sees it: the API's own log whenever it has rows (so a visitor who reloads sees what
- *   earlier sends wrote), else the recorded run's row.
+ *   steps 1 to 4 are ONE run: the one this page just made once there is one, the recorded run before. The API's own log rows
+ *   (what earlier sends wrote, possibly by other visitors) never replace a recorded step: before a live run they sit in their
+ *   own block, "Live rows from the demo API".
  * Only a refusal changes the run; a 401, a 429, an unreachable API or an unexpected 2xx is said under the button and the
  * last good run stays in place.
  */
@@ -77,7 +77,8 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
 
   const [live, setLive] = useState<{ readonly sentAt: string; readonly outcome: Outcome | null } | null>(null);
   const [notReady, setNotReady] = useState(false);
-  // Set when a call has settled, so the button reads "Send again" only then: it keeps its label while a call runs.
+  // Set when a call REACHED the service (a refusal, or a 2xx that should not happen), so the button reads "Send again" only
+  // then: after a 401, a 429 or a network failure nothing was sent, and it keeps its label while a call runs.
   const [sentOnce, setSentOnce] = useState(false);
 
   const send = useMutation({
@@ -99,16 +100,16 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
     const sentAt = new Date().toISOString();
     setLive({ sentAt, outcome: null });
     send.mutate(
-      { subject: "worker", data_class: "health", worker_ref: SYNTHETIC_WORKER_REF },
+      { subject: "worker", data_class: REQUEST_DATA_CLASS, worker_ref: SYNTHETIC_WORKER_REF },
       {
         onError: (error) => {
-          setLive({ sentAt, outcome: outcomeOf(error.problem, new Date().toISOString()) });
+          const result = outcomeOf(error.problem, new Date().toISOString());
+          setLive({ sentAt, outcome: result });
+          if (result.kind === "refused") setSentOnce(true);
         },
         // The contract says every answer is a refusal; a 2xx is a contract break and is never reported as a result.
         onSuccess: () => {
           setLive({ sentAt, outcome: { kind: "unexpected" } });
-        },
-        onSettled: () => {
           setSentOnce(true);
         },
       },
@@ -120,11 +121,15 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
   const liveAnswer: RefusalAnswer | null = outcome?.kind === "refused" ? outcome.answer : null;
 
   const runLive = liveAnswer !== null;
-  const liveRows: readonly AuditRow[] | undefined = log.data?.entries.map(toAuditRow);
-  const logIsLive = liveRows !== undefined && liveRows.length > 0;
-  const logRows: readonly AuditRow[] = logIsLive ? liveRows : runLive ? [] : (recorded?.entries ?? []);
-  const auditRow: AuditRow | null = runLive ? (liveRows?.[0] ?? null) : (recorded?.entries[0] ?? null);
+  const apiRows: readonly AuditRow[] = log.data?.entries.map(toAuditRow) ?? [];
+  // Steps 3 and 4 are part of the run on screen: this page's own call once there is one, else the recorded run. The API's
+  // rows that earlier sends wrote are NEVER mixed into a recorded run (their times are later, and "the same row" would be
+  // untrue): before a live run they are shown in their own labelled block.
+  const logRows: readonly AuditRow[] = runLive ? apiRows : (recorded?.entries ?? []);
+  const auditRow: AuditRow | null = runLive ? (apiRows[0] ?? null) : (recorded?.entries[0] ?? null);
   const shownRows = logRows.slice(0, MAX_ROWS);
+  const showApiBlock = !runLive && apiRows.length > 0;
+  const shownApiRows = apiRows.slice(0, MAX_ROWS);
 
   const answer: RefusalAnswer | null = liveAnswer ?? recorded?.answer ?? null;
   const requestSentAt = runLive && live !== null ? live.sentAt : (recorded?.request.sentAt ?? null);
@@ -164,7 +169,7 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
               <RequestCard
                 path={path}
                 workerRef={SYNTHETIC_WORKER_REF}
-                dataClass={recorded?.request.dataClass ?? "health"}
+                dataClass={REQUEST_DATA_CLASS}
                 sentBefore={sentOnce}
                 pending={pending}
                 onSend={onSend}
@@ -179,7 +184,7 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
             </Step>
             <Step time={pending ? BLANK_CLOCK : clock(logRows[0]?.at ?? null)} who={t("phone.who")} tone={logRows.length === 0 ? "wait" : "done"}>
               <h3 className="text-base font-semibold text-ink">{t("phone.title")}</h3>
-              <div aria-busy={pending || log.isFetching} data-log-source={logIsLive ? "live" : "recorded"}>
+              <div aria-busy={pending || log.isFetching} data-log-source={runLive ? "live" : "recorded"}>
                 <AccessLog
                   entries={shownRows}
                   empty={
@@ -194,7 +199,7 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
                 <p className="text-sm text-ink-3" data-log-count="">
                   {logRows.length > shownRows.length
                     ? t("phone.count", { shown: String(shownRows.length), total: String(logRows.length) })
-                    : logIsLive
+                    : runLive
                       ? t("phone.sourceLive")
                       : t("phone.sourceRecorded")}
                 </p>
@@ -204,6 +209,21 @@ export function GovernanceView({ recorded }: GovernanceViewProps) {
           </ol>
           <p className="text-sm text-ink-3">{t("notes.times")}</p>
         </section>
+
+        {showApiBlock ? (
+          <section aria-labelledby="live-rows-heading" className="flex flex-col gap-3 rounded-sign border border-hair bg-panel p-4" data-live-rows="">
+            <h2 id="live-rows-heading" className="text-base font-semibold text-ink">
+              {t("phone.liveBlockTitle")}
+            </h2>
+            <p className="max-w-(--measure) text-sm text-ink-3">{t("phone.liveBlockNote")}</p>
+            <div className="max-w-(--measure)" aria-busy={log.isFetching}>
+              <AccessLog entries={shownApiRows} empty={null} />
+            </div>
+            {apiRows.length > shownApiRows.length ? (
+              <p className="text-sm text-ink-3">{t("phone.count", { shown: String(shownApiRows.length), total: String(apiRows.length) })}</p>
+            ) : null}
+          </section>
+        ) : null}
 
         <div className="flex flex-wrap items-start gap-x-8 gap-y-4 border-t border-hair pt-6">
           {siteId === undefined ? null : <ResetDemoControl siteId={siteId} />}
@@ -262,9 +282,8 @@ function RunNotice({ runLive, recorded, locale }: { readonly runLive: boolean; r
     <div role="status" className={`${NOTICE} sm:flex-row sm:items-center sm:gap-3`} data-notice="recorded">
       <span className="flex flex-wrap items-center gap-2">
         <Stamp kind="RECORDED" detail={dayAndTime(recorded.recordedAt, locale)} />
-        {recorded.source === "msw-mock" ? <Stamp kind="SIMULATED" /> : null}
       </span>
-      <p>{t("recorded")}</p>
+      <p data-notice-source={recorded.source}>{recorded.source === "msw-mock" ? t("recordedMock") : t("recorded")}</p>
     </div>
   );
 }

@@ -3,13 +3,16 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 
+/** Every visible label comes from messages: the contract's class names are data keys, never copy. */
+const DATA_CLASS_KEY = { health: "dataClassHealth", personal: "dataClassPersonal", exposure: "dataClassExposure" } as const;
+
 export interface RequestCardProps {
   /** The path the request goes to, with the site id filled in. */
   readonly path: string;
   /** The made-up worker reference the request carries (the API discards it). */
   readonly workerRef: string;
-  readonly dataClass: string;
-  /** A call has been made on this page: the button then reads "Send again". */
+  readonly dataClass: "health" | "personal" | "exposure";
+  /** A call reached the service from this page: the button then reads "Send again". */
   readonly sentBefore: boolean;
   readonly pending: boolean;
   readonly onSend: () => void;
@@ -35,7 +38,7 @@ export function RequestCard({ path, workerRef, dataClass, sentBefore, pending, o
         <dt className="text-ink-3">{t("subject")}</dt>
         <dd className="text-ink">{t("subjectValue")}</dd>
         <dt className="text-ink-3">{t("dataClass")}</dt>
-        <dd className="text-ink">{dataClass === "health" ? t("dataClassHealth") : dataClass}</dd>
+        <dd className="text-ink">{t(DATA_CLASS_KEY[dataClass])}</dd>
         <dt className="text-ink-3">{t("workerRef")}</dt>
         <dd className="font-mono break-words text-ink" dir="ltr" translate="no">
           {workerRef}

@@ -148,7 +148,7 @@ test.describe("F2 against the real B3 (replay)", () => {
     await expect(page.locator("[data-audit=shown]")).toContainText("Refused");
     // The API's own log: at least the row just written, and the worker-facing sentence is the site's.
     await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(Math.max(1, before));
-    await expect(rows.first()).toContainText("An employer request for individual health data at this site was refused");
+    await expect(rows.first()).toContainText("An employer request for individual data at this site was refused");
   });
 });
 

@@ -7,9 +7,10 @@ import { http, HttpResponse, delay } from "msw";
 import type { ReactNode } from "react";
 import { AccessLog } from "@/components/governance/AccessLog";
 import { DemoProvider } from "@/features/demo/DemoProvider";
-import { outcomeOf, REFUSED_TYPE, SYNTHETIC_WORKER_REF } from "@/features/judge/governance/answer";
+import { outcomeOf, REFUSED_TYPE, REQUEST_DATA_CLASS, SYNTHETIC_WORKER_REF } from "@/features/judge/governance/answer";
 import { GovernanceView } from "@/features/judge/governance/GovernanceView";
-import { parseRecordedRun, toRecordedView, type RecordedView } from "@/features/judge/governance/recorded";
+import { parseRecordedRun, toRecordedView } from "@/features/judge/governance/recorded";
+import type { RecordedView } from "@/features/judge/governance/recorded-view";
 import { appendRefusal, resetDemoStateHard } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
 import { renderWithIntl } from "../../../utils/intl";
@@ -40,7 +41,7 @@ const root = path.resolve(import.meta.dirname, "../../../..");
 const recordedFile = JSON.parse(readFileSync(path.join(root, "data/recorded/governance-run.json"), "utf8")) as unknown;
 const recorded: RecordedView = toRecordedView(parseRecordedRun(recordedFile));
 
-const SENTENCE = "An employer request for individual health data at this site was refused";
+const SENTENCE = "An employer request for individual data at this site was refused";
 const SEND = "Send the employer's request";
 
 const PROBLEM = {
@@ -87,9 +88,13 @@ describe("GovernanceView: first paint", () => {
     const { container, root: view } = renderView();
     expect(view().getAttribute("data-governance")).toBe("recorded");
     expect(container.querySelectorAll("[data-hero]")).toHaveLength(1);
-    // the stamp, and the honest second stamp: the recording was made against the mock API
+    // the stamp, and a source-specific line: the recording was made against the mock API, never the live service
     expect(screen.getByText("Recorded")).toBeInTheDocument();
-    expect(screen.getByText("Simulated")).toBeInTheDocument();
+    expect(screen.queryByText("Simulated")).toBeNull();
+    expect(container.querySelector("[data-notice=recorded]")?.textContent).toContain(
+      "Recorded against the demo mock, not the live service. Press the button to run it against the demo API.",
+    );
+    expect(container.querySelector("[data-notice=recorded]")?.textContent).not.toMatch(/same audit row|same request/);
     // the answer: 403 and the problem fields
     expect(within(container.querySelector("[data-answer=shown]") as HTMLElement).getByText("403")).toBeInTheDocument();
     expect(screen.getByText(REFUSED_TYPE)).toBeInTheDocument();
@@ -203,6 +208,30 @@ describe("GovernanceView: the live call", () => {
     expect(calls.bodies).toHaveLength(2);
   });
 
+  it("the data class shown on the request card is the one the body carries (one constant, shown as a label)", async () => {
+    const calls = { bodies: [] as unknown[] };
+    server.use(refusing(calls));
+    const { container } = renderView();
+    const card = container.querySelector("[data-step]:nth-child(1)") as HTMLElement;
+    expect(within(card).getByText("Health")).toBeInTheDocument();
+    expect(card.textContent).not.toMatch(/health/);
+    await screen.findByRole("button", { name: "Reset demo site" });
+    await userEvent.setup().click(screen.getByRole("button", { name: SEND }));
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+    expect((calls.bodies[0] as { data_class: string }).data_class).toBe(REQUEST_DATA_CLASS);
+    expect(REQUEST_DATA_CLASS).toBe("health");
+  });
+
+  it("every sentence derived from a log row says 'individual data', never 'health' (a row carries no data class)", () => {
+    server.use(refusing({ bodies: [] }));
+    const { container } = renderView();
+    const audit = container.querySelector("[data-audit=shown]") as HTMLElement;
+    expect(audit.textContent).not.toMatch(/health/i);
+    expect((container.querySelector("[data-access-log=rows]") as HTMLElement).textContent).not.toMatch(/health/i);
+  });
+
   it("keeps the button label and marks the call busy while it runs (the button was never pre-disabled)", async () => {
     server.use(
       http.post("*/api/v1/sites/:site_id/data-requests", async () => {
@@ -225,28 +254,46 @@ describe("GovernanceView: the live call", () => {
     expect(screen.getByText("Waiting for the API")).toBeInTheDocument();
   });
 
-  it("the live log is shown after a reload: rows the API already has fill the worker's list, while steps 1 to 3 stay the recorded run", async () => {
+  it("rows the API already has (an earlier send, maybe another visitor) sit in their own labelled block and never replace a recorded step", async () => {
     appendRefusal("site-demo-mussafah");
     appendRefusal("site-demo-mussafah");
     const { container, root: view } = renderView();
-    await waitFor(() => {
-      expect(rows(container)).toHaveLength(2);
+    const block = await waitFor(() => {
+      const found = container.querySelector("[data-live-rows]");
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
     });
-    expect(container.querySelector("[data-log-source]")?.getAttribute("data-log-source")).toBe("live");
-    // one story: the request, the answer and the audit row are still the recorded run, labelled as such
+    expect(within(block).getByRole("heading", { name: "Live rows from the demo API" })).toBeInTheDocument();
+    expect(rows(block)).toHaveLength(2);
+    // step 4 is still the recorded run's own row: one story, one clock, every step labelled recorded
+    const step4 = container.querySelector("[data-log-source]") as HTMLElement;
+    expect(step4.getAttribute("data-log-source")).toBe("recorded");
+    expect(rows(step4)).toHaveLength(recorded.entries.length);
     expect(view().getAttribute("data-governance")).toBe("recorded");
-    expect(screen.getByText("Recorded")).toBeInTheDocument();
     expect(container.querySelector("[data-notice=live]")).toBeNull();
     expect(screen.getByText("03:30:15", { selector: "[data-step]:nth-child(2) b" })).toBeInTheDocument();
+    const clocks = [...container.querySelectorAll("[data-step] b")].map((b) => b.textContent);
+    expect(clocks.slice(2)).toEqual(["03:30:15", "03:30:15"]);
+  });
+
+  it("without any live row there is no live block (nothing to label)", async () => {
+    const { container } = renderView();
+    await screen.findByRole("button", { name: "Reset demo site" });
+    await waitFor(() => {
+      expect(container.querySelector("[data-log-source]")).not.toBeNull();
+    });
+    expect(container.querySelector("[data-live-rows]")).toBeNull();
   });
 
   it("caps the worker's list at the newest three rows and says how many there are", async () => {
     for (let i = 0; i < 7; i += 1) appendRefusal("site-demo-mussafah");
     const { container } = renderView();
     await waitFor(() => {
-      expect(rows(container)).toHaveLength(3);
+      expect(container.querySelector("[data-live-rows]")).not.toBeNull();
     });
-    expect(container.querySelector("[data-log-count]")?.textContent).toBe("The newest 3 of 7 rows, from the demo API's log");
+    expect(rows(container.querySelector("[data-live-rows]") as HTMLElement)).toHaveLength(3);
+    const block = container.querySelector("[data-live-rows]") as HTMLElement;
+    expect(within(block).getByText("The newest 3 of 7 rows, from the demo API's log")).toBeInTheDocument();
   });
 
   it("a refusal whose log comes back empty says so (empty), never a row it does not have", async () => {
@@ -296,6 +343,7 @@ describe("GovernanceView: outcomes that are not a refusal", () => {
     expect(notice.getAttribute("role")).toBe("alert");
     expect(notice.textContent).toMatch(/no demo employer token/);
     expect(notice.textContent).toMatch(/Nothing was recorded/);
+    expect(screen.queryByRole("button", { name: "Send again" })).toBeNull();
     // the recorded run stays, still labelled recorded; nothing live was drawn
     expect(screen.getByText("Recorded")).toBeInTheDocument();
     expect(container.querySelector("[data-notice=live]")).toBeNull();
@@ -320,8 +368,9 @@ describe("GovernanceView: outcomes that are not a refusal", () => {
     expect(calls).toBe(1);
     // calm: a status line, not an alert
     expect(container.querySelector("[data-notice=limited]")?.getAttribute("role")).toBe("status");
-    // and it can be sent again by hand
-    expect(screen.getByRole("button", { name: "Send again" })).not.toBeDisabled();
+    // and it can be sent again by hand; nothing was sent, so the button does not claim "again"
+    expect(screen.queryByRole("button", { name: "Send again" })).toBeNull();
+    expect(screen.getByRole("button", { name: SEND })).not.toBeDisabled();
   });
 
   it("API unreachable: the recorded run plus 'Nothing was sent, so nothing was recorded'", async () => {
@@ -331,6 +380,7 @@ describe("GovernanceView: outcomes that are not a refusal", () => {
     });
     const notice = container.querySelector("[data-notice=failed]") as HTMLElement;
     expect(notice.textContent).toContain("Nothing was sent, so nothing was recorded.");
+    expect(screen.queryByRole("button", { name: "Send again" })).toBeNull();
     expect(screen.getByText("Recorded")).toBeInTheDocument();
     expect(container.querySelector("[data-answer=shown]")).not.toBeNull();
   });

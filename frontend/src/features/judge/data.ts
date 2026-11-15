@@ -152,11 +152,21 @@ async function readFrontier(dataRoot: string): Promise<Read<RosterFrontier> | nu
   }
 }
 
-/** The scored files for the judge screens, from the first tier that has any (see the file comment). */
-export async function loadEval(options: LoadEvalOptions = {}): Promise<EvalData> {
-  const dataRoot = options.dataRoot ?? path.join(process.cwd(), "data");
-  const frontier = await readFrontier(dataRoot);
+/** The roster frontier on its own: its own failure domain, so a bad frontier file never hides a scored table and the reverse. */
+export interface FrontierData {
+  readonly frontier: RosterFrontier | null;
+  readonly file: EvalFileInfo | null;
+}
 
+export async function loadFrontier(options: LoadEvalOptions = {}): Promise<FrontierData> {
+  const read = await readFrontier(options.dataRoot ?? path.join(process.cwd(), "data"));
+  return { frontier: read?.value ?? null, file: read?.info ?? null };
+}
+
+/** The three scored exporter files (no frontier), from the first tier that has any (see the file comment). */
+export type ScoredData = Omit<EvalData, "frontier" | "files"> & { readonly files: Omit<EvalData["files"], "frontier"> };
+
+export async function loadScored(options: LoadEvalOptions = {}): Promise<ScoredData> {
   let source: EvalSource = "none";
   let reads: Record<EvalKind, Read<unknown> | null> = { policy: null, plans: null, day: null };
   for (const tier of tiersFor(options)) {
@@ -173,13 +183,14 @@ export async function loadEval(options: LoadEvalOptions = {}): Promise<EvalData>
     policy: (reads.policy?.value as Schemas["PolicyScoreboard"] | undefined) ?? null,
     plans: (reads.plans?.value as Schemas["PlanScoreboard"] | undefined) ?? null,
     day: (reads.day?.value as Schemas["DemoDay"] | undefined) ?? null,
-    frontier: frontier?.value ?? null,
     source,
-    files: {
-      policy: reads.policy?.info ?? null,
-      plans: reads.plans?.info ?? null,
-      day: reads.day?.info ?? null,
-      frontier: frontier?.info ?? null,
-    },
+    files: { policy: reads.policy?.info ?? null, plans: reads.plans?.info ?? null, day: reads.day?.info ?? null },
   };
+}
+
+/** The scored files and the frontier for the judge screens. Throws when either cannot be read; callers that can say which use the two loaders above. */
+export async function loadEval(options: LoadEvalOptions = {}): Promise<EvalData> {
+  const frontier = await loadFrontier(options);
+  const scored = await loadScored(options);
+  return { ...scored, frontier: frontier.frontier, files: { ...scored.files, frontier: frontier.file } };
 }

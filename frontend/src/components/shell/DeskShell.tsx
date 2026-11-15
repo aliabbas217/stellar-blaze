@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { ViewTransition, type ReactNode } from "react";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { useRouteTheme } from "@/components/shell/useRouteTheme";
-import { Link } from "@/i18n/navigation";
 import "@/styles/view-transitions.css";
 
-/** A route of a field surface (`/worker`, `/supervisor` and anything below): a desk page must not prefetch it (FieldLink.tsx). */
-function isFieldRoute(href: string): boolean {
-  return /^\/(?:worker|supervisor)(?:\/|$)/.test(href);
-}
+/*
+ * No link of the desk header prefetches (FieldLink.tsx): Lighthouse counts the script a prefetch pulls in against the page
+ * that made it, and /replay/governance read 10.8 KB gzip of /replay's chunk that it never runs. A desk route is one click
+ * away; its script loads when it is opened.
+ */
 
 export interface DeskNavItem {
   /** A route without the locale prefix, as the locale-aware Link takes it. */
@@ -59,26 +59,25 @@ export function DeskShell({
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center gap-4 border-b border-hair px-4 py-1 sm:px-6">
         <ViewTransition name="wordmark" share="morph" default="none">
-          <Link
+          <FieldLink
             href="/"
             className="inline-flex min-h-(--target) flex-none items-center font-display text-sm font-semibold uppercase tracking-wordmark text-ink no-underline"
           >
             {t("common.appName")}
-          </Link>
+          </FieldLink>
         </ViewTransition>
         <nav aria-label={t("shell.desk.menu")} className="min-w-0 flex-1 overflow-x-auto">
           <ul className="flex gap-1">
             {items.map((item) => {
-              const Anchor = isFieldRoute(item.href) ? FieldLink : Link;
               return (
                 <li key={item.href} className="flex-none">
-                  <Anchor
+                  <FieldLink
                     href={item.href}
                     aria-current={item.href === current ? "page" : undefined}
                     className="inline-flex min-h-(--target) items-center rounded-sign border border-transparent px-3 font-body text-sm text-ink-2 no-underline aria-[current=page]:border-ink aria-[current=page]:font-semibold aria-[current=page]:text-ink"
                   >
                     {item.label}
-                  </Anchor>
+                  </FieldLink>
                 </li>
               );
             })}

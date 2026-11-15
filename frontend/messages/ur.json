@@ -95,7 +95,7 @@
     },
     "accessLog": {
       "label": "Refused requests for individual data at this site",
-      "refused": "An employer request for individual health data at this site was refused"
+      "refused": "An employer request for individual data at this site was refused"
     }
   },
   "shell": {
@@ -842,11 +842,10 @@
       "baselineCommon": "Common practice",
       "bestTitle": "Best roster that keeps the sleep gate",
       "bestUnit": "fewer hours at 30 °C or more, on top of the legal default, with sleep kept at {hours} h or more",
-      "bestNone": "No roster beats the legal default and keeps the sleep gate at this commute.",
       "legalTitle": "Making the common roster legal",
-      "legalUnit": "fewer hours at 30 °C or more, going from common practice to the legal default. This gain belongs to the law, not to Stellar Blaze.",
+      "legalUnit": "fewer hours at 30 °C or more on average in the analysis, going from common practice to the legal default. This gain belongs to the law, not to Stellar Blaze.",
       "whatBest": "Share of hours at 30 °C or more avoided against the legal default at a {minutes} minute commute",
-      "whatLegal": "Share of hours at 30 °C or more avoided by making the common roster legal",
+      "whatLegal": "Share of hours at 30 °C or more avoided by making the common roster legal, on average in the analysis",
       "tableToggle": "Show the roster numbers as a table",
       "tableCaption": "Rosters at a {minutes} minute commute",
       "columns": {
@@ -854,12 +853,14 @@
         "sleep": "Sleep, hours",
         "exposure": "Hours at 30 °C or more per scheduled hour"
       },
-      "headingNone": "At a {minutes} minute commute, no roster shape outruns the heat under law, sleep and commute. Making the common roster legal cuts the hours at 30 °C or more by {legal}.",
-      "headingNoneBeyond": "Beyond a {threshold} minute commute, no roster shape outruns the heat under law, sleep and commute. Making the common roster legal cuts the hours at 30 °C or more by {legal}.",
-      "headingGain": "At a {minutes} minute commute, the best roster that keeps the {hours} h sleep gate cuts the hours at 30 °C or more by {gain} on top of the legal default. Going from common practice to the legal default cuts them by {legal}.",
+      "headingGain": "At a {minutes} minute commute the analysis finds {gain} fewer hours at 30 °C or more on top of the legal default, with sleep kept at {hours} h or more. Going from common practice to the legal default cuts them by {legal} on average in the analysis.",
       "headingMissing": "The analysis has no result for a {minutes} minute commute",
       "headingPending": "The roster frontier",
-      "bestMissing": "The analysis has no result for this commute."
+      "bestMissing": "The analysis has no result for this commute.",
+      "headingNoGainFails": "At a {minutes} minute commute the analysis finds no gain on top of the legal default. The legal default itself leaves {sleep} h of sleep there, under the {hours} h sleep gate. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
+      "headingNoGainPasses": "At a {minutes} minute commute the analysis finds no gain on top of the legal default: in {noChange} of {folds} cross-validation folds it was not beaten. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
+      "bestNoneFails": "No gain on top of the legal default at this commute. The legal default itself leaves {sleep} h of sleep, under the {hours} h sleep gate.",
+      "bestNonePasses": "No gain on top of the legal default at this commute: it was not beaten in {noChange} of {folds} cross-validation folds."
     },
     "story": {
       "label": "Story",
@@ -923,7 +924,9 @@
         "refNote": "A made-up example. The service discards the reference: it is never stored, logged or shown.",
         "send": "Send the employer's request",
         "sendAgain": "Send again",
-        "caption": "Each send is a real call to the demo API and adds one row to the log. Nothing is sent until you press the button."
+        "caption": "Each send is a real call to the demo API and adds one row to the log. Nothing is sent until you press the button.",
+        "dataClassPersonal": "Personal",
+        "dataClassExposure": "Exposure"
       },
       "answer": {
         "who": "API",
@@ -949,7 +952,7 @@
         "outcome": "Outcome",
         "outcomeValue": "Refused",
         "why": "Why",
-        "whyValue": "Individual health data is never released to an employer, whatever the reason given.",
+        "whyValue": "Individual data is never released to an employer, whatever the reason given.",
         "rules": "Rules in force",
         "model": "Model",
         "noModel": "none loaded",
@@ -963,7 +966,9 @@
         "note": "Every worker at this site sees the same list. It says an employer asked at the site, never whose data.",
         "sourceLive": "From the demo API's log",
         "sourceRecorded": "From the recorded run",
-        "count": "The newest {shown} of {total} rows, from the demo API's log"
+        "count": "The newest {shown} of {total} rows, from the demo API's log",
+        "liveBlockTitle": "Live rows from the demo API",
+        "liveBlockNote": "Written by sends to the demo API, by any visitor. They are not part of the recorded run above."
       },
       "notes": {
         "times": "Times are Dubai time. Each step shows when it happened.",
@@ -978,7 +983,7 @@
         "verify_detects_edited_row": "Editing a stored audit row is detected when the log is verified."
       },
       "status": {
-        "recorded": "This is a recorded run: the same request, the same answer, the same audit row. Press the button to run it live.",
+        "recorded": "This is a recorded run against the demo API. Press the button to run it live.",
         "live": {
           "title": "Live.",
           "reason": "This run was just made against the demo API, and the log below is the log the API returned."
@@ -1002,7 +1007,8 @@
           "reason": "This page does not report that as a result. Nothing is shown as a refusal."
         },
         "notReady": "The demo site is still loading. Try again in a moment.",
-        "logFailed": "The log could not be refreshed, so the rows shown may be out of date."
+        "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
+        "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
       }
     }
   }

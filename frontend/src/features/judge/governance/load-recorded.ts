@@ -1,7 +1,8 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { parseRecordedRun, toRecordedView, type RecordedView } from "./recorded";
+import { parseRecordedRun, toRecordedView } from "./recorded";
+import type { RecordedView } from "./recorded-view";
 
 /**
  * The recorded governance run, read at build time (the page is static) from data/recorded/governance-run.json. A missing or

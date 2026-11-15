@@ -108,6 +108,8 @@ export function validatePlanMutation() {
 export function dataRequestMutation(siteId: string) {
   return mutationOptions<never, ApiProblem, Schemas["DataRequestCreate"]>({
     mutationKey: ["data-request", siteId],
+    // Offline, the call fails at once as a network problem ("Not sent") instead of pausing until the device is back.
+    networkMode: "always",
     mutationFn: (body) => orThrow(apiClient.POST("/api/v1/sites/{site_id}/data-requests", { params: { path: { site_id: siteId } }, body })),
   });
 }

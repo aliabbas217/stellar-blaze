@@ -8,7 +8,7 @@ import { useUrlParam } from "@/lib/url-state";
 import { makeFormat } from "./adapters";
 import { FRONTIER_LEGAL_ID, frontierBestId, frontierClaims, type FrontierSource } from "./claims";
 import { FrontierHeading } from "./FrontierHeading";
-import { DEFAULT_COMMUTE } from "./frontier-statement";
+import { DEFAULT_COMMUTE, frontierNoGainNote, frontierStatement } from "./frontier-statement";
 import type { RosterFrontier } from "./roster-frontier";
 
 /*
@@ -59,8 +59,7 @@ export function FrontierPanel({ data, source }: FrontierPanelProps) {
   const { t, format, formatHours, labels } = useFrontierText(data);
   const sliderId = useId();
 
-  const gate = data.frontier_absolute_gate.find((g) => g.commute_min === commute);
-  const best = gate?.avoided_vs_legal_default_ge30 ?? null;
+  const statement = frontierStatement(data, commute);
   const claims = frontierClaims(data, source, format, {
     best: (minutes) => t("whatBest", { minutes: String(minutes) }),
     legal: t("whatLegal"),
@@ -110,18 +109,18 @@ export function FrontierPanel({ data, source }: FrontierPanelProps) {
       <div className="grid gap-6 sm:grid-cols-2" data-frontier-readouts="">
         <div className="flex flex-col gap-2 border-t border-edge pt-3">
           <h3 className="text-sm font-medium text-ink-3">{t("bestTitle")}</h3>
-          {best === null ? (
+          {statement.kind === "missing" ? (
             <p className="max-w-(--measure) text-base text-ink-2" data-frontier-best="missing">
               {t("bestMissing")}
             </p>
-          ) : best === 0 ? (
-            <p className="max-w-(--measure) text-base text-ink" data-frontier-best="none">
-              {t("bestNone")}
+          ) : statement.kind === "no-gain" ? (
+            <p className="max-w-(--measure) text-base text-ink" data-frontier-best="none" data-gate-passes={statement.gatePasses}>
+              {frontierNoGainNote(statement, t, formatHours)}
             </p>
           ) : (
             <Counter
               size="numeral"
-              value={bestClaim?.value ?? format.percentOne(best)}
+              value={bestClaim?.value ?? format.percentOne(statement.gain)}
               unit={t("bestUnit", { hours: formatHours(data.assumptions.sleep_gate_h) })}
               proof={bestClaim?.proof ?? null}
             />

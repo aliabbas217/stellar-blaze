@@ -204,6 +204,7 @@ describe("write options", () => {
     ["stopMutation", () => stopMutation("crew-b")],
     ["clearStopMutation", () => clearStopMutation("crew-b")],
     ["signOffMutation", () => signOffMutation("crew-b")],
+    ["dataRequestMutation", () => dataRequestMutation(DEMO_SITE)],
   ] as const)("%s sets networkMode always, so it is not held back while the device looks offline", (_name, options) => {
     expect(options().networkMode).toBe("always");
   });
@@ -233,6 +234,33 @@ describe("write options", () => {
     expect((failure as ApiProblem).problem.status).toBe(0);
     expect(seen).toEqual(["POST"]);
     // Coming back online sends nothing more: the failed stop is not a pending one.
+    onlineManager.setOnline(true);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+    expect(seen).toEqual(["POST"]);
+  });
+
+  it("a data request made while the device is offline fails at once as a network ApiProblem and is not queued", async () => {
+    asBff();
+    const seen: string[] = [];
+    server.use(
+      http.all("*/api/v1/*", ({ request }) => {
+        seen.push(request.method);
+        return HttpResponse.error();
+      }),
+    );
+    onlineManager.setOnline(false);
+    const failure = await Promise.race([
+      mutate(newClient(), dataRequestMutation(DEMO_SITE), { subject: "worker", data_class: "health", worker_ref: "x" }).catch((error: unknown) => error),
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve("still paused");
+        }, 1000);
+      }),
+    ]);
+    expect(failure).toBeInstanceOf(ApiProblem);
+    expect((failure as ApiProblem).problem.status).toBe(0);
     onlineManager.setOnline(true);
     await new Promise((resolve) => {
       setTimeout(resolve, 50);

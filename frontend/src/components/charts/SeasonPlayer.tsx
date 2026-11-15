@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState, ViewTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, ViewTransition } from "react";
 import { Counter } from "@/components/provenance/Counter";
 import type { Proof } from "@/components/provenance/proof";
 import { dayFormat } from "./day-format";
@@ -31,9 +31,18 @@ export interface SeasonPlayerProps {
   readonly limitC: number;
 }
 
+const noSubscription = (): (() => void) => () => undefined;
+
 export function SeasonPlayer({ ribbon, tally, proofs, limitC }: SeasonPlayerProps) {
   const t = useTranslations("judge.scoreboard");
   const locale = useLocale();
+  // False in the server HTML and until the island has hydrated, true after: a click before React is attached does nothing,
+  // so the button says whether it is live (the e2e waits for it).
+  const hydrated = useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
   const n = ribbon.days.length;
   const [upto, setUpto] = useState(n - 1);
   const [playing, setPlaying] = useState(false);
@@ -71,8 +80,10 @@ export function SeasonPlayer({ ribbon, tally, proofs, limitC }: SeasonPlayerProp
     setPlaying(true);
     let last = performance.now();
     const step = (now: number) => {
-      position.current = Math.min(n - 1, position.current + ((now - last) / PLAY_MS) * n);
-      last = now;
+      // A frame is stamped when the browser STARTED it, which can be earlier than the `performance.now()` read at the click:
+      // a negative step would take the position below day 0 (`days[-1]` is undefined, the date label throws). Time never runs back.
+      position.current = Math.min(n - 1, position.current + (Math.max(0, now - last) / PLAY_MS) * n);
+      last = Math.max(last, now);
       setUpto(Math.floor(position.current));
       if (position.current < n - 1) frame.current = requestAnimationFrame(step);
       else setPlaying(false);
@@ -134,6 +145,7 @@ export function SeasonPlayer({ ribbon, tally, proofs, limitC }: SeasonPlayerProp
         <button
           type="button"
           data-primary=""
+          data-hydrated={hydrated}
           onClick={onPlay}
           className="inline-flex min-h-(--target) items-center justify-center rounded-sign bg-ink px-5 text-base font-medium text-ground hover:underline hover:decoration-2 hover:underline-offset-4"
         >
