@@ -3,6 +3,7 @@ import { apiClient } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import { queryKeys } from "@/api/query-keys";
 import { call } from "@/api/result";
+import { ROSTER_INVALID_TYPE, RosterInvalidProblem, rosterErrorsOf } from "@/api/roster-problem";
 import type { components } from "@/api/schema";
 
 /*
@@ -94,9 +95,25 @@ export function transparencyLogQueryOptions(siteId: string) {
 
 // --- Writes ----------------------------------------------------------------------------------------------------------------
 
+/**
+ * The independent validator's verdict on a roster. Violations are the ANSWER (a 200); a roster that does not parse is a 422
+ * `roster-invalid` whose per-line `errors` the shared problem reader would drop, so it is thrown as a `RosterInvalidProblem`
+ * (an `ApiProblem` that keeps them). Every other failure is a plain `ApiProblem`.
+ */
 export function validatePlanMutation() {
   return mutationOptions<Schemas["PlanValidateResponse"], ApiProblem, Schemas["PlanValidateRequest"]>({
-    mutationFn: (body) => orThrow(apiClient.POST("/api/v1/plans/validate", { body })),
+    mutationFn: async (body) => {
+      let raw: unknown;
+      const result = await call(
+        apiClient.POST("/api/v1/plans/validate", { body }).then((settled) => {
+          raw = settled.error;
+          return settled;
+        }),
+      );
+      if (result.ok) return result.data;
+      const errors = result.problem.status === 422 && result.problem.type === ROSTER_INVALID_TYPE ? rosterErrorsOf(raw) : null;
+      throw errors === null ? new ApiProblem(result.problem) : new RosterInvalidProblem(result.problem, errors);
+    },
   });
 }
 

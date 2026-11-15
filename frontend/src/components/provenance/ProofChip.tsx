@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { ACTION_PRIMARY } from "@/components/states/actions";
 import type { ProofDrawerProps } from "./ProofDrawer";
 import type { Proof } from "./proof";
 
@@ -16,22 +17,26 @@ import type { Proof } from "./proof";
  * clicks reopen the same one. When it closes, focus goes back here.
  *
  * `label` replaces the word "Proof" on the button ("Why Orange?"); the accessible name stays "Proof for <what>". `field` is
- * the phone size: 44 px target and 16 px text, for the worker screens (a desk chip is 28 px).
+ * the phone size: 44 px target and 16 px text, for the worker screens (a desk chip is 28 px). `variant="primary"` is the desk
+ * primary action (a screen whose one action is "read how this is proved"): the same drawer, the primary button of the state
+ * components, and `data-primary` for the design gate.
  */
 export function ProofChip({
   proof,
   label,
   labelContent,
   field = false,
+  variant = "chip",
 }: {
   readonly proof: Proof | null;
+  readonly variant?: "chip" | "primary";
   readonly label?: string;
   /** The same words as `label`, as nodes (a level name wrapped in <bdi>, so an Urdu name inside an English phrase keeps its place). The accessible name stays `label`. */
   readonly labelContent?: ReactNode;
   readonly field?: boolean;
 }) {
   if (proof === null) return null;
-  return <Chip proof={proof} label={label} labelContent={labelContent} field={field} />;
+  return <Chip proof={proof} label={label} labelContent={labelContent} field={field} variant={variant} />;
 }
 
 function Chip({
@@ -39,7 +44,9 @@ function Chip({
   label,
   labelContent,
   field,
+  variant,
 }: {
+  readonly variant: "chip" | "primary";
   readonly proof: Proof;
   readonly label: string | undefined;
   readonly labelContent: ReactNode;
@@ -83,11 +90,16 @@ function Chip({
         // A custom label is the accessible name as it is written (WCAG 2.5.3: the name contains the visible text).
         aria-label={label ?? t("chipAria", { what: proof.what })}
         onClick={openDrawer}
-        className={`inline-flex items-center gap-1 rounded-sign border border-edge bg-transparent text-ink-2 hover:border-ink-2 hover:text-ink ${
-          field ? "min-h-(--target) min-w-(--target) touch-manipulation px-3 text-base" : "min-h-7 min-w-7 px-2 text-xs"
-        }`}
+        {...(variant === "primary" ? { "data-primary": "" } : {})}
+        className={
+          variant === "primary"
+            ? `${ACTION_PRIMARY} gap-2`
+            : `inline-flex items-center gap-1 rounded-sign border border-edge bg-transparent text-ink-2 hover:border-ink-2 hover:text-ink ${
+                field ? "min-h-(--target) min-w-(--target) touch-manipulation px-3 text-base" : "min-h-7 min-w-7 px-2 text-xs"
+              }`
+        }
       >
-        <span aria-hidden className="size-1.5 rotate-45 border border-current" />
+        {variant === "primary" ? null : <span aria-hidden className="size-1.5 rotate-45 border border-current" />}
         {/* One element: the button is a flex row, and a fragment of text, <bdi> and text would be three items with a gap between them. */}
         <span>{labelContent ?? label ?? t("chip")}</span>
       </button>

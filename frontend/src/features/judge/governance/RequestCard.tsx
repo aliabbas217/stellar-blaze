@@ -15,7 +15,8 @@ export interface RequestCardProps {
   /** A call reached the service from this page: the button then reads "Send again". */
   readonly sentBefore: boolean;
   readonly pending: boolean;
-  readonly onSend: () => void;
+  /** Absent in the server-rendered first paint: the gate loads the island on the tap and the island performs the send. */
+  readonly onSend?: () => void;
   /** What went wrong with the call just made: shown under the button, where the person who pressed it is looking. */
   readonly notice?: ReactNode;
 }
@@ -45,7 +46,7 @@ export function RequestCard({ path, workerRef, dataClass, sentBefore, pending, o
         </dd>
       </dl>
       <p className="text-sm text-ink-3">{t("refNote")}</p>
-      <button type="button" data-primary="" aria-busy={pending} onClick={onSend} className={`${ACTION_PRIMARY} w-full gap-2`}>
+      <button type="button" data-primary="" data-island-action="send" aria-busy={pending} {...(onSend === undefined ? {} : { onClick: onSend })} className={`${ACTION_PRIMARY} w-full gap-2`}>
         {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
         {sentBefore ? t("sendAgain") : t("send")}
       </button>

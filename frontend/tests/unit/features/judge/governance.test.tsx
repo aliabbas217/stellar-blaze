@@ -455,7 +455,7 @@ describe("AccessLog", () => {
     const source = readFileSync(path.join(root, "src/components/governance/AccessLog.tsx"), "utf8");
     expect(source).not.toMatch(/from\s+["'](?:@\/features\/|(?:\.\.?\/)+features\/)/);
     expect(source).not.toMatch(/from\s+["']@\/(?:api\/(?:client|queries)|providers)/);
-    const view = readFileSync(path.join(root, "src/features/judge/governance/GovernanceView.tsx"), "utf8");
+    const view = readFileSync(path.join(root, "src/features/judge/governance/GovernanceLayout.tsx"), "utf8");
     expect(view).toContain('from "@/components/governance/AccessLog"');
     expect(view).not.toMatch(/function AccessLog|const AccessLog/);
   });

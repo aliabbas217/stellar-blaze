@@ -162,9 +162,9 @@ describe("roster frontier reader", () => {
     expect(result.files.frontier?.path).toBe("static/roster_frontier.json");
   });
 
-  it("is null, not a throw, when the file is absent, and throws on a file of the wrong shape", async () => {
+  it("throws when the committed file is absent (a failure, like the hourly file) and when it has the wrong shape", async () => {
     rmSync(path.join(root, "static", "roster_frontier.json"));
-    expect((await loadEval({ dataRoot: root, fixturesRoot: fixtures, production: true })).frontier).toBeNull();
+    await expect(loadEval({ dataRoot: root, fixturesRoot: fixtures, production: true })).rejects.toThrow(/roster_frontier.*missing/);
     writeFileSync(path.join(root, "static", "roster_frontier.json"), JSON.stringify({ label: "x" }));
     await expect(loadEval({ dataRoot: root, fixturesRoot: fixtures, production: true })).rejects.toThrow(
       /roster_frontier/,

@@ -1,5 +1,3 @@
-"use client";
-
 import { useTranslations } from "next-intl";
 
 /*
@@ -15,6 +13,10 @@ const MODES = ["replay", "live"] as const;
  * from the forecast response (its `mode` stamp), and when a Live request is answered with a replay, the caller sets
  * `liveUnavailable` and the switch says so in words ("Live is not running on this deployment"), never silently
  * showing a replay as live. Presentational: the state lives in the demo context (`?demo=`).
+ *
+ * It has no `"use client"` on purpose: a server page can render it with NO `onChange` (the buttons then carry
+ * `data-island-action="demo-<mode>"` so a gate can load the interactive island on the first tap, see
+ * features/judge/live/useIslandGate). A client caller passes the handler.
  */
 export function DemoModeSwitch({
   value,
@@ -22,7 +24,7 @@ export function DemoModeSwitch({
   liveUnavailable,
 }: {
   value: DemoMode;
-  onChange: (mode: DemoMode) => void;
+  onChange?: (mode: DemoMode) => void;
   liveUnavailable: boolean;
 }) {
   const t = useTranslations("shell.demo.mode");
@@ -35,9 +37,14 @@ export function DemoModeSwitch({
             key={mode}
             type="button"
             aria-pressed={value === mode}
-            onClick={() => {
-              onChange(mode);
-            }}
+            data-island-action={`demo-${mode}`}
+            {...(onChange === undefined
+              ? {}
+              : {
+                  onClick: () => {
+                    onChange(mode);
+                  },
+                })}
             className="inline-flex min-h-(--target) min-w-(--target) items-center justify-center rounded-sign border border-edge px-3 font-body text-sm text-ink-2 aria-pressed:border-ink aria-pressed:font-semibold aria-pressed:text-ink"
           >
             {t(mode)}

@@ -8,6 +8,7 @@ import { Verdict } from "@/components/provenance/Verdict";
 import type { Proof } from "@/components/provenance/proof";
 import { PendingBanner } from "@/components/states/PendingBanner";
 import { banStateFrom } from "@/components/spine/ban-state";
+import { DaySkeleton } from "@/features/judge/DaySkeleton";
 import { ScoreboardSkeleton } from "@/features/judge/ScoreboardSkeleton";
 import { loadHourly } from "@/features/judge/hourly";
 import { makeFormat } from "@/features/judge/adapters";
@@ -43,6 +44,7 @@ export async function EvidenceSection() {
   const locale = await getLocale();
   const t = await getTranslations("judge.scoreboard");
   const tf = await getTranslations("judge.frontier");
+  const td = await getTranslations("judge.day");
   const tk = await getTranslations("common.kit.sample");
   const hourly = await loadHourly();
   const season = buildSeasonView({ ...hourly, locale, t });
@@ -153,6 +155,11 @@ export async function EvidenceSection() {
         <Cell caption="ScoreboardSkeleton · the loading state of the scoreboard route, at final size" wide testId="evidence-loading">
           <div role="status" aria-busy="true" aria-label={t("loading")} className="mx-auto flex w-full max-w-(--content-max) flex-col gap-10">
             <ScoreboardSkeleton />
+          </div>
+        </Cell>
+        <Cell caption="DaySkeleton · the loading state of the day route, at final size" wide testId="evidence-day-loading">
+          <div role="status" aria-busy="true" aria-label={td("loading")} className="mx-auto flex w-full max-w-(--content-max) flex-col gap-8">
+            <DaySkeleton />
           </div>
         </Cell>
         <Cell caption="FrontierChart · 45 minute commute, from the recorded roster analysis" wide>

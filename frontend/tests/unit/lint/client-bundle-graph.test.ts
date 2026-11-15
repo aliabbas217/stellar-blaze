@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { valueImports } from "./import-graph";
 
 /*
  * No client entry of the judge routes may reach `zod`. A `"use client"` file's whole import graph ships to the browser, and a
@@ -31,22 +32,6 @@ function resolveSpecifier(from: string, spec: string): string | null {
     if (ALL.has(candidate)) return candidate;
   }
   return null;
-}
-
-/** The value specifiers a source file imports (type-only imports and exports are dropped). */
-export function valueImports(source: string): string[] {
-  const out: string[] = [];
-  const staticImport = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^"';]*?)\s*from\s*["']([^"']+)["']/g;
-  for (const match of source.matchAll(staticImport)) {
-    const [, typeOnly, clause, spec] = match;
-    if (typeOnly !== undefined || spec === undefined) continue;
-    const named = /^\{([^}]*)\}$/.exec((clause ?? "").trim());
-    if (named !== null && (named[1] ?? "").split(",").map((s) => s.trim()).filter(Boolean).every((s) => s.startsWith("type "))) continue;
-    out.push(spec);
-  }
-  for (const match of source.matchAll(/(?:^|\n)\s*import\s*["']([^"']+)["']/g)) if (match[1] !== undefined) out.push(match[1]);
-  for (const match of source.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g)) if (match[1] !== undefined) out.push(match[1]);
-  return out;
 }
 
 /** The chain of files from `root` to the first forbidden package, or null. */

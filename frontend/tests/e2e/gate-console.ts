@@ -13,7 +13,7 @@
  * 404s, are ignored by path: a 500 on one of them, or any other failed request, is still an error. REMOVE an entry in the same
  * change that builds its view.
  */
-export const UNBUILT_CORE_ROUTES: readonly string[] = ["/replay/day", "/replay/try"];
+export const UNBUILT_CORE_ROUTES: readonly string[] = [];
 
 /** The path of a URL without its locale prefix ("/en/replay/day" is "/replay/day"). */
 export function routePath(url: string): string {

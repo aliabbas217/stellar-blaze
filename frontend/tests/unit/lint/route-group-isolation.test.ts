@@ -248,8 +248,10 @@ describe("route-group isolation: what the resolved rules report", () => {
     ["FieldLink itself is the one file that imports the raw Link", "src/components/shell/FieldLink.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', []],
     ["desk shell keeps the locale Link", "src/components/shell/DeskShell.tsx", 'import { Link } from "@/i18n/navigation"; export { Link };', []],
     ["hse route keeps the locale Link", HSE_ROUTE, 'import { Link } from "@/i18n/navigation"; export { Link };', []],
-    ["judge route keeps the locale Link", JUDGE_ROUTE, 'import { Link } from "@/i18n/navigation"; export { Link };', []],
-    ["judge feature keeps the locale Link", JUDGE_FEATURE, 'import { Link } from "@/i18n/navigation"; export { Link };', []],
+    // F2 Part G1b: the judge pages are measured against the route JS budget, so they link through FieldLink too (a prefetch ships the target page's script).
+    ["test_judge_cannot_import_the_raw_link: judge route, locale Link", JUDGE_ROUTE, 'import { Link } from "@/i18n/navigation"; export { Link };', [IMPORTS]],
+    ["judge feature, locale Link", JUDGE_FEATURE, 'import { Link } from "@/i18n/navigation"; export { Link };', [IMPORTS]],
+    ["judge route, FieldLink", JUDGE_ROUTE, 'import { FieldLink } from "@/components/shell/FieldLink"; export { FieldLink };', []],
     ["landing page, shared code and the neutral features", LANDING, 'import { Link } from "@/i18n/navigation"; import { d } from "@/features/demo/constants"; import { p } from "@/features/pwa/manifest"; import { j } from "@/features/judge/x"; export { Link, d, p, j };', []],
     ["judge route, shared code, the demo feature and its own feature", JUDGE_ROUTE, 'import { s } from "@/components/shell/DeskShell"; import { d } from "@/features/demo/DemoProvider"; import { j } from "@/features/judge/x"; export { s, d, j };', []],
     ["worker route, the demo feature (neutral)", WORKER_ROUTE, 'import { d } from "@/features/demo/DemoProvider"; export { d };', []],

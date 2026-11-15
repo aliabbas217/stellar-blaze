@@ -174,6 +174,17 @@ describe("FrontierPanel heading, true at every commute of the chart", () => {
     unmount();
   });
 
+  it("the readouts and labels never attribute the gain to a roster either (the heading is not the only text)", () => {
+    for (const commute of COMMUTE_VALUES) {
+      const { container, unmount } = headingAt(data, commute);
+      const readouts = container.querySelector("[data-frontier-readouts]")?.textContent ?? "";
+      expect(readouts.length).toBeGreaterThan(0);
+      expect(readouts).not.toMatch(OVERCLAIM);
+      expect(readouts).toContain("On top of the legal default");
+      unmount();
+    }
+  });
+
   it("the whole panel prints no export key, at any commute (copy rule: every label comes from messages)", () => {
     for (const commute of COMMUTE_VALUES) {
       const { container, unmount } = headingAt(data, commute);

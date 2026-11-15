@@ -140,10 +140,14 @@ async function readTier(tier: Tier, kind: EvalKind): Promise<Read<unknown> | nul
   return { value, info: { path: shown, sha256: sha256Hex(bytes) } };
 }
 
-async function readFrontier(dataRoot: string): Promise<Read<RosterFrontier> | null> {
+/**
+ * The roster frontier is a COMMITTED static file (data/static, copied into the build), so its absence is a failure like the
+ * hourly forecast file's, never "not scored yet": the screens render their read-failure state, not an empty one.
+ */
+async function readFrontier(dataRoot: string): Promise<Read<RosterFrontier>> {
   const shown = "static/roster_frontier.json";
   const bytes = await readIfPresent(path.join(dataRoot, shown));
-  if (bytes === null) return null;
+  if (bytes === null) throw new EvalDataError(shown, "the committed file is missing");
   try {
     return { value: parseRosterFrontier(parseJson(bytes, shown)), info: { path: shown, sha256: sha256Hex(bytes) } };
   } catch (error) {
@@ -160,7 +164,7 @@ export interface FrontierData {
 
 export async function loadFrontier(options: LoadEvalOptions = {}): Promise<FrontierData> {
   const read = await readFrontier(options.dataRoot ?? path.join(process.cwd(), "data"));
-  return { frontier: read?.value ?? null, file: read?.info ?? null };
+  return { frontier: read.value, file: read.info };
 }
 
 /** The three scored exporter files (no frontier), from the first tier that has any (see the file comment). */

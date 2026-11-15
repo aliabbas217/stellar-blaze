@@ -2,7 +2,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ProofRows, RecountButton } from "@/components/provenance/ProofRows";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { EmptyState } from "@/components/states/EmptyState";
-import { Link } from "@/i18n/navigation";
+import { FieldLink } from "@/components/shell/FieldLink";
 import { EvalSourceStamp } from "./EvalSourceStamp";
 import { FORECAST_CLAIMS, type Claim } from "./claims";
 import type { EvalSource } from "./data";
@@ -90,9 +90,9 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
             <RecountButton proof={claim.proof} />
           </section>
           <p>
-            <Link href="/replay" className="inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4">
+            <FieldLink href="/replay" className="inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4">
               {t("back")}
-            </Link>
+            </FieldLink>
           </p>
         </div>
       </div>

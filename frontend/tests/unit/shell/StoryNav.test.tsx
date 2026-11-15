@@ -3,7 +3,7 @@ import path from "node:path";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { StoryNav } from "@/components/shell/StoryNav";
-import { STORY_STEPS } from "@/components/shell/story-steps";
+import { STORY_STEPS, type StoryStep } from "@/components/shell/story-steps";
 import { isDeferredRoute } from "@/components/states/deferred-routes";
 import { renderWithIntl } from "../../utils/intl";
 
@@ -57,21 +57,45 @@ describe("StoryNav steps", () => {
   });
 });
 
+/** Runs `body` with the step `id` flagged unbuilt (the real flag flips when its view lands; the behaviour must hold for either value). */
+function withUnbuilt(id: StoryStep["id"], body: () => void): void {
+  const steps = STORY_STEPS as StoryStep[];
+  const at = steps.findIndex((step) => step.id === id);
+  const original = steps[at];
+  if (original === undefined) throw new Error(id);
+  steps[at] = { ...original, built: false };
+  try {
+    body();
+  } finally {
+    steps[at] = original;
+  }
+}
+
 describe("StoryNav", () => {
-  it("marks the current step and links the built ones; an unbuilt step is text, not a link", () => {
+  it("marks the current step and links the built ones", () => {
     renderWithIntl(<StoryNav current="scoreboard" />);
     const nav = screen.getByRole("navigation", { name: "Story" });
     expect(within(nav).getByText("Step 2 of 5: Scoreboard")).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "Scoreboard" })).toHaveAttribute("aria-current", "step");
     expect(within(nav).getByRole("link", { name: "The problem" })).toHaveAttribute("href", "/");
-    expect(within(nav).queryByRole("link", { name: "One day" })).toBeNull();
-    expect(within(nav).getByText("One day")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "One day" })).toHaveAttribute("href", "/replay/day");
   });
 
-  it("goes back to the previous built step and forward to the next built step, skipping the unbuilt one", () => {
+  it("an unbuilt step is text, not a link, and Back and Next skip it", () => {
+    withUnbuilt("day", () => {
+      renderWithIntl(<StoryNav current="scoreboard" />);
+      const nav = screen.getByRole("navigation", { name: "Story" });
+      expect(within(nav).queryByRole("link", { name: "One day" })).toBeNull();
+      expect(within(nav).getByText("One day")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Back: The problem" })).toHaveAttribute("href", "/");
+      expect(screen.getByRole("link", { name: "Next: Proof" })).toHaveAttribute("href", "/replay/proof/forecast.hours_over_limit");
+    });
+  });
+
+  it("goes back to the previous step and forward to the next one", () => {
     renderWithIntl(<StoryNav current="scoreboard" />);
     expect(screen.getByRole("link", { name: "Back: The problem" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Next: Proof" })).toHaveAttribute("href", "/replay/proof/forecast.hours_over_limit");
+    expect(screen.getByRole("link", { name: "Next: One day" })).toHaveAttribute("href", "/replay/day");
   });
 
   it("has no Next on the last step and no Back on the first", () => {

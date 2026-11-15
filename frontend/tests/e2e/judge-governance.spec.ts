@@ -93,9 +93,11 @@ test("governance refusal visible in the worker log: send, see the 403 and the ne
   expect(after).toBeGreaterThanOrEqual(1);
   await expect(page.locator("main")).not.toContainText(/about you|ADR|PDPL|purpose/i);
 
-  // reload: the sequence is the recorded run again; the rows the API already has sit in their own labelled block
+  // reload: the sequence is the recorded run again; the rows the API already has sit in their own labelled block (they come with
+  // the lazy island, which a focus on a control loads without sending anything)
   await page.reload();
   await expect(page.getByRole("button", { name: "Reset demo site" })).toBeVisible();
+  await page.getByRole("button", { name: SEND }).focus();
   const block = page.locator("[data-live-rows]");
   await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
   await expect.poll(() => block.locator("[data-access-row]").count()).toBeGreaterThanOrEqual(after);
@@ -121,6 +123,26 @@ test("governance first paint is the recorded run, with nothing sent, and it need
   expect(posts).toEqual([]);
 });
 
+test("governance first load makes no API call and ships no island; the first focus loads it and still sends nothing", async ({ page }) => {
+  const api: string[] = [];
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/v1/")) api.push(request.url());
+    if (request.method() === "POST") posts.push(request.url());
+  });
+  await page.setViewportSize(JUDGE);
+  await page.goto(PATH);
+  await expect(state(page)).toHaveAttribute("data-governance", "recorded");
+  await page.waitForTimeout(800);
+  expect(api).toEqual([]);
+  // a keyboard user reaches the send button with Tab: the island loads (sites are asked for) and no request is sent
+  await page.getByRole("button", { name: SEND }).focus();
+  await expect.poll(() => api.some((url) => url.includes("/sites"))).toBe(true);
+  await expect(page.getByRole("button", { name: SEND })).toBeFocused();
+  await page.waitForTimeout(500);
+  expect(posts).toEqual([]);
+});
+
 test("governance live rows the API already has sit in their own block and never replace the recorded step 4", async ({ page }) => {
   const entry = (at: string) => ({ at, kind: "data_request.refused", outcome: "refused", actor_role: "employer", rule: "r", policy_version: "p", config_version: 1, model_id: null });
   await page.route("**/api/v1/sites/*/transparency-log", (route) =>
@@ -131,6 +153,8 @@ test("governance live rows the API already has sit in their own block and never 
     }),
   );
   await open(page);
+  // the rows come with the lazy island: a focus on the send button loads it, and sends nothing
+  await page.getByRole("button", { name: SEND }).focus();
   const block = page.locator("[data-live-rows]");
   await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
   await expect(block.locator("[data-access-row]")).toHaveCount(2);
@@ -157,11 +181,14 @@ test("governance 429 is 'Not sent. Try again in a minute.' and the page never re
 test("governance 401 says the deployment has no demo token and records nothing", async ({ page }) => {
   await page.route("**/api/v1/sites/*/data-requests", (route) => route.fulfill(problem(401, { type: "urn:stellar-blaze:problem:unauthorized", title: "Unauthorized" })));
   await open(page);
-  const before = await rows(page).count();
+  // step 4 is the recorded run's one row; the API's own rows (earlier sends) arrive with the island and sit in their own block
+  const step4 = page.locator("[data-log-source] [data-access-row]");
+  const before = await step4.count();
   await page.getByRole("button", { name: SEND }).click();
   await expect(state(page)).toHaveAttribute("data-governance", "unauthorized");
   await expect(page.locator("[data-notice=unauthorized]")).toContainText("no demo employer token");
-  await expect(rows(page)).toHaveCount(before);
+  await expect(step4).toHaveCount(before);
+  await expect(page.locator("[data-log-source=recorded]")).toHaveCount(1);
 });
 
 test("governance API unreachable shows the recorded run and 'Nothing was sent, so nothing was recorded'", async ({ page }) => {

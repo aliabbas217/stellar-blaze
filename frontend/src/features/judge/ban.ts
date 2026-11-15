@@ -1,3 +1,4 @@
+import { banStateFrom, type BanState } from "@/components/spine/ban-state";
 import type { SeasonBan } from "./facts";
 
 /**
@@ -17,3 +18,31 @@ export const SEASON_BAN: SeasonBan = {
   start: "12:30",
   end: "15:00",
 };
+
+/** The replay site's time zone (`Site.timezone` of the demo site, ADR 0011): the recorded hours and the break are site-local. */
+export const SITE_TZ = "Asia/Dubai";
+
+const OFFSET = "+04:00";
+
+/**
+ * The break as a `BanState` for one site-local `date`, from the recorded `SEASON_BAN` through the same `banStateFrom` the
+ * live screens use (the one place that decides in-force or not), so a static page and an API page can never disagree about a
+ * date. The window's instants are made from the recorded clock times on that date in the site's fixed UTC+4 offset (Dubai has
+ * no daylight saving); outside the season `banStateFrom` returns the dashed outline and the date the break resumes.
+ */
+export function banStateFor(ban: SeasonBan, date: string, locale: string): BanState {
+  return banStateFrom(
+    {
+      starts_at: `${date}T${ban.start}:00${OFFSET}`,
+      ends_at: `${date}T${ban.end}:00${OFFSET}`,
+      season_start: ban.season_start,
+      season_end: ban.season_end,
+      start: ban.start,
+      end: ban.end,
+      timezone: SITE_TZ,
+    },
+    SITE_TZ,
+    date,
+    locale,
+  );
+}

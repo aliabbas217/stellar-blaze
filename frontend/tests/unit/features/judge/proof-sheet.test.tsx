@@ -74,7 +74,13 @@ describe("claims", () => {
     expect(ids).toContain("forecast.hours_over_limit");
     expect(ids).toContain("plan.naive.violation_minutes_per_season");
     expect(ids).toContain("frontier.legalisation.ge30");
-    expect(ids.filter((id) => id.startsWith("frontier.best.ge30.commute_"))).toHaveLength(6);
+    // a best-claim exists only where the export shows a gain: a zero (and every gate-failing commute) has no proof page
+    const gains = frontier.frontier_absolute_gate.filter((g) => g.avoided_vs_legal_default_ge30 > 0).map((g) => `frontier.best.ge30.commute_${String(g.commute_min)}`);
+    expect(gains.length).toBeGreaterThan(0);
+    expect(ids.filter((id) => id.startsWith("frontier.best.ge30.commute_"))).toEqual(gains);
+    for (const gate of frontier.frontier_absolute_gate.filter((g) => !g.b1_passes_sleep_gate)) {
+      expect(ids, `gate-failing ${String(gate.commute_min)} min`).not.toContain(`frontier.best.ge30.commute_${String(gate.commute_min)}`);
+    }
   });
 
   it("takes the recorded ban window from the contract's own, never a drifted copy", () => {

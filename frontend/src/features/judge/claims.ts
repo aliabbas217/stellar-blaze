@@ -138,14 +138,19 @@ export const FRONTIER_LEGAL_ID = "frontier.legalisation.ge30";
 
 /**
  * The roster frontier readouts, one per commute plus the legalisation gain. The numbers are shares of hours at WBGT 30 or
- * more avoided; only commutes the file has a gate row for are claims.
+ * more avoided. A best-claim exists only where the export shows a GAIN on top of the legal default
+ * (`avoided_vs_legal_default_ge30 > 0`): a zero is not a claim. Where the gate fails (30 to 90 minutes in the committed file) the
+ * zero would read as tested-and-equal, and "with sleep kept at the gate" would be untrue because the legal default itself misses it;
+ * where it passes, the panel says "not beaten in N of M folds" in its own sentence, which has no proof page.
  */
 export function frontierClaims(data: RosterFrontier, source: FrontierSource, format: JudgeFormat, text: FrontierClaimText): Claim[] {
   const script = `${data.generated_by} (${data.label})`;
   const proof = (what: string, claim: string): Proof =>
     proofFromStaticFile(source.file, what, { protocol: source.protocol, script, label: source.label, claim });
   return [
-    ...data.frontier_absolute_gate.map(
+    ...data.frontier_absolute_gate
+      .filter((gate) => gate.avoided_vs_legal_default_ge30 > 0)
+      .map(
       (gate): Claim => ({
         id: frontierBestId(gate.commute_min),
         what: text.best(gate.commute_min),

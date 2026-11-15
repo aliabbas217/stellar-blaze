@@ -56,7 +56,7 @@ describe("claim id families map to the loader that owns them", () => {
   it.each([
     ["policy.p3.missed_danger_hours", "scored"],
     ["plan.p1.heat_exposure_hours", "scored"],
-    ["frontier.best.ge30.commute_30", "frontier"],
+    ["frontier.best.ge30.commute_15", "frontier"],
     ["frontier.legalisation.ge30", "frontier"],
     ["forecast.days_over_limit", "forecast"],
   ] as const)("%s -> %s", (id, loader) => {
@@ -100,6 +100,13 @@ describe("loadClaims: a loader that fails is named, the others still serve", () 
     copy(HOURLY);
     put(FRONTIER, JSON.stringify({ label: "x" }));
     expect((await loadClaims("en", { dataRoot: root })).unreadable).toEqual(["frontier"]);
+  });
+
+  it("frontier file missing at request time (it is committed, like the hourly file): `frontier`, no throw, forecast claims still there", async () => {
+    copy(HOURLY);
+    const { claims, unreadable } = await loadClaims("en", { dataRoot: root });
+    expect(unreadable).toEqual(["frontier"]);
+    expect(claims.some((claim) => claim.id.startsWith("forecast."))).toBe(true);
   });
 
   it("hourly file missing at request time: `forecast` and no throw (a 500 before this fix); frontier claims still there", async () => {

@@ -811,7 +811,8 @@ export function parseRoster(text: string): RosterParse {
 
 const COMMON_ROSTER = "06:00-12:30 work|15:00-17:00 work";
 const LEGAL_DEFAULT = "06:00-11:00 work|15:00-18:00 work";
-const STRAIGHT_THROUGH = "06:00-18:00 work";
+// Straight through: the published shift worked without a stop (the try-a-plan template ends 17:00; 18:00 is the ADR example).
+const STRAIGHT_THROUGH_END: Record<string, string> = { "06:00-17:00 work": "17:00", "06:00-18:00 work": "18:00" };
 
 function range(date: string, from: string, to: string): Schemas["TimeRange"] {
   return { starts_at: instantAt(date, minutesOf(from)), ends_at: instantAt(date, minutesOf(to)) };
@@ -831,11 +832,13 @@ function cannedViolations(key: string, date: string): Schemas["Violation"][] {
   if (key === COMMON_ROSTER) {
     return [art18("06:00", "12:30", "6.5 hours of attendance without a one-hour break."), daily([range(date, "06:00", "12:30"), range(date, "15:00", "17:00")], "8.5 hours of attendance in the day.")];
   }
-  if (key === STRAIGHT_THROUGH) {
+  const straightEnd = STRAIGHT_THROUGH_END[key];
+  if (straightEnd !== undefined) {
+    const hours = (minutesOf(straightEnd) - minutesOf("06:00")) / 60;
     const ban: Schemas["Violation"][] = inBanSeason(date)
       ? [{ rule_id: "P-H1", clause: CLAUSE_BAN, source_id: "", ranges: [range(date, BAN_START, BAN_END)], detail: "Work inside the midday ban." }]
       : [];
-    return [...ban, art18("06:00", "18:00", "12 hours of attendance without a one-hour break."), daily([range(date, "06:00", "18:00")], "12 hours of attendance in the day.")];
+    return [...ban, art18("06:00", straightEnd, `${String(hours)} hours of attendance without a one-hour break.`), daily([range(date, "06:00", straightEnd)], `${String(hours)} hours of attendance in the day.`)];
   }
   return [];
 }
@@ -847,7 +850,7 @@ export interface TypedPlan {
 
 /**
  * The canned validator answer for a typed roster: the common roster (06:00-12:30 and 15:00-17:00) and straight-through
- * work (06:00-18:00) have violations; the legal default (06:00-11:00 and 15:00-18:00) has none; any other roster gets
+ * work (06:00-17:00, or 06:00-18:00) have violations; the legal default (06:00-11:00 and 15:00-18:00) has none; any other roster gets
  * "no violations, rules checked". It is a picture of the screen, not a check of the roster.
  */
 export function validateTyped(typed: TypedPlan, options: DayOptions = {}): Schemas["PlanValidateResponse"] {

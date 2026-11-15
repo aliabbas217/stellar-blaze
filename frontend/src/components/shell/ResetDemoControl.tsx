@@ -1,9 +1,10 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
 import { resetDemoMutation } from "@/api/queries";
+import { ResetDemoButton } from "@/components/shell/ResetDemoButton";
 
 /**
  * "Reset demo site": one tap, no confirm dialog, calls `reset_demo_site` (ADR 0062, 0066). Nothing is deleted: the API
@@ -14,17 +15,41 @@ import { resetDemoMutation } from "@/api/queries";
  * (reset is limited to once a minute) that it is limited and to try again shortly, both in a status line; any other
  * failure is an alert that quotes the request id. The button keeps its label while the request runs and is not
  * disabled (a second tap while one runs is ignored).
+ *
+ * `siteId` may be undefined while the demo site is still being looked up (the lazy island of a server-rendered page): a tap then
+ * is remembered and performed once, when the id arrives. `autoStart` is the same for a tap already made on the plain button
+ * of the first paint. If the lookup failed (`siteFailed`) a remembered tap is answered with `notReady`, never dropped silently.
+ * Neither ever fires on its own. The button is one stable element, so focus and a pending click survive the lookup.
  */
-export function ResetDemoControl({ siteId }: { siteId: string }) {
+export function ResetDemoControl({
+  siteId,
+  autoStart = false,
+  siteFailed = false,
+  notReady,
+}: {
+  siteId: string | undefined;
+  autoStart?: boolean;
+  siteFailed?: boolean;
+  notReady?: string;
+}) {
   const t = useTranslations("shell");
   const tError = useTranslations("states.error");
   const queryClient = useQueryClient();
   const reset = useMutation({
-    ...resetDemoMutation(siteId),
+    ...resetDemoMutation(siteId ?? ""),
     onSuccess: () => {
       void queryClient.invalidateQueries();
     },
   });
+
+  const [asked, setAsked] = useState(autoStart);
+  const started = useRef(false);
+  const { mutate } = reset;
+  useEffect(() => {
+    if (!asked || started.current || siteId === undefined) return;
+    started.current = true;
+    mutate();
+  }, [asked, siteId, mutate]);
 
   const status = reset.error?.problem.status;
   const unavailable = status === 404 || status === 501;
@@ -33,20 +58,18 @@ export function ResetDemoControl({ siteId }: { siteId: string }) {
 
   return (
     <div className="flex flex-col gap-2 font-body text-sm text-ink">
-      <button
-        type="button"
-        aria-busy={reset.isPending}
+      <ResetDemoButton
+        busy={reset.isPending || (asked && siteId === undefined && !siteFailed)}
         onClick={() => {
-          if (!reset.isPending) reset.mutate();
+          if (reset.isPending) return;
+          if (siteId === undefined) setAsked(true);
+          else reset.mutate();
         }}
-        className="inline-flex min-h-(--target) w-fit items-center justify-center gap-2 rounded-sign border border-edge px-4 text-base text-ink"
-      >
-        {reset.isPending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
-        {t("demo.reset.button")}
-      </button>
+      />
       <p role="status">
         {reset.isSuccess ? t("demo.reset.done", { epoch: String(reset.data.epoch_id) }) : null}
         {unavailable ? t("demo.reset.unavailable") : null}
+        {asked && siteId === undefined && siteFailed ? notReady : null}
         {rateLimited ? t("demo.reset.rateLimited") : null}
       </p>
       {reset.isError && !unavailable && !rateLimited ? (

@@ -131,7 +131,7 @@ test("scoreboard frontier commute lives in the URL and survives a reload", async
   await expect(page.getByRole("heading", { name: /^At a 45 minute commute the analysis finds no gain on top of the legal default./ })).toBeVisible();
 });
 
-test("scoreboard story footer links only to routes that exist and Next goes to the proof sheet", async ({ page }) => {
+test("scoreboard story footer links only to routes that exist and Next goes to the day page", async ({ page }) => {
   await open(page, "/en/replay");
   const nav = page.getByRole("navigation", { name: "Story" });
   await expect(nav.getByText("Step 2 of 5: Scoreboard")).toBeVisible();
@@ -139,8 +139,8 @@ test("scoreboard story footer links only to routes that exist and Next goes to t
     const response = await page.request.get(href);
     expect(response.status(), href).toBeLessThan(400);
   }
-  await nav.getByRole("link", { name: "Next: Proof" }).click();
-  await expect(page).toHaveURL(/\/en\/replay\/proof\/forecast\.hours_over_limit$/);
+  await nav.getByRole("link", { name: "Next: One day" }).click();
+  await expect(page).toHaveURL(/\/en\/replay\/day$/);
 });
 
 for (const [name, viewport] of [
