@@ -7,6 +7,7 @@ import json
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import httpx2
@@ -212,6 +213,11 @@ async def test_concurrent_rollbacks_with_the_same_expected_previous_exactly_one_
 # --- the API ------------------------------------------------------------------------------------------------------
 
 
+# These tests run the app with the FIXTURE models, whose ids differ from the released model the git default seed pins,
+# and they are about the poller, not about theta or the model pin: they start from a seed with nothing pinned.
+UNPINNED_SEED = Path(__file__).resolve().parents[1] / "fixtures" / "runtime" / "unpinned.toml"
+
+
 def api_for(settings: Settings, *, env: str, interval_s: float = 0.1) -> FastAPI:
     app = create_app(
         settings.model_copy(
@@ -220,6 +226,7 @@ def api_for(settings: Settings, *, env: str, interval_s: float = 0.1) -> FastAPI
                 "config_poll_interval_s": interval_s,  # below the setting's own floor on purpose: model_copy skips it
                 "rulesets_dir": RULESETS_DIR,
                 "models_dir": FIXTURE_MODELS,
+                "runtime_config_seed": UNPINNED_SEED,
             }
         )
     )
