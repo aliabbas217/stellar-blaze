@@ -15,7 +15,8 @@
 #   S6  every resource in the group is in the expected region (a display name such as "UAE North" matches uaenorth)
 #   S7  plain http://<web fqdn>/ does not answer 200 (a redirect or a refusal passes)
 #   S8  check-db-tls.sh --deployed passes (ADR 0042)
-#   S9  the rest of smoke-http.sh (H3 stop and undo, H4 replay clock window, H5, H7 forged bearer, H6 forged X-Forwarded-For)
+#   S9  the rest of smoke-http.sh (H3 stop and undo, H4 demo-window check of the epoch replay clock (its failure says to run
+#       reset-demo.sh), H5, H7 forged bearer, H6 forged X-Forwarded-For)
 # With --placeholder only S1, S2 (api, web), S6, S7 and S3 (the `/` check) run; S4, S5, S8 and S9 print SKIP.
 # smoke-http.sh runs last: its H6 drains the BFF rate-limit bucket, and unless --no-wait the script waits 62 s for it to refill.
 #

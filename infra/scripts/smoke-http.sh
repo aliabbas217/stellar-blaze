@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HTTP smoke test of a deployed Stellar Blaze demo, through the PUBLIC web URL only.
 #
-#   smoke-http.sh <base-url> [--wait]
+#   smoke-http.sh <base-url> [--wait] [--reset-on-h3-failure]
 #
 # It runs against the local production rehearsal (http://127.0.0.1:8080, infra/local/rehearse.sh) and against the real
 # public URL (https://<web fqdn>), and needs only bash and curl (no jq, no python). The api is private in production, so
@@ -17,12 +17,19 @@
 #       POST /api/v1/crews/crew-b/stops {"reason_code":"other"} is 201 with an `id` and `started_at`; then
 #       DELETE /api/v1/crews/crew-b/stops/<id> within 10 s is 204 (the undo window); then GET
 #       /api/v1/crews/crew-b/timeline has no "crew_level":"red" (an undone stop leaves no trace in levels).
+#       RECOVERY: when H3 fails AFTER the stop was created (the undo failed, took more than 10 s, or the timeline is red or
+#       unreadable) the stop may still be active, and an active stop leaves crew-b Red until the end of the replay shift. The FAIL
+#       output then says how to recover: POST /api/v1/sites/site-demo-mussafah/demo-reset through the web starts a new epoch, and
+#       the stop belongs to the old one (ADR 0066; the BFF allow-list contains the route). The script performs that reset ONCE,
+#       and only, when --reset-on-h3-failure is given (default off: a smoke test does not change state it was not asked to).
 #   H4  The replay clock. `started_at` of the stop of H3 is the api's replay "now" (UTC). Dubai is UTC+4 all year (no
 #       DST), so the clock is started_at + 4 h and must be between 10:00 and 17:30. DEMO-WINDOW ASSUMPTION: crew B's shift
 #       is 06:00-18:00 with a midday break (11:10 is inside the break), the replay anchor is SB_REPLAY_NOW =
-#       2026-06-14T10:10:00+04:00 and the clock then runs at real speed from the process start, so it leaves the window
-#       about 7 h 20 min after a start. Outside it a Stop no longer lands on a working hour and the demo is misleading:
-#       the failure says to run infra/scripts/restart-replay-clock.sh. The date is not checked, only the time of day.
+#       2026-06-14T10:10:00+04:00 and the clock is that anchor plus the real time since the start of the CURRENT EPOCH (the
+#       `site_epoch` row in Postgres, which the api and the alerts worker both read: ADR 0034 amendment of 2026-11-15; a
+#       restart of either does not move it). It leaves the window about 7 h 20 min after an epoch starts, and a demo reset
+#       starts a new epoch. Outside the window a Stop no longer lands on a working hour and the demo is misleading: the
+#       failure says to run `bash infra/scripts/reset-demo.sh <web-url>`. The date is not checked, only the time of day.
 #   H5  Only for an https URL: http:// on the same host must not answer 200 (a redirect or a refusal passes). SKIP
 #       otherwise.
 #   H7  A forged `Authorization: Bearer x` on a route that is NOT on the BFF allow-list (POST /api/v1/crews/crew-z/stops)
@@ -43,15 +50,17 @@
 set -uo pipefail
 
 usage() {
-  printf 'usage: %s <base-url> [--wait]\n' "$(basename -- "$0")" >&2
+  printf 'usage: %s <base-url> [--wait] [--reset-on-h3-failure]\n' "$(basename -- "$0")" >&2
   exit 2
 }
 
 base=""
 wait_after=false
+reset_on_h3_failure=false
 for arg in "$@"; do
   case "$arg" in
     --wait) wait_after=true ;;
+    --reset-on-h3-failure) reset_on_h3_failure=true ;;
     -h | --help) usage ;;
     -*) printf 'unknown option: %s\n' "$arg" >&2; usage ;;
     *)
@@ -157,6 +166,22 @@ else
   fi
   if [ "$h3_ok" = true ]; then
     pass H3 "stop $stop_id: 201, undone with 204 after ${undo_elapsed}s, and the crew-b timeline has no red hour"
+  else
+    # A stop was created and H3 failed after it: the stop may still be active, and an active stop leaves crew-b Red to the end
+    # of the replay shift, which spoils the demo for whoever looks next.
+    note "the stop $stop_id may still be active: an active stop leaves crew-b Red until the end of the replay shift (18:00)"
+    note "recovery: POST /api/v1/sites/site-demo-mussafah/demo-reset through the web ($base) starts a new epoch, and the stop"
+    note "belongs to the old one (ADR 0066; the BFF allow-list contains this route; limit 1 per 60 s and 10 per hour)"
+    if [ "$reset_on_h3_failure" = true ]; then
+      call POST /api/v1/sites/site-demo-mussafah/demo-reset
+      if [ "$status" = "200" ]; then
+        note "--reset-on-h3-failure: demo-reset done (200), crew-b is back to a clean epoch"
+      else
+        note "--reset-on-h3-failure: demo-reset FAILED with $status; do it by hand: curl -X POST $base/api/v1/sites/site-demo-mussafah/demo-reset"
+      fi
+    else
+      note "this run did not reset anything; --reset-on-h3-failure performs that one reset after an H3 failure (default off)"
+    fi
   fi
 fi
 
@@ -170,8 +195,9 @@ elif [[ "$started_at" =~ T([0-9]{2}):([0-9]{2}):[0-9]{2}(\.[0-9]+)?(Z|\+00:00)$ 
   if [ "$minutes" -ge 600 ] && [ "$minutes" -le 1050 ]; then
     pass H4 "replay clock is inside the demo window: $clock Asia/Dubai (started_at $started_at)"
   else
-    fail H4 "replay clock is outside the demo window: run infra/scripts/restart-replay-clock.sh"
+    fail H4 "replay clock is outside the demo window: run: bash infra/scripts/reset-demo.sh <web-url>"
     note "the api's replay clock reads $clock Asia/Dubai (started_at $started_at); the window is 10:00 to 17:30"
+    note "a demo reset starts a new epoch and so re-anchors the clock; here: bash infra/scripts/reset-demo.sh $base"
   fi
 else
   fail H4 "started_at '$started_at' is not a UTC timestamp (Z or +00:00); cannot read the replay clock"

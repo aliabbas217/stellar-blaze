@@ -14,6 +14,14 @@
 # the api image is 1.8 GB on disk); then prints one line per check.
 #   R1  the migrate job exited 0                       R2  its log shows the revision and the demo site
 #   R3  api healthy, alerts running and dispatching    R4  infra/scripts/smoke-http.sh passes entirely against the proxy
+#   R5  infra/scripts/reset-demo.sh through the proxy: 2xx and a NEW epoch (epoch_id above previous_epoch_id). It runs BEFORE the
+#       smoke test (H6 drains the BFF general bucket that a reset draws on) and is reported after R4. SKIP when the route
+#       answers 404 or 501 (a backend that predates it).
+#   R6  a restart of the api does not rewind the replay clock (ADR 0034 amendment of 2026-11-15: the clock counts from the epoch
+#       row in Postgres): the replay "now" is read through the BFF (a stop, undone at once, as smoke H3 and H4 do) when the epoch
+#       is at least 90 s old, the api container is restarted, and the second reading must be at or after the first and less
+#       than 10 minutes later. A backend that predates the epoch clock rewinds to the anchor, so it is detected first (the api
+#       image has no stellar_blaze.ports.replay_epoch) and R6 is SKIPPED with that reason, never passed.
 #   N1..N6 are NEGATIVE checks: each states a behaviour that must hold, and the check FAILs if it does not.
 #     N1  a plaintext database connection is refused
 #     N2  verify-full with an unrelated CA fails closed
@@ -23,8 +31,11 @@
 #     N6  web reached directly with forged X-Forwarded-For values evades the per-client bucket, while through the proxy it
 #         does not: why the proxy hop count matters (TRUSTED_PROXY_HOPS)
 #     N7  (extra) ssl=require WITH PGSSLROOTCERT set acts as verify-ca, not as no verification: a finding for ADR 0042
-# Exit status: 0 only if every check passed. The run takes roughly 4 to 6 minutes warm (the smoke script waits 62 s for the
-# rate-limit window), longer when an image has to be built.
+# Each check prints PASS, FAIL or SKIP (a check that cannot apply to this tree and says why). Exit status: 0 only if no check
+# FAILed; a SKIP is listed in the summary and counted apart, never as a pass. The run takes roughly 5 to 7 minutes warm (the smoke
+# script waits 62 s for the rate-limit window, R6 waits for the epoch to age), longer when an image has to be built.
+# The images are tagged stellar-blaze-{api,web}:rehearsal (override: SB_API_IMAGE, SB_WEB_IMAGE) and `docker compose build` always
+# rebuilds them from the tree this script sits in, so a run never uses an image of another tree.
 set -euo pipefail
 
 keep=false
@@ -105,12 +116,18 @@ verdicts=()
 whats=()
 failures=0
 
-record() { # <id> <PASS|FAIL> <what>
+skips=0
+
+record() { # <id> <PASS|FAIL|SKIP> <what>
   ids+=("$1")
   verdicts+=("$2")
   whats+=("$3")
   printf '%s %s %s\n' "$2" "$1" "$3"
-  if [ "$2" = FAIL ]; then failures=$((failures + 1)); fi
+  case "$2" in
+    FAIL) failures=$((failures + 1)) ;;
+    SKIP) skips=$((skips + 1)) ;;
+    *) ;;
+  esac
 }
 
 # mask: hide the generated password in anything printed.
@@ -154,7 +171,7 @@ if ! dc build >"$tmp/build.log" 2>&1; then
   die "docker compose build failed"
 fi
 
-api_image="${SB_API_IMAGE:-stellar-blaze-api:i1}"
+api_image="${SB_API_IMAGE:-stellar-blaze-api:rehearsal}"
 vapid_code='
 import base64
 from cryptography.hazmat.primitives import serialization
@@ -240,6 +257,28 @@ else
   record R3 FAIL "api health '$api_health'; alerts '$alerts_state'; alerts dispatch cycle logged: $alerts_cycle"
 fi
 
+# R5 runs BEFORE the smoke test and is recorded after R4: a demo reset draws on the BFF general bucket, which smoke H6 drains
+# for 61 s, and the upstream allows one reset per 60 s. Its verdict is decided here and recorded below, so the table keeps the
+# order R1 R2 R3 R4 R5 R6.
+printf 'Resetting the demo through the proxy (R5, before the smoke test: its H6 drains the rate-limit bucket)\n'
+reset_rc=0
+reset_out="$(bash "$scripts/reset-demo.sh" "$base_url" 2>&1)" || reset_rc=$?
+printf '%s\n' "$reset_out" | sed 's/^/    | /'
+reset_epochs="$(printf '%s\n' "$reset_out" | sed -n 's/^PASS D1 demo reset: epoch \([0-9][0-9]*\) -> \([0-9][0-9]*\)$/\1 \2/p' | head -n 1)"
+reset_previous="${reset_epochs%% *}"
+reset_new="${reset_epochs##* }"
+reset_status="$(printf '%s\n' "$reset_out" | sed -n 's/^FAIL D1 demo reset: answered \([0-9][0-9][0-9]\).*/\1/p' | head -n 1)"
+if [ "$reset_rc" -eq 0 ] && [ -n "$reset_epochs" ] && [ "$reset_new" -gt "$reset_previous" ]; then
+  r5_verdict=PASS
+  r5_what="demo reset through the proxy with no Authorization header: epoch $reset_previous -> $reset_new"
+elif [ "$reset_status" = 404 ] || [ "$reset_status" = 501 ]; then
+  r5_verdict=SKIP
+  r5_what="demo-reset answered $reset_status: this backend or web predates the route ($(printf '%s' "$reset_out" | tail -n 1 | cut -c1-200))"
+else
+  r5_verdict=FAIL
+  r5_what="demo reset: exit $reset_rc, epochs '${reset_epochs:-none}' (a PASS needs epoch_id above previous_epoch_id): $(printf '%s' "$reset_out" | tail -n 1 | cut -c1-200)"
+fi
+
 printf 'Running the HTTP smoke test against %s (takes about 70 s: H6 drains a rate-limit window)\n' "$base_url"
 smoke_rc=0
 bash "$scripts/smoke-http.sh" "$base_url" --wait >"$tmp/smoke.out" 2>&1 || smoke_rc=$?
@@ -251,6 +290,92 @@ else
   record R4 FAIL "smoke test exit $smoke_rc with $smoke_passes of 6 expected passes"
 fi
 proxied_first_429="$(sed -n 's/.* at request \([0-9][0-9]*\) of 30.*/\1/p' "$tmp/smoke.out" | head -n 1)"
+
+record R5 "$r5_verdict" "$r5_what"
+
+# R6: a restart of the api does not rewind the replay clock. Only on a backend that has the epoch clock (ADR 0034 amendment of
+# 2026-11-15): the older process-start clock restarts at SB_REPLAY_NOW with the process, so there the check would FAIL for a
+# reason that is the old design, not a defect. Support is detected from the image just built, not assumed.
+replay_anchor="$(sed -n 's/^ *SB_REPLAY_NOW: *"\(.*\)" *$/\1/p' "$compose" | head -n 1)"
+[ -n "$replay_anchor" ] || die "cannot read SB_REPLAY_NOW from $compose"
+anchor_s="$(date -u -d "$replay_anchor" +%s)"
+
+# read_replay_now: the replay "now" as the api sees it, through the BFF with no Authorization header of our own: create a stop
+# and undo it at once (inside the 10 s undo window, as smoke H3 and H4 do); started_at of the stop is the replay clock. Sets
+# replay_iso and replay_s (epoch seconds); returns 1 when it could not be read.
+replay_iso=""
+replay_s=0
+read_replay_now() {
+  local code stop_id started
+  replay_iso=""
+  code="$(curl -sS --max-time 20 -X POST -H 'Content-Type: application/json' --data '{"reason_code":"other"}' -o "$tmp/stop.json" -w '%{http_code}' "$base_url/api/v1/crews/crew-b/stops" 2>/dev/null)" || return 1
+  [ "$code" = 201 ] || return 1
+  stop_id="$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp/stop.json" | head -n 1)"
+  started="$(sed -n 's/.*"started_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp/stop.json" | head -n 1)"
+  [ -n "$stop_id" ] && [ -n "$started" ] || return 1
+  code="$(curl -sS --max-time 20 -X DELETE -o /dev/null -w '%{http_code}' "$base_url/api/v1/crews/crew-b/stops/$stop_id" 2>/dev/null)" || return 1
+  [ "$code" = 204 ] || return 1
+  replay_s="$(date -u -d "$started" +%s)" || return 1
+  replay_iso="$started"
+}
+
+# read_replay_now_retry: read_replay_now, up to 12 tries 5 s apart (web needs a moment to reach a restarted api).
+read_replay_now_retry() {
+  for _ in $(seq 1 12); do
+    if read_replay_now; then return 0; fi
+    sleep 5
+  done
+  return 1
+}
+
+if docker run --rm --pull never --entrypoint python "$api_image" -c 'import stellar_blaze.ports.replay_epoch' >/dev/null 2>&1; then
+  printf 'Restarting the api and reading the replay clock around it (R6)\n'
+  r6_error=""
+  clock_before=""
+  clock_before_s=0
+  if ! read_replay_now_retry; then
+    r6_error="the replay clock could not be read through the BFF before the restart"
+  else
+    # The epoch must be old enough (90 s) for a rewind to the anchor to show: the replay clock reads anchor + epoch age.
+    epoch_age=$((replay_s - anchor_s))
+    if [ "$epoch_age" -lt 90 ]; then
+      sleep $((90 - epoch_age + 1))
+      read_replay_now_retry || r6_error="the replay clock could not be read through the BFF before the restart (second try)"
+    fi
+    clock_before="$replay_iso"
+    clock_before_s="$replay_s"
+  fi
+  if [ -z "$r6_error" ]; then
+    dc restart api >"$tmp/restart-api.log" 2>&1 || r6_error="docker compose restart api failed: $(tail -n 3 "$tmp/restart-api.log" | mask | tr '\n' ' ')"
+  fi
+  if [ -z "$r6_error" ]; then
+    api_cid="$(container_of api)"
+    r6_healthy=false
+    for _ in $(seq 1 60); do
+      if [ "$(docker inspect -f '{{.State.Health.Status}}' "$api_cid")" = healthy ]; then
+        r6_healthy=true
+        break
+      fi
+      sleep 2
+    done
+    [ "$r6_healthy" = true ] || r6_error="the api was not healthy 120 s after its restart"
+  fi
+  if [ -z "$r6_error" ] && ! read_replay_now_retry; then
+    r6_error="the replay clock could not be read through the BFF after the restart"
+  fi
+  if [ -n "$r6_error" ]; then
+    record R6 FAIL "$r6_error"
+  else
+    r6_delta=$((replay_s - clock_before_s))
+    if [ "$r6_delta" -ge 0 ] && [ "$r6_delta" -lt 600 ]; then
+      record R6 PASS "a restart of the api did not rewind the replay clock: $clock_before, then $replay_iso (+${r6_delta}s across the restart)"
+    else
+      record R6 FAIL "the replay clock read $clock_before before the api restart and $replay_iso after (${r6_delta}s; it must be 0 to 599 s later)"
+    fi
+  fi
+else
+  record R6 SKIP "backend predates the epoch clock (ADR 0034 amendment): the image has no stellar_blaze.ports.replay_epoch"
+fi
 
 # --- (f) negative checks ---------------------------------------------------------------------------------------------
 migrate_cmd='sb-jobs db upgrade && sb-jobs site load fixtures/demo_site.toml --actor "deploy:local" --reason "load the synthetic demo site (rehearsal)"'
@@ -381,4 +506,12 @@ if [ "$failures" -gt 0 ]; then
   printf '\nREHEARSAL FAILED: %s check(s) failed\n' "$failures"
   exit 1
 fi
-printf '\nREHEARSAL OK: %s checks passed\n' "${#ids[@]}"
+if [ "$skips" -gt 0 ]; then
+  skipped_ids=()
+  for index in "${!ids[@]}"; do
+    if [ "${verdicts[$index]}" = SKIP ]; then skipped_ids+=("${ids[$index]}"); fi
+  done
+  printf '\nREHEARSAL OK: %s checks passed, %s SKIPPED (%s): a skipped check is not a pass\n' "$((${#ids[@]} - skips))" "$skips" "${skipped_ids[*]}"
+else
+  printf '\nREHEARSAL OK: %s checks passed, none skipped\n' "${#ids[@]}"
+fi

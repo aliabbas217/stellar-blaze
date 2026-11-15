@@ -13,9 +13,10 @@
 #   4. time one request: curl -o /dev/null -w '%{time_total}' https://<web fqdn><path> (default /api/v1/health/ready), which
 #      must answer 200, otherwise the number is not a cold start and the script fails;
 #   5. ALWAYS restore min replicas to 1 on every chosen app, in a trap (also on failure, Ctrl-C and termination);
-#   6. print the seconds and a reminder.
-# The reminder matters: scaling the api to zero and back restarts it, which resets ITS replay clock, but the alerts worker
-# kept running, so the two clocks now differ. Run restart-replay-clock.sh before the next session.
+#   6. print the seconds and a note.
+# The note: scaling the api to zero and back restarts it, which does NOT touch the replay clock: the clock counts from the demo
+# epoch row in Postgres (ADR 0034 amendment, backend/README.md "Alerts and the demo replay clock"), which the api and the
+# alerts worker both read, so nothing needs restarting afterwards. (That holds for a backend that has the epoch clock.)
 #
 # Environment: COLD_POLL_S (default 15), COLD_TIMEOUT_S (default 1200), COLD_START_TODAY (YYYY-MM-DD, for the self-tests).
 
@@ -139,9 +140,8 @@ touched=()
 printf 'COLD START: %s s to first 200 from https://%s%s (scaled to zero: %s)\n' "$seconds" "$web_fqdn" "$path" "${apps[*]}"
 case " ${apps[*]} " in
   *" api "*)
-    printf '\n*** REMINDER: run infra/scripts/restart-replay-clock.sh %s BEFORE the next session. ***\n' "$rg"
-    printf '*** The api restarted, which reset its replay clock; the alerts worker kept running, so their clocks now differ. ***\n'
+    printf '\nThe api restarted. The replay clock counts from the demo epoch in the database, so it is unchanged and nothing needs restarting.\n'
     ;;
-  *) printf '\nThe api was not scaled, so no replay clock was reset.\n' ;;
+  *) printf '\nThe api was not scaled.\n' ;;
 esac
 exit "$restore_rc"

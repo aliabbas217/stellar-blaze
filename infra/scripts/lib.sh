@@ -108,11 +108,3 @@ az_tsv() {
 is_null_value() {
   [ -z "$1" ] || [ "${1,,}" = "none" ]
 }
-
-# is_iso8601_offset_datetime <text>: success when the text is a real ISO 8601 date-time that carries an offset (`Z` or
-# `+hh:mm`), the shape the backend's SB_REPLAY_NOW (a timezone-aware datetime) needs. Needs GNU date (Git Bash, Ubuntu).
-is_iso8601_offset_datetime() {
-  local value="$1"
-  [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]] || return 1
-  date -d "$value" >/dev/null 2>&1
-}

@@ -39,13 +39,19 @@ fi
 # Knobs (environment; a name with _API / _WEB / _ALERTS applies to that app only, e.g. STUB_MAX_REPLICAS_API=3):
 #   STUB_STATE_DIR          a per-test directory for counters and markers (the harness sets it; STUB_AZ_LOG there records calls)
 #   containerapp show:      STUB_LATEST STUB_LATEST_READY STUB_APP_IMAGE STUB_MIN_REPLICAS STUB_MAX_REPLICAS
-#                           STUB_INGRESS_EXTERNAL STUB_REPLAY_NOW STUB_WEB_FQDN
+#                           STUB_INGRESS_EXTERNAL STUB_WEB_FQDN
 #   containerapp revision show: STUB_REV_IMAGE STUB_PROV STUB_RUNNING STUB_HEALTH STUB_TRAFFIC STUB_REPLICAS
 #                           STUB_REVISION_MISSING=1 (the revision cannot be read)
 #                           STUB_HEALTH_SEQ="Unhealthy Healthy" (healthState of the 1st, 2nd, ... call; the last repeats)
 #   job-migrate:            STUB_JOB_IMAGE STUB_JOB_MISSING=1 STUB_JOB_START_SILENT=1 STUB_JOB_START_FAIL=1
 #                           STUB_MIGRATE_STATUSES="Failed Running+Succeeded" (final status per execution; "+" separates the
 #                           statuses of successive polls of one execution; the last word repeats for later executions)
+#                           STUB_JOB_START_NONE=1 (start prints `None`, as `-o tsv` does for a null)
+#                           STUB_JOB_OLD_EXECUTIONS="job-migrate-old1" (executions of an EARLIER deploy: listed from the start and
+#                             `execution show` answers STUB_JOB_OLD_STATUS, default Succeeded, for them)
+#                           STUB_JOB_LIST_LAG=N (a started execution is missing from the list for its first N list calls;
+#                             a huge N means it never appears) STUB_JOB_LIST_FAIL=1 (the list call fails)
+#                           STUB_JOB_START_REUSES_OLD=1 (start answers the name of the first old execution)
 #   smoke:                  STUB_ENV_NAME STUB_PROFILES STUB_PROFILE_TYPES STUB_PRIVATE_ENDPOINTS STUB_EXTRA_RESOURCE="name:location"
 #   restart / cold start:   STUB_REPLICAS_STAY=1 (replicas never go away after min 0) STUB_UPDATE_FAIL=1
 #                           STUB_REPLICAS_STATIC=1 (a restart never replaces the replicas)
@@ -133,14 +139,6 @@ serve_deploy_call() {
           knob APP_IMAGE "$default_image"
           printf '%s\n' "$REPLY"
           ;;
-        *SB_REPLAY_NOW*)
-          if [ -n "$state_dir" ] && [ -f "$state_dir/replay-now-$app_name" ]; then
-            read -r REPLY <"$state_dir/replay-now-$app_name"
-          else
-            knob REPLAY_NOW '2026-06-14T10:10:00+04:00'
-          fi
-          printf '%s\n' "$REPLY"
-          ;;
         *minReplicas*)
           knob MIN_REPLICAS 1
           local min_r="$REPLY"
@@ -224,13 +222,6 @@ serve_deploy_call() {
         *"--min-replicas 1"*) rm -f "$state_dir/min0-$app_name" ;;
         *) ;;
       esac
-      case "$joined" in
-        *"--set-env-vars SB_REPLAY_NOW="*)
-          local after="${joined#*--set-env-vars SB_REPLAY_NOW=}"
-          printf '%s' "${after%% *}" >"$state_dir/replay-now-$app_name"
-          ;;
-        *) ;;
-      esac
       ;;
     "containerapp env list "*) printf '%s\n' "${STUB_ENV_NAME:-cae-test}" ;;
     "containerapp env show "*)
@@ -270,16 +261,42 @@ serve_deploy_call() {
         exit 1
       fi
       bump executions
-      if [ "${STUB_JOB_START_SILENT:-}" != "1" ]; then printf 'job-migrate-exec%s\n' "$REPLY"; fi
-      ;;
-    "containerapp job execution list "*)
-      need_state
-      if [ -f "$state_dir/executions" ]; then
-        read -r REPLY <"$state_dir/executions"
+      if [ "${STUB_JOB_START_REUSES_OLD:-}" = "1" ]; then
+        printf '%s\n' "${STUB_JOB_OLD_EXECUTIONS%% *}"
+      elif [ "${STUB_JOB_START_NONE:-}" = "1" ]; then
+        printf 'None\n'
+      elif [ "${STUB_JOB_START_SILENT:-}" != "1" ]; then
         printf 'job-migrate-exec%s\n' "$REPLY"
       fi
       ;;
+    "containerapp job execution list "*)
+      need_state
+      if [ "${STUB_JOB_LIST_FAIL:-}" = "1" ]; then
+        echo "ERROR: stub job execution list failure" >&2
+        exit 1
+      fi
+      local old_name started=0 listed_n n
+      for old_name in ${STUB_JOB_OLD_EXECUTIONS:-}; do printf '%s\n' "$old_name"; done
+      if [ -f "$state_dir/executions" ]; then
+        read -r started <"$state_dir/executions"
+        # an execution can be missing from the list for a while after its start: it appears from list call
+        # STUB_JOB_LIST_LAG + 1 on (counted from the first list call after the start)
+        bump "list-calls-after-start-$started"
+        listed_n="$REPLY"
+        if [ "$listed_n" -gt "${STUB_JOB_LIST_LAG:-0}" ]; then
+          for ((n = 1; n <= started; n++)); do printf 'job-migrate-exec%s\n' "$n"; done
+        fi
+      fi
+      ;;
     "containerapp job execution show "*)
+      local old_name_shown
+      for old_name_shown in ${STUB_JOB_OLD_EXECUTIONS:-}; do
+        if [ "$exec_name_arg" = "$old_name_shown" ]; then
+          # the execution of an EARLIER deploy: it ended long ago
+          printf '%s\n' "${STUB_JOB_OLD_STATUS:-Succeeded}"
+          return 0
+        fi
+      done
       local exec_n="${exec_name_arg##*exec}" word
       word_of "${STUB_MIGRATE_STATUSES:-Succeeded}" "$exec_n"
       word="${REPLY//+/ }"

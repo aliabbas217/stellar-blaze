@@ -3,8 +3,8 @@
 #   bash infra/scripts/tests/run.sh                  every test (about 6 minutes: the template tests call bicep many times)
 #   bash infra/scripts/tests/run.sh --fast           skips every test that needs bicep (template and db-tls --template tests)
 #   bash infra/scripts/tests/run.sh <name part>      only the tests whose name contains it, for example
-#                                                    run_migrate, healthcheck, smoke, restart_replay_clock, measure_cold_start,
-#                                                    resolve_image; --fast and a name part can be combined
+#                                                    run_migrate, healthcheck, smoke, smoke_http, restart_apps, reset_demo,
+#                                                    measure_cold_start, resolve_image; --fast and a name part can be combined
 # Works under Git Bash and on Ubuntu CI. It does not rely on the executable bit: the stubs are
 # committed without it, so the harness runs copies of them that it makes executable.
 # One function per case; the first failing assertion stops the run with a non-zero exit.
@@ -768,11 +768,77 @@ test_run_migrate_never_overrides_the_job() {
   assert_az_count "--image" 0
 }
 
-test_run_migrate_falls_back_to_the_newest_execution_when_start_prints_nothing() {
+test_run_migrate_identifies_the_new_execution_by_the_list_when_start_prints_nothing() {
   STUB_JOB_START_SILENT=1 run_migrate rg-test reg.example/sb-api:abc false
   assert_rc 0
-  assert_out_has "job-migrate-exec1"
-  assert_az_count "containerapp job execution list" 1
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
+  # one list BEFORE the start (the record of existing executions), one after it
+  assert_az_count "containerapp job execution list" 2
+  local lines list_before start_line list_after
+  lines="$(az_line "containerapp job execution list")"
+  list_before="${lines%% *}"
+  list_after="$(printf '%s' "$lines" | awk '{print $2}')"
+  start_line="$(az_line "containerapp job start" | awk '{print $1}')"
+  [ "$list_before" -lt "$start_line" ] && [ "$list_after" -gt "$start_line" ] || fail "the executions were not listed before and after the start (list $lines, start $start_line)"
+}
+
+test_run_migrate_fails_when_start_prints_nothing_and_only_an_old_execution_is_listed() {
+  # The reviewer's proof: the new execution is not listed yet, the list holds the previous deploy's execution, which is
+  # Succeeded. That must never read as success: the apps would roll out against an un-migrated schema.
+  STUB_JOB_START_SILENT=1 STUB_JOB_OLD_EXECUTIONS="job-migrate-old1" STUB_JOB_LIST_LAG=1000000 MIGRATE_IDENTIFY_TIMEOUT_S=0 \
+    run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_out_lacks "migrate ok"
+  assert_out_has "migrate FAILED"
+  assert_az_count "job-migrate-old1" 0
+  assert_az_count "containerapp job execution show" 0
+}
+
+test_run_migrate_ignores_an_old_execution_when_the_new_one_is_listed() {
+  STUB_JOB_START_SILENT=1 STUB_JOB_OLD_EXECUTIONS="job-migrate-old1 job-migrate-old2" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
+  assert_az_count "job-migrate-old" 0
+}
+
+test_run_migrate_waits_for_the_new_execution_to_appear_in_the_list() {
+  STUB_JOB_START_SILENT=1 STUB_JOB_OLD_EXECUTIONS="job-migrate-old1" STUB_JOB_LIST_LAG=2 MIGRATE_IDENTIFY_TIMEOUT_S=20 \
+    run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
+  assert_az_count "job-migrate-old1" 0
+  # the record before the start, then the lagging list polled three times
+  assert_az_count "containerapp job execution list" 4
+}
+
+test_run_migrate_treats_none_from_the_start_as_empty() {
+  # az -o tsv prints `None` for a null; it must not become an execution name that gets polled
+  STUB_JOB_START_NONE=1 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
+  assert_az_count "--job-execution-name None" 0
+  assert_az_count "containerapp job execution list" 2
+}
+
+test_run_migrate_does_not_trust_a_start_answer_that_existed_before_the_start() {
+  STUB_JOB_START_REUSES_OLD=1 STUB_JOB_OLD_EXECUTIONS="job-migrate-old1" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
+  assert_az_count "job-migrate-old1" 0
+}
+
+test_run_migrate_fails_when_the_list_is_unreadable_and_start_prints_nothing() {
+  # an unreadable list is not an empty list: with no record of the old executions nothing can be told apart
+  STUB_JOB_START_SILENT=1 STUB_JOB_LIST_FAIL=1 STUB_JOB_OLD_EXECUTIONS="job-migrate-old1" run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_out_lacks "migrate ok"
+  assert_az_count "containerapp job execution show" 0
+}
+
+test_run_migrate_uses_the_start_answer_when_the_list_is_unreadable() {
+  STUB_JOB_LIST_FAIL=1 run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 0
+  assert_out_has "migrate ok: execution job-migrate-exec1 Succeeded"
 }
 
 test_run_migrate_fails_when_the_job_cannot_be_started() {
@@ -782,6 +848,10 @@ test_run_migrate_fails_when_the_job_cannot_be_started() {
 }
 
 test_run_migrate_rejects_bad_usage() {
+  MIGRATE_IDENTIFY_TIMEOUT_S=soon run_migrate rg-test reg.example/sb-api:abc false
+  assert_rc 1
+  assert_err_has "whole numbers"
+  assert_no_az_calls
   run_migrate rg-test reg.example/sb-api:abc maybe
   assert_rc 1
   assert_err_has "usage"
@@ -1088,117 +1158,415 @@ test_smoke_rejects_bad_usage() {
   assert_err_has "usage"
 }
 
-# ---- restart-replay-clock.sh --------------------------------------------------------------------
+# ---- smoke-http.sh ------------------------------------------------------------------------------
 
-run_restart() { # <args...>
-  HEALTH_POLL_S=0 run_cmd bash "$scripts_dir/restart-replay-clock.sh" "$@"
+run_smoke_http() { # <extra args...>: the real script; curl is the BFF stub (stubs/curl-demo-bff), the base URL needs no network
+  mkdir -p "$work/bff-bin"
+  cp "$stubs_dir/curl-demo-bff" "$work/bff-bin/curl"
+  chmod +x "$work/bff-bin/curl"
+  FAKE_CURL_LOG="$STUB_STATE_DIR/bff.log" FAKE_STATE_DIR="$STUB_STATE_DIR" PATH="$work/bff-bin:$PATH" \
+    run_cmd bash "$scripts_dir/smoke-http.sh" http://127.0.0.1:8080 "$@"
 }
 
-test_restart_replay_clock_restarts_both_back_to_back_before_waiting() {
+# bff_count <fixed text>: how many requests the BFF stub recorded that contain the text.
+bff_count() {
+  local n
+  n="$(grep -cF -- "$1" "$STUB_STATE_DIR/bff.log" || true)"
+  printf '%s' "$n"
+}
+
+reset_route='POST /api/v1/sites/site-demo-mussafah/demo-reset'
+
+test_smoke_http_passes_and_never_resets_when_h3_passes() {
+  run_smoke_http --reset-on-h3-failure
+  assert_rc 0
+  assert_out_has "PASS H3"
+  assert_out_has "SMOKE OK"
+  assert_out_lacks "demo-reset"
+  [ "$(bff_count "$reset_route")" = "0" ] || fail "a reset was sent although H3 passed"
+}
+
+test_smoke_http_h3_failure_prints_the_recovery_and_resets_nothing_by_default() {
+  FAKE_UNDO_STATUS=500 run_smoke_http
+  assert_rc 1
+  assert_out_has "FAIL H3 Undo: DELETE /api/v1/crews/crew-b/stops/stop-1 expected 204, got 500"
+  assert_out_has "an active stop leaves crew-b Red until the end of the replay shift"
+  assert_out_has "POST /api/v1/sites/site-demo-mussafah/demo-reset through the web"
+  assert_out_has "starts a new epoch"
+  assert_out_has "--reset-on-h3-failure performs that one reset"
+  [ "$(bff_count "$reset_route")" = "0" ] || fail "a reset was sent without --reset-on-h3-failure"
+}
+
+test_smoke_http_h3_failure_with_the_flag_resets_exactly_once() {
+  FAKE_UNDO_STATUS=500 run_smoke_http --reset-on-h3-failure
+  assert_rc 1
+  assert_out_has "FAIL H3"
+  assert_out_has "POST /api/v1/sites/site-demo-mussafah/demo-reset through the web"
+  assert_out_has "demo-reset done (200)"
+  [ "$(bff_count "$reset_route")" = "1" ] || fail "expected exactly one reset, saw $(bff_count "$reset_route")"
+}
+
+test_smoke_http_h3_failure_with_the_flag_reports_a_reset_that_fails() {
+  FAKE_UNDO_STATUS=500 FAKE_RESET_STATUS=429 run_smoke_http --reset-on-h3-failure
+  assert_rc 1
+  assert_out_has "demo-reset FAILED with 429"
+  assert_out_has "do it by hand"
+  [ "$(bff_count "$reset_route")" = "1" ] || fail "expected one reset attempt, saw $(bff_count "$reset_route")"
+}
+
+test_smoke_http_a_red_timeline_after_the_undo_also_gets_the_recovery() {
+  FAKE_TIMELINE='{"hours":[{"crew_level":"red"}]}' run_smoke_http --reset-on-h3-failure
+  assert_rc 1
+  assert_out_has "an undone stop left a red hour in the timeline of crew-b"
+  assert_out_has "demo-reset done (200)"
+  [ "$(bff_count "$reset_route")" = "1" ] || fail "expected exactly one reset, saw $(bff_count "$reset_route")"
+}
+
+test_smoke_http_no_reset_when_no_stop_was_created() {
+  # nothing to recover from: the flag must not change state when the stop itself was refused
+  FAKE_STOP_STATUS=429 run_smoke_http --reset-on-h3-failure
+  assert_rc 1
+  assert_out_has "FAIL H3 Stop through the BFF"
+  assert_out_lacks "demo-reset"
+  [ "$(bff_count "$reset_route")" = "0" ] || fail "a reset was sent although no stop was created"
+}
+
+test_smoke_http_rejects_an_unknown_option_and_documents_the_flag() {
+  run_smoke_http --reset-on-h3
+  assert_rc 2
+  assert_err_has "unknown option: --reset-on-h3"
+  assert_err_has "[--reset-on-h3-failure]"
+}
+
+test_smoke_http_h4_outside_the_window_says_to_run_reset_demo() {
+  local started
+  # 14:00 UTC is 18:00 Dubai and 05:00 UTC is 09:00 Dubai: both outside 10:00-17:30; neither run changes anything by itself
+  for started in 2026-06-14T14:00:00Z 2026-06-14T05:00:00Z; do
+    FAKE_STARTED_AT="$started" run_smoke_http
+    assert_rc 1
+    assert_out_has "FAIL H4 replay clock is outside the demo window: run: bash infra/scripts/reset-demo.sh <web-url>"
+    assert_out_has "here: bash infra/scripts/reset-demo.sh http://127.0.0.1:8080"
+    assert_out_lacks "restart-replay-clock"
+    [ "$(bff_count "$reset_route")" = "0" ] || fail "an H4 failure sent a reset"
+  done
+  FAKE_STARTED_AT=2026-06-14T13:30:00Z run_smoke_http
+  assert_rc 0
+  assert_out_has "PASS H4 replay clock is inside the demo window: 17:30 Asia/Dubai"
+}
+
+# ---- restart-apps.sh ----------------------------------------------------------------------------
+
+run_restart() { # <args...>: no waiting between polls and no settle time unless the test sets RESTART_SETTLE_S
+  HEALTH_POLL_S=0 RESTART_SETTLE_S="${RESTART_SETTLE_S:-0}" run_cmd bash "$scripts_dir/restart-apps.sh" "$@"
+}
+
+# assert_issued_back_to_back <expected count>: the az calls that change anything (restart or update) are exactly that many
+# and sit on consecutive lines of the call log, so no wait (a show, a replica list) came between them.
+assert_issued_back_to_back() {
+  local lines first last n
+  lines="$(az_log | grep -nE '^containerapp (update|revision restart) ' | cut -d: -f1 | tr '\n' ' ' || true)"
+  n="$(printf '%s' "$lines" | wc -w | tr -d ' ')"
+  [ "$n" -eq "$1" ] || fail "expected $1 restart/update calls, saw $n (lines: $lines)"
+  first="${lines%% *}"
+  last="$(printf '%s' "$lines" | awk '{print $NF}')"
+  [ "$((last - first))" -eq "$(($1 - 1))" ] || fail "the $1 restarts are not back to back: a wait came between them (lines: $lines)"
+  # and nothing waits before the last one is issued: the first revision show comes after it
+  local first_wait
+  first_wait="$(az_line "revision show" | awk '{print $1}')"
+  [ -n "$first_wait" ] && [ "$first_wait" -gt "$last" ] || fail "a wait started before every restart was issued"
+}
+
+test_restart_apps_restarts_api_alerts_and_web_back_to_back_before_any_wait() {
   run_restart rg-test --timeout 0
   assert_rc 0
   assert_az_count "containerapp revision restart -n api -g rg-test --revision api--rev1" 1
   assert_az_count "containerapp revision restart -n alerts -g rg-test --revision alerts--rev1" 1
-  local restarts first_restart last_restart first_wait
-  restarts="$(az_line "revision restart")"
-  first_restart="${restarts%% *}"
-  last_restart="$(printf '%s' "$restarts" | awk '{print $NF}')"
-  [ "$((last_restart - first_restart))" -eq 1 ] || fail "the two restarts are not back to back (lines $restarts)"
-  first_wait="$(az_line "revision show" | awk '{print $1}')"
-  [ -n "$first_wait" ] && [ "$first_wait" -gt "$last_restart" ] || fail "a wait started before both restarts were issued"
+  assert_az_count "containerapp revision restart -n web -g rg-test --revision web--rev1" 1
+  assert_issued_back_to_back 3
+  # the order of the calls and of the report: api, alerts, web
+  local order
+  order="$(az_log | grep '^containerapp revision restart ' | awk '{print $5}' | tr '\n' ' ')"
+  [ "$order" = "api alerts web " ] || fail "restart order is '$order', expected 'api alerts web '"
   assert_az_count "containerapp update" 0
-  assert_out_has "Replay clock restarted."
-  assert_out_has "restarting only ONE of api and alerts desynchronises their clocks"
-  assert_out_has "next Bicep deploy resets SB_REPLAY_NOW"
-  assert_out_has "api=2026-06-14T10:10:00+04:00 alerts=2026-06-14T10:10:00+04:00"
+  assert_out_has "Apps restarted."
+  assert_out_has "restarted:             api alerts web"
+  assert_out_lacks "clock"
 }
 
-test_restart_replay_clock_waits_with_the_healthcheck_conditions() {
+test_restart_apps_waits_with_the_healthcheck_conditions() {
   run_restart rg-test --timeout 0
   assert_rc 0
   assert_out_has "PASS healthcheck api"
   assert_out_has "PASS healthcheck alerts"
+  assert_out_has "PASS healthcheck web"
   assert_az_count "containerapp revision show -n alerts -g rg-test --revision alerts--rev1" 1
+  assert_az_count "containerapp revision show -n web -g rg-test --revision web--rev1" 1
 }
 
-test_restart_replay_clock_fails_when_a_replica_is_not_replaced() {
-  STUB_REPLICAS_STATIC=1 run_restart rg-test --timeout 0
-  assert_rc 1
-  assert_err_has "replicas were not replaced"
-  assert_out_has "FAILED"
+test_restart_apps_goes_on_after_the_settle_time_when_the_replica_names_do_not_change() {
+  # Container Apps may restart in place: the names never change, so the wait must end on the settle time and the
+  # healthcheck conditions decide (a false FAIL here would have the operator redo a perfectly good restart)
+  local began=$SECONDS
+  STUB_REPLICAS_STATIC=1 RESTART_SETTLE_S=2 run_restart rg-test --timeout 0
+  assert_rc 0
+  [ $((SECONDS - began)) -ge 2 ] || fail "the settle time of 2 s was not waited out"
+  assert_err_has "the replica names did not change within 2s"
+  assert_out_has "PASS healthcheck api"
+  assert_out_has "PASS healthcheck alerts"
+  assert_out_has "PASS healthcheck web"
+  assert_out_has "Apps restarted."
 }
 
-test_restart_replay_clock_fails_when_an_app_is_unhealthy_afterwards() {
-  STUB_HEALTH_API="Unhealthy" run_restart rg-test --timeout 0
+test_restart_apps_does_not_wait_out_the_settle_time_when_the_replicas_are_replaced() {
+  HEALTH_POLL_S=0 RESTART_SETTLE_S=600 run_cmd timeout 60 bash "$scripts_dir/restart-apps.sh" rg-test --timeout 0
+  assert_rc 0
+  assert_err_has "api: replicas replaced"
+  assert_err_has "alerts: replicas replaced"
+  assert_err_has "web: replicas replaced"
+}
+
+test_restart_apps_fails_when_an_app_is_unhealthy_afterwards() {
+  # whichever app it is: api and web have an ingress to check, alerts is the worker without one
+  local app
+  for app in api alerts web; do
+    : >"$STUB_STATE_DIR/az.log"
+    rm -f "$STUB_STATE_DIR"/restarted-* "$STUB_STATE_DIR"/health-*
+    case "$app" in
+      api) STUB_HEALTH_API="Unhealthy" run_restart rg-test --timeout 0 ;;
+      alerts) STUB_HEALTH_ALERTS="Unhealthy" run_restart rg-test --timeout 0 ;;
+      *) STUB_HEALTH_WEB="Unhealthy" run_restart rg-test --timeout 0 ;;
+    esac
+    assert_rc 1
+    assert_out_has "FAIL healthcheck $app"
+    assert_out_has "FAILED"
+    assert_out_lacks "Apps restarted."
+  done
+}
+
+test_restart_apps_gates_every_app_even_after_the_first_failure() {
+  # one run reports every unhealthy app
+  STUB_HEALTH_API="Unhealthy" STUB_HEALTH_WEB="Unhealthy" run_restart rg-test --timeout 0
   assert_rc 1
   assert_out_has "FAIL healthcheck api"
-  assert_out_has "FAILED"
+  assert_out_has "PASS healthcheck alerts"
+  assert_out_has "FAIL healthcheck web"
 }
 
-test_restart_replay_clock_with_now_updates_both_apps() {
-  run_restart rg-test --now 2026-06-14T09:00:00+04:00 --timeout 0
-  assert_rc 0
-  assert_az_count "containerapp update -n api -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" 1
-  assert_az_count "containerapp update -n alerts -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" 1
+test_restart_apps_restarts_nothing_when_an_app_has_no_latest_revision() {
+  STUB_LATEST_ALERTS=None run_restart rg-test --timeout 0
+  assert_rc 1
+  assert_err_has "alerts has no latest revision"
   assert_az_count "revision restart" 0
-  local updates last_update first_wait
-  updates="$(az_line "containerapp update")"
-  last_update="$(printf '%s' "$updates" | awk '{print $NF}')"
-  first_wait="$(az_line "revision show" | awk '{print $1}')"
-  [ -n "$first_wait" ] && [ "$first_wait" -gt "$last_update" ] || fail "a wait started before both updates were issued"
-  assert_out_has "api=2026-06-14T09:00:00+04:00 alerts=2026-06-14T09:00:00+04:00"
-  assert_out_has "restarting only ONE of api and alerts desynchronises their clocks"
 }
 
-test_restart_replay_clock_rejects_a_bad_now_before_changing_anything() {
-  local bad
-  for bad in "2026-06-14T10:10:00" "2026-06-14 10:10:00+04:00" "2026-06-14" "10:10" "2026-13-45T10:10:00+04:00" "soon" "2026-06-14T10:10:00+0400"; do
-    run_restart rg-test --now "$bad"
-    assert_rc 1
-    assert_err_has "--now must be an ISO 8601 date-time WITH an offset"
-    assert_no_az_calls
-  done
-  run_restart rg-test --now "2026-06-14T10:10:00Z" --timeout 0
-  assert_rc 0
-}
-
-test_restart_replay_clock_touches_nothing_else() {
+test_restart_apps_touches_nothing_else() {
   run_restart rg-test --timeout 0
   assert_rc 0
   local line
   while IFS= read -r line; do
     case "$line" in
-      "containerapp show -n api "* | "containerapp show -n alerts "* | \
-        "containerapp replica list -n api "* | "containerapp replica list -n alerts "* | \
-        "containerapp revision restart -n api "* | "containerapp revision restart -n alerts "* | \
-        "containerapp revision show -n api "* | "containerapp revision show -n alerts "*) ;;
+      "containerapp show -n api "* | "containerapp show -n alerts "* | "containerapp show -n web "* | \
+        "containerapp replica list -n api "* | "containerapp replica list -n alerts "* | "containerapp replica list -n web "* | \
+        "containerapp revision restart -n api "* | "containerapp revision restart -n alerts "* | "containerapp revision restart -n web "* | \
+        "containerapp revision show -n api "* | "containerapp revision show -n alerts "* | "containerapp revision show -n web "*) ;;
       *) fail "unexpected az call: $line" ;;
     esac
   done <<<"$(az_log)"
-  : >"$STUB_STATE_DIR/az.log"
-  run_restart rg-test --now 2026-06-14T09:00:00+04:00 --timeout 0
-  assert_rc 0
-  while IFS= read -r line; do
-    case "$line" in
-      "containerapp update -n api -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" | \
-        "containerapp update -n alerts -g rg-test --set-env-vars SB_REPLAY_NOW=2026-06-14T09:00:00+04:00" | \
-        "containerapp show -n api "* | "containerapp show -n alerts "* | \
-        "containerapp revision show -n api "* | "containerapp revision show -n alerts "*) ;;
-      *) fail "unexpected az call: $line" ;;
-    esac
-  done <<<"$(az_log)"
-  assert_az_count "web" 0
+  assert_az_count "containerapp update" 0
   assert_az_count "job" 0
   assert_az_count "--image" 0
+  assert_az_count "secret" 0
+  assert_az_count "--set-env-vars" 0
 }
 
-test_restart_replay_clock_rejects_bad_usage() {
+test_restart_apps_rejects_bad_usage() {
   run_restart
   assert_rc 1
   assert_err_has "usage"
   run_restart rg-test --timeout soon
   assert_rc 1
   assert_err_has "whole number"
+  RESTART_SETTLE_S=soon run_restart rg-test
+  assert_rc 1
+  assert_err_has "RESTART_SETTLE_S must be a whole number"
+  run_restart rg-test --bogus
+  assert_rc 1
+  assert_err_has "usage"
+  # the options of the script this one replaced no longer exist
+  run_restart rg-test --with-web
+  assert_rc 1
+  assert_err_has "usage"
+  run_restart rg-test --now 2026-06-14T10:10:00+04:00
+  assert_rc 1
+  assert_err_has "usage"
+  run_restart rg-test other-rg
+  assert_rc 1
+  assert_err_has "usage"
+  assert_no_az_calls
+}
+
+# ---- reset-demo.sh ------------------------------------------------------------------------------
+
+# run_reset <args...>: the real script; curl is the BFF stub; no waiting on a Retry-After unless the test sets RESET_MAX_WAIT_S.
+# The request headers the script sends are recorded in $STUB_STATE_DIR/headers.log.
+run_reset() {
+  mkdir -p "$work/bff-bin"
+  cp "$stubs_dir/curl-demo-bff" "$work/bff-bin/curl"
+  chmod +x "$work/bff-bin/curl"
+  FAKE_CURL_LOG="$STUB_STATE_DIR/bff.log" FAKE_STATE_DIR="$STUB_STATE_DIR" FAKE_HEADERS_LOG="$STUB_STATE_DIR/headers.log" \
+    RESET_MAX_WAIT_S="${RESET_MAX_WAIT_S:-0}" PATH="$work/bff-bin:$PATH" \
+    run_cmd bash "$scripts_dir/reset-demo.sh" http://127.0.0.1:8080 "$@"
+}
+
+test_reset_demo_prints_the_epochs_of_a_successful_reset() {
+  run_reset
+  assert_rc 0
+  assert_out_has "PASS D1 demo reset: epoch 1 -> 2"
+  [ "$(bff_count "$reset_route")" = "1" ] || fail "expected exactly one reset, saw $(bff_count "$reset_route")"
+  [ "$(wc -l <"$STUB_STATE_DIR/bff.log" | tr -d ' ')" = "1" ] || fail "the script made a request other than the reset"
+  # any 2xx is a success (the route answers 200; a 201 would be too), and the ids come from whatever the body says
+  FAKE_RESET_STATUS=201 FAKE_RESET_BODY='{"site_id":"site-demo-mussafah","epoch_id":12,"previous_epoch_id":11,"reset_at":"2026-11-16T05:00:00Z"}' run_reset
+  assert_rc 0
+  assert_out_has "PASS D1 demo reset: epoch 11 -> 12"
+  # a pretty-printed body and fields in another order
+  FAKE_RESET_BODY='{
+  "reset_at": "2026-11-16T05:00:00Z",
+  "previous_epoch_id": 99,
+  "epoch_id": 100,
+  "site_id": "site-demo-mussafah"
+}' run_reset
+  assert_rc 0
+  assert_out_has "PASS D1 demo reset: epoch 99 -> 100"
+}
+
+test_reset_demo_sends_no_authorization_header_and_posts_to_the_one_route() {
+  run_reset
+  assert_rc 0
+  grep -qxF "$reset_route" "$STUB_STATE_DIR/bff.log" || fail "the request was not '$reset_route': $(cat "$STUB_STATE_DIR/bff.log")"
+  if [ -e "$STUB_STATE_DIR/headers.log" ] && grep -qi 'authorization' "$STUB_STATE_DIR/headers.log"; then
+    fail "an Authorization header was sent"
+  fi
+  # not even when a token is in the environment: nothing here reads one
+  DEMO_EMPLOYER_TOKEN=do-not-send-this-token run_reset
+  assert_rc 0
+  assert_out_lacks "do-not-send-this-token"
+  if [ -e "$STUB_STATE_DIR/headers.log" ] && grep -q 'do-not-send-this-token' "$STUB_STATE_DIR/headers.log"; then
+    fail "the token reached a request header"
+  fi
+  # a trailing slash on the URL does not double the slash
+  FAKE_CURL_LOG="$STUB_STATE_DIR/bff2.log" FAKE_STATE_DIR="$STUB_STATE_DIR" PATH="$work/bff-bin:$PATH" \
+    run_cmd bash "$scripts_dir/reset-demo.sh" http://127.0.0.1:8080/
+  assert_rc 0
+  grep -qxF "$reset_route" "$STUB_STATE_DIR/bff2.log" || fail "a trailing slash broke the route: $(cat "$STUB_STATE_DIR/bff2.log")"
+}
+
+test_reset_demo_prints_the_retry_after_of_a_429_and_does_not_retry_by_default() {
+  FAKE_RESET_STATUS=429 run_reset
+  assert_rc 1
+  assert_out_has "Retry-After 7"
+  assert_out_has "FAIL D1 demo reset: answered 429 (Retry-After 7)"
+  assert_out_has "--retry-after-once"
+  [ "$(bff_count "$reset_route")" = "1" ] || fail "retried without --retry-after-once: $(bff_count "$reset_route") requests"
+}
+
+test_reset_demo_waits_the_retry_after_once_and_succeeds() {
+  FAKE_RESET_STATUSES="429 200" run_reset --retry-after-once
+  assert_rc 0
+  assert_out_has "Retry-After 7"
+  assert_out_has "waiting 0 s (Retry-After 7, cap 0)"
+  assert_out_has "PASS D1 demo reset: epoch 1 -> 2"
+  [ "$(bff_count "$reset_route")" = "2" ] || fail "expected two requests, saw $(bff_count "$reset_route")"
+  # a 201 on the retry too
+  rm -f "$STUB_STATE_DIR/reset-calls" "$STUB_STATE_DIR/bff.log"
+  FAKE_RESET_STATUSES="429 201" run_reset --retry-after-once
+  assert_rc 0
+  assert_out_has "PASS D1"
+}
+
+test_reset_demo_caps_the_wait_and_copes_with_a_missing_retry_after() {
+  # the wait is the Retry-After clamped to RESET_MAX_WAIT_S (default 70): a huge value (the hourly limit) does not hang the run
+  local began=$SECONDS
+  FAKE_RESET_STATUSES="429 200" FAKE_RESET_RETRY_AFTER=3600 RESET_MAX_WAIT_S=1 run_reset --retry-after-once
+  assert_rc 0
+  assert_out_has "waiting 1 s (Retry-After 3600, cap 1)"
+  [ $((SECONDS - began)) -ge 1 ] || fail "the capped wait of 1 s did not happen"
+  [ $((SECONDS - began)) -lt 30 ] || fail "the wait was not capped"
+  # no Retry-After header at all: 61 s (the upstream window is 60 s), still capped
+  rm -f "$STUB_STATE_DIR/reset-calls"
+  FAKE_RESET_STATUSES="429 200" FAKE_RESET_RETRY_AFTER=none run_reset --retry-after-once
+  assert_rc 0
+  assert_out_has "Retry-After missing"
+  assert_out_has "waiting 0 s (Retry-After 61, cap 0)"
+  # a Retry-After that is not a number (an HTTP date) is the same
+  rm -f "$STUB_STATE_DIR/reset-calls"
+  FAKE_RESET_STATUSES="429 200" FAKE_RESET_RETRY_AFTER="Mon, 16 Nov 2026 05:00:00 GMT" run_reset --retry-after-once
+  assert_rc 0
+  assert_out_has "waiting 0 s (Retry-After 61, cap 0)"
+}
+
+test_reset_demo_gives_up_after_a_second_429() {
+  FAKE_RESET_STATUS=429 run_reset --retry-after-once
+  assert_rc 1
+  assert_out_has "FAIL D1 demo reset: answered 429 again after the wait"
+  [ "$(bff_count "$reset_route")" = "2" ] || fail "expected exactly two requests, saw $(bff_count "$reset_route")"
+}
+
+test_reset_demo_fails_on_a_409_without_retrying() {
+  FAKE_RESET_STATUS=409 run_reset --retry-after-once
+  assert_rc 1
+  assert_out_has "FAIL D1 demo reset: answered 409"
+  assert_out_has "not-a-demo-site"
+  assert_out_lacks "PASS"
+  [ "$(bff_count "$reset_route")" = "1" ] || fail "retried a 409: $(bff_count "$reset_route") requests"
+}
+
+test_reset_demo_fails_on_a_server_error_without_retrying() {
+  local code
+  for code in 500 502 503 404; do
+    rm -f "$STUB_STATE_DIR/bff.log"
+    FAKE_RESET_STATUS="$code" run_reset --retry-after-once
+    assert_rc 1
+    assert_out_has "FAIL D1 demo reset: answered $code"
+    assert_out_lacks "PASS"
+    [ "$(bff_count "$reset_route")" = "1" ] || fail "retried a $code: $(bff_count "$reset_route") requests"
+  done
+}
+
+test_reset_demo_fails_on_a_body_it_cannot_parse() {
+  local body
+  for body in '<html>ok</html>' '' '{"epoch_id":2}' '{"previous_epoch_id":1}' '{"epoch_id":"2","previous_epoch_id":"1"}' '[]'; do
+    FAKE_RESET_BODY="$body" run_reset
+    assert_rc 1
+    assert_out_has "FAIL D1 demo reset: answered 200 but the body has no numeric epoch_id and previous_epoch_id"
+    assert_out_lacks "PASS"
+  done
+}
+
+test_reset_demo_fails_when_nothing_answers() {
+  # the plain curl stub: exit 7 and %{http_code} 000, as a refused connection
+  STUB_CURL_RULES="http://=000" run_cmd bash "$scripts_dir/reset-demo.sh" http://127.0.0.1:1
+  assert_rc 1
+  assert_out_has "FAIL D1 demo reset: no answer from http://127.0.0.1:1/api/v1/sites/site-demo-mussafah/demo-reset"
+}
+
+test_reset_demo_rejects_bad_usage() {
+  run_cmd bash "$scripts_dir/reset-demo.sh"
+  assert_rc 2
+  assert_err_has "usage"
+  assert_err_has "[--retry-after-once]"
+  run_cmd bash "$scripts_dir/reset-demo.sh" ftp://host
+  assert_rc 2
+  assert_err_has "must start with http:// or https://"
+  run_cmd bash "$scripts_dir/reset-demo.sh" http://a http://b
+  assert_rc 2
+  assert_err_has "usage"
+  run_cmd bash "$scripts_dir/reset-demo.sh" http://a --retry
+  assert_rc 2
+  assert_err_has "unknown option: --retry"
+  RESET_MAX_WAIT_S=soon run_cmd bash "$scripts_dir/reset-demo.sh" http://a
+  assert_rc 2
+  assert_err_has "RESET_MAX_WAIT_S must be a whole number"
+  [ ! -s "$STUB_STATE_DIR/curl.log" ] || fail "curl was called on a usage error"
 }
 
 # ---- measure-cold-start.sh ----------------------------------------------------------------------
@@ -1238,8 +1606,9 @@ test_measure_cold_start_scales_to_zero_measures_and_restores() {
   run_cold rg-test
   assert_rc 0
   assert_out_has "COLD START: 0.123 s to first 200 from https://web.stub.uaenorth.azurecontainerapps.io/api/v1/health/ready"
-  assert_out_has "REMINDER: run infra/scripts/restart-replay-clock.sh rg-test"
-  assert_out_has "alerts worker kept running"
+  assert_out_has "The api restarted. The replay clock counts from the demo epoch in the database, so it is unchanged and nothing needs restarting."
+  assert_out_lacks "REMINDER"
+  assert_out_lacks "restart-replay-clock"
   assert_az_count "containerapp update -n web -g rg-test --min-replicas 0" 1
   assert_az_count "containerapp update -n api -g rg-test --min-replicas 0" 1
   assert_az_count "containerapp update -n web -g rg-test --min-replicas 1" 1
@@ -1258,8 +1627,8 @@ test_measure_cold_start_takes_a_path_and_one_app() {
   assert_rc 0
   assert_out_has "https://web.stub.uaenorth.azurecontainerapps.io/api/healthz (scaled to zero: web)"
   assert_az_count "containerapp update -n api" 0
-  assert_out_has "The api was not scaled"
-  assert_out_lacks "REMINDER"
+  assert_out_has "The api was not scaled."
+  assert_out_lacks "nothing needs restarting"
   run_cold rg-test /x alerts
   assert_rc 1
   assert_err_has "must be web or api"
@@ -1377,7 +1746,14 @@ tests=(
   test_run_migrate_fails_when_the_job_is_missing
   test_run_migrate_stops_before_starting_when_the_job_runs_another_image
   test_run_migrate_never_overrides_the_job
-  test_run_migrate_falls_back_to_the_newest_execution_when_start_prints_nothing
+  test_run_migrate_identifies_the_new_execution_by_the_list_when_start_prints_nothing
+  test_run_migrate_fails_when_start_prints_nothing_and_only_an_old_execution_is_listed
+  test_run_migrate_ignores_an_old_execution_when_the_new_one_is_listed
+  test_run_migrate_waits_for_the_new_execution_to_appear_in_the_list
+  test_run_migrate_treats_none_from_the_start_as_empty
+  test_run_migrate_does_not_trust_a_start_answer_that_existed_before_the_start
+  test_run_migrate_fails_when_the_list_is_unreadable_and_start_prints_nothing
+  test_run_migrate_uses_the_start_answer_when_the_list_is_unreadable
   test_run_migrate_fails_when_the_job_cannot_be_started
   test_run_migrate_rejects_bad_usage
   test_healthcheck_passes_on_the_happy_fixture
@@ -1413,14 +1789,34 @@ tests=(
   test_smoke_placeholder_runs_only_the_cost_and_reachability_checks
   test_smoke_placeholder_fails_when_the_web_root_is_not_200
   test_smoke_rejects_bad_usage
-  test_restart_replay_clock_restarts_both_back_to_back_before_waiting
-  test_restart_replay_clock_waits_with_the_healthcheck_conditions
-  test_restart_replay_clock_fails_when_a_replica_is_not_replaced
-  test_restart_replay_clock_fails_when_an_app_is_unhealthy_afterwards
-  test_restart_replay_clock_with_now_updates_both_apps
-  test_restart_replay_clock_rejects_a_bad_now_before_changing_anything
-  test_restart_replay_clock_touches_nothing_else
-  test_restart_replay_clock_rejects_bad_usage
+  test_smoke_http_passes_and_never_resets_when_h3_passes
+  test_smoke_http_h3_failure_prints_the_recovery_and_resets_nothing_by_default
+  test_smoke_http_h3_failure_with_the_flag_resets_exactly_once
+  test_smoke_http_h3_failure_with_the_flag_reports_a_reset_that_fails
+  test_smoke_http_a_red_timeline_after_the_undo_also_gets_the_recovery
+  test_smoke_http_no_reset_when_no_stop_was_created
+  test_smoke_http_rejects_an_unknown_option_and_documents_the_flag
+  test_smoke_http_h4_outside_the_window_says_to_run_reset_demo
+  test_restart_apps_restarts_api_alerts_and_web_back_to_back_before_any_wait
+  test_restart_apps_waits_with_the_healthcheck_conditions
+  test_restart_apps_goes_on_after_the_settle_time_when_the_replica_names_do_not_change
+  test_restart_apps_does_not_wait_out_the_settle_time_when_the_replicas_are_replaced
+  test_restart_apps_fails_when_an_app_is_unhealthy_afterwards
+  test_restart_apps_gates_every_app_even_after_the_first_failure
+  test_restart_apps_restarts_nothing_when_an_app_has_no_latest_revision
+  test_restart_apps_touches_nothing_else
+  test_restart_apps_rejects_bad_usage
+  test_reset_demo_prints_the_epochs_of_a_successful_reset
+  test_reset_demo_sends_no_authorization_header_and_posts_to_the_one_route
+  test_reset_demo_prints_the_retry_after_of_a_429_and_does_not_retry_by_default
+  test_reset_demo_waits_the_retry_after_once_and_succeeds
+  test_reset_demo_caps_the_wait_and_copes_with_a_missing_retry_after
+  test_reset_demo_gives_up_after_a_second_429
+  test_reset_demo_fails_on_a_409_without_retrying
+  test_reset_demo_fails_on_a_server_error_without_retrying
+  test_reset_demo_fails_on_a_body_it_cannot_parse
+  test_reset_demo_fails_when_nothing_answers
+  test_reset_demo_rejects_bad_usage
   test_measure_cold_start_refuses_inside_the_judging_window
   test_measure_cold_start_runs_just_outside_the_window
   test_measure_cold_start_i_know_overrides_the_window

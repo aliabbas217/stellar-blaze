@@ -21,12 +21,13 @@
 #   DEMO_EMPLOYER_TOKEN the demo employer token the BFF holds
 #   SB_ACCESS_TOKENS    {"<sha256 of that token>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}}
 # Optional: VAPID_PUBLIC_KEY (web), SB_PROXY_PORT (the loopback port of the proxy, default 8080), SB_API_IMAGE and
-# SB_WEB_IMAGE (the image tags to build and run).
+# SB_WEB_IMAGE (the image tags to build and run; default stellar-blaze-{api,web}:rehearsal, rebuilt from the tree on every run).
 name: sb-local
 
 # What api, alerts and migrate share: prod-like settings, the TLS-verified database URL and the replay clock. The replay
-# values must be identical on api and alerts (separate processes, separate clocks, started together: backend/README.md
-# "Alerts and the demo replay clock"), which is why they are one anchor and not copied.
+# values must be identical on api and alerts (separate processes that each derive the replay clock from them and, since the
+# ADR 0034 amendment of 2026-11-15, from the demo epoch row in Postgres: backend/README.md "Alerts and the demo replay clock"),
+# which is why they are one anchor and not copied. They need not start together, and rehearse.sh R6 restarts the api alone.
 x-sb-env: &sb-env
   SB_ENV: prod
   SB_LOG_FORMAT: json
@@ -41,7 +42,7 @@ x-sb-env: &sb-env
   SB_REPLAY_DEFAULT_DATE: "2026-06-14"
   SB_REPLAY_NOW: "2026-06-14T10:10:00+04:00"
 
-x-api-image: &api-image ${SB_API_IMAGE:-stellar-blaze-api:i1}
+x-api-image: &api-image ${SB_API_IMAGE:-stellar-blaze-api:rehearsal}
 
 x-ca-mount: &ca-mount
   type: bind
@@ -129,8 +130,8 @@ services:
       retries: 30
       start_period: 15s
 
-  # The alerts worker: a separate long-running process with its own replay clock, the same SB_REPLAY_* values as api (the
-  # anchor above) and no SB_ACCESS_TOKENS. Compose has no `args`: `entrypoint` and `command` are the equivalents of the
+  # The alerts worker: a separate long-running process, the same SB_REPLAY_* values as api (the anchor above) and no
+  # SB_ACCESS_TOKENS. Compose has no `args`: `entrypoint` and `command` are the equivalents of the
   # explicit `command` and `args` the Container Apps deploy sets (the image CMD is never relied on). The VAPID pair comes
   # from an optional env file so that it is either both set or both absent: an empty SB_VAPID_SUBJECT is a startup error.
   alerts:
@@ -156,7 +157,7 @@ services:
       args:
         APP_VERSION: local
         NEXT_PUBLIC_SB_DEMO: ""
-    image: ${SB_WEB_IMAGE:-stellar-blaze-web:i1}
+    image: ${SB_WEB_IMAGE:-stellar-blaze-web:rehearsal}
     depends_on:
       api:
         condition: service_healthy
