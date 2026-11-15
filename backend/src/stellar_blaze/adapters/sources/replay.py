@@ -4,7 +4,8 @@ A snapshot (``domain.weather.replay``) is a frozen copy of one summer's silver f
 sources check every data file against the SHA-256 in ``snapshot.json`` when they are built, so a file that was edited,
 truncated or replaced is refused before any number is served, and they read the bytes they hashed (not the file a
 second time), so the data cannot change between the check and the use. They also refuse a snapshot with a row in a
-held-out year (``HELD_OUT_SUMMERS``) or outside the window its manifest declares, hashes or not.
+locked year (``REPLAY_LOCKED_SUMMERS``, empty since the architect's go-ahead of 2026-11-15) or outside the window its
+manifest declares, hashes or not.
 
 ``ReplayForecastSource`` follows the ``WeatherForecastSource`` port as the Open-Meteo adapter does: the same lead rule,
 one row per valid hour and requested lead (a value the snapshot holds as null stays null), and UTC dates. It answers
@@ -28,9 +29,9 @@ from pydantic import ValidationError
 from stellar_blaze.domain.weather.models import LEADS_DAYS, NwpModel
 from stellar_blaze.domain.weather.replay import (
     FORECASTS_FILE,
-    HELD_OUT_SUMMERS,
     MANIFEST_FILE,
     OBSERVATIONS_FILE,
+    REPLAY_LOCKED_SUMMERS,
     REQUIRED_FILES,
     ReplaySnapshot,
 )
@@ -99,18 +100,18 @@ def _frame(path: Path, content: bytes, schema: pl.Schema) -> pl.DataFrame:
 
 
 def _check_rows(snapshot: ReplaySnapshot, path: Path, frame: pl.DataFrame, column: str) -> None:
-    """Refuse a frame with a row in a held-out year or outside the manifest's ``[start, end]``.
+    """Refuse a frame with a row in a locked year or outside the manifest's ``[start, end]``.
 
     The hashes only say the files are what the builder wrote; this says what they hold is allowed to be served. It runs
     on the frame already decoded from the verified bytes.
 
     Raises:
-        ReplaySnapshotError: A ``column`` value is in a year of ``HELD_OUT_SUMMERS`` (the message says so), or outside
-            the window the manifest declares.
+        ReplaySnapshotError: A ``column`` value is in a year of ``REPLAY_LOCKED_SUMMERS`` (the message says so), or
+            outside the window the manifest declares.
     """
-    held_out = sorted(set(frame[column].dt.year().unique().to_list()) & HELD_OUT_SUMMERS)
-    if held_out:
-        raise ReplaySnapshotError(f"{path}: holds rows of held-out year(s) {held_out}; a replay never serves them")
+    locked = sorted(set(frame[column].dt.year().unique().to_list()) & REPLAY_LOCKED_SUMMERS)
+    if locked:
+        raise ReplaySnapshotError(f"{path}: holds rows of locked year(s) {locked}; a replay never serves them")
     outside = frame.filter((pl.col(column) < snapshot.start) | (pl.col(column) > snapshot.end))
     if outside.height:
         raise ReplaySnapshotError(
@@ -144,7 +145,7 @@ class ReplayForecastSource:
 
         Raises:
             ReplaySnapshotError: The snapshot is missing a file, has a file whose hash differs from the manifest, holds
-                a file that is not ``FORECAST_SCHEMA``, or holds a row in a held-out year or outside its window.
+                a file that is not ``FORECAST_SCHEMA``, or holds a row in a locked year or outside its window.
         """
         self.snapshot, forecasts, _ = _load(snapshot_dir)
         self._frame = forecasts.sort("valid_time", "lead_days")
@@ -184,7 +185,7 @@ class ReplayObservationSource:
 
         Raises:
             ReplaySnapshotError: The snapshot is missing a file, has a file whose hash differs from the manifest, holds
-                a file that is not ``OBS_HOURLY_SCHEMA``, or holds a row in a held-out year or outside its window.
+                a file that is not ``OBS_HOURLY_SCHEMA``, or holds a row in a locked year or outside its window.
         """
         self.snapshot, _, hourly = _load(snapshot_dir)
         no_code = pl.lit(None, dtype=pl.String)

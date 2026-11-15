@@ -1,8 +1,16 @@
-"""The 2026 hold-out in replay snapshots: no snapshot holds a 2026 row until the architect records "2026 go".
+"""The 2026 summer in replay snapshots.
 
-Enforced in three places, each tested here so that injecting a 2026 row fails: the builder (``jobs.replay_build``), the
-manifest model (``ReplaySnapshot``) and both replay sources. They share one constant, ``HELD_OUT_SUMMERS``
-(``domain.weather.replay``). Data is the synthetic generator's; nothing here reads the gold file or any real 2026 data.
+Since the architect's go-ahead of 2026-11-15 (approved by Ali the same day) ``REPLAY_LOCKED_SUMMERS`` is empty: a 2026
+snapshot inside its declared window is built, validated and served. What this file still proves:
+
+* the replay lock is live: re-locked (by patching the constant where each of the three checkpoints reads it), the
+  builder (``jobs.replay_build``), the manifest model (``ReplaySnapshot``) and both replay sources refuse a locked year
+  again;
+* rows outside the manifest's declared window are refused, whatever year they are in;
+* the MODEL hold-out is untouched: ``HELD_OUT_SUMMERS`` is still exactly 2026 and is still the ML test summer (the model
+  loader's own tests are in ``test_model_holdout.py``).
+
+Data is the synthetic generator's; nothing here reads the gold file or any real 2026 data.
 """
 
 import hashlib
@@ -16,14 +24,17 @@ import pytest
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
+from stellar_blaze.adapters.sources import replay as replay_sources
 from stellar_blaze.adapters.sources.replay import ReplayForecastSource, ReplayObservationSource, ReplaySnapshotError
 from stellar_blaze.adapters.storage.parquet_store import ParquetStore
-from stellar_blaze.domain.weather.models import NwpModel
+from stellar_blaze.domain.weather import replay as replay_domain
+from stellar_blaze.domain.weather.models import NwpModel, summer_window
 from stellar_blaze.domain.weather.replay import (
     FORECASTS_FILE,
     HELD_OUT_SUMMERS,
     MANIFEST_FILE,
     OBSERVATIONS_FILE,
+    REPLAY_LOCKED_SUMMERS,
     ReplayFile,
     ReplaySnapshot,
     files_digest,
@@ -48,23 +59,32 @@ pytestmark = pytest.mark.unit
 REPLAY_DIR = Path(__file__).resolve().parents[2] / "replay"
 DATABASE_URL = "postgresql+asyncpg://sb:hunter2@localhost:5432/stellar_blaze"
 IN_2026 = datetime(2026, 7, 1, 12, tzinfo=UTC)
+LOCKED_2026 = frozenset({2026})
+SUMMER_2026 = 2026
 
 
-def scan_snapshot(directory: Path) -> list[str]:
-    """What is wrong with the snapshot at ``directory``, as a list of findings; empty when it holds nothing held out.
+def scan_snapshot(directory: Path, locked: frozenset[int] = REPLAY_LOCKED_SUMMERS) -> list[str]:
+    """What is wrong with the snapshot at ``directory``, as a list of findings; empty when it is consistent.
 
-    Reads the files directly (not through the replay sources), so it is an independent check of them.
+    Consistent means: the manifest window is exactly one summer's window (15 May 00:00 to 30 Sep 23:00 UTC), no row of
+    either file is outside it, and no row is in a year of ``locked``. Reads the files directly (not through the replay
+    sources), so it is an independent check of them.
     """
     findings: list[str] = []
     manifest = json.loads((directory / MANIFEST_FILE).read_bytes())
-    for key in ("start", "end"):
-        year = datetime.fromisoformat(manifest[key]).astimezone(UTC).year
-        if year in HELD_OUT_SUMMERS:
-            findings.append(f"{directory.name}/{MANIFEST_FILE}: {key} is in held-out year {year}")
+    start = datetime.fromisoformat(manifest["start"]).astimezone(UTC)
+    end = datetime.fromisoformat(manifest["end"]).astimezone(UTC)
+    if (start, end) != summer_window(start.year):
+        findings.append(
+            f"{directory.name}/{MANIFEST_FILE}: the window {start.isoformat()} to {end.isoformat()} is not a summer"
+        )
     for name in (FORECASTS_FILE, OBSERVATIONS_FILE):
-        years = set(pl.read_parquet(directory / name)["valid_time"].dt.year().unique().to_list())
-        for year in sorted(years & HELD_OUT_SUMMERS):
-            findings.append(f"{directory.name}/{name}: holds rows of held-out year {year}")
+        frame = pl.read_parquet(directory / name)
+        outside = frame.filter((pl.col("valid_time") < start) | (pl.col("valid_time") > end)).height
+        if outside:
+            findings.append(f"{directory.name}/{name}: {outside} rows outside the manifest window")
+        for year in sorted(set(frame["valid_time"].dt.year().unique().to_list()) & locked):
+            findings.append(f"{directory.name}/{name}: holds rows of locked year {year}")
     return findings
 
 
@@ -90,13 +110,26 @@ def snapshot_dir(tmp_path: Path) -> Path:
     return build_fixture_snapshot(tmp_path).directory
 
 
+@pytest.fixture
+def snapshot_dir_2026(tmp_path: Path) -> Path:
+    """A synthetic snapshot of the 2026 summer (built through the real builder, now that replay is unlocked)."""
+    return build_fixture_snapshot(tmp_path, summer=SUMMER_2026).directory
+
+
+def relock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lock 2026 again at every place the replay side reads the constant (each checkpoint is patched on its own)."""
+    monkeypatch.setattr(replay_domain, "REPLAY_LOCKED_SUMMERS", LOCKED_2026)
+    monkeypatch.setattr(replay_build, "REPLAY_LOCKED_SUMMERS", LOCKED_2026)
+    monkeypatch.setattr(replay_sources, "REPLAY_LOCKED_SUMMERS", LOCKED_2026)
+
+
 # --- the repository's own snapshots ---------------------------------------------------------------------------------
 
 
-def test_no_committed_snapshot_holds_a_held_out_year() -> None:
-    """Scans every ``backend/replay/<id>/``. Today the directory holds only ``.gitkeep``, so this passes vacuously.
+def test_every_committed_snapshot_is_consistent() -> None:
+    """Scans every ``backend/replay/<id>/``: one summer's window, no row outside it, no row of a locked year.
 
-    It starts to bite with the first committed snapshot; ``test_the_scanner_is_live`` proves the scanner itself works.
+    ``test_the_scanner_is_live`` proves the scanner itself works, so an empty directory is not the only way to pass.
     """
     findings = [finding for directory in sorted(REPLAY_DIR.glob("*/")) for finding in scan_snapshot(directory)]
 
@@ -104,48 +137,95 @@ def test_no_committed_snapshot_holds_a_held_out_year() -> None:
 
 
 def test_the_scanner_is_live(snapshot_dir: Path) -> None:
-    """The scan above is not vacuous by construction: it passes a clean snapshot and fails an injected row."""
+    """The scan above is not vacuous by construction: it passes a clean snapshot and fails injected rows."""
     assert scan_snapshot(snapshot_dir) == []
 
-    inject_row(snapshot_dir, FORECASTS_FILE, IN_2026)
-    inject_row(snapshot_dir, OBSERVATIONS_FILE, IN_2026)
+    inject_row(snapshot_dir, FORECASTS_FILE, datetime(SUMMER, 10, 1, 0, tzinfo=UTC))  # 1 October: after the window
+    inject_row(snapshot_dir, OBSERVATIONS_FILE, datetime(SUMMER, 5, 14, 23, tzinfo=UTC))  # 14 May: before it
 
     assert scan_snapshot(snapshot_dir) == [
-        f"{SNAPSHOT_ID}/{FORECASTS_FILE}: holds rows of held-out year 2026",
-        f"{SNAPSHOT_ID}/{OBSERVATIONS_FILE}: holds rows of held-out year 2026",
+        f"{SNAPSHOT_ID}/{FORECASTS_FILE}: 1 rows outside the manifest window",
+        f"{SNAPSHOT_ID}/{OBSERVATIONS_FILE}: 1 rows outside the manifest window",
     ]
 
 
-def test_the_held_out_years_are_exactly_2026() -> None:
-    assert frozenset({2026}) == HELD_OUT_SUMMERS  # a change here is the deliberate unlock, and shows in review
+def test_the_scanner_finds_a_locked_year(snapshot_dir_2026: Path) -> None:
+    """With 2026 locked the same scan names the year: the locked-year branch of the scanner is live too."""
+    assert scan_snapshot(snapshot_dir_2026) == []
+
+    assert scan_snapshot(snapshot_dir_2026, locked=LOCKED_2026) == [
+        f"fixture-2026/{FORECASTS_FILE}: holds rows of locked year 2026",
+        f"fixture-2026/{OBSERVATIONS_FILE}: holds rows of locked year 2026",
+    ]
 
 
-def test_the_replay_hold_out_is_the_ml_test_summer() -> None:
-    """The ML split's test summer and the replay hold-out are one fact: they must move together."""
+# --- the two constants ----------------------------------------------------------------------------------------------
+
+
+def test_the_model_hold_out_is_still_exactly_2026() -> None:
+    """``HELD_OUT_SUMMERS`` is the model loader's guard and stays: no model may carry 2026."""
+    assert frozenset({2026}) == HELD_OUT_SUMMERS
+
+
+def test_the_model_hold_out_is_the_ml_test_summer() -> None:
+    """The ML split's test summer and the model hold-out are one fact: they must move together."""
     assert TEST_SUMMER in HELD_OUT_SUMMERS
     assert frozenset({TEST_SUMMER}) == HELD_OUT_SUMMERS
+
+
+def test_the_replay_lock_is_open_by_the_architects_go_ahead() -> None:
+    """The architect's go-ahead of 2026-11-15 (approved by Ali): replay may hold 2026; a re-lock shows in review."""
+    assert frozenset() == REPLAY_LOCKED_SUMMERS
+    assert REPLAY_LOCKED_SUMMERS is not HELD_OUT_SUMMERS
 
 
 # --- the sources and the manifest -----------------------------------------------------------------------------------
 
 
+def test_a_2026_snapshot_inside_its_declared_window_is_accepted_by_the_model_and_both_sources(
+    snapshot_dir_2026: Path,
+) -> None:
+    manifest = json.loads((snapshot_dir_2026 / MANIFEST_FILE).read_bytes())
+    assert manifest["start"].startswith("2026-05-15")
+    assert manifest["end"].startswith("2026-09-30")
+
+    ReplaySnapshot.model_validate(manifest)
+    ReplayForecastSource(snapshot_dir_2026)
+    ReplayObservationSource(snapshot_dir_2026)
+
+
 @pytest.mark.parametrize("source_class", [ReplayForecastSource, ReplayObservationSource])
 @pytest.mark.parametrize("file", [FORECASTS_FILE, OBSERVATIONS_FILE])
-def test_a_2026_row_with_matching_hashes_is_refused_by_both_sources(
+def test_a_2026_row_outside_a_2025_window_is_refused_by_both_sources(
     snapshot_dir: Path, source_class: type[ReplayForecastSource | ReplayObservationSource], file: str
 ) -> None:
-    """One 2026 row in either file, hashes and provenance digest rewritten to match, stops either source."""
+    """One 2026 row in a 2025 snapshot, hashes and provenance digest rewritten to match, stops either source."""
     inject_row(snapshot_dir, file, IN_2026)
 
-    with pytest.raises(ReplaySnapshotError, match="held-out"):
+    with pytest.raises(ReplaySnapshotError, match="outside the manifest's window"):
         source_class(snapshot_dir)
 
 
-def test_a_row_outside_the_manifest_window_is_refused_even_in_an_allowed_year(snapshot_dir: Path) -> None:
-    inject_row(snapshot_dir, FORECASTS_FILE, datetime(SUMMER, 10, 1, 0, tzinfo=UTC))  # 1 October: after 30 September
+@pytest.mark.parametrize("summer", [SUMMER, SUMMER_2026])
+def test_a_row_outside_the_manifest_window_is_refused_in_any_year(tmp_path: Path, summer: int) -> None:
+    directory = build_fixture_snapshot(tmp_path, summer=summer).directory
+    inject_row(directory, FORECASTS_FILE, datetime(summer, 10, 1, 0, tzinfo=UTC))  # 1 October: after 30 September
 
     with pytest.raises(ReplaySnapshotError, match="outside the manifest's window"):
-        ReplayForecastSource(snapshot_dir)
+        ReplayForecastSource(directory)
+
+
+@pytest.mark.parametrize("source_class", [ReplayForecastSource, ReplayObservationSource])
+def test_relocked_2026_stops_both_sources(
+    snapshot_dir_2026: Path,
+    source_class: type[ReplayForecastSource | ReplayObservationSource],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sources' own checkpoint is live: only their constant is patched, the manifest model still accepts it."""
+    monkeypatch.setattr(replay_sources, "REPLAY_LOCKED_SUMMERS", LOCKED_2026)
+
+    with pytest.raises(ReplaySnapshotError, match="locked year"):
+        source_class(snapshot_dir_2026)
 
 
 def make_manifest(snapshot_dir: Path, **changes: Any) -> dict[str, Any]:
@@ -153,28 +233,31 @@ def make_manifest(snapshot_dir: Path, **changes: Any) -> dict[str, Any]:
     return manifest | changes
 
 
-@pytest.mark.parametrize(
-    ("changes", "fragment"),
-    [
-        pytest.param({"end": "2026-09-30T23:00:00Z"}, "held-out", id="end-in-2026"),
-        pytest.param({"start": "2026-05-15T00:00:00Z", "end": "2026-09-30T23:00:00Z"}, "held-out", id="window-in-2026"),
-        pytest.param(
-            {"start": "2025-12-31T23:00:00-05:00", "end": "2025-12-31T23:30:00-05:00"},
-            "held-out",
-            id="2026-in-utc-though-2025-on-the-wall",
-        ),
-        pytest.param(
-            {"start": "2025-05-15T00:00:00Z", "end": "2027-01-01T00:00:00Z"}, "held-out", id="2026-strictly-inside"
-        ),
-    ],
-)
-def test_a_manifest_window_in_a_held_out_year_is_refused_by_the_model(
-    snapshot_dir: Path, changes: dict[str, str], fragment: str
-) -> None:
-    manifest = make_manifest(snapshot_dir, **changes)
+_WINDOWS_TOUCHING_2026 = [
+    pytest.param({"end": "2026-09-30T23:00:00Z"}, id="end-in-2026"),
+    pytest.param({"start": "2026-05-15T00:00:00Z", "end": "2026-09-30T23:00:00Z"}, id="window-in-2026"),
+    pytest.param(
+        {"start": "2025-12-31T23:00:00-05:00", "end": "2025-12-31T23:30:00-05:00"},
+        id="2026-in-utc-though-2025-on-the-wall",
+    ),
+    pytest.param({"start": "2025-05-15T00:00:00Z", "end": "2027-01-01T00:00:00Z"}, id="2026-strictly-inside"),
+]
 
-    with pytest.raises(ValidationError, match=fragment):
-        ReplaySnapshot.model_validate(manifest)
+
+@pytest.mark.parametrize("changes", _WINDOWS_TOUCHING_2026)
+def test_a_manifest_window_in_2026_is_accepted_by_the_model(snapshot_dir: Path, changes: dict[str, str]) -> None:
+    ReplaySnapshot.model_validate(make_manifest(snapshot_dir, **changes))
+
+
+@pytest.mark.parametrize("changes", _WINDOWS_TOUCHING_2026)
+def test_relocked_2026_refuses_a_manifest_window_that_touches_it(
+    snapshot_dir: Path, changes: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The manifest model's own checkpoint is live: every year of the window is looked at, not only the endpoints."""
+    monkeypatch.setattr(replay_domain, "REPLAY_LOCKED_SUMMERS", LOCKED_2026)
+
+    with pytest.raises(ValidationError, match="locked"):
+        ReplaySnapshot.model_validate(make_manifest(snapshot_dir, **changes))
 
 
 def test_a_manifest_window_inside_an_allowed_year_is_accepted_by_the_model(snapshot_dir: Path) -> None:
@@ -184,13 +267,21 @@ def test_a_manifest_window_inside_an_allowed_year_is_accepted_by_the_model(snaps
     ReplaySnapshot.model_validate(manifest)
 
 
-def test_a_manifest_end_in_2026_stops_both_sources(snapshot_dir: Path) -> None:
+def test_a_manifest_window_that_ends_before_it_starts_is_refused_by_the_model(snapshot_dir: Path) -> None:
+    manifest = make_manifest(snapshot_dir, start="2026-09-30T23:00:00Z", end="2026-05-15T00:00:00Z")
+
+    with pytest.raises(ValidationError, match="before start"):
+        ReplaySnapshot.model_validate(manifest)
+
+
+def test_a_manifest_window_that_excludes_the_rows_stops_both_sources(snapshot_dir: Path) -> None:
+    """The window the manifest declares is what is served: an end before the last row refuses the snapshot."""
     (snapshot_dir / MANIFEST_FILE).write_bytes(
-        json.dumps(make_manifest(snapshot_dir, end="2026-09-30T23:00:00Z")).encode()
+        json.dumps(make_manifest(snapshot_dir, end="2025-07-10T23:00:00Z")).encode()
     )
 
     for source_class in (ReplayForecastSource, ReplayObservationSource):
-        with pytest.raises(ReplaySnapshotError, match="held-out"):
+        with pytest.raises(ReplaySnapshotError, match="outside the manifest's window"):
             source_class(snapshot_dir)
 
 
@@ -234,17 +325,36 @@ def build(store: ParquetStore, replay_dir: Path, summer: int) -> None:
         replay_dir=replay_dir,
         summer=summer,
         stations=list(FIXTURE_STATIONS),
-        snapshot_id=SNAPSHOT_ID,
+        snapshot_id=f"fixture-{summer}",
         git_sha=GIT_SHA,
     )
 
 
-def test_summer_2026_is_refused_before_anything_is_read_or_written(tmp_path: Path) -> None:
-    seed_silver(tmp_path)
+def test_summer_2026_builds_from_silver_that_holds_it(tmp_path: Path) -> None:
+    seed_silver(tmp_path, summer=SUMMER_2026)
     spy = SpyStore(tmp_path)
 
+    build(spy, tmp_path / "replay", SUMMER_2026)
+
+    assert sorted(spy.reads) == ["forecasts", "observations"]
+    directory = tmp_path / "replay" / "fixture-2026"
+    manifest = json.loads((directory / MANIFEST_FILE).read_bytes())
+    assert manifest["start"].startswith("2026-05-15")
+    assert manifest["end"].startswith("2026-09-30")
+    assert scan_snapshot(directory) == []
+    ReplayForecastSource(directory)
+    ReplayObservationSource(directory)
+
+
+def test_a_relocked_summer_is_refused_before_anything_is_read_or_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed_silver(tmp_path, summer=SUMMER_2026)
+    spy = SpyStore(tmp_path)
+    relock(monkeypatch)
+
     with pytest.raises(ReplayHoldoutError, match=r"2026.*architect"):
-        build(spy, tmp_path / "replay", 2026)
+        build(spy, tmp_path / "replay", SUMMER_2026)
 
     assert spy.reads == []  # the silver reader was never called
     assert not (tmp_path / "replay").exists()
@@ -254,7 +364,7 @@ def test_the_holdout_error_is_a_value_error() -> None:
     assert issubclass(ReplayHoldoutError, ValueError)
 
 
-def test_summer_2025_still_builds_with_the_guard_in_place(tmp_path: Path) -> None:
+def test_summer_2025_still_builds(tmp_path: Path) -> None:
     spy = SpyStore(tmp_path)
     seed_silver(tmp_path)
 
@@ -276,33 +386,33 @@ def stamp_stray_2026_rows(root: Path) -> ParquetStore:
     return store
 
 
-def test_a_stray_2026_row_in_silver_is_left_out_by_the_real_window(tmp_path: Path) -> None:
+def test_a_stray_row_of_another_summer_in_silver_is_left_out_by_the_real_window(tmp_path: Path) -> None:
     """Real silver holds several summers; building 2025 from it must work and must not carry a 2026 row along."""
     build_fixture_snapshot(tmp_path, store=stamp_stray_2026_rows(tmp_path))
 
     assert scan_snapshot(tmp_path / "replay" / SNAPSHOT_ID) == []
 
 
-def test_a_bad_window_that_lets_2026_through_fails_closed_and_leaves_nothing(
+def test_a_bad_window_that_lets_a_locked_year_through_fails_closed_and_leaves_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Defence in depth: with a window computation that reaches into 2026, the row check still refuses."""
+    """Defence in depth: with 2026 locked and a window computation that reaches into it, the row check still refuses."""
     store = stamp_stray_2026_rows(tmp_path)
     monkeypatch.setattr(
         replay_build,
         "summer_window",
         lambda year: (datetime(year, 5, 15, tzinfo=UTC), datetime(year + 1, 9, 30, 23, tzinfo=UTC)),
     )
+    monkeypatch.setattr(replay_build, "REPLAY_LOCKED_SUMMERS", LOCKED_2026)
 
-    with pytest.raises(ReplayHoldoutError, match="hold rows of held-out"):
+    with pytest.raises(ReplayHoldoutError, match="hold rows of locked"):
         build(store, tmp_path / "replay", SUMMER)
 
     assert not (tmp_path / "replay").exists()  # no directory, no staging directory
 
 
-def test_the_cli_exits_2_for_2026_and_touches_neither_git_nor_the_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def cli_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    """Point the CLI at ``tmp_path``; the returned list records every call of ``git_head`` (stubbed)."""
     git_calls: list[Path] = []
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SB_DATABASE_URL", DATABASE_URL)
@@ -316,6 +426,29 @@ def test_the_cli_exits_2_for_2026_and_touches_neither_git_nor_the_files(
         return GIT_SHA
 
     monkeypatch.setattr(replay_build, "git_head", recording_git_head)
+    return git_calls
+
+
+def test_the_cli_builds_2026_now_that_replay_is_unlocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seed_silver(tmp_path / "data", summer=SUMMER_2026)
+    git_calls = cli_environment(tmp_path, monkeypatch)
+
+    result = CliRunner().invoke(
+        app,
+        ["replay", "build", "--summer", "2026", "--station", "OMAA", "--station", "OMDB", "--snapshot-id", "demo-2026"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["snapshot_id"] == "demo-2026"
+    assert git_calls == [replay_build.repo_root()]
+    assert scan_snapshot(tmp_path / "replay" / "demo-2026") == []
+
+
+def test_the_cli_exits_2_for_a_relocked_summer_and_touches_neither_git_nor_the_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    git_calls = cli_environment(tmp_path, monkeypatch)
+    relock(monkeypatch)
 
     result = CliRunner().invoke(
         app, ["replay", "build", "--summer", "2026", "--station", "OMAA", "--snapshot-id", "demo-2026"]

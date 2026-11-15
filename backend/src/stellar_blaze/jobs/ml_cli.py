@@ -8,9 +8,11 @@ Commands that need no database and no advisory lock, like the ``config`` command
 summer from ``SB_DATA_DIR`` into ``<SB_REPLAY_DIR>/<ID>/`` with a hashed ``snapshot.json``. It writes inputs only (never
 corrected output or scores), refuses an existing snapshot, an id that is not a lowercase slug, and a snapshot above
 10 MB. The demo snapshot's agreed stations are OMAA, OMDB, OMAL and OMFJ (four clusters; OMAA is the scoreboard site).
-The 2026 summer is locked (``HELD_OUT_SUMMERS``) until the architect's go-ahead. Exit codes: 0 built, 1 refused or
-failed, 2 bad usage or configuration, or a held-out summer. Like every ``sb-jobs`` command it reads
-the ``SB_*`` environment, which includes ``SB_DATABASE_URL``, though this command never connects to it.
+A summer in ``REPLAY_LOCKED_SUMMERS`` is refused; the set has been empty since the architect's go-ahead of 2026-11-15,
+so the 2026 summer can be copied for the live demo (the separate ``HELD_OUT_SUMMERS`` guards the models, not replay).
+Exit codes: 0 built, 1 refused or failed, 2 bad usage or configuration, or a locked summer. Like every ``sb-jobs``
+command it reads the ``SB_*`` environment, which includes ``SB_DATABASE_URL``, though this command never connects to
+it.
 
 The warning thresholds of the freeze addendum (pre-registration 6.5; 2024-2025 out-of-fold samples only)::
 
@@ -152,7 +154,8 @@ def replay_build_command(
     """Copy a summer's silver forecasts and observations into a hashed snapshot under SB_REPLAY_DIR (at most 10 MB).
 
     The demo snapshot's agreed stations are OMAA, OMDB, OMAL and OMFJ (four clusters; OMAA is the scoreboard site),
-    which fit the budget. The 2026 summer is locked until the architect's go-ahead (exit code 2).
+    which fit the budget. A summer in ``REPLAY_LOCKED_SUMMERS`` is refused (exit code 2); the set is empty since the
+    architect's go-ahead of 2026-11-15.
     """
     from stellar_blaze.adapters.storage.parquet_store import ParquetStore
     from stellar_blaze.domain.weather.schemas import SchemaMismatchError
