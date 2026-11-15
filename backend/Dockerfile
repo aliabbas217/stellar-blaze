@@ -69,7 +69,8 @@ RUN groupadd --gid 10001 app \
 
 # Only what the app reads at run time, not all of /app: the virtualenv (which holds the installed project), the Alembic
 # migrations, ADR 0009's rulesets and model artifacts, the replay snapshots (SB_FORECAST_SOURCE=replay reads
-# replay/<SB_REPLAY_SNAPSHOT_ID>/) and ADR 0010's runtime-config seed (config/runtime/default.toml).
+# replay/<SB_REPLAY_SNAPSHOT_ID>/), ADR 0010's runtime-config seed (config/runtime/default.toml) and the synthetic demo
+# site (fixtures/demo_site.toml, loaded with `sb-jobs site load`).
 # Sources, pyproject.toml and uv.lock stay in the build stage.
 COPY --from=build /app/.venv /app/.venv
 COPY alembic/ alembic/
@@ -78,6 +79,8 @@ COPY rulesets/ rulesets/
 COPY models/ models/
 COPY replay/ replay/
 COPY config/ config/
+# The demo site fixture: `sb-jobs site load fixtures/demo_site.toml` runs in this image (the migrate job loads the demo site).
+COPY fixtures/ fixtures/
 # The MIT notice for the code ported from meteoHazard (domain/physics/twl.py) has to ship with that code.
 COPY THIRD_PARTY_NOTICES.md ./
 

@@ -1,5 +1,5 @@
 # Build context is backend/. The Dockerfile copies only pyproject.toml, uv.lock, src/, alembic/, alembic.ini, rulesets/,
-# models/, replay/, config/ and THIRD_PARTY_NOTICES.md, so this file keeps the context small and keeps secrets and local
+# models/, replay/, config/, fixtures/ and THIRD_PARTY_NOTICES.md, so this file keeps the context small and keeps secrets and local
 # state out of it. Never exclude rulesets/, models/, replay/ or config/: they ship inside the image (ADR 0009, ADR 0010).
 # `data` below is backend/data (the local silver and gold files, never shipped); replay snapshots are in replay/.
 
