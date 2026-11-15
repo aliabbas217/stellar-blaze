@@ -1026,7 +1026,7 @@
                 "type": "null"
               }
             ],
-            "description": "P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample.",
+            "description": "P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws are one realization per stratum (50 samples, fixed seed), so this probability and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.",
             "title": "P High"
           },
           "protective_twl_w_m2": {
@@ -1262,12 +1262,12 @@
             "type": "array"
           },
           "id": {
-            "description": "Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans).",
+            "description": "Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans); `H4-lead2` is H4 computed on the lead-2 rows (section 13: the stamp `issued by 18:00 GST the evening before` may be carried only when it is `supported`). A scoreboard without a lead-2 row has no `H4-lead2` entry.",
             "title": "Id",
             "type": "string"
           },
           "outcome": {
-            "description": "`supported` when every interval excludes zero in the stated direction.",
+            "description": "`supported` when the pre-registered rule holds, else `negative`. H4, H4-lead2 and H6: the paired interval of every named difference lies wholly below zero. H5: the paired interval of the missed-hours difference lies wholly below zero AND the false-alarm hours of P3 are at most 1.25 times those of P2 (a point-estimate rule: the pre-registration gives the +25% no interval). H7: the paired interval of missed-protection ticks lies wholly below zero.",
             "enum": [
               "supported",
               "negative"
@@ -1406,7 +1406,7 @@
                 "type": "null"
               }
             ],
-            "description": "95% bootstrap interval; null where none is defined (a total, a constant)."
+            "description": "95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days)."
           },
           "n": {
             "description": "Number of observations behind the value (days, hours or ticks, as the field says).",
@@ -1526,7 +1526,7 @@
           },
           "missed_protection_ticks": {
             "$ref": "#/components/schemas/Metric",
-            "description": "Worked ticks whose plan zone is milder than the truth zone (5-minute ticks)."
+            "description": "Truth High or Red ticks scheduled at a lighter cycle: worked (WORK) 5-minute ticks of a truth High-or-Red tick whose plan zone is milder than the truth zone (pre-registration 7.3, counter 3)."
           },
           "plan": {
             "description": "naive, ban_only, rule_raw (zones from raw IFS) or rule_corrected (q10 of corrected samples).",
@@ -2156,7 +2156,7 @@
                 "type": "null"
               }
             ],
-            "description": "Warning threshold on P(High) for the P3 rows; null for P0, P1 and P2.",
+            "description": "Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws are one realization per stratum (50 samples, fixed seed), so a probability here and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.",
             "title": "Theta"
           }
         },
@@ -2227,7 +2227,7 @@
             "type": "number"
           },
           "n_days": {
-            "description": "Days in the scored season with all inputs present.",
+            "description": "Days in the scored season with at least one scored hour at the headline lead.",
             "title": "N Days",
             "type": "integer"
           },
@@ -2258,7 +2258,7 @@
             "type": "string"
           },
           "sensitivity": {
-            "description": "The four cells of the 2 x 2 truth sensitivity, headline cell included.",
+            "description": "The four cells of the 2 x 2 truth sensitivity, headline cell included. The withdrawal `on` cells are dry-bulb leg only (> 44 C); no natural wet-bulb source exists, so the second leg of the ADR 0006 rule is not applied.",
             "items": {
               "$ref": "#/components/schemas/SensitivityCell"
             },
@@ -2281,7 +2281,7 @@
             "type": "number"
           },
           "verdicts": {
-            "description": "H4 (primary) and H5 (secondary) at the headline lead.",
+            "description": "H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2, which decides the `evening before` stamp) where lead 2 has rows.",
             "items": {
               "$ref": "#/components/schemas/HypothesisVerdict"
             },
@@ -2289,7 +2289,7 @@
             "type": "array"
           },
           "withdrawal_limits": {
-            "description": "Frozen withdrawal-limit switch (off).",
+            "description": "Frozen withdrawal-limit switch (off); when on, the cap is the dry-bulb leg only (> 44 C).",
             "title": "Withdrawal Limits",
             "type": "boolean"
           },
@@ -2366,7 +2366,7 @@
       },
       "Provenance": {
         "additionalProperties": false,
-        "description": "Where an exported number came from: protocol section, script and function, commit, data hash, model, label.\n\nThis is a local stand-in with exactly the fields of B2 Task 13's ``domain/provenance.py``; it is replaced by an\nimport from there when that task is merged. The class and field names stay identical so the OpenAPI component\nnames do not change.",
+        "description": "Where an exported number came from: protocol section, script and function, commit, data hash, model, label.\n\nB2's ``domain/provenance.py`` has a ``Provenance`` with the same fields. The two JSON schemas differ by the\n``pattern`` on ``data_sha256`` (B2's ``Sha256`` type has one; this model keeps a plain string) and by field\ndescriptions, so this model stays: replacing it would change a component of the frozen OpenAPI document that F2\ntypes from. ``ml.artifact_io.write_artifact`` converts it to B2's class (``wire_provenance``), which validates the\nSHA-256, so every file carries B2's block. The class and field names are identical.",
         "properties": {
           "data_sha256": {
             "description": "SHA-256 of the input data (the gold pairs file, or the OOF export for DEV).",
@@ -2991,7 +2991,7 @@
       },
       "SensitivityCell": {
         "additionalProperties": false,
-        "description": "One cell of the always-reported 2 x 2 truth sensitivity: margin {0, 7} x withdrawal limits {off, on}.",
+        "description": "One cell of the always-reported 2 x 2 truth sensitivity: margin {0, 7} x withdrawal limits {off, on}.\n\nThe withdrawal ``on`` cell is dry-bulb leg only (> 44 C): no natural wet-bulb source exists, so the second leg of\nthe ADR 0006 rule is not applied.",
         "properties": {
           "headline": {
             "description": "True for the frozen setting (margin 7, withdrawal off): the headline numbers.",
@@ -3021,7 +3021,7 @@
             "description": "Weighted truth danger hours under this truth definition."
           },
           "withdrawal_limits": {
-            "description": "Whether the withdrawal-limit cap was applied to the truth TWL.",
+            "description": "Whether the withdrawal-limit cap was applied to the truth TWL: dry-bulb leg only (> 44 C); no natural wet-bulb source exists, so the second leg of the ADR 0006 rule is not applied.",
             "title": "Withdrawal Limits",
             "type": "boolean"
           }
@@ -3384,6 +3384,19 @@
             "title": "Grid",
             "type": "array"
           },
+          "hour_weighting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How hours were weighted: the 7.2 ban weights (a clarification; section 6.5 does not mention them); null in a file written before this field existed.",
+            "title": "Hour Weighting"
+          },
           "n_hours": {
             "description": "Hours in the 2024-2025 selection set.",
             "title": "N Hours",
@@ -3403,6 +3416,32 @@
             "description": "The rule that produced the thresholds.",
             "title": "Rule",
             "type": "string"
+          },
+          "ruleset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Id of the ruleset whose zone edges, margin and ban window the thresholds were computed with; null in a file written before this field existed.",
+            "title": "Ruleset Id"
+          },
+          "ruleset_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SHA-256 of the bytes of that ruleset file; null in a file written before this field existed.",
+            "title": "Ruleset Sha256"
           },
           "theta_balanced": {
             "description": "Theta with the maximum Peirce score; ties go to the smaller theta.",

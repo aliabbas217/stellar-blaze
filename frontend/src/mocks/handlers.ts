@@ -235,7 +235,8 @@ async function jsonBody(request: Request): Promise<unknown> {
 // field, say) gets a 422 here instead of passing silently.
 const PushSubscriptionCreateSchema = z.strictObject({
   subscription: z.strictObject({
-    endpoint: z.string(),
+    // B3 refuses anything but an https URL (its 422: "endpoint must be an https URL").
+    endpoint: z.string().startsWith("https://"),
     expirationTime: z.number().nullable(),
     keys: z.strictObject({ p256dh: z.string(), auth: z.string() }),
   }),
@@ -466,7 +467,8 @@ export const handlers = [
       if (refused !== null) return refused;
       const crewId = pathParam(params, "crew_id");
       if (!crewExists(crewId)) return mockProblem(request, 404, `No crew ${crewId}.`);
-      clearStop(crewId, pathParam(params, "stop_id"));
+      const stopId = pathParam(params, "stop_id");
+      if (!clearStop(crewId, stopId)) return mockProblem(request, 404, `No stop ${stopId} on crew ${crewId}.`);
       return new HttpResponse(null, { status: 204 });
     }),
   ),

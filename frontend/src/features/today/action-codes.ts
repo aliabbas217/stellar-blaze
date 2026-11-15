@@ -59,7 +59,12 @@ export function actionPlan(codes: readonly string[]): ActionPlan {
       }
     }
   }
-  // The most protective lead wins: a stop over a cycle over plain shade.
-  const lead = leads.find((l) => l.kind === "stop") ?? leads.find((l) => l.kind === "cycle") ?? leads.find((l) => l.kind === "shade");
+  // The most protective lead wins: a stop over a cycle over plain shade. An hour carries one cycle per workload (B3's orange hour:
+  // light 45-15 and heavy 20-40) and Today has no workload at site level, so of several cycles the one with the least work leads,
+  // whatever their order in the array.
+  const strictest = leads
+    .filter((l): l is Extract<Lead, { kind: "cycle" }> => l.kind === "cycle")
+    .reduce<Extract<Lead, { kind: "cycle" }> | undefined>((best, next) => (best === undefined || next.workMinutes < best.workMinutes ? next : best), undefined);
+  const lead = leads.find((l) => l.kind === "stop") ?? strictest ?? leads.find((l) => l.kind === "shade");
   return { lead: lead ?? { kind: "siteRules" }, also: [...also] };
 }

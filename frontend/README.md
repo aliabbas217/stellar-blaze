@@ -55,7 +55,12 @@ branch `feat/b3-warnings-planner`, `backend/`), runs the specs, and stops it:
    `SB_ACCESS_TOKENS` as JSON `{"<sha256 of the token>": {"actor": "...", "role": "employer", "employer_id": "emp-demo"}}`.
    The replay clock starts at `SB_REPLAY_NOW` when set, else the replay date at 11:10 Asia/Dubai, and runs at real speed. 11:10 is crew B's midday
    break, so for a live stop set `SB_REPLAY_NOW` near 10:10 at the site.
-4. Serve it: `uv run uvicorn stellar_blaze.api.app:create_app --factory --port 8000`.
+4. Serve it: `uv run uvicorn stellar_blaze.api.app:create_app --factory --port 8000`, then wait until `GET /api/v1/risk-policy` reports
+   `config_version` 1 or more: outside prod the API serves the file snapshot (version 0) until its first poll (up to 5 s) finds the
+   database activation, and sign-off answers 503 meanwhile although `/health/ready` is already 200.
+5. The default config pins no model, so the replay serves the UNCORRECTED forecast: no spread (`p05 = p50 = p95`) and 2025-07-10 is
+   Green all day. With the corrector pinned (`sb-jobs config propose` a file holding `model_id = "<id in backend/models>"`, then `config activate`)
+   the same day is Amber and Orange from 10:00. The first live run (task-24b-report.md) covers both.
 
 Then, here, from `frontend/` (a production build first, `pnpm build`; the token is the plain bearer whose SHA-256 is in `SB_ACCESS_TOKENS`):
 

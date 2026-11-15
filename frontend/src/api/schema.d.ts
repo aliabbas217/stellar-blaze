@@ -1072,7 +1072,7 @@ export interface components {
             corrected_wbgt_c: components["schemas"]["WbgtQuantiles"] | null;
             /**
              * P High
-             * @description P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample.
+             * @description P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws are one realization per stratum (50 samples, fixed seed), so this probability and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.
              */
             p_high: number | null;
             /**
@@ -1204,12 +1204,12 @@ export interface components {
             comparisons: components["schemas"]["PairedComparison"][];
             /**
              * Id
-             * @description Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans).
+             * @description Hypothesis id of the pre-registration: H4 or H5 (Warnings), H6 or H7 (Plans); `H4-lead2` is H4 computed on the lead-2 rows (section 13: the stamp `issued by 18:00 GST the evening before` may be carried only when it is `supported`). A scoreboard without a lead-2 row has no `H4-lead2` entry.
              */
             id: string;
             /**
              * Outcome
-             * @description `supported` when every interval excludes zero in the stated direction.
+             * @description `supported` when the pre-registered rule holds, else `negative`. H4, H4-lead2 and H6: the paired interval of every named difference lies wholly below zero. H5: the paired interval of the missed-hours difference lies wholly below zero AND the false-alarm hours of P3 are at most 1.25 times those of P2 (a point-estimate rule: the pre-registration gives the +25% no interval). H7: the paired interval of missed-protection ticks lies wholly below zero.
              * @enum {string}
              */
             outcome: "supported" | "negative";
@@ -1297,7 +1297,7 @@ export interface components {
              * @description Heading slug of the pre-registration section that defines this metric.
              */
             anchor: string;
-            /** @description 95% bootstrap interval; null where none is defined (a total, a constant). */
+            /** @description 95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days). */
             ci: components["schemas"]["Interval"] | null;
             /**
              * N
@@ -1379,7 +1379,7 @@ export interface components {
              * @description Display name; naive and ban_only share the label `Ban only` (ADR 0057).
              */
             label: string;
-            /** @description Worked ticks whose plan zone is milder than the truth zone (5-minute ticks). */
+            /** @description Truth High or Red ticks scheduled at a lighter cycle: worked (WORK) 5-minute ticks of a truth High-or-Red tick whose plan zone is milder than the truth zone (pre-registration 7.3, counter 3). */
             missed_protection_ticks: components["schemas"]["Metric"];
             /**
              * Plan
@@ -1768,7 +1768,7 @@ export interface components {
             rule: string;
             /**
              * Theta
-             * @description Warning threshold on P(High) for the P3 rows; null for P0, P1 and P2.
+             * @description Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws are one realization per stratum (50 samples, fixed seed), so a probability here and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.
              */
             theta: number | null;
         };
@@ -1811,7 +1811,7 @@ export interface components {
             margin_w_m2: number;
             /**
              * N Days
-             * @description Days in the scored season with all inputs present.
+             * @description Days in the scored season with at least one scored hour at the headline lead.
              */
             n_days: number;
             /** @description Where the numbers in this file came from. */
@@ -1840,7 +1840,7 @@ export interface components {
             season_start: string;
             /**
              * Sensitivity
-             * @description The four cells of the 2 x 2 truth sensitivity, headline cell included.
+             * @description The four cells of the 2 x 2 truth sensitivity, headline cell included. The withdrawal `on` cells are dry-bulb leg only (> 44 C); no natural wet-bulb source exists, so the second leg of the ADR 0006 rule is not applied.
              */
             sensitivity: components["schemas"]["SensitivityCell"][];
             /**
@@ -1860,12 +1860,12 @@ export interface components {
             theta_protect: number;
             /**
              * Verdicts
-             * @description H4 (primary) and H5 (secondary) at the headline lead.
+             * @description H4 (primary) and H5 (secondary) at the headline lead, then H4-lead2 (H4 at lead 2, which decides the `evening before` stamp) where lead 2 has rows.
              */
             verdicts: components["schemas"]["HypothesisVerdict"][];
             /**
              * Withdrawal Limits
-             * @description Frozen withdrawal-limit switch (off).
+             * @description Frozen withdrawal-limit switch (off); when on, the cap is the dry-bulb leg only (> 44 C).
              */
             withdrawal_limits: boolean;
             /**
@@ -1904,9 +1904,11 @@ export interface components {
          * Provenance
          * @description Where an exported number came from: protocol section, script and function, commit, data hash, model, label.
          *
-         *     This is a local stand-in with exactly the fields of B2 Task 13's ``domain/provenance.py``; it is replaced by an
-         *     import from there when that task is merged. The class and field names stay identical so the OpenAPI component
-         *     names do not change.
+         *     B2's ``domain/provenance.py`` has a ``Provenance`` with the same fields. The two JSON schemas differ by the
+         *     ``pattern`` on ``data_sha256`` (B2's ``Sha256`` type has one; this model keeps a plain string) and by field
+         *     descriptions, so this model stays: replacing it would change a component of the frozen OpenAPI document that F2
+         *     types from. ``ml.artifact_io.write_artifact`` converts it to B2's class (``wire_provenance``), which validates the
+         *     SHA-256, so every file carries B2's block. The class and field names are identical.
          */
         Provenance: {
             /**
@@ -2317,6 +2319,9 @@ export interface components {
         /**
          * SensitivityCell
          * @description One cell of the always-reported 2 x 2 truth sensitivity: margin {0, 7} x withdrawal limits {off, on}.
+         *
+         *     The withdrawal ``on`` cell is dry-bulb leg only (> 44 C): no natural wet-bulb source exists, so the second leg of
+         *     the ADR 0006 rule is not applied.
          */
         SensitivityCell: {
             /**
@@ -2343,7 +2348,7 @@ export interface components {
             truth_danger_hours: components["schemas"]["Metric"];
             /**
              * Withdrawal Limits
-             * @description Whether the withdrawal-limit cap was applied to the truth TWL.
+             * @description Whether the withdrawal-limit cap was applied to the truth TWL: dry-bulb leg only (> 44 C); no natural wet-bulb source exists, so the second leg of the ADR 0006 rule is not applied.
              */
             withdrawal_limits: boolean;
         };
@@ -2574,6 +2579,12 @@ export interface components {
              */
             grid: components["schemas"]["ThetaGridPoint"][];
             /**
+             * Hour Weighting
+             * @description How hours were weighted: the 7.2 ban weights (a clarification; section 6.5 does not mention them); null in a file written before this field existed.
+             * @default null
+             */
+            hour_weighting: string | null;
+            /**
              * N Hours
              * @description Hours in the 2024-2025 selection set.
              */
@@ -2591,6 +2602,18 @@ export interface components {
              * @constant
              */
             rule: "preregistration §6.5";
+            /**
+             * Ruleset Id
+             * @description Id of the ruleset whose zone edges, margin and ban window the thresholds were computed with; null in a file written before this field existed.
+             * @default null
+             */
+            ruleset_id: string | null;
+            /**
+             * Ruleset Sha256
+             * @description SHA-256 of the bytes of that ruleset file; null in a file written before this field existed.
+             * @default null
+             */
+            ruleset_sha256: string | null;
             /**
              * Theta Balanced
              * @description Theta with the maximum Peirce score; ties go to the smaller theta.

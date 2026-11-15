@@ -412,16 +412,24 @@ export function crewStops(crewId: string): Schemas["CrewStop"][] {
 
 /** Records a stop at the replay clock. The mock never alerts anyone and says nothing of the kind. */
 export function createStop(crewId: string): Schemas["CrewStop"] {
+  // Idempotent while a stop is active (real B3, first live run): the same stop comes back, no second row.
+  const active = activeStop(crewId);
+  if (active !== undefined) return stopOf(active);
   stopCounter += 1;
   const row: StopRow = { id: `stop-${String(stopCounter).padStart(4, "0")}`, crewId, startedAt: REPLAY_INSTANT, clearedAt: null };
   stops.push(row);
   return stopOf(row);
 }
 
-/** Clears a stop at the replay clock. Idempotent: an unknown or cleared stop changes nothing. */
-export function clearStop(crewId: string, stopId: string): void {
+/**
+ * Clears a stop at the replay clock. Clearing a stop that is already cleared changes nothing (still found); returns false for a stop
+ * this crew has never had in this epoch, which real B3 answers with a 404 problem.
+ */
+export function clearStop(crewId: string, stopId: string): boolean {
   const row = stops.find((candidate) => candidate.id === stopId && candidate.crewId === crewId);
-  if (row !== undefined && row.clearedAt === null) row.clearedAt = REPLAY_INSTANT;
+  if (row === undefined) return false;
+  if (row.clearedAt === null) row.clearedAt = REPLAY_INSTANT;
+  return true;
 }
 
 /**

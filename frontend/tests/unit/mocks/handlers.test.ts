@@ -652,6 +652,12 @@ describe("push subscriptions", () => {
     expect((await post({ ...body, crew_id: "crew-z" })).status).toBe(404);
     expect((await post({ ...body, crew_id: "crew-b" })).status).toBe(201);
   });
+
+  // Real B3 (first live run): the endpoint must be an https URL ("endpoint must be an https URL" is its 422).
+  it("answers 422 for a push endpoint that is not https", async () => {
+    const insecure = await send("POST", "/api/v1/push/subscriptions", { ...body, subscription: { ...body.subscription, endpoint: "http://push.example/abc" } });
+    expect(insecure.status).toBe(422);
+  });
 });
 
 describe("create_data_request and get_site_transparency_log", () => {
@@ -755,9 +761,23 @@ describe("create_crew_stop and delete_crew_stop", () => {
     expect((await clear()).status).toBe(204);
     expect((await clear()).status).toBe(204);
     expect(hourAt((await timeline("crew-b")).hours, "11:00")?.crew_level).toBe("orange");
-    expect((await send("DELETE", "/api/v1/crews/crew-b/stops/stop-9999", undefined, EMPLOYER)).status).toBe(204);
+    // Real B3 (first live run): a stop id the crew has never had is a 404 problem, not a silent 204.
+    const unknown = await send("DELETE", "/api/v1/crews/crew-b/stops/stop-9999", undefined, EMPLOYER);
+    expect(unknown.status).toBe(404);
+    expect((await json<{ type: string }>(unknown)).type).toBe(`${PROBLEM_TYPE}not-found`);
     expect((await send("DELETE", `/api/v1/crews/crew-b/stops/${id}`, undefined, {})).status).toBe(401);
     expect((await send("DELETE", `/api/v1/crews/nope/stops/${id}`, undefined, EMPLOYER)).status).toBe(404);
+  });
+
+  it("is idempotent while a stop is active: the same stop comes back (real B3), and a new one only after it is cleared", async () => {
+    const first = await json<Schemas["CrewStop"]>(await stop());
+    const again = await json<Schemas["CrewStop"]>(await stop());
+    expect(again).toEqual(first);
+    expect((await crewList()).filter((crew) => crew.stopped)).toHaveLength(1);
+
+    await send("DELETE", `/api/v1/crews/crew-b/stops/${first.id}`, undefined, EMPLOYER);
+    const next = await json<Schemas["CrewStop"]>(await stop());
+    expect(next.id).not.toBe(first.id);
   });
 
   it("answers 404 for an unknown crew and 422 for a reason outside the contract", async () => {
@@ -796,7 +816,8 @@ describe("reset_demo_site", () => {
     const second = await json<Schemas["CrewStop"]>(await send("POST", "/api/v1/crews/crew-b/stops", { reason_code: "heat" }, EMPLOYER));
 
     expect(second.id).not.toBe(first.id);
-    expect((await send("DELETE", `/api/v1/crews/crew-b/stops/${first.id}`, undefined, EMPLOYER)).status).toBe(204);
+    // The old id belongs to the old epoch: unknown now (404), and the new stop stands.
+    expect((await send("DELETE", `/api/v1/crews/crew-b/stops/${first.id}`, undefined, EMPLOYER)).status).toBe(404);
     expect((await crewList()).find((crew) => crew.id === "crew-b")).toMatchObject({ stopped: true, active_stop_id: second.id });
   });
 
@@ -916,7 +937,10 @@ describe("x-sb-mock-scenario", () => {
       ...(method === "POST" ? { body: JSON.stringify({ reason_code: "heat" }) } : {}),
     });
 
-    expect(res.status).toBeLessThan(300);
+    // The clear names a stop that does not exist in this test (real B3 answers that with a 404): what is pinned is only that the
+    // scenario does not turn it into a 503.
+    if (method === "DELETE") expect(res.status).toBe(404);
+    else expect(res.status).toBeLessThan(300);
   });
 
   it("ignores an unknown scenario", async () => {
