@@ -12,6 +12,10 @@ The 2026 summer is locked (``HELD_OUT_SUMMERS``) until the architect's go-ahead.
 failed, 2 bad usage or configuration, or a held-out summer. Like every ``sb-jobs`` command it reads
 the ``SB_*`` environment, which includes ``SB_DATABASE_URL``, though this command never connects to it.
 
+The warning thresholds of the freeze addendum (pre-registration 6.5; 2024-2025 out-of-fold samples only)::
+
+    sb-jobs freeze theta [--oof PATH] [--ruleset ID] [--out PATH]
+
 The gated 2026 evaluation, behind the pre-registration gate (``jobs/evaluate_2026.py``)::
 
     sb-jobs evaluate-2026 --part forecast|warnings|plans|all [--amendment ID]
@@ -73,6 +77,13 @@ replay_app = typer.Typer(
     help="Replay snapshots: frozen, hashed copies of a summer's forecasts and observations.",
 )
 ml_app.add_typer(replay_app, name="replay")
+freeze_app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_show_locals=False,
+    help="Values the pre-registration's freeze addendum records, computed on 2024-2025 data only.",
+)
+ml_app.add_typer(freeze_app, name="freeze")
 
 
 def _settings() -> Settings:
@@ -165,6 +176,90 @@ def replay_build_command(
                 "models": built.snapshot.models,
                 "files": {file.path: file.sha256 for file in built.snapshot.files},
             }
+        )
+    )
+
+
+@freeze_app.command("theta")
+def freeze_theta_command(
+    oof: Annotated[
+        Path | None,
+        typer.Option("--oof", help="oof_samples_abu_dhabi.parquet (default: artifacts/eval/dev/ at the repo root)."),
+    ] = None,
+    ruleset: Annotated[str, typer.Option("--ruleset", help="Released ruleset whose zones and ban window apply.")] = (
+        "ae-heat-2026.1"
+    ),
+    out: Annotated[
+        Path | None, typer.Option("--out", help="theta.json (default: artifacts/eval/dev/theta.json at the repo root).")
+    ] = None,
+) -> None:
+    """Apply pre-registration 6.5 to the out-of-fold samples and write theta_protect, theta_balanced and the grid.
+
+    Refuses (exit 2, nothing written) a file with any row of summer 2026, an unknown or draft ruleset, an unreadable
+    file, or a set with no truth danger hour. The rule and its one clarification (hours weighted by their non-ban
+    fraction) are in ``stellar_blaze.ml.theta``. Exit codes: 0 written, 1 failed, 2 refused or bad usage.
+    """
+    import hashlib
+    from datetime import UTC, datetime
+
+    import polars as pl
+
+    from stellar_blaze.domain.scoreboard import Provenance, ProvenanceLabel
+    from stellar_blaze.jobs.replay_build import ReplayBuildError, git_head, repo_root
+    from stellar_blaze.ml.artifact_io import write_artifact
+    from stellar_blaze.ml.data import HoldoutViolationError, read_oof_samples
+    from stellar_blaze.ml.eval_inputs import frozen_params, load_frozen_ruleset
+    from stellar_blaze.ml.exporters import OOF_SAMPLES_FILE, PROTOCOL_PATH, SELECTION_ANCHOR
+    from stellar_blaze.ml.theta import select_theta
+
+    settings = _settings()
+    root = repo_root()
+    source = oof if oof is not None else root / "artifacts" / "eval" / "dev" / OOF_SAMPLES_FILE
+    target = out if out is not None else root / "artifacts" / "eval" / "dev" / "theta.json"
+    try:
+        loaded = load_frozen_ruleset(settings.rulesets_dir, ruleset)
+    except (KeyError, OSError, ValueError) as exc:
+        raise typer.BadParameter(f"{ruleset}: {exc}", param_hint="--ruleset") from None
+    try:
+        data = source.read_bytes()
+        frame = read_oof_samples(source)
+    except (OSError, pl.exceptions.PolarsError) as exc:
+        raise typer.BadParameter(f"{source}: {exc}", param_hint="--oof") from None
+    try:
+        git_sha = git_head(root)
+    except ReplayBuildError as exc:
+        _fail(f"freeze theta refused: {exc}")
+    provenance = Provenance(
+        protocol_path=PROTOCOL_PATH,
+        protocol_anchor=SELECTION_ANCHOR,
+        script="stellar_blaze.ml.theta",
+        function="select_theta",
+        git_sha=git_sha,
+        data_sha256=hashlib.sha256(data).hexdigest(),
+        model_id=None,
+        label=ProvenanceLabel.REAL,
+        generated_at=datetime.now(UTC),
+    )
+    try:
+        decision = select_theta(frame, loaded.ruleset, frozen_params(loaded), provenance=provenance)
+    except HoldoutViolationError as exc:
+        typer.echo(f"freeze theta refused: {exc}", err=True)
+        raise typer.Exit(2) from None
+    except ValueError as exc:
+        typer.echo(f"freeze theta refused: {exc}", err=True)
+        raise typer.Exit(2) from None
+    write_artifact(target, decision)
+    typer.echo(
+        json.dumps(
+            {
+                "theta_protect": decision.theta_protect,
+                "theta_balanced": decision.theta_balanced,
+                "red_hour_share": decision.red_hour_share,
+                "n_hours": decision.n_hours,
+                "ruleset_sha256": loaded.sha256,
+                "out": str(target),
+            },
+            sort_keys=True,
         )
     )
 

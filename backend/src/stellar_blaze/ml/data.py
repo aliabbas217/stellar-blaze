@@ -32,6 +32,7 @@ __all__ = [
     "HoldoutViolationError",
     "load_dev_pairs",
     "load_test_pairs",
+    "read_oof_samples",
 ]
 
 DEV_SUMMERS: Final = frozenset({2024, 2025})
@@ -163,3 +164,16 @@ def load_test_pairs(
     if actual != pinned:
         raise HoldoutViolationError(f"{path} has sha256 {actual}, the lock's gold_sha256 is {pinned}")
     return _load(path, summers=DEV_SUMMERS | {TEST_SUMMER}, models=models)
+
+
+def read_oof_samples(path: Path) -> pl.DataFrame:
+    """The dev export ``oof_samples_abu_dhabi.parquet`` as written (2024-2025 out-of-fold samples; no 2026 row).
+
+    A plain read: the consumers (``ml.theta``, the dev scoreboards) refuse a 2026 row themselves, so the file is
+    checked where it is used, not here.
+
+    Raises:
+        OSError: The file cannot be read.
+        polars.exceptions.PolarsError: It is not a Parquet file.
+    """
+    return pl.read_parquet(path)
