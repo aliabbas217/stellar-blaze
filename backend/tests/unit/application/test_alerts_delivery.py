@@ -293,3 +293,163 @@ async def test_a_stops_own_recipients_cannot_be_flooded_by_hanging_subscriptions
     real = [sub_id for sub_id, m in channel.sent if m.crew_id == "crew-b" and m.level is R]
     assert len(real) == 1
     assert channel.peak >= 201  # all of the crew's sends were in flight together (a 16-slot lane peaks at 16)
+
+
+# --- the reserved lane belongs to OPERATOR-RECORDED stops only (fix round 2, finding A) -----------------------------
+
+
+class OriginProbeChannel(RecordingPushChannel):
+    """Crew pushes to every endpoint but one of ``real`` hang for ever. ``cancelled`` counts the hanging sends the
+    dispatch's deadline has cut so far; ``started_at_cancel_count`` is that count when each real send STARTED: a real
+    send that starts before any deadline expired did not wait behind a single hanging one (no sleeps of ours)."""
+
+    def __init__(self, real: set[str]) -> None:
+        super().__init__()
+        self.real = real
+        self.in_flight = 0
+        self.peak = 0
+        self.cancelled = 0
+        self.started_at_cancel_count: dict[str, int] = {}
+
+    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+        self.in_flight += 1
+        self.peak = max(self.peak, self.in_flight)
+        try:
+            if message.audience.value == "crew" and sub.endpoint in self.real:
+                self.started_at_cancel_count[sub.endpoint] = self.cancelled
+            if message.audience.value == "crew" and sub.endpoint not in self.real:
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    self.cancelled += 1
+                    raise
+            return await super().send_to(sub, message)
+        finally:
+            self.in_flight -= 1
+
+
+class HangingEverywhereChannel(RecordingPushChannel):
+    """Every push hangs for ever; ``peak`` is the most sends in flight at once."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_flight = 0
+        self.peak = 0
+
+    async def send_to(self, sub: SubscriptionRecord, message: OutboundMessage) -> DeliveryResult:
+        self.in_flight += 1
+        self.peak = max(self.peak, self.in_flight)
+        try:
+            await asyncio.Event().wait()
+        finally:
+            self.in_flight -= 1
+        raise AssertionError("unreachable: the event is never set")
+
+
+FORECAST_RED_FROM_08Z = dict.fromkeys(range(8, 16), R)  # red announced from 08:00Z, a run at 04:20Z is inside the lead
+RUN_AT = datetime(2026, 7, 1, 4, 20, tzinfo=UTC)
+STOP_AT = datetime(2026, 7, 1, 4, 10, tzinfo=UTC)
+
+
+async def flooded_world(*, stopped: tuple[str, ...], flooded: tuple[str, ...], per_crew: int = 200) -> World:
+    """Forecast red from 08:00Z. Every ``flooded`` crew holds ``per_crew`` hanging subscriptions; every crew in
+    ``stopped`` also has one real subscription and an operator stop recorded at 04:10Z (red from 04:00Z)."""
+    w = await world(FORECAST_RED_FROM_08Z)
+    for crew in flooded:
+        for n in range(per_crew - (1 if crew in stopped else 0)):  # a crew holds at most 200 subscriptions in all
+            await w.subscribe(f"https://push.example/hang-{crew}-{n}", crew=crew)
+    for crew in stopped:
+        await w.subscribe(f"https://push.example/real-{crew}", crew=crew)
+    epoch = await w.sites.active_epoch(SITE_ID)
+    w.clock.now = STOP_AT
+    for crew in stopped:
+        await w.stops.start(crew, "heat", f"lead-{crew[-1]}", epoch)
+    return w
+
+
+@pytest.mark.asyncio
+async def test_forecast_reds_of_other_crews_cannot_delay_an_operator_stop() -> None:
+    """The finding: three crews with a forecast red (200 hanging subscriptions each, the public cap) and ONE operator
+    stop for crew-d with one real subscription. Before the fix every crew red shared one 200-slot lane, so the stop's
+    send was the 601st on it and started only after two batches of hanging sends had been cut by their deadline."""
+    w = await flooded_world(stopped=("crew-d",), flooded=("crew-a", "crew-b", "crew-c"))
+    channel = OriginProbeChannel({"https://push.example/real-crew-d"})
+
+    await asyncio.wait_for(
+        run_with(w, channel, RUN_AT, DeliveryLimits(delivery_deadline_s=0.05, run_budget_s=60)), timeout=30
+    )
+
+    assert channel.started_at_cancel_count == {"https://push.example/real-crew-d": 0}
+    [stop_row] = [r for r in w.crew_events("crew-d") if r.level is R]
+    assert (stop_row.kind, stop_row.valid_from, stop_row.delivered, stop_row.failed) == (
+        "escalate",
+        datetime(2026, 7, 1, 4, tzinfo=UTC),
+        1,
+        0,
+    )
+    for crew in ("crew-a", "crew-b", "crew-c"):  # the forecast reds were announced too (ordinary lane, all cut)
+        [red] = [r for r in w.crew_events(crew) if r.level is R]
+        assert (red.valid_from, red.delivered, red.failed) == (datetime(2026, 7, 1, 8, tzinfo=UTC), 0, 200)
+
+
+@pytest.mark.asyncio
+async def test_forecast_reds_never_use_the_reserved_lane() -> None:
+    """No operator stop at all: three crews with a forecast red and 40 hanging subscriptions each send through the
+    ordinary 16-slot lane (before the fix they peaked at 120 in flight)."""
+    w = await flooded_world(stopped=(), flooded=("crew-a", "crew-b", "crew-c"), per_crew=40)
+    channel = OriginProbeChannel(set())
+
+    await asyncio.wait_for(
+        run_with(w, channel, RUN_AT, DeliveryLimits(delivery_deadline_s=0.02, run_budget_s=60)), timeout=30
+    )
+
+    assert 0 < channel.peak <= 16
+    assert len([r for r in w.alerts.records if r.level is R and r.crew_id is not None]) == len(w.crews)
+
+
+@pytest.mark.asyncio
+async def test_a_stop_on_a_crew_whose_forecast_is_red_later_is_still_an_operator_stop() -> None:
+    """The operator stop is red from 04:00Z, the forecast only from 08:00Z: the event starts at an hour the operator
+    stopped, so it rides the reserved lane even though red was also forecast for that crew."""
+    w = await flooded_world(stopped=("crew-d",), flooded=("crew-d",))
+    channel = OriginProbeChannel({"https://push.example/real-crew-d"})
+
+    await asyncio.wait_for(
+        run_with(w, channel, RUN_AT, DeliveryLimits(delivery_deadline_s=0.05, run_budget_s=60)), timeout=30
+    )
+
+    assert channel.peak >= 200  # all 200 recipients of the stop (the crew cap) in flight together
+    [stop_row] = [r for r in w.crew_events("crew-d") if r.level is R]
+    assert (stop_row.delivered, stop_row.failed) == (1, 199)
+
+
+@pytest.mark.asyncio
+async def test_two_simultaneous_operator_stops_do_not_delay_each_other() -> None:
+    """Two crews stopped in the same cycle, each at the 200-subscription cap (199 hanging plus one real): each stop has
+    its OWN lane, so both real sends start before a single hanging send has been cut by its deadline (a shared 200-slot
+    lane would hold one stop's real send behind the other's 200)."""
+    w = await flooded_world(stopped=("crew-c", "crew-d"), flooded=("crew-c", "crew-d"))
+    channel = OriginProbeChannel({"https://push.example/real-crew-c", "https://push.example/real-crew-d"})
+
+    await asyncio.wait_for(
+        run_with(w, channel, RUN_AT, DeliveryLimits(delivery_deadline_s=0.1, run_budget_s=60)), timeout=30
+    )
+
+    assert channel.started_at_cancel_count == {
+        "https://push.example/real-crew-c": 0,
+        "https://push.example/real-crew-d": 0,
+    }
+    assert channel.peak >= 2 * 199  # both stops' hanging recipients were in flight together
+
+
+@pytest.mark.asyncio
+async def test_ordinary_events_stay_capped_at_sixteen_sends() -> None:
+    w = await world(AMBER_FROM_10)
+    for n in range(100):
+        await w.subscribe(f"https://push.example/site-{n}")
+    channel = HangingEverywhereChannel()
+    await asyncio.wait_for(
+        run_with(w, channel, AT, DeliveryLimits(delivery_deadline_s=0.01, run_budget_s=60)), timeout=30
+    )
+
+    assert channel.peak == 16

@@ -16,7 +16,8 @@ hourly level timeline with the last event of that target in the epoch:
   reach the crew only at 12:00).
 
 ``dispatch`` is the use case ``sb-jobs alerts dispatch`` runs. The crew level it computes includes the crew's active
-stops of the ACTIVE epoch, through the same helpers ``day_plan`` uses (``stopped_mask``, ``crew_hours``), so a stop
+stops of the ACTIVE epoch, through the same helpers ``day_plan`` uses (``stopped_mask``, ``stopped_hours``,
+``crew_hours``), so a stop
 recorded between two runs is escalated by the NEXT run: one immediate ``red`` crew event, no dwell, no sign-off wait
 (there is no HTTP trigger, ADR 0058 decision 5). Cadence: ``alert_dispatch_interval_minutes`` of the active config is
 stored on every ``alert_event`` row and in the ``alerts.dispatched`` audit row of each run that created, delivered or
@@ -27,12 +28,20 @@ delivery deadline of being recorded (about 5 min 45 s with the defaults: 300 s +
 source or push service does: the worst case is a stop recorded just after the previous cycle read the stops; the next
 cycle starts one period after that one STARTED, spends at most the forecast-leg deadline in phase A (the forecast fetch
 is cut and the day falls back to the protective one, so the stop is still read and escalated), and its stop sends then
-start at once in their own lane and end within one delivery deadline. ``prepare`` (phase A: every target of a site,
+start at once in their own lane and end within one delivery deadline (this holds for an OPERATOR-RECORDED stop: see the
+lanes below). ``prepare`` (phase A: every target of a site,
 database reads only, no call to a push service) computes the new events and their recipients; ``deliver`` (phase B, over
 every prepared site at once) sends them all concurrently, ORDERED by severity (escalations before de-escalations, higher
-level first, crew before site: a stop is a red crew escalation, so it is first in the queue). Ordinary events share one
-bounded semaphore (16); crew red escalations (stops) have a RESERVED lane sized to the per-crew subscription cap (200),
-so a crew's recipients all send at once and public subscriptions that hang can neither queue nor delay them. Each send
+level first, crew before site: a stop is a red crew escalation, so it is early in the queue). Ordinary events, a
+FORECAST-driven crew red included, share one bounded semaphore (16). An OPERATOR-RECORDED stop (the crew's red
+escalation whose ``valid_from`` is an hour a crew-lead stop of the ``CrewStopStore`` covers,
+``_Pending.operator_stop``) has a
+RESERVED lane of its own: one ``asyncio.Semaphore`` PER STOP sized to the per-crew subscription cap (200), so all of its
+recipients send at once and neither public subscriptions that hang nor another crew's flood nor another stop can queue
+or delay them. The residual: a forecast-driven crew red is an ordinary-lane event and CAN be delayed (it waits its turn
+behind hanging sends, up to one delivery deadline per batch of 16); an operator stop cannot. The connector of a pooling
+channel is provisioned for the ordinary lane plus ``SIMULTANEOUS_STOPS_PROVISIONED`` stop lanes (``ports.push``).
+Each send
 is under a hard per-delivery deadline (the channel's timeout plus a margin) and the whole run under a per-run deadline
 anchored at the START OF THE CYCLE (``period - margin``, phase A counts against it): a send that times out, or that
 cannot start before the run deadline, counts as ``failed`` with detail ``deadline``, and the event row is still
@@ -64,7 +73,7 @@ from typing import Final, Literal
 import structlog
 from pydantic import JsonValue
 
-from stellar_blaze.application.day_plan import crew_hours, stopped_mask
+from stellar_blaze.application.day_plan import crew_hours, stopped_hours, stopped_mask
 from stellar_blaze.application.runtime_config import ConfigSnapshot, ruleset_for
 from stellar_blaze.application.site_day import SiteDay, effective_params
 from stellar_blaze.domain.plans.model import CrewSpec
@@ -101,7 +110,7 @@ logger = structlog.stdlib.get_logger(__name__)
 _HOUR: Final = timedelta(hours=1)
 _ORDER: Final = tuple(AlertLevel)  # declared in ascending severity
 SEND_CONCURRENCY: Final = ORDINARY_SEND_CONCURRENCY
-STOP_LANE_CONCURRENCY: Final = MAX_SUBSCRIPTIONS_PER_CREW  # the reserved lane of crew red escalations
+STOP_LANE_CONCURRENCY: Final = MAX_SUBSCRIPTIONS_PER_CREW  # the size of EACH operator stop's own reserved lane
 MIN_PERIOD_S: Final = 60.0
 RUN_MARGIN_S: Final = 10.0  # the run deadline is the period minus this: a run ends before the next one starts
 DELIVERY_MARGIN_S: Final = 2.0  # the per-delivery deadline is the channel's own timeout plus this
@@ -201,7 +210,8 @@ class DeliveryLimits:
     """Bounds of phase B. ``None`` deadlines are derived: the channel's timeout plus a margin, and the period minus a
     margin. ``monotonic`` is injectable (a test advances it). ``started_at`` is the ``monotonic`` reading at the START
     OF THE CYCLE: the run deadline is anchored there (phase A counts against the budget); ``None`` anchors it at the
-    start of ``deliver``. ``stop_concurrency`` is the size of the reserved lane of crew red escalations."""
+    start of ``deliver``. ``stop_concurrency`` is the size of the reserved lane of EACH operator-recorded stop (a
+    semaphore per stop)."""
 
     concurrency: int = SEND_CONCURRENCY
     delivery_deadline_s: float | None = None
@@ -215,6 +225,7 @@ class DeliveryLimits:
 class _Target:
     crew_id: str | None
     levels: list[tuple[datetime, AlertLevel | None]]
+    stopped: frozenset[datetime] = frozenset()  # the hours an operator-recorded stop covers (crews only)
 
 
 @dataclass(frozen=True)
@@ -226,6 +237,7 @@ class _Pending:
     key: str
     recipients: tuple[SubscriptionRecord, ...]
     after: int | None  # index of the previous event of the same target in ``Prepared.pending``: stored before this one
+    operator_stop: bool = False  # origin: a crew-lead stop (reserved lane), not a forecast (internal, not in the API)
 
 
 @dataclass(frozen=True)
@@ -297,7 +309,13 @@ async def prepare(
     for crew in crews:
         found = await stops.active_between(crew.crew_id, start, end, epoch)
         mask = stopped_mask([(s.started_at, s.cleared_at) for s in found], start)
-        targets.append(_Target(crew.crew_id, [(h.starts_at, h.level) for h in crew_hours(site_day, mask, start)]))
+        targets.append(
+            _Target(
+                crew.crew_id,
+                [(h.starts_at, h.level) for h in crew_hours(site_day, mask, start)],
+                stopped_hours(site_day, mask, start),
+            )
+        )
 
     pending: list[_Pending] = []
     for target in targets:
@@ -330,7 +348,13 @@ async def prepare(
                 valid_from=alert.valid_from,
                 template_id=END_TEMPLATE if alert.level is AlertLevel.GREEN else CHANGE_TEMPLATE,
             )
-            pending.append(_Pending(alert, message, key, recipients, previous))
+            operator_stop = (
+                target.crew_id is not None
+                and alert.level is AlertLevel.RED
+                and alert.kind == "escalate"
+                and alert.valid_from in target.stopped
+            )
+            pending.append(_Pending(alert, message, key, recipients, previous, operator_stop))
             previous = len(pending) - 1
     return Prepared(report, site_day, epoch, snapshot, tuple(pending))
 
@@ -345,8 +369,11 @@ def _priority(item: _Pending) -> tuple[int, int, int]:
 
 
 def _is_stop(item: _Pending) -> bool:
-    """A crew RED escalation: what a crew-lead stop produces (a forecast red for the crew too): the reserved lane."""
-    return item.message.crew_id is not None and item.alert.level is AlertLevel.RED and item.alert.kind == "escalate"
+    """An OPERATOR-RECORDED stop: a crew red escalation that starts at an hour a stop row of the ``CrewStopStore``
+    covers (what a crew-lead stop produces); it gets a reserved lane. A forecast-driven crew red is NOT one (it starts
+    at an hour no stop covers): it is an ordinary-lane event, because a flood of forecast reds across crews must never
+    queue an operator's stop. The origin is decided in ``prepare`` from the stop rows, never from level and kind."""
+    return item.operator_stop
 
 
 async def dispatch(
@@ -379,8 +406,8 @@ async def dispatch(
         snapshot: The active config snapshot; with no ``version_id`` nothing is persisted and nothing is sent.
         catalog: The rulesets (the tunables resolve against the one in force on the date).
         now: The DOMAIN time of the run (a replay clock in replay mode), timezone-aware.
-        limits: Phase B bounds (defaults: 16 concurrent sends and a reserved 200-send lane for crew red escalations,
-            the channel's timeout plus 2 s per send, the period minus 10 s for the run).
+        limits: Phase B bounds (defaults: 16 concurrent sends for ordinary events and a reserved 200-send lane PER
+            operator-recorded stop, the channel's timeout plus 2 s per send, the period minus 10 s for the run).
 
     Raises:
         ConfigParametersError, NoRulesetError, RulesetIncompleteError, SiteNotFoundError: Deployment or caller faults.
@@ -424,7 +451,6 @@ async def deliver(
         per_send = (channel.timeout_s if channel is not None else 0.0) + DELIVERY_MARGIN_S
     run_deadline = (mono() if bounds.started_at is None else bounds.started_at) + budget
     gate = asyncio.Semaphore(bounds.concurrency)
-    stop_gate = asyncio.Semaphore(bounds.stop_concurrency)
 
     async def send(
         active: PushChannel, sub: SubscriptionRecord, message: OutboundMessage, lane: asyncio.Semaphore
@@ -454,7 +480,9 @@ async def deliver(
     sends: dict[tuple[int, int], list[asyncio.Task[DeliveryResult]]] = {}
     for i, j in order:
         item = prepared[i].pending[j]
-        lane = stop_gate if _is_stop(item) else gate
+        # One lane PER operator stop: a stop has at most ``stop_concurrency`` (the per-crew cap) recipients, so its own
+        # semaphore never makes one of them wait, and no other stop or event can take a slot of it.
+        lane = asyncio.Semaphore(bounds.stop_concurrency) if _is_stop(item) else gate
         sends[(i, j)] = (
             [asyncio.create_task(send(channel, sub, item.message, lane)) for sub in item.recipients]
             if channel is not None

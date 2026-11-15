@@ -11,13 +11,21 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from stellar_blaze.ports.notifications import DeliveryResult, OutboundMessage
 
-# The public subscribe route is capped at this many subscriptions per crew and epoch. The dispatch gives crew red
-# escalations (stops) a send lane of exactly this size, so one crew's recipients all send at once whatever the other
-# lane does; ``ORDINARY_SEND_CONCURRENCY`` is the lane of every other event. A channel that pools connections must allow
-# at least ``CONNECTION_LIMIT`` of them (the sum of both lanes).
+# The public subscribe route is capped at this many subscriptions per crew and epoch. The dispatch gives EACH
+# operator-recorded stop (a crew-lead stop, never a forecast-driven red) its own send lane of exactly this size, so that
+# stop's recipients all send at once whatever any other event or stop does; ``ORDINARY_SEND_CONCURRENCY`` is the one
+# shared lane of every other event (a forecast red included, which can therefore be delayed by hanging subscriptions).
+#
+# A channel that pools connections must allow at least ``CONNECTION_LIMIT``: the ordinary lane plus
+# ``SIMULTANEOUS_STOPS_PROVISIONED`` stop lanes. 4 is the number of crews of the demo site (all of them stopped in the
+# same cycle is the worst case of one site; operator stops are rate limited to 30 per 60 s per token and almost never
+# coincide). Beyond that bound nothing fails at once: the excess sends wait for a free connection INSIDE their
+# per-delivery deadline and, if none frees up, fail with ``deadline`` (a stop's recipients that cannot connect in time
+# are failed and counted, never retried). Raise the constant (and the host's file-descriptor limit) to provision more.
 MAX_SUBSCRIPTIONS_PER_CREW: Final = 200
 ORDINARY_SEND_CONCURRENCY: Final = 16
-CONNECTION_LIMIT: Final = MAX_SUBSCRIPTIONS_PER_CREW + ORDINARY_SEND_CONCURRENCY
+SIMULTANEOUS_STOPS_PROVISIONED: Final = 4
+CONNECTION_LIMIT: Final = ORDINARY_SEND_CONCURRENCY + SIMULTANEOUS_STOPS_PROVISIONED * MAX_SUBSCRIPTIONS_PER_CREW
 
 
 class NewSubscription(BaseModel):

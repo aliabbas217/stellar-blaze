@@ -12,8 +12,10 @@ active is recorded as skipped, not stacked).
   when no cycle has ever read one) and it waits ``max(0, period - elapsed)`` after a cycle, so a cycle starts one period
   after the previous one STARTED, however long the run took. The escalation SLA follows: a crew stop is delivered within
   one period plus the forecast-leg deadline plus one delivery deadline of being recorded (about 5 min 45 s with the
-  defaults). The worst case is a stop recorded just after the previous cycle read the stops: the next cycle starts one
-  period after that one started, its forecast leg is cut at ``min(30 s, period / 4)`` (``forecast_deadline_s``: a stop
+  defaults). This is the guarantee of an OPERATOR-RECORDED stop, which sends in a reserved lane of its own; a
+  forecast-driven crew red is an ordinary-lane event and can be delayed under a flood of hanging subscriptions. The
+  worst case is a stop recorded just after the previous cycle read the stops: the next cycle starts one period after
+  that one started, its forecast leg is cut at ``min(30 s, period / 4)`` (``forecast_deadline_s``: a stop
   needs no forecast, so a hanging weather source costs the stop at most that, then the protective fallback day is used
   and the stop is read and escalated), and its sends are bounded (``application.alerts``). A loop that never waits is
   impossible: the period is at least 60 s and a failing cycle that returns at once still waits the rest of it;

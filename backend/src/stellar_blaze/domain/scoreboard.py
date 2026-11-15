@@ -73,7 +73,8 @@ class Metric(ArtifactModel):
     value: float = Field(description="Point estimate, in the unit the field name or description states.")
     ci: Interval | None = Field(
         description="95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which "
-        "more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days)."
+        "more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days). A lead "
+        "with no rows carries ci null and n 0 on its truth_danger_hours."
     )
     n: int = Field(description="Number of observations behind the value (days, hours or ticks, as the field says).")
     anchor: str = Field(description="Heading slug of the pre-registration section that defines this metric.")
@@ -141,8 +142,10 @@ class PolicyRow(ArtifactModel):
     rule: str = Field(description="One-line definition of when the policy warns an hour.")
     theta: float | None = Field(
         description="Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws "
-        "are one realization per stratum (50 samples, fixed seed), so a probability here and the live product's for "
-        "the same hour can differ by up to about 0.07 at p = 0.5."
+        "are one realization per stratum (50 samples, fixed seed): one standard error of a share of 50 samples is "
+        "about 0.07 at p = 0.5, and two independent draws (the scoreboard and the live product) differ by about "
+        "0.10 (one "
+        "standard deviation) for the same hour."
     )
     missed_danger_hours: Metric = Field(
         description="Truth-High (or Red) worked hours not warned, weighted by non-ban fraction."
@@ -324,8 +327,10 @@ class DemoDayHour(ArtifactModel):
     )
     p_high: float | None = Field(
         description="P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws "
-        "are one realization per stratum (50 samples, fixed seed), so this probability and the live product's for the "
-        "same hour can differ by up to about 0.07 at p = 0.5."
+        "are one realization per stratum (50 samples, fixed seed): one standard error of a share of 50 samples is "
+        "about 0.07 at p = 0.5, and two independent draws (this scoreboard and the live product) differ by about "
+        "0.10 (one "
+        "standard deviation) for the same hour."
     )
     protective_twl_w_m2: float | None = Field(
         description="10th percentile of the corrected effective TWL in W/m2 (the plan quantile)."

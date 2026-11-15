@@ -57,6 +57,7 @@ __all__ = [
     "day_plan",
     "plan_segments",
     "protective_timeline",
+    "stopped_hours",
     "stopped_mask",
 ]
 
@@ -402,11 +403,21 @@ async def day_plan(
     )
 
 
+def stopped_hours(site_day: SiteDay, mask: list[bool], start: datetime) -> frozenset[datetime]:
+    """The ``starts_at`` of every hour of the day that a stop covers (any of its ticks is masked): the hours
+    ``crew_hours`` turns red. The alert dispatch uses it to tell an operator-recorded stop from a forecast red."""
+    return frozenset(
+        hour.starts_at
+        for hour in site_day.hours
+        if any(mask[i] for i in range(_TICKS) if hour.starts_at <= start + _TICK * i < hour.starts_at + _HOUR)
+    )
+
+
 def crew_hours(site_day: SiteDay, mask: list[bool], start: datetime) -> tuple[CrewHour, ...]:
     out: list[CrewHour] = []
+    stopped_at = stopped_hours(site_day, mask, start)
     for hour in site_day.hours:
-        stopped = any(mask[i] for i in range(_TICKS) if hour.starts_at <= start + _TICK * i < hour.starts_at + _HOUR)
-        if stopped:
+        if hour.starts_at in stopped_at:
             out.append(CrewHour(hour.starts_at, Zone.RED, AlertLevel.RED))
         else:
             out.append(CrewHour(hour.starts_at, hour.zone, hour.level))

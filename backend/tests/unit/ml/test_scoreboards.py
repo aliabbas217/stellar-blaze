@@ -13,6 +13,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
+import numpy as np
 import polars as pl
 import pytest
 
@@ -532,6 +533,45 @@ def test_a_warned_run_across_the_ban_hours_is_two_alerts() -> None:
     assert alerts_of((7, 8, 9, 10, 11, 12)) == pytest.approx(2.0)
 
 
+def alerts_of_rows(rows: list[E]) -> float:
+    return row(two_day_board(rows), "P1").alerts_per_shift.value
+
+
+def two_day_board(entries: list[E]) -> PolicyScoreboard:
+    """P1 on the two days 1 and 2 July 2025 (ban season), whatever rows ``entries`` has."""
+    return scoreboards.warnings_scoreboard(
+        make_rows(entries),
+        theta_protect=0.30,
+        theta_balanced=0.35,
+        ruleset=released_ruleset(),
+        params=default_params(),
+        context=context(date(2025, 7, 1), date(2025, 7, 2)),
+        leads=(1,),
+    )
+
+
+def test_a_warned_last_hour_of_one_day_and_a_warned_first_hour_of_the_next_are_two_alerts() -> None:
+    """The time-adjacency term of ``_runs``: 14Z of day 1 and 06Z of day 2 are neighbors in the flattened array but
+    16 hours apart, so they are two runs (the mutant ``flag & ~previous`` joins them: 1 run for two shift days)."""
+    entries = [
+        E(at(2025, 7, d, h), raw_wbgt=33.0 if (d, h) in {(1, 14), (2, 6)} else 25.0)
+        for d in (1, 2)
+        for h in range(6, 15)
+    ]
+
+    assert alerts_of_rows(entries) == pytest.approx(2 / 2)  # 2 runs over 2 shift days
+
+
+def test_a_missing_row_between_two_warned_hours_splits_the_run() -> None:
+    """06Z and 08Z are warned and the 07Z row is absent (an hour the export has no row for): the hours are not
+    consecutive in time, so two runs; with the 07Z row present and warned it is one."""
+    gap = [E(at(2025, 7, 1, h), raw_wbgt=33.0) for h in (6, 8)]
+    whole = [E(at(2025, 7, 1, h), raw_wbgt=33.0) for h in (6, 7, 8)]
+
+    assert row(one_day_board(gap), "P1").alerts_per_shift.value == pytest.approx(2.0)
+    assert row(one_day_board(whole), "P1").alerts_per_shift.value == pytest.approx(1.0)
+
+
 # --- the withdrawal cell of the 2 x 2 -------------------------------------------------------------------------------
 
 
@@ -657,8 +697,49 @@ def test_a_sparse_policy_keeps_its_interval_when_a_few_replicates_are_undefined(
     far = row(sparse_board(warn_days), "P1").far
     assert far.value == pytest.approx(0.5)
     assert far.ci is not None
-    assert 0.0 <= far.ci.lo <= 0.5 <= far.ci.hi <= 1.0
     assert far.n == 4
+    # Recomputed here from the module's own replicate sums (the primitive the interval is built on), dropping the
+    # undefined replicates with plain numpy: exactly ONE of the 2,000 is undefined (not the "about 1%" of the comment
+    # above: the blocks cover a day with probability 7/40 each), and the defined ones reach both ends of [0, 1].
+    sums = replicate_sums_of(warn_days)
+    defined = sums[:, 1] > 0.0
+    assert int((~defined).sum()) == 1
+    lo, hi = np.percentile(sums[defined, 0] / sums[defined, 1], [2.5, 97.5])
+    assert (far.ci.lo, far.ci.hi) == pytest.approx((float(lo), float(hi)))
+    assert (far.ci.lo, far.ci.hi) == (0.0, 1.0)  # pinned: with one undefined replicate, dropping and zero-filling agree
+
+
+def replicate_sums_of(warn_days: dict[int, bool]) -> Any:
+    layout, columns = bootstrap._layout(far_daily(warn_days), value="value", weight="weight")  # noqa: SLF001
+    return bootstrap._replicate_sums(  # noqa: SLF001
+        layout,
+        columns,
+        block_days=scoreboards.BOOTSTRAP_BLOCK_DAYS,
+        n_boot=scoreboards.BOOTSTRAP_REPLICATES,
+        seed=bootstrap.DEFAULT_SEED,
+    )
+
+
+def test_undefined_replicates_are_dropped_not_counted_as_zero() -> None:
+    """P1 warns on days 0, 3 and 14, every one a false alarm: in every DEFINED replicate the numerator equals the
+    denominator, so the ratio is exactly 1 and the interval is [1, 1] by hand. 80 of the 2,000 replicates (4%, above
+    the 2.5% tail and below the 5% limit) resample none of the three days: dropped they leave [1, 1]; a mutant that
+    zero-fills them puts 4% of the mass at 0 and the lower end falls to 0."""
+    warn_days = {0: False, 3: False, 14: False}
+    sums = replicate_sums_of(warn_days)
+    undefined = int((sums[:, 1] <= 0.0).sum())
+    assert (
+        0.025 * scoreboards.BOOTSTRAP_REPLICATES
+        < undefined
+        <= scoreboards.UNDEFINED_REPLICATE_LIMIT * (scoreboards.BOOTSTRAP_REPLICATES)
+    )  # the premise: a tail's worth of replicates is undefined, yet fewer than the limit
+
+    far = row(sparse_board(warn_days), "P1").far
+
+    assert far.value == pytest.approx(1.0)
+    assert far.ci is not None
+    assert (far.ci.lo, far.ci.hi) == (1.0, 1.0)
+    assert far.n == 3
 
 
 def test_a_policy_with_most_replicates_undefined_has_no_interval_but_keeps_its_value() -> None:

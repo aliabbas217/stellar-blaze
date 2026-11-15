@@ -21,10 +21,12 @@ the session is hardened against server-side request forgery (the host allow-list
 
 * a REDIRECT is never followed: a ``TraceConfig`` raises ``RedirectRefusedError`` on the first one (FAILED
   ``redirect``); the response that asked for it is the only request that reaches that server;
-* a NAME that resolves to any non-global address (private, loopback, link-local, reserved, multicast, unspecified) is
-  refused by ``PublicOnlyResolver`` before a connection is made (FAILED ``blocked``). An IP literal is not resolved by
-  aiohttp: the subscribe route refuses those (``api.push_validation``);
-* the connector allows ``CONNECTION_LIMIT`` connections (the sum of the dispatch's two send lanes).
+* a NAME that resolves to any non-global address (private, loopback, link-local, reserved, multicast, unspecified) or
+  to an IPv6 address inside a refused transition network (IPv4-mapped, IPv4-compatible, NAT64, 6to4, Teredo:
+  ``_REFUSED_V6_NETWORKS``) is refused by ``PublicOnlyResolver`` before a connection is made (FAILED ``blocked``). An
+  IP literal is not resolved by aiohttp: the subscribe route refuses those (``api.push_validation``);
+* the connector allows ``CONNECTION_LIMIT`` connections (the ordinary lane plus ``SIMULTANEOUS_STOPS_PROVISIONED``
+  operator-stop lanes, ``ports.push``; sends beyond it wait for a connection inside their delivery deadline).
 """
 
 import ipaddress
@@ -83,12 +85,30 @@ class BlockedAddressError(Exception):
     """A host name resolved to an address that is not globally routable: no connection is made."""
 
 
+# IPv6 networks that carry an IPv4 address (or are a transition mechanism to one). No push service is reached through
+# them, and they can smuggle an internal IPv4 target past a check that only reads the IPv6 flags, so they are refused
+# outright (not unwrapped and judged: a resolver answer in one of them is never a legitimate public push service). The
+# verdict must not rest on the standard library's tables, which gained and changed rows across 3.12.x and 3.13.x
+# (``ipaddress`` once called 64:ff9b::7f00:1 global); ``is_global`` below stays as the second, general check.
+_REFUSED_V6_NETWORKS: Final = tuple(
+    ipaddress.IPv6Network(prefix)
+    for prefix in (
+        "::/96",  # IPv4-compatible (deprecated, RFC 4291 2.5.5.1), also the unspecified and loopback addresses
+        "::ffff:0:0/96",  # IPv4-mapped (RFC 4291 2.5.5.2)
+        "64:ff9b::/96",  # NAT64 well-known prefix (RFC 6052)
+        "64:ff9b:1::/48",  # NAT64 local-use prefix (RFC 8215)
+        "2002::/16",  # 6to4 (RFC 3056; deprecated by RFC 7526)
+        "2001::/32",  # Teredo (RFC 4380)
+    )
+)
+
+
 def _is_public(address: str) -> bool:
-    """Globally routable and unicast: ``is_global`` alone still accepts multicast (224.0.0.1), so the listed classes are
-    refused explicitly too. An IPv4-mapped IPv6 address (``::ffff:10.0.0.1``) is judged as the IPv4 it carries."""
+    """Globally routable unicast, and not in a refused IPv6 transition network (``_REFUSED_V6_NETWORKS``): ``is_global``
+    alone still accepts multicast (224.0.0.1), so the listed classes are refused explicitly too."""
     ip = ipaddress.ip_address(address)
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address) and any(ip in network for network in _REFUSED_V6_NETWORKS):
+        return False
     return ip.is_global and not (
         ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified
     )
@@ -96,8 +116,9 @@ def _is_public(address: str) -> bool:
 
 class PublicOnlyResolver(AbstractResolver):
     """Resolves through ``inner`` (default: aiohttp's ``ThreadedResolver``) and refuses the whole answer when ANY
-    address is not public (not ``is_global``, or private, loopback, link-local, reserved, multicast, unspecified): a
-    public name that points inside the network must not turn a push into a request to an internal service."""
+    address is not public (not ``is_global``, or private, loopback, link-local, reserved, multicast, unspecified, or in
+    a refused IPv6 transition network): a public name that points inside the network must not turn a push into a
+    request to an internal service."""
 
     def __init__(self, inner: AbstractResolver | None = None) -> None:
         self._inner = inner  # the default is built on first use: ``ThreadedResolver`` needs a running event loop

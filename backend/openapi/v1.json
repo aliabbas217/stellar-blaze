@@ -1026,7 +1026,7 @@
                 "type": "null"
               }
             ],
-            "description": "P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws are one realization per stratum (50 samples, fixed seed), so this probability and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.",
+            "description": "P(High or worse) from the corrected joint samples, 0 to 1; null when no finite sample. The draws are one realization per stratum (50 samples, fixed seed): one standard error of a share of 50 samples is about 0.07 at p = 0.5, and two independent draws (this scoreboard and the live product) differ by about 0.10 (one standard deviation) for the same hour.",
             "title": "P High"
           },
           "protective_twl_w_m2": {
@@ -1406,7 +1406,7 @@
                 "type": "null"
               }
             ],
-            "description": "95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days)."
+            "description": "95% bootstrap interval; null where none is defined: a ratio with no denominator, or one for which more than 5% of the 2,000 bootstrap replicates are undefined (a policy that warned on very few days). A lead with no rows carries ci null and n 0 on its truth_danger_hours."
           },
           "n": {
             "description": "Number of observations behind the value (days, hours or ticks, as the field says).",
@@ -2156,7 +2156,7 @@
                 "type": "null"
               }
             ],
-            "description": "Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws are one realization per stratum (50 samples, fixed seed), so a probability here and the live product's for the same hour can differ by up to about 0.07 at p = 0.5.",
+            "description": "Warning threshold on P(High or Red) for the P3 rows; null for P0, P1 and P2. The corrected draws are one realization per stratum (50 samples, fixed seed): one standard error of a share of 50 samples is about 0.07 at p = 0.5, and two independent draws (the scoreboard and the live product) differ by about 0.10 (one standard deviation) for the same hour.",
             "title": "Theta"
           }
         },

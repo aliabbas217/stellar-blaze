@@ -3,6 +3,7 @@ the endpoint and keys never reach a log line or a result. The library call is ca
 runs the REAL library against a local push service to prove the parameter names and the 404/410 behavior."""
 
 import base64
+import ipaddress
 import json
 import logging
 import socket
@@ -304,6 +305,92 @@ async def test_the_public_only_resolver_refuses_a_non_global_answer(address: str
         await resolver.resolve("push.test", 443)
 
 
+# IPv6 forms that embed an IPv4 address (fix round 2, finding B). Python 3.13.15 already refuses every one of them
+# (``is_reserved`` for ::/8 and so 64:ff9b::/96, ``is_private`` for the rest), but the verdict then rests on the
+# stdlib's tables, which changed across 3.12.x/3.13.x; ``_REFUSED_V6_NETWORKS`` states it in the code.
+EMBEDDING_FORMS = [
+    "::ffff:127.0.0.1",  # IPv4-mapped, loopback
+    "::ffff:10.0.0.1",  # IPv4-mapped, private
+    "::ffff:93.184.216.34",  # IPv4-mapped, PUBLIC: still refused (no push service is reached through a mapped address)
+    "64:ff9b::7f00:1",  # NAT64 well-known prefix, loopback
+    "64:ff9b::a00:1",  # NAT64, private
+    "64:ff9b::5db8:d822",  # NAT64, public 93.184.216.34
+    "64:ff9b:1::7f00:1",  # NAT64 local-use prefix, loopback
+    "64:ff9b:1::a00:1",  # NAT64 local-use, private
+    "2002:7f00:1::1",  # 6to4, loopback
+    "2002:0a00:0001::1",  # 6to4, private
+    "2002:5db8:d822::1",  # 6to4, public 93.184.216.34
+    "2001:0:4136:e378:8000:63bf:80ff:fffe",  # Teredo, obfuscated client 127.0.0.1
+    "2001:0:4136:e378:8000:63bf:f5ff:fffe",  # Teredo, obfuscated client 10.0.0.1
+    "::127.0.0.1",  # deprecated IPv4-compatible, loopback
+    "::10.0.0.1",  # deprecated IPv4-compatible, private
+]
+PUBLIC_ADDRESSES = ["93.184.216.34", "8.8.8.8", "2606:4700::1111", "2001:4860:4860::8888", "2a00:1450:4001::200e"]
+
+
+@pytest.mark.parametrize("address", EMBEDDING_FORMS)
+async def test_the_public_only_resolver_refuses_an_ipv6_address_that_embeds_an_ipv4(address: str) -> None:
+    resolver = PublicOnlyResolver(FakeDns({"push.test": [address]}))
+    with pytest.raises(BlockedAddressError):
+        await resolver.resolve("push.test", 443)
+
+    mixed = PublicOnlyResolver(FakeDns({"push.test": ["2606:4700::1111", address]}))
+    with pytest.raises(BlockedAddressError):  # ONE refused address blocks the whole name
+        await mixed.resolve("push.test", 443)
+
+
+@pytest.mark.parametrize("address", PUBLIC_ADDRESSES)
+async def test_the_public_only_resolver_passes_public_ipv4_and_ipv6(address: str) -> None:
+    resolver = PublicOnlyResolver(FakeDns({"push.test": [address]}))
+
+    assert [a["host"] for a in await resolver.resolve("push.test", 443)] == [address]
+
+
+def _constant(value: bool) -> property:
+    return property(lambda _self: value)
+
+
+@pytest.mark.parametrize("address", EMBEDDING_FORMS)
+async def test_the_refused_prefixes_do_not_depend_on_the_standard_librarys_tables(
+    address: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Simulate a Python whose tables call every address global (the NAT64 and 6to4 rows were added to ``ipaddress``
+    in 3.12.4/3.13: an older patch release judged ``64:ff9b::7f00:1`` global): the explicit list still refuses."""
+    for attribute, value in (
+        ("is_global", True),
+        ("is_private", False),
+        ("is_reserved", False),
+        ("is_loopback", False),
+        ("is_link_local", False),
+        ("is_multicast", False),
+        ("is_unspecified", False),
+    ):
+        monkeypatch.setattr(ipaddress.IPv6Address, attribute, _constant(value))
+    resolver = PublicOnlyResolver(FakeDns({"push.test": [address]}))
+    with pytest.raises(BlockedAddressError):
+        await resolver.resolve("push.test", 443)
+
+    ok = PublicOnlyResolver(FakeDns({"push.test": ["2606:4700::1111"]}))
+    assert [a["host"] for a in await ok.resolve("push.test", 443)] == ["2606:4700::1111"]
+
+
+@pytest.mark.parametrize("address", EMBEDDING_FORMS)
+async def test_a_name_that_resolves_to_an_embedding_address_is_blocked_before_any_connection(address: str) -> None:
+    """The send itself: FAILED ``blocked``, and the fake DNS was asked exactly once (nothing else was attempted)."""
+    secret, p256dh, auth = _real_keys()
+    store = InMemoryPushStore()
+    dns = FakeDns({"push.example.test": [address]})
+    record = await _record_for(store, "https://push.example.test/send", p256dh, auth)
+    channel = WebPushChannel(secret, SUBJECT, store, resolver=PublicOnlyResolver(dns))
+    try:
+        result = await channel.send_to(record, message())
+    finally:
+        await channel.aclose()
+
+    assert (result.status, result.detail) == (DeliveryStatus.FAILED, "blocked")
+    assert dns.asked == ["push.example.test"]
+
+
 async def test_the_public_only_resolver_refuses_when_any_address_is_non_global_and_passes_public_ones() -> None:
     mixed = PublicOnlyResolver(FakeDns({"push.test": ["93.184.216.34", "10.0.0.1"]}))
     public = PublicOnlyResolver(FakeDns({"push.test": ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"]}))
@@ -396,14 +483,14 @@ async def test_a_name_that_resolves_to_a_private_address_is_blocked_before_conne
     assert hits == []
 
 
-async def test_the_channels_default_resolver_is_the_public_only_one_and_the_connector_has_room_for_both_lanes() -> None:
+async def test_the_default_resolver_is_public_only_and_the_connector_fits_the_ordinary_and_four_stop_lanes() -> None:
     store = InMemoryPushStore()
     channel = WebPushChannel("key", SUBJECT, store)
     try:
         session = channel._session_in_use()  # noqa: SLF001
         connector = session.connector
         assert isinstance(connector, aiohttp.TCPConnector)
-        assert connector.limit == CONNECTION_LIMIT == 216
+        assert connector.limit == CONNECTION_LIMIT == 816
         assert isinstance(connector._resolver, PublicOnlyResolver)  # noqa: SLF001
     finally:
         await channel.aclose()
