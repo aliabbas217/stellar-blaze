@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Stub for curl, used by infra/scripts/tests/run.sh. Never touches the network.
+# No script in this chunk calls curl yet; later chunks (health gate, smoke test) extend this file.
+# Behaviour is chosen by $STUB_SCENARIO:
+#   curlfail   exit 22 (what `curl -f` returns on an HTTP error)
+#   anything else: print a healthy JSON body and exit 0
+set -euo pipefail
+
+if [ "${STUB_SCENARIO:-ok}" = "curlfail" ]; then
+  exit 22
+fi
+printf '{"status":"ok"}\n'

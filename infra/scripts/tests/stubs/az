@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Stub for the Azure CLI, used by infra/scripts/tests/run.sh. Never contacts Azure.
+# The canned JSON below is INVENTED to exercise the scripts; it is not captured from real Azure output.
+# Behaviour is chosen by $STUB_SCENARIO:
+#   ok           everything passes, PostgreSQL 18 offered
+#   pg17         as ok, but no "18" version entry in list-skus
+#   p1_compact   as ok, but the location list holds the short name "uaenorth"
+#   nolocation   managedEnvironments is not offered in UAE North
+#   nob1ms       list-skus has no Standard_B1ms
+#   noreg        Microsoft.Consumption is NotRegistered
+#   noowner      the role assignment list is empty
+set -euo pipefail
+
+scenario="${STUB_SCENARIO:-ok}"
+args=("$@")
+joined="$*"
+
+# value of the flag $1 (e.g. -n), empty when absent
+flag_value() {
+  local flag="$1" i
+  for ((i = 0; i < ${#args[@]} - 1; i++)); do
+    if [ "${args[$i]}" = "$flag" ]; then
+      printf '%s' "${args[$((i + 1))]}"
+      return 0
+    fi
+  done
+}
+
+case "$joined" in
+  "provider show "*)
+    provider="$(flag_value -n)"
+    case "$joined" in
+      *managedEnvironments*)
+        case "$scenario" in
+          nolocation) printf '["East US","West Europe","North Europe"]\n' ;;
+          p1_compact) printf '["uaenorth","westeurope"]\n' ;;
+          *) printf '["East US","UAE North","West Europe"]\n' ;;
+        esac
+        ;;
+      *registrationState*)
+        if [ "$scenario" = "noreg" ] && [ "$provider" = "Microsoft.Consumption" ]; then
+          printf 'NotRegistered\n'
+        else
+          printf 'Registered\n'
+        fi
+        ;;
+      *) echo "az stub: unhandled: $joined" >&2; exit 2 ;;
+    esac
+    ;;
+  "postgres flexible-server list-skus "*)
+    case "$scenario" in
+      nob1ms) printf '[{"name":"Standard_D2ds_v4","supportedServerVersions":[{"name":"17"}]}]\n' ;;
+      pg17) printf '[{"name":"Standard_B1ms","supportedServerVersions":[{"name":"17"},{"name":"16"}]}]\n' ;;
+      *) printf '[{"name":"Standard_B1ms","supportedServerVersions":[{"name":"18"},{"name":"17"}]}]\n' ;;
+    esac
+    ;;
+  "account show "*)
+    case "$joined" in
+      *"--query id"*) printf '00000000-0000-0000-0000-000000000000\n' ;;
+      *user.name*) printf 'operator@example.org\n' ;;
+      *) echo "az stub: unhandled: $joined" >&2; exit 2 ;;
+    esac
+    ;;
+  "role assignment list "*)
+    if [ "$scenario" != "noowner" ]; then
+      printf 'Owner\n'
+    fi
+    ;;
+  "bicep build "*)
+    printf '{"stub":"az-bicep-build","args":"%s"}\n' "$joined"
+    ;;
+  *)
+    echo "az stub: unhandled: $joined" >&2
+    exit 2
+    ;;
+esac
