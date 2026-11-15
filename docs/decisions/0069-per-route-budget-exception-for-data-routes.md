@@ -41,4 +41,4 @@ Five routes are exempt from the 174,080 B script budget: `/worker`, `/worker/ale
 After the submission (build option 2); the idle-host re-measure shows an exempt route missing its asserts; a route grows toward the cap.
 
 ## Links
-[ADR 0003](0003-one-nextjs-pwa-no-native-app.md) · [0045](0045-f2-scope-core-demo-path.md) · [0059](0059-frontend-governance-invariants-sw-allow-list-and-revocation.md)
+[ADR 0003](0003-frontend-single-nextjs-app-pwa.md) · [0045](0045-f2-scope-core-demo-path.md) · [0059](0059-frontend-governance-invariants-sw-allow-list-and-revocation.md)
