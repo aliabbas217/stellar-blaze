@@ -115,7 +115,12 @@ export function CrewsView() {
     },
     [model],
   );
-  const work = useStopWork(focalId ?? standIn, serverOf);
+  // The crew's name as the list shows it: kept with a queued stop and used to name a crew in an expiry notice.
+  const nameOf = useCallback(
+    (crewId: string): string | null => (model.status === "ready" ? (model.crews.find((candidate) => candidate.crew.id === crewId)?.crew.name ?? null) : null),
+    [model],
+  );
+  const work = useStopWork(focalId ?? standIn, serverOf, nameOf);
   const entry = model.status === "ready" ? model.crews.find((crew) => crew.crew.id === work.crewId) : undefined;
 
   let content: ReactNode;
@@ -156,7 +161,12 @@ export function CrewsView() {
           <ResetDemoControl siteId={siteId} />
         </div>
       ) : null}
-      <StopWorkBar crewName={entry?.crew.name ?? null} work={work.crewId === null ? null : work} noCrew={model.status === "empty" ? "none" : "unavailable"} />
+      <StopWorkBar
+        crewName={entry?.crew.name ?? null}
+        work={work.crewId === null ? null : work}
+        notices={work}
+        noCrew={model.status === "empty" ? "none" : "unavailable"}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { IslandStatus } from "@/features/judge/live/IslandStatus";
 import { useIslandGate } from "@/features/judge/live/useIslandGate";
 import type { GovernanceIslandProps } from "./GovernanceIsland";
 import type { RecordedView } from "./recorded-view";
@@ -21,6 +22,7 @@ export function GovernanceGate({ recorded, children }: { readonly recorded: Reco
   return (
     <div className="contents" {...gate.handlers}>
       {children}
+      <IslandStatus failed={gate.failed} />
     </div>
   );
 }

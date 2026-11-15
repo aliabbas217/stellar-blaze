@@ -1,6 +1,7 @@
 import { proofFromStaticFile, type Proof, type ProofLabel } from "@/components/provenance/proof";
 import type { ScoreRow } from "@/components/provenance/ScoreboardTable";
 import type { JudgeFormat } from "./adapters";
+import type { DayCounter } from "./day-view";
 import type { SeasonFacts } from "./facts";
 import type { RosterFrontier } from "./roster-frontier";
 
@@ -8,7 +9,8 @@ import type { RosterFrontier } from "./roster-frontier";
  * Claims: every number the judge screens show with a proof has a stable id, and the proof sheet
  * (`/replay/proof/<claim>`) is addressed by it. A claim is built here from the same data and the same proofs the tables and
  * counters use, so the sheet can never say something the page did not. The ids:
- *   policy.<p0|p1|p2|p3|p3_balanced>.<metric>          a Warnings cell (adapters.ts, `policyClaim`)
+ *   policy.<p0|p1|p2|p3|p3_balanced>.<metric>          a Warnings cell at lead 1 (adapters.ts, `policyClaim`); policy.lead2.<p>.<metric> at lead 2
+ *   day.<high|outside|p1|raw|ours|balanced>              the scored day's counters (day-view.ts)
  *   plan.<plan>.<metric>                                a Plans cell (`planClaim`)
  *   forecast.<days_over_limit|hours_over_limit|hours_in_break>
  *                                                       the season counts, from the recorded forecast file
@@ -22,7 +24,7 @@ export type ClaimKind = "scored" | "forecast" | "analysis";
 /**
  * Which loader each claim-id family comes from. A claim is missing for one of two reasons: no such number exists (an unknown
  * id) or the file behind it could not be read; the second is told apart by WHICH LOADER failed, never by guessing from the id.
- *   scored    policy.* and plan.*   the scored exporter files (`loadScored`)
+ *   scored    policy.*, plan.*, day.*   the scored exporter files (`loadScored`)
  *   frontier  frontier.*            the roster-frontier file (`loadFrontier`)
  *   forecast  forecast.*            the recorded hourly forecast (`loadHourly`)
  */
@@ -30,6 +32,7 @@ export type ClaimLoader = "scored" | "frontier" | "forecast";
 
 const CLAIM_FAMILIES: readonly (readonly [prefix: string, loader: ClaimLoader])[] = [
   ["policy.", "scored"],
+  ["day.", "scored"],
   ["plan.", "scored"],
   ["frontier.", "frontier"],
   ["forecast.", "forecast"],
@@ -79,6 +82,13 @@ export function rowClaims(rows: readonly ScoreRow[]): Claim[] {
         },
       ];
     }),
+  );
+}
+
+/** The scored day's counters (`day.<high|outside|p1|raw|ours|balanced>`): each with its proof, from the same model the day page draws. */
+export function dayClaims(counters: readonly DayCounter[] | null): Claim[] {
+  return (counters ?? []).flatMap((counter): Claim[] =>
+    counter.proof === null ? [] : [{ id: `day.${counter.id}`, what: counter.label, value: counter.value, unit: counter.unit, kind: "scored", proof: counter.proof }],
   );
 }
 

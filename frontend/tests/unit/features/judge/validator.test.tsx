@@ -1,14 +1,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { REPLAY_DATE } from "@/features/demo/constants";
 import { banStateFor, SEASON_BAN } from "@/features/judge/ban";
 import { TryGate } from "@/features/judge/validator/TryGate";
 import { TryStatic } from "@/features/judge/validator/TryStatic";
-import { filledRuns, normalizeTime, parseTime, runProblem, runsToSegments, segmentsToRuns, templateOf, templateRuns, TEMPLATES } from "@/features/judge/validator/runs";
+import { filledEntries, filledRuns, normalizeTime, parseTime, rowOfLine, runProblem, runsToSegments, segmentsToRuns, templateOf, templateRuns, TEMPLATES } from "@/features/judge/validator/runs";
+import { forecastToday } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
 import { renderWithIntl } from "../../../utils/intl";
 
@@ -44,15 +45,18 @@ const ban = banStateFor(SEASON_BAN, REPLAY_DATE, "en");
 
 function renderTry(run: typeof recorded | null = recorded) {
   return renderWithIntl(
-    <TryGate heat={heat} ban={ban} dateLabel="Thu 3 Sep" recorded={run}>
+    <TryGate date={REPLAY_DATE} heat={heat} ban={ban} dateLabel="Thu 3 Sep" recorded={run}>
       <TryStatic heat={heat} ban={ban} dateLabel="Thu 3 Sep" recorded={run} />
     </TryGate>,
   );
 }
 
-/** Focuses a field and waits until the lazy island has taken over (the demo site name is its first visible sign), then gives focus back to the field. */
+/**
+ * Brings the lazy island in the way a visitor does (a click on a control: focusing or typing in a field never swaps the page, see
+ * useIslandGate), waits until it has taken over (the demo site name is its first visible sign), then clicks the field.
+ */
 async function warmed(user: ReturnType<typeof userEvent.setup>, label: string): Promise<HTMLElement> {
-  await user.click(screen.getByLabelText(label));
+  await user.click(screen.getByRole("button", { name: /^Common roster/ }));
   await screen.findByText("Mussafah M-14 yard (synthetic)");
   const field = screen.getByLabelText(label);
   await user.click(field);
@@ -109,6 +113,25 @@ describe("runs: the plan becomes the request", () => {
     const script = readFileSync(path.join(root, "scripts/record-validator-run.mjs"), "utf8");
     expect(script).toContain(`const DATE = "${REPLAY_DATE}"`);
     for (const run of TEMPLATES[0]?.runs ?? []) expect(script).toContain(`start: "${run.start}", end: "${run.end}"`);
+  });
+});
+
+describe("runs: blank rows and the API's lines (Part G3 I4)", () => {
+  it("test_roster_invalid_line_maps_to_the_row: Run 1 blank, Runs 2 and 3 filled: the API's line 2 is Run 3", () => {
+    const runs = [
+      { start: "", end: "" },
+      { start: "06:00", end: "10:00" },
+      { start: "15:00", end: "17:00" },
+    ];
+    const rows = filledEntries(runs).map((entry) => entry.row);
+    expect(rows).toEqual([1, 2]);
+    expect(rowOfLine(1, rows)).toBe(2);
+    expect(rowOfLine(2, rows)).toBe(3);
+    // an error about the whole roster (line 0) or past the segments is never put on a wrong row
+    expect(rowOfLine(0, rows)).toBe(0);
+    expect(rowOfLine(9, rows)).toBe(9);
+    // no blank row: the lines are the rows
+    expect(rowOfLine(2, filledEntries(templateRuns("common")).map((entry) => entry.row))).toBe(2);
   });
 });
 
@@ -319,6 +342,136 @@ describe("TryGate: the lazy island", () => {
     });
     expect(container.querySelector("[data-invalid-line='2']")?.textContent).toBe("Run 2: end 25:00 is not a time");
     expect(container.querySelector("[data-answer]")).toBeNull();
+  });
+
+  it("test_roster_invalid_labels_the_row_the_visitor_typed: with Run 1 blank the API line 2 reads Run 3", async () => {
+    server.use(
+      http.post("*/api/v1/plans/validate", () =>
+        problem(422, { type: "urn:stellar-blaze:problem:roster-invalid", title: "Roster invalid", errors: [{ line: 2, message: "end 25:00 is not a time" }] }),
+      ),
+    );
+    const { container } = renderTry();
+    const user = userEvent.setup();
+    await warmed(user, "Run 1: Start");
+    await user.clear(screen.getByLabelText("Run 1: Start"));
+    await user.clear(screen.getByLabelText("Run 1: End"));
+    await user.clear(screen.getByLabelText("Run 2: Start"));
+    await user.type(screen.getByLabelText("Run 2: Start"), "06:00");
+    await user.clear(screen.getByLabelText("Run 2: End"));
+    await user.type(screen.getByLabelText("Run 2: End"), "10:00");
+    await user.type(screen.getByLabelText("Run 3: Start"), "15:00");
+    await user.type(screen.getByLabelText("Run 3: End"), "17:00");
+    await user.click(screen.getByRole("button", { name: CHECK }));
+    await waitFor(() => {
+      expect(container.querySelector("[data-try]")?.getAttribute("data-try")).toBe("invalid");
+    });
+    expect(container.querySelector("[data-invalid-line='3']")?.textContent).toBe("Run 3: end 25:00 is not a time");
+    expect(container.querySelector("[data-invalid-line='2']")).toBeNull();
+  });
+
+  it("a half-written row is named by its ROW, not by its place among the filled rows", async () => {
+    const { container } = renderTry();
+    const user = userEvent.setup();
+    await warmed(user, "Run 1: Start");
+    for (const label of ["Run 1: Start", "Run 1: End", "Run 2: Start", "Run 2: End"]) await user.clear(screen.getByLabelText(label));
+    await user.type(screen.getByLabelText("Run 3: Start"), "09:00");
+    await user.click(screen.getByRole("button", { name: CHECK }));
+    expect(await screen.findByText("Run 3: Write the time as hh:mm, for example 06:00.")).toBeInTheDocument();
+    expect(container.querySelector("[data-notice]")?.getAttribute("data-notice")).toBe("run");
+  });
+
+  it("test_try_uses_the_api_day_and_mode: the request carries the day the forecast reports and the page says which day it is", async () => {
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => HttpResponse.json({ ...forecastToday(String(params.site_id), { date: "2026-06-14" }), mode: "live" })),
+    );
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    const { container } = renderTry();
+    await userEvent.setup().click(screen.getByRole("button", { name: CHECK }));
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+    // neither the demo feature constant nor the day the server rendered
+    expect(calls.bodies[0]).toMatchObject({ date: "2026-06-14", site_id: "site-demo-mussafah" });
+    expect(REPLAY_DATE).not.toBe("2026-06-14");
+    await waitFor(() => {
+      expect(container.querySelector("[data-try]")?.getAttribute("data-try")).toMatch(/answer|none/);
+    });
+    // the page draws the API's day: its label, today (live mode), the break not in force before 15 June, and no recorded heat for another day
+    expect(container.textContent).toContain("Checked on Sun 14 Jun, today at the site");
+    expect(container.querySelector("[data-slot=in-force]")).toBeNull();
+    expect(container.textContent).not.toContain("the replay day");
+  });
+
+  it("when the day the API reports is the day the server drew, nothing is re-drawn and the replay sentence stays", async () => {
+    const { container } = renderTry();
+    await userEvent.setup().click(screen.getByRole("button", { name: CHECK }));
+    await waitFor(() => {
+      expect(container.querySelector("[data-try]")?.getAttribute("data-try")).toBe("answer");
+    });
+    expect(container.textContent).toContain("Checked on Thu 3 Sep, the replay day");
+    expect(container.querySelector("[data-slot=in-force]")).not.toBeNull();
+  });
+
+  it("a forecast that fails is said, never a silent wait, and nothing is sent", async () => {
+    server.use(http.get("*/api/v1/sites/:site_id/forecast/today", () => problem(500)));
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    renderTry();
+    await userEvent.setup().click(screen.getByRole("button", { name: CHECK }));
+    // the query retries once (about a second) before it gives up: the check waits, shown as checking, then says so
+    expect(await screen.findByText("The day to check could not be read from the site's forecast. Try again in a moment.", undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(calls.bodies).toHaveLength(0);
+  });
+
+  it("test_enter_in_a_time_field_runs_the_check: a real form, Enter reads the row, one request when it reads", async () => {
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    const { container } = renderTry();
+    expect(container.querySelector("form")).not.toBeNull();
+    const user = userEvent.setup();
+    await warmed(user, "Run 3: Start");
+    await user.type(screen.getByLabelText("Run 3: Start"), "09:00{Enter}");
+    // a half-written row: said, nothing sent (Enter ran the check, which read the row)
+    expect(await screen.findByText("Run 3: Write the time as hh:mm, for example 06:00.")).toBeInTheDocument();
+    expect(calls.bodies).toHaveLength(0);
+    await user.type(screen.getByLabelText("Run 3: End"), "09:30{Enter}");
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+  });
+
+  it("a submit BEFORE the island loads is carried over: the typed times are checked once and the page never navigates", async () => {
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    renderTry();
+    const field = screen.getByLabelText("Run 3: Start");
+    fireEvent.change(field, { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("Run 3: End"), { target: { value: "09:30" } });
+    // fireEvent returns false when the submit was cancelled (no navigation)
+    expect(fireEvent.submit(field.closest("form") as HTMLFormElement)).toBe(false);
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+    expect(calls.bodies[0]).toMatchObject({ segments: expect.arrayContaining([{ start: "09:00", end: "09:30", state: "work" }]) as unknown });
+  });
+
+  it("test_queued_check_runs_once_in_strict_mode: effects that run twice still send one request", async () => {
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    renderWithIntl(
+      <StrictMode>
+        <TryGate date={REPLAY_DATE} heat={heat} ban={ban} dateLabel="Thu 3 Sep" recorded={recorded}>
+          <TryStatic heat={heat} ban={ban} dateLabel="Thu 3 Sep" recorded={recorded} />
+        </TryGate>
+      </StrictMode>,
+    );
+    await userEvent.setup().click(screen.getByRole("button", { name: CHECK }));
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(calls.bodies).toHaveLength(1);
   });
 
   it("an assumption typed before the island loads survives the swap and is what the request carries", async () => {

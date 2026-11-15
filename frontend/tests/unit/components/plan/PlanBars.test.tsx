@@ -71,7 +71,7 @@ describe("PlanBars: slot, now and heat", () => {
     through.unmount();
     const foot = render(<PlanBars {...props} ban={IN_FORCE} />);
     const parent = foot.container.querySelector("[data-slot='in-force']")?.parentElement;
-    expect(parent?.className).toContain("h-6");
+    expect(parent?.className).toContain("h-8");
     expect(parent?.className).not.toContain("top-0");
   });
 
@@ -104,6 +104,33 @@ describe("PlanBars: slot, now and heat", () => {
     expect(spans[0]?.style.getPropertyValue("--heat-sun")).toBe("oklch(0.9 0.05 90)");
     expect(spans[1]?.style.backgroundColor).toBe("rgb(1, 2, 3)");
     expect(spans[2]?.getAttribute("style")).toBeNull();
+  });
+});
+
+describe("PlanBars: labels that must stay readable on a phone (Part G3 M6)", () => {
+  it("the in-force slot label wraps inside the band instead of truncating to 'Midd...'", () => {
+    const { container } = render(<PlanBars {...props} ban={IN_FORCE} />);
+    const label = container.querySelector("[data-slot='in-force'] span");
+    expect(label?.textContent).toBe("Midday break");
+    expect(label?.className).not.toContain("truncate");
+    expect(label?.className).toContain("text-center");
+  });
+
+  it("the not-in-force outline is named in words below the chart (visible text, not hidden inside the aria-hidden band)", () => {
+    const out: BanState = { kind: "not-in-force", resumesLabel: "15 Jun", outline: { fromHour: 12.5, toHour: 15 } };
+    const { container } = render(<PlanBars {...props} ban={out} />);
+    expect(container.querySelector("[data-slot='outline']")?.textContent).toBe("");
+    const caption = container.querySelector("[data-slot-label='outline']");
+    expect(caption?.textContent).toBe(labels.outline);
+    // outside the role=img element, so assistive technology reads it
+    expect(container.querySelector("[data-plan-bars]")?.contains(caption ?? null)).toBe(false);
+  });
+
+  it("the first hour label is flush with the axis start on the desk too: centred on x=0 it was clipped on a phone", () => {
+    const { container } = render(<PlanBars {...props} ban={IN_FORCE} />);
+    const first = container.querySelector<HTMLElement>("[data-plan-bars] > div:last-child span");
+    expect(first?.textContent).toBe("06:00");
+    expect(first?.className).not.toContain("-translate-x-1/2");
   });
 });
 

@@ -106,6 +106,10 @@ export function FrontierPanel({ data, source }: FrontierPanelProps) {
 
       <FrontierChart data={data} commuteMin={commute} labels={labels(commute)} formatHours={formatHours} />
 
+      <p className="max-w-(--measure) text-sm text-ink-3" data-frontier-units="">
+        {t("unitsNote", { hours: formatHours(data.assumptions.sleep_gate_h) })}
+      </p>
+
       <div className="grid gap-6 sm:grid-cols-2" data-frontier-readouts="">
         <div className="flex flex-col gap-2 border-t border-edge pt-3">
           <h3 className="text-sm font-medium text-ink-3">{t("bestTitle")}</h3>

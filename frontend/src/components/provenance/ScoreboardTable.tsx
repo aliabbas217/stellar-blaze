@@ -23,6 +23,8 @@ export interface ScoreCell {
   /** What the number is, in words: names it for the proof chip and the missing-provenance note. */
   readonly what: string;
   readonly proof: Proof | null;
+  /** The file has no denominator for this metric (the false-alarm share of a policy that never warns): shown as "not computed", never as 0. */
+  readonly notComputed?: boolean;
 }
 
 export interface ScoreRow {
@@ -94,6 +96,10 @@ export function ScoreboardTable({ caption, columns, rows, pending = false, rowHe
                     <span role="img" aria-label={t("notScored")} className="text-lg text-ink-3">
                       ###
                     </span>
+                  ) : cell.notComputed === true ? (
+                    <span data-not-computed="" className="text-base text-ink-3">
+                      {t("notComputed")}
+                    </span>
                   ) : (
                     <span className="flex flex-col items-end gap-1 max-sm:items-start">
                       <span className="flex items-center justify-end gap-2 max-sm:justify-start">
@@ -102,7 +108,7 @@ export function ScoreboardTable({ caption, columns, rows, pending = false, rowHe
                         </Proved>
                       </span>
                       {cell.interval !== undefined && cell.proof !== null ? (
-                        <span className="text-sm font-normal whitespace-nowrap text-ink-3">{cell.interval}</span>
+                        <span className="text-sm font-normal whitespace-nowrap text-ink-3 max-sm:whitespace-normal">{cell.interval}</span>
                       ) : null}
                     </span>
                   )}

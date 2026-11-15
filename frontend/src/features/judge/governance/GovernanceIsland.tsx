@@ -11,11 +11,11 @@ export interface GovernanceIslandProps extends IslandProps {
   readonly recorded: RecordedView | null;
 }
 
-export default function GovernanceIsland({ recorded, initialAction, restoreFocus }: GovernanceIslandProps) {
+export default function GovernanceIsland({ recorded, initialActions, restoreFocus }: GovernanceIslandProps) {
   return (
     <QueryProvider>
       <DemoProvider>
-        <GovernanceView recorded={recorded} initialAction={initialAction} restoreFocus={restoreFocus} />
+        <GovernanceView recorded={recorded} initialActions={initialActions} restoreFocus={restoreFocus} />
       </DemoProvider>
     </QueryProvider>
   );

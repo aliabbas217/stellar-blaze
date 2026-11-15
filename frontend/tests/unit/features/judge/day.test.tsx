@@ -47,6 +47,7 @@ const none: EvalData = {
   day: null,
   frontier: null,
   source: "none",
+  record: null,
   files: { policy: null, plans: null, day: null, frontier: null },
 };
 const scored = (day: DemoDay = syntheticDay): EvalData => ({ ...none, day, source: "synthetic-shape", files: { ...none.files, day: dayFile } });
@@ -65,12 +66,12 @@ describe("DayView: the series that exist", () => {
     expect(screen.getByText("Ours (5 to 95 % range) and station truth: added by the scoring run")).toBeInTheDocument();
     // legend: no empty entries for series that do not exist
     expect(container.querySelectorAll("[data-legend] li")).toHaveLength(1);
-    // four ### counters under ONE banner, no number and no proof chip among them
+    // five ### counters under ONE banner, no number and no proof chip among them
     const counters = container.querySelector("[data-day-counters]") as HTMLElement;
-    expect(counters.querySelectorAll("[data-counter-pending]")).toHaveLength(4);
+    expect(counters.querySelectorAll("[data-counter-pending]")).toHaveLength(6);
     expect(counters.querySelectorAll("[role=status]")).toHaveLength(1);
     expect(counters.querySelectorAll("[data-proof-id]")).toHaveLength(0);
-    expect(within(counters).getAllByLabelText("not scored yet")).toHaveLength(4);
+    expect(within(counters).getAllByLabelText("not scored yet")).toHaveLength(6);
   });
 
   it("draws all three series once a scored day exists, on the day the file says", () => {
@@ -93,15 +94,20 @@ describe("DayView: the series that exist", () => {
 });
 
 describe("DayView: counters have a proof or are not shown", () => {
-  it("test_counters_have_proofs_or_hashes: each of the four counters carries its proof chip", () => {
+  it("test_counters_have_proofs_or_hashes: each of the five counters carries its proof chip", () => {
     const { container } = view(scored());
     const ids = [...container.querySelectorAll("[data-counter-id]")].map((el) => el.getAttribute("data-counter-id"));
-    expect(ids).toEqual(["high", "outside", "raw", "ours"]);
+    expect(ids).toEqual(["high", "outside", "p1", "raw", "ours", "balanced"]);
     for (const el of container.querySelectorAll("[data-counter-id]")) expect(el.querySelector("[data-proof-id]"), el.getAttribute("data-counter-id") ?? "").not.toBeNull();
     // the values are the file's own
     const text = container.querySelector("[data-day-counters]")?.textContent ?? "";
-    expect(text).toContain(syntheticDay.high_hours.toFixed(1));
-    expect(text).toContain(syntheticDay.p3_hits.toFixed(1));
+    // whole hours are written whole, with the total they are out of; only a partly banned hour has a decimal
+    const whole = (v: number): string => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+    expect(text).toContain(whole(syntheticDay.high_hours));
+    expect(text).toContain(`${whole(syntheticDay.p3_hits)} of ${whole(syntheticDay.high_hours)}`);
+    expect(text).toContain("Called by ADOSH zones on the raw forecast");
+    expect(text).toContain("Called by the fixed 32 °C rule on the raw forecast");
+    expect(text).not.toMatch(/[0-9]\.0(?![0-9])/);
   });
 
   it("a file whose provenance is incomplete shows no value at all (MissingProvenance), never the number", () => {
@@ -117,7 +123,10 @@ describe("DayView: counters have a proof or are not shown", () => {
     expect(screen.getByText("The day file could not be read")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute("href", "/replay/day");
     expect(container.querySelectorAll("[data-counter-id], [data-counter-pending]")).toHaveLength(0);
-    expect(container.querySelector("[data-series=raw]")).not.toBeNull();
+    // a read failure draws no day and says nothing about a scoring run (I4)
+    expect(container.querySelector("[data-series]")).toBeNull();
+    expect(container.querySelector("[data-day-shown=failed]")).not.toBeNull();
+    expect(container.textContent).not.toMatch(/scoring run|Day shown|hottest raw forecast/i);
   });
 });
 

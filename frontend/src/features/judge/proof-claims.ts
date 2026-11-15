@@ -2,8 +2,9 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 import type { Locale } from "@/i18n/routing";
 import { makeFormat, toPlanRows, toPolicyRows } from "./adapters";
-import { frontierClaims, rowClaims, type Claim, type ClaimLoader } from "./claims";
+import { dayClaims, frontierClaims, rowClaims, type Claim, type ClaimLoader } from "./claims";
 import { loadFrontier, loadScored, type EvalSource, type FrontierData, type LoadEvalOptions, type ScoredData } from "./data";
+import { buildDay } from "./day-view";
 import { loadHourly, type HourlyData } from "./hourly";
 import { DATA_MANIFEST } from "./manifest.generated";
 import { buildSeasonView } from "./season-view";
@@ -46,9 +47,10 @@ async function attempt<T>(name: ClaimLoader, failed: ClaimLoader[], load: () => 
 }
 
 export async function loadClaims(locale: Locale, options: LoadClaimsOptions = {}): Promise<LoadedClaims> {
-  const [t, tf] = await Promise.all([
+  const [t, tf, td] = await Promise.all([
     getTranslations({ locale, namespace: "judge.scoreboard" }),
     getTranslations({ locale, namespace: "judge.frontier" }),
+    getTranslations({ locale, namespace: "judge.day" }),
   ]);
   const failed: ClaimLoader[] = [];
   const [hourly, scored, frontier] = await Promise.all([
@@ -73,7 +75,11 @@ export async function loadClaims(locale: Locale, options: LoadClaimsOptions = {}
   }
   const files = scored?.files;
   if (scored?.policy != null && files?.policy != null) {
-    claims.push(...rowClaims(toPolicyRows(scored.policy, 1, { file: files.policy, format, text: policyTableText(t) })));
+    const ctx = { file: files.policy, format, text: policyTableText(t) };
+    claims.push(...rowClaims(toPolicyRows(scored.policy, 1, ctx)), ...rowClaims(toPolicyRows(scored.policy, 2, ctx)));
+  }
+  if (hourly !== null && scored?.day != null && files?.day != null) {
+    claims.push(...dayClaims(buildDay({ day: scored.day, dayFile: files.day, hourly, locale, t: td }).counters));
   }
   if (scored?.plans != null && files?.plans != null) {
     claims.push(...rowClaims(toPlanRows(scored.plans, { file: files.plans, format, text: planTableText(t) })));

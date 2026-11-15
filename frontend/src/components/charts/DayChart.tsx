@@ -194,7 +194,7 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
             ) : null}
           </svg>
 
-          <span className="absolute end-1 -translate-y-full pb-1 text-sm text-ink" style={{ top: `${num(topPct(limitC))}%` }}>
+          <span className="absolute start-1 pt-1 text-sm text-ink" style={{ top: `${num(topPct(limitC))}%` }}>
             {labels.limit}
           </span>
 
@@ -225,7 +225,7 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
                 width: `${num(pctOfHour(box.toHour, from, to) - pctOfHour(box.fromHour, from, to))}%`,
               }}
             >
-              <span className="truncate">{slot === null ? labels.outline : labels.slot}</span>
+              {slot === null ? null : <span className="text-center leading-3">{labels.slot}</span>}
             </div>
           </div>
         )}
@@ -247,18 +247,21 @@ export function DayChart({ raw, ours, truth, ban, from, to, limitC, labels }: Da
         {hasRaw ? <LegendItem kind="raw" text={labels.legend.raw} /> : null}
         {hasOurs ? <LegendItem kind="ours" text={labels.legend.ours} /> : null}
         {hasTruth ? <LegendItem kind="truth" text={labels.legend.truth} /> : null}
+        {slot === null && box !== null ? <LegendItem kind="outline" text={labels.outline} /> : null}
       </ul>
     </figure>
   );
 }
 
-function LegendItem({ kind, text }: { readonly kind: "raw" | "ours" | "truth"; readonly text: string }) {
+function LegendItem({ kind, text }: { readonly kind: "raw" | "ours" | "truth" | "outline"; readonly text: string }) {
   const sample =
     kind === "raw"
       ? "border-t-2 border-dashed border-viz-raw"
       : kind === "ours"
         ? "h-1 rounded-sign bg-viz-ours"
-        : "border-t-[3px] border-viz-truth";
+        : kind === "outline"
+          ? "h-3 border border-dashed border-edge"
+          : "border-t-[3px] border-viz-truth";
   return (
     <li data-legend-item={kind} className="flex items-center gap-2">
       <span aria-hidden className={`inline-block w-6 ${sample}`} />

@@ -47,7 +47,7 @@ export function PlanStrip({ runs, validator, heat, ban, dateLabel }: PlanStripPr
           outline: ban.kind === "not-in-force" && ban.resumesLabel !== null ? t("strip.outline", { date: ban.resumesLabel }) : t("strip.outlineUnknown"),
         }}
       />
-      <p className="text-sm text-ink-3">{t("strip.heatNote")}</p>
+      <p className="text-sm text-ink-3">{heat.some((colour) => colour !== null) ? t("strip.heatNote") : t("strip.noHeat")}</p>
     </div>
   );
 }

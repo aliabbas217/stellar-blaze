@@ -14,7 +14,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkEvalShape, EVAL_FILES, EVAL_KINDS, sha256Hex } from "../src/features/judge/eval-shape.mjs";
+import { checkEvalShape, checkEvaluationRecord, EVAL_FILES, EVAL_KINDS, sha256Hex } from "../src/features/judge/eval-shape.mjs";
 
 /** What each static file is, in the vocabulary of the proof label. The origin text comes from the file itself. */
 const LABELS = {
@@ -79,7 +79,10 @@ function renderManifestModule(files) {
   ].join("\n");
 }
 
-/** Problems with the held-out 2026 files, one line each; empty when all three are present and valid. */
+/**
+ * Problems with the held-out 2026 files, one line each; empty when all three are present and valid, the evaluation record is present,
+ * valid and names exactly these bytes, and the published copies (what the browser recounts) are identical to them.
+ */
 function scoredProblems(root) {
   const problems = [];
   for (const kind of EVAL_KINDS) {
@@ -98,6 +101,36 @@ function scoredProblems(root) {
     }
     const problem = checkEvalShape(kind, parsed, "scored_2026");
     if (problem !== null) problems.push(`data/eval/2026/${name}: ${problem}`);
+  }
+  problems.push(...recordProblems(root));
+  return problems;
+}
+
+/** The evaluation record (the lock the run started under) must be there, valid, and describe exactly the files that ship. */
+function recordProblems(root) {
+  const dir = path.join(root, "data", "eval", "2026");
+  const recordFile = path.join(dir, "evaluation_record.json");
+  if (!existsSync(recordFile)) return ["data/eval/2026/evaluation_record.json is missing (scripts/sync-eval-data.mjs --git writes it)"];
+  let record;
+  try {
+    record = JSON.parse(readFileSync(recordFile, "utf8"));
+  } catch {
+    return ["data/eval/2026/evaluation_record.json is not valid JSON"];
+  }
+  const problem = checkEvaluationRecord(record);
+  if (problem !== null) return [`data/eval/2026/evaluation_record.json: ${problem}`];
+  const problems = [];
+  for (const kind of EVAL_KINDS) {
+    const name = `${EVAL_FILES[kind].name}.json`;
+    const file = path.join(dir, name);
+    if (!existsSync(file)) continue;
+    const bytes = readFileSync(file);
+    if (record.files[name]?.sha256 !== sha256Hex(bytes)) problems.push(`data/eval/2026/${name} is not the file the evaluation record names (its SHA-256 differs)`);
+  }
+  for (const name of [...EVAL_KINDS.map((kind) => `${EVAL_FILES[kind].name}.json`), "evaluation_record.json"]) {
+    const copy = path.join(root, "public", "data", "eval", "2026", name);
+    const source = path.join(dir, name);
+    if (existsSync(source) && (!existsSync(copy) || !readFileSync(copy).equals(readFileSync(source)))) problems.push(`public/data/eval/2026/${name} is missing or differs from data/eval/2026/${name}`);
   }
   return problems;
 }

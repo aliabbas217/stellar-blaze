@@ -44,7 +44,7 @@ export interface DayTableRow {
 }
 
 export interface DayCounter {
-  readonly id: "high" | "outside" | "raw" | "ours";
+  readonly id: "high" | "outside" | "p1" | "raw" | "ours" | "balanced";
   readonly label: string;
   readonly value: string;
   readonly unit: string;
@@ -186,18 +186,24 @@ export function buildDay({ day, dayFile, hourly, locale, t }: DayInput): DayMode
 
   let counters: DayCounter[] | null = null;
   if (day !== null && dayFile !== null) {
-    const entry = (id: DayCounter["id"], label: string, value: number): DayCounter => ({
+    // Hours are counted whole; a partly banned hour counts its fraction, so only then is there a decimal.
+    const count = (value: number): string => (Number.isInteger(value) ? fmt.whole(value) : fmt.one(value));
+    const entry = (id: DayCounter["id"], label: string, value: number, of?: number): DayCounter => ({
       id,
       label,
-      value: fmt.one(value),
+      value: of === undefined ? count(value) : t("counters.of", { n: count(value), total: count(of) }),
       unit: label,
       proof: proofFromProvenance(day.provenance, "", label, dayFile, { claim: `day.${id}` }),
     });
     counters = [
       entry("high", t("counters.high"), day.high_hours),
       entry("outside", t("counters.outside", { start: SEASON_BAN.start, end: SEASON_BAN.end }), day.high_hours_outside_ban),
-      entry("raw", t("counters.raw"), day.raw_hits),
-      entry("ours", t("counters.ours"), day.p3_hits),
+      // "of N": the hours the station recorded in the High or Red zone. P1 (the fixed 32 degree rule) and P2 (the ADOSH zones) both read
+      // the raw forecast; the file's own `raw_hits` is P2's, so the label names the policy and P1's count is its own counter.
+      entry("p1", t("counters.p1"), hitsBy(day, "P1"), day.high_hours),
+      entry("raw", t("counters.raw"), day.raw_hits, day.high_hours),
+      entry("ours", t("counters.ours"), day.p3_hits, day.high_hours),
+      entry("balanced", t("counters.balanced"), hitsBy(day, "P3_balanced"), day.high_hours),
     ];
   }
 
@@ -216,6 +222,15 @@ export function buildDay({ day, dayFile, hourly, locale, t }: DayInput): DayMode
     candidates: day?.candidates ?? null,
     runnerUp: day?.runner_up === null || day === null ? null : f.dayMonth(day.runner_up.date),
   };
+}
+
+/**
+ * The hours of the scored day that were High or Red on the station and that the policy `warnedBy` named warned about, counted the way the
+ * file counts its own `raw_hits` (P2) and `p3_hits` (P3_protect): each hour weighted by its `ban_weight`. The balanced-threshold count has no
+ * field of its own in the file; it is counted from the same hours, and a test pins the method against the two fields that do exist.
+ */
+export function hitsBy(day: DemoDay, policy: DemoDay["hours"][number]["warned_by"][number]): number {
+  return day.hours.filter((hour) => hour.truth_zone === "high" || hour.truth_zone === "red").filter((hour) => hour.warned_by.includes(policy)).reduce((sum, hour) => sum + hour.ban_weight, 0);
 }
 
 /** While there is no scored day, "the day rule" is proved by what the page does draw: the recorded forecast file. */

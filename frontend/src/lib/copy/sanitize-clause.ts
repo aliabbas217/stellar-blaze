@@ -21,8 +21,13 @@
  */
 
 const REF_NUMBER = "\\d{4}";
+/**
+ * A rule id: "P-H3", "P-H1a", "P-H7.cap60", "P-H5.ban_season". A dot belongs to the id only when more id follows it ("P-H7.cap60");
+ * a full stop after it ends the sentence and is never part of the id ("... ADR 0011 P-H10. Next" keeps its boundary).
+ */
+const RULE_ID = "P-H[A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)*";
 /** "ADR 0011", "ADR 0011 P-H3", "ADR 0011 section 4", "ADR 0011 sections 4 and 8", "ADR 0046 to 0050". */
-const ADR_REF = `ADR\\s+${REF_NUMBER}(?:\\s+to\\s+${REF_NUMBER})?(?:\\s+sections?\\s+\\d+(?:\\s+and\\s+\\d+)?)?(?:\\s+P-H[A-Za-z0-9._]*)?`;
+const ADR_REF = `ADR\\s+${REF_NUMBER}(?:\\s+to\\s+${REF_NUMBER})?(?:\\s+sections?\\s+\\d+(?:\\s+and\\s+\\d+)?)?(?:\\s+${RULE_ID})?`;
 const ADR_REF_G = new RegExp(ADR_REF, "g");
 const ADR_REF_ONCE = new RegExp(ADR_REF);
 
@@ -30,7 +35,8 @@ const ADR_REF_ONCE = new RegExp(ADR_REF);
 const DANGLING = /\b(?:in|of|per|under|see|by|to|as|from|at|the|is|are)\s*$/i;
 
 const LABEL = /PROTECTIVE READINGS?/g;
-const LEADING_RULE_ID = /^P-H\d+[A-Za-z0-9._]*\s+(?=[A-Z])/;
+/** A rule id at the very start, with the separator after it: spaces, or a full stop and spaces ("P-H10. No added minutes"): after a LEADING id the period is the separator, not part of a sentence. */
+const LEADING_RULE_ID = /^P-H\d+[A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*\.?\s+(?=[A-Z])/;
 const ARTICLE = /\bArt\.\s*\d+(?:\(\d+\))*(?:\([a-z]\))*/;
 
 /** Separators a removal can leave at the ends of what it was inside of. */

@@ -66,6 +66,26 @@ export function filledRuns(runs: readonly Run[]): Run[] {
   return runs.filter((run) => run.start.trim() !== "" || run.end.trim() !== "");
 }
 
+/** A run that is not blank, with the row of the form it was typed in (0-based): the request drops the blank rows, the screen must not. */
+export interface FilledRun {
+  readonly run: Run;
+  readonly row: number;
+}
+
+export function filledEntries(runs: readonly Run[]): FilledRun[] {
+  return runs.flatMap((run, row) => (run.start.trim() !== "" || run.end.trim() !== "" ? [{ run, row }] : []));
+}
+
+/**
+ * The row (1-based, as the form labels it "Run n") that the API's `line` (1-based index into the `segments` it was sent) points
+ * at. `rows` are the 0-based form rows of the sent runs, in order (`filledEntries(...).map(e => e.row)`). A line the request had
+ * no segment for (0, or past the end: an error about the whole roster) is returned as it came, never mapped onto a wrong row.
+ */
+export function rowOfLine(line: number, rows: readonly number[]): number {
+  const row = rows[line - 1];
+  return row === undefined ? line : row + 1;
+}
+
 /**
  * The request's `segments` for runs that all read as times (`runProblem` is null for each): `work` segments in the order given,
  * times normalised to `HH:MM`. Throws a RangeError for a run that does not read, so a caller that skipped the check fails loudly

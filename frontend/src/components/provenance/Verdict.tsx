@@ -14,13 +14,15 @@ export interface VerdictProps {
   readonly proof: Proof | null;
   /** The data-tier stamp (`DEV 2025`) when the sentence does not come from the held-out run; shown under the heading. */
   readonly stamp?: ReactNode;
+  /** One line under the sentence (for example what the prior run found), in the caller's words: never part of the sentence. */
+  readonly caption?: string | null;
 }
 
 /**
  * "What the season showed": the one sentence the pre-registered outcome table picks, written the same way whether the
  * product won or lost. A sentence without provenance is as unshowable as a number without it.
  */
-export function Verdict({ sentence, proof, stamp }: VerdictProps) {
+export function Verdict({ sentence, proof, stamp, caption = null }: VerdictProps) {
   const t = useTranslations("judge.scoreboard.verdict");
   const headingId = useId();
   return (
@@ -41,6 +43,11 @@ export function Verdict({ sentence, proof, stamp }: VerdictProps) {
         <p className="flex max-w-(--measure) flex-wrap items-center gap-x-3 gap-y-2 text-lg text-ink sm:text-xl">
           <span>{sentence}</span>
           <ProofChip proof={proof} />
+        </p>
+      )}
+      {caption === null ? null : (
+        <p className="max-w-(--measure) text-sm text-ink-2" data-verdict-caption="">
+          {caption}
         </p>
       )}
       <p className="max-w-(--measure) text-sm text-ink-3">{t("note")}</p>

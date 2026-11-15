@@ -41,9 +41,10 @@ const ideal: EvalData = {
   day: null,
   frontier,
   source: "2026",
+  record: null,
   files: { policy: files("policy_scoreboard"), plans: files("plan_scoreboard"), day: null, frontier: { path: "static/roster_frontier.json", sha256: "d".repeat(64) } },
 };
-const empty: EvalData = { policy: null, plans: null, day: null, frontier, source: "none", files: { policy: null, plans: null, day: null, frontier: ideal.files.frontier } };
+const empty: EvalData = { policy: null, plans: null, day: null, frontier, source: "none", record: null, files: { policy: null, plans: null, day: null, frontier: ideal.files.frontier } };
 
 const frontierSource = { label: "REAL weather + assumed crew", protocol: "recorded analysis" } as const;
 
@@ -70,13 +71,13 @@ describe("ScoreboardView", () => {
 
   it("test_warnings_rows_in_order_ours_last", () => {
     const { container } = view(ideal);
-    const rows = [...container.querySelectorAll("#warnings tbody tr")];
+    const rows = [...container.querySelectorAll("#warnings > table tbody tr")];
     expect(rows.map((r) => r.getAttribute("data-row"))).toEqual(["P0", "P1", "P2", "P3_protect", "P3_balanced"]);
     expect(rows.map((r) => r.getAttribute("aria-current"))).toEqual([null, null, null, "true", "true"]);
-    expect(within(rows[0] as HTMLElement).getByText("Midday break only")).toBeInTheDocument();
+    expect(within(rows[0] as HTMLElement).getByText("Baseline: ban only")).toBeInTheDocument();
     expect(within(rows[3] as HTMLElement).getByText("Stellar Blaze")).toBeInTheDocument();
     // every number has a proof chip: 4 per row
-    expect(container.querySelectorAll("#warnings tbody [data-proof-id]")).toHaveLength(5 * 4);
+    expect(container.querySelectorAll("#warnings > table tbody [data-proof-id]")).toHaveLength(5 * 4);
   });
 
   it("test_headline_says_24_hours_ahead_not_evening_before", () => {
@@ -84,14 +85,17 @@ describe("ScoreboardView", () => {
     const text = container.textContent;
     expect(text).toContain("about 24 hours ahead");
     expect(text).toContain("Held-out 2026, every choice fixed on 2024-2025 data");
-    expect(text).not.toMatch(/evening before/i);
+    // the lead-2 stamp ("issued by 18:00 the evening before") may be carried for lead 2 only: never in the headline, the lede or the facts line
+    const header = container.querySelector("header")?.textContent ?? "";
+    expect(header).not.toMatch(/evening before/i);
+    expect(container.querySelector("[data-lead=\"2\"]")?.textContent ?? "").toMatch(/evening before/i);
   });
 
   it("merges the plans the file names as identical into one row, and marks ours", () => {
     const { container } = view(ideal);
     const rows = [...container.querySelectorAll("#plans tbody tr")];
     expect(rows.map((r) => r.getAttribute("data-row"))).toEqual(["merged", "rule_raw", "rule_corrected"]);
-    expect(screen.getByText("Ban only (= working every shift minute outside the midday break, on the legal roster)")).toBeInTheDocument();
+    expect(screen.getByText("Baseline: ban only (= working every shift minute outside the midday break, on the legal roster)")).toBeInTheDocument();
     expect(rows[2]?.getAttribute("aria-current")).toBe("true");
     expect(container.querySelectorAll("#plans tbody [data-proof-id]")).toHaveLength(3 * 4);
   });

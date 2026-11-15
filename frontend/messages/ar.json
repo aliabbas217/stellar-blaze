@@ -95,7 +95,7 @@
     },
     "accessLog": {
       "label": "Refused requests for individual data at this site",
-      "refused": "An employer request for individual data at this site was refused"
+      "refused": "A request for a worker's health data was refused"
     }
   },
   "shell": {
@@ -607,7 +607,7 @@
         "itemsOne": "1 item needs a tick: {list}.",
         "items": "{count} items need a tick: {list}.",
         "item": "Plan zone <bdi>{zone}</bdi>, <bdi>{from}</bdi> to <bdi>{to}</bdi>",
-      "itemText": "Plan zone {zone}, {from} to {to}",
+        "itemText": "Plan zone {zone}, {from} to {to}",
         "tickOne": "Tick 1 more item to sign",
         "tickMany": "Tick {count} more items to sign",
         "submit": "Sign off",
@@ -669,6 +669,7 @@
       "queuedDetail": "The stop for <bdi>{crew}</bdi> is kept on this phone and sent when it is back online.",
       "failed": "Not sent. Tell the crew now.",
       "failedDetail": "Press Stop work to try again.",
+      "expired": "Stop for <bdi>{crew}</bdi> was not sent. It waited 60 minutes without a connection and has expired. Tell the crew now, by voice or radio, and press Stop again when you are online.",
       "noCrew": "The crew list did not load. Tell the crew to stop work now.",
       "noCrews": "There are no crews at this site to stop."
     }
@@ -719,6 +720,12 @@
     },
     "proof": {
       "chip": "Proof",
+      "lock": {
+        "note": "Held-out 2026 run: the protocol was committed and locked before the models were scored.",
+        "hash": "SHA-256 of the lock the run started under",
+        "protocolCommit": "Commit of the pre-registered protocol",
+        "amendmentsNote": "Changes to the protocol and the freeze addendum, each committed before 2026 was scored. They are listed with their commit and fingerprint; read them with the protocol, they are not summarized here."
+      },
       "chipAria": "Proof for {what}",
       "loadFailed": "The proof could not be opened. Try again.",
       "title": "Where this number comes from",
@@ -731,7 +738,9 @@
         "sha": "SHA-256",
         "label": "Label",
         "model": "Model",
-        "generated": "Generated"
+        "lock": "Pre-registration",
+        "generated": "Generated",
+        "amendments": "Amendments and freeze"
       },
       "sha": {
         "file": "Of the file this page drew",
@@ -784,19 +793,22 @@
     "openToday": "افتح مستويات اليوم"
   },
   "judge": {
+    "island": {
+      "loadFailed": "Could not load. Try again."
+    },
     "scoreboard": {
       "title": "Summer 2026, replayed honestly",
       "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded.",
       "facts": "Forecast made about 24 hours ahead · Scored against station thermometers",
       "skip": "Skip to the scores",
       "season": {
-        "heading": "The season, daily peak forecast",
-        "aria": "Daily peak forecast WBGT at Abu Dhabi airport, {days} days, {from} to {to}. {daysOver} of {days} days peak above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
-        "ariaNoBreak": "Daily peak forecast WBGT at Abu Dhabi airport, {days} days, {from} to {to}. {daysOver} of {days} days peak above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
+        "heading": "The season: recorded raw forecast, before correction",
+        "aria": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
+        "ariaNoBreak": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
         "limit": "Heavy-work limit {limit} °C",
         "slot": "Midday break in force, {from} to {to}, {start} to {end}",
         "slotShort": "Midday break in force",
-        "peak": "{value} °C, {day}, {hour}, the hottest forecast",
+        "peak": "{value} °C, {day}, {hour}, the hottest raw forecast",
         "coolest": "Coolest day still peaked at {value} °C, {day}",
         "tableToggle": "Show the daily numbers as a table",
         "tableCaption": "Daily peak forecast, one row per day",
@@ -807,35 +819,42 @@
           "inBreak": "Midday break in force"
         },
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "caption": "Recorded raw forecast, before correction. These are not hours that were actually over the limit: what the station recorded is scored below."
       },
       "tally": {
         "through": "Through {date}",
         "final": "Through {date}, final",
         "daysOf": "of {total}",
-        "days": "days the forecast peak crossed {limit} °C",
-        "hours": "working hours forecast above the limit",
+        "days": "days the raw forecast peak was above {limit} °C",
+        "hours": "working hours the raw forecast put above the limit",
         "inBreak": "of those inside the midday break",
-        "whatDays": "Days the forecast peak crossed the limit",
-        "whatHours": "Working hours forecast above the limit",
-        "whatInBreak": "Hours above the limit inside the midday break"
+        "whatDays": "Days the recorded raw forecast peaked above the limit, before correction",
+        "whatHours": "Working hours the recorded raw forecast put above the limit, before correction",
+        "whatInBreak": "Raw-forecast hours above the limit inside the midday break, before correction"
       },
       "player": {
         "play": "Play the season",
         "pause": "Pause",
         "resume": "Resume",
-        "note": "Plays {days} days in 8 seconds. The forecast counts are recorded; the scores below fill from the scoring run.",
+        "note": "Plays {days} days in 8 seconds. Counts of the recorded raw forecast, before correction, not hours that were actually over the limit. The scores below compare warnings with what the station recorded.",
         "reducedMotion": "Animation is off on this device, so the whole season is shown."
       },
       "verdict": {
         "heading": "What the season showed",
         "pending": "Chosen from the pre-registered outcome table after the single scoring run.",
-        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change."
+        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change.",
+        "other": "Other pre-registered checks, as the scoring run wrote them",
+        "lead2": "The same check on the forecast issued by 18:00 the evening before",
+        "plansHeading": "Plans, as the scoring run wrote them",
+        "priorNow": "Supported on 2026 (pre-registered).",
+        "priorSupported": "On the 2025 development run, the prior run, this check was supported too.",
+        "priorNotSupported": "On the 2025 development run, the prior run, this check was not supported."
       },
       "warnings": {
         "heading": "Warnings",
         "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
-        "defs": "A danger hour is an hour the station was in the ADOSH High zone. Stellar Blaze warns when the calibrated chance of the High zone passes a threshold set on 2024 and 2025 data only.",
+        "defs": "A danger hour is an hour the station was in the ADOSH High or Red zone. Stellar Blaze warns when its corrected forecast puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; both thresholds are shown.",
         "caption": "Four ways to warn a crew, scored on the season",
         "columns": {
           "policy": "Policy",
@@ -851,25 +870,49 @@
         "pending": "Warnings, summer 2026: danger hours nobody was warned about, false alarms and the two shares",
         "policies": {
           "P0": {
-            "label": "Midday break only",
-            "sub": "{start} to {end} by law, nothing else"
+            "label": "Baseline: ban only",
+            "sub": "{start} to {end} by law, nothing else. It never warns on a worked hour.",
+            "code": "P0"
           },
           "P1": {
             "label": "Fixed 32 °C rule",
-            "sub": "Stop when the raw forecast reaches 32 °C"
+            "sub": "Stop when the raw forecast reaches 32 °C",
+            "code": "P1"
           },
           "P2": {
             "label": "ADOSH zones on the raw forecast",
-            "sub": "The regulator's zones, no correction"
+            "sub": "The regulator's zones, no correction",
+            "code": "P2"
           },
           "P3_protect": {
             "label": "Stellar Blaze",
-            "sub": "Corrected forecast, warns at the protective threshold"
+            "sub": "Corrected forecast, warns at the protective threshold",
+            "code": "P3, protective"
           },
           "P3_balanced": {
             "label": "Stellar Blaze, balanced",
-            "sub": "Corrected forecast, warns at the balanced threshold"
+            "sub": "Corrected forecast, warns at the balanced threshold",
+            "code": "P3, balanced"
           }
+        },
+        "lead2": {
+          "heading": "Stricter check: forecast issued by 18:00 the evening before",
+          "sub": "The same ways to warn, on the forecast issued by 18:00 Gulf time the evening before.",
+          "caption": "Ways to warn a crew, scored on the season with the forecast issued by 18:00 the evening before"
+        },
+        "truth": "On the station's own record the season had {value} danger hours ({lo} to {hi}, 95% interval). A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}, at Abu Dhabi airport (OMAA), summer 2026; the thermal margin of {margin} W/m² is an assumption.",
+        "truthWhat": "Danger hours in the season, from the station record",
+        "rowSub": "{code}. {sub}",
+        "tradeoff": {
+          "missed": "Danger hours missed: Stellar Blaze at the protective threshold (theta {theta}) missed {a}, which is {c0} ban only ({p0}{o0}), {c2} ADOSH zones on the raw forecast ({p2}{o2}) and {c1} the fixed 32 °C rule ({p1}{o1}).",
+          "falseAlarm": "False-alarm hours: {a}, which is {c1} the fixed 32 °C rule ({p1}{o1}) and {c2} ADOSH zones on the raw forecast ({p2}{o2}).",
+          "balanced": "At the balanced threshold (theta {theta}) Stellar Blaze and ADOSH zones on the raw forecast cannot be told apart: danger hours missed {m1} and {m2}, false-alarm hours {f1} and {f2}, with overlapping 95% intervals.",
+          "cmp": {
+            "fewer": "fewer than",
+            "more": "more than",
+            "same": "the same as"
+          },
+          "overlap": "; the 95% intervals overlap"
         }
       },
       "plans": {
@@ -892,7 +935,7 @@
         "roster": "Roster: {roster}",
         "rows": {
           "merged": {
-            "label": "Ban only (= working every shift minute outside the midday break, on the legal roster)",
+            "label": "Baseline: ban only (= working every shift minute outside the midday break, on the legal roster)",
             "sub": "The legal minimum. Working through and ban only are the same plan."
           },
           "rule_raw": {
@@ -903,12 +946,15 @@
             "label": "Rule plan on our corrected forecast",
             "sub": "The protective quantile of the corrected forecast"
           }
-        }
+        },
+        "tradeoff": "Rule-violation minutes per worker-season fall from {from} with ban only to {to} on the corrected plan. It adds {rest} rest minutes per worker-season against ban only; the rule plan on the raw forecast adds {restRaw}. {days} scored days, simulated crew."
       },
       "table": {
         "notScored": "not scored yet",
         "ours": "This is the Stellar Blaze row.",
-        "interval": "95% interval {lo} to {hi}"
+        "interval": "95% interval {lo} to {hi}",
+        "notComputed": "not computed",
+        "baselineNoInterval": "baseline, no interval"
       },
       "partial": {
         "title": "The Plans table is not on this page yet",
@@ -925,10 +971,11 @@
         "primary": "Try again"
       },
       "limits": {
-        "station": "Airport station, not a worksite.",
+        "station": "Abu Dhabi airport only (OMAA), one summer the models had not seen.",
         "crew": "The crew of {size} is an assumed schedule.",
         "truth": "Truth is station temperature, humidity and wind plus modelled sunshine.",
-        "twl": "Thermal work limit aligned with ADOSH zones, not certified."
+        "twl": "Thermal work limit aligned with ADOSH zones, not certified.",
+        "simulated": "Simulated crew, real weather."
       },
       "loading": "Loading the season",
       "factsHeldOut": "Held-out 2026, every choice fixed on 2024-2025 data",
@@ -941,6 +988,10 @@
         "high_cycled_share": "of High-zone heavy work planned as cycled",
         "missed_protection_ticks": "minutes in a milder plan zone than the truth",
         "rest_minutes_added_vs_naive": "minutes per worker-season"
+      },
+      "evaluation": {
+        "line": "Scored once on summer 2026, under a protocol locked before the run.",
+        "what": "The 2026 evaluation: held-out and pre-registered"
       }
     },
     "frontier": {
@@ -975,7 +1026,8 @@
       "headingNoGainFails": "At a {minutes} minute commute the analysis finds no gain on top of the legal default. The legal default itself leaves {sleep} h of sleep there, under the {hours} h sleep gate. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
       "headingNoGainPasses": "At a {minutes} minute commute the analysis finds no gain on top of the legal default: in {noChange} of {folds} cross-validation folds it was not beaten. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
       "bestNoneFails": "No gain on top of the legal default at this commute. The legal default itself leaves {sleep} h of sleep, under the {hours} h sleep gate.",
-      "bestNonePasses": "No gain on top of the legal default at this commute: it was not beaten in {noChange} of {folds} cross-validation folds."
+      "bestNonePasses": "No gain on top of the legal default at this commute: it was not beaten in {noChange} of {folds} cross-validation folds.",
+      "unitsNote": "Each percentage is a relative reduction in hours at 30 °C WBGT or more, against the legal default or against common practice. The sleep gate is the least sleep a roster may leave a worker: {hours} h a night."
     },
     "day": {
       "title": "One day, hour by hour, chosen by a rule before we looked",
@@ -1023,26 +1075,31 @@
       },
       "counters": {
         "heading": "What the station recorded, and who called it",
-        "sub": "Called means the forecast put that hour in the High zone. These four numbers come from the one scoring run; the page ships unchanged whatever they are.",
-        "pending": "The scored day",
-        "high": "High-zone working hours on the day",
+        "sub": "Called means the forecast put that hour in the High or Red zone. These numbers come from the one scoring run; the page ships unchanged whatever they are.",
+        "pending": "The tally for the day the protocol picks",
+        "high": "High or Red zone working hours on the day",
         "outside": "Of those, outside {start} to {end}",
-        "raw": "Called by the raw forecast",
-        "ours": "Called by Stellar Blaze",
-        "hours": "hours"
+        "raw": "Called by ADOSH zones on the raw forecast",
+        "ours": "Called by Stellar Blaze, protective threshold",
+        "hours": "hours",
+        "balanced": "Called by Stellar Blaze, balanced threshold",
+        "p1": "Called by the fixed 32 °C rule on the raw forecast",
+        "of": "{n} of {total}"
       },
       "error": {
         "title": "The day file could not be read",
         "reason": "The season scoreboard still works. Nothing here is guessed in the meantime.",
         "primary": "Try again"
       },
-      "loading": "Loading the day"
+      "loading": "Loading the day",
+      "titlePending": "One day, hour by hour"
     },
     "try": {
       "title": "Try a plan against the rules",
       "lede": "Pick a roster or write your own. The independent validator checks it against the day's heat and the labour rules, and answers with the rules the plan breaks.",
       "independent": "The validator is independent: it shares no code with the planners that make our plans, so a plan cannot pass because the planner and the checker agree with themselves.",
       "day": "Checked on {date}, the replay day, for a crew of {headcount} doing heavy work.",
+      "dayLive": "Checked on {date}, today at the site, for a crew of {headcount} doing heavy work.",
       "templates": {
         "heading": "Start from a roster",
         "common": "Common roster",
@@ -1066,7 +1123,7 @@
         "end": "End",
         "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
         "none": "Add at least one run of work to check a plan.",
-      "placeholder": "hh:mm",
+        "placeholder": "hh:mm",
         "problem": {
           "format": "Write the time as hh:mm, for example 06:00.",
           "grid": "Use a multiple of 5 minutes, for example 06:05.",
@@ -1079,20 +1136,22 @@
         "heatNote": "The colour behind the plan is the raw forecast of the day, hour by hour.",
         "aria": "Work plan on {date}: {runs}. {marks}",
         "ariaMarksOne": "1 rule broken, numbered on the plan.",
-      "ariaMarks": "{count} rules broken, numbered on the plan.",
+        "ariaMarks": "{count} rules broken, numbered on the plan.",
         "ariaNoMarks": "Not checked yet.",
         "ariaClean": "No rule broken.",
         "slot": "Midday break",
         "outline": "Midday break by law: not in force until {date}",
-        "outlineUnknown": "Midday break by law: not in force on this date"
+        "outlineUnknown": "Midday break by law: not in force on this date",
+        "noHeat": "No recorded forecast colour is drawn for this day: the recorded forecast is for another day."
       },
       "check": "Check this plan",
       "checking": "Checking the plan",
       "notReady": "The demo site is still loading. Try again in a moment.",
+      "noDay": "The day to check could not be read from the site's forecast. Try again in a moment.",
       "result": {
         "heading": "What the validator found",
         "brokenOne": "1 rule broken",
-    "broken": "{count} rules broken",
+        "broken": "{count} rules broken",
         "zero": "0 rules broken",
         "zeroNote": "Every rule it checked passed for this plan.",
         "checked": "What was checked",
@@ -1152,14 +1211,15 @@
       "notes": {
         "forecastAhead": "About 24 hours ahead of each day, by the ECMWF model.",
         "notAForecast": "Not a forecast: recorded station observations and a roster model.",
-        "protocolCommitted": "The pre-registration, commit 661b373, before 2026 was scored.",
+        "protocolCommitted": "The pre-registration, commit {commit}, before 2026 was scored.",
         "noProtocolForecast": "No scoring protocol: this count is made from the recorded forecast file.",
         "noProtocolAnalysis": "No scoring protocol: this is a recorded analysis, not a scored result.",
         "runScored": "The single scoring run wrote this file.",
         "runDev": "The 2025 development run wrote this file. It is not the result.",
         "runNotScoring": "Not a scoring run: nothing here is scored.",
         "shown": "This page reads the file whose fingerprint is above.",
-        "runSynthetic": "Not a scoring run: a script wrote this file with made-up numbers, only to check the layout."
+        "runSynthetic": "Not a scoring run: a script wrote this file with made-up numbers, only to check the layout.",
+        "protocolDev": "The pre-registration. This is a development run: it is not the held-out result."
       },
       "emptyTitle": "No provenance recorded for this number",
       "emptyReason": "No provenance recorded for this number. It is not shown as a result.",
@@ -1211,7 +1271,7 @@
         "outcome": "Outcome",
         "outcomeValue": "Refused",
         "why": "Why",
-        "whyValue": "Individual data is never released to an employer, whatever the reason given.",
+        "whyValue": "A worker's health data is never released to an employer, whatever the reason given.",
         "rules": "Rules in force",
         "model": "Model",
         "noModel": "none loaded",
@@ -1270,6 +1330,87 @@
         "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
         "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
       }
+    },
+    "landing": {
+      "metaTitle": "Heat that stops work, forecast about 24 hours ahead",
+      "skip": "Skip to the scoreboard",
+      "kicker": "Summer 2026, replayed against airport thermometers",
+      "title": "Heat that stops work, forecast about 24 hours ahead.",
+      "lede": "Hour-by-hour heat levels, legal shift plans and warnings in six languages, for the crews on a worksite, shift by shift.",
+      "primary": "See the scoreboard",
+      "secondary": "Walk me through it",
+      "apps": {
+        "heading": "Open the apps",
+        "note": "Both run on synthetic data in this demo."
+      },
+      "field": {
+        "region": "The forecast heat field over the UAE, {day}",
+        "readout": "Field reading at the selected hour",
+        "hottest": "Hottest grid cell at {hour}",
+        "where": "{lat} N {lon} E",
+        "station": "Abu Dhabi airport (OMAA), its own forecast series",
+        "limit": "Heavy-work limit (NIOSH)",
+        "cells": "Grid cells above the limit",
+        "cellsOf": "{n} of {total}",
+        "degrees": "°C",
+        "sourcePeak": "WBGT in the sun from the ECMWF forecast issued the day before, as recorded, before any correction. {day} has the highest daily peak of the summer's raw forecast and is shown for illustration, not as the day we scored.",
+        "sourcePlain": "WBGT in the sun from the ECMWF forecast issued the day before, as recorded, before any correction. {day} is shown for illustration, not as the day we scored.",
+        "proofWhat": "The forecast heat field, {day}, every hour",
+        "stations": {
+          "OMAA": "Abu Dhabi",
+          "OMDB": "Dubai",
+          "OMAL": "Al Ain",
+          "OMFJ": "Fujairah"
+        },
+        "scrubber": {
+          "label": "Hour of the day, {day}",
+          "valueText": "{hour}: hottest grid cell {hottest} degrees, Abu Dhabi airport {station}",
+          "play": "Play the day",
+          "pause": "Pause the day",
+          "when": "{day}, Gulf time"
+        },
+        "loading": "Loading the forecast field",
+        "error": {
+          "title": "The forecast files did not load",
+          "reason": "The scoreboard and the proof pages still work. Reload to try the field again.",
+          "primary": "See the scoreboard"
+        }
+      },
+      "hook": {
+        "heading": "The season on the station's own record",
+        "label": "danger hours at Abu Dhabi airport, summer 2026",
+        "interval": "{lo} to {hi}, 95% interval",
+        "definition": "A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}. Whether an hour was a danger hour is derived from the station's recorded observations; the thermal margin of {margin} W/m² is an assumption."
+      },
+      "problem": {
+        "eyebrow": "The problem",
+        "heading": "The midday break covers only part of the hot hours",
+        "body1": "From {from} to {to} the law stops outdoor work from {start} to {end}. The recorded raw forecast puts working hours above the heavy-work limit outside that window too.",
+        "body2": "A crew needs to know which hours, not which months. That is the forecast we give them about 24 hours ahead.",
+        "ofHours": "of {total} working hours",
+        "calendarAria": "Every working hour, {start} to {end}, of {days} days from {from} to {to}, from the recorded raw forecast before correction. {over} of {n} hours are above the {limit} °C heavy-work limit; the midday break is cut in below the line for the days it is in force.",
+        "legendSlot": "Midday break, by law",
+        "legendHot": "Coloured: above {limit} °C, brighter is hotter",
+        "legendCool": "Grey: not above the limit",
+        "tableToggle": "Show the counts as a table",
+        "tableCaption": "Recorded raw forecast working hours above the limit, by month",
+        "columns": {
+          "period": "Days",
+          "hours": "Working hours",
+          "over": "Above the limit",
+          "inBreak": "Inside the midday break"
+        },
+        "period": "{from} to {to}",
+        "bridge": "These {over} hours and the {danger} danger hours at the top of this page count different things against different limits: here the recorded raw forecast against the {limit} °C heavy-work limit, there the station's observed heat against the ADOSH High or Red zone."
+      },
+      "season": {
+        "eyebrow": "The scoreboard",
+        "heading": "Four ways to warn a crew, judged on one summer",
+        "body": "Each way to warn gets only the forecast it would have had about 24 hours ahead. The station's thermometers then say what happened.",
+        "caption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
+        "open": "Open the scoreboard"
+      },
+      "ledeProof": "Every figure about the season and the scores comes from a recorded file, and its proof chip says which."
     }
   }
 }

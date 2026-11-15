@@ -74,7 +74,7 @@ test("try a plan: common roster shows violations, keyboard only", async ({ page 
   await expect(page.getByText("0 rules broken")).toBeVisible();
 });
 
-test("try a plan: first load makes no API call; the first focus loads the island and sends nothing", async ({ page }) => {
+test("try a plan: first load makes no API call; focus only warms the island, the first tap brings it in and sends nothing", async ({ page }) => {
   const api: string[] = [];
   const posts: string[] = [];
   page.on("request", (request) => {
@@ -84,11 +84,33 @@ test("try a plan: first load makes no API call; the first focus loads the island
   await open(page);
   await page.waitForTimeout(800);
   expect(api).toEqual([]);
-  await page.getByRole("button", { name: CHECK }).focus();
+  // a field focus and a typed time warm the chunk but never replace the page: the soft keyboard of a phone stays up
+  const field = page.getByLabel("Run 3: Start");
+  await field.focus();
+  await page.keyboard.type("09");
+  await page.waitForTimeout(800);
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue("09");
+  expect(api).toEqual([]);
+  // a tap on the Replay switch brings the island in (sites and their forecast are asked for), keeps what was typed, sends nothing
+  await page.getByRole("button", { name: "Replay" }).click();
   await expect.poll(() => api.some((url) => url.includes("/sites"))).toBe(true);
-  await expect(page.getByRole("button", { name: CHECK })).toBeFocused();
+  await expect(page.getByLabel("Run 3: Start")).toHaveValue("09");
   await page.waitForTimeout(500);
   expect(posts).toEqual([]);
+});
+
+test("try a plan: Enter in a time field runs the check (a real form), once", async ({ page }) => {
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/plans/validate")) posts.push(request.url());
+  });
+  await open(page);
+  await page.getByLabel("Run 3: Start").fill("09:00");
+  await page.getByLabel("Run 3: End").fill("09:30");
+  await page.getByLabel("Run 3: End").press("Enter");
+  await expect(page.locator("[data-try]")).toHaveAttribute("data-try", /answer|none/);
+  expect(posts).toHaveLength(1);
 });
 
 for (const [name, viewport] of [

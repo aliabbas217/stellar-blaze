@@ -48,6 +48,8 @@ export interface TableText {
   /** What a number is, for its proof chip: `metric` is a `PolicyMetric` or `PlanMetric` key. */
   readonly what: (metric: string, rowLabel: string) => string;
   readonly interval: (lo: string, hi: string) => string;
+  /** Shown instead of an interval on the baseline row whose bootstrap interval is a single point ("baseline, no interval"). */
+  readonly baselineNoInterval?: string;
   /** What a metric counts ("hours", "of danger hours were warned"), for the proof sheet. Optional. */
   readonly unit?: (metric: string) => string;
 }
@@ -80,8 +82,12 @@ export function policySlug(policy: PolicyId): string {
   return policy === "P3_protect" ? "p3" : policy.toLowerCase();
 }
 
-export function policyClaim(policy: PolicyId, metric: string): string {
-  return `policy.${policySlug(policy)}.${metric}`;
+/** The lead the Warnings headline is scored at (about 24 hours ahead) and the strict sensitivity lead (issued by 18:00 the evening before). */
+export type PolicyLead = 1 | 2;
+
+/** Lead 1 keeps the plain id (`policy.p3.pod`); lead 2 is `policy.lead2.p3.pod`, so one number never has two sheets. */
+export function policyClaim(policy: PolicyId, metric: string, lead: PolicyLead = 1): string {
+  return `policy.${lead === 1 ? "" : "lead2."}${policySlug(policy)}.${metric}`;
 }
 
 export function planClaim(plan: PlanId, metric: string): string {
@@ -93,11 +99,23 @@ interface Shown {
   readonly interval: string | null;
 }
 
-function shown(metric: Metric, scale: number, show: (v: number) => string, text: TableText): Shown {
+function shown(metric: Metric, scale: number, show: (v: number) => string, text: TableText, baseline: boolean): Shown {
+  // A baseline that never warns has a degenerate interval (the bootstrap of a constant): it is not a measured uncertainty, so it is
+  // not printed as one.
+  const point = metric.ci !== null && metric.ci.lo === metric.ci.hi && metric.ci.lo === metric.value;
   return {
     value: show(metric.value * scale),
-    interval: metric.ci === null ? null : text.interval(show(metric.ci.lo * scale), show(metric.ci.hi * scale)),
+    interval:
+      metric.ci === null ? null : baseline && point && text.baselineNoInterval !== undefined ? text.baselineNoInterval : text.interval(show(metric.ci.lo * scale), show(metric.ci.hi * scale)),
   };
+}
+
+/**
+ * A metric with no denominator (`n` is 0 and it has no interval: the false-alarm share of a policy that never warns) is NOT
+ * computed, whatever `value` says: the file writes 0 there. It is shown as "not computed", never as a zero and never with a proof.
+ */
+function notComputed(metric: Metric): boolean {
+  return metric.n === 0 && metric.ci === null;
 }
 
 function cell(
@@ -109,25 +127,28 @@ function cell(
   provenance: Schemas["Provenance"],
   ctx: AdapterContext,
   metricKey: string,
+  baseline = false,
 ): ScoreCell {
-  const { value, interval } = shown(metric, scale, show, ctx.text);
+  if (notComputed(metric)) return { value: "", what, proof: null, notComputed: true };
+  const { value, interval } = shown(metric, scale, show, ctx.text, baseline);
   const proof: Proof | null = proofFromProvenance(provenance, metric.anchor, what, ctx.file, { claim });
   const unit = ctx.text.unit?.(metricKey);
   return { value, ...(unit === undefined ? {} : { unit }), ...(interval === null ? {} : { interval }), what, proof };
 }
 
 /**
- * The Warnings rows at forecast lead `lead` (1: about 24 hours ahead), in the order of the file: P0, P1, P2, the protective
- * P3 and, only when the file carries it, the balanced P3. Our rows are last and marked.
+ * The Warnings rows at forecast lead `lead` (1: about 24 hours ahead, the headline; 2: issued by 18:00 the evening before), in the
+ * order of the file: P0, P1, P2, the protective P3 and, only when the file carries it, the balanced P3 (both thetas are shown).
+ * Our rows are last and marked.
  */
-export function toPolicyRows(sb: PolicyScoreboard, lead: 1, ctx: AdapterContext): ScoreRow[] {
+export function toPolicyRows(sb: PolicyScoreboard, lead: PolicyLead, ctx: AdapterContext): ScoreRow[] {
   const result = sb.leads.find((l) => l.lead_days === lead);
   if (result === undefined) return [];
   const f = ctx.format;
   return result.rows.map((row) => {
     const { label, sub } = ctx.text.row(row.policy);
     const at = (key: PolicyMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key), sb.provenance, ctx, key);
+      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key, lead), sb.provenance, ctx, key, row.policy === "P0");
     return {
       id: row.policy,
       label,
@@ -154,8 +175,10 @@ export function toPlanRows(sb: PlanScoreboard, ctx: AdapterContext): ScoreRow[] 
     if (isMerged) mergedDone = true;
     const id = isMerged ? "merged" : row.plan;
     const { label, sub } = isMerged ? ctx.text.row("merged") : knownRow(ctx.text, row.plan, row.label);
+    // ban only (and naive, which is ban only on the legal roster) is a baseline by construction: its single-point intervals are not measured
+    const baseline = row.plan === "naive" || row.plan === "ban_only";
     const at = (key: PlanMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key);
+      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key, baseline);
     rows.push({
       id,
       label,

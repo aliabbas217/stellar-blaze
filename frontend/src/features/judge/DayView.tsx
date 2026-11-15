@@ -37,10 +37,24 @@ export function DayView({ data, failed = false, hourly }: DayViewProps) {
   const model = buildDay({ day, dayFile, hourly, locale, t });
   const source = day === null ? "none" : (data?.source ?? "none");
 
+  // A day file that could not be read draws NO day and says nothing about a scoring run: after the run, "until the scoring run
+  // picks the day" would be false, and the recorded hottest day shown as the day would read as the scored one.
+  if (failed) {
+    return (
+      <main id="main-content" className="mx-auto flex w-full max-w-(--content-max) flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8" data-day-shown="failed">
+        <header className="flex flex-col gap-3">
+          <h1 className="max-w-(--measure) font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{t("titlePending")}</h1>
+        </header>
+        <EmptyState title={t("error.title")} reason={t("error.reason")} primary={{ label: t("error.primary"), href: "/replay/day" }} />
+        <StoryNav current="day" />
+      </main>
+    );
+  }
+
   return (
     <main id="main-content" className="mx-auto flex w-full max-w-(--content-max) flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
       <header className="flex flex-col gap-3">
-        <h1 className="max-w-(--measure) font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{t("title")}</h1>
+        <h1 className="max-w-(--measure) font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{model.scored ? t("title") : t("titlePending")}</h1>
         <p className="max-w-(--measure) text-lg text-ink-2">{t("lede")}</p>
         <EvalSourceStamp source={source} />
       </header>
@@ -70,11 +84,7 @@ export function DayView({ data, failed = false, hourly }: DayViewProps) {
         <HoursTable model={model} />
       </section>
 
-      {failed ? (
-        <EmptyState title={t("error.title")} reason={t("error.reason")} primary={{ label: t("error.primary"), href: "/replay/day" }} />
-      ) : (
-        <Counters model={model} />
-      )}
+      <Counters model={model} />
 
       <StoryNav current="day" />
     </main>
@@ -164,7 +174,7 @@ function HoursTable({ model }: { readonly model: DayModel }) {
 function Counters({ model }: { readonly model: DayModel }) {
   const t = useTranslations("judge.day.counters");
   const notScored = useTranslations("judge.day.table")("notScored");
-  const pendingLabels = [t("high"), t("outside", { start: SEASON_BAN.start, end: SEASON_BAN.end }), t("raw"), t("ours")];
+  const pendingLabels = [t("high"), t("outside", { start: SEASON_BAN.start, end: SEASON_BAN.end }), t("p1"), t("raw"), t("ours"), t("balanced")];
   return (
     <section aria-labelledby="day-counters-heading" className="flex flex-col gap-4" data-day-counters="">
       <h2 id="day-counters-heading" className="font-display text-2xl font-medium">
@@ -172,7 +182,7 @@ function Counters({ model }: { readonly model: DayModel }) {
       </h2>
       <p className="max-w-(--measure) text-base text-ink-2">{t("sub")}</p>
       {model.counters === null ? <PendingBanner what={t("pending")} /> : null}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {model.counters === null
           ? pendingLabels.map((label) => (
               <div key={label} className="flex flex-col gap-2 border-t border-edge pt-3" data-counter-pending="">
@@ -183,7 +193,7 @@ function Counters({ model }: { readonly model: DayModel }) {
               </div>
             ))
           : model.counters.map((counter) => (
-              <div key={counter.id} className={`border-t pt-3 ${counter.id === "ours" ? "border-signal" : "border-edge"}`} data-counter-id={counter.id}>
+              <div key={counter.id} className={`border-t pt-3 ${counter.id === "ours" || counter.id === "balanced" ? "border-signal" : "border-edge"}`} data-counter-id={counter.id}>
                 <Counter size="numeral" value={counter.value} unit={counter.label} proof={counter.proof} />
               </div>
             ))}

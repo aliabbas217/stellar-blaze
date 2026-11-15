@@ -248,7 +248,11 @@ export function PlanView({ crewId }: { readonly crewId: string }) {
   );
   // The bar is for the crew in the URL, whatever else is loading or failing. The one exception is a crew that does not exist.
   const notFound = screen.state.status === "failed" && screen.state.failure.kind === "not-found";
-  const work = useStopWork(notFound ? null : crewId, serverOf);
+  const nameOf = useCallback(
+    (id: string): string | null => screen.crews?.find((candidate) => candidate.id === id)?.name ?? (id === crewId ? crewName : null),
+    [screen.crews, crewId, crewName],
+  );
+  const work = useStopWork(notFound ? null : crewId, serverOf, nameOf);
 
   const state = screen.state;
   const suppressed = state.status === "ready" ? state.plan.suppressed : false;
@@ -275,7 +279,7 @@ export function PlanView({ crewId }: { readonly crewId: string }) {
           <ResetDemoControl siteId={screen.siteId} />
         </div>
       ) : null}
-      <StopWorkBar crewName={crewName} work={notFound ? null : work} noCrew="none" />
+      <StopWorkBar crewName={crewName} work={notFound ? null : work} notices={work} noCrew="none" />
     </div>
   );
 }

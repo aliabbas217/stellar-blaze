@@ -41,7 +41,7 @@ const root = path.resolve(import.meta.dirname, "../../../..");
 const recordedFile = JSON.parse(readFileSync(path.join(root, "data/recorded/governance-run.json"), "utf8")) as unknown;
 const recorded: RecordedView = toRecordedView(parseRecordedRun(recordedFile));
 
-const SENTENCE = "An employer request for individual data at this site was refused";
+const SENTENCE = "A request for a worker's health data was refused";
 const SEND = "Send the employer's request";
 
 const PROBLEM = {
@@ -224,12 +224,12 @@ describe("GovernanceView: the live call", () => {
     expect(REQUEST_DATA_CLASS).toBe("health");
   });
 
-  it("every sentence derived from a log row says 'individual data', never 'health' (a row carries no data class)", () => {
+  it("every sentence derived from a log row is the architect's fixed copy: a request for a worker's health data was refused (G4 ruling, which replaces the 'individual data' wording)", () => {
     server.use(refusing({ bodies: [] }));
     const { container } = renderView();
-    const audit = container.querySelector("[data-audit=shown]") as HTMLElement;
-    expect(audit.textContent).not.toMatch(/health/i);
-    expect((container.querySelector("[data-access-log=rows]") as HTMLElement).textContent).not.toMatch(/health/i);
+    expect((container.querySelector("[data-access-log=rows]") as HTMLElement).textContent).toContain(SENTENCE);
+    expect((container.querySelector("[data-audit=shown]") as HTMLElement).textContent).toContain("A worker's health data is never released to an employer");
+    expect(document.body.textContent).not.toContain("An employer request for individual data");
   });
 
   it("keeps the button label and marks the call busy while it runs (the button was never pre-disabled)", async () => {

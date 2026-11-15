@@ -22,6 +22,17 @@ export const PROOF_LABELS = {
 } as const satisfies Record<ProofLabel, string>;
 
 /** Everything the proof drawer shows for one number. Identifiers and hashes are data; the row names are messages. */
+/**
+ * What the held-out run was locked to, shown beside a number from a 2026 file: the lock, the protocol commit, and the amendments
+ * and the freeze addendum the run lists (each with its commit and SHA-256), all from `evaluation_record.json`.
+ */
+export interface EvaluationInfo {
+  readonly lockSha256: string;
+  readonly protocolCommit: string;
+  readonly amendments: readonly { readonly path: string; readonly commit: string; readonly sha256: string }[];
+  readonly freeze: { readonly path: string; readonly commit: string; readonly sha256: string };
+}
+
 export interface Proof {
   /** The number in words, already localized by the caller ("Alerts per shift, P3 protect"). */
   readonly what: string;
@@ -46,6 +57,11 @@ export interface Proof {
    * it has one. The drawer then offers a link to the sheet.
    */
   readonly claim?: string;
+  /**
+   * The held-out run's pre-registration lock (SHA-256 of the lock the run started under) and the commit of the protocol, on a
+   * number from a 2026 result file. The drawer shows them: the label alone ("REAL") does not say the run was locked first.
+   */
+  readonly evaluation?: EvaluationInfo;
 }
 
 /**
@@ -80,7 +96,7 @@ export function proofFromProvenance(
   provenance: Partial<Provenance> | null | undefined,
   anchor: string,
   what: string,
-  file: { readonly path: string; readonly sha256: string | null },
+  file: { readonly path: string; readonly sha256: string | null; readonly evaluation?: EvaluationInfo },
   options: { readonly label?: ProofLabel; readonly claim?: string } = {},
 ): Proof | null {
   if (provenance === null || provenance === undefined) return null;
@@ -102,6 +118,8 @@ export function proofFromProvenance(
     modelId: provenance.model_id ?? null,
     generatedAt: generated_at,
     ...(options.claim === undefined ? {} : { claim: options.claim }),
+    // A development or synthetic file is not the held-out run: it never shows a lock.
+    ...(file.evaluation === undefined || isDevPath(file.path) ? {} : { evaluation: file.evaluation }),
   };
 }
 

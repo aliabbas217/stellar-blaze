@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AccessLog } from "@/components/governance/AccessLog";
 import { Stamp } from "@/components/provenance/Stamp";
 import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
+import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { AnswerCard } from "./AnswerCard";
 import { AuditCard } from "./AuditCard";
@@ -226,7 +227,18 @@ function RunNotice({ runLive, recorded, locale }: { readonly runLive: boolean; r
  * What went wrong with the call just made, shown under the button that made it. Only a refusal changes the sequence; every
  * other outcome is said here, the last good run stays in place, and nothing here is worded as a refusal.
  */
-export function CallNotice({ outcome, notReady, logFailed }: { readonly outcome: Outcome | null; readonly notReady: boolean; readonly logFailed: boolean }) {
+export function CallNotice({
+  outcome,
+  notReady,
+  offline = false,
+  logFailed,
+}: {
+  readonly outcome: Outcome | null;
+  readonly notReady: boolean;
+  /** A send was tapped with no network: nothing was sent and the recorded run stays on screen. */
+  readonly offline?: boolean;
+  readonly logFailed: boolean;
+}) {
   const t = useTranslations("judge.governance.status");
   const note = "flex flex-col gap-1 rounded-sign border border-edge bg-ground px-3 py-2 text-sm text-ink-2";
   return (
@@ -234,6 +246,11 @@ export function CallNotice({ outcome, notReady, logFailed }: { readonly outcome:
       {logFailed ? (
         <div role="status" className={note} data-notice="logFailed">
           <p>{t("logFailed")}</p>
+        </div>
+      ) : null}
+      {offline ? (
+        <div data-notice="offline">
+          <OfflineBanner />
         </div>
       ) : null}
       {notReady ? (

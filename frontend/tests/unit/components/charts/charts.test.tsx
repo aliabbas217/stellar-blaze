@@ -245,7 +245,9 @@ describe("DayChart", () => {
     expect(container.querySelector("[data-slot=in-force]")).toBeNull();
     const outline = container.querySelector("[data-slot=outline]");
     expect(outline?.className).toContain("border-dashed");
-    expect(outline?.textContent).toBe(dayLabels.outline);
+    // the band is too narrow for the sentence on a phone: the legend names it in words
+    expect(outline?.textContent).toBe("");
+    expect(container.querySelector("[data-legend-item=outline]")?.textContent).toBe(dayLabels.outline);
   });
 
   it("draws no slot and no outline when the break has no extent", () => {
