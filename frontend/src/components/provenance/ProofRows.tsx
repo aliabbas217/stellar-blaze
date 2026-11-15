@@ -38,6 +38,15 @@ export function ProofRows({ proof }: { readonly proof: Proof }) {
         </span>
       </Row>
       <Row name={t("rows.label")}>{t(`labels.${PROOF_LABELS[proof.label]}`)}</Row>
+      {proof.evaluation === undefined ? null : (
+        <Row name={t("rows.lock")}>
+          <span className="flex flex-col gap-3">
+            <span className="text-base text-ink">{t("lock.note")}</span>
+            <Hash caption={t("lock.hash")} value={proof.evaluation.lockSha256} />
+            <Hash caption={t("lock.protocolCommit")} value={proof.evaluation.protocolCommit} />
+          </span>
+        </Row>
+      )}
       <Row name={t("rows.model")} code>
         {proof.modelId ?? none}
       </Row>

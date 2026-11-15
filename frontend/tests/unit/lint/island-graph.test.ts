@@ -70,7 +70,8 @@ export function firstLoadViolation(roots: readonly string[], read: (file: string
   return null;
 }
 
-const LAYOUTS = [join(SRC, "app/[locale]/(judge)/replay/layout.tsx"), join(LIVE, "layout.tsx")];
+// Every layout above a page (the app has no root layout above [locale]): the locale layout, the judge shell and the (live) group. A provider added to any of them fails here.
+const LAYOUTS = [join(SRC, "app/[locale]/layout.tsx"), join(SRC, "app/[locale]/(judge)/replay/layout.tsx"), join(LIVE, "layout.tsx")];
 const PAGES = ["governance/page.tsx", "try/page.tsx"].map((p) => join(LIVE, p)).filter((p) => existsSync(p));
 
 describe("the first-load graph of the judge pages that call the API", () => {
@@ -82,11 +83,21 @@ describe("the first-load graph of the judge pages that call the API", () => {
     expect(firstLoadViolation([...LAYOUTS, page])).toBeNull();
   });
 
-  it("the island IS reached, but only through a dynamic import (a separate chunk)", () => {
-    const gate = join(SRC, "features/judge/governance/GovernanceGate.tsx");
-    expect(valueImports(readFileSync(gate, "utf8"))).toContain("./GovernanceIsland");
-    expect(staticImports(readFileSync(gate, "utf8"))).not.toContain("./GovernanceIsland");
-    expect(firstLoadViolation([join(SRC, "features/judge/governance/GovernanceIsland.tsx")])).not.toBeNull();
+  it("walks the locale layout too, not only the judge layouts (the scan covers every layout above a page)", () => {
+    expect(existsSync(join(SRC, "app/layout.tsx"))).toBe(false);
+    expect(LAYOUTS.map(rel)).toEqual(["app/[locale]/layout.tsx", "app/[locale]/(judge)/replay/layout.tsx", "app/[locale]/(judge)/replay/(live)/layout.tsx"]);
+    for (const layout of LAYOUTS) expect(existsSync(layout)).toBe(true);
+  });
+
+  it.each([
+    ["governance", "features/judge/governance/GovernanceGate.tsx", "./GovernanceIsland", "features/judge/governance/GovernanceIsland.tsx"],
+    ["try", "features/judge/validator/TryGate.tsx", "./TryIsland", "features/judge/validator/TryIsland.tsx"],
+  ])("the %s island IS reached, but only through a dynamic import (a separate chunk)", (_name, gatePath, spec, islandPath) => {
+    const gate = join(SRC, gatePath);
+    expect(valueImports(readFileSync(gate, "utf8"))).toContain(spec);
+    expect(staticImports(readFileSync(gate, "utf8"))).not.toContain(spec);
+    // the island itself is what carries TanStack Query: reached statically it would be a violation, so the dynamic edge is the only guard
+    expect(firstLoadViolation([join(SRC, islandPath)])).not.toBeNull();
   });
 
   it("fails on the leak it guards: a provider mounted in the (live) layout", () => {

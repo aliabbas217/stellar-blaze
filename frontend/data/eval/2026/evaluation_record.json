@@ -1,0 +1,28 @@
+{
+  "evaluation_set": "scored_2026",
+  "lock_sha256": "d9b9130a824c1861a9a28831b687a0b4a9208762c39afcc7ef946f45a6d09b92",
+  "go_sha256": "3f818deffaae5207acc0093dc82fc421b932a80821c5edc663f9a6ebbf1e3729",
+  "protocol_path": "docs/research/2026-11-12-preregistration-2026-evaluation.md",
+  "protocol_commit": "661b373b3bf8257e997cf5cebb8691ddc9e9d693",
+  "protocol_sha256": "ce116fe64a00b8b5509ae567a72973e85d1cf2120af725127b970bdb8885b7b8",
+  "model_id": "corrector-20261114-d327987-6edafa",
+  "files": {
+    "policy_scoreboard.json": {
+      "commit": "ec823dd24b7e37ca3006965abd1a3d3c67b15fbc",
+      "sha256": "be82c0045f0a78f17866318e5c51fa92c85fc67834a95f079097c4e85cbead22"
+    },
+    "plan_scoreboard.json": {
+      "commit": "36c465a27ef54e52f34822eed36336d004558632",
+      "sha256": "ae28956ffd95cfce4f943882105d916838492edad64341b1ce12c20fd86517bc"
+    },
+    "demo_day.json": {
+      "commit": "ec823dd24b7e37ca3006965abd1a3d3c67b15fbc",
+      "sha256": "6c38d7e65c94c8a015bae005b79b07ad3ce7c54c84262d227e70b8a79d61be54"
+    }
+  },
+  "prior_run": {
+    "evaluation_set": "dev_2025",
+    "h4_outcome": "negative",
+    "commit": "167a58335c5f8c2183b45764abf14de33f598bcc"
+  }
+}

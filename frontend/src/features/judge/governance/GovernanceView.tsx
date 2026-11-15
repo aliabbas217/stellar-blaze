@@ -8,7 +8,7 @@ import { dataRequestMutation, transparencyLogQueryOptions } from "@/api/queries"
 import { ResetDemoControl } from "@/components/shell/ResetDemoControl";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { DemoSwitch } from "@/features/demo/DemoSwitch";
-import { useRestoreFocus } from "@/features/judge/live/useIslandGate";
+import { lastModeTap, NO_ACTIONS, useRestoreFocus } from "@/features/judge/live/useIslandGate";
 import { outcomeOf, REQUEST_DATA_CLASS, SYNTHETIC_WORKER_REF, type Outcome } from "./answer";
 import { CallNotice, GovernanceLayout } from "./GovernanceLayout";
 import { toAuditRow, type AuditRow, type RecordedView, type RefusalAnswer } from "./recorded-view";
@@ -21,19 +21,19 @@ import { deriveRun } from "./run";
  * the live reset.
  *
  * "Send the employer's request" makes the live call. The page never sends by itself: the only way a request is made is a tap,
- * either on the button here or on the plain button of the first paint (`initialAction === "send"`, performed once after the
+ * either on the button here or on the plain button of the first paint (`initialActions` has "send", performed once after the
  * demo site is known). A 429 is shown and never retried.
  */
 
 export interface GovernanceViewProps {
   /** The recorded run, or null when none could be read. */
   readonly recorded: RecordedView | null;
-  /** The tap that loaded this island, performed once (see `IslandProps`). */
-  readonly initialAction?: string | null;
+  /** The taps made while this island loaded, in order, each performed once (see `IslandProps`). */
+  readonly initialActions?: readonly string[];
   readonly restoreFocus?: string | null;
 }
 
-export function GovernanceView({ recorded, initialAction = null, restoreFocus = null }: GovernanceViewProps) {
+export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreFocus = null }: GovernanceViewProps) {
   const t = useTranslations("judge.governance.status");
   const demo = useDemo();
   const queryClient = useQueryClient();
@@ -86,24 +86,27 @@ export function GovernanceView({ recorded, initialAction = null, restoreFocus = 
     );
   }
 
-  // The tap that loaded this island (the plain buttons of the first paint carry no handler). Performed once, and only after
-  // the demo site is known or known to be missing: a send needs the site id.
-  const handedOff = useRef(false);
+  // The taps made while this island loaded (the plain buttons of the first paint carry no handler), each performed once: a mode
+  // choice at once, a send only after the demo site is known or known to be missing (it needs the site id), a reset by the
+  // reset control itself (its `autoStart`). They are independent, so Reset then Send both run, the reset dispatched first.
   const { siteStatus, setDemo } = demo;
+  const modeTap = lastModeTap(initialActions);
+  const wantsSend = initialActions.includes("send");
+  const handedOff = useRef({ mode: false, send: false });
   const onSendRef = useRef(onSend);
   useEffect(() => {
     onSendRef.current = onSend;
   });
   useEffect(() => {
-    if (handedOff.current) return;
-    if (initialAction === "demo-live" || initialAction === "demo-replay") {
-      handedOff.current = true;
-      setDemo(initialAction === "demo-live" ? "live" : "replay");
-    } else if (initialAction === "send" && siteStatus !== "loading") {
-      handedOff.current = true;
-      onSendRef.current();
-    }
-  }, [initialAction, siteStatus, setDemo]);
+    if (modeTap === null || handedOff.current.mode) return;
+    handedOff.current.mode = true;
+    setDemo(modeTap);
+  }, [modeTap, setDemo]);
+  useEffect(() => {
+    if (!wantsSend || handedOff.current.send || siteStatus === "loading") return;
+    handedOff.current.send = true;
+    onSendRef.current();
+  }, [wantsSend, siteStatus]);
   useRestoreFocus(restoreFocus);
 
   const apiRows: readonly AuditRow[] = log.data?.entries.map(toAuditRow) ?? [];
@@ -122,7 +125,7 @@ export function GovernanceView({ recorded, initialAction = null, restoreFocus = 
       onSend={onSend}
       notice={<CallNotice outcome={run.outcome} notReady={notReady} logFailed={log.isError && run.runLive} />}
       modeSwitch={<DemoSwitch />}
-      reset={<ResetDemoControl siteId={siteId} autoStart={initialAction === "reset"} siteFailed={siteStatus === "error"} notReady={t("notReady")} />}
+      reset={<ResetDemoControl siteId={siteId} autoStart={initialActions.includes("reset")} siteFailed={siteStatus === "error"} notReady={t("notReady")} />}
     />
   );
 }

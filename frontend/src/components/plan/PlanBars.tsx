@@ -102,90 +102,98 @@ export function PlanBars({ bars = [], blocks = [], marks = [], heat, ban, fromHo
   const through = slotThrough && slot !== null;
 
   return (
-    <div role="img" aria-label={labels.ariaLabel} dir="ltr" className="flex w-full flex-col gap-1 text-ink" data-plan-bars="">
-      <div className="relative h-32 w-full sm:h-40">
-        <div aria-hidden className="absolute inset-x-0 top-0 flex h-12 overflow-hidden sm:h-16 rounded-sign border border-hair" data-plan-heat="">
-          {hours.map((hour) => {
-            const cell = heatStyle(heat[hour] ?? null);
-            return <span key={hour} className={`h-full flex-1 ${cell.className}`} style={cell.style} />;
+    <div className="flex w-full flex-col gap-1">
+      <div role="img" aria-label={labels.ariaLabel} dir="ltr" className="flex w-full flex-col gap-1 text-ink" data-plan-bars="">
+        <div className="relative h-32 w-full sm:h-40">
+          <div aria-hidden className="absolute inset-x-0 top-0 flex h-12 overflow-hidden sm:h-16 rounded-sign border border-hair" data-plan-heat="">
+            {hours.map((hour) => {
+              const cell = heatStyle(heat[hour] ?? null);
+              return <span key={hour} className={`h-full flex-1 ${cell.className}`} style={cell.style} />;
+            })}
+          </div>
+          {bars.map((bar, i) => (
+            <span
+              key={`${String(bar.fromMin)}-${String(bar.toMin)}-${String(i)}`}
+              data-plan-bar=""
+              className="absolute top-16 h-8 rounded-sign bg-ink sm:top-20"
+              style={{ left: `${String(at(bar.fromMin))}%`, width: `${String(at(bar.toMin) - at(bar.fromMin))}%` }}
+            />
+          ))}
+          {drawn.map((block, i) => (
+            <span
+              key={`${block.state}-${String(block.fromMin)}-${String(i)}`}
+              data-plan-bar=""
+              data-plan-block={block.state}
+              className={`absolute top-16 box-border h-8 min-w-0.5 rounded-sign sm:top-20 ${PLAN_STATE_CLASS[block.state]}`}
+              style={{ left: `${String(at(block.fromMin))}%`, width: `${String(at(block.toMin) - at(block.fromMin))}%` }}
+            />
+          ))}
+          {marks.map((mark, index) => {
+            // Violations that attach to the same stretch of work would sit on top of each other: they are fanned out side by side.
+            const same = marks.filter((other) => other.fromMin === mark.fromMin && other.toMin === mark.toMin);
+            const spread = (same.indexOf(mark) - (same.length - 1) / 2) * 28;
+            return (
+            <span
+              key={`${String(mark.n)}-${String(index)}`}
+              data-violation-mark={mark.n}
+              aria-hidden
+              className="absolute top-13 flex size-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-signal bg-ground text-sm font-semibold tabular-nums text-ink sm:top-17"
+              style={{ left: `calc(${String(at((mark.fromMin + mark.toMin) / 2))}% + ${String(spread)}px)` }}
+            >
+              {mark.n}
+            </span>
+            );
+          })}
+          {box === null ? null : (
+            <div className={`absolute inset-x-0 bottom-0 ${through ? "top-0" : "h-8"}`}>
+              <div
+                data-slot={slot === null ? "outline" : "in-force"}
+                className={`absolute inset-y-0 flex ${through ? "items-end pb-1" : "items-center"} justify-center overflow-hidden px-1 text-xs text-ink-2 ${
+                  slot === null ? "border border-dashed border-edge" : "border-x border-edge bg-slot"
+                } ${field ? "text-sm" : ""}`}
+                style={{ left: `${String(at(box.fromHour * 60))}%`, width: `${String(at(box.toHour * 60) - at(box.fromHour * 60))}%` }}
+              >
+                {slot === null ? null : <span className="text-center leading-tight">{labels.slot}</span>}
+              </div>
+            </div>
+          )}
+          {showNow ? (
+            <span
+              aria-hidden
+              data-now=""
+              className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-signal"
+              style={{ left: `${String(at(nowMin))}%` }}
+            />
+          ) : null}
+        </div>
+        <div aria-hidden className={`relative ${field ? "h-6" : "h-5"} ${field ? "text-base" : "text-xs"} text-ink-3`}>
+          {(field ? [...hours, toHour] : hours).map((hour, i, all) => {
+            // A phone: the first label flush with the axis start and the last with its end, so none overflows the page.
+            const edge = i === 0 ? "start" : field && i === all.length - 1 ? "end" : "middle";
+            const step = toHour - fromHour >= 9 ? 3 : 2;
+            const shown = field ? (hour - fromHour) % step === 0 : true;
+            if (!shown) return null;
+            return (
+              <span
+                key={hour}
+                {...(field ? { "data-time-label": "" } : {})}
+                className={`absolute top-0 whitespace-nowrap tabular-nums ${
+                  edge === "start" ? "" : edge === "end" ? "-translate-x-full" : "-translate-x-1/2"
+                } ${field ? "" : `${i % 3 === 0 ? "" : "max-sm:hidden"} ${i % 2 === 0 ? "" : "sm:hidden"}`}`}
+                style={{ left: `${String(at(hour * 60))}%` }}
+              >
+                {hourLabel(hour)}
+              </span>
+            );
           })}
         </div>
-        {bars.map((bar, i) => (
-          <span
-            key={`${String(bar.fromMin)}-${String(bar.toMin)}-${String(i)}`}
-            data-plan-bar=""
-            className="absolute top-16 h-8 rounded-sign bg-ink sm:top-20"
-            style={{ left: `${String(at(bar.fromMin))}%`, width: `${String(at(bar.toMin) - at(bar.fromMin))}%` }}
-          />
-        ))}
-        {drawn.map((block, i) => (
-          <span
-            key={`${block.state}-${String(block.fromMin)}-${String(i)}`}
-            data-plan-bar=""
-            data-plan-block={block.state}
-            className={`absolute top-16 box-border h-8 min-w-0.5 rounded-sign sm:top-20 ${PLAN_STATE_CLASS[block.state]}`}
-            style={{ left: `${String(at(block.fromMin))}%`, width: `${String(at(block.toMin) - at(block.fromMin))}%` }}
-          />
-        ))}
-        {marks.map((mark, index) => {
-          // Violations that attach to the same stretch of work would sit on top of each other: they are fanned out side by side.
-          const same = marks.filter((other) => other.fromMin === mark.fromMin && other.toMin === mark.toMin);
-          const spread = (same.indexOf(mark) - (same.length - 1) / 2) * 28;
-          return (
-          <span
-            key={`${String(mark.n)}-${String(index)}`}
-            data-violation-mark={mark.n}
-            aria-hidden
-            className="absolute top-13 flex size-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-signal bg-ground text-sm font-semibold tabular-nums text-ink sm:top-17"
-            style={{ left: `calc(${String(at((mark.fromMin + mark.toMin) / 2))}% + ${String(spread)}px)` }}
-          >
-            {mark.n}
-          </span>
-          );
-        })}
-        {box === null ? null : (
-          <div className={`absolute inset-x-0 bottom-0 ${through ? "top-0" : "h-6"}`}>
-            <div
-              data-slot={slot === null ? "outline" : "in-force"}
-              className={`absolute inset-y-0 flex ${through ? "items-end pb-1" : "items-center"} justify-center overflow-hidden px-1 text-xs text-ink-2 ${
-                slot === null ? "border border-dashed border-edge" : "border-x border-edge bg-slot"
-              } ${field ? "text-sm" : ""}`}
-              style={{ left: `${String(at(box.fromHour * 60))}%`, width: `${String(at(box.toHour * 60) - at(box.fromHour * 60))}%` }}
-            >
-              <span className={through ? "text-center leading-tight" : "truncate"}>{slot === null ? labels.outline : labels.slot}</span>
-            </div>
-          </div>
-        )}
-        {showNow ? (
-          <span
-            aria-hidden
-            data-now=""
-            className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-signal"
-            style={{ left: `${String(at(nowMin))}%` }}
-          />
-        ) : null}
       </div>
-      <div aria-hidden className={`relative ${field ? "h-6" : "h-5"} ${field ? "text-base" : "text-xs"} text-ink-3`}>
-        {(field ? [...hours, toHour] : hours).map((hour, i, all) => {
-          // A phone: the first label flush with the axis start and the last with its end, so none overflows the page.
-          const edge = field ? (i === 0 ? "start" : i === all.length - 1 ? "end" : "middle") : "middle";
-          const step = toHour - fromHour >= 9 ? 3 : 2;
-          const shown = field ? (hour - fromHour) % step === 0 : true;
-          if (!shown) return null;
-          return (
-            <span
-              key={hour}
-              {...(field ? { "data-time-label": "" } : {})}
-              className={`absolute top-0 whitespace-nowrap tabular-nums ${
-                edge === "start" ? "" : edge === "end" ? "-translate-x-full" : "-translate-x-1/2"
-              } ${field ? "" : `${i % 3 === 0 ? "" : "max-sm:hidden"} ${i % 2 === 0 ? "" : "sm:hidden"}`}`}
-              style={{ left: `${String(at(hour * 60))}%` }}
-            >
-              {hourLabel(hour)}
-            </span>
-          );
-        })}
-      </div>
+      {/* The break is not in force on this day: its dashed outline is named in words below the chart (a band this narrow cannot hold the sentence). */}
+      {slot === null && outline !== null ? (
+        <p className="text-sm text-ink-2" data-slot-label="outline">
+          {labels.outline}
+        </p>
+      ) : null}
     </div>
   );
 }

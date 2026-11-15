@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { dayFormat } from "@/components/charts/day-format";
 import { REPLAY_DATE } from "@/features/demo/constants";
 import { banStateFor, SEASON_BAN } from "@/features/judge/ban";
+import { loadScored } from "@/features/judge/data";
 import { loadHourly } from "@/features/judge/hourly";
 import { heatColor } from "@/lib/heat/ramp";
 import { loadRecordedPlan } from "@/features/judge/validator/recorded-plan";
@@ -23,18 +24,21 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function TryPage() {
   const locale = await getLocale();
-  const [hourly, recorded] = await Promise.all([loadHourly(), loadRecordedPlan()]);
-  const at = hourly.series.days.indexOf(REPLAY_DATE);
+  const [hourly, recorded, scored] = await Promise.all([loadHourly(), loadRecordedPlan(), loadScored()]);
+  // The day the page is drawn for before the API has answered: the scored demo day when there is one, else the replay day. The island
+  // takes the day from the API's own forecast and re-draws when it differs (TryPlanView).
+  const date = scored.day?.date ?? (hourly.series.days.includes(REPLAY_DATE) ? REPLAY_DATE : (hourly.series.days[0] ?? REPLAY_DATE));
+  const at = hourly.series.days.indexOf(date);
   const row = at < 0 ? [] : (hourly.series.wbgt_c_by_local_hour[at] ?? []);
   // The raw forecast of the replay day, one colour per local hour (heat colour on data only; the judge routes are night only).
   const heat = Array.from({ length: 24 }, (_, hour) => {
     const value = row[hour];
     return value === null || value === undefined ? null : heatColor(value, "night");
   });
-  const ban = banStateFor(SEASON_BAN, REPLAY_DATE, locale);
-  const dateLabel = dayFormat(locale).withWeekday(REPLAY_DATE);
+  const ban = banStateFor(SEASON_BAN, date, locale);
+  const dateLabel = dayFormat(locale).withWeekday(date);
   return (
-    <TryGate heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded}>
+    <TryGate date={date} heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded}>
       <TryStatic heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded} />
     </TryGate>
   );

@@ -13,6 +13,8 @@ type PlanValidateResponse = components["schemas"]["PlanValidateResponse"];
 export interface ViolationView {
   /** The API's rule id, an identifier (`P-H3`, `P-H2.daily`): shown in mono, never translated. */
   readonly ruleId: string;
+  /** The API's id of the source the clause is quoted from (`fdl-33-2021`), for the clause text reader. */
+  readonly sourceId: string;
   /** The text of the clause the rule comes from, or "" when the contract carries none: an empty clause is never invented. */
   readonly clause: string;
   /** What the plan does wrong, in the API's own sentence. */
@@ -40,6 +42,7 @@ export function toValidatorView(result: ValidatorResult): ValidatorView {
     checkedRules: result.checked_rules,
     violations: result.violations.map((violation) => ({
       ruleId: violation.rule_id,
+      sourceId: violation.source_id,
       clause: violation.clause,
       detail: violation.detail,
       ranges: violation.ranges.map((range) => ({ fromMin: localMinutesOf(range.starts_at), toMin: localMinutesOf(range.ends_at) })),

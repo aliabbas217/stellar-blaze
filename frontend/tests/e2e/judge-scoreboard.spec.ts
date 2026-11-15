@@ -1,19 +1,36 @@
+import { mkdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { gateReport, watchConsole } from "./gate.ts";
 
 /*
- * The season scoreboard (/en/replay) and the proof sheet (/en/replay/proof/<claim>) in a production build. The production
- * build has no 2026 exporter file (the single scoring run has not written them), so these specs exercise the honest state
- * the live site is in today: the recorded season and its counts are real, the Warnings and Plans tables are pending
- * (### under one banner each), the roster frontier is drawn. The ideal state (scored numbers) cannot exist in production
- * without the 2026 files; it is covered by the unit tests over the synthetic shape fixtures and by the design-gate
- * screenshots, which run the dev server with SB_SHAPE_FIXTURES=1.
+ * The season scoreboard (/en/replay) and the proof sheet (/en/replay/proof/<claim>) in a production build, which ships the REAL
+ * held-out 2026 files (data/eval/2026, synced from the B3 run): Warnings at lead 1 and lead 2, Plans, the runner's own verdict
+ * sentences, the roster frontier. The pending state (no scored file) and the shape fixtures are covered by the unit tests; the
+ * specs read the same files from disk so no number is typed twice.
  * Every title contains "scoreboard" or "proof sheet", so `pnpm e2e -g scoreboard` selects the scoreboard ones.
+ * Screenshots are written only when SB_GATE_SHOTS names a directory (the design gate run), never in a normal e2e run.
  */
 
 const JUDGE = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
 const SEASON_DAYS = 139;
+
+interface Verdict {
+  readonly id: string;
+  readonly text: string;
+}
+const eval2026 = (name: string): { verdicts: readonly Verdict[] } & Record<string, unknown> =>
+  JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", `${name}.json`), "utf8")) as { verdicts: readonly Verdict[] } & Record<string, unknown>;
+
+async function shot(page: Page, view: string, name: string, viewport: { width: number; height: number }): Promise<void> {
+  const dir = process.env.SB_GATE_SHOTS;
+  if (dir === undefined || dir === "") return;
+  const wide = viewport.width === JUDGE.width ? "1440" : "390";
+  mkdirSync(path.join(dir, view), { recursive: true });
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  await page.screenshot({ path: path.join(dir, view, `${name}-${wide}-night.png`), clip: { x: 0, y: 0, width: viewport.width, height: Math.min(height, wide === "390" ? 3000 : 1800) }, fullPage: true });
+}
 
 async function open(page: Page, path: string, viewport = JUDGE): Promise<string[]> {
   const errors = watchConsole(page);
@@ -80,15 +97,53 @@ test("scoreboard renders with the API stopped: the page makes no API request at 
   expect(errors).toEqual([]);
 });
 
-test("scoreboard pending state: one banner per table, ### in every cell, no proof inside a table", async ({ page }) => {
+test("scoreboard scored state: three scored tables, no pending cell, no DEV stamp, every number with its proof", async ({ page }) => {
   await open(page, "/en/replay");
-  await expect(page.locator("table[data-scoreboard=pending]")).toHaveCount(2);
-  await expect(page.locator("table[data-scoreboard=pending] [aria-label='not scored yet']")).toHaveCount(16 + 12);
-  await expect(page.locator("table [data-proof-id]")).toHaveCount(0);
-  await expect(page.getByText(/^Warnings, summer 2026/)).toHaveCount(1);
-  await expect(page.getByText(/^Plans, summer 2026/)).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "See how a number is proved" })).toHaveAttribute("href", "/en/replay/proof/forecast.hours_over_limit");
-  await expect(page.getByText("Chosen from the pre-registered outcome table after the single scoring run.")).toBeVisible();
+  // Warnings at lead 1 and at lead 2, and Plans
+  await expect(page.locator("table[data-scoreboard=scored]")).toHaveCount(3);
+  await expect(page.locator("table[data-scoreboard=pending]")).toHaveCount(0);
+  await expect(page.locator("[aria-label='not scored yet']")).toHaveCount(0);
+  await expect(page.getByText("###")).toHaveCount(0);
+  await expect(page.getByText("DEV 2025")).toHaveCount(0);
+  await expect(page.locator("#warnings > table tbody tr")).toHaveCount(5);
+  await expect(page.locator("#warnings [data-lead='2'] table tbody tr")).toHaveCount(5);
+  await expect(page.locator("#plans tbody tr")).toHaveCount(3);
+  // ban only has no false alarms to take a share of: "not computed", never 0 %
+  await expect(page.locator("[data-not-computed]")).toHaveCount(2);
+  await expect(page.locator("#warnings > table [data-row=P0] [data-not-computed]")).toHaveText("not computed");
+  // the plan cut and its rest cost are one sentence, over the scored days of the plans file
+  const tradeoff = page.locator("[data-plans-tradeoff]");
+  for (const part of ["33,875", "2,140", "31,680", "13,560", "138 scored days", "simulated crew"]) await expect(tradeoff).toContainText(part);
+});
+
+test("scoreboard shows every verdict sentence exactly as the runner wrote it, including the one that did not hold", async ({ page }) => {
+  await open(page, "/en/replay");
+  const main = page.locator("main");
+  const sentences = [...eval2026("policy_scoreboard").verdicts, ...eval2026("plan_scoreboard").verdicts];
+  expect(sentences.map((v) => v.id)).toEqual(["H4", "H5", "H4-lead2", "H6", "H7"]);
+  for (const verdict of sentences) await expect(main).toContainText(verdict.text, { useInnerText: false });
+  await expect(main).toContainText("H5 not supported at lead 1 (secondary)");
+  // the stamp "issued by 18:00 the evening before" belongs to lead 2 only
+  await expect(page.locator("main > header")).not.toContainText(/evening before/i);
+  await expect(page.locator("[data-lead='2']")).toContainText("issued by 18:00 GST the evening before");
+  // H4 is not a stable result: the page names the prior run and never says robust
+  await expect(page.locator("[data-verdict-caption]")).toHaveText("Supported on 2026 (pre-registered). On the 2025 development run, the prior run, this check was not supported.");
+  await expect(main).not.toContainText(/robust|consistently|calibrated|beats every|beats ADOSH|catches 90|best overall|highest CSI|untouched/i);
+});
+
+test("scoreboard evaluation chip shows the held-out label and the pre-registration lock in the drawer", async ({ page }) => {
+  await open(page, "/en/replay");
+  const record = JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", "evaluation_record.json"), "utf8")) as { lock_sha256: string; protocol_commit: string };
+  await expect(page.locator("[data-evaluation]")).toContainText("Scored once on summer 2026, under a protocol locked before the run.");
+  await page.locator("[data-evaluation] [data-proof-id]").click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator("dt", { hasText: "Pre-registration" })).toBeVisible();
+  await expect(drawer.getByText(record.lock_sha256)).toBeVisible();
+  await expect(drawer.getByText(record.protocol_commit)).toBeVisible();
+  await expect(drawer.getByText("REAL", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
 });
 
 test("scoreboard proof chip opens the drawer with the file's sha, and Escape returns focus to the chip", async ({ page }) => {
@@ -147,13 +202,18 @@ for (const [name, viewport] of [
   ["1440", JUDGE],
   ["390", PHONE],
 ] as const) {
-  test(`scoreboard design gate, pending state, ${name} wide`, async ({ page }) => {
+  test(`scoreboard design gate, scored state, ${name} wide`, async ({ page }) => {
     const errors = await open(page, "/en/replay", viewport);
     const report = await gateReport(page, { consoleErrors: errors, hero: viewport === JUDGE, spine: true, locale: "en" });
     await test.info().attach("gate-report.json", { body: JSON.stringify(report, null, 2), contentType: "application/json" });
+    if (process.env.SB_GATE_SHOTS !== undefined && process.env.SB_GATE_SHOTS !== "") {
+      const heroPct = report.heroShare === null ? "n/a" : (report.heroShare * 100).toFixed(1);
+      console.log(`GATE scoreboard ${name}: hero ${heroPct}% overflow ${String(report.overflowPx)}px minText ${String(report.minTextPx)}px minTarget ${String(report.minTargetPx)}px axe ${String(report.axeViolations.length)} failures ${String(report.failures.length)}`);
+    }
     expect(report.failures).toEqual([]);
     expect(report.axeViolations).toEqual([]);
     if (viewport === JUDGE) expect(report.heroShare ?? 0).toBeGreaterThanOrEqual(0.35);
+    await shot(page, "scoreboard", "ideal", viewport);
   });
 }
 
@@ -163,6 +223,17 @@ test("proof sheet recounts the file in this browser and reports a match", async 
   await expect(page.locator("[data-timeline] li")).toHaveCount(4);
   await page.getByRole("button", { name: "Recount in this browser" }).click();
   await expect(page.getByText("Matches", { exact: true })).toBeVisible();
+});
+
+test("proof sheet serves the lead 2 and day counter claims, with the lock", async ({ page }) => {
+  await open(page, "/en/replay/proof/policy.lead2.p3.pod");
+  await expect(page.locator("[data-sheet-number]")).toBeVisible();
+  await expect(page.locator("dt", { hasText: "Pre-registration" })).toBeVisible();
+  await open(page, "/en/replay/proof/day.balanced");
+  await expect(page.locator("[data-sheet-number]")).toContainText("5.0");
+  await open(page, "/en/replay/proof/policy.p3.pod");
+  const record = JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", "evaluation_record.json"), "utf8")) as { lock_sha256: string };
+  await expect(page.getByText(record.lock_sha256)).toBeVisible();
 });
 
 test("proof sheet for an unknown number is the empty state, with a way to a number that has proof", async ({ page }) => {
@@ -185,10 +256,14 @@ for (const [name, viewport] of [
   ["390", PHONE],
 ] as const) {
   test(`proof sheet design gate, ${name} wide`, async ({ page }) => {
-    const errors = await open(page, "/en/replay/proof/forecast.hours_over_limit", viewport);
+    const errors = await open(page, "/en/replay/proof/policy.p3.pod", viewport);
     const report = await gateReport(page, { consoleErrors: errors, hero: false, locale: "en" });
     await test.info().attach("gate-report.json", { body: JSON.stringify(report, null, 2), contentType: "application/json" });
+    if (process.env.SB_GATE_SHOTS !== undefined && process.env.SB_GATE_SHOTS !== "") {
+      console.log(`GATE proof sheet ${name}: overflow ${String(report.overflowPx)}px minText ${String(report.minTextPx)}px minTarget ${String(report.minTargetPx)}px axe ${String(report.axeViolations.length)} failures ${String(report.failures.length)}`);
+    }
     expect(report.failures).toEqual([]);
+    await shot(page, "proof", "ideal", viewport);
   });
 
   test(`proof sheet design gate, empty state, ${name} wide`, async ({ page }) => {

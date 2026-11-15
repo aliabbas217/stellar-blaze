@@ -44,7 +44,7 @@ export interface DayTableRow {
 }
 
 export interface DayCounter {
-  readonly id: "high" | "outside" | "raw" | "ours";
+  readonly id: "high" | "outside" | "raw" | "ours" | "balanced";
   readonly label: string;
   readonly value: string;
   readonly unit: string;
@@ -198,6 +198,7 @@ export function buildDay({ day, dayFile, hourly, locale, t }: DayInput): DayMode
       entry("outside", t("counters.outside", { start: SEASON_BAN.start, end: SEASON_BAN.end }), day.high_hours_outside_ban),
       entry("raw", t("counters.raw"), day.raw_hits),
       entry("ours", t("counters.ours"), day.p3_hits),
+      entry("balanced", t("counters.balanced"), hitsBy(day, "P3_balanced")),
     ];
   }
 
@@ -216,6 +217,15 @@ export function buildDay({ day, dayFile, hourly, locale, t }: DayInput): DayMode
     candidates: day?.candidates ?? null,
     runnerUp: day?.runner_up === null || day === null ? null : f.dayMonth(day.runner_up.date),
   };
+}
+
+/**
+ * The hours of the scored day that were High or Red on the station and that the policy `warnedBy` named warned about, counted the way the
+ * file counts its own `raw_hits` (P2) and `p3_hits` (P3_protect): each hour weighted by its `ban_weight`. The balanced-threshold count has no
+ * field of its own in the file; it is counted from the same hours, and a test pins the method against the two fields that do exist.
+ */
+export function hitsBy(day: DemoDay, policy: DemoDay["hours"][number]["warned_by"][number]): number {
+  return day.hours.filter((hour) => hour.truth_zone === "high" || hour.truth_zone === "red").filter((hour) => hour.warned_by.includes(policy)).reduce((sum, hour) => sum + hour.ban_weight, 0);
 }
 
 /** While there is no scored day, "the day rule" is proved by what the page does draw: the recorded forecast file. */

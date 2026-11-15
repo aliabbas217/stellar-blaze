@@ -1,10 +1,10 @@
 import type { components } from "@/api/schema";
-import { REPLAY_DATE } from "@/features/demo/constants";
 import { runsToSegments, type Run } from "./runs";
 
 /*
- * The one place the validator request is built. The site and date are the replay site and the replay day; the crew is the
- * hypothetical crew of the roster analysis (20 people, heavy work). The two assumptions the contract REQUIRES (`acclimatised`,
+ * The one place the validator request is built. The site is the demo site and the date is the one the API's own forecast for
+ * that site reports (the replay day in replay mode, today in live mode; the contract REQUIRES a date, so live mode cannot omit it);
+ * neither is a constant here. The crew is the hypothetical crew of the roster analysis (20 people, heavy work). The two assumptions the contract REQUIRES (`acclimatised`,
  * `days_per_week`) are the visitor's: the form starts them at the protective values and shows them as editable.
  */
 
@@ -22,10 +22,10 @@ export function parseDays(text: string): number | null {
   return Number(trimmed);
 }
 
-export function buildRequest(input: { readonly siteId: string; readonly runs: readonly Run[]; readonly acclimatised: boolean; readonly days: number }): PlanValidateRequest {
+export function buildRequest(input: { readonly siteId: string; readonly date: string; readonly runs: readonly Run[]; readonly acclimatised: boolean; readonly days: number }): PlanValidateRequest {
   return {
     site_id: input.siteId,
-    date: REPLAY_DATE,
+    date: input.date,
     crew: { workload: "heavy", headcount: REPLAY_HEADCOUNT, acclimatised: input.acclimatised, days_per_week: input.days },
     segments: runsToSegments(input.runs),
   };

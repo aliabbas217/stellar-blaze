@@ -1,4 +1,4 @@
-import { DemoModeSwitch } from "@/components/shell/DemoModeSwitch";
+import { StaticModeSwitch } from "@/features/judge/live/StaticModeSwitch";
 import { ResetDemoButton } from "@/components/shell/ResetDemoButton";
 import { GovernanceLayout } from "./GovernanceLayout";
 import type { RecordedView } from "./recorded-view";
@@ -20,7 +20,7 @@ export function GovernanceStatic({ recorded }: { readonly recorded: RecordedView
       pending={false}
       logFetching={false}
       sentBefore={false}
-      modeSwitch={<DemoModeSwitch value="replay" liveUnavailable={false} />}
+      modeSwitch={<StaticModeSwitch />}
       reset={
         <div className="flex flex-col gap-2 font-body text-sm text-ink">
           <ResetDemoButton />

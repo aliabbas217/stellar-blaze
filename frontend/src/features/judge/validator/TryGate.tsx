@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { BanState } from "@/components/spine/ban-state";
+import { IslandStatus } from "@/features/judge/live/IslandStatus";
 import { useIslandGate, type IslandProps } from "@/features/judge/live/useIslandGate";
 import type { TryViewProps } from "./TryPlanView";
 import type { RecordedPlanView } from "./view";
@@ -14,6 +15,7 @@ import type { RecordedPlanView } from "./view";
 const loadIsland = () => import("./TryIsland");
 
 export interface TryGateProps {
+  readonly date: string;
   readonly heat: readonly (string | null)[];
   readonly ban: BanState;
   readonly dateLabel: string;
@@ -21,15 +23,16 @@ export interface TryGateProps {
   readonly children: ReactNode;
 }
 
-export function TryGate({ heat, ban, dateLabel, recorded, children }: TryGateProps) {
+export function TryGate({ date, heat, ban, dateLabel, recorded, children }: TryGateProps) {
   const gate = useIslandGate<TryViewProps & IslandProps>(loadIsland);
   if (gate.Island !== null) {
     const Island = gate.Island;
-    return <Island heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded} {...gate.handoff} />;
+    return <Island date={date} heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded} {...gate.handoff} />;
   }
   return (
     <div className="contents" {...gate.handlers}>
       {children}
+      <IslandStatus failed={gate.failed} />
     </div>
   );
 }

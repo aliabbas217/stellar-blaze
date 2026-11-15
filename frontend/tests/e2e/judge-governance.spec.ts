@@ -94,10 +94,10 @@ test("governance refusal visible in the worker log: send, see the 403 and the ne
   await expect(page.locator("main")).not.toContainText(/about you|ADR|PDPL|purpose/i);
 
   // reload: the sequence is the recorded run again; the rows the API already has sit in their own labelled block (they come with
-  // the lazy island, which a focus on a control loads without sending anything)
+  // the lazy island, which a tap on the Replay switch brings in without sending anything: focus alone only warms the chunk)
   await page.reload();
   await expect(page.getByRole("button", { name: "Reset demo site" })).toBeVisible();
-  await page.getByRole("button", { name: SEND }).focus();
+  await page.getByRole("button", { name: "Replay" }).click();
   const block = page.locator("[data-live-rows]");
   await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
   await expect.poll(() => block.locator("[data-access-row]").count()).toBeGreaterThanOrEqual(after);
@@ -123,7 +123,7 @@ test("governance first paint is the recorded run, with nothing sent, and it need
   expect(posts).toEqual([]);
 });
 
-test("governance first load makes no API call and ships no island; the first focus loads it and still sends nothing", async ({ page }) => {
+test("governance first load makes no API call and ships no island; focus only warms it, the first tap brings it in and still sends nothing", async ({ page }) => {
   const api: string[] = [];
   const posts: string[] = [];
   page.on("request", (request) => {
@@ -135,12 +135,39 @@ test("governance first load makes no API call and ships no island; the first foc
   await expect(state(page)).toHaveAttribute("data-governance", "recorded");
   await page.waitForTimeout(800);
   expect(api).toEqual([]);
-  // a keyboard user reaches the send button with Tab: the island loads (sites are asked for) and no request is sent
-  await page.getByRole("button", { name: SEND }).focus();
+  // a keyboard user reaches the send button with Tab: the chunk is warmed, the page is the same page and still no API call
+  const send = page.getByRole("button", { name: SEND });
+  await send.focus();
+  await page.waitForTimeout(800);
+  await expect(send).toBeFocused();
+  await expect(state(page)).toHaveAttribute("data-governance", "recorded");
+  expect(api).toEqual([]);
+  // a real tap on the Replay switch brings the island in (sites are asked for) and no request is sent
+  await page.getByRole("button", { name: "Replay" }).click();
   await expect.poll(() => api.some((url) => url.includes("/sites"))).toBe(true);
-  await expect(page.getByRole("button", { name: SEND })).toBeFocused();
   await page.waitForTimeout(500);
   expect(posts).toEqual([]);
+});
+
+test("governance a press that outlasts the island load still sends exactly once (pointerdown, chunk resolves, pointerup)", async ({ page }) => {
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/data-requests")) posts.push(request.url());
+  });
+  await page.setViewportSize(JUDGE);
+  await page.goto(PATH);
+  await expect(state(page)).toHaveAttribute("data-governance", "recorded");
+  const send = page.getByRole("button", { name: SEND });
+  await send.hover();
+  await page.mouse.down();
+  // the chunk arrives while the button is still down (a fast or cached chunk does this inside a 60 to 150 ms press)
+  await page.waitForTimeout(1200);
+  await expect(state(page)).toHaveAttribute("data-governance", "recorded");
+  await page.mouse.up();
+  await expect(state(page)).toHaveAttribute("data-governance", "live");
+  await expect.poll(() => posts.length).toBe(1);
+  await page.waitForTimeout(500);
+  expect(posts).toHaveLength(1);
 });
 
 test("governance live rows the API already has sit in their own block and never replace the recorded step 4", async ({ page }) => {
@@ -153,8 +180,8 @@ test("governance live rows the API already has sit in their own block and never 
     }),
   );
   await open(page);
-  // the rows come with the lazy island: a focus on the send button loads it, and sends nothing
-  await page.getByRole("button", { name: SEND }).focus();
+  // the rows come with the lazy island: a tap on the Replay switch brings it in, and sends nothing
+  await page.getByRole("button", { name: "Replay" }).click();
   const block = page.locator("[data-live-rows]");
   await expect(block.getByRole("heading", { name: "Live rows from the demo API" })).toBeVisible();
   await expect(block.locator("[data-access-row]")).toHaveCount(2);

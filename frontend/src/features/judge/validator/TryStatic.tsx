@@ -1,6 +1,6 @@
 import { useLocale } from "next-intl";
 import type { BanState } from "@/components/spine/ban-state";
-import { DemoModeSwitch } from "@/components/shell/DemoModeSwitch";
+import { StaticModeSwitch } from "@/features/judge/live/StaticModeSwitch";
 import { TryPlanLayout } from "./TryPlanLayout";
 import { DEFAULT_ACCLIMATISED, DEFAULT_DAYS_PER_WEEK } from "./request";
 import { templateRuns } from "./runs";
@@ -43,7 +43,7 @@ export function TryStatic({
       recorded={recorded}
       showRecorded={false}
       locale={locale}
-      modeSwitch={<DemoModeSwitch value="replay" liveUnavailable={false} />}
+      modeSwitch={<StaticModeSwitch />}
     />
   );
 }

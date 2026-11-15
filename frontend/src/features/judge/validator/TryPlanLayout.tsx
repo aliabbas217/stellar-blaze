@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import type { ReactNode, SyntheticEvent } from "react";
 import type { RosterError } from "@/api/roster-problem";
 import { Stamp } from "@/components/provenance/Stamp";
 import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
@@ -54,6 +54,8 @@ export interface TryLayoutProps {
   /** The recorded B0 result, when the build has one: it is what "Show a recorded result" shows. */
   readonly recorded: RecordedPlanView | null;
   readonly showRecorded: boolean;
+  /** Which day the API said it is: the replay day or today at the site (the sentence under the heading says which). Replay until the API has answered. */
+  readonly mode?: "live" | "replay";
   /** Said under the check button: a plan that does not read, the demo site still loading. Island only. */
   readonly notice?: ReactNode;
   /** Undefined in the first paint: the gate loads the island, which owns the state. */
@@ -77,44 +79,51 @@ export function TryPlanLayout(props: TryLayoutProps) {
           <p className="max-w-(--measure) text-sm text-ink-3">{t("independent")}</p>
         </header>
 
-        <section aria-labelledby="try-plan-heading" className="flex flex-col gap-4" data-hero="">
-          <h2 id="try-plan-heading" className="text-base font-semibold text-ink">
-            {t("strip.heading")}
-          </h2>
-          <p className="text-sm text-ink-2">{t("day", { date: dateLabel, headcount: String(REPLAY_HEADCOUNT) })}</p>
-          <PlanStrip runs={runs} validator={phase === "answer" || phase === "none" ? (answer?.validator ?? null) : null} heat={heat} ban={ban} dateLabel={dateLabel} />
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                data-primary=""
-                data-island-action="check"
-                aria-busy={loading}
-                {...(handlers === undefined ? {} : { onClick: handlers.onCheck })}
-                className={`${ACTION_PRIMARY} gap-2`}
-              >
-                {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
-                {t("check")}
-              </button>
-              {loading ? (
-                <p role="status" className="text-sm text-ink-3">
-                  {t("checking")}
-                </p>
-              ) : null}
+        {/* One real form (Enter in a time field runs the check); `display: contents` keeps the page's own column. */}
+        <form
+          noValidate
+          className="contents"
+          {...(handlers === undefined
+            ? {}
+            : {
+                onSubmit: (event: SyntheticEvent<HTMLFormElement>) => {
+                  event.preventDefault();
+                  handlers.onCheck();
+                },
+              })}
+        >
+          <section aria-labelledby="try-plan-heading" className="flex flex-col gap-4" data-hero="">
+            <h2 id="try-plan-heading" className="text-base font-semibold text-ink">
+              {t("strip.heading")}
+            </h2>
+            <p className="text-sm text-ink-2">{t(props.mode === "live" ? "dayLive" : "day", { date: dateLabel, headcount: String(REPLAY_HEADCOUNT) })}</p>
+            <PlanStrip runs={runs} validator={phase === "answer" || phase === "none" ? (answer?.validator ?? null) : null} heat={heat} ban={ban} dateLabel={dateLabel} />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="submit" data-primary="" data-island-action="check" aria-busy={loading} className={`${ACTION_PRIMARY} gap-2`}>
+                  {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
+                  {t("check")}
+                </button>
+                {loading ? (
+                  <p role="status" className="text-sm text-ink-3">
+                    {t("checking")}
+                  </p>
+                ) : null}
+              </div>
+              {props.notice}
             </div>
-            {props.notice}
-          </div>
-        </section>
+          </section>
 
-        <RunsForm
-          runs={runs}
-          rowProblems={props.rowProblems}
-          templateId={templateId}
-          acclimatised={props.acclimatised}
-          daysPerWeek={props.daysPerWeek}
-          daysProblem={props.daysProblem}
-          {...(handlers === undefined ? {} : { handlers })}
-        />
+          <RunsForm
+            runs={runs}
+            rowProblems={props.rowProblems}
+            templateId={templateId}
+            acclimatised={props.acclimatised}
+            daysPerWeek={props.daysPerWeek}
+            daysProblem={props.daysProblem}
+            {...(handlers === undefined ? {} : { handlers })}
+          />
+        </form>
 
         <Result {...props} />
       </main>

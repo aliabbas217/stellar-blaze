@@ -607,7 +607,7 @@
         "itemsOne": "1 item needs a tick: {list}.",
         "items": "{count} items need a tick: {list}.",
         "item": "Plan zone <bdi>{zone}</bdi>, <bdi>{from}</bdi> to <bdi>{to}</bdi>",
-      "itemText": "Plan zone {zone}, {from} to {to}",
+        "itemText": "Plan zone {zone}, {from} to {to}",
         "tickOne": "Tick 1 more item to sign",
         "tickMany": "Tick {count} more items to sign",
         "submit": "Sign off",
@@ -719,6 +719,11 @@
     },
     "proof": {
       "chip": "Proof",
+      "lock": {
+        "note": "Held-out 2026 run: the protocol was committed and locked before the models were scored.",
+        "hash": "SHA-256 of the lock the run started under",
+        "protocolCommit": "Commit of the pre-registered protocol"
+      },
       "chipAria": "Proof for {what}",
       "loadFailed": "The proof could not be opened. Try again.",
       "title": "Where this number comes from",
@@ -731,6 +736,7 @@
         "sha": "SHA-256",
         "label": "Label",
         "model": "Model",
+        "lock": "Pre-registration",
         "generated": "Generated"
       },
       "sha": {
@@ -784,19 +790,22 @@
     "openToday": "आजका स्तर खोल्नुहोस्"
   },
   "judge": {
+    "island": {
+      "loadFailed": "Could not load. Try again."
+    },
     "scoreboard": {
       "title": "Summer 2026, replayed honestly",
       "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded.",
       "facts": "Forecast made about 24 hours ahead · Scored against station thermometers",
       "skip": "Skip to the scores",
       "season": {
-        "heading": "The season, daily peak forecast",
-        "aria": "Daily peak forecast WBGT at Abu Dhabi airport, {days} days, {from} to {to}. {daysOver} of {days} days peak above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
-        "ariaNoBreak": "Daily peak forecast WBGT at Abu Dhabi airport, {days} days, {from} to {to}. {daysOver} of {days} days peak above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
+        "heading": "The season: recorded raw forecast, before correction",
+        "aria": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
+        "ariaNoBreak": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
         "limit": "Heavy-work limit {limit} °C",
         "slot": "Midday break in force, {from} to {to}, {start} to {end}",
         "slotShort": "Midday break in force",
-        "peak": "{value} °C, {day}, {hour}, the hottest forecast",
+        "peak": "{value} °C, {day}, {hour}, the hottest raw forecast",
         "coolest": "Coolest day still peaked at {value} °C, {day}",
         "tableToggle": "Show the daily numbers as a table",
         "tableCaption": "Daily peak forecast, one row per day",
@@ -807,35 +816,42 @@
           "inBreak": "Midday break in force"
         },
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "caption": "Recorded raw forecast, before correction. These are not hours that were actually over the limit: what the station recorded is scored below."
       },
       "tally": {
         "through": "Through {date}",
         "final": "Through {date}, final",
         "daysOf": "of {total}",
-        "days": "days the forecast peak crossed {limit} °C",
-        "hours": "working hours forecast above the limit",
+        "days": "days the raw forecast peak was above {limit} °C",
+        "hours": "working hours the raw forecast put above the limit",
         "inBreak": "of those inside the midday break",
-        "whatDays": "Days the forecast peak crossed the limit",
-        "whatHours": "Working hours forecast above the limit",
-        "whatInBreak": "Hours above the limit inside the midday break"
+        "whatDays": "Days the recorded raw forecast peaked above the limit, before correction",
+        "whatHours": "Working hours the recorded raw forecast put above the limit, before correction",
+        "whatInBreak": "Raw-forecast hours above the limit inside the midday break, before correction"
       },
       "player": {
         "play": "Play the season",
         "pause": "Pause",
         "resume": "Resume",
-        "note": "Plays {days} days in 8 seconds. The forecast counts are recorded; the scores below fill from the scoring run.",
+        "note": "Plays {days} days in 8 seconds. Counts of the recorded raw forecast, before correction, not hours that were actually over the limit. The scores below compare warnings with what the station recorded.",
         "reducedMotion": "Animation is off on this device, so the whole season is shown."
       },
       "verdict": {
         "heading": "What the season showed",
         "pending": "Chosen from the pre-registered outcome table after the single scoring run.",
-        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change."
+        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change.",
+        "other": "Other pre-registered checks, as the scoring run wrote them",
+        "lead2": "The same check on the forecast issued by 18:00 the evening before",
+        "plansHeading": "Plans, as the scoring run wrote them",
+        "priorNow": "Supported on 2026 (pre-registered).",
+        "priorSupported": "On the 2025 development run, the prior run, this check was supported too.",
+        "priorNotSupported": "On the 2025 development run, the prior run, this check was not supported."
       },
       "warnings": {
         "heading": "Warnings",
         "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
-        "defs": "A danger hour is an hour the station was in the ADOSH High zone. Stellar Blaze warns when the calibrated chance of the High zone passes a threshold set on 2024 and 2025 data only.",
+        "defs": "A danger hour is an hour the station was in the ADOSH High zone. Stellar Blaze warns when its corrected forecast puts the High zone above a threshold chosen on 2024 and 2025 data only; both thresholds are shown.",
         "caption": "Four ways to warn a crew, scored on the season",
         "columns": {
           "policy": "Policy",
@@ -851,8 +867,8 @@
         "pending": "Warnings, summer 2026: danger hours nobody was warned about, false alarms and the two shares",
         "policies": {
           "P0": {
-            "label": "Midday break only",
-            "sub": "{start} to {end} by law, nothing else"
+            "label": "Baseline: ban only",
+            "sub": "{start} to {end} by law, nothing else. It never warns on a worked hour."
           },
           "P1": {
             "label": "Fixed 32 °C rule",
@@ -870,7 +886,14 @@
             "label": "Stellar Blaze, balanced",
             "sub": "Corrected forecast, warns at the balanced threshold"
           }
-        }
+        },
+        "lead2": {
+          "heading": "Stricter check: forecast issued by 18:00 the evening before",
+          "sub": "The same ways to warn, on the forecast issued by 18:00 Gulf time the evening before.",
+          "caption": "Ways to warn a crew, scored on the season with the forecast issued by 18:00 the evening before"
+        },
+        "truth": "On the station's own record the season had {value} danger hours ({lo} to {hi}, 95% interval). A danger hour is an hour in the ADOSH High zone during working daytime ({hours}) at Abu Dhabi airport (OMAA), summer 2026; the thermal margin of {margin} W/m² is an assumption.",
+        "truthWhat": "Danger hours in the season, from the station record"
       },
       "plans": {
         "heading": "Plans",
@@ -892,7 +915,7 @@
         "roster": "Roster: {roster}",
         "rows": {
           "merged": {
-            "label": "Ban only (= working every shift minute outside the midday break, on the legal roster)",
+            "label": "Baseline: ban only (= working every shift minute outside the midday break, on the legal roster)",
             "sub": "The legal minimum. Working through and ban only are the same plan."
           },
           "rule_raw": {
@@ -903,12 +926,14 @@
             "label": "Rule plan on our corrected forecast",
             "sub": "The protective quantile of the corrected forecast"
           }
-        }
+        },
+        "tradeoff": "Rule-violation minutes per worker-season fall from {from} to {to} on the corrected plan, which also adds more rest: {rest} minutes, against {restRaw} for the rule plan on the raw forecast. {days} scored days, simulated crew."
       },
       "table": {
         "notScored": "not scored yet",
         "ours": "This is the Stellar Blaze row.",
-        "interval": "95% interval {lo} to {hi}"
+        "interval": "95% interval {lo} to {hi}",
+        "notComputed": "not computed"
       },
       "partial": {
         "title": "The Plans table is not on this page yet",
@@ -925,10 +950,11 @@
         "primary": "Try again"
       },
       "limits": {
-        "station": "Airport station, not a worksite.",
+        "station": "Abu Dhabi airport only (OMAA), one summer the models had not seen.",
         "crew": "The crew of {size} is an assumed schedule.",
         "truth": "Truth is station temperature, humidity and wind plus modelled sunshine.",
-        "twl": "Thermal work limit aligned with ADOSH zones, not certified."
+        "twl": "Thermal work limit aligned with ADOSH zones, not certified.",
+        "simulated": "Simulated crew, real weather."
       },
       "loading": "Loading the season",
       "factsHeldOut": "Held-out 2026, every choice fixed on 2024-2025 data",
@@ -941,6 +967,10 @@
         "high_cycled_share": "of High-zone heavy work planned as cycled",
         "missed_protection_ticks": "minutes in a milder plan zone than the truth",
         "rest_minutes_added_vs_naive": "minutes per worker-season"
+      },
+      "evaluation": {
+        "line": "Scored once on summer 2026, under a protocol locked before the run.",
+        "what": "The 2026 evaluation: held-out and pre-registered"
       }
     },
     "frontier": {
@@ -1023,26 +1053,29 @@
       },
       "counters": {
         "heading": "What the station recorded, and who called it",
-        "sub": "Called means the forecast put that hour in the High zone. These four numbers come from the one scoring run; the page ships unchanged whatever they are.",
-        "pending": "The scored day",
+        "sub": "Called means the forecast put that hour in the High zone. These numbers come from the one scoring run; the page ships unchanged whatever they are.",
+        "pending": "The tally for the day the protocol picks",
         "high": "High-zone working hours on the day",
         "outside": "Of those, outside {start} to {end}",
         "raw": "Called by the raw forecast",
-        "ours": "Called by Stellar Blaze",
-        "hours": "hours"
+        "ours": "Called by Stellar Blaze, protective threshold",
+        "hours": "hours",
+        "balanced": "Called by Stellar Blaze, balanced threshold"
       },
       "error": {
         "title": "The day file could not be read",
         "reason": "The season scoreboard still works. Nothing here is guessed in the meantime.",
         "primary": "Try again"
       },
-      "loading": "Loading the day"
+      "loading": "Loading the day",
+      "titlePending": "One day, hour by hour"
     },
     "try": {
       "title": "Try a plan against the rules",
       "lede": "Pick a roster or write your own. The independent validator checks it against the day's heat and the labour rules, and answers with the rules the plan breaks.",
       "independent": "The validator is independent: it shares no code with the planners that make our plans, so a plan cannot pass because the planner and the checker agree with themselves.",
       "day": "Checked on {date}, the replay day, for a crew of {headcount} doing heavy work.",
+      "dayLive": "Checked on {date}, today at the site, for a crew of {headcount} doing heavy work.",
       "templates": {
         "heading": "Start from a roster",
         "common": "Common roster",
@@ -1066,7 +1099,7 @@
         "end": "End",
         "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
         "none": "Add at least one run of work to check a plan.",
-      "placeholder": "hh:mm",
+        "placeholder": "hh:mm",
         "problem": {
           "format": "Write the time as hh:mm, for example 06:00.",
           "grid": "Use a multiple of 5 minutes, for example 06:05.",
@@ -1079,7 +1112,7 @@
         "heatNote": "The colour behind the plan is the raw forecast of the day, hour by hour.",
         "aria": "Work plan on {date}: {runs}. {marks}",
         "ariaMarksOne": "1 rule broken, numbered on the plan.",
-      "ariaMarks": "{count} rules broken, numbered on the plan.",
+        "ariaMarks": "{count} rules broken, numbered on the plan.",
         "ariaNoMarks": "Not checked yet.",
         "ariaClean": "No rule broken.",
         "slot": "Midday break",
@@ -1089,10 +1122,11 @@
       "check": "Check this plan",
       "checking": "Checking the plan",
       "notReady": "The demo site is still loading. Try again in a moment.",
+      "noDay": "The day to check could not be read from the site's forecast. Try again in a moment.",
       "result": {
         "heading": "What the validator found",
         "brokenOne": "1 rule broken",
-    "broken": "{count} rules broken",
+        "broken": "{count} rules broken",
         "zero": "0 rules broken",
         "zeroNote": "Every rule it checked passed for this plan.",
         "checked": "What was checked",

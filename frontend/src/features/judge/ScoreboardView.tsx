@@ -1,6 +1,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { SeasonPlayer } from "@/components/charts/SeasonPlayer";
 import { ScoreboardTable, type ScoreRow } from "@/components/provenance/ScoreboardTable";
+import { ProofChip } from "@/components/provenance/ProofChip";
 import { Verdict } from "@/components/provenance/Verdict";
 import { proofFromProvenance } from "@/components/provenance/proof";
 import { StoryNav } from "@/components/shell/StoryNav";
@@ -11,6 +12,7 @@ import { makeFormat, pendingPlanRows, pendingPolicyRows, toPlanRows, toPolicyRow
 import { EvalSourceStamp } from "./EvalSourceStamp";
 import { FrontierSection } from "./FrontierSection";
 import { FORECAST_CLAIMS } from "./claims";
+import { VerdictList } from "./VerdictList";
 import type { EvalData } from "./data";
 import type { HourlyData } from "./hourly";
 import { buildSeasonView } from "./season-view";
@@ -63,6 +65,9 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
   const files = data?.files;
   const policyRows: ScoreRow[] =
     policy !== null && files?.policy != null ? toPolicyRows(policy, 1, { file: files.policy, format, text: policyText }) : pendingPolicyRows(policyText);
+  // The strict sensitivity (forecast issued by 18:00 the evening before): the same policies at lead 2, when the file has it.
+  const lead2Rows: ScoreRow[] =
+    policy !== null && files?.policy != null ? toPolicyRows(policy, 2, { file: files.policy, format, text: policyText }) : [];
   const planRows: ScoreRow[] =
     plans !== null && files?.plans != null ? toPlanRows(plans, { file: files.plans, format, text: planText }) : pendingPlanRows(planText);
 
@@ -72,6 +77,57 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
     primary !== null && policy !== null && files?.policy != null
       ? proofFromProvenance(policy.provenance, "", t("verdict.heading"), files.policy)
       : null;
+
+  const policyProof =
+    policy !== null && files?.policy != null ? proofFromProvenance(policy.provenance, "", t("verdict.other"), files.policy) : null;
+  const plansProof =
+    plans !== null && files?.plans != null ? proofFromProvenance(plans.provenance, "", t("verdict.plansHeading"), files.plans) : null;
+  const lead1Verdicts = (policy?.verdicts ?? []).filter((verdict) => !verdict.primary && verdict.id !== "H4-lead2");
+  const lead2Verdicts = (policy?.verdicts ?? []).filter((verdict) => verdict.id === "H4-lead2");
+  const planVerdicts = plans?.verdicts ?? [];
+  // The prior run: H4 on the 2025 development run, from the evaluation record (written by script). Never "robust", never "consistently".
+  const prior = data?.record?.prior_run.h4_outcome ?? null;
+  const priorCaption =
+    primary === null || prior === null
+      ? null
+      : [primary.outcome === "supported" ? t("verdict.priorNow") : null, prior === "supported" ? t("verdict.priorSupported") : t("verdict.priorNotSupported")]
+          .filter((part) => part !== null)
+          .join(" ");
+
+  // The plans card: the violation cut and the rest cost together, every number from the file (never typed).
+  const planByName = (name: string) => plans?.rows.find((row) => row.plan === name);
+  const baseline = planByName("ban_only") ?? planByName("naive");
+  const corrected = planByName("rule_corrected");
+  const raw = planByName("rule_raw");
+  const tradeoff =
+    plans !== null && baseline !== undefined && corrected !== undefined && raw !== undefined
+      ? t("plans.tradeoff", {
+          days: format.whole(plans.n_days),
+          from: format.whole(baseline.violation_minutes_per_season.value),
+          to: format.whole(corrected.violation_minutes_per_season.value),
+          rest: format.whole(corrected.rest_minutes_added_vs_naive.value),
+          restRaw: format.whole(raw.rest_minutes_added_vs_naive.value),
+        })
+      : null;
+
+  // The held-out run's own label and lock, through the proof chip (the drawer shows the lock hash and the protocol commit).
+  const evaluationProof =
+    data?.source === "2026" && policy !== null && files?.policy != null ? proofFromProvenance(policy.provenance, "", t("evaluation.what"), files.policy) : null;
+
+  // The truth-based figure: the station's own danger hours (value and interval read from the Warnings file), with its definition.
+  const truthMetric = policy?.leads.find((lead) => lead.lead_days === 1)?.truth_danger_hours ?? null;
+  const truth =
+    policy !== null && truthMetric !== null && truthMetric.ci !== null
+      ? t("warnings.truth", {
+          value: format.one(truthMetric.value),
+          lo: format.one(truthMetric.ci.lo),
+          hi: format.one(truthMetric.ci.hi),
+          hours: policy.working_hours_utc,
+          margin: format.whole(policy.margin_w_m2),
+        })
+      : null;
+  const truthProof =
+    policy !== null && truthMetric !== null && files?.policy != null ? proofFromProvenance(policy.provenance, truthMetric.anchor, t("warnings.truthWhat"), files.policy) : null;
 
   const noScoredFile = policy === null && plans === null;
   // The held-out claim describes the 2026 run (or the protocol before it has run); beside a dev or shape-fixture stamp it would read
@@ -97,15 +153,24 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
           {heldOut ? ` · ${t("factsHeldOut")}` : ""}
         </p>
         <EvalSourceStamp source={source} />
+        {evaluationProof === null ? null : (
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-2" data-evaluation="">
+            <span>{t("evaluation.line")}</span>
+            <ProofChip proof={evaluationProof} />
+          </p>
+        )}
       </header>
 
+      <p className="max-w-(--measure) text-sm text-ink-2" data-season-caption="">
+        {t("season.caption")}
+      </p>
       <SeasonPlayer ribbon={season.ribbon} tally={season.tally} proofs={season.proofs} limitC={season.ribbon.limitC} />
 
       {failed ? (
         <EmptyState title={t("error.title")} reason={t("error.reason")} primary={{ label: t("error.primary"), href: "/replay" }} />
       ) : (
         <>
-          <Verdict sentence={primary?.text ?? null} proof={verdictProof} stamp={<EvalSourceStamp source={source} />} />
+          <Verdict sentence={primary?.text ?? null} proof={verdictProof} stamp={<EvalSourceStamp source={source} />} caption={priorCaption} />
 
           {noScoredFile ? (
             <EmptyState
@@ -121,6 +186,12 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
             </h2>
             <EvalSourceStamp source={source} />
             <p className="max-w-(--measure) text-base text-ink-2">{t("warnings.sub")}</p>
+            {truth === null ? null : (
+              <p className="flex max-w-(--measure) flex-wrap items-center gap-x-3 gap-y-2 text-base text-ink" data-truth-danger="">
+                <span>{truth}</span>
+                {truthProof === null ? null : <ProofChip proof={truthProof} />}
+              </p>
+            )}
             {policy === null ? <PendingBanner what={t("warnings.pending")} /> : null}
             <ScoreboardTable
               caption={t("warnings.caption")}
@@ -129,7 +200,17 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
               rows={policyRows}
               pending={policy === null}
             />
+            <VerdictList heading={t("verdict.other")} items={lead1Verdicts} proof={policyProof} what={t("verdict.other")} />
             <p className="max-w-(--measure) text-sm text-ink-3">{t("warnings.defs")}</p>
+
+            {lead2Rows.length === 0 ? null : (
+              <div className="flex flex-col gap-4 border-t border-hair pt-6" data-lead="2">
+                <h3 className="text-lg font-semibold text-ink">{t("warnings.lead2.heading")}</h3>
+                <p className="max-w-(--measure) text-base text-ink-2">{t("warnings.lead2.sub")}</p>
+                <ScoreboardTable caption={t("warnings.lead2.caption")} rowHeading={t("warnings.columns.policy")} columns={policyColumns} rows={lead2Rows} />
+                <VerdictList heading={t("verdict.lead2")} items={lead2Verdicts} proof={policyProof} what={t("verdict.lead2")} />
+              </div>
+            )}
           </section>
 
           <section id="plans" aria-labelledby="plans-heading" className="flex scroll-mt-4 flex-col gap-4">
@@ -152,6 +233,11 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
                     {plans.crew_label} · <bdi>{t("plans.roster", { roster: plans.roster })}</bdi>
                   </p>
                 )}
+                {tradeoff === null ? null : (
+                  <p className="max-w-(--measure) text-lg text-ink" data-plans-tradeoff="">
+                    {tradeoff}
+                  </p>
+                )}
                 <ScoreboardTable
                   caption={t("plans.caption")}
                   rowHeading={t("plans.columns.plan")}
@@ -159,6 +245,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
                   rows={planRows}
                   pending={plans === null}
                 />
+                <VerdictList heading={t("verdict.plansHeading")} items={planVerdicts} proof={plansProof} what={t("verdict.plansHeading")} />
                 <p className="max-w-(--measure) text-sm text-ink-3">{t("plans.defs")}</p>
               </>
             )}
@@ -176,6 +263,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
 
       <ul className="flex flex-wrap gap-x-6 gap-y-2 border-t border-hair pt-4 text-sm text-ink-3" data-limits="">
         <li>{t("limits.station")}</li>
+        <li>{t("limits.simulated")}</li>
         {crew === undefined ? null : <li>{t("limits.crew", { size: format.whole(crew) })}</li>}
         <li>{t("limits.truth")}</li>
         <li>{t("limits.twl")}</li>

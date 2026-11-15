@@ -11,7 +11,8 @@ import { loadHourly } from "@/features/judge/hourly";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("judge.day");
-  return { title: t("title") };
+  // Neutral: the rule claim ("chosen by a rule before we looked") belongs to the scored page, and a document title cannot know the state.
+  return { title: t("titlePending") };
 }
 
 export default async function DayPage() {

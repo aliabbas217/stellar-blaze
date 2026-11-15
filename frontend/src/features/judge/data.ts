@@ -2,7 +2,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { components } from "@/api/schema";
-import { checkEvalShape, EVAL_FILES, EVAL_KINDS, sha256Hex, type EvalKind, type EvaluationSet } from "./eval-shape.mjs";
+import { checkEvalShape, checkEvaluationRecord, EVAL_FILES, EVAL_KINDS, sha256Hex, type EvalKind, type EvaluationSet } from "./eval-shape.mjs";
 import { parseRosterFrontier, type RosterFrontier } from "./roster-frontier";
 
 /*
@@ -27,10 +27,30 @@ type Schemas = components["schemas"];
 
 export type EvalSource = "2026" | "dev-2025" | "synthetic-shape" | "none";
 
+/**
+ * What the held-out run was locked to (`data/eval/2026/evaluation_record.json`, written by scripts/sync-eval-data.mjs from the run's
+ * own artifacts). Only the 2026 tier has one.
+ */
+export interface EvaluationRecord {
+  readonly evaluation_set: "scored_2026";
+  /** The pre-registration lock the run was started under (from the go-ahead marker, tied to the run by `go_sha256`). */
+  readonly lock_sha256: string;
+  readonly go_sha256: string;
+  readonly protocol_path: string;
+  readonly protocol_commit: string;
+  readonly protocol_sha256: string;
+  readonly model_id: string;
+  readonly files: Readonly<Record<string, { readonly commit: string; readonly sha256: string }>>;
+  /** The 2025 development run: its primary hypothesis (H4) outcome, the "prior run". */
+  readonly prior_run: { readonly evaluation_set: "dev_2025"; readonly h4_outcome: string; readonly commit: string };
+}
+
 /** A file the page drew: its path relative to `data/` (what the proof drawer shows) and the SHA-256 of its bytes. */
 export interface EvalFileInfo {
   readonly path: string;
   readonly sha256: string;
+  /** The lock and protocol commit of the held-out run, on a 2026 file; the proof drawer shows them. */
+  readonly evaluation?: { readonly lockSha256: string; readonly protocolCommit: string };
 }
 
 export interface EvalData {
@@ -40,6 +60,8 @@ export interface EvalData {
   /** The roster frontier is recorded climatology, not a scored export: it is read whatever the tier. */
   readonly frontier: RosterFrontier | null;
   readonly source: EvalSource;
+  /** The held-out run's lock and prior run (2026 tier only), or null. */
+  readonly record: EvaluationRecord | null;
   /** Path and fingerprint of every file that was read, for `proofFromProvenance`. */
   readonly files: {
     readonly policy: EvalFileInfo | null;
@@ -77,10 +99,20 @@ interface Tier {
   readonly suffix: string;
 }
 
+/**
+ * The `data/` directory. Development only: SB_EVAL_DATA_ROOT points the loader at another directory (the design gate uses it to
+ * photograph the "file could not be read" states with a deliberately broken copy). Production never reads it: a build has exactly one
+ * data root, `<cwd>/data`.
+ */
+function defaultDataRoot(production: boolean): string {
+  const override = process.env.SB_EVAL_DATA_ROOT;
+  return !production && override !== undefined && override !== "" ? override : path.join(process.cwd(), "data");
+}
+
 function tiersFor(options: LoadEvalOptions): readonly Tier[] {
   const production = options.production ?? process.env.NODE_ENV === "production";
   const shapeFixtures = options.shapeFixtures ?? process.env.SB_SHAPE_FIXTURES === "1";
-  const dataRoot = options.dataRoot ?? path.join(process.cwd(), "data");
+  const dataRoot = options.dataRoot ?? defaultDataRoot(production);
   const fixturesRoot = options.fixturesRoot ?? path.join(process.cwd(), "tests", "fixtures", "eval");
   const tiers: Tier[] = [
     { source: "2026", set: "scored_2026", dir: path.join(dataRoot, "eval", "2026"), shown: "eval/2026", suffix: ".json" },
@@ -163,24 +195,41 @@ export interface FrontierData {
 }
 
 export async function loadFrontier(options: LoadEvalOptions = {}): Promise<FrontierData> {
-  const read = await readFrontier(options.dataRoot ?? path.join(process.cwd(), "data"));
+  const read = await readFrontier(options.dataRoot ?? defaultDataRoot(options.production ?? process.env.NODE_ENV === "production"));
   return { frontier: read.value, file: read.info };
 }
 
 /** The three scored exporter files (no frontier), from the first tier that has any (see the file comment). */
 export type ScoredData = Omit<EvalData, "frontier" | "files"> & { readonly files: Omit<EvalData["files"], "frontier"> };
 
+/** The evaluation record of the 2026 tier, or null when the tier has none. A record that is not valid is a deployment error. */
+async function readRecord(tier: Tier): Promise<EvaluationRecord | null> {
+  if (tier.source !== "2026") return null;
+  const bytes = await readIfPresent(path.join(tier.dir, "evaluation_record.json"));
+  if (bytes === null) return null;
+  const shown = `${tier.shown}/evaluation_record.json`;
+  const value = parseJson(bytes, shown);
+  const problem = checkEvaluationRecord(value);
+  if (problem !== null) throw new EvalDataError(shown, problem);
+  return value as EvaluationRecord;
+}
+
 export async function loadScored(options: LoadEvalOptions = {}): Promise<ScoredData> {
   let source: EvalSource = "none";
+  let record: EvaluationRecord | null = null;
   let reads: Record<EvalKind, Read<unknown> | null> = { policy: null, plans: null, day: null };
   for (const tier of tiersFor(options)) {
     const found = await Promise.all(EVAL_KINDS.map((kind) => readTier(tier, kind)));
     if (found.some((read) => read !== null)) {
       source = tier.source;
+      record = await readRecord(tier);
       reads = { policy: found[0] ?? null, plans: found[1] ?? null, day: found[2] ?? null };
       break;
     }
   }
+  // The held-out files carry the lock they were scored under, so every proof of a 2026 number can show it.
+  const withLock = (read: Read<unknown> | null): EvalFileInfo | null =>
+    read === null ? null : record === null ? read.info : { ...read.info, evaluation: { lockSha256: record.lock_sha256, protocolCommit: record.protocol_commit } };
 
   return {
     // The shape was checked against the contract's required keys in readTier; the generated type is the contract.
@@ -188,7 +237,8 @@ export async function loadScored(options: LoadEvalOptions = {}): Promise<ScoredD
     plans: (reads.plans?.value as Schemas["PlanScoreboard"] | undefined) ?? null,
     day: (reads.day?.value as Schemas["DemoDay"] | undefined) ?? null,
     source,
-    files: { policy: reads.policy?.info ?? null, plans: reads.plans?.info ?? null, day: reads.day?.info ?? null },
+    record,
+    files: { policy: withLock(reads.policy), plans: withLock(reads.plans), day: withLock(reads.day) },
   };
 }
 

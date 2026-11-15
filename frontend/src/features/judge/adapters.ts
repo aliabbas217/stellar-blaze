@@ -80,8 +80,12 @@ export function policySlug(policy: PolicyId): string {
   return policy === "P3_protect" ? "p3" : policy.toLowerCase();
 }
 
-export function policyClaim(policy: PolicyId, metric: string): string {
-  return `policy.${policySlug(policy)}.${metric}`;
+/** The lead the Warnings headline is scored at (about 24 hours ahead) and the strict sensitivity lead (issued by 18:00 the evening before). */
+export type PolicyLead = 1 | 2;
+
+/** Lead 1 keeps the plain id (`policy.p3.pod`); lead 2 is `policy.lead2.p3.pod`, so one number never has two sheets. */
+export function policyClaim(policy: PolicyId, metric: string, lead: PolicyLead = 1): string {
+  return `policy.${lead === 1 ? "" : "lead2."}${policySlug(policy)}.${metric}`;
 }
 
 export function planClaim(plan: PlanId, metric: string): string {
@@ -100,6 +104,14 @@ function shown(metric: Metric, scale: number, show: (v: number) => string, text:
   };
 }
 
+/**
+ * A metric with no denominator (`n` is 0 and it has no interval: the false-alarm share of a policy that never warns) is NOT
+ * computed, whatever `value` says: the file writes 0 there. It is shown as "not computed", never as a zero and never with a proof.
+ */
+function notComputed(metric: Metric): boolean {
+  return metric.n === 0 && metric.ci === null;
+}
+
 function cell(
   metric: Metric,
   scale: number,
@@ -110,6 +122,7 @@ function cell(
   ctx: AdapterContext,
   metricKey: string,
 ): ScoreCell {
+  if (notComputed(metric)) return { value: "", what, proof: null, notComputed: true };
   const { value, interval } = shown(metric, scale, show, ctx.text);
   const proof: Proof | null = proofFromProvenance(provenance, metric.anchor, what, ctx.file, { claim });
   const unit = ctx.text.unit?.(metricKey);
@@ -117,17 +130,18 @@ function cell(
 }
 
 /**
- * The Warnings rows at forecast lead `lead` (1: about 24 hours ahead), in the order of the file: P0, P1, P2, the protective
- * P3 and, only when the file carries it, the balanced P3. Our rows are last and marked.
+ * The Warnings rows at forecast lead `lead` (1: about 24 hours ahead, the headline; 2: issued by 18:00 the evening before), in the
+ * order of the file: P0, P1, P2, the protective P3 and, only when the file carries it, the balanced P3 (both thetas are shown).
+ * Our rows are last and marked.
  */
-export function toPolicyRows(sb: PolicyScoreboard, lead: 1, ctx: AdapterContext): ScoreRow[] {
+export function toPolicyRows(sb: PolicyScoreboard, lead: PolicyLead, ctx: AdapterContext): ScoreRow[] {
   const result = sb.leads.find((l) => l.lead_days === lead);
   if (result === undefined) return [];
   const f = ctx.format;
   return result.rows.map((row) => {
     const { label, sub } = ctx.text.row(row.policy);
     const at = (key: PolicyMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key), sb.provenance, ctx, key);
+      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key, lead), sb.provenance, ctx, key);
     return {
       id: row.policy,
       label,

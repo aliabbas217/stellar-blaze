@@ -1,4 +1,5 @@
 import { useLocale, useTranslations } from "next-intl";
+import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 import { clockOf } from "./runs";
 import type { ViolationView } from "./view";
 
@@ -26,7 +27,7 @@ export function ViolationList({ violations }: { readonly violations: readonly Vi
               {violation.ruleId}
             </code>
           </p>
-          {violation.clause === "" ? null : <p className="max-w-(--measure) text-sm text-ink-2" data-clause="">{violation.clause}</p>}
+          {violation.clause === "" ? null : <p className="max-w-(--measure) text-sm text-ink-2" data-clause="">{sanitizeClause(violation.clause, { sourceId: violation.sourceId })}</p>}
           <p className="text-sm text-ink-2 tabular-nums">
             <span className="text-ink-3">{t("result.when")} </span>
             <bdi>{list.format(violation.ranges.map((range) => t("runs.range", { from: clockOf(range.fromMin), to: clockOf(range.toMin) })))}</bdi>

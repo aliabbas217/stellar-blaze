@@ -171,3 +171,43 @@ describe("roster frontier reader", () => {
     );
   });
 });
+
+describe("the data root and the evaluation record", () => {
+  it("production reads only <cwd>/data: SB_EVAL_DATA_ROOT is a development knob and is ignored (test_production_reads_only_data_eval_2026)", async () => {
+    // an override pointing at a directory with NO files: development follows it (nothing scored), production does not
+    const empty = mkdtempSync(path.join(tmpdir(), "sb-empty-"));
+    mkdirSync(path.join(empty, "static"), { recursive: true });
+    writeFileSync(path.join(empty, "static", "roster_frontier.json"), readFileSync(path.join(REPO_DATA, "static", "roster_frontier.json")));
+    vi.stubEnv("SB_EVAL_DATA_ROOT", empty);
+    try {
+      const dev = await loadEval({ production: false, shapeFixtures: false });
+      expect(dev.source).toBe("none");
+      const production = await loadEval({ production: true });
+      expect(production.source).toBe("2026");
+      for (const info of [production.files.policy, production.files.plans, production.files.day]) expect(info?.path).toMatch(/^eval\/2026\//);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it("a 2026 tier with an invalid evaluation record is a deployment error, not a silent absence", async () => {
+    put("eval/2026/policy_scoreboard.json", scored("policy_scoreboard"));
+    put("eval/2026/evaluation_record.json", JSON.stringify({ evaluation_set: "scored_2026", lock_sha256: "nope" }));
+    await expect(loadEval({ dataRoot: root, fixturesRoot: fixtures, production: true })).rejects.toThrow(/evaluation_record\.json/);
+  });
+
+  it("carries the lock of a valid record onto every 2026 file it drew, and onto no dev file", async () => {
+    put("eval/2026/policy_scoreboard.json", scored("policy_scoreboard"));
+    const lock = "a".repeat(64);
+    const record = { evaluation_set: "scored_2026", lock_sha256: lock, go_sha256: "b".repeat(64), protocol_path: "p.md", protocol_commit: "c".repeat(40), protocol_sha256: "d".repeat(64), model_id: "m", files: {}, prior_run: { evaluation_set: "dev_2025", h4_outcome: "negative", commit: "e".repeat(40) } };
+    put("eval/2026/evaluation_record.json", JSON.stringify(record));
+    const heldOut = await loadEval({ dataRoot: root, fixturesRoot: fixtures, production: true });
+    expect(heldOut.files.policy?.evaluation).toEqual({ lockSha256: lock, protocolCommit: "c".repeat(40) });
+    expect(heldOut.record?.prior_run.h4_outcome).toBe("negative");
+    rmSync(path.join(root, "eval", "2026"), { recursive: true });
+    putDev("policy_scoreboard");
+    const dev = await loadEval({ dataRoot: root, fixturesRoot: fixtures, production: false });
+    expect(dev.files.policy?.evaluation).toBeUndefined();
+    expect(dev.record).toBeNull();
+  });
+});
