@@ -57,6 +57,8 @@ export type PlanScreenState =
       readonly items: readonly PlanAckItem[];
       /** No fresh forecast: the crews see the protective plan. */
       readonly protective: boolean;
+      /** The site forecast is still being read: not stale, not fresh (no notice, and the strip keeps its place until the heat is known). */
+      readonly forecastPending: boolean;
       /**
        * The latest read of the plan failed in a way that does not say the plan is wrong (no network, a 5xx): the last plan stays on
        * screen as it was, under a notice, and sign-off is NOT offered on it (a sign-off must never be offered on a plan whose latest
@@ -135,8 +137,11 @@ export function usePlanModel(crewId: string): PlanScreen {
     const blocks = planBlocks(plan, zone);
     const axis = planAxis(blocks);
     const forecastFresh = forecast !== undefined && forecastFreshness(forecast, now) === "fresh";
+    // A forecast still being read is UNKNOWN, not stale: saying "no fresh forecast" for the moment it takes would be false, and the notice's
+    // block pushed the strip and the rows down when it left (layout shift on the plan screen).
+    const forecastPending = forecast === undefined && forecastQuery.isPending && !crewsQuery.isError;
     // A forecast that is missing, stale or a fallback is not live: the crews see the protective plan, and no heat colour is drawn.
-    const protective = plan.forecast_status !== "fresh" || plan.status === "fallback" || !forecastFresh;
+    const protective = plan.forecast_status !== "fresh" || plan.status === "fallback" || (!forecastFresh && !forecastPending);
     const ban = banStateFrom(plan.ban_window, zone, plan.date, locale);
     const nowMin = localDate(now, zone) === plan.date ? Math.round(hourOfDay(now, zone) * 60) : null;
     const currentIndex = nowMin === null ? -1 : blocks.findIndex((block) => block.fromMin <= nowMin && nowMin < block.toMin);
@@ -151,6 +156,7 @@ export function usePlanModel(crewId: string): PlanScreen {
       currentIndex,
       items: ackItemsOf(plan, zone),
       protective,
+      forecastPending,
       refreshFailed: planQuery.isError
         ? {
             retry: () => {

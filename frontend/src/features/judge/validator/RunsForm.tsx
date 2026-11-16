@@ -1,5 +1,6 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { clockOf, parseTime, TEMPLATES, type Run, type RunProblem, type TemplateId } from "./runs";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The inputs of the check: the three roster templates, the work times (three editable runs), and the two crew assumptions the
@@ -38,7 +39,7 @@ const FIELD = "min-h-(--target) w-28 rounded-sign border border-edge bg-ground p
 
 export function RunsForm({ runs, rowProblems, templateId, acclimatised, daysPerWeek, daysProblem, handlers }: RunsFormProps) {
   const t = useTranslations("judge.try");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const list = new Intl.ListFormat(locale, { type: "conjunction" });
   const rangeText = (run: Run): string => {
     const start = parseTime(run.start);

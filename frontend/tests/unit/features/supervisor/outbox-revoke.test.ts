@@ -31,7 +31,7 @@ describe("a worker's revoke never touches the stop outbox", () => {
       return originalOpen(name, version);
     };
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-b", new Date("2026-09-03T08:00:00Z"), factory);
+    await enqueueStop("crew-b", new Date("2026-09-03T08:00:00Z"), { factory });
 
     // The default store: F1's real effects (caches, Serwist's expiration rows, the push registration), nothing replaced.
     const store = createProfileStore();

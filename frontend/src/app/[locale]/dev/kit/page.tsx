@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { DraftBadge } from "@/components/shell/DraftBadge";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
 import { SunToggle } from "@/components/shell/SunToggle";
 import { Link } from "@/i18n/navigation";
@@ -42,7 +41,6 @@ export default async function KitPage(props: PageProps<"/[locale]/dev/kit">) {
         <div className="flex flex-wrap items-center gap-3">
           <LocaleSwitcher />
           <SunToggle />
-          <DraftBadge />
           <Link href="/dev/kit/spine" className="inline-flex min-h-(--target) items-center text-base text-ink-2 underline">
             {t("spineLink")}
           </Link>

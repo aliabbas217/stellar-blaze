@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import { CopyStepLink } from "./CopyStepLink";
 import { STORY_STEPS, type StoryStepId } from "./story-steps";
 
@@ -12,6 +13,7 @@ import { STORY_STEPS, type StoryStepId } from "./story-steps";
  */
 export function StoryNav({ current }: { readonly current: StoryStepId }) {
   const t = useTranslations("judge.story");
+  const attrs = useLocaleAttrs();
   const position = STORY_STEPS.findIndex((step) => step.id === current);
   const built = STORY_STEPS.map((step, index) => ({ ...step, index })).filter((step) => step.built);
   const previous = [...built].reverse().find((step) => step.index < position);
@@ -21,7 +23,7 @@ export function StoryNav({ current }: { readonly current: StoryStepId }) {
     "inline-flex min-h-12 items-center justify-center rounded-sign border border-edge bg-ground px-4 text-base text-ink no-underline hover:bg-panel";
 
   return (
-    <nav aria-label={t("label")} data-story-nav="" className="flex flex-col gap-4 border-t border-hair pt-6">
+    <nav {...attrs} aria-label={t("label")} data-story-nav="" className="flex flex-col gap-4 border-t border-hair pt-6">
       <p className="text-sm text-ink-3">{t("chapter", { n: String(position + 1), total: String(STORY_STEPS.length), label: label(current) })}</p>
       <ol className="flex flex-wrap gap-2">
         {STORY_STEPS.map((step) => (

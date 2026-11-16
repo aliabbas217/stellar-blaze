@@ -4,7 +4,7 @@ import {
   cameraMatrix,
   COAST_STRIDE,
   decimateCoast,
-  frameVertices,
+  isoVertexCap,
   heightOf,
   IsoLines,
   mapCentreX,
@@ -46,12 +46,12 @@ function frameAt(mobile: boolean, hour: number): { terrain: number; iso: number;
   }
   const lines = decimateCoast(coast, COAST_STRIDE[mobile ? "phone" : "desktop"]);
   const coastVertices = lines.reduce((sum, line) => sum + line.length, 0);
-  // the cap the worker gives the isotherms: what is left of the budget after the mesh and the coast
-  const iso = new IsoLines(MAX_VERTICES[mobile ? "phone" : "desktop"] - vertexCount(mesh) - coastVertices);
+  // the cap the worker gives the isotherms: its own function, not a mirrored formula
+  const iso = new IsoLines(isoVertexCap(mobile, coastVertices));
   isothermEach(values, nx, nz, 1, (x1, y1, x2, y2, level) => {
     iso.add(x1, y1, x2, y2, level);
   });
-  return { terrain: vertexCount(mesh), iso: iso.vertices, coast: coastVertices, total: frameVertices(mesh, iso.vertices, coastVertices), dropped: iso.dropped };
+  return { terrain: vertexCount(mesh), iso: iso.vertices, coast: coastVertices, total: vertexCount(mesh) + iso.vertices + coastVertices, dropped: iso.dropped };
 }
 
 describe("the vertex budget", () => {
@@ -192,56 +192,43 @@ describe("isotherms on the mesh", () => {
   });
 });
 
-describe("the frame-rate monitor", () => {
-  it("test_falls_back_when_fps_below_30_for_2s: gives the scene up after 2 s of frames slower than 30 per second (fake clock)", () => {
+describe("the frame-rate monitor (it times each frame the worker was asked for, request to answer)", () => {
+  it("test_falls_back_when_fps_below_30_for_2s: gives the scene up after 2 s of frames slower than 30 per second", () => {
     expect(FPS_FLOOR).toBe(30);
     expect(FPS_WINDOW_MS).toBe(2000);
     const monitor = new FpsMonitor();
-    let now = 1000;
-    monitor.tick(now); // first frame: nothing to measure yet
     let gaveUp = false;
-    let elapsed = 0;
-    while (elapsed < 1900) {
-      now += 40; // 25 frames per second
-      elapsed += 40;
-      gaveUp = monitor.tick(now);
-    }
+    for (let spent = 0; spent < 1900; spent += 40) gaveUp = monitor.tick(40); // 25 frames per second
     expect(gaveUp).toBe(false); // 1.9 s is not enough
-    for (let i = 0; i < 4 && !gaveUp; i++) {
-      now += 40;
-      gaveUp = monitor.tick(now);
-    }
+    for (let i = 0; i < 4 && !gaveUp; i++) gaveUp = monitor.tick(40);
     expect(gaveUp).toBe(true);
+  });
+
+  it("gives up a worker slower than the old pause constant: 300 ms and 600 ms a frame (3 and 1.7 per second)", () => {
+    for (const frameMs of [150, 300, 600, 2500]) {
+      const monitor = new FpsMonitor();
+      let frames = 0;
+      while (!monitor.tick(frameMs)) frames++;
+      expect(frames * frameMs, `${String(frameMs)} ms a frame`).toBeLessThan(2000 + frameMs);
+    }
   });
 
   it("never gives up at 40 frames per second, and a fast frame resets the count", () => {
     const monitor = new FpsMonitor();
-    let now = 0;
-    monitor.tick(now);
-    for (let i = 0; i < 400; i++) {
-      now += 25;
-      expect(monitor.tick(now)).toBe(false);
-    }
+    for (let i = 0; i < 400; i++) expect(monitor.tick(25)).toBe(false);
     // 1.5 s slow, one fast frame, 1.5 s slow again: never 2 s in a row
     const slow = new FpsMonitor();
-    let t = 0;
-    slow.tick(t);
-    for (let i = 0; i < 37; i++) {
-      t += 40;
-      expect(slow.tick(t)).toBe(false);
-    }
-    t += 10;
-    expect(slow.tick(t)).toBe(false);
-    for (let i = 0; i < 37; i++) {
-      t += 40;
-      expect(slow.tick(t)).toBe(false);
-    }
+    for (let i = 0; i < 37; i++) expect(slow.tick(40)).toBe(false);
+    expect(slow.tick(10)).toBe(false);
+    for (let i = 0; i < 37; i++) expect(slow.tick(40)).toBe(false);
   });
 
-  it("does not count a pause (a gap of a quarter second or more is not a slow frame)", () => {
+  it("reset forgets the run (the day stopped playing, or the page was hidden)", () => {
     const monitor = new FpsMonitor();
-    monitor.tick(0);
-    for (const at of [5000, 10_000, 15_000]) expect(monitor.tick(at)).toBe(false);
+    for (let i = 0; i < 6; i++) monitor.tick(300);
+    monitor.reset();
+    for (let i = 0; i < 6; i++) expect(monitor.tick(300)).toBe(false);
+    expect(monitor.tick(300)).toBe(true);
   });
 });
 

@@ -25,6 +25,7 @@ import "@/styles/view-transitions.css";
 export function FieldShell({
   siteName,
   crewLabel,
+  reserveLabels = false,
   clock,
   dock,
   children,
@@ -35,6 +36,12 @@ export function FieldShell({
    */
   siteName?: string | null;
   crewLabel?: string | null;
+  /**
+   * Hold the header's final height from the first paint: two lines for the site's name and one for the crew's. The names arrive after
+   * the page does (the demo site, then the crew's timeline), and on a phone each one grew the header and pushed the whole screen down
+   * (layout shift 0.05 on the crew plan screen). For a screen that always has both; others keep the height of what they show.
+   */
+  reserveLabels?: boolean;
   /** The time to show, already formatted (a node, so the caller can put a Suspense boundary around what reads the URL). Omitted: none is shown. */
   clock?: ReactNode;
   dock?: ReactNode;
@@ -59,7 +66,7 @@ export function FieldShell({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-110 flex-col bg-ground sm:my-6 sm:min-h-0 sm:border sm:border-hair">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hair px-4 py-2">
+      <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-hair px-4 py-2">
         <ViewTransition name="wordmark" share="morph" default="none">
           <FieldLink
             href="/"
@@ -71,13 +78,17 @@ export function FieldShell({
         {/* From sm up the wordmark takes its own line (basis-full above): beside it the name had about 90 px and a long word ("Mussafah") was cut. */}
         <div className="min-w-0 flex-1">
           {site === undefined ? null : (
-            // Two lines at most, then cut. The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a
-            // rule for every element of the page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
-            <p {...(site === null ? {} : { title: site })} className="line-clamp-2 font-body text-base leading-tight font-semibold text-ink">
+            // The name wraps and is never cut: the demo site's name ends in "(synthetic)", and a two-line clamp put its ellipsis exactly there
+            // when the Arabic sun-mode button left the name about 135 px (F2 Task 22 fix round 1). A long word breaks instead of overflowing.
+            // The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a rule for every element of the
+            // page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
+            <p {...(site === null ? {} : { title: site })} className={`font-body text-base leading-tight font-semibold break-words text-ink${reserveLabels ? " max-sm:min-h-10" : ""}`}>
               {site === null ? t("shell.field.noSite") : <bdi className="leading-[inherit]">{site}</bdi>}
             </p>
           )}
-          {crew === null ? null : (
+          {crew === null ? (
+            reserveLabels ? <p aria-hidden="true" className="max-sm:min-h-[1.0938rem]" /> : null
+          ) : (
             <p className="truncate font-body text-sm leading-tight text-ink-3">
               <bdi className="leading-[inherit]">{crew}</bdi>
             </p>

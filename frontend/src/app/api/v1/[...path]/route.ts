@@ -1,5 +1,6 @@
 import { problemResponse, UPSTREAM_UNAVAILABLE_TYPE } from "@/api/problem";
 import { employerAuth, forwardHeaders, isWorkerCacheableRead, type LimitClass } from "./employer-auth";
+import { isSafetyRoute, pathSegmentsOf, upstreamTimeouts, type UpstreamTimeouts } from "@/lib/upstream-timeouts";
 import { clientKey, limitersFor, trustedProxyHops } from "./rate-limit";
 
 /*
@@ -23,8 +24,12 @@ export const dynamic = "force-dynamic";
 
 const RESPONSE_HEADERS = ["content-type", "x-request-id", "retry-after"];
 
-// A hung API must end as a problem the UI can show, not as a request that never answers.
-const UPSTREAM_TIMEOUT_MS = 10_000;
+/*
+ * A hung API must end as a problem the UI can show, not as a request that never answers. Two limits (src/lib/upstream-timeouts.ts):
+ * Stop work and its undo or resume are held to UPSTREAM_TIMEOUT_MS (default 10 s: a Stop never hangs), everything else to
+ * UPSTREAM_READ_TIMEOUT_MS (default 10 s; the deployment raises it so a cold start of the scaled-to-zero API is waited out, not
+ * shown as an error). A timed-out request of either kind is the same 502 upstream-unavailable problem as an unreachable API.
+ */
 
 const API_PREFIX = "/api/v1/";
 
@@ -66,10 +71,29 @@ function requestIdOf(request: Request): string {
   return request.headers.get("x-request-id") ?? crypto.randomUUID();
 }
 
+interface LoggedCause {
+  name: string;
+  message: string;
+  cause?: LoggedCause;
+}
+
+/**
+ * An error as the log shows it: its name and message, and its own cause's the same way, nothing else. The error object itself is
+ * never logged (a timeout's DOMException prints about 30 lines of stack and constants; any error might carry a request or its
+ * headers). `fetch failed` alone says nothing, so the connection error under it (ECONNREFUSED, a DNS failure) is kept one level down.
+ * A thrown value that is not an Error is not logged at all.
+ */
+function loggedCause(error: unknown, depth = 0): LoggedCause | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const inner = depth < 2 ? loggedCause(error.cause, depth + 1) : undefined;
+  return { name: error.name, message: error.message, ...(inner === undefined ? {} : { cause: inner }) };
+}
+
 function unavailable(request: Request, reason: string, cause?: unknown): Response {
   const requestId = requestIdOf(request);
-  // The browser gets a generic problem; the cause stays in the server log, tied to the same request id.
-  console.error("bff: upstream unavailable", { request_id: requestId, reason, cause });
+  // The browser gets a generic problem; the cause (name and message only) stays in the server log, tied to the same request id.
+  const logged = loggedCause(cause);
+  console.error("bff: upstream unavailable", { request_id: requestId, reason, ...(logged === undefined ? {} : { cause: logged }) });
   return problemResponse({
     type: UPSTREAM_UNAVAILABLE_TYPE,
     title: "Upstream unavailable",
@@ -88,6 +112,21 @@ async function answer(request: Request): Promise<Response> {
   if (!incoming.pathname.startsWith(API_PREFIX)) {
     return problemResponse({ type: "about:blank", title: "Not Found", status: 404, request_id: requestIdOf(request) });
   }
+  // Parsed now, before anything is spent on the request: a bad value is an error with its name in the log, never a default
+  // (instrumentation.ts throws at server start, after which the server answers 500 everywhere; this is the guard where that did not run).
+  let limits: UpstreamTimeouts;
+  try {
+    limits = upstreamTimeouts();
+  } catch (error) {
+    // The message is the reason; there is nothing more in the error worth logging.
+    return unavailable(request, error instanceof Error ? error.message : "the upstream time limits are invalid");
+  }
+  const isSafety = isSafetyRoute(request.method, pathSegmentsOf(incoming.pathname));
+  const timeoutMs = isSafety ? limits.safetyMs : limits.readMs;
+  // A read the client has given up on (tab closed, connection dropped) is aborted upstream too, so a hung read does not hold the
+  // API for the whole limit. NEVER a write or a safety route: a Stop or a sign-off in flight must reach the API even if the phone
+  // loses its connection a moment after pressing it, and only its own time limit may cut it.
+  const abortsWithClient = !isSafety && (request.method === "GET" || request.method === "HEAD");
   const decision = employerAuth(request.method, incoming.pathname);
   if (decision.limitClass !== null) {
     const limited = rateLimited(request, decision.limitClass);
@@ -106,7 +145,7 @@ async function answer(request: Request): Promise<Response> {
       headers,
       ...(body === undefined || body.byteLength === 0 ? {} : { body }),
       cache: "no-store",
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      signal: abortsWithClient ? AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     return unavailable(request, "request to the API failed", error);

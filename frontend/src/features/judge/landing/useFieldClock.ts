@@ -41,13 +41,26 @@ export function useFieldClock(peakHour: number, autoplay: boolean, onFrame: (hou
     frameCallback.current = onFrame;
   }, [onFrame]);
 
-  const stop = useCallback(() => {
+  /** A frame loop is running (so the canvas has been told the day plays). */
+  const running = useRef(false);
+
+  /** Stops the loop without telling the canvas (a seek draws its own frame). */
+  const halt = useCallback(() => {
     cancelAnimationFrame(frame.current);
+    running.current = false;
     setPlaying(false);
   }, []);
 
+  /** The day stops playing (Pause, or the end of the pass): the canvas is told with a frame that is NOT playing, so it stops metering. */
+  const stop = useCallback(() => {
+    const wasRunning = running.current;
+    halt();
+    if (wasRunning) frameCallback.current(position.current, false);
+  }, [halt]);
+
   const loop = useCallback(() => {
     cancelAnimationFrame(frame.current);
+    running.current = true;
     let last = performance.now();
     const step = (now: number): void => {
       // A frame never advances the day by more than 50 ms: a tab that was hidden for a minute must not use up the once-only day.
@@ -57,10 +70,10 @@ export function useFieldClock(peakHour: number, autoplay: boolean, onFrame: (hou
       frameCallback.current(position.current, true);
       setHour(Math.floor(position.current));
       if (travelled.current < HOURS) frame.current = requestAnimationFrame(step);
-      else setPlaying(false);
+      else stop();
     };
     frame.current = requestAnimationFrame(step);
-  }, [peakHour]);
+  }, [peakHour, stop]);
 
   const play = useCallback(() => {
     // A finished pass starts over from the peak; a paused one continues.
@@ -71,7 +84,7 @@ export function useFieldClock(peakHour: number, autoplay: boolean, onFrame: (hou
 
   const seek = useCallback(
     (to: number) => {
-      stop();
+      halt();
       const whole = ((Math.round(to) % HOURS) + HOURS) % HOURS;
       position.current = whole;
       // The next Play continues the day from here: the pass is measured from the peak.
@@ -79,13 +92,14 @@ export function useFieldClock(peakHour: number, autoplay: boolean, onFrame: (hou
       frameCallback.current(whole, false);
       setHour(whole);
     },
-    [peakHour, stop],
+    [peakHour, halt],
   );
 
   useEffect(() => {
     if (autoplayAtMount.current) loop();
     return () => {
       cancelAnimationFrame(frame.current);
+      running.current = false;
     };
   }, [loop]);
 

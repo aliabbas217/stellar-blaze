@@ -11,7 +11,9 @@ import { hourLabel, LIMIT_C, type FieldReading } from "./field-data";
  *
  * `live`: the live region is ONE short sentence (hour, hottest grid cell, airport), not the whole card: an arrow press would
  * otherwise read about eight nodes. While the day plays it is silent (a number read aloud every second is noise); at rest it is
- * `polite`, so a reader who moves the slider hears the new reading. The card itself stays ordinary text a reader can browse.
+ * `polite`, so a reader who moves the day with the pointer or a button hears the new reading. While the slider itself has focus it is
+ * silent too: the slider's own value text carries the same words, and both together would read every key press twice.
+ * The card itself stays ordinary text a reader can browse.
  */
 
 export interface ReadoutText {
@@ -56,7 +58,7 @@ export function FieldReadout({ reading, source, proof, live, announce }: FieldRe
     <aside
       aria-label={t("readout")}
       data-field-readout=""
-      className="relative z-10 grid gap-2 rounded-sign border border-hair bg-ground/90 p-4 min-[900px]:absolute min-[900px]:end-10 min-[900px]:bottom-36 min-[900px]:w-80 max-[899px]:order-4 max-[899px]:mx-4"
+      className="relative z-10 grid gap-2 rounded-sign border border-hair bg-ground/90 p-4 min-[1100px]:absolute min-[1100px]:end-10 min-[1100px]:bottom-36 min-[1100px]:w-80 max-[899px]:order-4 max-[899px]:mx-4 min-[900px]:max-[1099px]:col-start-1 min-[900px]:max-[1099px]:row-start-3 min-[900px]:max-[1099px]:mx-10 min-[900px]:max-[1099px]:mb-4 min-[900px]:max-[1099px]:grid-cols-2 min-[900px]:max-[1099px]:gap-x-8"
     >
       <p className="sr-only" aria-live={live ? "polite" : "off"} data-readout-live="">
         {announce}
@@ -69,21 +71,25 @@ export function FieldReadout({ reading, source, proof, live, announce }: FieldRe
       <p className="text-sm text-ink-3 tabular-nums" data-readout-where="">
         {t("where", { lat: text.lat, lon: text.lon })}
       </p>
-      <dl className="mt-1 grid grid-cols-[1fr_auto] border-t border-hair text-sm">
+      <dl className="mt-1 grid grid-cols-[1fr_auto] border-t border-hair text-sm min-[900px]:max-[1099px]:col-start-2 min-[900px]:max-[1099px]:row-span-3 min-[900px]:max-[1099px]:row-start-1 min-[900px]:max-[1099px]:mt-0">
         <dt className="border-b border-hair py-2 text-ink-2">{t("station")}</dt>
         <dd className="border-b border-hair py-2 text-end tabular-nums text-ink" data-readout-station="">
-          {text.station} {t("degrees")}
+          <bdi dir="ltr">
+            {text.station} {t("degrees")}
+          </bdi>
         </dd>
         <dt className="border-b border-hair py-2 text-ink-2">{t("limit")}</dt>
         <dd className="border-b border-hair py-2 text-end tabular-nums text-ink">
-          {text.limit} {t("degrees")}
+          <bdi dir="ltr">
+            {text.limit} {t("degrees")}
+          </bdi>
         </dd>
         <dt className="border-b border-hair py-2 text-ink-2">{t("cells")}</dt>
         <dd className="border-b border-hair py-2 text-end tabular-nums text-ink" data-readout-cells="">
           {t("cellsOf", { n: text.cells, total: text.cellsTotal })}
         </dd>
       </dl>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 min-[900px]:max-[1099px]:col-span-2">
         <p className="min-w-0 flex-1 text-xs leading-snug text-ink-3">{source}</p>
         <ProofChip proof={proof} />
       </div>

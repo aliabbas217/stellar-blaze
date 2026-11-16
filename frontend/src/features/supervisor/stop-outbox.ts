@@ -12,8 +12,9 @@
  *
  * Two limits keep the outbox from becoming a hazard of its own (W6): every operation is bounded (`OUTBOX_IO_TIMEOUT_MS`, a hung
  * IndexedDB is a failure, not a wait), and a row older than `OUTBOX_ROW_TTL_MS` (or further ahead of the clock than
- * `OUTBOX_CLOCK_SKEW_MS`) is never sent: it becomes a tombstone (`expiredAt`, in the same store) that the screen shows as a notice until it
- * is dismissed. A tombstone holds the crew id and name and two times, no person: the outbox stays outside a worker's "remove my data".
+ * `OUTBOX_CLOCK_SKEW_MS`, or with no readable time) is never sent: it becomes a tombstone (`expiredAt` and why, `expiredKind`, in the same
+ * store) that the screen shows as a notice until it is dismissed. A tombstone holds the crew id and name, two times and the reason, no
+ * person: the outbox stays outside a worker's "remove my data".
  *
  * The factory is a parameter (default: the browser's `indexedDB`) so a test can hand in its own.
  */
@@ -142,25 +143,51 @@ export function outboxAvailable(factory: Factory | undefined = defaultFactory())
   return factory !== undefined;
 }
 
-/** A row as stored: a tombstone (`expiredAt` set) is an expired stop kept for the notice, never a stop to send. */
+/**
+ * Why a stop was never sent, which decides what the notice may say. "lapsed": it truly waited longer than `OUTBOX_ROW_TTL_MS`. "clock": its
+ * stored time was ahead of the phone's clock beyond the skew, or unreadable, so the wait is unknown and "it waited 60 minutes" would be false.
+ */
+export type ExpiryKind = "lapsed" | "clock";
+
+/** A stop that was never sent and is told to the supervisor: the row, and why (see `ExpiryKind`). */
+export interface ExpiredStop extends QueuedStop {
+  readonly expiredKind: ExpiryKind;
+}
+
+/** A row as stored: a tombstone (`expiredAt` set) is an expired stop kept for the notice, never a stop to send. A tombstone written before `expiredKind` existed has none and reads "lapsed". */
 interface StoredStop extends QueuedStop {
   readonly expiredAt?: string;
+  readonly expiredKind?: ExpiryKind;
 }
 
 const isTombstone = (row: StoredStop): boolean => typeof row.expiredAt === "string";
 const hasCrew = (row: StoredStop): boolean => typeof row.crewId === "string";
 const hasTime = (row: StoredStop): boolean => typeof row.clientTime === "string" && Number.isFinite(Date.parse(row.clientTime));
+const kindOf = (row: StoredStop): ExpiryKind => (row.expiredKind === "clock" ? "clock" : "lapsed");
 
 /**
- * Whether a row's time puts it out of reach of a send, on the phone's clock (`now`, ms): older than `OUTBOX_ROW_TTL_MS` (exactly the TTL is
- * still fresh), more than `OUTBOX_CLOCK_SKEW_MS` AHEAD of the clock (a negative age: the clock was wrong when it was written, or has been
- * corrected since, so the age is unknown; exactly the skew is still fresh), or no readable time at all.
+ * Why a row's time puts it out of reach of a send, on the phone's clock (`now`, ms), or null while it is fresh. No readable time: "clock"
+ * (the wait is unknown; it wins over every other reason). More than `OUTBOX_CLOCK_SKEW_MS` AHEAD of the clock (a negative age: the clock was
+ * wrong when it was written, or has been corrected since; exactly the skew is still fresh): "clock". Older than `OUTBOX_ROW_TTL_MS` (exactly
+ * the TTL is still fresh): "lapsed".
  */
-export function isStopExpired(clientTime: string, now: number = Date.now()): boolean {
+export function stopExpiry(clientTime: string, now: number = Date.now()): ExpiryKind | null {
   const written = Date.parse(clientTime);
-  if (!Number.isFinite(written)) return true;
+  if (!Number.isFinite(written)) return "clock";
   const age = now - written;
-  return age > OUTBOX_ROW_TTL_MS || age < -OUTBOX_CLOCK_SKEW_MS;
+  if (age < -OUTBOX_CLOCK_SKEW_MS) return "clock";
+  return age > OUTBOX_ROW_TTL_MS ? "lapsed" : null;
+}
+
+/** Whether a row's time puts it out of reach of a send (`stopExpiry` is not null). */
+export function isStopExpired(clientTime: string, now: number = Date.now()): boolean {
+  return stopExpiry(clientTime, now) !== null;
+}
+
+/** What `enqueueStop` may be given besides the stop itself: a test's IndexedDB, and the label the Stop button showed. */
+export interface EnqueueOptions {
+  readonly factory?: Factory | undefined;
+  readonly crewName?: string | undefined;
 }
 
 /**
@@ -173,12 +200,8 @@ export function isStopExpired(clientTime: string, now: number = Date.now()): boo
  * a waiting stop nor removed here: dismissing it is the screen's. `crewName` is the label the Stop button shows, kept so a notice about
  * this stop can name the crew after a reload with no crews list.
  */
-export async function enqueueStop(
-  crewId: string,
-  clientTime: Date,
-  factory: Factory | undefined = defaultFactory(),
-  crewName?: string,
-): Promise<void> {
+export async function enqueueStop(crewId: string, clientTime: Date, options: EnqueueOptions = {}): Promise<void> {
+  const { factory = defaultFactory(), crewName } = options;
   if (factory === undefined) throw new Error("No IndexedDB: the stop cannot be kept.");
   const row = { crewId, clientTime: clientTime.toISOString(), ...(crewName === undefined || crewName === "" ? {} : { crewName }) };
   await inTransaction(factory, "readwrite", (store) => {
@@ -218,63 +241,93 @@ export async function clearStopsFor(crewId: string, factory: Factory | undefined
  * is not waiting either.
  */
 export async function pendingStops(factory: Factory | undefined = defaultFactory()): Promise<QueuedStop[]> {
+  return (await waitingRows(factory)).filter(hasTime);
+}
+
+/**
+ * Every row that is not a tombstone and names a crew, oldest first, INCLUDING a row whose time cannot be read: such a row is never sent and
+ * never "waiting", but the supervisor must be told it was dropped (an `ExpiredStop` of kind "clock"), so the expiry code reads it too.
+ */
+async function waitingRows(factory: Factory | undefined): Promise<QueuedStop[]> {
   if (factory === undefined) return [];
   const rows = await inTransaction(factory, "readonly", (store) => store.getAll() as IDBRequest<StoredStop[]>);
-  return rows.filter((row) => hasCrew(row) && hasTime(row) && !isTombstone(row)).sort((a, b) => a.key - b.key);
+  return rows.filter((row) => hasCrew(row) && !isTombstone(row)).sort((a, b) => a.key - b.key);
 }
 
 /** The expired stops still to be told to the supervisor (tombstones), oldest first: each is a notice until `dismissExpiredFor` removes it. */
-export async function expiredStops(factory: Factory | undefined = defaultFactory()): Promise<QueuedStop[]> {
+export async function expiredStops(factory: Factory | undefined = defaultFactory()): Promise<ExpiredStop[]> {
   if (factory === undefined) return [];
   const rows = await inTransaction(factory, "readonly", (store) => store.getAll() as IDBRequest<StoredStop[]>);
-  return rows.filter((row) => hasCrew(row) && isTombstone(row)).sort((a, b) => a.key - b.key);
+  return rows
+    .filter((row) => hasCrew(row) && isTombstone(row))
+    .sort((a, b) => a.key - b.key)
+    .map((row) => ({ ...row, expiredKind: kindOf(row) }));
 }
 
-/** The supervisor has been told: removes the crew's tombstones for good. Waiting stops are never touched. */
-export async function dismissExpiredFor(crewId: string, factory: Factory | undefined = defaultFactory()): Promise<void> {
+/** What `dismissExpiredFor` may be told: one kind of notice only (default: both), and a test's IndexedDB. */
+export interface DismissOptions {
+  readonly kind?: ExpiryKind | undefined;
+  readonly factory?: Factory | undefined;
+}
+
+/**
+ * The supervisor has been told: removes the crew's tombstones for good (of one kind, or both), AND the crew's waiting rows that are expired
+ * but were never marked (a store that could not write when they expired): otherwise a notice shown from memory would come back at the next
+ * open, and a sweep that read the row before the dismissal could mark it afterwards. A waiting row that is still fresh is never touched.
+ */
+export async function dismissExpiredFor(crewId: string, options: DismissOptions = {}): Promise<void> {
+  const { kind, factory = defaultFactory() } = options;
   if (factory === undefined) return;
   await inTransaction(factory, "readwrite", (store) => {
     const existing = store.getAll() as IDBRequest<StoredStop[]>;
     existing.onsuccess = () => {
-      for (const row of existing.result) if (row.crewId === crewId && isTombstone(row)) store.delete(row.key);
+      const now = Date.now();
+      for (const row of existing.result) {
+        if (row.crewId !== crewId) continue;
+        const why = isTombstone(row) ? kindOf(row) : stopExpiry(row.clientTime, now);
+        if (why !== null && (kind === undefined || kind === why)) store.delete(row.key);
+      }
     };
     return existing;
   });
 }
 
 /**
- * Marks every row that `isStopExpired` as an expired tombstone, WITHOUT sending it, and returns the rows it marked (oldest first) so the
- * screen can tell the supervisor. The tombstone keeps the crew id, its name and the two times, nothing else, and stays until dismissed:
- * a notice that lived only in memory was lost by a reload. A row that cannot be marked is left for the next round (a failure stops this
- * round, the rows already marked are still returned): it is never sent either way, because the drain skips an expired row it still finds.
+ * Marks every waiting row that is expired (`stopExpiry`) as a tombstone, WITHOUT sending it, and returns ALL the expired rows it found
+ * (oldest first), marked or not, so the screen can tell the supervisor: a row whose mark failed (a store that cannot write: quota) is told
+ * from memory and marked next round, never lost. The tombstone keeps the crew id, its name, the two times and why (`expiredKind`), nothing
+ * else, and stays until dismissed: a notice that lived only in memory was lost by a reload. A failure stops the marking of this round
+ * (a hung store costs one deadline, not N); the drain skips an expired row it still finds, so it is never sent either way.
  * The screen calls this when it opens, offline too: a stop that will never be sent must not read "sent when it is back online".
  */
-export async function discardExpiredStops(factory: Factory | undefined = defaultFactory(), now: number = Date.now()): Promise<QueuedStop[]> {
+export async function discardExpiredStops(factory: Factory | undefined = defaultFactory(), now: number = Date.now()): Promise<ExpiredStop[]> {
   if (factory === undefined) return [];
-  return markExpiredRows(await pendingStops(factory), now, factory);
+  return reportExpiredRows(await waitingRows(factory), now, factory);
 }
 
-/** The marking half of `discardExpiredStops`, over rows already read: never rejects, returns the rows it marked. */
-async function markExpiredRows(rows: readonly QueuedStop[], now: number, factory: Factory): Promise<QueuedStop[]> {
-  const marked: QueuedStop[] = [];
-  for (const row of rows.filter((candidate) => isStopExpired(candidate.clientTime, now))) {
+/** The marking half of `discardExpiredStops`, over rows already read: never rejects, returns every expired row (marked or not). */
+async function reportExpiredRows(rows: readonly QueuedStop[], now: number, factory: Factory): Promise<ExpiredStop[]> {
+  const expired = rows.flatMap((row): ExpiredStop[] => {
+    const expiredKind = stopExpiry(row.clientTime, now);
+    return expiredKind === null ? [] : [{ ...row, expiredKind }];
+  });
+  for (const row of expired) {
     try {
-      await markExpired(row.key, now, factory);
+      await markExpired(row, now, factory);
     } catch {
       break;
     }
-    marked.push(row);
   }
-  return marked;
+  return expired;
 }
 
 /** Turns one waiting row into its tombstone, in one transaction (the row may have been removed meanwhile: then nothing is written back). */
-async function markExpired(key: number, now: number, factory: Factory): Promise<void> {
+async function markExpired(stop: ExpiredStop, now: number, factory: Factory): Promise<void> {
   await inTransaction(factory, "readwrite", (store) => {
-    const found = store.get(key) as IDBRequest<StoredStop | undefined>;
+    const found = store.get(stop.key) as IDBRequest<StoredStop | undefined>;
     found.onsuccess = () => {
       const row = found.result;
-      if (row !== undefined && !isTombstone(row)) store.put({ ...row, expiredAt: new Date(now).toISOString() });
+      if (row !== undefined && !isTombstone(row)) store.put({ ...row, expiredAt: new Date(now).toISOString(), expiredKind: stop.expiredKind });
     };
     return found;
   });
@@ -284,44 +337,81 @@ async function removeStop(key: number, factory: Factory): Promise<void> {
   await inTransaction(factory, "readwrite", (store) => store.delete(key));
 }
 
+/** One row as it is stored now (undefined: it is gone). */
+async function readRow(key: number, factory: Factory): Promise<StoredStop | undefined> {
+  return inTransaction(factory, "readonly", (store) => store.get(key) as IDBRequest<StoredStop | undefined>);
+}
+
 /** What the sender says about one row: it is done (sent, or refused for good), or it must stay for next time. */
 export type SendResult = "done" | "keep";
 
-/** What one drain did: the rows that were sent (or refused for good) and removed, and the rows that were too old to send, kept as tombstones. */
+/**
+ * What one drain did: the rows that were sent (or refused for good) and removed, and the rows that were too old to send (told from memory
+ * even when the store could not mark them; the ones it could are tombstones).
+ */
 export interface DrainResult {
   readonly done: QueuedStop[];
-  readonly expired: QueuedStop[];
+  readonly expired: ExpiredStop[];
 }
 
 let draining: Promise<DrainResult> | null = null;
 
 /**
  * Sends every waiting stop that is not expired, oldest first, through `send`, and removes a row only when `send` answers "done". An
- * expired row is marked a tombstone WITHOUT being sent (`discardExpiredStops`) and comes back in `expired`; if marking fails the row is
- * still skipped, and the fresh rows are sent this round. One drain runs at a time (a second call joins the first), and a failure
- * leaves the rest where it is: the next reconnect or app open tries again. Two tabs may both send the same row; the API's stop is
- * idempotent while a stop is active (it answers 201 with the same body), so that is harmless. `now` is the phone's clock (ms).
+ * expired row is marked a tombstone WITHOUT being sent and comes back in `expired`; if marking fails the row is still skipped (and still
+ * told), and the fresh rows are sent this round. One drain runs at a time (a second call joins the first), and a failure leaves the rest
+ * where it is: the next reconnect or app open tries again. Two tabs may both send the same row; the API's stop is idempotent while a stop
+ * is active (it answers 201 with the same body), so that is harmless.
+ *
+ * `now` is the clock the rows are judged by: by default the phone's live `Date.now()`, read again at every judgement (the read can take up to
+ * the deadline, each send up to the request timeout), so a row that was 59 minutes 59 seconds old when the drain started is NOT sent past its
+ * 60 minutes. A test injects a function (one reading per judgement) or a fixed number (one instant for the whole drain). Immediately before
+ * each send the row is also read again: if another connection (another tab) removed it or marked it expired meanwhile it is skipped, so one
+ * tab never sends a stop another tab has just told the supervisor was not sent.
  */
 export function drainStopOutbox(
   send: (stop: QueuedStop) => Promise<SendResult>,
   factory: Factory | undefined = defaultFactory(),
-  now: number = Date.now(),
+  now: number | (() => number) = Date.now,
 ): Promise<DrainResult> {
   if (factory === undefined) return Promise.resolve({ done: [], expired: [] });
   if (draining !== null) return draining;
+  const clock = typeof now === "number" ? (): number => now : now;
   const run = (async (): Promise<DrainResult> => {
     const done: QueuedStop[] = [];
     // One read (a hung store costs one deadline, not two). Marking the expired rows never rejects: a row that could not be marked is
     // skipped below, and the fresh rows are sent this round.
-    const rows = await pendingStops(factory);
-    const old = await markExpiredRows(rows, now, factory);
+    const rows = await waitingRows(factory);
+    const expired = await reportExpiredRows(rows, clock(), factory);
+    const known = new Set(expired.map((row) => row.key));
     for (const row of rows) {
-      if (isStopExpired(row.clientTime, now)) continue;
+      if (known.has(row.key)) continue;
+      let current: StoredStop | undefined;
+      try {
+        current = await readRow(row.key, factory);
+      } catch {
+        // The store cannot be read: nothing can be verified or removed now. The rest wait for the next round.
+        break;
+      }
+      if (current === undefined || isTombstone(current)) continue;
+      // The live clock, after the read above: a row that aged out while it waited its turn is told, not sent.
+      const late = await reportExpiredRows([row], clock(), factory);
+      if (late.length > 0) {
+        expired.push(...late);
+        continue;
+      }
       if ((await send(row)) !== "done") continue;
-      await removeStop(row.key, factory);
+      // The API answered: the row is done whether or not it can be removed. A failed delete must not reject the drain (the caller would lose
+      // `done` and `expired`, and a recorded stop would never be shown as recorded): the row stays, is sent again next round (idempotent), and
+      // the round stops here since the store is not writable.
       done.push(row);
+      try {
+        await removeStop(row.key, factory);
+      } catch {
+        break;
+      }
     }
-    return { done, expired: old };
+    return { done, expired };
   })();
   draining = run.finally(() => {
     draining = null;

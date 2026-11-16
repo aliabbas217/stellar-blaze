@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/states/Skeletons";
+import { WakingLine } from "@/components/states/WakingLine";
 import { REFUSED_TYPE } from "./answer";
 import type { RefusalAnswer } from "./recorded-view";
 
@@ -18,7 +19,18 @@ export const ANSWER_SKELETON_HEIGHT = "13rem";
  * `detail` carries a design-record reference that does not belong in product copy). An unknown problem type gets its title
  * and request id and no explanation, so nothing the page cannot vouch for is worded as a refusal.
  */
-export function AnswerCard({ answer, pending }: AnswerCardProps) {
+export function AnswerCard(props: AnswerCardProps) {
+  return (
+    <>
+      <AnswerBody {...props} />
+      {/* The request is a live call and can be waiting for a scaled-to-zero API. Beside the card, not in it: the card is aria-busy
+          while pending, and a change inside a busy region is not announced. */}
+      {props.pending ? <WakingLine /> : null}
+    </>
+  );
+}
+
+function AnswerBody({ answer, pending }: AnswerCardProps) {
   const t = useTranslations("judge.governance.answer");
   return (
     <div className="grid content-start gap-3" aria-busy={pending}>

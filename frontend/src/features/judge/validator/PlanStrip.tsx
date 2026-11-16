@@ -1,8 +1,9 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { PlanBars, type PlanMark } from "@/components/plan/PlanBars";
 import type { BanState } from "@/components/spine/ban-state";
 import { clockOf, parseTime, runProblem, type Run } from "./runs";
 import type { ValidatorView } from "./view";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The plan on the day's heat, with the midday break cut through and each violation numbered on the bar it attaches to. The
@@ -24,7 +25,7 @@ export const STRIP_AXIS: { readonly from: number; readonly to: number } = { from
 
 export function PlanStrip({ runs, validator, heat, ban, dateLabel }: PlanStripProps) {
   const t = useTranslations("judge.try");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const drawn = runs.filter((run) => runProblem(run) === null).map((run) => ({ fromMin: minutes(run.start), toMin: minutes(run.end) }));
   const marks: PlanMark[] = (validator?.violations ?? []).flatMap((violation, i) => violation.ranges.map((range) => ({ n: i + 1, fromMin: range.fromMin, toMin: range.toMin })));
   const list = new Intl.ListFormat(locale, { type: "conjunction" });

@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { ProofRows, RecountButton } from "./ProofRows";
 import type { Proof } from "./proof";
 
@@ -39,6 +40,7 @@ export function ProofDrawer({ proof, open, onClose }: ProofDrawerProps) {
     // The backdrop click is a pointer convenience on top of the two keyboard paths (Escape, the Close button).
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- see above
     <dialog
+      {...CLAIMS_ENGLISH}
       ref={dialog}
       aria-labelledby={titleId}
       onClose={onClose}

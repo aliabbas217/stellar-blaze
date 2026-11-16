@@ -1,4 +1,4 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { ProofRows, RecountButton } from "@/components/provenance/ProofRows";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -6,6 +6,7 @@ import { FieldLink } from "@/components/shell/FieldLink";
 import { EvalSourceStamp } from "./EvalSourceStamp";
 import { FORECAST_CLAIMS, type Claim } from "./claims";
 import type { EvalSource } from "./data";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /**
  * The proof sheet (`/replay/proof/<claim>`): one number as large as it gets, where it comes from (the same rows as the
@@ -103,13 +104,13 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
 
 function Timeline({ claim, source }: { readonly claim: Claim; readonly source: EvalSource }) {
   const t = useTranslations("judge.proof");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const kind = claim.kind;
   const generated = claim.proof.generatedAt;
   const at =
     generated === null
       ? null
-      : new Intl.DateTimeFormat(`${locale === "en" ? "en-GB" : locale}-u-nu-latn`, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(generated));
+      : new Intl.DateTimeFormat(`${locale}-GB-u-nu-latn`, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(generated));
 
   const steps = [
     { id: "forecast", note: kind === "analysis" ? t("notes.notAForecast") : t("notes.forecastAhead") },

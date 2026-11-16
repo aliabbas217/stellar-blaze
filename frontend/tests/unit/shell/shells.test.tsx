@@ -64,6 +64,42 @@ describe("FieldShell", () => {
     expect(within(screen.getByRole("navigation", { name: "Language" })).getAllByRole("link")).toHaveLength(6);
   });
 
+  it("reserveLabels holds the header's height for the names that arrive late: two lines for the site, one for the crew (no layout shift when they come)", () => {
+    chrome();
+    const first = renderWithIntl(
+      <FieldShell siteName={null} reserveLabels>
+        <main>page</main>
+      </FieldShell>,
+    );
+    const held = (root: HTMLElement, token: string): boolean => [...root.querySelectorAll("p")].some((p) => p.className.includes(token));
+    const header = screen.getByRole("banner");
+    // Before the names: the honest placeholder line keeps two lines of room, and an empty crew line is held (hidden from assistive tech).
+    expect(held(header, "max-sm:min-h-10")).toBe(true);
+    expect([...header.querySelectorAll("p")].some((p) => p.getAttribute("aria-hidden") === "true" && p.className.includes("min-h-[1.0938rem]"))).toBe(true);
+    // A screen that does not ask keeps the height of what it shows.
+    first.unmount();
+    renderWithIntl(
+      <FieldShell siteName={null}>
+        <main>page</main>
+      </FieldShell>,
+    );
+    expect(held(screen.getByRole("banner"), "max-sm:min-h-10")).toBe(false);
+    expect([...screen.getByRole("banner").querySelectorAll("p")].some((p) => p.getAttribute("aria-hidden") === "true")).toBe(false);
+  });
+
+  it("test_header_name_is_never_clamped: the demo site's '(synthetic)' marker is not cut by a line clamp (fix round 1; the real layout is asserted in rtl.spec.ts)", () => {
+    chrome();
+    renderWithIntl(
+      <FieldShell {...props}>
+        <main>page</main>
+      </FieldShell>,
+    );
+    const name = within(screen.getByRole("banner")).getByText("Mussafah M-14 yard (synthetic)").closest("p");
+    expect(name).not.toBeNull();
+    expect(name?.className).not.toMatch(/line-clamp|truncate|overflow-hidden|text-ellipsis/);
+    expect(name?.getAttribute("title")).toBe("Mussafah M-14 yard (synthetic)");
+  });
+
   it("renders the page and the dock, and owns no <main> of its own", () => {
     chrome();
     const { container } = renderWithIntl(

@@ -124,7 +124,8 @@ describe("GET", () => {
     expect(res.headers.get("x-request-id")).toBe(body.request_id);
     expect(console.error).toHaveBeenCalledWith(
       "bff: upstream unavailable",
-      expect.objectContaining({ request_id: body.request_id, cause: expect.any(Error) as unknown }),
+      // The cause is logged as its name and message only, never the error object (route.ts loggedCause).
+      expect.objectContaining({ request_id: body.request_id, cause: expect.objectContaining({ name: "TypeError", message: expect.any(String) as unknown }) as unknown }),
     );
   });
 

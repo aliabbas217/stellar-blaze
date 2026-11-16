@@ -6,10 +6,10 @@
     "appName": "Stellar Blaze",
     "appDescription": "संयुक्त अरब इमिरेट्समा खुला ठाउँमा काम गर्ने कामदारहरूका लागि गर्मीको तनावबाट सुरक्षा।",
     "spine": {
-      "slotTitle": "Midday break",
-      "slotRange": "<bdi>{from}</bdi> to <bdi>{to}</bdi>, by law",
-      "outline": "Midday break by law: not in force until <bdi>{date}</bdi>",
-      "outlineNoDate": "Midday break by law: not in force"
+      "slotTitle": "दिउँसोको विश्राम",
+      "slotRange": "<bdi>{from}</bdi> देखि <bdi>{to}</bdi> सम्म, कानुनअनुसार",
+      "outline": "कानुनअनुसार दिउँसोको विश्राम: <bdi>{date}</bdi> सम्म लागू छैन",
+      "outlineNoDate": "कानुनअनुसार दिउँसोको विश्राम: लागू छैन"
     },
     "spineKit": {
       "kicker": "Stellar Blaze · design kit · {locale}",
@@ -94,8 +94,8 @@
       "spineLink": "Time spine kit"
     },
     "accessLog": {
-      "label": "Refused requests for individual data at this site",
-      "refused": "A request for a worker's health data was refused"
+      "label": "यस साइटमा व्यक्तिगत डेटाका लागि अस्वीकार गरिएका अनुरोधहरू",
+      "refused": "कुनै कामदारको स्वास्थ्य डेटाको अनुरोध अस्वीकार गरियो"
     }
   },
   "shell": {
@@ -115,8 +115,7 @@
       "on": "चालु",
       "off": "बन्द"
     },
-    "draftTranslation": "मस्यौदा अनुवाद",
-    "draftTranslationNote": "यो अनुवाद मेसिनले बनाएको मस्यौदा हो। कुनै मातृभाषीले अझै यसको समीक्षा गरेका छैनन्।",
+    "machineTranslation": "मेसिन अनुवाद, जसलाई अहिलेसम्म कुनै मातृभाषीले समीक्षा गरेका छैनन्",
     "roleChooser": {
       "title": "आफ्नो भूमिका छान्नुहोस्",
       "intro": "खुला ठाउँमा काम गर्ने कामदारहरूका लागि गर्मीको तनावबाट सुरक्षा। आफ्नो कामसँग मिल्ने दृश्य छान्नुहोस्।",
@@ -140,35 +139,35 @@
       "home": "सुरुमा फर्कनुहोस्"
     },
     "demo": {
-      "banner": "Synthetic demo site: no real people, no real data",
+      "banner": "कृत्रिम डेमो साइट: कुनै वास्तविक मानिस छैनन्, कुनै वास्तविक डेटा छैन",
       "reset": {
-        "button": "Reset demo site",
-        "done": "Demo site reset (new epoch {epoch}).",
-        "unavailable": "Reset is not available on this deployment.",
-        "failed": "We could not reset the demo site. Try again.",
-        "rateLimited": "Reset is limited to once a minute. Try again shortly."
+        "button": "डेमो साइट रिसेट गर्नुहोस्",
+        "done": "डेमो साइट रिसेट भयो (नयाँ चरण {epoch})।",
+        "unavailable": "यस डिप्लोयमेन्टमा रिसेट उपलब्ध छैन।",
+        "failed": "हामीले डेमो साइट रिसेट गर्न सकेनौं। फेरि प्रयास गर्नुहोस्।",
+        "rateLimited": "रिसेट एक मिनेटमा एकपटक मात्र गर्न सकिन्छ। केही बेरपछि प्रयास गर्नुहोस्।"
       },
       "mode": {
-        "label": "Data source",
-        "live": "Live",
-        "replay": "Replay",
-        "liveUnavailable": "Live is not running on this deployment"
+        "label": "डेटाको स्रोत",
+        "live": "प्रत्यक्ष",
+        "replay": "रिप्ले",
+        "liveUnavailable": "यस डिप्लोयमेन्टमा प्रत्यक्ष मोड चलिरहेको छैन"
       }
     },
     "field": {
-      "noSite": "No site chosen",
-      "clockLabel": "Time at the site",
+      "noSite": "कुनै साइट रोजिएको छैन",
+      "clockLabel": "साइटमा समय",
       "pendingClock": "--:--"
     },
     "desk": {
-      "menu": "Main",
+      "menu": "मुख्य",
       "nav": {
-        "story": "The story",
-        "scoreboard": "Scoreboard",
-        "day": "One day",
-        "try": "Try a plan",
-        "governance": "Governance",
-        "crews": "For crews"
+        "story": "कथा",
+        "scoreboard": "स्कोरबोर्ड",
+        "day": "एक दिन",
+        "try": "योजना जाँचेर हेर्नुहोस्",
+        "governance": "शासन",
+        "crews": "समूहहरूका लागि"
       }
     }
   },
@@ -177,157 +176,157 @@
       "label": "कामदार नेभिगेसन",
       "today": "आज",
       "alerts": "अलर्ट",
-      "unwell": "I feel unwell",
-      "myData": "My data",
-      "backToToday": "Back to Today"
+      "unwell": "मलाई अस्वस्थ लागिरहेको छ",
+      "myData": "मेरो डेटा",
+      "backToToday": "आजमा फर्कनुहोस्"
     },
     "today": {
-      "title": "Today",
+      "title": "आज",
       "kicker": {
-        "site": "Site level now",
-        "personal": "Your level now",
-        "stale": "Last known level",
-        "fallback": "No fresh forecast: protective plan",
-        "noHour": "No forecast for this hour",
-        "protective": "Protective level",
-        "lastKnownHigher": "Last known level: <bdi>{level}</bdi>"
+        "site": "साइटको स्तर अहिले",
+        "personal": "तपाईंको स्तर अहिले",
+        "stale": "पछिल्लो थाहा भएको स्तर",
+        "fallback": "ताजा पूर्वानुमान छैन: सुरक्षात्मक योजना",
+        "noHour": "यस घण्टाको पूर्वानुमान छैन",
+        "protective": "सुरक्षात्मक स्तर",
+        "lastKnownHigher": "पछिल्लो थाहा भएको स्तर: <bdi>{level}</bdi>"
       },
-      "until": "until <bdi>{time}</bdi>",
-      "personalHigher": "Your own level is higher than the site level.",
+      "until": "<bdi>{time}</bdi> सम्म",
+      "personalHigher": "तपाईंको आफ्नै स्तर साइटको स्तरभन्दा माथि छ।",
       "lead": {
-        "cycle": "Work {work} min, rest {rest} min in shade",
-        "shade": "Rest in shade",
-        "stop": "Stop work",
-        "siteRules": "Follow the site rules",
-        "protective": "Site rules: rest in shade every hour, drink water"
+        "cycle": "{work} मिनेट काम गर्नुहोस्, {rest} मिनेट छायाँमा आराम गर्नुहोस्",
+        "shade": "छायाँमा आराम गर्नुहोस्",
+        "stop": "काम रोक्नुहोस्",
+        "siteRules": "साइटका नियम पालना गर्नुहोस्",
+        "protective": "साइटका नियम: हरेक घण्टा छायाँमा आराम गर्नुहोस्, पानी पिउनुहोस्"
       },
-      "draftWording": "Draft wording, awaiting clinical review",
+      "draftWording": "मस्यौदा शब्दावली, चिकित्सकीय समीक्षाको प्रतीक्षामा",
       "also": {
-        "heading": "Also now",
-        "water": "Drink water",
-        "buddy": "Never work alone",
-        "selfPaced": "Self-paced work: workers must be allowed to adjust their work rate according to environmental conditions.",
-        "noUnacclimatised": "No unacclimatised person to work",
-        "induction": "High Risk induction required emphasising hydration and identifying signs of heat strain",
-        "bottle": "Provide personal water bottle (2 litre capacity) on-site at all times"
+        "heading": "अहिले यो पनि",
+        "water": "पानी पिउनुहोस्",
+        "buddy": "कहिल्यै एक्लै काम नगर्नुहोस्",
+        "selfPaced": "आफ्नै गतिमा काम: कामदारहरूलाई वातावरणको अवस्था अनुसार आफ्नो कामको गति मिलाउन अनुमति हुनुपर्छ।",
+        "noUnacclimatised": "गर्मीमा अभ्यस्त नभएको कुनै व्यक्तिले काम नगरोस्",
+        "induction": "उच्च जोखिमको परिचयात्मक तालिम अनिवार्य छ, जसमा शरीरमा पानीको कमी हुन नदिन र गर्मीको तनावका लक्षण चिन्नमा जोड दिइयोस्",
+        "bottle": "सधैं साइटमा व्यक्तिगत पानीको बोतल (2 लिटर क्षमताको) उपलब्ध गराउनुहोस्"
       },
       "why": {
-        "level": "Why <bdi>{level}</bdi>?",
-        "siteRules": "Why site rules?"
+        "level": "किन <bdi>{level}</bdi>?",
+        "siteRules": "किन साइटका नियम?"
       },
       "proofWhat": {
-        "level": "{level} level now, from the forecast",
-        "siteRules": "Site rules, because no level could be worked out"
+        "level": "अहिले {level} स्तर, पूर्वानुमानबाट",
+        "siteRules": "साइटका नियम, किनकि कुनै स्तर निकाल्न सकिएन"
       },
-      "turnOnWarnings": "Turn on warnings",
+      "turnOnWarnings": "चेतावनी खोल्नुहोस्",
       "spine": {
-        "now": "Now",
-        "breakIn": "Break in {duration}",
-        "backToWork": "Back to work {time}",
-        "shiftEnds": "Shift ends {time}",
-        "noBreakAfter": "No midday break by law after {date}",
-        "noBreakUntil": "No midday break by law until {date}",
-        "aria": "Heat level by hour, {from} to {to}. {waypoints}"
+        "now": "अहिले",
+        "breakIn": "विश्राम {duration} पछि",
+        "backToWork": "काममा फर्कने {time}",
+        "shiftEnds": "सिफ्ट सकिने {time}",
+        "noBreakAfter": "{date} पछि कानुनअनुसार दिउँसोको विश्राम छैन",
+        "noBreakUntil": "{date} सम्म कानुनअनुसार दिउँसोको विश्राम छैन",
+        "aria": "घण्टा अनुसार गर्मीको स्तर, {from} देखि {to} सम्म। {waypoints}"
       },
       "age": {
-        "hoursMinutes": "{hours} h {minutes} min",
-        "hours": "{hours} h",
-        "minutes": "{minutes} min"
+        "hoursMinutes": "{hours} घण्टा {minutes} मिनेट",
+        "hours": "{hours} घण्टा",
+        "minutes": "{minutes} मिनेट"
       },
       "entry": {
-        "title": "Scan your crew's code",
-        "reason": "Point your camera at the poster on site, or open the link in your crew's group. No account, nothing to type.",
-        "demo": "See the demo yard",
-        "loading": "Finding the demo yard",
-        "unavailable": "The demo yard could not be loaded. Check your connection and try again.",
-        "chooseFailed": "Your choice could not be saved on this phone. Try again.",
-        "pinFailed": "This phone could not save the site. Reload the page to try again."
+        "title": "आफ्नो समूहको कोड स्क्यान गर्नुहोस्",
+        "reason": "साइटमा टाँसिएको पोस्टरतर्फ क्यामेरा देखाउनुहोस्, वा आफ्नो समूहको ग्रुपमा लिंक खोल्नुहोस्। खाता छैन, केही टाइप गर्नु पर्दैन।",
+        "demo": "डेमो यार्ड हेर्नुहोस्",
+        "loading": "डेमो यार्ड खोजिँदै छ",
+        "unavailable": "डेमो यार्ड लोड गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+        "chooseFailed": "तपाईंको रोजाइ यो फोनमा सुरक्षित गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+        "pinFailed": "यो फोनले साइट सुरक्षित गर्न सकेन। पेज फेरि लोड गरेर प्रयास गर्नुहोस्।"
       },
       "noShift": {
-        "title": "No shift for {crew} today",
-        "titleNoCrew": "No shift today",
-        "reason": "Your crew has no shift on this date. The site level still applies.",
-        "primary": "Turn on warnings"
+        "title": "आज {crew} को कुनै सिफ्ट छैन",
+        "titleNoCrew": "आज कुनै सिफ्ट छैन",
+        "reason": "यो मितिमा तपाईंको समूहको कुनै सिफ्ट छैन। साइटको स्तर अझै लागू हुन्छ।",
+        "primary": "चेतावनी खोल्नुहोस्"
       },
-      "errorRules": "Until it loads, follow the site rules: rest in shade every hour, drink water."
+      "errorRules": "यो लोड नभएसम्म साइटका नियम पालना गर्नुहोस्: हरेक घण्टा छायाँमा आराम गर्नुहोस्, पानी पिउनुहोस्।"
     },
     "alert": {
-      "title": "Heat warning",
+      "title": "गर्मीको चेतावनी",
       "kicker": {
-        "site": "Site heat warning",
-        "crew": "Crew heat warning"
+        "site": "साइटको गर्मीको चेतावनी",
+        "crew": "समूहको गर्मीको चेतावनी"
       },
-      "from": "from <bdi>{time}</bdi>",
+      "from": "<bdi>{time}</bdi> देखि",
       "changed": {
-        "heading": "What changed in your shift",
-        "was": "Was <bdi>{previous}</bdi>, now <bdi>{level}</bdi>",
-        "now": "Now <bdi>{level}</bdi>"
+        "heading": "तपाईंको सिफ्टमा के बदलियो",
+        "was": "पहिले <bdi>{previous}</bdi> थियो, अहिले <bdi>{level}</bdi>",
+        "now": "अहिले <bdi>{level}</bdi>"
       },
       "spine": {
-        "now": "Now",
-        "starts": "{level} from {time}",
-        "ends": "Until {time}",
-        "aria": "Heat level by hour. {summary}"
+        "now": "अहिले",
+        "starts": "{level} {time} देखि",
+        "ends": "{time} सम्म",
+        "aria": "घण्टा अनुसार गर्मीको स्तर। {summary}"
       },
-      "personalHigher": "Your level is higher: <bdi>{level}</bdi>",
-      "doNow": "What to do",
-      "gotIt": "Got it",
+      "personalHigher": "तपाईंको स्तर माथि छ: <bdi>{level}</bdi>",
+      "doNow": "के गर्ने",
+      "gotIt": "बुझें",
       "ended": {
-        "title": "This warning ended at {time}",
-        "reason": "The level may have changed since the alert was sent. Open Today to see the level now.",
-        "primary": "Open Today"
+        "title": "यो चेतावनी {time} मा सकियो",
+        "reason": "अलर्ट पठाइएपछि स्तर बदलिएको हुन सक्छ। अहिलेको स्तर हेर्न «आज» खोल्नुहोस्।",
+        "primary": "«आज» खोल्नुहोस्"
       },
-      "saved": "The forecast is not available right now. This is the level the alert gave, saved on this phone.",
-      "notCovered": "The latest forecast does not show this warning. This is the level the alert gave, saved on this phone."
+      "saved": "पूर्वानुमान अहिले उपलब्ध छैन। यो अलर्टले दिएको स्तर हो, यही फोनमा सुरक्षित।",
+      "notCovered": "पछिल्लो पूर्वानुमानमा यो चेतावनी देखिँदैन। यो अलर्टले दिएको स्तर हो, यही फोनमा सुरक्षित।"
     },
     "unwell": {
-      "title": "I feel unwell",
-      "worksOffline": "Calling works without internet. It needs a phone signal.",
-      "privacy": "Nothing you do on this screen is sent to your employer. Call your supervisor now.",
+      "title": "मलाई अस्वस्थ लागिरहेको छ",
+      "worksOffline": "कल इन्टरनेटबिना चल्छ। यसका लागि फोनको सिग्नल चाहिन्छ।",
+      "privacy": "यस स्क्रिनमा तपाईंले गरेको कुनै पनि कुरा तपाईंको रोजगारदातालाई पठाइँदैन। अहिले आफ्नो सुपरभाइजरलाई कल गर्नुहोस्।",
       "timer": {
-        "tappedAt": "You tapped at <bdi>{time}</bdi>",
-        "elapsed": "Time since you tapped",
-        "tap": "Tap",
-        "minutes": "{count} min"
+        "tappedAt": "तपाईंले <bdi>{time}</bdi> मा ट्याप गर्नुभयो",
+        "elapsed": "ट्याप गरेदेखिको समय",
+        "tap": "ट्याप गर्नुहोस्",
+        "minutes": "{count} मिनेट"
       },
       "offline": {
-        "title": "Offline",
-        "body": "Calling still works. It does not need internet."
+        "title": "अफलाइन",
+        "body": "कल अझै चल्छ। यसलाई इन्टरनेट चाहिँदैन।"
       },
       "calls": {
-        "label": "Call for help",
+        "label": "मद्दतका लागि कल गर्नुहोस्",
         "emergency": {
-          "title": "Call 998",
-          "detail": "Ambulance"
+          "title": "998 मा कल गर्नुहोस्",
+          "detail": "एम्बुलेन्स"
         },
         "supervisor": {
-          "title": "Call your supervisor",
-          "absent": "Your site's supervisor number appears here once your site adds it",
-          "unknown": "Your site's supervisor number is saved on this phone once you open Today with a connection"
+          "title": "आफ्नो सुपरभाइजरलाई कल गर्नुहोस्",
+          "absent": "तपाईंको साइटको सुपरभाइजरको नम्बर तपाईंको साइटले थपेपछि यहाँ देखिनेछ",
+          "unknown": "तपाईंको साइटको सुपरभाइजरको नम्बर जडानसहित «आज» खोल्दा यो फोनमा सुरक्षित हुन्छ"
         },
         "firstAider": {
-          "title": "Call the site first-aider",
-          "absent": "Your site's first-aider number appears here once your site adds it",
-          "unknown": "Your site's first-aider number is saved on this phone once you open Today with a connection",
-          "askNearby": "Ask the nearest person to call your first aider."
+          "title": "साइटको प्राथमिक उपचारकर्तालाई कल गर्नुहोस्",
+          "absent": "तपाईंको साइटको प्राथमिक उपचारकर्ताको नम्बर तपाईंको साइटले थपेपछि यहाँ देखिनेछ",
+          "unknown": "तपाईंको साइटको प्राथमिक उपचारकर्ताको नम्बर जडानसहित «आज» खोल्दा यो फोनमा सुरक्षित हुन्छ",
+          "askNearby": "सबैभन्दा नजिकको व्यक्तिलाई तपाईंको प्राथमिक उपचारकर्तालाई कल गर्न भन्नुहोस्।"
         },
         "demo": {
-          "emergency": "Demo: this would call 998 (ambulance)",
-          "supervisor": "Demo: this would call your supervisor",
-          "firstAider": "Demo: this would call the site first-aider",
-          "noCall": "No call is made in the demo.",
-          "synthetic": "Synthetic number"
+          "emergency": "डेमो: यसले 998 (एम्बुलेन्स) मा कल गरिदिने थियो",
+          "supervisor": "डेमो: यसले तपाईंको सुपरभाइजरलाई कल गरिदिने थियो",
+          "firstAider": "डेमो: यसले साइटको प्राथमिक उपचारकर्तालाई कल गरिदिने थियो",
+          "noCall": "डेमोमा कुनै कल गरिँदैन।",
+          "synthetic": "कृत्रिम नम्बर"
         }
       },
       "steps": {
-        "heading": "Heat-stroke first aid, in ADOSH's words",
-        "one": "Call emergency contact number and notify supervisor",
-        "two": "Move the sick employee to a cool shaded area",
-        "three": "Cool the employee using methods such as: soaking their clothes with water; spraying, sponging, or showering them with water; and fanning their body.",
-        "source": "Exact text of the ADOSH-SF Technical Guideline, Safety in the Heat v4.0, section 4.5(c).",
-        "reviewed": "Reviewed by an independent clinical consultant, <bdi>{date}</bdi>"
+        "heading": "लू लाग्दाको प्राथमिक उपचार, ADOSH अनुसार",
+        "one": "आपत्कालीन सम्पर्क नम्बरमा कल गर्नुहोस् र सुपरभाइजरलाई जानकारी दिनुहोस्",
+        "two": "बिरामी कर्मचारीलाई चिसो छायादार ठाउँमा लैजानुहोस्",
+        "three": "कर्मचारीलाई चिसो पार्नुहोस्, जस्तै: उसका कपडा पानीले भिजाएर; उसमाथि पानी छर्केर, पानीले स्पन्ज गरेर वा पानीले नुहाएर; र उसको शरीरमा हावा हालेर।",
+        "source": "ADOSH-SF Technical Guideline, Safety in the Heat v4.0, section 4.5(c) को हुबहु अङ्ग्रेजी पाठबाट अनुवाद गरिएको।",
+        "reviewed": "एक स्वतन्त्र चिकित्सा सल्लाहकारले समीक्षा गरेका, <bdi>{date}</bdi>"
       },
-      "numbersSavedOn": "Numbers saved on {date}"
+      "numbersSavedOn": "नम्बर {date} मा सुरक्षित गरिएको"
     }
   },
   "today": {
@@ -407,7 +406,7 @@
       "subscribed": "यो साइटका लागि अलर्ट खुला छन्।",
       "error": "हामीले अलर्ट खोल्न सकेनौं। केही बेरपछि फेरि प्रयास गर्नुहोस्।",
       "disableError": "हामीले अलर्ट बन्द गर्न सकेनौं। केही बेरपछि फेरि प्रयास गर्नुहोस्।",
-      "hostNotAllowed": "This browser's push service is not supported, so alerts cannot be turned on here."
+      "hostNotAllowed": "यस ब्राउजरको पुस सेवा समर्थित छैन, त्यसैले यहाँ अलर्ट खोल्न सकिँदैन।"
     },
     "unsupported": {
       "title": "यो फोनमा अलर्ट उपलब्ध छैन",
@@ -480,198 +479,199 @@
     },
     "suppressed": "{k} जनाभन्दा कम मानिस, गोपनीयता जोगाउन विवरण लुकाइएको छ",
     "crews": {
-      "pageTitle": "Crews today",
-      "kicker": "Needs you first",
-      "kickerOff": "Highest level, off shift now",
+      "pageTitle": "आजका समूहहरू",
+      "kicker": "पहिले तपाईंको आवश्यकता छ",
+      "kickerOff": "सबैभन्दा माथिको स्तर, अहिले सिफ्टबाहिर",
       "strips": {
-        "aria": "Crews today, worst first. Now {now}.",
-        "ariaBreak": "Crews today, worst first. Midday break {from} to {to}. Now {now}.",
-        "legend": "Bar height is the crew's level. Colour is the heat of the hour. Only shift hours are drawn.",
-        "now": "Now"
+        "aria": "आजका समूहहरू, सबैभन्दा नराम्रो पहिले। अहिले {now}।",
+        "ariaBreak": "आजका समूहहरू, सबैभन्दा नराम्रो पहिले। दिउँसोको विश्राम {from} देखि {to} सम्म। अहिले {now}।",
+        "legend": "पट्टीको उचाइ समूहको स्तर हो। रङ त्यो घण्टाको गर्मी हो। सिफ्टका घण्टा मात्र देखाइएको छ।",
+        "now": "अहिले"
       },
       "focal": {
-        "workingCycleBreak": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi> (<bdi>{cycle}</bdi>); midday break in <bdi>{breakIn}</bdi>.",
-        "workingCycle": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi> (<bdi>{cycle}</bdi>).",
-        "workingBreak": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi>; midday break in <bdi>{breakIn}</bdi>.",
-        "working": "<bdi>{crew}</bdi> is <bdi>{level}</bdi> until <bdi>{until}</bdi>.",
-        "off": "<bdi>{crew}</bdi> is off shift now. Back at <bdi>{start}</bdi> into <bdi>{level}</bdi>.",
-        "offNoStart": "<bdi>{crew}</bdi> is off shift now.",
-        "stopped": "<bdi>{crew}</bdi> stopped work at <bdi>{time}</bdi>.",
-        "noLevel": "No level for <bdi>{crew}</bdi> right now. Follow the protective plan.",
-        "cycle": "work {work}, rest {rest}"
+        "workingCycleBreak": "<bdi>{crew}</bdi> <bdi>{until}</bdi> सम्म <bdi>{level}</bdi> मा छ (<bdi>{cycle}</bdi>); दिउँसोको विश्राम <bdi>{breakIn}</bdi> पछि।",
+        "workingCycle": "<bdi>{crew}</bdi> <bdi>{until}</bdi> सम्म <bdi>{level}</bdi> मा छ (<bdi>{cycle}</bdi>)।",
+        "workingBreak": "<bdi>{crew}</bdi> <bdi>{until}</bdi> सम्म <bdi>{level}</bdi> मा छ; दिउँसोको विश्राम <bdi>{breakIn}</bdi> पछि।",
+        "working": "<bdi>{crew}</bdi> <bdi>{until}</bdi> सम्म <bdi>{level}</bdi> मा छ।",
+        "off": "<bdi>{crew}</bdi> अहिले सिफ्टबाहिर छ। <bdi>{start}</bdi> मा <bdi>{level}</bdi> मा फर्कनेछ।",
+        "offNoStart": "<bdi>{crew}</bdi> अहिले सिफ्टबाहिर छ।",
+        "stopped": "<bdi>{crew}</bdi> ले <bdi>{time}</bdi> मा काम रोक्यो।",
+        "noLevel": "अहिले <bdi>{crew}</bdi> को कुनै स्तर छैन। सुरक्षात्मक योजना पालना गर्नुहोस्।",
+        "cycle": "काम {work}, आराम {rest}"
       },
       "duration": {
-        "minutes": "{minutes} min",
-        "hours": "{hours} h",
-        "hoursMinutes": "{hours} h {minutes} min"
+        "minutes": "{minutes} मिनेट",
+        "hours": "{hours} घण्टा",
+        "hoursMinutes": "{hours} घण्टा {minutes} मिनेट"
       },
       "row": {
-        "working": "<bdi>{level}</bdi> until <bdi>{until}</bdi>",
-        "off": "Off, <bdi>{level}</bdi> at <bdi>{start}</bdi>",
-        "offNoStart": "Off now",
-        "none": "No level",
-        "stopped": "Work stopped <bdi>{time}</bdi>",
-        "noShift": "No shift today",
+        "working": "<bdi>{until}</bdi> सम्म <bdi>{level}</bdi>",
+        "off": "सिफ्टबाहिर, <bdi>{start}</bdi> मा <bdi>{level}</bdi>",
+        "offNoStart": "अहिले सिफ्टबाहिर",
+        "none": "कुनै स्तर छैन",
+        "stopped": "काम <bdi>{time}</bdi> मा रोकियो",
+        "noShift": "आज कुनै सिफ्ट छैन",
         "plan": {
-          "signed": "Plan signed",
-          "unsigned": "Plan unsigned",
-          "changed": "Plan changed since signed"
+          "signed": "योजनामा हस्ताक्षर भएको छ",
+          "unsigned": "योजनामा हस्ताक्षर भएको छैन",
+          "changed": "हस्ताक्षरपछि योजना बदलियो"
         },
-        "runs": "Levels by hour: {runs}.",
-        "run": "{level} {from} to {to}",
-        "openPlan": "Open plan"
+        "runs": "घण्टा अनुसार स्तर: {runs}।",
+        "run": "{level} {from} देखि {to} सम्म",
+        "openPlan": "योजना खोल्नुहोस्"
       },
-      "primary": "Open <bdi>{crew}</bdi> plan",
+      "primary": "<bdi>{crew}</bdi> को योजना खोल्नुहोस्",
       "footnote": {
-        "one": "<bdi>{crews}</bdi> has fewer than <bdi>{k}</bdi> people, so its health detail is hidden to protect privacy. Its level is shown.",
-        "many": "<bdi>{crews}</bdi> have fewer than <bdi>{k}</bdi> people, so their health detail is hidden to protect privacy. Their levels are shown."
+        "one": "<bdi>{crews}</bdi> मा <bdi>{k}</bdi> जनाभन्दा कम मानिस छन्, त्यसैले गोपनीयता जोगाउन यसको स्वास्थ्य विवरण लुकाइएको छ। यसको स्तर देखाइएको छ।",
+        "many": "<bdi>{crews}</bdi> मा <bdi>{k}</bdi> जनाभन्दा कम मानिस छन्, त्यसैले गोपनीयता जोगाउन तिनीहरूको स्वास्थ्य विवरण लुकाइएको छ। तिनीहरूको स्तर देखाइएको छ।"
       },
       "stale": {
-        "title": "No fresh forecast: protective plan",
-        "body": "Crews see the protective plan until the forecast refreshes. Stop work is not affected."
+        "title": "ताजा पूर्वानुमान छैन: सुरक्षात्मक योजना",
+        "body": "पूर्वानुमान नयाँ नभएसम्म समूहहरूले सुरक्षात्मक योजना देख्छन्। काम रोक्ने कुरामा यसको असर पर्दैन।"
       },
       "offline": {
-        "title": "You are offline",
-        "body": "What is on screen may be out of date. Stop work is kept on this phone and sent when it is back online."
+        "title": "तपाईं अफलाइन हुनुहुन्छ",
+        "body": "स्क्रिनमा भएको कुरा पुरानो हुन सक्छ। काम रोक्ने आदेश यो फोनमा राखिन्छ र अनलाइन हुनासाथ पठाइन्छ।"
       },
       "error": {
-        "title": "Crew status did not load"
+        "title": "समूहहरूको अवस्था लोड भएन"
       },
       "empty": {
-        "title": "No crews at this site yet",
-        "reason": "Crews appear here once they are added for this site.",
-        "primary": "Back to the start"
+        "title": "यस साइटमा अहिलेसम्म कुनै समूह छैन",
+        "reason": "यस साइटका लागि समूह थपिएपछि तिनीहरू यहाँ देखिनेछन्।",
+        "primary": "सुरुमा फर्कनुहोस्"
       }
     },
     "plan": {
-      "pageTitle": "Crew plan",
-      "back": "All crews",
-      "title": "<bdi>{crew}</bdi> plan",
-      "titleGeneric": "Crew plan",
-      "kicker": "Crew level now",
+      "pageTitle": "समूहको योजना",
+      "back": "सबै समूह",
+      "title": "<bdi>{crew}</bdi> को योजना",
+      "titleGeneric": "समूहको योजना",
+      "kicker": "समूहको स्तर अहिले",
       "workload": {
-        "light": "light work",
-        "moderate": "moderate work",
-        "heavy": "heavy work"
+        "light": "हल्का काम",
+        "moderate": "मध्यम काम",
+        "heavy": "भारी काम"
       },
-      "people": "<bdi>{count}</bdi> people",
-      "peopleHidden": "fewer than <bdi>{k}</bdi> people, health detail hidden",
+      "people": "<bdi>{count}</bdi> जना",
+      "peopleHidden": "<bdi>{k}</bdi> जनाभन्दा कम मानिस, स्वास्थ्य विवरण लुकाइएको",
       "restrictions": {
-        "one": "restrictions declared for <bdi>1</bdi> member",
-        "many": "restrictions declared for <bdi>{count}</bdi> members"
+        "one": "<bdi>1</bdi> जना सदस्यका लागि प्रतिबन्ध घोषणा गरिएको छ",
+        "many": "<bdi>{count}</bdi> जना सदस्यका लागि प्रतिबन्ध घोषणा गरिएको छ"
       },
-      "unsigned": "Not signed. Crews see the rule plan, labelled unsigned fallback. Alerts and Stop work do not wait for you.",
-      "changed": "Changed since signed at <bdi>{time}</bdi>. Crews see the current rule plan, labelled changed since signed. Alerts and Stop work do not wait for you.",
-      "changedNoTime": "Changed since signed. Crews see the current rule plan, labelled changed since signed. Alerts and Stop work do not wait for you.",
-      "floorBanner": "Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.",
+      "unsigned": "हस्ताक्षर भएको छैन। समूहहरूले नियममा आधारित योजना देख्छन्, जसमा «हस्ताक्षरबिनाको विकल्प» लेखिएको छ। अलर्ट र काम रोक्ने कुराले तपाईंलाई पर्खँदैनन्।",
+      "changed": "<bdi>{time}</bdi> मा हस्ताक्षरपछि बदलियो। समूहहरूले हालको नियममा आधारित योजना देख्छन्, जसमा «हस्ताक्षरपछि बदलिएको» लेखिएको छ। अलर्ट र काम रोक्ने कुराले तपाईंलाई पर्खँदैनन्।",
+      "changedNoTime": "हस्ताक्षरपछि बदलियो। समूहहरूले हालको नियममा आधारित योजना देख्छन्, जसमा «हस्ताक्षरपछि बदलिएको» लेखिएको छ। अलर्ट र काम रोक्ने कुराले तपाईंलाई पर्खँदैनन्।",
+      "floorBanner": "हरियोको अर्थ काम बढाउने अनुमति होइन। कानुनी र ADOSH को न्यूनतम सर्त अझै लागू हुन्छन्। सल्लाहका लागि मात्र; जिम्मेवारी अझै रोजगारदाताकै हो।",
       "strip": {
-        "aria": "Plan for {crew}, {from} to {to}, against the heat of the day. Every block is listed below the chart.",
-        "slot": "Midday break",
-        "outline": "Midday break by law: not in force until {date}",
-        "outlineUnknown": "Midday break by law: not in force",
-        "heatNote": "Colour behind the bars is the forecast heat of each hour."
+        "aria": "{crew} को योजना, {from} देखि {to} सम्म, दिनको गर्मीको तुलनामा। हरेक ब्लक चार्टको तल सूचीबद्ध छ।",
+        "slot": "दिउँसोको विश्राम",
+        "outline": "कानुनअनुसार दिउँसोको विश्राम: {date} सम्म लागू छैन",
+        "outlineUnknown": "कानुनअनुसार दिउँसोको विश्राम: लागू छैन",
+        "heatNote": "पट्टीहरूको पछाडिको रङ हरेक घण्टाको अनुमानित गर्मी हो।"
       },
       "legend": {
-        "work": "Work",
-        "rest": "Rest in shade",
-        "art18": "Art. 18 break",
-        "ban": "Midday break",
-        "stopped": "Stop work",
-        "now": "Now"
+        "work": "काम",
+        "rest": "छायाँमा आराम",
+        "art18": "धारा 18 को विश्राम",
+        "ban": "दिउँसोको विश्राम",
+        "stopped": "काम रोक्नुहोस्",
+        "now": "अहिले"
       },
       "state": {
-        "work": "Work",
-        "adoshRest": "Rest in shade",
-        "art18Break": "Art. 18 break",
-        "ban": "Midday break",
-        "stopped": "Stop work",
-        "off": "Off shift"
+        "work": "काम",
+        "adoshRest": "छायाँमा आराम",
+        "art18Break": "धारा 18 को विश्राम",
+        "ban": "दिउँसोको विश्राम",
+        "stopped": "काम रोक्नुहोस्",
+        "off": "सिफ्टबाहिर"
       },
       "blocks": {
-        "heading": "Every block, and why it is there",
-        "range": "<bdi>{from}</bdi> to <bdi>{to}</bdi>",
-        "now": "Now",
-        "rule": "Rule",
-        "noClause": "No clause text came with this block."
+        "heading": "हरेक ब्लक, र त्यो किन छ",
+        "range": "<bdi>{from}</bdi> देखि <bdi>{to}</bdi> सम्म",
+        "now": "अहिले",
+        "rule": "नियम",
+        "noClause": "यस ब्लकसँग कुनै धाराको पाठ आएको छैन।"
       },
       "zone": {
-        "medium": "Medium",
-        "high": "High",
-        "red": "Red"
+        "medium": "मध्यम",
+        "high": "उच्च",
+        "red": "रातो"
       },
       "signOff": {
-        "heading": "Sign off today's plan",
-        "intro": "Items in the Medium, High and Red plan zones need a tick each. Signing never delays an alert or a stop.",
-        "zoneNote": "A plan zone is set for each block from the plan's protective heat reading. The level shown above is the hourly warning, so the two can differ.",
-        "none": "No item on this plan needs a tick.",
-        "itemsOne": "1 item needs a tick: {list}.",
-        "items": "{count} items need a tick: {list}.",
-        "item": "Plan zone <bdi>{zone}</bdi>, <bdi>{from}</bdi> to <bdi>{to}</bdi>",
-        "itemText": "Plan zone {zone}, {from} to {to}",
-        "tickOne": "Tick 1 more item to sign",
-        "tickMany": "Tick {count} more items to sign",
-        "submit": "Sign off",
-        "sending": "Signing off",
-        "missing": "These items still need a tick: {list}.",
-        "failed": "Sign-off was not recorded. Try again. Alerts and Stop work do not wait for it.",
-        "offline": "No signal. Sign-off was not sent. Alerts and Stop work do not wait for it.",
-        "signed": "Signed <bdi>{time}</bdi> by the site supervisor. Crews see this plan.",
-        "signedNoTime": "Signed. Crews see this plan."
+        "heading": "आजको योजनामा हस्ताक्षर गर्नुहोस्",
+        "intro": "योजनाको मध्यम, उच्च र रातो क्षेत्रका हरेक विषयमा एक-एक टिक लगाउनुपर्छ। हस्ताक्षरले कुनै अलर्ट वा काम रोक्ने कुरामा ढिलाइ गर्दैन।",
+        "zoneNote": "हरेक ब्लकको योजना क्षेत्र योजनाको सुरक्षात्मक गर्मी रिडिङबाट तय हुन्छ। माथि देखाइएको स्तर घण्टाअनुसारको चेतावनी हो, त्यसैले दुवै फरक हुन सक्छन्।",
+        "none": "यस योजनाको कुनै विषयमा टिक लगाउनु पर्दैन।",
+        "itemsOne": "1 विषयमा टिक लगाउनुपर्छ: {list}।",
+        "items": "{count} विषयमा टिक लगाउनुपर्छ: {list}।",
+        "item": "योजना क्षेत्र <bdi>{zone}</bdi>, <bdi>{from}</bdi> देखि <bdi>{to}</bdi> सम्म",
+        "itemText": "योजना क्षेत्र {zone}, {from} देखि {to} सम्म",
+        "tickOne": "हस्ताक्षरका लागि थप 1 विषयमा टिक लगाउनुहोस्",
+        "tickMany": "हस्ताक्षरका लागि थप {count} विषयमा टिक लगाउनुहोस्",
+        "submit": "हस्ताक्षर गर्नुहोस्",
+        "sending": "हस्ताक्षर हुँदैछ",
+        "missing": "यी विषयमा अझै टिक लगाउनुपर्छ: {list}।",
+        "failed": "हस्ताक्षर दर्ता भएन। फेरि प्रयास गर्नुहोस्। अलर्ट र काम रोक्ने कुराले यसलाई पर्खँदैनन्।",
+        "offline": "सिग्नल छैन। हस्ताक्षर पठाइएन। अलर्ट र काम रोक्ने कुराले यसलाई पर्खँदैनन्।",
+        "signed": "साइट सुपरभाइजरले <bdi>{time}</bdi> मा हस्ताक्षर गरे। समूहहरूले यो योजना देख्छन्।",
+        "signedNoTime": "हस्ताक्षर भयो। समूहहरूले यो योजना देख्छन्।"
       },
-      "loading": "Loading the plan",
+      "loading": "योजना लोड हुँदैछ",
       "empty": {
-        "title": "No plan for this crew today",
-        "reason": "There are no shift hours to plan. Alerts and Stop work are not affected.",
-        "primary": "All crews"
+        "title": "आज यस समूहको कुनै योजना छैन",
+        "reason": "योजना बनाउन कुनै सिफ्टका घण्टा छैनन्। अलर्ट र काम रोक्ने कुरामा यसको असर पर्दैन।",
+        "primary": "सबै समूह"
       },
       "error": {
-        "title": "The plan did not load",
-        "detail": "Crews see the rule plan meanwhile. Alerts and Stop work are not affected."
+        "title": "योजना लोड भएन",
+        "detail": "त्यतिन्जेल समूहहरूले नियममा आधारित योजना देख्छन्। अलर्ट र काम रोक्ने कुरामा यसको असर पर्दैन।"
       },
       "refreshFailed": {
-        "title": "This plan could not be refreshed.",
-        "body": "Showing the last plan this phone read. It may be out of date. Sign-off is off until the plan loads.",
-        "retry": "Try again"
+        "title": "यो योजना ताजा गर्न सकिएन।",
+        "body": "यो फोनले पढेको पछिल्लो योजना देखाइँदै छ। यो पुरानो हुन सक्छ। योजना लोड नभएसम्म हस्ताक्षर बन्द छ।",
+        "retry": "फेरि प्रयास गर्नुहोस्"
       },
       "invalid": {
-        "title": "This plan failed the rule check and is not shown.",
-        "detail": "Crews see the site-rules fallback, never less protective than the midday ban. Sign-off is off until a plan passes."
+        "title": "यो योजना नियम जाँचमा असफल भयो र देखाइएको छैन।",
+        "detail": "समूहहरूले साइटका नियमको विकल्प देख्छन्, जुन दिउँसोको निषेधभन्दा कहिल्यै कम सुरक्षात्मक हुँदैन। कुनै योजनाले जाँच पास नगरेसम्म हस्ताक्षर बन्द छ।"
       },
       "notLegal": {
-        "title": "This shift is not legal as planned",
-        "detail": "The crew's published shift breaks a shift rule by itself, so no plan can be made until the shift is fixed. Alerts and Stop work are not affected.",
-        "rules": "Rules the shift breaks"
+        "title": "यो सिफ्ट जसरी योजना बनाइएको छ त्यसरी कानुनसम्मत छैन",
+        "detail": "समूहको प्रकाशित सिफ्टले आफैँमा सिफ्टको कुनै नियम तोड्छ, त्यसैले सिफ्ट ठीक नभएसम्म कुनै योजना बनाउन सकिँदैन। अलर्ट र काम रोक्ने कुरामा यसको असर पर्दैन।",
+        "rules": "सिफ्टले तोडेका नियमहरू"
       },
       "notFound": {
-        "title": "This crew was not found",
-        "reason": "No crew with this link is at this site.",
-        "primary": "All crews"
+        "title": "यो समूह भेटिएन",
+        "reason": "यस साइटमा यो लिंकको कुनै समूह छैन।",
+        "primary": "सबै समूह"
       }
     },
     "stop": {
-      "region": "Stop work",
-      "button": "Stop work, <bdi>{crew}</bdi>",
-      "sending": "Sending the stop",
-      "recorded": "<bdi>{crew}</bdi> stopped <bdi>{time}</bdi>. Stop recorded. Crews are notified within about six minutes. Tell the crew now.",
-      "undo": "Undo ({seconds} s)",
-      "undoFailed": "Undo was not sent. Try again, or use Resume work.",
-      "stoppedBar": "Work stopped <bdi>{time}</bdi>",
-      "stoppedDetail": "<bdi>{crew}</bdi>. Stop recorded. Crews are notified within about six minutes. Tell the crew now.",
-      "stoppedDetailLate": "<bdi>{crew}</bdi>. Tell the crew now.",
-      "resume": "Resume work",
-      "resumeTitle": "Resume work for <bdi>{crew}</bdi>?",
-      "resumeBody": "This ends the stop recorded at <bdi>{time}</bdi>.",
-      "resumeConfirm": "Resume work",
-      "resumeCancel": "Keep work stopped",
-      "resumeFailed": "Resume was not sent. Try again.",
-      "noActiveStop": "No active stop found for this crew (already resumed, or the demo was reset).",
-      "queued": "Not sent: no signal. Tell the crew now.",
-      "queuedDetail": "The stop for <bdi>{crew}</bdi> is kept on this phone and sent when it is back online.",
-      "failed": "Not sent. Tell the crew now.",
-      "failedDetail": "Press Stop work to try again.",
-      "expired": "Stop for <bdi>{crew}</bdi> was not sent. It waited 60 minutes without a connection and has expired. Tell the crew now, by voice or radio, and press Stop again when you are online.",
-      "noCrew": "The crew list did not load. Tell the crew to stop work now.",
-      "noCrews": "There are no crews at this site to stop."
+      "region": "काम रोक्नुहोस्",
+      "button": "काम रोक्नुहोस्, <bdi>{crew}</bdi>",
+      "sending": "आदेश पठाइँदै छ",
+      "recorded": "<bdi>{crew}</bdi> ले <bdi>{time}</bdi> मा काम रोक्यो। आदेश दर्ता भयो। समूहहरूलाई करिब छ मिनेटभित्र जानकारी दिइन्छ। समूहलाई अहिले भन्नुहोस्।",
+      "undo": "फिर्ता लिनुहोस् ({seconds} सेकेन्ड)",
+      "undoFailed": "फिर्ता लिने आदेश पठाइएन। फेरि प्रयास गर्नुहोस्, वा «काम फेरि सुरु गर्नुहोस्» प्रयोग गर्नुहोस्।",
+      "stoppedBar": "काम <bdi>{time}</bdi> मा रोकियो",
+      "stoppedDetail": "<bdi>{crew}</bdi>। आदेश दर्ता भयो। समूहहरूलाई करिब छ मिनेटभित्र जानकारी दिइन्छ। समूहलाई अहिले भन्नुहोस्।",
+      "stoppedDetailLate": "<bdi>{crew}</bdi>। समूहलाई अहिले भन्नुहोस्।",
+      "resume": "काम फेरि सुरु गर्नुहोस्",
+      "resumeTitle": "<bdi>{crew}</bdi> को काम फेरि सुरु गर्ने?",
+      "resumeBody": "यसले <bdi>{time}</bdi> मा दर्ता गरिएको आदेश अन्त्य गर्छ।",
+      "resumeConfirm": "काम फेरि सुरु गर्नुहोस्",
+      "resumeCancel": "काम रोकिएकै राख्नुहोस्",
+      "resumeFailed": "फेरि सुरु गर्ने आदेश पठाइएन। फेरि प्रयास गर्नुहोस्।",
+      "noActiveStop": "यस समूहको कुनै चालु आदेश भेटिएन (काम पहिल्यै सुरु भइसकेको छ, वा डेमो रिसेट भएको छ)।",
+      "queued": "पठाइएन: सिग्नल छैन। समूहलाई अहिले भन्नुहोस्।",
+      "queuedDetail": "<bdi>{crew}</bdi> को आदेश यो फोनमा राखिएको छ र अनलाइन हुँदा पठाइनेछ।",
+      "failed": "पठाइएन। समूहलाई अहिले भन्नुहोस्।",
+      "failedDetail": "फेरि प्रयास गर्न «काम रोक्नुहोस्» थिच्नुहोस्।",
+      "expiredClock": "<bdi>{crew}</bdi> को आदेश पठाइएन। थिच्दा यो फोनको समय गलत देखिएको थियो, त्यसैले यसलाई राखिएन। समूहलाई अहिले भन्नुहोस्, आवाजले वा रेडियोले, र अनलाइन हुँदा «काम रोक्नुहोस्» फेरि थिच्नुहोस्।",
+      "expired": "<bdi>{crew}</bdi> को आदेश पठाइएन। यसले जडानबिना 60 मिनेट पर्खियो र म्याद सकियो। समूहलाई अहिले भन्नुहोस्, आवाजले वा रेडियोले, र अनलाइन हुँदा «काम रोक्नुहोस्» फेरि थिच्नुहोस्।",
+      "noCrew": "समूहको सूची लोड भएन। समूहलाई अहिले काम रोक्न भन्नुहोस्।",
+      "noCrews": "यस साइटमा रोक्नका लागि कुनै समूह छैन।"
     }
   },
   "hse": {
@@ -685,6 +685,7 @@
   "states": {
     "retry": "फेरि प्रयास गर्नुहोस्",
     "loading": "लोड हुँदैछ",
+    "waking": "सेवा सुचारु गरिँदैछ। केही समय प्रयोग नभएपछि पहिलो पटक लोड हुन बढी समय लाग्न सक्छ।",
     "noData": "कुनै डाटा छैन",
     "offline": "तपाईं अफलाइन हुनुहुन्छ",
     "error": {
@@ -699,24 +700,24 @@
       "detail": "यो जानकारी पुरानो हुन सक्छ। अनलाइन फर्कँदा स्तर नयाँ हुन्छन्।"
     },
     "staleBanner": {
-      "title": "Last known level",
-      "body": "Updated <bdi>{time}</bdi>, <bdi>{age}</bdi> ago. This may be out of date."
+      "title": "पछिल्लो थाहा भएको स्तर",
+      "body": "<bdi>{time}</bdi> मा अद्यावधिक भयो, <bdi>{age}</bdi> अघि। यो पुरानो हुन सक्छ।"
     },
     "offlineBanner": {
-      "title": "You are offline",
-      "body": "Showing what this phone saved.",
-      "lastKnown": "Updated <bdi>{time}</bdi>, <bdi>{age}</bdi> ago."
+      "title": "तपाईं अफलाइन हुनुहुन्छ",
+      "body": "यो फोनले सुरक्षित गरेको कुरा देखाइँदै छ।",
+      "lastKnown": "<bdi>{time}</bdi> मा अद्यावधिक भयो, <bdi>{age}</bdi> अघि।"
     },
-    "pendingBanner": "{what} is not scored yet. The numbers appear here when it is.",
-    "missingProvenance": "{what} is not shown because its source is missing.",
-    "requestIdLabel": "Request ID",
+    "pendingBanner": "{what} को स्कोर अझै भएको छैन। भएपछि संख्याहरू यहाँ देखिनेछन्।",
+    "missingProvenance": "{what} देखाइएको छैन किनकि यसको स्रोत छैन।",
+    "requestIdLabel": "अनुरोधको पहिचान",
     "stamp": {
-      "replay": "Replay",
-      "recorded": "Recorded",
-      "simulated": "Simulated",
-      "designed": "Designed",
+      "replay": "रिप्ले",
+      "recorded": "रेकर्ड गरिएको",
+      "simulated": "अनुकरण गरिएको",
+      "designed": "डिजाइन गरिएको",
       "dev2025": "DEV 2025",
-      "notClinicallyReviewed": "Not clinically reviewed"
+      "notClinicallyReviewed": "चिकित्सकीय समीक्षा भएको छैन"
     },
     "proof": {
       "chip": "Proof",
@@ -775,12 +776,12 @@
     },
     "cellLabel": "{time}, {name}, स्तर {index}",
     "banActive": "काम निषेधको समय",
-    "siteRules": "Site rules",
+    "siteRules": "साइटका नियम",
     "scale": {
-      "live": "Level {index} of 4, {name}",
-      "stale": "Last known level {index} of 4, {name}",
-      "fallback": "Fallback level {index} of 4, {name}",
-      "none": "No level, the site rules apply"
+      "live": "स्तर {index}, जम्मा 4 मध्ये, {name}",
+      "stale": "पछिल्लो थाहा भएको स्तर {index}, जम्मा 4 मध्ये, {name}",
+      "fallback": "विकल्प स्तर {index}, जम्मा 4 मध्ये, {name}",
+      "none": "कुनै स्तर छैन, साइटका नियम लागू हुन्छन्"
     }
   },
   "actions": {
@@ -794,7 +795,7 @@
   },
   "judge": {
     "island": {
-      "loadFailed": "Could not load. Try again."
+      "loadFailed": "लोड गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "scoreboard": {
       "title": "Summer 2026, replayed honestly",
@@ -856,6 +857,7 @@
         "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
         "defs": "A danger hour is an hour the station was in the ADOSH High or Red zone. Stellar Blaze warns when its corrected forecast puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; both thresholds are shown.",
         "caption": "Four ways to warn a crew, scored on the season",
+        "miniCaption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
         "columns": {
           "policy": "Policy",
           "missed": "Danger hours nobody was warned about",
@@ -1181,19 +1183,19 @@
       "loading": "Loading the checker"
     },
     "story": {
-      "label": "Story",
-      "chapter": "Step {n} of {total}: {label}",
-      "back": "Back: {label}",
-      "next": "Next: {label}",
-      "copy": "Copy link to this step",
-      "copied": "Link copied",
-      "copyFailed": "Could not copy the link",
+      "label": "कथा",
+      "chapter": "चरण {n}, जम्मा {total} मध्ये: {label}",
+      "back": "पछाडि: {label}",
+      "next": "अगाडि: {label}",
+      "copy": "यो चरणको लिंक कपी गर्नुहोस्",
+      "copied": "लिंक कपी भयो",
+      "copyFailed": "लिंक कपी गर्न सकिएन",
       "steps": {
-        "problem": "The problem",
-        "scoreboard": "Scoreboard",
-        "day": "One day",
-        "proof": "Proof",
-        "product": "The product"
+        "problem": "समस्या",
+        "scoreboard": "स्कोरबोर्ड",
+        "day": "एक दिन",
+        "proof": "प्रमाण",
+        "product": "उत्पादन"
       }
     },
     "proof": {
@@ -1332,85 +1334,84 @@
       }
     },
     "landing": {
-      "metaTitle": "Heat that stops work, forecast about 24 hours ahead",
-      "skip": "Skip to the scoreboard",
-      "kicker": "Summer 2026, replayed against airport thermometers",
-      "title": "Heat that stops work, forecast about 24 hours ahead.",
-      "lede": "Hour-by-hour heat levels, legal shift plans and warnings in six languages, for the crews on a worksite, shift by shift.",
-      "primary": "See the scoreboard",
-      "secondary": "Walk me through it",
+      "metaTitle": "काम रोक्ने गर्मी, करिब 24 घण्टा अगाडिको पूर्वानुमान",
+      "skip": "स्कोरबोर्डमा जानुहोस्",
+      "kicker": "गर्मी 2026, विमानस्थलका थर्मोमिटरहरूको तुलनामा फेरि चलाइएको",
+      "title": "काम रोक्ने गर्मी, करिब 24 घण्टा अगाडिको पूर्वानुमान।",
+      "lede": "घण्टै पिच्छे गर्मीको स्तर, कानुनी सिफ्ट योजना र छ भाषामा चेतावनी, कार्यस्थलका समूहहरूका लागि, सिफ्ट पिच्छे।",
+      "primary": "स्कोरबोर्ड हेर्नुहोस्",
+      "secondary": "मलाई घुमाएर देखाउनुहोस्",
       "apps": {
-        "heading": "Open the apps",
-        "note": "Both run on synthetic data in this demo."
+        "heading": "एपहरू खोल्नुहोस्",
+        "note": "यस डेमोमा दुवै कृत्रिम डेटामा चल्छन्।"
       },
       "field": {
-        "region": "The forecast heat field over the UAE, {day}",
-        "readout": "Field reading at the selected hour",
-        "hottest": "Hottest grid cell at {hour}",
-        "where": "{lat} N {lon} E",
-        "station": "Abu Dhabi airport (OMAA), its own forecast series",
-        "limit": "Heavy-work limit (NIOSH)",
-        "cells": "Grid cells above the limit",
-        "cellsOf": "{n} of {total}",
+        "region": "संयुक्त अरब इमिरेट्समाथि अनुमानित गर्मीको क्षेत्र, {day}",
+        "readout": "चुनिएको घण्टामा क्षेत्रको रिडिङ",
+        "hottest": "{hour} मा सबैभन्दा तातो ग्रिड सेल",
+        "where": "{lat} उत्तर {lon} पूर्व",
+        "station": "अबु धाबी विमानस्थल (OMAA), यसको आफ्नै पूर्वानुमान शृङ्खला",
+        "limit": "भारी कामको सीमा (NIOSH)",
+        "cells": "सीमाभन्दा माथिका ग्रिड सेल",
+        "cellsOf": "{total} मध्ये {n}",
         "degrees": "°C",
-        "sourcePeak": "WBGT in the sun from the ECMWF forecast issued the day before, as recorded, before any correction. {day} has the highest daily peak of the summer's raw forecast and is shown for illustration, not as the day we scored.",
-        "sourcePlain": "WBGT in the sun from the ECMWF forecast issued the day before, as recorded, before any correction. {day} is shown for illustration, not as the day we scored.",
-        "proofWhat": "The forecast heat field, {day}, every hour",
+        "sourcePeak": "घाममा WBGT, ECMWF को अघिल्लो दिन जारी पूर्वानुमानबाट, जसरी रेकर्ड भयो, कुनै सुधारअघि। {day} मा गर्मीको काँचो पूर्वानुमानको दैनिक सबैभन्दा उच्च चुचुरो छ र यो उदाहरणका लागि देखाइएको हो, हामीले मूल्यांकन गरेको दिनका रूपमा होइन।",
+        "sourcePlain": "घाममा WBGT, ECMWF को अघिल्लो दिन जारी पूर्वानुमानबाट, जसरी रेकर्ड भयो, कुनै सुधारअघि। {day} उदाहरणका लागि देखाइएको हो, हामीले मूल्यांकन गरेको दिनका रूपमा होइन।",
+        "proofWhat": "अनुमानित गर्मीको क्षेत्र, {day}, हरेक घण्टा",
         "stations": {
-          "OMAA": "Abu Dhabi",
-          "OMDB": "Dubai",
-          "OMAL": "Al Ain",
-          "OMFJ": "Fujairah"
+          "OMAA": "अबु धाबी",
+          "OMDB": "दुबई",
+          "OMAL": "अल ऐन",
+          "OMFJ": "फुजैरा"
         },
         "scrubber": {
-          "label": "Hour of the day, {day}",
-          "valueText": "{hour}: hottest grid cell {hottest} degrees, Abu Dhabi airport {station}",
-          "play": "Play the day",
-          "pause": "Pause the day",
-          "when": "{day}, Gulf time"
+          "label": "दिनको घण्टा, {day}",
+          "valueText": "{hour}: सबैभन्दा तातो ग्रिड सेल {hottest} डिग्री, अबु धाबी विमानस्थल {station}",
+          "play": "दिन चलाउनुहोस्",
+          "pause": "दिन रोक्नुहोस्",
+          "when": "{day}, खाडीको समयमा"
         },
-        "loading": "Loading the forecast field",
+        "loading": "पूर्वानुमानको क्षेत्र लोड हुँदैछ",
         "error": {
-          "title": "The forecast files did not load",
-          "reason": "The scoreboard and the proof pages still work. Reload to try the field again.",
-          "primary": "See the scoreboard"
+          "title": "पूर्वानुमानका फाइल लोड भएनन्",
+          "reason": "स्कोरबोर्ड र प्रमाणका पेज अझै चल्छन्। क्षेत्र फेरि हेर्न रिलोड गर्नुहोस्।",
+          "primary": "स्कोरबोर्ड हेर्नुहोस्"
         }
       },
       "hook": {
-        "heading": "The season on the station's own record",
-        "label": "danger hours at Abu Dhabi airport, summer 2026",
-        "interval": "{lo} to {hi}, 95% interval",
-        "definition": "A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}. Whether an hour was a danger hour is derived from the station's recorded observations; the thermal margin of {margin} W/m² is an assumption."
+        "heading": "स्टेशनको आफ्नै रेकर्डमा यो मौसम",
+        "label": "अबु धाबी विमानस्थलमा खतराका घण्टा, गर्मी 2026",
+        "interval": "{lo} देखि {hi}, 95% अन्तराल",
+        "definition": "खतराको घण्टा भनेको कामको दिनको समय, {hours}, भित्र ADOSH को उच्च वा रातो क्षेत्रमा परेको घण्टा हो। कुनै घण्टा खतराको घण्टा थियो कि थिएन भन्ने कुरा अवलोकनबाट निस्केको सत्यले तय गर्छ; {margin} W/m² को तापीय मार्जिन एउटा अनुमान हो।"
       },
       "problem": {
-        "eyebrow": "The problem",
-        "heading": "The midday break covers only part of the hot hours",
-        "body1": "From {from} to {to} the law stops outdoor work from {start} to {end}. The recorded raw forecast puts working hours above the heavy-work limit outside that window too.",
-        "body2": "A crew needs to know which hours, not which months. That is the forecast we give them about 24 hours ahead.",
-        "ofHours": "of {total} working hours",
-        "calendarAria": "Every working hour, {start} to {end}, of {days} days from {from} to {to}, from the recorded raw forecast before correction. {over} of {n} hours are above the {limit} °C heavy-work limit; the midday break is cut in below the line for the days it is in force.",
-        "legendSlot": "Midday break, by law",
-        "legendHot": "Coloured: above {limit} °C, brighter is hotter",
-        "legendCool": "Grey: not above the limit",
-        "tableToggle": "Show the counts as a table",
-        "tableCaption": "Recorded raw forecast working hours above the limit, by month",
+        "eyebrow": "समस्या",
+        "heading": "दिउँसोको विश्रामले तातो घण्टाहरूको केही भाग मात्र ढाक्छ",
+        "body1": "{from} देखि {to} सम्म कानुनले {start} देखि {end} सम्म खुला ठाउँमा काम रोक्छ। रेकर्ड गरिएको काँचो पूर्वानुमानअनुसार त्यो अवधिबाहिर पनि कामका केही घण्टा भारी कामको सीमाभन्दा माथि छन्।",
+        "body2": "समूहलाई कुन घण्टा भन्ने जान्नुपर्छ, कुन महिना होइन। करिब 24 घण्टा अगाडि हामी उनीहरूलाई यही पूर्वानुमान दिन्छौं।",
+        "ofHours": "जम्मा {total} कामका घण्टामध्ये",
+        "calendarAria": "कामको हरेक घण्टा, {start} देखि {end} सम्म, {from} देखि {to} सम्मका {days} दिनको, सुधारअघि रेकर्ड गरिएको काँचो पूर्वानुमानबाट। {n} मध्ये {over} घण्टा {limit} °C को भारी कामको सीमाभन्दा माथि छन्; दिउँसोको विश्राम लागू हुने दिनमा त्यो रेखामुनि काटेर देखाइएको छ।",
+        "legendSlot": "दिउँसोको विश्राम, कानुनअनुसार",
+        "legendHot": "रङ्गीन: {limit} °C भन्दा माथि, जति चम्किलो उति तातो",
+        "legendCool": "खैरो: सीमाभन्दा माथि छैन",
+        "tableToggle": "गणनालाई तालिकामा देखाउनुहोस्",
+        "tableCaption": "सीमाभन्दा माथिका कामका घण्टा, रेकर्ड गरिएको काँचो पूर्वानुमान, महिना अनुसार",
         "columns": {
-          "period": "Days",
-          "hours": "Working hours",
-          "over": "Above the limit",
-          "inBreak": "Inside the midday break"
+          "period": "दिन",
+          "hours": "कामका घण्टा",
+          "over": "सीमाभन्दा माथि",
+          "inBreak": "दिउँसोको विश्रामभित्र"
         },
-        "period": "{from} to {to}",
-        "bridge": "These {over} hours and the {danger} danger hours at the top of this page count different things against different limits: here the recorded raw forecast against the {limit} °C heavy-work limit, there the station's observed heat against the ADOSH High or Red zone."
+        "period": "{from} देखि {to} सम्म",
+        "bridge": "यी {over} घण्टा र यो पेजको माथिका {danger} खतराका घण्टाले फरक सीमाको तुलनामा फरक कुरा गन्छन्: यहाँ रेकर्ड गरिएको काँचो पूर्वानुमान {limit} °C को भारी कामको सीमाको तुलनामा छ, त्यहाँ स्टेशनले देखेको गर्मी ADOSH को उच्च वा रातो क्षेत्रको तुलनामा छ।"
       },
       "season": {
-        "eyebrow": "The scoreboard",
-        "heading": "Four ways to warn a crew, judged on one summer",
-        "body": "Each way to warn gets only the forecast it would have had about 24 hours ahead. The station's thermometers then say what happened.",
-        "caption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
-        "open": "Open the scoreboard"
+        "eyebrow": "स्कोरबोर्ड",
+        "heading": "समूहलाई सचेत गराउने चार तरिका, एउटै गर्मीमा परीक्षण गरिएको",
+        "body": "सचेत गराउने हरेक तरिकाले करिब 24 घण्टा अगाडि पाउने पूर्वानुमान मात्र पाउँछ। त्यसपछि स्टेशनका थर्मोमिटरले के भयो भनेर बताउँछन्।",
+        "open": "स्कोरबोर्ड खोल्नुहोस्"
       },
-      "ledeProof": "Every figure about the season and the scores comes from a recorded file, and its proof chip says which."
+      "ledeProof": "मौसम र स्कोरबारे हरेक संख्या रेकर्ड गरिएको फाइलबाट आउँछ, र त्यसको प्रमाण चिह्नले कुन हो भनेर बताउँछ।"
     }
   }
 }

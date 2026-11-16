@@ -49,6 +49,13 @@ export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreF
   // recorded run stays in view. It shows only while the browser stays offline.
   const offline = useOffline();
   const [offlineTapped, setOfflineTapped] = useState(false);
+  // The notice belongs to the tap that made it: when the network comes back it is forgotten, so going offline again later shows
+  // nothing until the next send (state adjusted while rendering, React's pattern for "reset on a change").
+  const [wasOffline, setWasOffline] = useState(offline);
+  if (offline !== wasOffline) {
+    setWasOffline(offline);
+    if (!offline) setOfflineTapped(false);
+  }
   // Set when a call REACHED the service (a refusal, or a 2xx that should not happen), so the button reads "Send again" only
   // then: after a 401, a 429 or a network failure nothing was sent, and it keeps its label while a call runs.
   const [sentOnce, setSentOnce] = useState(false);
@@ -134,7 +141,7 @@ export function GovernanceView({ recorded, initialActions = NO_ACTIONS, restoreF
       logFetching={log.isFetching}
       sentBefore={sentOnce}
       onSend={onSend}
-      notice={<CallNotice outcome={run.outcome} notReady={notReady} offline={offlineTapped && offline} logFailed={log.isError && run.runLive} />}
+      notice={<CallNotice outcome={run.outcome} notReady={notReady} offline={offlineTapped} logFailed={log.isError && run.runLive} />}
       modeSwitch={<DemoSwitch />}
       reset={<ResetDemoControl siteId={siteId} autoStart={initialActions.includes("reset")} siteFailed={siteStatus === "error"} notReady={t("notReady")} />}
     />

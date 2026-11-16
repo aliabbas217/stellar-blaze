@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useId, useMemo } from "react";
 import { COMMUTES, FrontierChart, type Commute } from "@/components/charts/FrontierChart";
 import { Counter } from "@/components/provenance/Counter";
@@ -10,6 +10,7 @@ import { FRONTIER_LEGAL_ID, frontierBestId, frontierClaims, type FrontierSource 
 import { FrontierHeading } from "./FrontierHeading";
 import { DEFAULT_COMMUTE, frontierNoGainNote, frontierStatement } from "./frontier-statement";
 import type { RosterFrontier } from "./roster-frontier";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The roster frontier with its commute slider. The commute is the `commute` query parameter, so a link reproduces the
@@ -37,7 +38,7 @@ export interface FrontierPanelProps {
 /** The text and numbers of a frontier at one commute; shared by the live panel and its server-rendered fallback. */
 export function useFrontierText(data: RosterFrontier) {
   const t = useTranslations("judge.frontier");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const format = useMemo(() => makeFormat(locale), [locale]);
   const hours = useMemo(() => new Intl.NumberFormat(`${locale}-u-nu-latn`, { maximumFractionDigits: 2 }), [locale]);
   const labels = (minutes: Commute) => ({

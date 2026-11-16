@@ -133,6 +133,7 @@ export function PlanBars({ bars = [], blocks = [], marks = [], heat, ban, fromHo
             const same = marks.filter((other) => other.fromMin === mark.fromMin && other.toMin === mark.toMin);
             const spread = (same.indexOf(mark) - (same.length - 1) / 2) * 28;
             return (
+            // fixed-height-ok: a numbered circle holding one Western digit (aria-hidden, the violation list below carries the words); the digit cannot grow in any script
             <span
               key={`${String(mark.n)}-${String(index)}`}
               data-violation-mark={mark.n}

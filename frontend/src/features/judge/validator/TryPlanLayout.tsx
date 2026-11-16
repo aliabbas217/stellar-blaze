@@ -7,6 +7,7 @@ import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
 import type { BanState } from "@/components/spine/ban-state";
 import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { Skeleton } from "@/components/states/Skeletons";
+import { WakingLine } from "@/components/states/WakingLine";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
 import { PlanStrip } from "./PlanStrip";
 import { RunsForm, type RunsFormHandlers } from "./RunsForm";
@@ -146,9 +147,13 @@ function Result(props: TryLayoutProps) {
       </h2>
 
       {phase === "loading" ? (
-        <div aria-busy="true">
-          <Skeleton height="var(--s-24)" />
-        </div>
+        <>
+          <div aria-busy="true">
+            <Skeleton height="var(--s-24)" />
+          </div>
+          {/* The check is a live call and can be waiting for a scaled-to-zero API. */}
+          <WakingLine />
+        </>
       ) : null}
 
       {(phase === "answer" || phase === "none") && answer !== null ? <AnswerBlock answer={answer} /> : null}

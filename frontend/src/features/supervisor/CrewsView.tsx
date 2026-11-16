@@ -4,17 +4,19 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, type ReactNode } from "react";
 import { ModeStampRow, ModeStampSkeleton } from "@/components/provenance/ModeStamp";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
 import { ResetDemoControl } from "@/components/shell/ResetDemoControl";
 import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
 import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { Skeleton } from "@/components/states/Skeletons";
+import { WakingLine } from "@/components/states/WakingLine";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import { DEMO_CREW_ID, isDemoMode } from "@/features/demo/constants";
 import { CrewStrips } from "@/features/supervisor/CrewStrips";
 import { FocalSentence } from "@/features/supervisor/FocalSentence";
-import { StopWorkBar } from "@/features/supervisor/StopWorkBar";
+import { BAR_CLEARANCE, StopWorkBar } from "@/features/supervisor/StopWorkBar";
 import { useCrewsModel, type CrewsModel } from "@/features/supervisor/useCrewsModel";
 import { useStopWork, type ServerStop } from "@/features/supervisor/useStopWork";
 
@@ -33,14 +35,18 @@ const bdi = (chunks: ReactNode): ReactNode => <bdi>{chunks}</bdi>;
 export function CrewsSkeleton() {
   const t = useTranslations("states");
   return (
-    <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
-      {isDemoMode() ? <ModeStampSkeleton /> : null}
-      <Skeleton height="calc(var(--s-6) + var(--s-2) + var(--t-22) * var(--sign-leading-text, 1.5) * 3)" />
-      {Array.from({ length: 4 }, (_, index) => (
-        <Skeleton key={index} height="7rem" />
-      ))}
-      <span className="sr-only">{t("loading")}</span>
-    </div>
+    <>
+      <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
+        {isDemoMode() ? <ModeStampSkeleton /> : null}
+        <Skeleton height="calc(var(--s-6) + var(--s-2) + var(--t-22) * var(--sign-leading-text, 1.5) * 3)" />
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} height="7rem" />
+        ))}
+        <span className="sr-only">{t("loading")}</span>
+      </div>
+      {/* Outside the busy region (a change inside it is not announced). The crews read can be waiting for a scaled-to-zero API. */}
+      <WakingLine className="px-4 pt-3" />
+    </>
   );
 }
 
@@ -153,7 +159,7 @@ export function CrewsView() {
   }
 
   return (
-    <div className="flex flex-1 flex-col pb-60">
+    <div className={`flex flex-1 flex-col ${BAR_CLEARANCE}`}>
       {demo ? <SyntheticDemoBanner siteName={siteName} /> : null}
       {content}
       {demo && siteId !== null ? (
@@ -161,6 +167,8 @@ export function CrewsView() {
           <ResetDemoControl siteId={siteId} />
         </div>
       ) : null}
+      {/* The foot of the screen, above the room kept for the Stop bar: the one quiet line of a machine-translated catalogue (architect ruling 2026-11-15). */}
+      <MachineTranslationNotice className="px-4 pt-6" />
       <StopWorkBar
         crewName={entry?.crew.name ?? null}
         work={work.crewId === null ? null : work}

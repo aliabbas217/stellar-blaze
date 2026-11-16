@@ -3,6 +3,7 @@ import { Serwist, type PrecacheEntry, type SerwistGlobalConfig } from "serwist";
 import { ALERT_QUERY_PARAMS, offlineFallbacks } from "@/features/pwa/fallback";
 import { readLocalePref } from "@/features/pwa/prefs";
 import { runtimeCachingWith } from "@/features/pwa/runtime-caching";
+import { listenWithoutWorkerScripts } from "@/features/pwa/worker-scripts";
 import { openNotificationTarget, readPushData, showPushNotification } from "@/features/push/sw-handlers";
 
 /*
@@ -37,7 +38,9 @@ const serwist = new Serwist({
   fallbacks: { entries: offlineFallbacks() },
 });
 
-serwist.addEventListeners();
+// Serwist's listeners, with the guard in front of them that leaves worker scripts to the network (worker-scripts.ts: a worker
+// served from a cache loses the `#params=` bootstrap config in its URL).
+listenWithoutWorkerScripts(serwist, self);
 
 /*
  * Web Push (docs/contracts/web-push.md). The logic is in src/features/push/sw-handlers.ts, where it is unit tested; this

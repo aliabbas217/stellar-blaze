@@ -86,10 +86,10 @@ const root = path.resolve(import.meta.dirname, "..");
 export const MESSAGES_DIR = path.join(root, "messages");
 export const SW_STRINGS_FILE = path.join(root, "src", "features", "push", "sw-strings.ts");
 
-/** Reads every messages/<locale>.json. */
+/** Reads every messages/<locale>.json. Only locale files (two letters): messages/review-manifest.json sits in the same folder and is not one. */
 export function readAllMessages(dir: string = MESSAGES_DIR): Record<string, unknown> {
   const byLocale: Record<string, unknown> = {};
-  for (const file of readdirSync(dir).filter((name) => name.endsWith(".json"))) {
+  for (const file of readdirSync(dir).filter((name) => /^[a-z]{2}\.json$/.test(name))) {
     byLocale[path.basename(file, ".json")] = JSON.parse(readFileSync(path.join(dir, file), "utf8"));
   }
   return byLocale;

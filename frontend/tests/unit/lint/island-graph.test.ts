@@ -133,7 +133,15 @@ describe("the first-load graph of the landing page", () => {
   });
 
   it("keeps the WebGL scene and its worker on the landing route: nothing outside the landing feature imports them, and inside it only FieldIsland does, dynamically", () => {
-    const importers = [...ALL].filter((file) => /FieldCanvasGL|terrain\.worker|terrain-math/.test(readFileSync(file, "utf8")) && !file.startsWith(LANDING_DIR) && !file.includes("tests"));
+    // An IMPORT (or a worker started by URL) of the scene, the worker or the terrain maths: a comment that names them (the
+    // service worker's worker-scripts.ts explains the terrain worker) is not a dependency on them.
+    const SCENE = /FieldCanvasGL|terrain\.worker|terrain-math/;
+    const importers = [...ALL].filter((file) => {
+      if (file.startsWith(LANDING_DIR) || file.includes("tests")) return false;
+      const source = readFileSync(file, "utf8");
+      const byUrl = [...source.matchAll(/new URL\(\s*["']([^"']+)["']/g)].map((m) => m[1] ?? "");
+      return [...valueImports(source), ...byUrl].some((spec) => SCENE.test(spec));
+    });
     expect(importers.map(rel)).toEqual([]);
     const gl = [...ALL].filter((file) => file.startsWith(LANDING_DIR) && /import\(\s*["']\.\/FieldCanvasGL["']\s*\)|from\s*["']\.\/FieldCanvasGL["']/.test(readFileSync(file, "utf8")));
     // FieldIsland imports it (dynamically) and FieldCanvas2D-free files only type-import it

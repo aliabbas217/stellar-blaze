@@ -7,7 +7,7 @@ import { MOCK_SCENARIO_HEADER } from "../../../src/api/mock-scenario.ts";
  * a real deployment never does. Every view's spec uses this one helper, so a scenario is named the same way everywhere.
  */
 
-export const SCENARIOS = ["error", "stale", "empty", "fallback", "suppressed", "offseason", "noshift", "shift-not-legal", "plan-invalid", "unavailable"] as const;
+export const SCENARIOS = ["error", "stale", "empty", "fallback", "suppressed", "offseason", "noshift", "shift-not-legal", "plan-invalid", "unavailable", "slow"] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
 /**

@@ -234,15 +234,94 @@ describe("test_steps_are_the_exact_adosh_text", () => {
     expect(text).not.toMatch(/sip|drink|litre|liter|ml\b|clothing off|remove .* clothes|stay with/i);
   });
 
-  it("every catalogue carries the three steps and the citation", () => {
+  it("English is the exact ADOSH text; the other five are machine drafts of it that keep the citation verbatim in English and say they are translated", () => {
     for (const locale of ["en", "ur", "hi", "bn", "ne", "ar"]) {
       const messages = JSON.parse(readFileSync(path.resolve(import.meta.dirname, `../../../../messages/${locale}.json`), "utf8")) as {
         worker: { unwell: { steps: Record<string, string> } };
       };
       const steps = messages.worker.unwell.steps;
-      expect([steps["one"], steps["two"], steps["three"]], locale).toEqual([...ADOSH_STEPS]);
-      expect(steps["source"], locale).toContain("Safety in the Heat v4.0, section 4.5(c)");
+      const written = [steps["one"], steps["two"], steps["three"]];
+      if (locale === "en") expect(written, locale).toEqual([...ADOSH_STEPS]);
+      else {
+        // Task 22 (native review pending, shown with the draft line and "Not clinically reviewed"): a translation, never the English left in place.
+        expect(written, locale).not.toEqual([...ADOSH_STEPS]);
+        for (const step of written) expect(step, locale).not.toBe("");
+        // The source line is not "Exact text of ..." over translated words: it names the English original and says this is a translation.
+        expect(steps["source"], locale).not.toMatch(/^Exact text/);
+      }
+      // The architect's citation, word for word, in every language (a reviewer or a worker's supervisor can look it up).
+      expect(steps["source"], locale).toContain("ADOSH-SF Technical Guideline, Safety in the Heat v4.0, section 4.5(c)");
     }
+  });
+});
+
+/*
+ * Task 22 fix round 1 (independent review, Important 2 and 3): the machine drafts of the three steps keep every concept of the
+ * English, so a shorter or softer draft cannot ship; the heading above them says "according to ADOSH", never "in ADOSH's words",
+ * because the steps under it are a translation (the line below them says so).
+ */
+const catalogue = (locale: string): { worker: { unwell: { steps: Record<string, string>; calls: { demo: Record<string, string> } } } } =>
+  JSON.parse(readFileSync(path.resolve(import.meta.dirname, `../../../../messages/${locale}.json`), "utf8")) as ReturnType<typeof catalogue>;
+
+/** Per language and step, one pattern per concept of the English step (call / contact / supervisor / notify; move / shade / cool; ...). */
+const STEP_CONCEPTS: Readonly<Record<string, readonly (readonly RegExp[])[]>> = {
+  ar: [
+    [/اتصل/u, /الاتصال/u, /الطوارئ/u, /المشرف/u, /أبلغ/u],
+    [/انقل/u, /المريض/u, /بارد/u, /مظلل/u],
+    [/بَرِّد/u, /بلّ/u, /بالماء/u, /رشّ/u, /الإسفنج/u, /يستحم/u, /تهوية/u],
+  ],
+  ur: [
+    [/کال/u, /رابطہ/u, /ایمرجنسی/u, /سپروائزر/u, /اطلاع/u],
+    [/لے جائیں/u, /بیمار/u, /ٹھنڈی/u, /سایہ دار/u],
+    [/ٹھنڈا/u, /بھگو/u, /پانی/u, /چھڑک/u, /سپنج/u, /نہلا/u, /پنکھا/u],
+  ],
+  hi: [
+    [/कॉल/u, /संपर्क/u, /आपातकालीन/u, /सुपरवाइज़र/u, /सूचित/u],
+    [/ले जाएँ/u, /बीमार/u, /ठंडी/u, /छायादार/u],
+    [/ठंडा/u, /भिगो/u, /पानी/u, /छिड़क/u, /स्पंज/u, /नहला/u, /पंखा/u],
+  ],
+  bn: [
+    [/কল/u, /যোগাযোগ/u, /জরুরি/u, /সুপারভাইজার/u, /জানান/u],
+    [/নিয়ে যান/u, /অসুস্থ/u, /ঠান্ডা/u, /ছায়া/u],
+    [/ঠান্ডা/u, /ভিজিয়ে/u, /পানি/u, /ছিটিয়ে/u, /স্পঞ্জ/u, /গোসল/u, /বাতাস/u],
+  ],
+  ne: [
+    [/कल/u, /सम्पर्क/u, /आपत्कालीन/u, /सुपरभाइजर/u, /जानकारी/u],
+    [/लैजानुहोस्/u, /बिरामी/u, /चिसो/u, /छायादार/u],
+    [/चिसो/u, /भिजाएर/u, /पानी/u, /छर्केर/u, /स्पन्ज/u, /नुहाएर/u, /हावा/u],
+  ],
+};
+
+/** The word each heading used to say for "words"; none may be in a non-English heading now. */
+const WORDS_WORD: Readonly<Record<string, RegExp>> = { ar: /بكلمات|كلمات/u, ur: /الفاظ|لفظ/u, hi: /शब्दों|शब्द/u, bn: /ভাষায়|শব্দ/u, ne: /शब्दमा|शब्द/u };
+
+/** What each language says for "would call" in the demo rows (a conditional: nothing is dialled in the demo). */
+const WOULD_CALL: Readonly<Record<string, RegExp>> = { ar: /كان .*سيتصل/u, ur: /ہو جاتی/u, hi: /हो जाती/u, bn: /দিত/u, ne: /थियो/u };
+
+describe("test_steps_keep_the_meaning_and_the_heading_says_according_to_adosh", () => {
+  it("every machine draft keeps every concept of its English step (step one keeps the emergency CONTACT number)", () => {
+    for (const [locale, steps] of Object.entries(STEP_CONCEPTS)) {
+      const written = catalogue(locale).worker.unwell.steps;
+      for (const [index, key] of ["one", "two", "three"].entries())
+        for (const concept of (steps[index] ?? [])) expect(written[key], `${locale}.${key} ${concept.source}`).toMatch(concept);
+    }
+  });
+
+  it("the English heading is exactly the architect's; no other language claims to give ADOSH's words", () => {
+    expect(catalogue("en").worker.unwell.steps["heading"]).toBe("Heat-stroke first aid, in ADOSH's words");
+    for (const [locale, wordsWord] of Object.entries(WORDS_WORD)) {
+      const heading = catalogue(locale).worker.unwell.steps["heading"] ?? "";
+      expect(heading, locale).not.toMatch(wordsWord);
+      expect(heading, locale).toContain("ADOSH");
+    }
+  });
+
+  it("the demo call rows are conditional in every language (nothing is dialled), never a future 'will call'", () => {
+    for (const [locale, would] of Object.entries(WOULD_CALL)) {
+      const demo = catalogue(locale).worker.unwell.calls.demo;
+      for (const key of ["emergency", "supervisor", "firstAider"]) expect(demo[key], `${locale}.${key}`).toMatch(would);
+    }
+    for (const key of ["emergency", "supervisor", "firstAider"]) expect(catalogue("ar").worker.unwell.calls.demo[key]).not.toContain("سيتصل هذا");
   });
 });
 

@@ -148,6 +148,28 @@ describe("Try a plan offline", () => {
     });
   });
 
+  it("test_try_offline_notice_does_not_come_back_without_a_press: offline, press, online, offline again: the banner is gone until the check is pressed again", async () => {
+    goOffline();
+    const user = userEvent.setup();
+    const { container } = renderTry();
+    await user.click(screen.getByRole("button", { name: "Check this plan" }));
+    await screen.findByText("You are offline");
+    goOnline();
+    await waitFor(() => {
+      expect(screen.queryByText("You are offline")).toBeNull();
+    });
+    // the network drops again: nothing was pressed, so nothing is said
+    goOffline();
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(screen.queryByText("You are offline")).toBeNull();
+    expect(container.querySelector("[data-try]")).toHaveAttribute("data-try", "idle");
+    // a press now says it, as the first time did
+    await user.click(screen.getByRole("button", { name: "Check this plan" }));
+    expect(await screen.findByText("You are offline")).toBeInTheDocument();
+  });
+
   it("online and still looking up the site, a check still waits (the offline state does not replace the wait)", async () => {
     // the lookup is slow but the network is up: "still loading" behaviour is the island's own, covered by validator.test.tsx; here only that
     // the offline notice is NOT shown while online
@@ -185,5 +207,24 @@ describe("Governance offline", () => {
     await waitFor(() => {
       expect(screen.queryByText("You are offline")).toBeNull();
     });
+  });
+
+  it("test_governance_offline_notice_does_not_come_back_without_a_press: offline, send, online, offline again: no banner until the next send", async () => {
+    goOffline();
+    const user = userEvent.setup();
+    renderGate();
+    await user.click(screen.getByRole("button", { name: "Send the employer's request" }));
+    await screen.findByText("You are offline");
+    goOnline();
+    await waitFor(() => {
+      expect(screen.queryByText("You are offline")).toBeNull();
+    });
+    goOffline();
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(screen.queryByText("You are offline")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Send the employer's request" }));
+    expect(await screen.findByText("You are offline")).toBeInTheDocument();
   });
 });

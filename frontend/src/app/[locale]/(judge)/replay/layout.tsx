@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { DeskShell } from "@/components/shell/DeskShell";
+import { ClaimsEnglish } from "@/i18n/claims-english";
 import { ClientMessages } from "@/i18n/ClientMessages";
 
 /*
@@ -8,6 +9,9 @@ import { ClientMessages } from "@/i18n/ClientMessages";
  * so the scoreboard, day and proof pages ship neither (Task 25 budget). The two pages that mutate (`try`, `governance`)
  * sit in the `(live)` sub-layout, which adds them. Judge code must not import worker, supervisor or HSE code: see the
  * isolation rule in eslint.config.mjs.
+ *
+ * The pages are the claims surfaces, English by design in every catalogue (F2 Task 22): their content is a `lang="en" dir="ltr"`
+ * block, the desk header above it keeps the active locale (src/i18n/claims-english.tsx).
  *
  * Typed with `children` only: no page exists under this segment yet, so `LayoutProps<"/[locale]/replay">` is not
  * generated; the view tasks add their pages and the menu links below start to resolve.
@@ -25,7 +29,9 @@ export default async function ReplayLayout({ children }: { children: ReactNode }
 
   return (
     <ClientMessages>
-      <DeskShell items={items}>{children}</DeskShell>
+      <DeskShell items={items}>
+        <ClaimsEnglish>{children}</ClaimsEnglish>
+      </DeskShell>
     </ClientMessages>
   );
 }

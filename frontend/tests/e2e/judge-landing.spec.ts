@@ -375,7 +375,7 @@ test("landing reduced motion: no autoplay on either path, the field rests on the
 
 /** Where the Abu Dhabi label sits across the hero, as a fraction of the page width (a station name is DOM text on either path; the hidden 2D layer under the scene has one too). */
 async function airportAt(page: Page, width: number): Promise<number> {
-  const box = await page.locator("[data-hero]").first().getByText("Abu Dhabi", { exact: true }).filter({ visible: true }).boundingBox();
+  const box = await page.locator('[data-hero] [data-station-label="OMAA"]').filter({ visible: true }).first().boundingBox();
   if (box === null) throw new Error("the Abu Dhabi label is not on the map");
   return (box.x + box.width / 2) / width;
 }
@@ -442,7 +442,9 @@ for (const [url, width, height] of [
         el.scrollIntoView({ block: "center" });
         const box = el.getBoundingClientRect();
         const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-        return top !== null && (el === top || el.contains(top) || top.contains(el)) ? "reachable" : `covered by ${top?.tagName ?? "nothing"} ${top?.className.toString().slice(0, 40) ?? ""}`;
+        // Strict: the element itself, or something inside it (the text of a link belongs to the same control). NOT `top.contains(el)`:
+        // an ancestor under the pointer is what a cover looks like, so it must not count as reachable.
+        return top !== null && (el === top || el.contains(top)) ? "reachable" : `covered by ${top?.tagName ?? "nothing"} ${top?.className.toString().slice(0, 40) ?? ""}`;
       };
       return {
         primary: covered(document.querySelector("[data-primary]")),
@@ -453,4 +455,59 @@ for (const [url, width, height] of [
     });
     expect(result).toEqual({ primary: "reachable", secondary: "reachable", proof: "reachable", scrubber: "reachable" });
   });
+}
+
+test("landing spine on a phone shows the ticks 00:00, 06:00, 12:00, 18:00, 00:00 and no others (the thinning is pinned)", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, PHONE, "/en?static");
+  await drawn(page);
+  const shown = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-spine-track] [data-tick]")].filter((el) => getComputedStyle(el).display !== "none").map((el) => el.textContent),
+  );
+  expect(shown).toEqual(["00:00", "06:00", "12:00", "18:00", "00:00"]);
+  // a wide screen keeps all nine
+  await page.setViewportSize(WIDE);
+  const wide = await page.evaluate(() => [...document.querySelectorAll("[data-spine-track] [data-tick]")].filter((el) => getComputedStyle(el).display !== "none").length);
+  expect(wide).toBe(9);
+});
+
+/**
+ * Arabic and Urdu readout (Task 22 review): the airport and limit cells read "30.7 °C" and "26.6 °C", the number first, as one
+ * left-to-right run. Without isolation the unit stood before the number ("C° 30.7"). Measured on the painted order (the left edge
+ * of the digits against the left edge of the unit), not on the text nodes alone.
+ */
+for (const locale of ["ur", "ar"] as const) {
+  for (const viewport of [WIDE, PHONE]) {
+    test(`landing readout in ${locale} at ${String(viewport.width)}: a value is followed by its unit, never "C°" before the number`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await open(page, viewport, `/${locale}?static`);
+      await drawn(page);
+      const result = await page.evaluate(() => {
+        const card = document.querySelector("[data-field-readout]") as HTMLElement;
+        const stray: string[] = [];
+        const walk = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n !== null; n = walk.nextNode()) if (/^C° ?\d/.test((n.textContent ?? "").trim())) stray.push((n.textContent ?? "").trim());
+        const order = [...card.querySelectorAll("dd bdi")].map((bdi) => {
+          // React renders "{value} {unit}" as three adjacent text nodes: the first is the number, the last the unit
+          const nodes: Text[] = [];
+          const nodeWalk = document.createTreeWalker(bdi, NodeFilter.SHOW_TEXT);
+          for (let n = nodeWalk.nextNode(); n !== null; n = nodeWalk.nextNode()) nodes.push(n as Text);
+          const leftOf = (node: Text | undefined): number => {
+            if (node === undefined) return Number.NaN;
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return range.getBoundingClientRect().left;
+          };
+          return { text: bdi.textContent, digitsLeft: leftOf(nodes[0]), unitLeft: leftOf(nodes.at(-1)) };
+        });
+        return { stray, order };
+      });
+      expect(result.stray, "no text node reads C° before a number").toEqual([]);
+      expect(result.order.length, "the airport and limit cells").toBe(2);
+      for (const cell of result.order) {
+        expect(cell.text).toMatch(/^\d+\.\d °C$/);
+        expect(cell.digitsLeft, `${cell.text}: the number is painted before (left of) its unit`).toBeLessThan(cell.unitLeft);
+      }
+    });
+  }
 }

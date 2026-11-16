@@ -1,4 +1,6 @@
 import {
+  consoleLineToRecord,
+  isHydrationText,
   isUrllessResourceLine,
   requestFailure,
   responseError,
@@ -58,5 +60,47 @@ describe("routePath", () => {
     expect(routePath("http://h/en/replay/day")).toBe("/replay/day");
     expect(routePath("http://h/replay/day?x=1")).toBe("/replay/day");
     expect(routePath("http://h/ur/replay/proof/forecast.hours_over_limit")).toBe("/replay/proof/forecast.hours_over_limit");
+  });
+});
+
+describe("isHydrationText", () => {
+  it.each([
+    "Minified React error #418; visit https://react.dev/errors/418?args[]=text for the full message",
+    "Minified React error #423",
+    "Minified React error #425",
+    "Minified React error #422",
+    "Hydration failed because the server rendered text didn't match the client.",
+    "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties.",
+    'Warning: Text content did not match. Server: "11:09" Client: "11:12"',
+  ])("is a hydration message: %s", (text) => {
+    expect(isHydrationText(text)).toBe(true);
+  });
+
+  it.each([
+    "Uncaught TypeError: x is not a function",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Minified React error #321; visit https://react.dev/errors/321",
+    "Download the React DevTools for a better development experience",
+  ])("is not: %s", (text) => {
+    expect(isHydrationText(text)).toBe(false);
+  });
+});
+
+describe("consoleLineToRecord", () => {
+  it("records an error that is not the URL-less resource line", () => {
+    expect(consoleLineToRecord("error", "boom", false)).toBe("boom");
+    expect(consoleLineToRecord("error", "Failed to load resource: 500", false)).toBeNull();
+  });
+
+  it("records a warning only when warnings are asked for, and marks it as one", () => {
+    expect(consoleLineToRecord("warning", "deprecated", false)).toBeNull();
+    expect(consoleLineToRecord("warning", "deprecated", true)).toBe("warning: deprecated");
+  });
+
+  it("records a hydration message of ANY type, whatever the options", () => {
+    for (const type of ["log", "info", "debug", "warning", "error"]) {
+      expect(consoleLineToRecord(type, "Hydration failed because", false), type).not.toBeNull();
+    }
+    expect(consoleLineToRecord("log", "plain log line", true)).toBeNull();
   });
 });

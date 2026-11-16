@@ -14,7 +14,7 @@ export interface MeshSize {
 
 /**
  * ADR 0037 section 3: at most 6,000 vertices on a desktop and 1,500 on a phone, counted over EVERYTHING one frame sends to the
- * GPU: the terrain mesh, the isotherm lines and the coast lines (`frameVertices`). The forecast field is a 22 x 17 grid, so a
+ * GPU: the terrain mesh, the isotherm lines and the coast lines (`isoVertexCap` leaves the lines what the mesh and the coast do not use). The forecast field is a 22 x 17 grid, so a
  * mesh of 65 x 49 (desktop) or 27 x 21 (phone) is finer than it (about 8.5 and 1.5 times its nodes).
  */
 export const MESH = { desktop: { nx: 65, nz: 49 }, phone: { nx: 27, nz: 21 } } as const satisfies Record<string, MeshSize>;
@@ -24,9 +24,14 @@ export const MAX_VERTICES = { desktop: 6000, phone: 1500 } as const;
 /** Every how many points of a coast line one is kept: a phone draws every fourth (the outline is the same at a quarter of the vertices). */
 export const COAST_STRIDE = { desktop: 1, phone: 4 } as const;
 
-/** The vertices of one frame: the surface, the isotherm lines (shared endpoints) and the coast lines (one vertex per point). */
-export function frameVertices(mesh: MeshSize, isoVertices: number, coastVertices: number): number {
-  return vertexCount(mesh) + isoVertices + coastVertices;
+/**
+ * What is left of the vertex budget for the isotherm lines after the mesh and the coast lines (a guard: the real field never reaches
+ * it, `IsoLines.dropped` says so). The worker caps its isotherms with this very function and the budget test imports it, so the cap
+ * is written once.
+ */
+export function isoVertexCap(mobile: boolean, coastVertices: number): number {
+  const mesh = meshFor(mobile);
+  return Math.max(2, MAX_VERTICES[mobile ? "phone" : "desktop"] - vertexCount(mesh) - coastVertices);
 }
 
 /** The coast lines a scene draws: the points kept by the stride (always the last point of a line), lines of fewer than 2 points dropped. */
@@ -196,35 +201,28 @@ export function projectToScreen(matrix: Mat, x: number, y: number, z: number, wi
 }
 
 /**
- * ADR 0037 section 4: below 30 frames per second for 2 seconds, the scene gives way to the 2D field. The frames counted are the
- * ones the WORKER finished (a `drawn` answer), never the page's animation frames: a slow GPU shows up as late answers.
+ * ADR 0037 section 4: below 30 frames per second for 2 seconds, the scene gives way to the 2D field. What is measured is how long
+ * the WORKER took for each frame it was asked for (request to answer), never the page's animation frames and never the gap between
+ * two answers: a gap can be a pause (the page asked for nothing: a hidden tab, a frozen scene) and so cannot tell a slow GPU from
+ * an idle one, whereas the time a request waited for its answer is the GPU's own, however slow it is (3 frames per second included).
  */
 export const FPS_FLOOR = 30;
 export const FPS_WINDOW_MS = 2000;
-/** A gap this long between two frames is a pause (nothing was being drawn), not a slow frame. */
-export const PAUSE_MS = 250;
 
 export class FpsMonitor {
-  #last: number | null = null;
   #slowMs = 0;
 
-  /** Call once per frame the worker finished while the day PLAYS, with the time of the answer (ms). True when the scene should be given up. */
-  tick(nowMs: number): boolean {
-    const last = this.#last;
-    this.#last = nowMs;
-    if (last === null) return false;
-    const dt = nowMs - last;
-    if (dt >= PAUSE_MS) {
-      this.#slowMs = 0;
-      return false;
-    }
-    this.#slowMs = dt > 1000 / FPS_FLOOR ? this.#slowMs + dt : 0;
+  /**
+   * Call once per frame the worker finished while the day PLAYS, with how long that frame took from request to answer (ms).
+   * True when the frames have been slower than 30 per second for 2 seconds on end (the sum of the slow frames' own time).
+   */
+  tick(frameMs: number): boolean {
+    this.#slowMs = frameMs > 1000 / FPS_FLOOR ? this.#slowMs + frameMs : 0;
     return this.#slowMs >= FPS_WINDOW_MS;
   }
 
-  /** Forget the last frame (the day stopped playing): the next tick starts a new run. */
+  /** The day stopped playing, or the page was hidden: the next frame starts a new run. */
   reset(): void {
-    this.#last = null;
     this.#slowMs = 0;
   }
 }

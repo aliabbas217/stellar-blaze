@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { LEVELS, levelIndex, type Level } from "@/components/level/level";
-import { DraftBadge } from "@/components/shell/DraftBadge";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
 import { SunToggle } from "@/components/shell/SunToggle";
 
@@ -209,7 +208,6 @@ export default async function SpecimenPage(props: PageProps<"/[locale]/dev/speci
         <div className="flex flex-wrap items-center gap-3">
           <LocaleSwitcher />
           <SunToggle />
-          <DraftBadge />
         </div>
       </header>
 

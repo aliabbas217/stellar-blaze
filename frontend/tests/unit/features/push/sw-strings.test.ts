@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { SW_STRINGS_FILE, pushStringsOf, readAllMessages, renderSwStrings } from "../../../../scripts/build-sw-strings.ts";
 import { SW_STRINGS } from "@/features/push/sw-strings";
@@ -15,6 +16,22 @@ describe("sw-strings.ts", () => {
   it("equals what the messages produce (run `node scripts/build-sw-strings.ts` after editing push messages)", () => {
     const committed = readFileSync(SW_STRINGS_FILE, "utf8");
     expect(committed).toBe(renderSwStrings(readAllMessages()));
+  });
+
+  it("reads the locale catalogues and nothing else in messages/ (review-manifest.json lives there and is not a locale)", () => {
+    expect(Object.keys(readAllMessages()).sort()).toEqual([...routing.locales].sort());
+  });
+
+  it("test_locale_file_pattern_escapes_the_dot: a file whose name only looks like <xx>.json (any character before 'json') is not read", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "t22f-sw-strings-"));
+    try {
+      writeFileSync(path.join(dir, "en.json"), JSON.stringify({ ok: true }));
+      writeFileSync(path.join(dir, "enxjson"), "this is not JSON and must never be parsed");
+      writeFileSync(path.join(dir, "ab-json"), "{");
+      expect(Object.keys(readAllMessages(dir))).toEqual(["en"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("survives the pre-commit fixers unchanged: one final newline, no trailing whitespace, LF only", () => {

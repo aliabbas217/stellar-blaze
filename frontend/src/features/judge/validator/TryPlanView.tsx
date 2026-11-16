@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { siteForecastQueryOptions, validatePlanMutation } from "@/api/queries";
 import { RosterInvalidProblem, type RosterError } from "@/api/roster-problem";
@@ -16,6 +16,7 @@ import { TryPlanLayout, type TryPhase } from "./TryPlanLayout";
 import { buildRequest, DEFAULT_ACCLIMATISED, DEFAULT_DAYS_PER_WEEK, parseDays } from "./request";
 import { filledEntries, MAX_RUNS, normalizeTime, padRuns, rowOfLine, runProblem, templateOf, templateRuns, type Run, type RunProblem, type TemplateId } from "./runs";
 import { toAnswerView, type AnswerView, type RecordedPlanView } from "./view";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The interactive try-a-plan screen: the island that `TryGate` loads on the first interaction with a control (so TanStack
@@ -73,7 +74,7 @@ function lastTemplateTap(actions: readonly string[]): TemplateId | undefined {
 
 export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActions = NO_ACTIONS, restoreFocus = null, fields = NO_FIELDS }: TryViewProps) {
   const t = useTranslations("judge.try");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const demo = useDemo();
   const site = demo.site;
   const siteId = site?.id;
@@ -96,6 +97,13 @@ export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActio
   const [showRecorded, setShowRecorded] = useState(false);
   // A tap on "Check this plan" before the demo site is known waits for it (one call, then) instead of asking the visitor to try again.
   const [queued, setQueued] = useState(() => initialActions.includes("check") || initialActions.includes("submit"));
+  // The offline notice belongs to the press that made it: when the network comes back it is forgotten, so going offline again later
+  // shows nothing until the check is pressed again (state adjusted while rendering, React's pattern for "reset on a change").
+  const [wasOffline, setWasOffline] = useState(offline);
+  if (offline !== wasOffline) {
+    setWasOffline(offline);
+    if (!offline && outcome?.kind === "offline") setOutcome(null);
+  }
 
   const validate = useMutation(validatePlanMutation());
 
@@ -194,11 +202,10 @@ export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActio
       ? { heat, ban, dateLabel }
       : { heat: NO_HEAT, ban: banStateFor(SEASON_BAN, shownDate, locale), dateLabel: dayFormat(locale).withWeekday(shownDate) };
 
-  // An offline notice belongs to the moment the check was pressed with no network: back online the page is idle again, and the next
-  // press runs the normal flow (no reload).
+  // Back online the page is idle again (the offline notice was cleared above), and the next press runs the normal flow (no reload).
   const phase: TryPhase = validate.isPending || queued
     ? "loading"
-    : outcome === null || (outcome.kind === "offline" && !offline)
+    : outcome === null
       ? "idle"
       : outcome.kind === "answer"
         ? outcome.answer.validator.violations.length === 0

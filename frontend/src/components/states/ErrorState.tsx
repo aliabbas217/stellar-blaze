@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "./actions";
 
 export interface ErrorStateProps {
@@ -20,6 +21,7 @@ export interface ErrorStateProps {
  */
 export function ErrorState({ title, detail, onRetry, requestId, children }: ErrorStateProps) {
   const t = useTranslations("states");
+  const attrs = useLocaleAttrs();
   const [copied, setCopied] = useState(false);
 
   async function copy(id: string): Promise<void> {
@@ -32,7 +34,7 @@ export function ErrorState({ title, detail, onRetry, requestId, children }: Erro
   }
 
   return (
-    <section role="alert" className="flex flex-col items-start gap-3 rounded-sign border border-edge px-6 py-8">
+    <section {...attrs} role="alert" className="flex flex-col items-start gap-3 rounded-sign border border-edge px-6 py-8">
       <h2 className="font-display text-lg font-medium">{title}</h2>
       <p className="max-w-(--measure) text-base text-ink-2">{detail}</p>
       {children}

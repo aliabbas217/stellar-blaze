@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { useCallback, useImperativeHandle, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type Ref } from "react";
+import { percentAt, pct, screenPercent } from "@/components/spine/geometry";
 import { TimeSpine, type BanState } from "@/components/spine/TimeSpine";
 import { hourLabel } from "./field-data";
 
@@ -12,12 +13,22 @@ import { hourLabel } from "./field-data";
  * slider and no button, so nothing moves when the island takes over (CLS 0).
  */
 
+/**
+ * What a playing day uses to move the now line: one DOM write per frame, no React render. React still owns the line when it commits
+ * (the hour changed, the day was paused), and the last position handed to `move` is put back after every commit, so a commit never
+ * snaps the line to the whole hour for a frame.
+ */
+export interface NowHandle {
+  readonly move: (position: number) => void;
+}
+
 export interface HourScrubberProps {
   /** The station's 24 hourly forecasts for the day: the colours of the spine. */
   readonly values: readonly number[];
   readonly ban: BanState;
-  /** The hour of the now line (fractional while the day plays). */
+  /** The hour of the now line when React draws it (a whole hour); while the day plays the line is moved through `nowRef`. */
   readonly position: number;
+  readonly nowRef?: Ref<NowHandle>;
   /** The whole hour the text states. */
   readonly hour: number;
   readonly dir: "ltr" | "rtl";
@@ -30,12 +41,42 @@ export interface HourScrubberProps {
   readonly calm: boolean;
   readonly onSeek?: (hour: number) => void;
   readonly onToggle?: () => void;
+  /** The slider took or lost keyboard focus (the readout's live sentence is silent while it has it: the slider says the same words itself). */
+  readonly onFocusChange?: (focused: boolean) => void;
 }
 
-export function HourScrubber({ values, ban, position, hour, dir, dayLabel, valueText, interactive, playing, calm, onSeek, onToggle }: HourScrubberProps) {
+export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabel, valueText, interactive, playing, calm, onSeek, onToggle, onFocusChange }: HourScrubberProps) {
   const t = useTranslations("judge.landing.field.scrubber");
   const track = useRef<HTMLDivElement>(null);
   const rtl = dir === "rtl";
+  const spine = useRef<HTMLDivElement>(null);
+  /** The latest position a frame put the now line at (null until the day has been drawn once). */
+  const moved = useRef<number | null>(null);
+
+  const place = useCallback(
+    (at: number): void => {
+      const line = spine.current?.querySelector("[data-now]");
+      if (line === null || line === undefined) return;
+      const x = pct(screenPercent(percentAt(at, 0, 24), "h", dir));
+      line.setAttribute("x1", x);
+      line.setAttribute("x2", x);
+    },
+    [dir],
+  );
+  useImperativeHandle(
+    nowRef,
+    () => ({
+      move: (at: number) => {
+        moved.current = at;
+        place(at);
+      },
+    }),
+    [place],
+  );
+  // React wrote the line's attributes when it committed (the whole hour): put the last frame's position back before the browser paints
+  useLayoutEffect(() => {
+    if (moved.current !== null) place(moved.current);
+  });
 
   function hourAt(clientX: number): number {
     const box = track.current?.getBoundingClientRect();
@@ -70,10 +111,11 @@ export function HourScrubber({ values, ban, position, hour, dir, dayLabel, value
   return (
     <div
       data-scrub=""
-      className="relative z-10 grid grid-cols-[var(--target)_minmax(0,1fr)] items-center gap-x-4 gap-y-1 px-4 min-[900px]:absolute min-[900px]:inset-x-10 min-[900px]:bottom-3 min-[900px]:grid-cols-[var(--target)_minmax(0,1fr)_12.5rem] min-[900px]:px-0 max-[899px]:order-3"
+      className="relative z-10 grid grid-cols-[var(--target)_minmax(0,1fr)] items-center gap-x-4 gap-y-1 px-4 min-[1100px]:absolute min-[1100px]:inset-x-10 min-[1100px]:bottom-3 min-[900px]:max-[1099px]:col-start-1 min-[900px]:max-[1099px]:row-start-2 min-[900px]:max-[1099px]:mx-10 min-[900px]:max-[1099px]:mb-3 min-[900px]:grid-cols-[var(--target)_minmax(0,1fr)_12.5rem] min-[900px]:px-0 max-[899px]:order-3"
     >
       {showPlay ? (
         interactive ? (
+          // fixed-height-ok: an icon-only button (two bars or a triangle, no text); its size is the 44 px target token
           <button
             type="button"
             onClick={onToggle}
@@ -98,7 +140,7 @@ export function HourScrubber({ values, ban, position, hour, dir, dayLabel, value
         <span aria-hidden="true" className="size-(--target)" />
       )}
       {/* On a phone the track is about 250 px: the 3-hourly tick labels would run into each other, so every other one is dropped (00, 06, 12, 18, 00). */}
-      <div className="relative min-w-0 max-[899px]:[&_[data-tick]:nth-child(even)]:hidden" data-spine-track="">
+      <div ref={spine} className="relative min-w-0 max-[899px]:[&_[data-tick]:nth-child(even)]:hidden" data-spine-track="">
         <TimeSpine
           orientation="h"
           from={0}
@@ -126,6 +168,8 @@ export function HourScrubber({ values, ban, position, hour, dir, dayLabel, value
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onKeyDown={onKeyDown}
+            onFocus={() => onFocusChange?.(true)}
+            onBlur={() => onFocusChange?.(false)}
             className="absolute inset-y-0 inset-x-6 cursor-pointer touch-pan-y rounded-sign"
           />
         ) : null}

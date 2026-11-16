@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { axeViolations } from "./axe.ts";
-import { isUrllessResourceLine, requestFailure, responseError, UNBUILT_CORE_ROUTES } from "./gate-console.ts";
+import { consoleLineToRecord, requestFailure, responseError, UNBUILT_CORE_ROUTES } from "./gate-console.ts";
 
 /*
  * The deterministic half of the design gate (F2 plan, "Design gate protocol" item 2). Every view's e2e calls `gateReport`
@@ -30,6 +30,43 @@ export const MIN_FIELD_LABEL_PX = 16;
 export const MIN_TARGET_PX = 24;
 export const MIN_FIELD_TARGET_PX = 44;
 export const MIN_HERO_SHARE = 0.35;
+
+/**
+ * Hero shares below the 35 % floor that were RECORDED instead of fixed (F2 Task 22, ruling 5), keyed `<state>:<locale>`, with the number
+ * measured at 390 x 844 when it was recorded. tests/e2e/hero-share.spec.ts holds each to its number minus RECORDED_HERO_TOLERANCE, so an
+ * exception can only improve; an entry is removed the day its state meets the floor. The Urdu "partial" Today state (a banner above the
+ * sign) is the older exception recorded in worker-today-notlive.spec.ts.
+ */
+export type HeroKey = {
+  readonly state: "today-live" | "today-personal" | "today-partial" | "today-not-live" | "alert" | "unwell" | "crews" | "plan";
+};
+export const RECORDED_HERO_EXCEPTIONS: Readonly<Record<string, number>> = {
+  // Today with a profile on the phone, Urdu, 390 x 844 (worker-today-notlive.spec.ts). With the real Urdu copy (F2 Task 22) the "your own
+  // level is higher" line (18 px at the Urdu leading of 2.5, 45 px) and, in the partial state, the three-line "not available" banner stand
+  // above the spine. Measured 2026-11-16: personal 30.2 % (was 35.5 % with English text in the Urdu catalogue), partial 23.0 % (was 28.3 %).
+  // Level-word trim 0.75 em -> 0.5 em (the Nastaliq face now draws the word: "orange" ran 20 px into the kicker row at 0.75): 3.8 points less on
+  // the first screen. Measured 2026-11-16: live 33.2 %, personal 26.4 %, partial 19.2 %.
+  "today-live:ur": 0.332,
+  "today-personal:ur": 0.264,
+  "today-partial:ur": 0.192,
+  // Arabic, Today with a profile and the risk policy down (the three-line "not available" banner above the spine), measured in fix round 1
+  // (the first time hero-share.spec.ts measured personal and partial outside Urdu). The reviewer's estimate was 32 %. Hindi, Bengali and
+  // Nepali measure 35.1 % (above the floor by 0.1 point, so they are not exceptions, but one more line of copy there makes them one).
+  "today-partial:ar": 0.328,
+};
+export const RECORDED_HERO_TOLERANCE = 0.01;
+
+/** The `[data-hero]` area inside the first fold as a share of the fold (the same measure `gateReport` takes), or null when the page has none. */
+export async function heroShareOf(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const hero = document.querySelector("[data-hero]");
+    if (hero === null) return null;
+    const r = hero.getBoundingClientRect();
+    const w = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0));
+    const h = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+    return (w * h) / (window.innerWidth * window.innerHeight);
+  });
+}
 /** `root` is the document's own default name (the page cross-fade), not a shared element. */
 export const SHARED_TRANSITION_NAMES = ["root", "wordmark", "spine", "level", "unwell"] as const;
 
@@ -70,12 +107,14 @@ export { UNBUILT_CORE_ROUTES };
 /**
  * Starts collecting console errors, uncaught exceptions, HTTP errors (400 and up) and network-layer failures, each with its
  * URL (the console message for a failed resource does not say which one, and `response` never fires for a request that got
- * no response). Call before `page.goto`; pass the array to `gateReport`. The rules are in gate-console.ts.
+ * no response). Call before `page.goto`; pass the array to `gateReport`. The rules are in gate-console.ts. A hydration message
+ * of any console type is always recorded; `warnings: true` (the console-clean gate) also records every console warning.
  */
-export function watchConsole(page: Page): string[] {
+export function watchConsole(page: Page, { warnings = false }: { readonly warnings?: boolean } = {}): string[] {
   const errors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error" && !isUrllessResourceLine(message.text())) errors.push(message.text());
+    const line = consoleLineToRecord(message.type(), message.text(), warnings);
+    if (line !== null) errors.push(line);
   });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {

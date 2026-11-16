@@ -26,6 +26,22 @@ export function detectEnv(): UpgradeEnv {
   };
 }
 
+/** One pass of the day turns the desktop scene by 16 s x 0.025 rad/s. */
+export const ORBIT_MAX_RAD = 0.4;
+
+/**
+ * `?orbit=<radians>` starts the WebGL scene at that point of its orbit (0 to one pass of the day, 0.4), anything else is 0. With reduced
+ * motion the day rests there, so a test or a gate shot gets a deterministic pose instead of a moment of an autoplay: the contrast spec
+ * samples the copy over the map at several azimuths this way.
+ */
+export function orbitFromSearch(search: string): number {
+  const raw = new URLSearchParams(search).get("orbit");
+  if (raw === null || raw.trim() === "") return 0;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.min(value, ORBIT_MAX_RAD);
+}
+
 interface IdleWindow {
   requestIdleCallback?: (run: () => void, options?: { timeout: number }) => number;
   cancelIdleCallback?: (id: number) => void;

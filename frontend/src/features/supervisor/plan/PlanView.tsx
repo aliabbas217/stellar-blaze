@@ -5,15 +5,17 @@ import { Fragment, lazy, Suspense, useCallback, type ReactNode } from "react";
 import { ModeStamp, ModeStampSkeleton } from "@/components/provenance/ModeStamp";
 import { useFieldCrewLabel } from "@/components/shell/FieldHeading";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
 import { ResetDemoControl } from "@/components/shell/ResetDemoControl";
 import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
 import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { Skeleton } from "@/components/states/Skeletons";
+import { WakingLine } from "@/components/states/WakingLine";
 import { isDemoMode } from "@/features/demo/constants";
 import { FocalSentence } from "@/features/supervisor/FocalSentence";
-import { StopWorkBar } from "@/features/supervisor/StopWorkBar";
+import { BAR_CLEARANCE, StopWorkBar } from "@/features/supervisor/StopWorkBar";
 import { useStopWork, type ServerStop } from "@/features/supervisor/useStopWork";
 import { BlockRows } from "@/features/supervisor/plan/BlockRows";
 import { FloorBanner } from "@/features/supervisor/plan/FloorBanner";
@@ -41,16 +43,20 @@ const SignOffForm = lazy(() => import("@/features/supervisor/plan/SignOffForm"))
 export function PlanSkeleton() {
   const t = useTranslations("states");
   return (
-    <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
-      {isDemoMode() ? <ModeStampSkeleton /> : null}
-      <Skeleton height="3.5rem" />
-      <Skeleton height="calc(var(--s-6) + var(--s-2) + var(--t-22) * var(--sign-leading-text, 1.5) * 3)" />
-      <Skeleton height="11rem" />
-      {Array.from({ length: 4 }, (_, index) => (
-        <Skeleton key={index} height="2.75rem" />
-      ))}
-      <span className="sr-only">{t("loading")}</span>
-    </div>
+    <>
+      <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
+        {isDemoMode() ? <ModeStampSkeleton /> : null}
+        <Skeleton height="3.5rem" />
+        <Skeleton height="calc(var(--s-6) + var(--s-2) + var(--t-22) * var(--sign-leading-text, 1.5) * 3)" />
+        <Skeleton height="11rem" />
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} height="2.75rem" />
+        ))}
+        <span className="sr-only">{t("loading")}</span>
+      </div>
+      {/* Outside the busy region (a change inside it is not announced). The day plan read can be waiting for a scaled-to-zero API. */}
+      <WakingLine className="px-4 pt-3" />
+    </>
   );
 }
 
@@ -214,7 +220,14 @@ function Body({ screen }: { readonly screen: PlanScreen }) {
           </div>
         ) : null}
         <div className="pt-3" />
-        <PlanStrip crewName={crewName} blocks={state.blocks} axis={state.axis} heat={state.heat} ban={state.ban} nowMin={state.nowMin} />
+        {state.forecastPending ? (
+          // The strip's place until the heat is known (it is 15 rem with its legend and heat note): what is below does not move when it arrives.
+          <div className="px-4" data-plan-strip-pending="">
+            <Skeleton height="15rem" />
+          </div>
+        ) : (
+          <PlanStrip crewName={crewName} blocks={state.blocks} axis={state.axis} heat={state.heat} ban={state.ban} nowMin={state.nowMin} />
+        )}
         <BlockRows blocks={state.blocks} currentIndex={state.currentIndex} nowMin={state.nowMin} />
       </section>
       <div className="pt-4">
@@ -259,7 +272,7 @@ export function PlanView({ crewId }: { readonly crewId: string }) {
   const restricted = state.status === "ready" ? state.plan.restricted_headcount : null;
 
   return (
-    <div className="flex flex-1 flex-col pb-60">
+    <div className={`flex flex-1 flex-col ${BAR_CLEARANCE}`}>
       {demo ? <SyntheticDemoBanner siteName={screen.siteName} /> : null}
       <BackLink />
       {!notFound ? (
@@ -279,6 +292,8 @@ export function PlanView({ crewId }: { readonly crewId: string }) {
           <ResetDemoControl siteId={screen.siteId} />
         </div>
       ) : null}
+      {/* The foot of the screen, above the room kept for the Stop bar: the one quiet line of a machine-translated catalogue (architect ruling 2026-11-15). */}
+      <MachineTranslationNotice className="px-4 pt-6" />
       <StopWorkBar crewName={crewName} work={notFound ? null : work} notices={work} noCrew="none" />
     </div>
   );

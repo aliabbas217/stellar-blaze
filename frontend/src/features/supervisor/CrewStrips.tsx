@@ -28,8 +28,12 @@ import "@/styles/view-transitions.css";
  * long name wraps instead of clipping.
  */
 
-/** The label column: wide enough for "Orange until 17:00" at 16 px, narrow enough to leave 12 hours a track. */
-const LABEL_COLUMN = "8.5rem";
+/**
+ * The label column: wide enough for "Orange until 17:00" at 16 px, narrow enough to leave 12 hours a track. It is also never more than
+ * 45 % of the row: at 200 % text on a 320 px phone 8.5rem is 272 px of a 288 px row, the track gets 4 px and the page widens to 406 px
+ * (so a phone lays everything out wider than its screen and the fixed Stop bar leaves it). Labels wrap in the narrower column.
+ */
+const LABEL_COLUMN = "min(8.5rem, 45%)";
 
 type Custom = CSSProperties & Record<`--${string}`, string>;
 
@@ -244,16 +248,23 @@ export function CrewStrips({ crews, from, to, nowHour, ban, heat }: CrewStripsPr
         <div className="grid gap-x-3" style={{ gridTemplateColumns: `${LABEL_COLUMN} minmax(0, 1fr)` }}>
           <span aria-hidden="true" />
           <div dir="ltr" aria-hidden="true" className="relative h-6">
-            {tickHours(from, to, true).filter((hour) => hour % 6 === 0).map((hour) => (
-              <span
-                key={hour}
-                data-tick={hour}
-                style={{ left: `${pct(screenPercent(percentAt(hour, from, to), "h", dir))}%` }}
-                className="absolute top-1 -translate-x-1/2 font-body text-base font-medium leading-solid text-ink-2"
-              >
-                {formatClock(hour)}
-              </span>
-            ))}
+            {tickHours(from, to, true).filter((hour) => hour % 6 === 0).map((hour) => {
+              const at = screenPercent(percentAt(hour, from, to), "h", dir);
+              // A tick near either end of the track is aligned INTO the track (its label starts or ends at the tick), not centred on it: a centred
+              // label spills half its width past the track, and at 200 % text on a 320 px phone that is wider than the section's padding and
+              // widens the whole page (a phone then lays everything out wider than its screen and the fixed Stop bar leaves it).
+              const align = at <= 8 ? "" : at >= 85 ? "-translate-x-full" : "-translate-x-1/2";
+              return (
+                <span
+                  key={hour}
+                  data-tick={hour}
+                  style={{ left: `${pct(at)}%` }}
+                  className={`absolute top-1 ${align} font-body text-base font-medium leading-solid text-ink-2`}
+                >
+                  {formatClock(hour)}
+                </span>
+              );
+            })}
           </div>
         </div>
         <p className="pt-2 text-sm text-ink-3">{t("strips.legend")}</p>

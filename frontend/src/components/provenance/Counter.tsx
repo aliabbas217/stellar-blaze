@@ -9,6 +9,8 @@ export interface CounterProps {
   readonly unit: string;
   /** The uncertainty line ("95% interval 1.2 to 3.4"), when the number has one. */
   readonly interval?: string;
+  /** The language and direction of `interval`, when it is a translated line inside an English claims block (the landing's "of N working hours"). */
+  readonly intervalAttrs?: { readonly lang: string; readonly dir: "ltr" | "rtl" };
   /** Null: no provenance, so the value is not rendered at all (a note stands in its place). */
   readonly proof: Proof | null;
   /** `mega` is the hero figure (76 px), `numeral` the row figure (36 px). */
@@ -26,7 +28,7 @@ const SIZE = {
  * A scored or counted number with its provenance: the figure, what it counts, its interval, and the proof chip. Every
  * number has provenance or is not shown: with no proof the value never reaches the markup (see `Proved`).
  */
-export function Counter({ value, unit, interval, proof, size, danger = false }: CounterProps) {
+export function Counter({ value, unit, interval, intervalAttrs, proof, size, danger = false }: CounterProps) {
   return (
     <div data-counter={size} className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -38,7 +40,7 @@ export function Counter({ value, unit, interval, proof, size, danger = false }: 
         {danger ? <LevelMark level="red" /> : null}
         <span>{unit}</span>
       </p>
-      {interval !== undefined && proof !== null ? <p className="text-sm text-ink-3 tabular-nums">{interval}</p> : null}
+      {interval !== undefined && proof !== null ? <p {...intervalAttrs} className="text-sm text-ink-3 tabular-nums">{interval}</p> : null}
     </div>
   );
 }
