@@ -44,4 +44,35 @@ describe("Dockerfile: the demo switch is a build argument of the stage that buil
   it("keeps APP_VERSION where it was: a runtime-stage ARG", () => {
     expect(runtime).toMatch(/^ARG APP_VERSION=dev$/m);
   });
+
+  it("also gives the BUILD stage the release id before `pnpm build` runs (the offline pages' precache revision is APP_VERSION || a random id), with an empty default", () => {
+    const stage = build ?? "";
+    const arg = indexOfLine(stage, /^ARG APP_VERSION=\s*$/);
+    const env = indexOfLine(stage, /^ENV APP_VERSION=\$\{APP_VERSION\}\s*$/);
+    const run = indexOfLine(stage, /^RUN pnpm build\b/);
+    expect(arg).toBeGreaterThan(-1);
+    expect(env).toBeGreaterThan(arg);
+    expect(run).toBeGreaterThan(env);
+  });
+});
+
+describe("Dockerfile: the base image is pinned by digest and the runtime ships no package manager", () => {
+  const froms = dockerfile.split(/\r?\n/).filter((line) => line.startsWith("FROM "));
+
+  it("pins BOTH stages to the same node image by tag AND sha256 digest (a tag moves, a digest does not)", () => {
+    expect(froms).toHaveLength(2);
+    for (const line of froms) expect(line).toMatch(/^FROM node:24\.\d+\.\d+-trixie-slim@sha256:[0-9a-f]{64} AS (build|runtime)$/);
+    const images = froms.map((line) => line.replace(/ AS .*/, ""));
+    expect(images[0]).toBe(images[1]);
+  });
+
+  it("uses the Node version `.nvmrc` and `engines` say (the image is not older than what CI tests)", () => {
+    const nvmrc = readFileSync(join(process.cwd(), ".nvmrc"), "utf8").trim();
+    expect(froms[0]).toContain(`node:${nvmrc}-trixie-slim@`);
+  });
+
+  it("removes npm, corepack and yarn from the RUNTIME stage (their bundled brace-expansion and undici were every HIGH trivy finding); the build stage keeps npm to install pnpm", () => {
+    expect(runtime).toMatch(/^RUN rm -rf \/usr\/local\/lib\/node_modules .*\/usr\/local\/bin\/npm .*\/usr\/local\/bin\/corepack .*\/opt\/yarn-v/m);
+    expect(build).toMatch(/^RUN npm i -g pnpm@/m);
+  });
 });
