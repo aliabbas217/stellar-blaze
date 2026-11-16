@@ -539,7 +539,7 @@
       "landing layout: no station name sits under the readout card, a line of copy or a button/chip (en, webgl)",
       "landing layout: no station name sits under the readout card, a line of copy or a button/chip (ur, 2d)",
       "landing layout: no station name sits under the readout card, a line of copy or a button/chip (ur, webgl)",
-      "landing layout: the hook's chip keeps 8 px clear of the 2D map's edge from 1100 to 1920 px in English, Urdu, Hindi and Bengali, and wraps by design below 1440"
+      "landing layout: the hook's chip keeps 8 px clear of the 2D map's edge from 1100 to 1920 px in English, Urdu, Hindi and Bengali, on its own row"
     ],
     "desktop-chromium": [
       "landing contrast guard bites: an h1 shrunk to 20 px is no longer large text, and the measurement fails it by name (threshold by rendered size)",
@@ -570,7 +570,7 @@
       "landing layout: no station name sits under the readout card, a line of copy or a button/chip (en, webgl)",
       "landing layout: no station name sits under the readout card, a line of copy or a button/chip (ur, 2d)",
       "landing layout: no station name sits under the readout card, a line of copy or a button/chip (ur, webgl)",
-      "landing layout: the hook's chip keeps 8 px clear of the 2D map's edge from 1100 to 1920 px in English, Urdu, Hindi and Bengali, and wraps by design below 1440"
+      "landing layout: the hook's chip keeps 8 px clear of the 2D map's edge from 1100 to 1920 px in English, Urdu, Hindi and Bengali, on its own row"
     ]
   },
   "judge-landing-sw.spec.ts": {
@@ -777,20 +777,6 @@
       "kit, sun > kit states have no axe violation (sun, ar)",
       "kit, sun > kit states have no axe violation (sun, en)",
       "kit, sun > kit states have no axe violation (sun, ur)"
-    ]
-  },
-  "l1f3-shots.spec.ts": {
-    "mobile-chromium": [
-      "l1f3 shot after hero 1440 and 1920 (pixel diff against the baseline)",
-      "l1f3 shot full-1440",
-      "l1f3 shot laptop-1366-static",
-      "l1f3 shot ur-layout-1024-webgl"
-    ],
-    "desktop-chromium": [
-      "l1f3 shot after hero 1440 and 1920 (pixel diff against the baseline)",
-      "l1f3 shot full-1440",
-      "l1f3 shot laptop-1366-static",
-      "l1f3 shot ur-layout-1024-webgl"
     ]
   },
   "landing-display-face.spec.ts": {
@@ -1224,8 +1210,8 @@
       "Today says 'Last known level: Red' in the lead and the last-known sign can be reached above the dock: stale, ur",
       "Today shows the emergency control and the protective lead together when offline (Today)",
       "Today's Urdu level words keep clear of the rows around them in the Nastaliq face (Today)",
-      "Today, Urdu, partial: the hero share is a recorded exception (23.0%) and never lower (Today)",
-      "Today, Urdu, personal: the hero share is a recorded exception (30.2%) and never lower (Today)"
+      "Today, Urdu, partial: the hero share is a recorded exception (19.2%) and never lower (Today)",
+      "Today, Urdu, personal: the hero share is a recorded exception (26.4%) and never lower (Today)"
     ],
     "desktop-chromium": [
       "Today leads with the protective plan and holds the hero floor: fallback, ar, night",
@@ -1269,8 +1255,8 @@
       "Today says 'Last known level: Red' in the lead and the last-known sign can be reached above the dock: stale, ur",
       "Today shows the emergency control and the protective lead together when offline (Today)",
       "Today's Urdu level words keep clear of the rows around them in the Nastaliq face (Today)",
-      "Today, Urdu, partial: the hero share is a recorded exception (23.0%) and never lower (Today)",
-      "Today, Urdu, personal: the hero share is a recorded exception (30.2%) and never lower (Today)"
+      "Today, Urdu, partial: the hero share is a recorded exception (19.2%) and never lower (Today)",
+      "Today, Urdu, personal: the hero share is a recorded exception (26.4%) and never lower (Today)"
     ]
   },
   "worker-today.spec.ts": {
