@@ -16,8 +16,10 @@ import {
   OUTBOX_ROW_TTL_MS,
   outboxAvailable,
   pendingStops,
+  stopExpiry,
   type DrainResult,
-  type QueuedStop,
+  type ExpiredStop,
+  type ExpiryKind,
   type SendResult,
 } from "@/features/supervisor/stop-outbox";
 
@@ -45,7 +47,12 @@ import {
  * supervisor is on the screen: the notice is a tombstone in the outbox, so it survives a reload and stays until the supervisor dismisses it
  * (`dismissExpired`), presses Stop for that crew again, or undoes or resumes it. The expiry is found at app open, by a drain, by ONE timer
  * set for the earliest waiting row (no polling), and when the page comes back (`visibilitychange`, `pageshow`): the queued state of a
- * row that expired is cleared in the same step, so the bar never says "kept on this phone" and "expired" about one stop.
+ * row that expired is cleared in the same step, so the bar never says "kept on this phone" and "expired" about one stop. There are two
+ * reasons and two sentences (`ExpiryKind`): the stop truly waited past the TTL ("lapsed"), or its stored time was ahead of the phone's clock
+ * or unreadable ("clock"), where "it waited 60 minutes" would be false. A row the store could not mark is still told, from memory; a row
+ * whose request was in flight as the TTL passed and that the API then recorded takes its notice back (`dropSent`; a row the API refused for
+ * good keeps it). "Was not sent" never stands beside a crew that IS stopped: when the crews list shows the crew stopped by a stop that started
+ * at or after the row's time (an unanswered POST that landed, another phone's stop), the older notice and its tombstone go (`supersededBy`).
  *
  * The server's own view of the crew (`server`, from the crews list) is merged in: a stop that is active after a reload, or
  * recorded by another phone, reads "stopped" here too, without an undo window.
@@ -74,16 +81,20 @@ export interface ServerStop {
   readonly asOf: number;
 }
 
-/** A stop this phone kept that was NEVER sent and has expired, about one crew, named as the Stop button names it. */
+/**
+ * A stop this phone kept that was NEVER sent and has expired, about one crew, named as the Stop button names it. `kind` says why, and so
+ * which sentence is true: "lapsed" it waited longer than the TTL, "clock" its stored time was ahead of the phone's clock or unreadable.
+ */
 export interface ExpiredNotice {
   readonly crewId: string;
   readonly crewName: string;
+  readonly kind: ExpiryKind;
 }
 
-/** The expiry notices of every crew (not only the bar's), and how the supervisor dismisses one. */
+/** The expiry notices of every crew (not only the bar's), and how the supervisor dismisses one (one crew's notice of one kind). */
 export interface StopNotices {
   readonly expired: readonly ExpiredNotice[];
-  readonly dismissExpired: (crewId: string) => void;
+  readonly dismissExpired: (crewId: string, kind: ExpiryKind) => void;
 }
 
 export interface StopWork extends StopNotices {
@@ -120,14 +131,21 @@ const IDLE = { kind: "idle", crewId: null } as const;
 /** The prefixes of the keys whose answers a stop, an undo or a resume changes. */
 const CREW_STATE_KEYS = [["crews"], ["crew-timeline"], ["crew-day-plan"]] as const;
 
-/** The expired stop being told for a crew: when its row was written, and the crew's name if the row kept one. */
+/** The expired stop being told for a crew and a reason: when its row was written, and the crew's name if the row kept one. */
 interface ExpiredRecord {
+  readonly crewId: string;
+  readonly kind: ExpiryKind;
   readonly clientTime: string;
   readonly crewName: string | null;
 }
 
-/** What an expired stop is reported with: the crew and the row's time, and the name the press kept (the key is never needed). */
-type ExpiredRow = Pick<QueuedStop, "crewId" | "clientTime" | "crewName">;
+/** What an expired stop is reported with: the crew, the row's time, why, and the name the press kept (the key is never needed). */
+type ExpiredRow = Pick<ExpiredStop, "crewId" | "clientTime" | "crewName" | "expiredKind">;
+
+/** A crew has at most one notice per reason. */
+const noticeKey = (crewId: string, kind: ExpiryKind): string => `${kind}:${crewId}`;
+/** The row a stop was sent from, whatever its key: crew and time on the phone's clock. */
+const rowKey = (crewId: string, clientTime: string): string => `${crewId}@${clientTime}`;
 
 /** Removes a crew's waiting rows from the outbox (its stop is recorded, so they are spent); true once they are gone. */
 async function dropRows(crewId: string): Promise<boolean> {
@@ -203,15 +221,18 @@ export function useStopWork(
   const resumedAt = resumed !== null && resumed.crewId === crewId ? resumed.at : null;
   // The crew an undo or resume found no stop for (404), and when: shown until a crew list newer than that says the crew is stopped again.
   const [gone, setGone] = useState<{ readonly crewId: string | null; readonly at: number } | null>(null);
-  // Stops this phone kept that were never sent and have expired, by crew, until the supervisor dismisses them.
+  // Stops this phone kept that were never sent and have expired, by crew and reason (`noticeKey`), until the supervisor dismisses them.
   const [expiredRows, setExpiredRows] = useState<Readonly<Record<string, ExpiredRecord>>>({});
   // An offline press is waiting on the outbox (a slow store): the button is busy, with no new wording.
   const [queuing, setQueuing] = useState(false);
   const sending = useRef(false);
-  // What the supervisor has done since an asynchronous check started, by crew (a counter): a check that began before a press, an undo, a
-  // resume or a dismissal must not bring back a notice that action ended.
+  // What the supervisor has done since an asynchronous check started (a counter): a check that began before a press, an undo, a resume or a
+  // dismissal must not bring back a notice that action ended. Kept by crew (a press, an undo, a resume: every notice of the crew) and by
+  // crew and reason (Close on one notice).
   const actions = useRef(0);
   const lastAction = useRef(new Map<string, number>());
+  // The rows this phone SENT (crew and time) and the API recorded: a late sweep or lapse must not tell them as "not sent".
+  const sentRows = useRef(new Set<string>());
 
   const stopMutationOptions = useMemo(() => stopMutation(crewId ?? ""), [crewId]);
   const clearMutationOptions = useMemo(() => clearStopMutation(crewId ?? ""), [crewId]);
@@ -224,20 +245,46 @@ export function useStopWork(
     for (const queryKey of CREW_STATE_KEYS) void queryClient.invalidateQueries({ queryKey });
   }, [queryClient]);
 
-  /** Tells the supervisor of stops that expired. With `since`, a crew the supervisor has acted on after that point is left out. */
+  /**
+   * Tells the supervisor of stops that expired. A row this phone has since sent is left out, and with `since` so is a notice the supervisor
+   * has acted on after that point (a press, an undo, a resume or Close).
+   */
   const noteExpired = useCallback((rows: readonly ExpiredRow[], since?: number): void => {
-    const fresh = since === undefined ? rows : rows.filter((row) => (lastAction.current.get(row.crewId) ?? 0) <= since);
+    const acted = (row: ExpiredRow): number =>
+      Math.max(lastAction.current.get(row.crewId) ?? 0, lastAction.current.get(noticeKey(row.crewId, row.expiredKind)) ?? 0);
+    const fresh = rows.filter(
+      (row) => !sentRows.current.has(rowKey(row.crewId, row.clientTime)) && (since === undefined || acted(row) <= since),
+    );
     if (fresh.length === 0) return;
     setExpiredRows((known) => {
       const next = { ...known };
-      // The latest row per crew is the one the notice is about.
+      // The latest row per crew and reason is the one the notice is about.
       for (const row of fresh) {
-        const earlier = next[row.crewId];
+        const key = noticeKey(row.crewId, row.expiredKind);
+        const earlier = next[key];
         if (earlier === undefined || Date.parse(row.clientTime) >= Date.parse(earlier.clientTime)) {
-          next[row.crewId] = { clientTime: row.clientTime, crewName: row.crewName ?? earlier?.crewName ?? null };
+          next[key] = { crewId: row.crewId, kind: row.expiredKind, clientTime: row.clientTime, crewName: row.crewName ?? earlier?.crewName ?? null };
         }
       }
       return next;
+    });
+  }, []);
+
+  /** Rows the API recorded: a notice that said one "was not sent" (the TTL passed while the request was in flight) is false now, and goes. */
+  const dropSent = useCallback((rows: readonly { readonly crewId: string; readonly clientTime: string }[]): void => {
+    if (rows.length === 0) return;
+    for (const row of rows) sentRows.current.add(rowKey(row.crewId, row.clientTime));
+    setExpiredRows((known) => {
+      const left = Object.entries(known).filter(([, record]) => !sentRows.current.has(rowKey(record.crewId, record.clientTime)));
+      return left.length === Object.keys(known).length ? known : Object.fromEntries(left);
+    });
+  }, []);
+
+  /** Notices that were settled elsewhere (the crews list shows the crew stopped) leave memory: (crew, reason) pairs. */
+  const forgetNotices = useCallback((pairs: readonly (readonly [string, ExpiryKind])[]): void => {
+    setExpiredRows((known) => {
+      const left = Object.entries(known).filter(([, record]) => !pairs.some(([id, kind]) => record.crewId === id && record.kind === kind));
+      return left.length === Object.keys(known).length ? known : Object.fromEntries(left);
     });
   }, []);
 
@@ -247,12 +294,18 @@ export function useStopWork(
     setOutboxRows((known) => withoutRows(known, rows));
   }, [setOutboxRows]);
 
-  /** The supervisor is done with a crew's notice (a new press, an undo, a resume, or Close): gone from the screen and from the outbox. */
-  const dismissFor = useCallback((id: string): void => {
+  /**
+   * The supervisor is done with a crew's notice (a new press, an undo, a resume: every notice of the crew; or Close: that one notice, of one
+   * reason): gone from the screen and from the outbox, expired rows the store never managed to mark included.
+   */
+  const dismissFor = useCallback((id: string, kind?: ExpiryKind): void => {
     actions.current += 1;
-    lastAction.current.set(id, actions.current);
-    setExpiredRows((known) => (known[id] === undefined ? known : Object.fromEntries(Object.entries(known).filter(([key]) => key !== id))));
-    if (outboxAvailable()) void dismissExpiredFor(id).catch(() => undefined);
+    lastAction.current.set(kind === undefined ? id : noticeKey(id, kind), actions.current);
+    setExpiredRows((known) => {
+      const left = Object.entries(known).filter(([, record]) => record.crewId !== id || (kind !== undefined && record.kind !== kind));
+      return left.length === Object.keys(known).length ? known : Object.fromEntries(left);
+    });
+    if (outboxAvailable()) void dismissExpiredFor(id, { kind }).catch(() => undefined);
   }, []);
 
   const stop = (): void => {
@@ -274,7 +327,7 @@ export function useStopWork(
       setQueuing(true);
       try {
         if (!outboxAvailable()) throw new Error("no outbox");
-        await enqueueStop(crewId, pressedAt, undefined, crewName);
+        await enqueueStop(crewId, pressedAt, { crewName });
         // The row is the queued state (one row per crew); local state falls back to idle so the outbox row is what the bar reads.
         setOutboxRows((known) => ({ ...known, [crewId]: pressedAt.toISOString() }));
         setLocal({ kind: "idle" });
@@ -408,7 +461,8 @@ export function useStopWork(
     const since = actions.current;
     void (async () => {
       try {
-        await discardExpiredStops();
+        // Every expired row found, marked or not: one the store could not mark (quota) is told from memory, and marked when it recovers.
+        noteExpired(await discardExpiredStops(), since);
       } catch {
         // The read failed: the reads below fail the same way or still find what they can.
       }
@@ -418,8 +472,21 @@ export function useStopWork(
         // Nothing to tell from here.
       }
       try {
-        const waiting = (await pendingStops())
-          .filter((row) => !isStopExpired(row.clientTime, Date.now()) && (lastAction.current.get(row.crewId) ?? 0) <= since)
+        const read = await pendingStops();
+        // A row that passed its limit between the discard above and this read (the reads can take seconds) is neither waiting nor sent:
+        // it is told here, from memory, and marked behind the notice; no timer is armed for a row that is not waiting.
+        // One reading of the clock for both judgements below: a row is either told here or kept waiting (and timed), never neither.
+        const instant = Date.now();
+        const late = read.flatMap((row): ExpiredStop[] => {
+          const expiredKind = stopExpiry(row.clientTime, instant);
+          return expiredKind === null ? [] : [{ ...row, expiredKind }];
+        });
+        if (late.length > 0) {
+          noteExpired(late, since);
+          void discardExpiredStops().catch(() => undefined);
+        }
+        const waiting = read
+          .filter((row) => !isStopExpired(row.clientTime, instant) && (lastAction.current.get(row.crewId) ?? 0) <= since)
           .map((row): [string, string] => [row.crewId, row.clientTime]);
         setOutboxRows((known) => ({ ...Object.fromEntries(waiting), ...known }));
       } catch {
@@ -443,21 +510,26 @@ export function useStopWork(
   useEffect(() => {
     const waiting = Object.entries(outboxRows);
     const sweepStore = async (): Promise<void> => {
+      // What the supervisor does while the store answers (a press, Close) is not undone by the answer.
+      const since = actions.current;
       try {
         const rows = await discardExpiredStops();
         if (rows.length === 0) return;
-        noteExpired(rows);
+        noteExpired(rows, since);
         forgetRows(rows.map((row) => ({ crewId: row.crewId, at: row.clientTime })));
       } catch {
         // The store could not be read: the rows already known are handled from memory below.
       }
     };
     const lapse = (): void => {
-      const lapsed = waiting.filter(([, at]) => isStopExpired(at, Date.now()));
+      const lapsed = waiting.flatMap(([id, at]): ExpiredRow[] => {
+        const expiredKind = stopExpiry(at, Date.now());
+        return expiredKind === null ? [] : [{ crewId: id, clientTime: at, expiredKind }];
+      });
       if (lapsed.length > 0) {
         // From memory first: the notice never waits on a store that may be slow, and the store catches up through `sweepStore`.
-        noteExpired(lapsed.map(([id, at]) => ({ crewId: id, clientTime: at })));
-        forgetRows(lapsed.map(([id, at]) => ({ crewId: id, at })));
+        noteExpired(lapsed);
+        forgetRows(lapsed.map((row) => ({ crewId: row.crewId, at: row.clientTime })));
       }
       void sweepStore();
     };
@@ -474,11 +546,12 @@ export function useStopWork(
       );
     };
     arm();
-    window.addEventListener("visibilitychange", lapse);
+    // `visibilitychange` is fired at the document and bubbles to the window; `pageshow` is fired at the window.
+    document.addEventListener("visibilitychange", lapse);
     window.addEventListener("pageshow", lapse);
     return () => {
       if (timer !== undefined) clearTimeout(timer);
-      window.removeEventListener("visibilitychange", lapse);
+      document.removeEventListener("visibilitychange", lapse);
       window.removeEventListener("pageshow", lapse);
     };
   }, [outboxRows, noteExpired, forgetRows]);
@@ -520,6 +593,9 @@ export function useStopWork(
       const { done, expired } = result;
       noteExpired(expired, since);
       forgetRows(expired.map((row) => ({ crewId: row.crewId, at: row.clientTime })));
+      // A row sent after its timer fired (the TTL passed while its request was in flight) was told "not sent" from memory: it was sent.
+      // Only a RECORDED stop takes its notice back: a row the API refused for good is also "done" (removed), but it was not sent.
+      dropSent(done.filter((row) => recorded.has(row.crewId)));
       if (done.length > 0 || unanswered.length > 0) refresh();
       if (done.length === 0) return;
       setOutboxRows((known) => done.reduce((left, row) => withoutCrew(left, row.crewId), known));
@@ -538,11 +614,42 @@ export function useStopWork(
     return () => {
       window.removeEventListener("online", onOnline);
     };
-  }, [crewId, refresh, noteExpired, forgetRows]);
+  }, [crewId, refresh, noteExpired, forgetRows, dropSent]);
 
-  const expired: ExpiredNotice[] = Object.entries(expiredRows)
-    .sort(([, a], [, b]) => (Date.parse(a.clientTime) - Date.parse(b.clientTime)) || 0)
-    .map(([id, row]) => ({ crewId: id, crewName: row.crewName ?? nameOf(id) ?? id }));
+  // "Was not sent" never stands beside a crew that IS stopped: when the crews list shows the crew stopped by a stop that started at or after
+  // the row's time (an unanswered POST that landed, or another phone's stop), the older notice is moot ("press Stop again" would be wrong
+  // guidance). A stop that started BEFORE the row's time says nothing about the row and leaves the notice. Hidden in this render, and its
+  // tombstone is removed by the effect below.
+  const supersededBy = (record: ExpiredRecord): boolean => {
+    const listed = serverOf(record.crewId);
+    return listed !== null && listed.stopped && listed.stoppedAt !== null && Date.parse(listed.stoppedAt) >= Date.parse(record.clientTime);
+  };
+  const superseded = JSON.stringify(
+    Object.values(expiredRows)
+      .filter(supersededBy)
+      .map((record) => [record.crewId, record.kind]),
+  );
+  useEffect(() => {
+    const stale = JSON.parse(superseded) as [string, ExpiryKind][];
+    if (stale.length === 0) return;
+    // What the supervisor (or the list) has settled is not undone by a check that began earlier.
+    for (const [id, kind] of stale) {
+      actions.current += 1;
+      lastAction.current.set(noticeKey(id, kind), actions.current);
+    }
+    const removed = outboxAvailable() ? Promise.all(stale.map(([id, kind]) => dismissExpiredFor(id, { kind }))) : Promise.resolve([]);
+    // Behind the store (whatever it answered) the record leaves memory too, so a later resume of the crew cannot bring the notice back.
+    void removed
+      .catch(() => undefined)
+      .then(() => {
+        forgetNotices(stale);
+      });
+  }, [superseded, forgetNotices]);
+
+  const expired: ExpiredNotice[] = Object.values(expiredRows)
+    .filter((record) => !supersededBy(record))
+    .sort((a, b) => (Date.parse(a.clientTime) - Date.parse(b.clientTime)) || 0)
+    .map((row) => ({ crewId: row.crewId, kind: row.kind, crewName: row.crewName ?? nameOf(row.crewId) ?? row.crewId }));
   const notices = { expired, dismissExpired: dismissFor, busy: queuing } as const;
 
   if (local.kind === "stopped") {

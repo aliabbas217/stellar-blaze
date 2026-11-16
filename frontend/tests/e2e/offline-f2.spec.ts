@@ -356,7 +356,9 @@ async function seedOutbox(page: Page, rows: readonly { crewId: string; crewName:
 }
 
 const minutesAgoIso = (minutes: number): string => new Date(Date.now() - minutes * 60_000).toISOString();
+const minutesAheadIso = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString();
 const expiredNotice = (crew: string): string => en.supervisor.stop.expired.replace("<bdi>{crew}</bdi>", crew);
+const clockNotice = (crew: string): string => en.supervisor.stop.expiredClock.replace("<bdi>{crew}</bdi>", crew);
 
 /** Every stop request the page makes (the mock records a stop on `POST .../stops`). */
 function watchStopRequests(page: Page): string[] {
@@ -384,8 +386,12 @@ test("offline f2: a stop kept 61 minutes ago is never sent: the page says it exp
   await page.reload();
   await page.locator("[data-crew]").first().waitFor();
   await expect(notice).toContainText(expiredNotice("Crew A"));
-  await notice.getByRole("button", { name: en.shell.close }).click();
+  await expect(notice).not.toContainText("looked wrong");
+  // Closed with the keyboard: the focused Close button leaves the page, and focus must land on the Stop button, not on <body> (real browser).
+  await notice.getByRole("button", { name: en.shell.close }).focus();
+  await page.keyboard.press("Enter");
   await expect(notice).toHaveCount(0);
+  await expect(page.getByRole("button", { name: stopLabel("Crew A") })).toBeFocused();
   await page.reload();
   await page.locator("[data-crew]").first().waitFor();
   await expect(notice).toHaveCount(0);
@@ -404,6 +410,42 @@ test("offline f2: a stop that expired for Crew A is told on Crew B's page too, a
   await expect(stopBar(page)).toHaveAttribute("data-stop-state", "idle");
   await expect(stopBar(page)).not.toContainText(/Not sent|kept on this phone/);
   expect(stopRequests, "an expired stop is never sent").toEqual([]);
+});
+
+test("offline f2: a stop whose time is 10 minutes AHEAD of the phone's clock reads the clock text (never '60 minutes'), is never sent, and focus walks from one Close to the next, then to Stop", async ({ page }) => {
+  const stopRequests = watchStopRequests(page);
+  await page.goto("/en/replay");
+  // Crew A truly waited 61 minutes; Crew D's stored time is in the phone's future (its clock was wrong when it was pressed).
+  await seedOutbox(page, [
+    { crewId: "crew-a", crewName: "Crew A", clientTime: minutesAgoIso(61) },
+    { crewId: "crew-d", crewName: "Crew D", clientTime: minutesAheadIso(10) },
+  ]);
+
+  await page.goto("/en/supervisor");
+  await page.locator("[data-crew]").first().waitFor();
+  const lapsed = page.locator('[data-expired-stop="crew-a"]');
+  const ahead = page.locator('[data-expired-stop="crew-d"]');
+  await expect(lapsed).toContainText(expiredNotice("Crew A"));
+  await expect(ahead).toContainText(clockNotice("Crew D"));
+  await expect(ahead).not.toContainText("60 minutes");
+  await expect(lapsed).not.toContainText("looked wrong");
+  await expect(stopBar(page)).toHaveAttribute("data-stop-state", "idle");
+
+  // Durable, both kinds, across a reload.
+  await page.reload();
+  await page.locator("[data-crew]").first().waitFor();
+  await expect(lapsed).toContainText(expiredNotice("Crew A"));
+  await expect(ahead).toContainText(clockNotice("Crew D"));
+
+  // Oldest first: Crew A's Close, then Crew D's, then the Stop button.
+  await lapsed.getByRole("button", { name: en.shell.close }).focus();
+  await page.keyboard.press("Enter");
+  await expect(lapsed).toHaveCount(0);
+  await expect(ahead.getByRole("button", { name: en.shell.close })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(ahead).toHaveCount(0);
+  await expect(page.getByRole("button", { name: stopLabel("Crew A") })).toBeFocused();
+  expect(stopRequests, "neither an expired nor an ahead-of-clock stop is ever sent").toEqual([]);
 });
 
 /** The path of a Cache Storage entry listed as "<cache> <path+query>" (no query). */

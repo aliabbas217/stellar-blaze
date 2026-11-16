@@ -1,11 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefCallback } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefCallback } from "react";
 import { Spinner } from "@/components/states/Spinner";
 import { ACTION_SECONDARY } from "@/components/states/actions";
 import { useClock } from "@/features/demo/useClock";
-import { NOTIFY_WINDOW_MS, type StopNotices, type StopWorkOf } from "@/features/supervisor/useStopWork";
+import { NOTIFY_WINDOW_MS, type ExpiredNotice, type StopNotices, type StopWorkOf } from "@/features/supervisor/useStopWork";
 import { useTimeFormat } from "@/lib/time/use-time-format";
 
 /*
@@ -64,18 +64,23 @@ function useBarHeightPublisher(): RefCallback<HTMLDivElement> {
 }
 
 /**
- * The notices are at most 40 % of the viewport and scroll inside that: with several expired crews on a short screen (a phone in landscape,
- * 390 x 667) a bar of unbounded height would push the Stop button, or the first notice and its Close button, off the screen, and a fixed bar
- * cannot be scrolled to. The Stop button never moves out of view; the notices scroll behind a keyboard-focusable region.
+ * The bar fits ANY viewport (architect's rule): the Stop button is on screen down to 320 x 480 and at 200 % text, portrait and landscape, and
+ * the top of the bar is never cut off. A fixed bar cannot be scrolled to, so the bar is a flex column capped at the viewport (`INNER`) and the
+ * parts GIVE WAY in a fixed order when the screen is too short: first the notices region (`shrink-[1000]`, it scrolls: a flex item shrinks in
+ * proportion to its size times its shrink factor, so it reaches its minimum long before the rest moves), then the state line ("Not sent",
+ * `STATE`, it scrolls too), and never the Stop button (`shrink-0`). With several notices the region is also capped at 40 % of the viewport
+ * (`NOTICES_MAX`) so the page behind keeps its room; one notice has no cap of its own and shows whole whenever the screen has room.
  */
-const NOTICES_MAX = "max-h-[40dvh] overflow-y-auto overscroll-contain";
-const INNER = "mx-auto max-w-110 border-t-4 border-ink px-4 pt-3 pb-[calc(var(--s-3)+env(safe-area-inset-bottom))]";
+const NOTICES_MAX = "max-h-[40dvh]";
+const NOTICES_SCROLL = "min-h-0 shrink-[1000] overflow-y-auto overscroll-contain";
+const STATE = "min-h-0 overflow-y-auto";
+const INNER = "mx-auto flex max-h-dvh max-w-110 flex-col border-t-4 border-ink px-4 pt-3 pb-[calc(var(--s-3)+env(safe-area-inset-bottom))]";
 // The press target: an ink block with a second frame inside it (the stamp the screen's single primary action does not have).
-const PRESS = "block w-full touch-manipulation rounded-sign bg-ink p-1 font-body text-ground";
+const PRESS = "block w-full shrink-0 touch-manipulation rounded-sign bg-ink p-1 font-body text-ground";
 const PRESS_FRAME =
   "flex min-h-16 w-full items-center justify-center gap-3 rounded-sign border-2 border-ground px-4 text-xl font-bold leading-(--sign-leading-text)";
 const GHOST =
-  "flex min-h-14 w-full touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-lg font-semibold text-ground";
+  "flex min-h-14 w-full shrink-0 touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-lg font-semibold text-ground";
 const bdi = (chunks: ReactNode): ReactNode => <bdi>{chunks}</bdi>;
 
 /** The emergency mark: an octagon (the stop sign's shape) round a solid square. Decorative: the words say it. Drawn here, not in the pictogram set. */
@@ -176,43 +181,99 @@ export interface StopWorkBarProps {
 }
 
 // `rule` is the hairline under the notices: without it the last notice runs into the state line below it ("Not sent. Tell the crew now."), which reads as part of that notice.
-const NOTICE_LIGHT = { text: "text-ink-2", rule: "border-hair", close: `${ACTION_SECONDARY} min-h-11 shrink-0 px-4 text-base` } as const;
+const NOTICE_LIGHT = { text: "text-ink-2", rule: "border-hair", close: `${ACTION_SECONDARY} min-h-11 w-full px-4 text-base` } as const;
 const NOTICE_DARK = {
   text: "text-ground",
   rule: "border-ground",
   close:
-    "flex min-h-11 shrink-0 touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-base font-semibold text-ground",
+    "flex min-h-11 w-full touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-base font-semibold text-ground",
 } as const;
 
+/** The focus target after the last notice closes: the bar's own action (Stop, Undo or Resume, or the no-crew line). */
+const PRIMARY = "primary";
+
 /**
- * The stops that expired unsent, one notice per crew, until dismissed. The status region is ALWAYS mounted (empty when there is
- * nothing to say): a live region that is inserted already filled is not announced, one that is filled after it exists is. "Close"
- * is the shell's existing label; each button is described by its own notice so a screen reader hears which one it closes.
+ * Focus is handed to the bar's action when the last notice goes (architect's choice), and an Enter held down on that Close keeps firing
+ * `keydown` at whatever has focus: every repeat would press the action (Stop, Undo or Resume). A repeat never activates it; a fresh press
+ * does. Space presses on key up and is not affected.
  */
-function ExpiredNotices({ notices, tone }: { notices: StopNotices; tone: typeof NOTICE_LIGHT | typeof NOTICE_DARK }) {
+const ignoreRepeat = (event: KeyboardEvent<HTMLElement>): void => {
+  if (event.repeat) event.preventDefault();
+};
+
+/**
+ * The stops that expired unsent, one notice per crew and reason, until dismissed. The status region is ALWAYS mounted (empty when there is
+ * nothing to say): a live region that is inserted already filled is not announced, one that is filled after it exists is. "Close"
+ * is the shell's existing label, a full row UNDER its notice (a column beside the text would double the notice's height); each button is
+ * described by its own notice so a screen reader hears which one it closes. Closing a notice unmounts the focused button, so focus is
+ * handed on in the same commit: to the next notice's Close, else to the bar's own action (`focusPrimary`), never left on <body>.
+ */
+function ExpiredNotices({
+  notices,
+  tone,
+  focusPrimary,
+}: {
+  notices: StopNotices;
+  tone: typeof NOTICE_LIGHT | typeof NOTICE_DARK;
+  focusPrimary: () => void;
+}) {
   const t = useTranslations("supervisor.stop");
   const shell = useTranslations("shell");
   const prefix = useId();
+  const closes = useRef(new Map<string, HTMLButtonElement>());
+  // Where focus goes once the notice being closed is gone (a notice key, or PRIMARY); null when no close is under way.
+  const handOn = useRef<string | null>(null);
+  const keyOf = (notice: ExpiredNotice): string => `${notice.kind}:${notice.crewId}`;
+  const order = notices.expired.map(keyOf).join("|");
+
+  // A Close had focus when the notices last changed: if its notice then vanishes by itself (the stop was recorded, or the crews list shows the
+  // crew stopped) the browser drops focus to <body>; it is handed to the bar's action, the same place as after the last Close.
+  const closeHadFocus = useRef(false);
+
+  useEffect(() => {
+    const target = handOn.current;
+    handOn.current = null;
+    if (target === PRIMARY) focusPrimary();
+    else if (target !== null) closes.current.get(target)?.focus();
+    else if (closeHadFocus.current && (document.activeElement === null || document.activeElement === document.body)) focusPrimary();
+    closeHadFocus.current = [...closes.current.values()].some((button) => button === document.activeElement);
+  }, [order, focusPrimary]);
+
+  // One notice is never scrolled (the whole text and its Close are always visible); several share a region capped at 40 % of the screen.
+  const stacked = notices.expired.length > 1;
   return (
-    // With notices the region scrolls (NOTICES_MAX), so it is a focusable scroll container: a keyboard user can reach the notices below the fold of it.
+    // A region that scrolls is a focusable scroll container: a keyboard user can reach the notices below the fold of it.
     <div
       role="status"
       data-expired-stops=""
-      {...(notices.expired.length === 0 ? {} : { tabIndex: 0 })}
-      className={notices.expired.length === 0 ? undefined : `mb-3 flex flex-col gap-3 border-b pb-3 ${tone.rule} ${NOTICES_MAX}`}
+      {...(stacked ? { tabIndex: 0 } : {})}
+      className={notices.expired.length === 0 ? undefined : `mb-3 flex flex-col gap-3 border-b pb-3 ${tone.rule} ${NOTICES_SCROLL} ${stacked ? NOTICES_MAX : ""}`}
     >
-      {notices.expired.map((notice) => {
-        const id = `${prefix}-${notice.crewId}`;
+      {notices.expired.map((notice, index) => {
+        const id = `${prefix}-${keyOf(notice).replaceAll(":", "-")}`;
         return (
-          <div key={notice.crewId} data-expired-stop={notice.crewId} className="flex items-start justify-between gap-3">
+          <div key={keyOf(notice)} data-expired-stop={notice.crewId} data-expired-kind={notice.kind} className="flex shrink-0 flex-col gap-2">
             <p id={id} className={`text-base leading-(--sign-leading-text) ${tone.text}`}>
-              {t.rich("expired", { crew: notice.crewName, bdi })}
+              {t.rich(notice.kind === "clock" ? "expiredClock" : "expired", { crew: notice.crewName, bdi })}
             </p>
             <button
               type="button"
               aria-describedby={id}
+              onFocus={() => {
+                closeHadFocus.current = true;
+              }}
+              onBlur={(event) => {
+                // A button removed while focused may report a blur on its way out: that is not the focus moving on.
+                closeHadFocus.current = !event.currentTarget.isConnected;
+              }}
+              ref={(button) => {
+                if (button === null) closes.current.delete(keyOf(notice));
+                else closes.current.set(keyOf(notice), button);
+              }}
               onClick={() => {
-                notices.dismissExpired(notice.crewId);
+                const next = notices.expired[index + 1];
+                handOn.current = next === undefined ? PRIMARY : keyOf(next);
+                notices.dismissExpired(notice.crewId, notice.kind);
               }}
               className={tone.close}
             >
@@ -231,6 +292,14 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
   const [confirming, setConfirming] = useState(false);
   const clock = useClock();
   const publishHeight = useBarHeightPublisher();
+  // The bar's one action (Stop, Undo or Resume; the no-crew line when there is no crew): where focus goes when the last notice closes.
+  const primary = useRef<HTMLElement | null>(null);
+  const setPrimary = useCallback((element: HTMLElement | null) => {
+    primary.current = element;
+  }, []);
+  const focusPrimary = useCallback(() => {
+    primary.current?.focus();
+  }, []);
   // The target is always named: the crew's name, else its id, so the button and the confirmation never read as a bare "the crew".
   const label = crewName ?? work?.crewId ?? "";
   const at = work?.at === null || work?.at === undefined ? "" : time(new Date(work.at));
@@ -243,8 +312,8 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
     return (
       <div ref={publishHeight} data-emergency="" className={BAR}>
         <div className={`${INNER} bg-ground`}>
-          <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} />
-          <p role="status" className="py-2 text-lg font-semibold text-ink">
+          <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} focusPrimary={focusPrimary} />
+          <p ref={setPrimary} tabIndex={-1} role="status" className="py-2 text-lg font-semibold text-ink">
             {noCrew === "none" ? t("noCrews") : t("noCrew")}
           </p>
         </div>
@@ -259,8 +328,8 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
     return (
       <div ref={publishHeight} data-emergency="" data-stop-state={undoOpen ? "undo" : "stopped"} className={BAR}>
         <div className={`${INNER} border-ink bg-ink text-ground`}>
-          <ExpiredNotices notices={notices} tone={NOTICE_DARK} />
-          <div role="status" className="flex flex-col gap-1 pb-3">
+          <ExpiredNotices notices={notices} tone={NOTICE_DARK} focusPrimary={focusPrimary} />
+          <div role="status" className={`flex flex-col gap-1 pb-3 ${STATE}`}>
             {undoOpen ? (
               <p className="text-lg font-semibold leading-(--sign-leading-text)">{t.rich("recorded", { crew: label, time: at, bdi })}</p>
             ) : (
@@ -279,12 +348,14 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
             {work.noActiveStop ? <p className="text-base leading-(--sign-leading-text)">{t("noActiveStop")}</p> : null}
           </div>
           {undoOpen ? (
-            <button type="button" onClick={work.undo} className={GHOST}>
+            <button ref={setPrimary} type="button" onKeyDown={ignoreRepeat} onClick={work.undo} className={GHOST}>
               {t("undo", { seconds: String(work.undoSecondsLeft) })}
             </button>
           ) : (
             <button
+              ref={setPrimary}
               type="button"
+              onKeyDown={ignoreRepeat}
               onClick={() => {
                 setConfirming(true);
               }}
@@ -314,14 +385,14 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
   return (
     <div ref={publishHeight} data-emergency="" data-stop-state={work.state} className={BAR}>
       <div className={`${INNER} bg-ground`}>
-        <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} />
+        <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} focusPrimary={focusPrimary} />
         {work.state === "queued" ? (
-          <div role="alert" className="flex flex-col gap-1 pb-3 text-ink">
+          <div role="alert" className={`flex flex-col gap-1 pb-3 text-ink ${STATE}`}>
             <p className="text-lg font-semibold leading-(--sign-leading-text)">{t("queued")}</p>
             <p className="text-base leading-(--sign-leading-text) text-ink-2">{t.rich("queuedDetail", { crew: label, bdi })}</p>
           </div>
         ) : work.state === "failed" ? (
-          <div role="alert" className="flex flex-col gap-1 pb-3 text-ink">
+          <div role="alert" className={`flex flex-col gap-1 pb-3 text-ink ${STATE}`}>
             <p className="text-lg font-semibold leading-(--sign-leading-text)">{t("failed")}</p>
             <p className="text-base leading-(--sign-leading-text) text-ink-2">{t("failedDetail")}</p>
           </div>
@@ -336,7 +407,7 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
             {t("noActiveStop")}
           </p>
         ) : null}
-        <button type="button" aria-busy={work.state === "sending" || work.busy} onClick={work.stop} className={PRESS}>
+        <button ref={setPrimary} type="button" aria-busy={work.state === "sending" || work.busy} onKeyDown={ignoreRepeat} onClick={work.stop} className={PRESS}>
           <span className={PRESS_FRAME}>
             {work.state === "sending" ? <Spinner className="size-7" /> : <StopMark />}
             <span>{t.rich("button", { crew: label, bdi })}</span>

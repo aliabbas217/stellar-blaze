@@ -1,4 +1,5 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
+import { defaultScheduler, notifyManager } from "@tanstack/react-query";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { IDBFactory } from "fake-indexeddb";
 import { http, HttpResponse } from "msw/http";
@@ -9,7 +10,7 @@ import { enqueueStop, expiredStops, OUTBOX_ROW_TTL_MS, pendingStops } from "@/fe
 import { clearStop, createStop, crewStops, resetDemoState } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
 import { renderWithIntl } from "../../../utils/intl";
-import { gatedOpen, refusingGet } from "./outbox-faults";
+import { addRawRow, gatedOpen, holdingOpen, refusingGet } from "./outbox-faults";
 import { renderCrews, renderPlan, stopBar, textOf, installSupervisorTestEnvironment } from "./support";
 
 /*
@@ -466,7 +467,7 @@ describe("Stop work: never shown as delivered when it was not", () => {
   it("a stop waiting in the outbox when the app opens is sent then, and recorded only after the API answered", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", recent(), factory);
+    await enqueueStop("crew-a", recent(), { factory });
     renderCrews();
 
     await waitFor(() => {
@@ -481,7 +482,7 @@ describe("Stop work: never shown as delivered when it was not", () => {
   it("a stop the API keeps refusing (429) stays in the outbox and is not reported sent", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", recent(), factory);
+    await enqueueStop("crew-a", recent(), { factory });
     server.use(http.post(STOP_ROUTE, () => problem429()));
     renderCrews();
     await press();
@@ -626,7 +627,7 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("with no signal and a row already waiting, the bar opens on 'Not sent: no signal', and pressing again writes no second row", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", recent(), factory);
+    await enqueueStop("crew-a", recent(), { factory });
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
     const user = userEvent.setup();
     renderCrews();
@@ -647,7 +648,7 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("online with the API refusing the waiting row (429), the bar reads 'Not sent' instead of a plain idle button", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", recent(), factory);
+    await enqueueStop("crew-a", recent(), { factory });
     server.use(http.post(STOP_ROUTE, () => problem429()));
     renderCrews();
 
@@ -658,9 +659,9 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("enqueueStop keeps one row per crew even when two presses race", async () => {
     const factory = new IDBFactory();
     await Promise.all([
-      enqueueStop("crew-a", recent(), factory),
-      enqueueStop("crew-a", recent(), factory),
-      enqueueStop("crew-b", recent(), factory),
+      enqueueStop("crew-a", recent(), { factory }),
+      enqueueStop("crew-a", recent(), { factory }),
+      enqueueStop("crew-b", recent(), { factory }),
     ]);
 
     const rows = await pendingStops(factory);
@@ -670,7 +671,7 @@ describe("Stop work: a stop kept in the outbox is still 'Not sent' after a reloa
   it("a drain that finishes after the bar moved to the focal crew reconciles on that crew: it refreshes and reads the recorded stop", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", recent(), factory);
+    await enqueueStop("crew-a", recent(), { factory });
     // The drain starts while the demo's stand-in crew (crew-b) is the bar's crew; the POST answers only once the crew list has
     // arrived and the focal crew (Crew A) has taken over, so the drain's own effect run is no longer the live one.
     let release: () => void = () => undefined;
@@ -723,7 +724,7 @@ describe("Stop work: Resume sends the server's stop id when another phone re-sto
     const before = listRequests;
     await act(async () => {
       vi.advanceTimersByTime(60_000);
-      window.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
       await Promise.resolve();
     });
     await waitFor(() => {
@@ -929,7 +930,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("an old row is not sent: no POST, the notice names the crew as the button does ('Crew A', never 'Crew Crew A'), and Stop work is a plain idle button", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", hoursAgo(2), factory, "Crew A");
+    await enqueueStop("crew-a", hoursAgo(2), { factory, crewName: "Crew A" });
     let posts = 0;
     server.events.on("request:start", ({ request }) => {
       if (request.method === "POST") posts += 1;
@@ -954,7 +955,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
-    await enqueueStop("crew-a", hoursAgo(3), factory);
+    await enqueueStop("crew-a", hoursAgo(3), { factory });
     renderCrews();
     await press();
 
@@ -966,7 +967,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("a fresh row is sent as before and shows no notice", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", new Date(Date.now() - 59 * 60 * 1000), factory);
+    await enqueueStop("crew-a", new Date(Date.now() - 59 * 60 * 1000), { factory });
     renderCrews();
 
     await barSays("Work stopped 11:10");
@@ -978,7 +979,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("the supervisor's next press for that crew dismisses its notice for good, whatever that press does", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", hoursAgo(2), factory);
+    await enqueueStop("crew-a", hoursAgo(2), { factory });
     const user = userEvent.setup();
     renderCrews();
     await barSays(noticeFor("Crew A"));
@@ -996,7 +997,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("a stop that expired for a crew the bar is NOT about is told too: found at app open, under Crew A's Stop work, naming Crew D", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-d", hoursAgo(2), factory);
+    await enqueueStop("crew-d", hoursAgo(2), { factory });
     renderCrews();
 
     await barSays(noticeFor("Crew D"));
@@ -1012,7 +1013,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
     renderCrews();
     await press();
     expect(barText()).not.toContain("was not sent");
-    await enqueueStop("crew-d", hoursAgo(2), factory);
+    await enqueueStop("crew-d", hoursAgo(2), { factory });
 
     act(() => {
       window.dispatchEvent(new Event("online"));
@@ -1025,8 +1026,8 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("several expired stops: one notice per crew, each with its own Close", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-c", hoursAgo(2), factory);
-    await enqueueStop("crew-d", hoursAgo(3), factory);
+    await enqueueStop("crew-c", hoursAgo(2), { factory });
+    await enqueueStop("crew-d", hoursAgo(3), { factory });
     renderCrews();
     await press();
 
@@ -1042,7 +1043,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("the notice survives a reload until it is dismissed, and Close removes it for good", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-d", hoursAgo(2), factory);
+    await enqueueStop("crew-d", hoursAgo(2), { factory });
     const user = userEvent.setup();
     const first = renderCrews();
     await barSays(noticeFor("Crew D"));
@@ -1071,7 +1072,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("Stop work for another crew leaves a notice alone: only a press, undo or resume for ITS crew (or Close) dismisses it", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-d", hoursAgo(2), factory);
+    await enqueueStop("crew-d", hoursAgo(2), { factory });
     const user = userEvent.setup();
     renderCrews();
     await barSays(noticeFor("Crew D"));
@@ -1085,8 +1086,8 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("names the crew from the row when the crews list does not know it, and by its id when nothing does", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-z", hoursAgo(2), factory, "Crew Z");
-    await enqueueStop("crew-q", hoursAgo(2), factory);
+    await enqueueStop("crew-z", hoursAgo(2), { factory, crewName: "Crew Z" });
+    await enqueueStop("crew-q", hoursAgo(2), { factory });
     renderCrews();
     await press();
 
@@ -1101,7 +1102,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
   it("the crew detail screen tells it too: Crew A's expired stop is told on Crew B's page", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", hoursAgo(2), factory);
+    await enqueueStop("crew-a", hoursAgo(2), { factory });
     renderPlan("crew-b");
 
     await barSays(noticeFor("Crew A"));
@@ -1111,7 +1112,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
     const onLine = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
-    await enqueueStop("crew-a", hoursAgo(2), factory);
+    await enqueueStop("crew-a", hoursAgo(2), { factory });
     const user = userEvent.setup();
     renderCrews();
     await barSays(noticeFor("Crew A"));
@@ -1137,7 +1138,7 @@ describe("Stop work: a stop that expired unsent is told for ANY crew, durably, u
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
-    await enqueueStop("crew-a", hoursAgo(2), factory);
+    await enqueueStop("crew-a", hoursAgo(2), { factory });
     renderCrews();
     await press();
     const seen: string[] = [];
@@ -1161,6 +1162,9 @@ function isFresh(iso: string | undefined): boolean {
 }
 
 describe("Stop work: a queued stop that expires while the page is open (I1)", () => {
+  afterEach(() => {
+    notifyManager.setScheduler(defaultScheduler);
+  });
   const noticeFor = (crew: string): string => en.supervisor.stop.expired.replace("<bdi>{crew}</bdi>", crew);
   const KEPT = /Not sent|kept on this phone|sent when it is back online/;
   const TTL = OUTBOX_ROW_TTL_MS;
@@ -1203,45 +1207,44 @@ describe("Stop work: a queued stop that expires while the page is open (I1)", ()
   });
 
   it("(b) held open offline: ONE timer set for the row's expiry flips 'Not sent / kept' to the notice at 60 minutes and 1 ms, not at 60 minutes, and the next press queues a fresh row", async () => {
-    // Timers (setTimeout included) are fake from the first render, so the hook's timer is armed on them. TanStack Query batches its
-    // notifications with setTimeout(0): a real-time pump lets zero-delay timers run without moving the clock.
+    // Timers (setTimeout included) are fake from the first render, so the hook's timer is armed on them. Testing Library only drives fake
+    // timers when it finds a `jest` global (its asyncWrapper otherwise waits on a fake setTimeout(0) that never runs): the stub below hands it
+    // vitest's clock, so its waits advance the fake clock themselves and no real-time pump is needed. TanStack's notification batching
+    // (setTimeout(0)) is moved to a microtask for the test and restored in `afterEach`.
+    vi.stubGlobal("jest", { advanceTimersByTime: (ms: number) => vi.advanceTimersByTime(ms) });
+    notifyManager.setScheduler((callback) => {
+      queueMicrotask(callback);
+    });
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
-    const pump = setInterval(() => {
-      vi.advanceTimersByTime(0);
-    }, 5);
-    try {
-      const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
-      const { at, factory } = await queueOffline(user);
-      // Exactly 60 minutes after the row's time: still waiting.
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(at + TTL - Date.now());
-      });
-      expect(Date.now()).toBe(at + TTL);
-      expect(barText()).toContain("kept on this phone and sent when it is back online");
-      expect(barText()).not.toContain("was not sent. It waited");
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+    const { at, factory } = await queueOffline(user);
+    // Exactly 60 minutes after the row's time: still waiting.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(at + TTL - Date.now());
+    });
+    expect(Date.now()).toBe(at + TTL);
+    expect(barText()).toContain("kept on this phone and sent when it is back online");
+    expect(barText()).not.toContain("was not sent. It waited");
 
-      // One millisecond later: the notice, and the kept line is gone.
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1);
-      });
-      await barSays(noticeFor("Crew A"));
-      expect(barText()).not.toMatch(KEPT);
-      // The notice never waits on the store; the row is marked expired right behind it.
-      await waitFor(async () => {
-        expect(await pendingStops(factory)).toEqual([]);
-      });
+    // One millisecond later: the notice, and the kept line is gone.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await barSays(noticeFor("Crew A"));
+    expect(barText()).not.toMatch(KEPT);
+    // The notice never waits on the store; the row is marked expired right behind it.
+    await waitFor(async () => {
+      expect(await pendingStops(factory)).toEqual([]);
+    });
 
-      // The next press is not ignored: it queues a FRESH row and the notice is over.
-      await user.click(await press());
-      await barSays("Not sent: no signal. Tell the crew now.");
-      const rows = await pendingStops(factory);
-      expect(rows).toHaveLength(1);
-      expect(Date.parse(rows[0]?.clientTime ?? "")).toBeGreaterThanOrEqual(at + TTL);
-      expect(barText()).not.toContain("was not sent. It waited");
-    } finally {
-      clearInterval(pump);
-    }
-  });
+    // The next press is not ignored: it queues a FRESH row and the notice is over.
+    await user.click(await press());
+    await barSays("Not sent: no signal. Tell the crew now.");
+    const rows = await pendingStops(factory);
+    expect(rows).toHaveLength(1);
+    expect(Date.parse(rows[0]?.clientTime ?? "")).toBeGreaterThanOrEqual(at + TTL);
+    expect(barText()).not.toContain("was not sent. It waited");
+  }, 20_000);
 
   it("(c) returning to the page re-checks the age: exactly 60 minutes still waits, 1 ms more tells it (visibilitychange)", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -1251,7 +1254,7 @@ describe("Stop work: a queued stop that expires while the page is open (I1)", ()
 
     vi.setSystemTime(at + TTL);
     act(() => {
-      window.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
     });
     await settle();
     expect(barText()).toContain("kept on this phone and sent when it is back online");
@@ -1259,7 +1262,7 @@ describe("Stop work: a queued stop that expires while the page is open (I1)", ()
 
     vi.setSystemTime(at + TTL + 1);
     act(() => {
-      window.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
     });
     await barSays(noticeFor("Crew A"));
     expect(barText()).not.toMatch(KEPT);
@@ -1296,11 +1299,360 @@ describe("Stop work: a queued stop that expires while the page is open (I1)", ()
   });
 });
 
+describe("Stop work: two notice texts, one per reason (W6 fix 2, item 8)", () => {
+  const hoursAgo = (hours: number): Date => new Date(Date.now() - hours * 60 * 60 * 1000);
+  const minutesAhead = (minutes: number): string => new Date(Date.now() + minutes * 60 * 1000).toISOString();
+  const lapsedFor = (crew: string): string => en.supervisor.stop.expired.replace("<bdi>{crew}</bdi>", crew);
+  const clockFor = (crew: string): string => en.supervisor.stop.expiredClock.replace("<bdi>{crew}</bdi>", crew);
+  const noticeEl = (crewId: string, kind?: string): HTMLElement | null =>
+    document.querySelector<HTMLElement>(`[data-expired-stop="${crewId}"]${kind === undefined ? "" : `[data-expired-kind="${kind}"]`}`);
+
+  it("the catalogue holds the architect's second text, it is a safety key with the same placeholder as the first, and it claims neither a wait nor a delivery", () => {
+    expect(en.supervisor.stop.expiredClock).toBe(
+      "Stop for <bdi>{crew}</bdi> was not sent. The time on this phone looked wrong when it was pressed, so it was not kept. Tell the crew now, by voice or radio, and press Stop again when you are online.",
+    );
+    expect((en._meta.safety_keys as readonly string[]).includes("supervisor.stop.expiredClock")).toBe(true);
+    expect(en.supervisor.stop.expiredClock).not.toMatch(/60 minutes|waited/);
+    expect(withoutWindow(en.supervisor.stop.expiredClock)).not.toMatch(DELIVERY_CLAIM);
+    expect(en.supervisor.stop.expiredClock.match(/\{\w+\}/g)).toEqual(en.supervisor.stop.expired.match(/\{\w+\}/g));
+  });
+
+  it("(a) a row older than the TTL shows the 60-minute text and never the clock text", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-d", hoursAgo(2), { factory });
+    renderCrews();
+    await barSays(lapsedFor("Crew D"));
+    expect(barText()).toContain("waited 60 minutes");
+    expect(barText()).not.toContain("looked wrong");
+  });
+
+  it("(b) a row more than 5 minutes ahead of the phone's clock shows the clock text and never '60 minutes'; exactly +5 minutes is still fresh and is sent without a notice", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await addRawRow(factory, { crewId: "crew-d", clientTime: minutesAhead(10) });
+    await addRawRow(factory, { crewId: "crew-c", clientTime: minutesAhead(5) });
+    renderCrews();
+
+    await barSays(clockFor("Crew D"));
+    expect(barText()).not.toContain("60 minutes");
+    expect(barText()).not.toContain("waited");
+    // The edge row (+5 minutes, a moment older by now) is fresh: no notice for Crew C, and its stop went out.
+    expect(noticeEl("crew-c")).toBeNull();
+    await waitFor(() => {
+      expect(crewStops("crew-c")).toHaveLength(1);
+    }, SLOW);
+    expect(crewStops("crew-d")).toHaveLength(0);
+  });
+
+  it("(c) a row whose time cannot be read shows the clock text", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await addRawRow(factory, { crewId: "crew-d", clientTime: "not a time" });
+    renderCrews();
+
+    await barSays(clockFor("Crew D"));
+    expect(barText()).not.toContain("60 minutes");
+    expect(crewStops("crew-d")).toHaveLength(0);
+    expect((await expiredStops(factory)).map((row) => [row.crewId, row.expiredKind])).toEqual([["crew-d", "clock"]]);
+  });
+
+  it("(d) both kinds survive a reload until Close: a crew with both has both lines, each with its own Close that removes only itself", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-c", hoursAgo(2), { factory });
+    await addRawRow(factory, { crewId: "crew-d", clientTime: minutesAgoIso(120) });
+    await addRawRow(factory, { crewId: "crew-d", clientTime: minutesAhead(10) });
+    const user = userEvent.setup();
+    const first = renderCrews();
+    await waitFor(() => {
+      expect(noticeEl("crew-c", "lapsed")).not.toBeNull();
+      expect(noticeEl("crew-d", "lapsed")).not.toBeNull();
+      expect(noticeEl("crew-d", "clock")).not.toBeNull();
+      // The rows carry no crew name: the notice names the crew by its id until the crews list has answered, then by its name. Wait for the
+      // name (asserting at once raced the crews request under load).
+      expect(textOf(noticeEl("crew-d", "clock"))).toContain(clockFor("Crew D"));
+      expect(textOf(noticeEl("crew-d", "lapsed"))).toContain(lapsedFor("Crew D"));
+    }, SLOW);
+
+    first.unmount();
+    renderCrews();
+    await waitFor(() => {
+      expect(noticeEl("crew-c", "lapsed")).not.toBeNull();
+      expect(noticeEl("crew-d", "lapsed")).not.toBeNull();
+      expect(noticeEl("crew-d", "clock")).not.toBeNull();
+    }, SLOW);
+
+    await user.click(within(noticeEl("crew-d", "clock") as HTMLElement).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(noticeEl("crew-d", "clock")).toBeNull();
+    });
+    expect(noticeEl("crew-d", "lapsed")).not.toBeNull();
+    await waitFor(async () => {
+      expect((await expiredStops(factory)).map((row) => [row.crewId, row.expiredKind])).toEqual([
+        ["crew-c", "lapsed"],
+        ["crew-d", "lapsed"],
+      ]);
+    });
+  });
+
+  it("(e) item 2: a store that cannot mark the row still tells it from memory, with the right text for each kind, and the row is never sent", async () => {
+    const real = new IDBFactory();
+    await enqueueStop("crew-c", hoursAgo(2), { factory: real });
+    await addRawRow(real, { crewId: "crew-d", clientTime: minutesAhead(10) });
+    vi.stubGlobal("indexedDB", refusingGet(real, () => true));
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    renderCrews();
+    await press();
+
+    await barSays(lapsedFor("Crew C"));
+    await barSays(clockFor("Crew D"));
+    expect(await expiredStops(real)).toEqual([]);
+    expect((await pendingStops(real)).map((row) => row.crewId)).toContain("crew-c");
+    expect(crewStops("crew-c")).toHaveLength(0);
+    expect(crewStops("crew-d")).toHaveLength(0);
+  });
+
+  it("(e) item 2, the drain path: a row another tab left, expired, that the store cannot mark, is told after the online event", async () => {
+    const real = new IDBFactory();
+    vi.stubGlobal("indexedDB", refusingGet(real, () => true));
+    renderCrews();
+    await press();
+    expect(barText()).not.toContain("was not sent");
+    await enqueueStop("crew-d", hoursAgo(2), { factory: real });
+    await addRawRow(real, { crewId: "crew-c", clientTime: minutesAhead(30) });
+
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await barSays(lapsedFor("Crew D"));
+    await barSays(clockFor("Crew C"));
+    expect(crewStops("crew-d")).toHaveLength(0);
+    expect(crewStops("crew-c")).toHaveLength(0);
+  });
+});
+
+/** An ISO time `minutes` before now (the row of a stop pressed that long ago, on the phone's clock). */
+function minutesAgoIso(minutes: number): string {
+  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+}
+
+describe("Stop work: an expiry while the POST is in flight, and a sweep that races a press (W6 fix 2, items 4 and 7)", () => {
+  const lapsedFor = (crew: string): string => en.supervisor.stop.expired.replace("<bdi>{crew}</bdi>", crew);
+  const noticeEl = (crewId: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-expired-stop="${crewId}"]`);
+
+  it("item 4: the row's POST is in flight as the TTL passes: the notice may show while it is unanswered, but once the POST succeeds the false 'was not sent' is gone and 'Work stopped' stands alone", async () => {
+    // A fake `Date` makes the age exact: the row has 1 s of life when the drain sends it, and the test (not the machine's load) moves the
+    // clock past the TTL while the request is held. The hook's timer is real and re-arms until the fake clock says the row is expired.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    const written = Date.now() - OUTBOX_ROW_TTL_MS + 1_000;
+    await addRawRow(factory, { crewId: "crew-a", clientTime: new Date(written).toISOString() });
+    let posting: () => void = () => undefined;
+    const posted = new Promise<void>((resolve) => {
+      posting = resolve;
+    });
+    let answer: () => void = () => undefined;
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      http.post(STOP_ROUTE, async ({ params }) => {
+        posting();
+        await answered;
+        const recorded = createStop(String(params["crew_id"]));
+        return HttpResponse.json(recorded, { status: 201 });
+      }),
+    );
+    renderCrews();
+    await press();
+    await posted;
+
+    // The TTL passes while the request is unanswered: the timer's notice appears, and the sweep behind it marks the row.
+    vi.setSystemTime(written + OUTBOX_ROW_TTL_MS + 1);
+    await barSays(lapsedFor("Crew A"));
+    await waitFor(async () => {
+      expect((await expiredStops(factory)).map((row) => row.crewId)).toEqual(["crew-a"]);
+    }, SLOW);
+
+    answer();
+    await barSays("Work stopped 11:10");
+    // The store is settled once the drain has removed the row; nothing is left in flight that could bring the notice back.
+    await waitFor(async () => {
+      expect(await expiredStops(factory)).toEqual([]);
+      expect(await pendingStops(factory)).toEqual([]);
+    }, SLOW);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(barText()).toContain("Work stopped 11:10");
+    expect(barText()).not.toContain("was not sent");
+    expect(document.querySelector("[data-expired-stop]")).toBeNull();
+  }, 20_000);
+
+  it("item 4, negative: the same in-flight row whose POST is REFUSED after the TTL keeps its notice (it truly was not sent) and never reads 'Work stopped'", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    const written = Date.now() - OUTBOX_ROW_TTL_MS + 1_000;
+    await addRawRow(factory, { crewId: "crew-a", clientTime: new Date(written).toISOString() });
+    let posting: () => void = () => undefined;
+    const posted = new Promise<void>((resolve) => {
+      posting = resolve;
+    });
+    let answer: () => void = () => undefined;
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      http.post(STOP_ROUTE, async () => {
+        posting();
+        await answered;
+        return problem429();
+      }),
+    );
+    renderCrews();
+    await press();
+    await posted;
+    vi.setSystemTime(written + OUTBOX_ROW_TTL_MS + 1);
+    await barSays(lapsedFor("Crew A"));
+
+    const refused = new Promise<void>((resolve) => {
+      server.events.on("response:mocked", ({ request }) => {
+        if (request.method === "POST") resolve();
+      });
+    });
+    answer();
+    await refused;
+    // The refusal is a "keep" (429): nothing observable follows it, so the negative assertions below wait one short real tick for the
+    // drain's tail. A tick that is too short can only make them pass vacuously, never fail; the notice is also asserted positively first.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    server.events.removeAllListeners();
+
+    expect(barText()).toContain(lapsedFor("Crew A"));
+    expect(barText()).not.toContain("Work stopped");
+    expect(crewStops("crew-a")).toHaveLength(0);
+  }, 20_000);
+
+  it("item 7: a Close between the lapse and the end of the sweep does not bring the notice back or leave a tombstone behind", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const real = new IDBFactory();
+    const held = holdingOpen(real);
+    vi.stubGlobal("indexedDB", held.factory);
+    vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+    renderCrews();
+    await user.click(await press());
+    await barSays("Not sent: no signal. Tell the crew now.");
+    const [row] = await pendingStops(real);
+    const at = Date.parse(row?.clientTime ?? "");
+
+    // The sweep reads the row (open 1) and would mark it (open 2): hold the marking.
+    const { release, reached } = held.hold(2);
+    vi.setSystemTime(at + OUTBOX_ROW_TTL_MS + 1);
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    });
+    // The notice shows from memory at once; the sweep is parked at its marking. The supervisor closes the notice while it waits.
+    await barSays(lapsedFor("Crew A"));
+    await reached;
+    await user.click(within(noticeEl("crew-a") as HTMLElement).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(noticeEl("crew-a")).toBeNull();
+    });
+
+    release();
+    // A sleep stays: after release() the parked sweep has nothing observable to await (its mark finds the row gone and writes nothing).
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(noticeEl("crew-a")).toBeNull();
+    expect(await expiredStops(real)).toEqual([]);
+  });
+});
+
+describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
+  const hoursAgo = (hours: number): Date => new Date(Date.now() - hours * 60 * 60 * 1000);
+  const closeOf = (crewId: string): HTMLElement =>
+    within(document.querySelector<HTMLElement>(`[data-expired-stop="${crewId}"]`) as HTMLElement).getByRole("button", { name: "Close" });
+
+  it("Close with the keyboard moves focus to the next notice's Close, then (last) to the Stop button; it never falls to <body>", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-c", hoursAgo(2), { factory });
+    await enqueueStop("crew-d", hoursAgo(3), { factory });
+    const user = userEvent.setup();
+    renderCrews();
+    await waitFor(() => {
+      expect(document.querySelectorAll("[data-expired-stop]")).toHaveLength(2);
+    }, SLOW);
+    const stopButton = await press();
+
+    // Oldest first: Crew D (3 hours) is the first notice, Crew C (2 hours) the second.
+    closeOf("crew-d").focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(document.querySelector('[data-expired-stop="crew-d"]')).toBeNull();
+    });
+    expect(document.activeElement).toBe(closeOf("crew-c"));
+
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(document.querySelector("[data-expired-stop]")).toBeNull();
+    });
+    expect(document.activeElement).toBe(stopButton);
+    // The press that closed the last notice did not press Stop.
+    expect(crewStops("crew-a")).toHaveLength(0);
+  });
+
+  it("closing the first of several notices with the pointer moves focus the same way", async () => {
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-c", hoursAgo(2), { factory });
+    await enqueueStop("crew-d", hoursAgo(3), { factory });
+    const user = userEvent.setup();
+    renderCrews();
+    await waitFor(() => {
+      expect(document.querySelectorAll("[data-expired-stop]")).toHaveLength(2);
+    }, SLOW);
+
+    // Oldest first: Crew D (3 hours) is the first notice, Crew C (2 hours) the second.
+    await user.click(closeOf("crew-d"));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(closeOf("crew-c"));
+    });
+  });
+
+  it("in the stopped state the last Close hands focus to the bar's one action (Resume work), not to <body>", async () => {
+    createStop("crew-a");
+    const factory = new IDBFactory();
+    vi.stubGlobal("indexedDB", factory);
+    await enqueueStop("crew-d", hoursAgo(2), { factory });
+    const user = userEvent.setup();
+    renderCrews();
+    await waitFor(() => {
+      expect(document.querySelector('[data-expired-stop="crew-d"]')).not.toBeNull();
+    }, SLOW);
+
+    closeOf("crew-d").focus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(document.querySelector("[data-expired-stop]")).toBeNull();
+    });
+    expect(document.activeElement).toBe(within(stopBar()).getByRole("button", { name: "Resume work" }));
+  });
+});
+
 describe("Stop work: the outbox's own failures never hide a waiting stop or re-tell a stale one (W6 minors 1 to 4)", () => {
   it("minor 1: a store that cannot mark an expired row still shows the waiting row of this crew as 'Not sent'", async () => {
     const real = new IDBFactory();
-    await enqueueStop("crew-d", new Date(Date.now() - 2 * 60 * 60 * 1000), real);
-    await enqueueStop("crew-a", new Date(Date.now() - 5 * 60 * 1000), real);
+    await enqueueStop("crew-d", new Date(Date.now() - 2 * 60 * 60 * 1000), { factory: real });
+    await enqueueStop("crew-a", new Date(Date.now() - 5 * 60 * 1000), { factory: real });
     const [stale] = await pendingStops(real);
     vi.stubGlobal("indexedDB", refusingGet(real, (key) => key === stale?.key));
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
@@ -1310,11 +1662,13 @@ describe("Stop work: the outbox's own failures never hide a waiting stop or re-t
     await barSays("Not sent: no signal. Tell the crew now.");
     expect(stopBar()).toHaveAttribute("data-stop-state", "queued");
     expect(crewStops("crew-d")).toHaveLength(0);
+    // Item 2: crew-d's expired row could not be marked, and it is still told (from memory), never lost and never sent.
+    await barSays(en.supervisor.stop.expired.replace("<bdi>{crew}</bdi>", "Crew D"));
   });
 
   it("minor 2: a mount-time check that finishes AFTER the supervisor pressed Stop does not bring the notice back", async () => {
     const real = new IDBFactory();
-    await enqueueStop("crew-a", new Date(Date.now() - 2 * 60 * 60 * 1000), real);
+    await enqueueStop("crew-a", new Date(Date.now() - 2 * 60 * 60 * 1000), { factory: real });
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -1330,6 +1684,7 @@ describe("Stop work: the outbox's own failures never hide a waiting stop or re-t
     await waitFor(async () => {
       expect((await pendingStops(real)).length).toBe(0);
     }, SLOW);
+    // A sleep stays: the check that began at app open has nothing observable to await once the supervisor's press has ended its notice.
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     expect(barText()).toContain("Stop recorded");
@@ -1347,7 +1702,7 @@ describe("Stop work: the outbox's own failures never hide a waiting stop or re-t
     expect(region).toHaveAttribute("role", "status");
     expect(textOf(region)).toBe("");
 
-    await enqueueStop("crew-d", new Date(Date.now() - 2 * 60 * 60 * 1000), factory);
+    await enqueueStop("crew-d", new Date(Date.now() - 2 * 60 * 60 * 1000), { factory });
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
@@ -1418,6 +1773,7 @@ describe("Stop work: a timed-out undo, resume or drain asks the server what is t
     await waitFor(() => {
       expect(lists.count()).toBe(before + 1);
     });
+    // A sleep stays: "exactly one refetch" is a negative (a storm is not an event we can await). Too short a wait can only pass vacuously, never fail.
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(lists.count()).toBe(before + 1);
     lists.stop();
@@ -1443,6 +1799,7 @@ describe("Stop work: a timed-out undo, resume or drain asks the server what is t
       expect(lists.count()).toBe(before + 1);
     });
     // Exactly one: a refetch storm (a retry loop, a refresh per state change) must fail here, so give a second one time to show up.
+    // A sleep stays: "exactly one refetch" is a negative (a storm is not an event we can await). Too short a wait can only pass vacuously, never fail.
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(lists.count()).toBe(before + 1);
     lists.stop();
@@ -1451,7 +1808,7 @@ describe("Stop work: a timed-out undo, resume or drain asks the server what is t
   it("a drain whose POST times out but landed on the server reads the recorded stop, not 'Not sent'", async () => {
     const factory = new IDBFactory();
     vi.stubGlobal("indexedDB", factory);
-    await enqueueStop("crew-a", recent(), factory);
+    await enqueueStop("crew-a", recent(), { factory });
     const timeouts = controlledTimeouts();
     // The server records the stop only once the crews list has loaded (the screen's first read says "nothing stopped"): a drain that is
     // quicker than the list would otherwise make the first read already show the stop, and the intermediate "Not sent" would never exist.

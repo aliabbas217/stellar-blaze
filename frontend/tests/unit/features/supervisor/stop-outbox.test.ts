@@ -24,7 +24,7 @@ const NOON = justNow();
 describe("stop outbox", () => {
   it("writes a stop as the crew id and the client time, and nothing else", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", NOON, factory);
+    await enqueueStop("crew-b", NOON, { factory });
 
     const rows = await pendingStops(factory);
     expect(rows).toHaveLength(1);
@@ -34,7 +34,7 @@ describe("stop outbox", () => {
 
   it("uses the database name the ruling fixes, sb-stop-outbox-v1", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", NOON, factory);
+    await enqueueStop("crew-b", NOON, { factory });
 
     const names = (await factory.databases()).map((database) => database.name);
     expect(names).toEqual([STOP_OUTBOX_DB]);
@@ -43,8 +43,8 @@ describe("stop outbox", () => {
 
   it("test_stop_outbox_survives_reload: a new connection reads what an earlier one wrote, oldest first", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", new Date("2026-09-03T08:00:00Z"), factory);
-    await enqueueStop("crew-a", new Date("2026-09-03T08:01:00Z"), factory);
+    await enqueueStop("crew-b", new Date("2026-09-03T08:00:00Z"), { factory });
+    await enqueueStop("crew-a", new Date("2026-09-03T08:01:00Z"), { factory });
 
     // Each call opens and closes its own connection: this is what a reloaded page does.
     expect((await pendingStops(factory)).map((row) => row.crewId)).toEqual(["crew-b", "crew-a"]);
@@ -58,8 +58,8 @@ describe("stop outbox", () => {
 
   it("drain removes a row only when the sender says done: a row that must stay is still there next time", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", NOON, factory);
-    await enqueueStop("crew-a", NOON, factory);
+    await enqueueStop("crew-b", NOON, { factory });
+    await enqueueStop("crew-a", NOON, { factory });
 
     const { done } = await drainStopOutbox((row) => Promise.resolve(row.crewId === "crew-b" ? "done" : "keep"), factory);
 
@@ -69,7 +69,7 @@ describe("stop outbox", () => {
 
   it("never reports a stop as sent by itself: a sender that fails leaves every row", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", NOON, factory);
+    await enqueueStop("crew-b", NOON, { factory });
 
     await expect(drainStopOutbox(() => Promise.reject(new Error("offline")), factory)).rejects.toThrow("offline");
     expect(await pendingStops(factory)).toHaveLength(1);
@@ -77,7 +77,7 @@ describe("stop outbox", () => {
 
   it("one drain runs at a time: a second call joins the first and each row is sent once", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", NOON, factory);
+    await enqueueStop("crew-b", NOON, { factory });
     const send = vi.fn(() => Promise.resolve("done" as const));
 
     const [first, second] = await Promise.all([drainStopOutbox(send, factory), drainStopOutbox(send, factory)]);
@@ -90,7 +90,7 @@ describe("stop outbox", () => {
 
   it("with no IndexedDB there is no outbox: a stop cannot be kept, and says so", async () => {
     expect(outboxAvailable(undefined)).toBe(false);
-    await expect(enqueueStop("crew-b", NOON, undefined)).rejects.toThrow(/cannot be kept/);
+    await expect(enqueueStop("crew-b", NOON, { factory: undefined })).rejects.toThrow(/cannot be kept/);
     expect(await pendingStops(undefined)).toEqual([]);
   });
 });
@@ -155,7 +155,7 @@ describe("W6.1: IndexedDB never holds a safety action forever", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { factory, opens } = hungOpen();
     let settled = false;
-    const outcome = enqueueStop("crew-b", NOON, factory).then(
+    const outcome = enqueueStop("crew-b", NOON, { factory }).then(
       () => "resolved",
       (error: unknown) => (error instanceof Error ? error.message : "rejected"),
     );
@@ -175,7 +175,7 @@ describe("W6.1: IndexedDB never holds a safety action forever", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const stalled = stalledTransaction();
 
-    const outcome = expect(enqueueStop("crew-b", NOON, stalled.factory)).rejects.toThrow(/timed out/i);
+    const outcome = expect(enqueueStop("crew-b", NOON, { factory: stalled.factory })).rejects.toThrow(/timed out/i);
     await vi.advanceTimersByTimeAsync(OUTBOX_IO_TIMEOUT_MS);
     await outcome;
 
@@ -204,7 +204,7 @@ describe("W6.1: IndexedDB never holds a safety action forever", () => {
 
     vi.useRealTimers();
     const healthy = new IDBFactory();
-    await enqueueStop("crew-b", NOON, healthy);
+    await enqueueStop("crew-b", NOON, { factory: healthy });
     const second = await drainStopOutbox(send, healthy);
     expect(second.done.map((row) => row.crewId)).toEqual(["crew-b"]);
     expect(send).toHaveBeenCalledTimes(1);
@@ -213,7 +213,7 @@ describe("W6.1: IndexedDB never holds a safety action forever", () => {
   it("a healthy outbox does not leave a timer behind", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const factory = new IDBFactory();
-    await enqueueStop("crew-b", NOON, factory);
+    await enqueueStop("crew-b", NOON, { factory });
     await pendingStops(factory);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -228,8 +228,8 @@ describe("W6.2: a row older than an hour is never sent", () => {
 
   it("drain discards an old row without sending it, reports it as expired, and still sends a fresh row", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-a", minutesAgo(61), factory);
-    await enqueueStop("crew-b", minutesAgo(59), factory);
+    await enqueueStop("crew-a", minutesAgo(61), { factory });
+    await enqueueStop("crew-b", minutesAgo(59), { factory });
     const sent: string[] = [];
 
     const result = await drainStopOutbox((row) => {
@@ -246,8 +246,8 @@ describe("W6.2: a row older than an hour is never sent", () => {
   it("the age is measured on the row's clientTime against the phone's clock: exactly 60 minutes is still sent, one millisecond more is not", async () => {
     const factory = new IDBFactory();
     const now = Date.parse("2026-11-15T10:00:00Z");
-    await enqueueStop("crew-edge", new Date(now - OUTBOX_ROW_TTL_MS), factory);
-    await enqueueStop("crew-late", new Date(now - OUTBOX_ROW_TTL_MS - 1), factory);
+    await enqueueStop("crew-edge", new Date(now - OUTBOX_ROW_TTL_MS), { factory });
+    await enqueueStop("crew-late", new Date(now - OUTBOX_ROW_TTL_MS - 1), { factory });
     const sent: string[] = [];
 
     const result = await drainStopOutbox(
@@ -267,8 +267,8 @@ describe("W6.2: a row older than an hour is never sent", () => {
 
   it("discardExpiredStops removes only the old rows and returns them (the screen reads them on open, with no signal needed)", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-a", minutesAgo(180), factory);
-    await enqueueStop("crew-b", minutesAgo(1), factory);
+    await enqueueStop("crew-a", minutesAgo(180), { factory });
+    await enqueueStop("crew-b", minutesAgo(1), { factory });
 
     const expired = await discardExpiredStops(factory);
 
@@ -278,7 +278,7 @@ describe("W6.2: a row older than an hour is never sent", () => {
 
   it("a row whose time cannot be read is not listed as pending (its age is unknown, so it is never sent)", async () => {
     const factory = new IDBFactory();
-    await enqueueStop("crew-a", justNow(), factory);
+    await enqueueStop("crew-a", justNow(), { factory });
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = factory.open(STOP_OUTBOX_DB, 1);
       request.onsuccess = () => {
