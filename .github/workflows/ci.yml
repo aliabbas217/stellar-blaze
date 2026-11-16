@@ -30,23 +30,38 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      # Every catalogue has exactly en's keys with the same placeholders and tags, review-manifest.json is current, and (the release flag)
+      # no Tier 1 string is still English. Tier 2 (the claims surfaces) is English by design and never blocks.
+      - run: pnpm i18n:check
+        env:
+          SB_REQUIRE_TRANSLATED: "1"
       # Regenerates src/api/schema.d.ts from the OpenAPI source and fails when it differs from the committed file.
       - run: pnpm api:check
-      - run: pnpm test
+      # Four workers: with the default (every core) the full suite is load-sensitive and a few timing-bound tests fail under load that pass alone.
+      - run: pnpm test --maxWorkers=4
       # SB_REQUIRE_SCORED=1: a build without the held-out 2026 files (or with an evaluation record that does not name them) fails here, not on the live site.
       - run: pnpm build
         env:
           SB_REQUIRE_SCORED: "1"
-      # Reads the build output: 174,080 B gzip of first-load script per route, 199,680 B for /worker and /worker/alerts only (architect, F2 W3.1).
+      # Reads the build output: 174,080 B gzip of first-load script per route, 199,680 B for the five ADR 0069 routes only (/worker, /worker/alerts,
+      # /worker/alert, /supervisor, /supervisor/crews/[crewId]); it fails on a route it cannot find, so a rename cannot drop a limit.
       - run: pnpm bundle:check
       # The full Chromium (not the headless shell): the push tests need a browser that honours a notification permission grant.
       - run: pnpm exec playwright install --with-deps chromium
       # Starts the mock API and the standalone production server itself (webServer in playwright.config.ts).
+      # Lists the registered e2e tests (no browser) and compares them with tests/e2e/registered-tests.json: a test that silently stops being
+      # registered (a describe closed too early) fails here instead of passing unnoticed. Regenerate on purpose with `pnpm e2e:registered --write`.
+      - run: pnpm e2e:registered
+      # SB_E2E_REQUIRE_WEBGL: the WebGL rows (landing contrast, scene) fail instead of skipping when the runner has no WebGL. The first CI run
+      # decides whether SwiftShader flags are needed (WebGL on a CI runner is unproven).
       - run: pnpm e2e
+        env:
+          SB_E2E_REQUIRE_WEBGL: "1"
       - run: pnpm design:lint
-      # Starts the same stack (scripts/serve-stack.mjs), then audits /en/worker and /en/worker/alerts against the budgets in lighthouserc.json.
+      # Starts the same stack (scripts/serve-stack.mjs), then audits the 14 URLs of lighthouserc.json (the whole demo, 3 runs each) against the per-URL
+      # matrix of ADR 0069. `--no-sandbox` is here and nowhere else (ADR 0063): the runner's Chrome cannot start its sandbox in a container.
       # @lhci/cli is a devDependency, so its whole tree comes from the lockfile (exact pins, minimumReleaseAge), not from `pnpm dlx`.
-      - run: pnpm exec lhci autorun
+      - run: pnpm exec lhci autorun --collect.settings.chromeFlags="--no-sandbox"
       - uses: actions/upload-artifact@v7.0.2
         if: failure()
         with:

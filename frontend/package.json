@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=24.22.2 <25"
+    "node": ">=24.22.3 <25"
   },
   "packageManager": "pnpm@12.18.0",
   "scripts": {
@@ -17,8 +17,11 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
+    "e2e:registered": "node scripts/check-e2e-registered.mjs",
     "e2e:live": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/e2e-live.mjs",
     "design:lint": "node scripts/design-lint.mjs",
+    "i18n:sync": "node scripts/i18n-sync.mjs",
+    "i18n:check": "node scripts/i18n-sync.mjs --check",
     "api:gen": "openapi-typescript openapi/stellar-blaze.openapi.json -o src/api/schema.d.ts",
     "api:check": "pnpm api:gen && git diff --exit-code src/api/schema.d.ts",
     "mock:api": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mock-api.ts",
