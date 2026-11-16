@@ -220,7 +220,14 @@ function Body({ screen }: { readonly screen: PlanScreen }) {
           </div>
         ) : null}
         <div className="pt-3" />
-        <PlanStrip crewName={crewName} blocks={state.blocks} axis={state.axis} heat={state.heat} ban={state.ban} nowMin={state.nowMin} />
+        {state.forecastPending ? (
+          // The strip's place until the heat is known (it is 15 rem with its legend and heat note): what is below does not move when it arrives.
+          <div className="px-4" data-plan-strip-pending="">
+            <Skeleton height="15rem" />
+          </div>
+        ) : (
+          <PlanStrip crewName={crewName} blocks={state.blocks} axis={state.axis} heat={state.heat} ban={state.ban} nowMin={state.nowMin} />
+        )}
         <BlockRows blocks={state.blocks} currentIndex={state.currentIndex} nowMin={state.nowMin} />
       </section>
       <div className="pt-4">

@@ -116,6 +116,39 @@ describe("the plan screen: the replay stamp follows the plan's own mode", () => 
     await new Promise((resolve) => setTimeout(resolve, 50));
   };
 
+  it("while the forecast is still being read the plan does not call it stale, and the strip's place is held (no notice flashes, nothing moves when it arrives)", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      planWith("live"),
+      http.get(FORECAST, async ({ params }) => {
+        await held;
+        const day = forecastToday(String(params["site_id"]), { now: new Date("2026-09-03T07:10:00Z") });
+        if (day === undefined) throw new Error("fixture");
+        forecastServed = true;
+        return HttpResponse.json({ ...day, mode: "live" });
+      }),
+    );
+    renderPlan("crew-b");
+    await heading("Crew B plan");
+    await waitFor(() => {
+      expect(rows().length).toBeGreaterThan(0);
+    });
+    // The forecast is unknown, not stale: "No fresh forecast: protective plan" would be a false statement for a moment, and its block
+    // (a hundred pixels) pushed the strip and the rows down when it left (layout shift 0.076 on the plan screen, Lighthouse).
+    expect(screen.queryByText(en.supervisor.crews.stale.title)).toBeNull();
+    expect(document.querySelector("[data-plan-strip-pending]")).not.toBeNull();
+    expect(document.querySelector("[data-plan-strip]")).toBeNull();
+    release();
+    await waitFor(() => {
+      expect(document.querySelector("[data-plan-strip]")).not.toBeNull();
+    });
+    expect(document.querySelector("[data-plan-strip-pending]")).toBeNull();
+    // (At this test's clock the fixture forecast IS old, so once it is known the notice may rightly show: that is an answer, not a wait.)
+  });
+
   it("a live plan carries no Replay stamp, although the forecast says replay", async () => {
     server.use(planWith("live"), forecastWith("replay"));
     renderPlan("crew-b");

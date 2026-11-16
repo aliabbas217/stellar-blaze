@@ -5,6 +5,7 @@ import { FieldShell } from "@/components/shell/FieldShell";
 import { DemoClock } from "@/features/demo/DemoClock";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { DemoSwitch } from "@/features/demo/DemoSwitch";
+import { usePathname } from "@/i18n/navigation";
 
 /*
  * Glue between the supervisor routes and the presentational field shell: the demo site, the demo clock and the mode
@@ -13,9 +14,11 @@ import { DemoSwitch } from "@/features/demo/DemoSwitch";
  */
 export function SupervisorFrame({ children }: { children: ReactNode }) {
   const { site } = useDemo();
+  // A crew's plan always has a site name and a crew name: the header keeps their height from the first paint (no shift when they arrive).
+  const crewScreen = usePathname().includes("/supervisor/crews/");
 
   return (
-    <FieldShell siteName={site?.name ?? null} clock={<DemoClock />}>
+    <FieldShell siteName={site?.name ?? null} reserveLabels={crewScreen} clock={<DemoClock />}>
       <div className="border-b border-hair px-4 py-2">
         <DemoSwitch />
       </div>
