@@ -3,6 +3,7 @@ import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import en from "../../../messages/en.json";
 import type { components } from "../../../src/api/schema.d.ts";
+import { sanitizeClause } from "../../../src/lib/copy/sanitize-clause.ts";
 import { watchConsole } from "../gate.ts";
 import { liveApiOrigin, liveEmployerToken, LIVE_SKIP_MESSAGE, NO_TOKEN_SKIP_MESSAGE } from "./env.ts";
 
@@ -633,8 +634,14 @@ test.describe("F2 against the real B3: try a plan", () => {
       await expect(page.getByText(`${String(body.validator.violations.length)} rule${body.validator.violations.length === 1 ? "" : "s"} broken`)).toBeVisible();
       for (const violation of body.validator.violations) {
         await expect(page.locator("[data-violations]").getByText(violation.rule_id, { exact: true })).toBeVisible();
-        if (violation.clause !== "") await expect(page.locator("[data-violations]")).toContainText(violation.clause);
+        // The page draws the clause as product copy (F2 W5): the ruleset's own internal ADR references are taken out and the label
+        // "PROTECTIVE READING" reads "Protective reading", so the raw API text is not on screen. The page must show exactly that
+        // sanitised text (its rules are pinned in tests/unit/lib/copy/sanitize-clause.test.ts), and never an ADR reference.
+        if (violation.clause !== "") {
+          await expect(page.locator("[data-violations]")).toContainText(sanitizeClause(violation.clause, { sourceId: violation.source_id }));
+        }
       }
+      await expect(page.locator("[data-violations]")).not.toContainText(/ADR\s+\d{4}/);
       expect(errors.filter((message) => !/plans\/validate/.test(message))).toEqual([]);
     });
   }
