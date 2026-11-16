@@ -5,6 +5,7 @@ import { queryKeys } from "@/api/query-keys";
 import { call } from "@/api/result";
 import { ROSTER_INVALID_TYPE, RosterInvalidProblem, rosterErrorsOf } from "@/api/roster-problem";
 import type { components } from "@/api/schema";
+import { trackSafetyFlight } from "@/lib/safety-flight";
 
 /*
  * Typed TanStack Query options for the F2 operations of the v1 contract (openapi/stellar-blaze.openapi.json), every
@@ -161,7 +162,8 @@ function isAbort(error: unknown): boolean {
  */
 async function orThrowBounded<T>(request: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   try {
-    return await orThrow(request);
+    // Counted as in flight while it is on the wire: the service worker update check waits for it (features/pwa/safety-flight.ts).
+    return await trackSafetyFlight(orThrow(request));
   } catch (error) {
     if (isAbort(error)) throw new ApiProblem(networkProblem());
     throw error;
