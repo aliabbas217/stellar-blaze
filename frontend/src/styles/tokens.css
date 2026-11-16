@@ -181,7 +181,10 @@
   /* Display type (36 to 48 px headings, the landing's h1 and h2): the body rules above are far more than a large Arabic-script line needs
      (F2 Task 22: measured on the landing's real Urdu title, see the task report). Body text and the 64 px level word keep 1.8 and 2.5. */
   --leading-ar-display: 1.4;
-  --leading-ur-display: 1.4;
+  /* Urdu 1.6, not 1.4: since the display headings are drawn by Noto Nastaliq Urdu itself (not the operating system's Arial) their ink reaches
+     0.2 to 0.3 em past the line box and the landing's kicker above and lede below sat inside it (tests/e2e/judge-landing-contrast.spec.ts,
+     "landing ink: ur"). Arabic stays at 1.4 (clean). */
+  --leading-ur-display: 1.6;
 
   /* font fallbacks; the loaded family arrives through next/font as --font-display / --font-body / --font-mono */
   --font-display-fallback: system-ui, sans-serif;

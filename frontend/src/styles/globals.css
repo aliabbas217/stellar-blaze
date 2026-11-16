@@ -293,9 +293,12 @@
     --sign-leading-word: var(--leading-ur);
     --sign-leading-display: var(--leading-ur-display);
     --sign-word-size: var(--t-64);
-    /* 0.75 em, measured on the face that ships (Noto Nastaliq Urdu, F2 W2): the nearest ink of the four level words is 10 px from the
-       row above or below (tests/e2e/worker-today-notlive.spec.ts keeps it at 8 px or more). 0.5 em was measured in the fallback Naskh. */
-    --sign-word-trim: calc(var(--t-64) * 0.75);
+    /* 0.5 em. The level word is drawn by Noto Nastaliq Urdu itself since the display headings left the operating system's Arial for the
+       locale face. Measured on the four words (tests/e2e/worker-today-notlive.spec.ts prints them): at the earlier 0.75 em the ink of
+       "orange" ran 20 px into the box of the kicker row above and "green" 5 px into the scale below; at 0.5 em the most is 4.4 px (the rows'
+       own blank is about a line high, so their ink is not touched); at 0.25 em every word keeps 8 px but the first screen loses 7.6 points.
+       0.5 em costs 3.8 points of the hero share against 0.75 em: the Urdu exceptions in tests/e2e/gate.ts say so. */
+    --sign-word-trim: calc(var(--t-64) * 0.5);
   }
 
   :lang(hi),
