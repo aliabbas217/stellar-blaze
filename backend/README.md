@@ -157,7 +157,7 @@ export SB_REPLAY_NOW=2026-06-14T10:10:00+04:00                               # t
 export SB_ACCESS_TOKENS='{"<sha256 of your demo token>": {"actor": "demo-bff", "role": "employer", "employer_id": "emp-demo"}}'
 
 uv run sb-jobs db upgrade            # migrates and seeds the git default config: the released model and warning_theta 0.30
-uv run sb-jobs site load fixtures/demo_site.toml --actor you --reason "demo"
+uv run sb-jobs site load fixtures/demo_site.toml --actor you --reason "demo site for the replay day"   # the reason must be 10 to 500 characters
 uv run uvicorn stellar_blaze.api.app:create_app --factory --host 127.0.0.1 --port 8123
 ```
 
