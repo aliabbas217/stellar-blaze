@@ -19,7 +19,7 @@ Heat stops work in the UAE on a legal clock; Stellar Blaze turns tomorrow's fore
 1. **0:00-0:20** Hook. 3D field; the hook number comes **only from a committed file**, with its definition and proof chip, never typed. Preferred, truth-based (`policy_scoreboard.json`): in summer 2026 at OMAA, 252.5 [191.5, 315.5] working hours were in the ADOSH High zone by observation-derived truth (margin 7 W/m², an assumption, working daytime 06:00-14:59 UTC). A midday ban alone leaves them unwarned, because the ban covers two and a half hours. If the season ribbon's raw-forecast count (the recorded day-1 IFS forecast, 1,624 of 1,807 hours from 06:00 to 19:00) is used, it must say "recorded raw forecast, before correction" and must not read as hours that were actually over a limit (the 2026 forecast ran warm). **Correction, 2026-11-15:** an earlier draft of this line quoted "about 58% of summer-2025 daytime hours at WBGT 32 °C"; that figure comes from an early audit script in the research repo and is in no committed file of this repo, so it is withdrawn.
 2. **0:20-1:00** The honest scoreboard, OMAA, summer 2026, lead 1. Show all four policies and both thresholds. Say plainly: we beat ban-only by a wide margin; a naive WBGT 32 rule misses fewer danger hours than ours but raises more false alarms; raw ADOSH zones raise fewer false alarms and miss more. Tap one proof chip.
 3. **1:00-1:40** Supervisor on the pre-registered day 2026-06-14. Crew plan, a try-a-plan that the law checker refuses with a cited article, sign-off, Stop work, Undo. (For the phone moment: set `alert_dispatch_interval_minutes` to 1 for the recording; the default bound is about six minutes.)
-4. **1:40-2:05** Worker: Today, alert, "I feel unwell", in Urdu and one other language.
+4. **1:40-2:05** Worker: Today, alert, "I feel unwell", in Urdu and one other language. Say plainly that the translations are machine-made and await native review; each non-English locale shows one quiet line to that effect in its settings or about area ("Machine translation, not yet reviewed by a native speaker"). The judge claims pages stay in English by design.
 5. **2:05-2:30** Governance refusal and the access log.
 6. **2:30-3:00** Promise: the roadmap slide and the ask.
 
@@ -39,3 +39,11 @@ The honest constraint: two training summers, one test summer, eight airports (no
 
 ## What must exist by Wed 18 Nov 12:00 to tell this story
 Landing hero (3D with 2D fallback); the 2026 data swap; the live backend on a public HTTPS URL (Azure UAE North, or the Render fallback after the Monday 22:00 trigger); a real-phone push check (Ali's phone with the installed PWA); the Urdu and Arabic layouts; the deck; the recorded video on Thu 19 Nov.
+
+## Concerns we share openly (the deck's "limits" slide; the full list is in ADR 0072 and the evaluation report)
+- Evidence: one test summer, one site-summer (OMAA), airports not worksites, derived heat-stress truth, no worker-outcome data; our event probabilities are overstated, and the warning policy trades more false alarms for fewer misses than raw ADOSH zones.
+- Review: not clinically reviewed; machine translations await a native review; the PDPL position awaits counsel.
+- Hosting: cost-minimal on purpose (a cold start on the first live request, no high availability, hardening deferred, no GPU, so no voice).
+
+## What a budget buys (the right-hand column of the roadmap slide)
+Always-on replicas and zone-redundant Postgres; private networking, Key Vault and managed-identity database access; monitoring and on-call; a UAE GPU for self-hosted speech and language models; on-site WBGT sensors and a pilot with real outcomes; more summers and the summer-rotated model; native-language and clinical reviews; a counsel review.
