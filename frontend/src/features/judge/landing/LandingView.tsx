@@ -6,9 +6,11 @@ import { ScoreboardTable } from "@/components/provenance/ScoreboardTable";
 import { Counter } from "@/components/provenance/Counter";
 import { proofFromProvenance, proofFromStaticFile } from "@/components/provenance/proof";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
 import { makeFormat, toPolicyRows } from "@/features/judge/adapters";
+import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { SEASON_BAN, banStateFor } from "@/features/judge/ban";
 import type { EvalData } from "@/features/judge/data";
 import { EvalSourceStamp } from "@/features/judge/EvalSourceStamp";
@@ -25,6 +27,10 @@ import { FieldGate } from "./FieldGate";
 import { FieldPoster, type FieldPanelProps } from "./FieldPoster";
 import { HeatCalendar } from "./HeatCalendar";
 import { LandingHeader } from "./LandingHeader";
+
+// Unicode isolates: an LTR run inside an Arabic or Urdu sentence (LRI ... PDI) is never reordered by the bidi algorithm.
+const LRI = String.fromCharCode(0x2066);
+const PDI = String.fromCharCode(0x2069);
 
 /*
  * The landing page body: the hero (the field, over the copy), chapter 1 "The problem" and chapter 2 "The scoreboard", and the
@@ -93,7 +99,8 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
       ? {
           value: format.one(truthMetric.value),
           interval: t("hook.interval", { lo: format.one(truthMetric.ci.lo), hi: format.one(truthMetric.ci.hi) }),
-          definition: t("hook.definition", { hours: policy.working_hours_utc, margin: format.whole(policy.margin_w_m2) }),
+          // The hour range stays one LTR run inside an Arabic or Urdu sentence (LRI ... PDI): "06:00-14:59 UTC", never reversed.
+          definition: t("hook.definition", { hours: `${LRI}${policy.working_hours_utc}${PDI}`, margin: format.whole(policy.margin_w_m2) }),
           proof: proofFromProvenance(policy.provenance, truthMetric.anchor, ts("warnings.truthWhat"), file),
         }
       : null;
@@ -157,34 +164,41 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
         <section
           aria-labelledby="landing-title"
           data-landing-hero=""
-          className="relative border-b border-hair max-[899px]:flex max-[899px]:flex-col min-[900px]:min-h-[clamp(41rem,calc(100svh-3.5rem),60rem)] min-[900px]:overflow-hidden"
+          className="relative border-b border-hair max-[899px]:flex max-[899px]:flex-col min-[900px]:max-[1099px]:grid min-[900px]:max-[1099px]:grid-cols-[minmax(0,1fr)] min-[900px]:max-[1099px]:grid-rows-[1fr_auto_auto] min-[900px]:min-h-[clamp(41rem,calc(100svh-3.5rem),60rem)] min-[900px]:overflow-hidden"
         >
-          <div className="relative z-10 grid content-start gap-5 px-4 pt-6 max-[899px]:order-1 min-[900px]:mt-[clamp(1.5rem,6vh,4rem)] min-[900px]:mb-36 min-[900px]:rtl:mb-48 min-[900px]:ms-10 min-[900px]:max-w-[min(34rem,calc(100%-27rem))] min-[900px]:px-0 min-[900px]:pt-0">
-            <p className="text-sm text-ink-3">{t("kicker")}</p>
+          <div className="relative z-10 grid content-start gap-5 px-4 pt-6 max-[899px]:order-1 min-[900px]:max-[1099px]:col-start-1 min-[900px]:max-[1099px]:row-start-1 min-[900px]:mt-[clamp(1.5rem,6vh,4rem)] min-[1100px]:mb-36 min-[1100px]:rtl:mb-48 min-[900px]:max-[1099px]:mb-8 min-[900px]:ms-10 min-[900px]:max-w-[min(34rem,calc(100%-27rem))] min-[900px]:px-0 min-[900px]:pt-0">
+            <p data-contrast="body" data-contrast-name="kicker" className="text-sm text-ink-3">{t("kicker")}</p>
             <h1
               id="landing-title"
-              className="font-display text-4xl leading-(--sign-leading-word) font-normal tracking-display min-[900px]:text-5xl min-[900px]:[@media(max-height:820px)]:text-4xl min-[900px]:rtl:text-4xl"
+              data-contrast="large"
+              data-contrast-name="h1"
+              className="font-display text-4xl leading-(--sign-leading-display) font-normal tracking-display min-[900px]:text-5xl min-[900px]:[@media(max-height:820px)]:text-4xl min-[900px]:rtl:text-4xl"
             >
               {t("title")}
             </h1>
-            <p className="max-w-[44ch] text-lg text-ink-2 max-[899px]:hidden">{t("lede")}</p>
+            <p data-contrast="body" data-contrast-name="lede" className="max-w-[44ch] text-lg text-ink-2 max-[899px]:hidden">{t("lede")}</p>
             <div className="flex flex-wrap gap-3 max-[899px]:flex-col">
-              <FieldLink href="/replay" data-primary="" className={`${ACTION_PRIMARY} min-h-12 text-lg`}>
+              <FieldLink href="/replay" data-primary="" data-avoid="" className={`${ACTION_PRIMARY} min-h-12 text-lg`}>
                 {t("primary")}
               </FieldLink>
-              <FieldLink href="#problem" className={`${ACTION_SECONDARY} min-h-12 text-lg`}>
+              <FieldLink href="#problem" data-avoid="" className={`${ACTION_SECONDARY} min-h-12 text-lg`}>
                 {t("secondary")}
               </FieldLink>
             </div>
             {hook === null ? null : (
               <div className="grid gap-1 border-t border-edge pt-4 max-[899px]:hidden" data-hook="">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <strong className="font-display text-4xl leading-solid font-normal tracking-display tabular-nums text-ink">{hook.value}</strong>
-                  <span className="text-base text-ink-2">{t("hook.label")}</span>
-                  <ProofChip proof={hook.proof} />
+                  <strong data-contrast="large" data-contrast-name="hook-figure" className="font-display text-4xl leading-solid font-normal tracking-display tabular-nums text-ink">{hook.value}</strong>
+                  <span data-contrast="body" data-contrast-name="hook-label" className="text-base text-ink-2">{t("hook.label")}</span>
+                  {/* From 1100 px up the chip takes its own row (a basis of the whole row), whatever the length of the label in any language: wrapping is the design, not a width that fits one string. On one row at 1440 px the chip ended 20 px inside the 2D map's edge. data-avoid is on the chip's own box, not the row. */}
+                  <span className="flex min-[1100px]:basis-full">
+                    <span data-avoid="" className="inline-flex">
+                      <ProofChip proof={hook.proof} />
+                    </span>
+                  </span>
                 </div>
-                <p className="text-sm text-ink-3 tabular-nums"><bdi>{hook.interval}</bdi></p>
-                <p className="max-w-[52ch] text-sm text-ink-3">{hook.definition}</p>
+                <p data-contrast="body" data-contrast-name="hook-interval" className="text-sm text-ink-3 tabular-nums"><bdi>{hook.interval}</bdi></p>
+                <p data-contrast="body" data-contrast-name="hook-definition" className="max-w-[52ch] text-sm text-ink-3">{hook.definition}</p>
               </div>
             )}
           </div>
@@ -214,7 +228,7 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
           <section id="problem" aria-labelledby="problem-title" className="grid scroll-mt-4 gap-6 min-[900px]:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] min-[900px]:gap-12">
             <div className="grid content-start gap-4 min-[900px]:sticky min-[900px]:top-6">
               <p className="text-sm text-ink-3">{t("problem.eyebrow")}</p>
-              <h2 id="problem-title" className="font-display text-3xl leading-(--sign-leading-word) font-normal tracking-display">
+              <h2 id="problem-title" className="font-display text-3xl leading-(--sign-leading-display) font-normal tracking-display">
                 {t("problem.heading")}
               </h2>
               <p className="max-w-[46ch] text-base text-ink-2">
@@ -228,10 +242,10 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
               <p className="max-w-[46ch] text-base text-ink-2">{t("problem.body2")}</p>
             </div>
             <div className="grid min-w-0 content-start gap-6">
-              <p className="text-sm text-ink-2" data-season-caption="">
+              <p {...CLAIMS_ENGLISH} className="text-sm text-ink-2" data-season-caption="">
                 {ts("season.caption")}
               </p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-problem-counts="">
+              <div {...CLAIMS_ENGLISH} className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-problem-counts="">
                 <div className={counter} data-count="hours">
                   <Counter
                     size="numeral"
@@ -239,6 +253,7 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
                     value={format.whole(facts.over)}
                     unit={ts("tally.hours")}
                     interval={t("problem.ofHours", { total: format.whole(facts.n) })}
+                    intervalAttrs={{ lang: locale, dir }}
                   />
                 </div>
                 <div className={counter} data-count="inBan">
@@ -317,12 +332,12 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
           <section id="scoreboard" aria-labelledby="season-title" className="grid scroll-mt-4 gap-6 min-[900px]:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] min-[900px]:gap-12">
             <div className="grid content-start gap-4 min-[900px]:sticky min-[900px]:top-6">
               <p className="text-sm text-ink-3">{t("season.eyebrow")}</p>
-              <h2 id="season-title" className="font-display text-3xl leading-(--sign-leading-word) font-normal tracking-display">
+              <h2 id="season-title" className="font-display text-3xl leading-(--sign-leading-display) font-normal tracking-display">
                 {t("season.heading")}
               </h2>
               <p className="max-w-[46ch] text-base text-ink-2">{t("season.body")}</p>
               {evaluationProof === null ? null : (
-                <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-2" data-evaluation="">
+                <p {...CLAIMS_ENGLISH} className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-2" data-evaluation="">
                   <span>{ts("evaluation.line")}</span>
                   <ProofChip proof={evaluationProof} />
                 </p>
@@ -335,14 +350,18 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
               <SeasonRibbon {...season.ribbon} compact />
               {data?.source !== "2026" && data !== null ? <EvalSourceStamp source={data.source} /> : null}
               {miniRows.length === 0 ? null : (
-                <ScoreboardTable caption={t("season.caption")} rowHeading={ts("warnings.columns.policy")} columns={miniColumns} rows={miniRows} />
+                <div {...CLAIMS_ENGLISH}>
+                  <ScoreboardTable caption={ts("warnings.miniCaption")} rowHeading={ts("warnings.columns.policy")} columns={miniColumns} rows={miniRows} />
+                </div>
               )}
               {tradeoff === null ? null : (
-                <p className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="">
+                <p {...CLAIMS_ENGLISH} className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="">
                   {tradeoff}
                 </p>
               )}
-              <VerdictList heading={ts("verdict.heading")} items={verdicts} proof={verdictProof} what={ts("verdict.heading")} />
+              <div {...CLAIMS_ENGLISH}>
+                <VerdictList heading={ts("verdict.heading")} items={verdicts} proof={verdictProof} what={ts("verdict.heading")} />
+              </div>
             </div>
           </section>
 
@@ -355,6 +374,9 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
             <AppLinks />
             <p className="text-sm text-ink-3">{t("apps.note")}</p>
           </section>
+
+          {/* The foot of the page, below everything: the one quiet line of a machine-translated catalogue (architect ruling 2026-11-15). */}
+          <MachineTranslationNotice />
         </div>
       </main>
     </>

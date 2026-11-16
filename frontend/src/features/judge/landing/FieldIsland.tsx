@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { FieldCanvas2D, type FieldCanvasHandle } from "./FieldCanvas2D";
 import type { FieldCanvasGLProps } from "./FieldCanvasGL";
 import { readingAt } from "./field-data";
@@ -9,10 +9,10 @@ import type { LoadedField } from "./field-load";
 import { FieldReadout, readoutText } from "./FieldReadout";
 import type { FieldPanelProps } from "./FieldPoster";
 import { FieldStage } from "./FieldStage";
-import { HourScrubber } from "./HourScrubber";
+import { HourScrubber, type NowHandle } from "./HourScrubber";
 import { useFieldClock } from "./useFieldClock";
 import { useReducedMotion } from "./useReducedMotion";
-import { canUpgrade, detectEnv, whenIdle } from "./webgl-support";
+import { canUpgrade, detectEnv, orbitFromSearch, whenIdle } from "./webgl-support";
 
 /*
  * The live hero: the field drawn from the recorded grid, the readout and the hour scrubber, driven by one clock. Loaded after
@@ -27,16 +27,20 @@ import { canUpgrade, detectEnv, whenIdle } from "./webgl-support";
 
 type Mode = "2d" | "webgl";
 
+// Memoised: the island re-renders once per whole hour of a playing day, and neither canvas takes anything that changes with it.
+const Flat2D = memo(FieldCanvas2D);
+
 export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; readonly data: LoadedField }) {
   const t = useTranslations("judge.landing.field");
   const flat = useRef<FieldCanvasHandle>(null);
   const gl = useRef<FieldCanvasHandle>(null);
   const calm = useReducedMotion();
-  const [position, setPosition] = useState(panel.peakHour);
+  const nowLine = useRef<NowHandle>(null);
   const [mode, setMode] = useState<Mode>("2d");
+  const [sliderFocused, setSliderFocused] = useState(false);
   const modeRef = useRef<Mode>("2d");
   const hourRef = useRef(panel.peakHour);
-  const [scene, setScene] = useState<{ readonly Scene: ComponentType<FieldCanvasGLProps>; readonly hour: number } | null>(null);
+  const [scene, setScene] = useState<{ readonly Scene: ComponentType<FieldCanvasGLProps>; readonly hour: number; readonly azimuth: number } | null>(null);
 
   // The day plays on its own only if the reader had not asked for reduced motion when the page opened; asking later stops it.
   const [calmAtMount] = useState(calm);
@@ -44,7 +48,9 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
     hourRef.current = hour;
     gl.current?.draw(hour, playing);
     if (modeRef.current === "2d") flat.current?.draw(hour, playing);
-    setPosition(hour);
+    // the now line of the scrubber moves in the DOM, every frame; React state carries only the whole hour (the clock's), so a playing day
+    // re-renders the island about 1.5 times a second, not 60 (Part L1 fix round 3, minor 5)
+    nowLine.current?.move(hour);
   });
   const pause = clock.pause;
   useEffect(() => {
@@ -61,7 +67,7 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
       import("./FieldCanvasGL").then(
         (module) => {
           // The hour the day is at when the scene arrives: it starts there, not at the peak.
-          if (live) setScene({ Scene: module.FieldCanvasGL, hour: hourRef.current });
+          if (live) setScene({ Scene: memo(module.FieldCanvasGL), hour: hourRef.current, azimuth: orbitFromSearch(window.location.search) });
         },
         () => undefined, // the chunk did not load: the 2D field stays, which is the fallback anyway
       );
@@ -88,13 +94,13 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
     <>
       <FieldStage path={mode}>
         <div className={mode === "webgl" ? "invisible absolute inset-0" : "absolute inset-0"}>
-          <FieldCanvas2D grid={data.grid} coast={data.coast} initialHour={panel.peakHour} rtl={panel.dir === "rtl"} handleRef={flat} />
+          <Flat2D grid={data.grid} coast={data.coast} initialHour={panel.peakHour} rtl={panel.dir === "rtl"} handleRef={flat} />
         </div>
-        {scene === null ? null : <scene.Scene grid={data.grid} coast={data.coast} initialHour={scene.hour} rtl={panel.dir === "rtl"} handleRef={gl} onReady={ready} onFail={gaveUp} />}
+        {scene === null ? null : <scene.Scene grid={data.grid} coast={data.coast} initialHour={scene.hour} initialAzimuth={scene.azimuth} rtl={panel.dir === "rtl"} handleRef={gl} onReady={ready} onFail={gaveUp} />}
       </FieldStage>
       <FieldReadout
         reading={reading}
-        live={!clock.playing}
+        live={!clock.playing && !sliderFocused}
         announce={t("scrubber.valueText", { hour: text.hour, hottest: text.hottest, station: text.station })}
         proof={panel.proof}
         source={t(panel.highestOfSeason ? "sourcePeak" : "sourcePlain", { day: panel.dayLabel })}
@@ -102,7 +108,8 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
       <HourScrubber
         values={panel.omaa}
         ban={panel.ban}
-        position={clock.playing ? position : clock.hour}
+        position={clock.hour}
+        nowRef={nowLine}
         hour={clock.hour}
         dir={panel.dir}
         dayLabel={panel.dayLabel}
@@ -112,6 +119,7 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
         calm={calm}
         onSeek={clock.seek}
         onToggle={clock.playing ? clock.pause : clock.play}
+        onFocusChange={setSliderFocused}
       />
     </>
   );

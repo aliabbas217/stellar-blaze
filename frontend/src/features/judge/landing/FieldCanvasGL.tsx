@@ -4,6 +4,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import type { FieldCanvasHandle } from "./FieldCanvas2D";
 import type { FieldGrid, Polyline } from "./field-data";
 import { labelCodes, PHONE_MAX_WIDTH, STATIONS } from "./field-draw";
+import { reapplyAvoidance } from "./label-avoid";
 import { StationLabels, type StationLabel } from "./StationLabels";
 import { FpsMonitor } from "./terrain-math";
 import type { InitMessage, WorkerOut } from "./terrain.worker";
@@ -15,9 +16,10 @@ import type { InitMessage, WorkerOut } from "./terrain.worker";
  * the same data, when
  *   - the worker cannot start, the canvas cannot be transferred, or WebGL is not there (`fail` from the worker),
  *   - the context is lost, or the worker throws,
- *   - the day plays under 30 frames per second for 2 seconds (ADR 0037 section 4). The frames counted are the ones the WORKER
- *     finished (its `drawn` answers) while the day plays: the animation frames of the page say nothing about a slow GPU, and a
- *     scene that is standing still is not at 0 frames per second.
+ *   - the day plays under 30 frames per second for 2 seconds (ADR 0037 section 4). What is timed is each frame the WORKER was
+ *     asked for, from the request to its `drawn` answer, while the day plays: the animation frames of the page say nothing about a
+ *     slow GPU, a gap between answers cannot tell a slow worker (3 frames per second) from a pause, and a scene that is standing
+ *     still, or a hidden page, is not at 0 frames per second.
  * One frame at a time is in flight: a newer hour waits for the answer to the last one and only the latest is drawn.
  *
  * The worker starts in a microtask, not in the effect body: React's development StrictMode runs an effect, its cleanup and the
@@ -28,6 +30,8 @@ export interface FieldCanvasGLProps {
   readonly grid: FieldGrid;
   readonly coast: readonly Polyline[];
   readonly initialHour: number;
+  /** Where the orbit starts, radians (`?orbit=`, see webgl-support.ts); 0 by default. */
+  readonly initialAzimuth?: number;
   /** Right-to-left page: the scene sits on the left, like the 2D field. */
   readonly rtl?: boolean;
   readonly handleRef: Ref<FieldCanvasHandle>;
@@ -37,10 +41,23 @@ export interface FieldCanvasGLProps {
   readonly onFail: (why: string) => void;
 }
 
+/** Moves the station names (the children of `box`, in the order of the stations) to the scene's latest projection. */
+function moveLabels(box: HTMLElement | null, places: readonly (readonly [number, number])[]): void {
+  if (box === null) return;
+  places.forEach(([x, y], i) => {
+    const name = box.children[i];
+    if (name instanceof HTMLElement) {
+      name.style.left = `${String(x)}px`;
+      name.style.top = `${String(y)}px`;
+    }
+  });
+  reapplyAvoidance(box); // a name that moved under the card or the copy is hidden, one that cleared it is shown again
+}
+
 /** Orbit speed of the desktop scene while the day plays, radians per second. */
 const ORBIT = 0.025;
 
-export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef, onReady, onFail }: FieldCanvasGLProps) {
+export function FieldCanvasGL({ grid, coast, initialHour, initialAzimuth = 0, rtl = false, handleRef, onReady, onFail }: FieldCanvasGLProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const worker = useRef<Worker | null>(null);
   const ready = useRef(false);
@@ -49,12 +66,14 @@ export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef
   const force = useRef(true);
   const given = useRef(false);
   const hour = useRef(initialHour);
-  const azimuth = useRef(0);
+  const azimuth = useRef(initialAzimuth);
   const lastPlaying = useRef<number | null>(null);
   /** The latest draw request was a frame of a playing day (a seek is not measured). */
   const playingNow = useRef(false);
-  const labelHour = useRef<number | null>(null);
-  const labelSize = useRef("");
+  /** The request in flight: when it was sent, and whether it was a frame of a playing day. */
+  const sentAt = useRef(0);
+  const sentPlaying = useRef(false);
+  const labelBox = useRef<HTMLDivElement>(null);
   const monitor = useRef(new FpsMonitor());
   const sendRef = useRef<() => void>(() => undefined);
   const callbacks = useRef({ onReady, onFail });
@@ -92,6 +111,9 @@ export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef
       }
       busy.current = true;
       dirty.current = false;
+      // the request is stamped: how long the worker takes for it is the frame rate that matters (ADR 0037 section 4)
+      sentAt.current = performance.now();
+      sentPlaying.current = playingNow.current;
       w.postMessage({ type: "draw", hour: hour.current, azimuth: azimuth.current, width: el.clientWidth, height: el.clientHeight, dpr, force: force.current });
       force.current = false;
     };
@@ -114,21 +136,19 @@ export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef
             send();
           } else {
             busy.current = false;
-            // ADR 0037 section 4: the frames the worker finished, while the day plays. A seek, or a scene standing still, is not slow.
-            if (playingNow.current) {
-              if (monitor.current.tick(performance.now())) giveUp("under 30 frames per second for 2 seconds");
+            // ADR 0037 section 4: how long the worker took for a frame of a PLAYING day (request to answer). A seek, a scene standing
+            // still and a hidden page (nothing is asked, and its timers are throttled) are not slow.
+            if (sentPlaying.current && !document.hidden) {
+              if (monitor.current.tick(performance.now() - sentAt.current)) giveUp("under 30 frames per second for 2 seconds");
             } else {
               monitor.current.reset();
             }
             if (given.current) return;
-            // The station names move with the hour (the relief changes under them) and with a resize: not sixty times a second.
-            const whole = Math.floor(hour.current);
-            const size = `${String(el.clientWidth)}x${String(el.clientHeight)}`;
-            if (!playingNow.current || whole !== labelHour.current || size !== labelSize.current || first) {
-              labelHour.current = whole;
-              labelSize.current = size;
-              setLabels(message.labels.map(([x, y], i) => ({ code: codes[i] ?? "OMAA", x, y })));
-            }
+            // The station names follow the scene frame by frame (it orbits while the day plays): the first answer creates them (React
+            // state), every answer after that only moves them in the DOM, so a playing day does not re-render the tree sixty times a second.
+            const places = message.labels;
+            if (first) setLabels(places.map(([x, y], i) => ({ code: codes[i] ?? "OMAA", x, y })));
+            else moveLabels(labelBox.current, places);
             if (first) {
               first = false;
               setShown(true);
@@ -139,6 +159,10 @@ export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef
         };
         w.onerror = () => {
           giveUp("worker error");
+        };
+        // an answer the page cannot deserialize is a lost frame the scene cannot recover from: the same way out
+        w.onmessageerror = () => {
+          giveUp("worker message error");
         };
         const init: InitMessage = {
           type: "init",
@@ -198,7 +222,7 @@ export function FieldCanvasGL({ grid, coast, initialHour, rtl = false, handleRef
         data-field-canvas="webgl"
         className={`absolute inset-0 size-full transition-opacity ${shown ? "opacity-100" : "opacity-0"}`}
       />
-      {shown ? <StationLabels labels={labels} /> : null}
+      {shown ? <StationLabels labels={labels} containerRef={labelBox} /> : null}
     </>
   );
 }

@@ -64,9 +64,12 @@ describe("useFieldClock", () => {
     expect(frames.pending()).toBe(0);
     const frameCount = onFrame.mock.calls.length;
     expect(frameCount).toBeGreaterThan(900);
-    // the last frame is the peak again, flagged as playing; and every frame of the pass was a playing frame
-    expect(onFrame.mock.calls.at(-1)?.[0]).toBeCloseTo(PEAK, 5);
-    expect(onFrame.mock.calls.every(([, playing]) => playing === true)).toBe(true);
+    // the last frame of the pass is the peak again, flagged as playing; the day then says it stopped (a frame that is NOT playing,
+    // so the canvas stops metering and its stale "playing" flag is cleared: test_stop_emits_a_non_playing_frame)
+    const calls = onFrame.mock.calls;
+    expect(calls.at(-1)?.[1]).toBe(false);
+    expect(calls.at(-1)?.[0]).toBeCloseTo(PEAK, 5);
+    expect(calls.slice(0, -1).every(([, playing]) => playing === true)).toBe(true);
     // it does not start again by itself
     run(frames, 20);
     expect(onFrame.mock.calls.length).toBe(frameCount);
@@ -117,6 +120,28 @@ describe("useFieldClock", () => {
     expect(result.current.hour).toBe(20);
     expect(onFrame).toHaveBeenLastCalledWith(20, false);
     expect(frames.pending()).toBe(0);
+  });
+
+  it("test_stop_emits_a_non_playing_frame: Pause tells the canvas the day is no longer playing, at the hour it stopped on", () => {
+    const frames = stubFrames();
+    const onFrame = vi.fn();
+    const { result } = renderHook(() => useFieldClock(PEAK, true, onFrame));
+    run(frames, 2);
+    const playingHour = onFrame.mock.calls.at(-1)?.[0] as number;
+    expect(onFrame.mock.calls.at(-1)?.[1]).toBe(true);
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.playing).toBe(false);
+    const last = onFrame.mock.calls.at(-1);
+    expect(last?.[1]).toBe(false);
+    expect(last?.[0]).toBeCloseTo(playingHour, 9);
+    // a second Pause (already stopped) says nothing more
+    const count = onFrame.mock.calls.length;
+    act(() => {
+      result.current.pause();
+    });
+    expect(onFrame.mock.calls.length).toBe(count);
   });
 
   it("test_clock_clamps_dt: a hidden tab (one frame a minute later) does not use up the once-only day", () => {

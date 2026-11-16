@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { act, fireEvent, screen, within } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { Profiler, type ReactNode } from "react";
 import { isDeferredRoute } from "@/components/states/deferred-routes";
 import { parseHourlySeries, seasonFacts } from "@/features/judge/facts";
 import { SEASON_BAN } from "@/features/judge/ban";
@@ -11,6 +11,7 @@ import { parseCoast, parseField, readingAt } from "@/features/judge/landing/fiel
 import { FieldIsland } from "@/features/judge/landing/FieldIsland";
 import { readoutText } from "@/features/judge/landing/FieldReadout";
 import { LandingView } from "@/features/judge/landing/LandingView";
+import urMessages from "../../../../../messages/ur.json";
 import { renderWithIntl } from "../../../../utils/intl";
 
 /*
@@ -76,6 +77,36 @@ describe("the landing page", () => {
     expect(container.querySelector("[data-hero]")).not.toBeNull();
   });
 
+  it("test_no_page_language_text_inside_a_claims_block: in Urdu every lang=en block of the landing (the sr-only table caption included) holds no Arabic-script text of its own", () => {
+    const { container } = renderWithIntl(<LandingView field={field} hourly={hourly} data={data} dir="rtl" />, { locale: "ur", messages: urMessages });
+    const blocks = [...container.querySelectorAll("[lang='en']")];
+    expect(blocks.length).toBeGreaterThanOrEqual(6);
+    const arabic = /[؀-ۿݐ-ݿ]/;
+    const leaks: string[] = [];
+    for (const block of blocks) {
+      const walk = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n !== null; n = walk.nextNode()) {
+        const text = n.textContent ?? "";
+        if (!arabic.test(text)) continue;
+        // a translated piece that restores the page language with its own lang attribute is allowed (a banner, the story footer)
+        const own = n.parentElement?.closest("[lang]");
+        if (own !== null && own !== undefined && own !== block && own.getAttribute("lang") !== "en") continue;
+        leaks.push(text.trim().slice(0, 60));
+      }
+    }
+    expect(leaks).toEqual([]);
+  });
+
+  it("test_hero_controls_are_label_obstacles: both buttons and the hook's Proof chip carry data-avoid (a station name is kept clear of them)", () => {
+    const { container } = view();
+    const hero = container.querySelector("[data-landing-hero]") as HTMLElement;
+    const avoided = [...hero.querySelectorAll("[data-avoid]")];
+    expect(avoided.map((el) => el.textContent.trim())).toEqual(expect.arrayContaining(["See the scoreboard", "Walk me through it"]));
+    const chip = hero.querySelector("[data-hook] button") as HTMLElement;
+    expect(chip.closest("[data-avoid]")).not.toBeNull();
+    expect(avoided).toHaveLength(3);
+  });
+
   it("states the readout at the peak hour in the first HTML, with the station value, the limit and the proof", () => {
     const { container } = view();
     const readout = container.querySelector("[data-field-readout]");
@@ -97,9 +128,12 @@ describe("the landing page", () => {
     expect(hook).toHaveTextContent(metric.value.toFixed(1));
     expect(hook).toHaveTextContent(`${metric.ci.lo.toFixed(1)} to ${metric.ci.hi.toFixed(1)}, 95% interval`);
     expect(hook).toHaveTextContent(policy.working_hours_utc);
+    // The hour range is a left-to-right run inside a sentence that may be Arabic or Urdu: it is isolated (LRI ... PDI) so "06:00-14:59 UTC" is never shown reversed.
+    expect(hook?.textContent).toContain(`${String.fromCharCode(0x2066)}${policy.working_hours_utc}${String.fromCharCode(0x2069)}`);
     expect(hook).toHaveTextContent(`${String(policy.margin_w_m2)} W/m² is an assumption`);
-    // what the truth is: derived from the station's recorded observations, against the ADOSH High or Red zone (the file's own words)
-    expect(hook).toHaveTextContent("derived from the station's recorded observations");
+    // what the truth is: "observation-derived truth" (the architect's demo story), against the ADOSH High or Red zone
+    expect(hook).toHaveTextContent("is decided by observation-derived truth");
+    expect(hook).not.toHaveTextContent("recorded observations");
     expect(hook).toHaveTextContent("ADOSH High or Red zone");
     expect(within(hook as HTMLElement).getByRole("button", { name: /Proof for/ })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/58/);
@@ -338,6 +372,41 @@ describe("the live field island", () => {
     expect(card.querySelectorAll("[aria-live]")).toHaveLength(1);
   });
 
+  it("test_no_double_announce_on_the_slider: while the slider has focus the readout sentence is not live (the slider's own value text is heard once); it is live again on blur", () => {
+    stubBrowser(true);
+    island();
+    const slider = screen.getByRole("slider");
+    const live = document.querySelector("[data-readout-live]") as HTMLElement;
+    expect(live).toHaveAttribute("aria-live", "polite");
+    act(() => {
+      slider.focus();
+    });
+    expect(live).toHaveAttribute("aria-live", "off");
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(live).toHaveAttribute("aria-live", "off");
+    // the slider carries the same words, so nothing is lost: its value text is the live sentence
+    expect(slider.getAttribute("aria-valuetext")).toBe(live.textContent);
+    act(() => {
+      slider.blur();
+    });
+    expect(live).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("test_spine_tick_thinning_pinned: on a phone every other 3-hourly label is hidden by parity, leaving 00:00 06:00 12:00 18:00 00:00", () => {
+    stubBrowser(true);
+    island();
+    const track = document.querySelector("[data-spine-track]") as HTMLElement;
+    // the rule that hides them is on the track (a media query jsdom does not evaluate; the e2e proves it on a 390 page)
+    expect(track.className).toContain("max-[899px]:[&_[data-tick]:nth-child(even)]:hidden");
+    const ticks = [...track.querySelectorAll<HTMLElement>("[data-tick]")];
+    expect(ticks.map((tick) => tick.textContent)).toEqual(["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "00:00"]);
+    // the ticks are consecutive siblings, so `nth-child(even)` is the parity of the label's own place in the list
+    expect(new Set(ticks.map((tick) => tick.parentElement)).size).toBe(1);
+    expect(ticks.map((tick) => [...(tick.parentElement?.children ?? [])].indexOf(tick))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    const kept = ticks.filter((tick) => !tick.matches(":nth-child(even)")).map((tick) => tick.textContent);
+    expect(kept).toEqual(["00:00", "06:00", "12:00", "18:00", "00:00"]);
+  });
+
   it("test_reduced_motion_is_read_live: asking for reduced motion while the day plays stops it and removes Play; asking later does not restart it", () => {
     stubBrowser(false);
     island();
@@ -375,6 +444,49 @@ describe("the live field island", () => {
     });
     expect(screen.getByRole("button", { name: "Play the day" })).toBeInTheDocument();
     expect(document.querySelector("[data-readout-live]")).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("test_playing_day_island_renders_per_hour_not_per_frame: the WHOLE island (stage, readout, scrubber) commits about once per whole-hour change while the day plays, and the now line still moves every frame", () => {
+    vi.useFakeTimers({ toFake: ["performance"] });
+    const callbacks: FrameRequestCallback[] = [];
+    stubBrowser(false);
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => callbacks.push(cb));
+    let commits = 0;
+    renderWithIntl(
+      <Profiler
+        id="island"
+        onRender={() => {
+          commits++;
+        }}
+      >
+        <FieldIsland panel={panel} data={{ grid, coast }} />
+      </Profiler>,
+    );
+    const nowLine = (): string => document.querySelector("[data-now]")?.getAttribute("x1") ?? "";
+    const frame = (): void => {
+      act(() => {
+        vi.advanceTimersByTime(1000 / 60);
+        callbacks.splice(0).forEach((cb) => {
+          cb(performance.now());
+        });
+      });
+    };
+    frame();
+    const before = commits;
+    const startedAt = nowLine();
+    const positions = new Set<string>();
+    // 2 s of a playing day at 60 frames per second: 120 frames, the clock at 1.5 hours per second = 3 whole-hour changes
+    for (let i = 0; i < 120; i++) {
+      frame();
+      positions.add(nowLine());
+    }
+    const renders = commits - before;
+    console.log(`ISLAND RENDERS while playing: ${String(renders)} commits in 120 frames (2 s)`);
+    expect(Number(document.querySelector("[data-readout-live]")?.getAttribute("aria-live") === "off")).toBe(1); // it really was playing
+    expect(nowLine(), "the now line moved").not.toBe(startedAt);
+    expect(positions.size, "and it moved on (nearly) every frame, not once per hour").toBeGreaterThan(100);
+    expect(renders, "whole-hour changes (3 in 2 s) plus slack, never one per frame").toBeLessThanOrEqual(6);
+    vi.useRealTimers();
   });
 
   it("test_readout_text_equals_canvas_values: every hour's readout equals the reading the canvas is drawn from", () => {

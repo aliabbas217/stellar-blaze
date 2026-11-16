@@ -1,5 +1,5 @@
 import { heatLut, isothermEach, lutOffset, makeSampler } from "./field-data";
-import { cameraMatrix, COAST_STRIDE, decimateCoast, heightOf, IsoLines, MAX_VERTICES, meshFor, projectToScreen, vertexCount } from "./terrain-math";
+import { cameraMatrix, COAST_STRIDE, decimateCoast, heightOf, isoVertexCap, IsoLines, meshFor, projectToScreen } from "./terrain-math";
 
 /*
  * The landing terrain, drawn in a worker on an OffscreenCanvas so that creating the WebGL context, building the mesh and drawing
@@ -178,7 +178,7 @@ function init(message: InitMessage): void {
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.coastIndex);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, coastIndex, gl.STATIC_DRAW);
   // the isotherms get what is left of the vertex budget after the mesh and the coast (a guard: the real field never reaches it)
-  const isoCap = Math.max(2, MAX_VERTICES[mobile ? "phone" : "desktop"] - vertexCount({ nx, nz }) - coastPoints);
+  const isoCap = isoVertexCap(mobile, coastPoints);
   scene = {
     gl,
     canvas,
