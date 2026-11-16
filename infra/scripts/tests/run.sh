@@ -1903,7 +1903,7 @@ run_wait() { # <args...>: the real script; curl is the plain stub; no sleeping b
 test_wait_ready_passes_at_once_when_the_api_answers() {
   run_wait http://127.0.0.1:8080
   assert_rc 0
-  assert_out_has "PASS ready: the api answered through http://127.0.0.1:8080 after 0s"
+  case "$out" in *"PASS ready: the api answered through http://127.0.0.1:8080 after "[01]"s"*) ;; *) fail "stdout does not contain a PASS ready line after 0s or 1s (SECONDS counts whole seconds, so a slow host can cross a boundary): $out" ;; esac
   assert_out_lacks "waiting for the api"
   grep -qF "http://127.0.0.1:8080/api/v1/health/ready" "$STUB_STATE_DIR/curl.log" || fail "curl did not ask the ready route through the web"
   [ "$(wc -l <"$STUB_STATE_DIR/curl.log" | tr -d ' ')" = "1" ] || fail "more than one request for an api that was ready"
