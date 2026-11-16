@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefCallback } from "react";
 import { Spinner } from "@/components/states/Spinner";
 import { ACTION_SECONDARY } from "@/components/states/actions";
 import { useClock } from "@/features/demo/useClock";
@@ -34,6 +34,41 @@ import { useTimeFormat } from "@/lib/time/use-time-format";
  */
 
 const BAR = "fixed inset-x-0 bottom-0 z-10";
+
+/**
+ * The bar is fixed, so the page must end above it, and the bar's height is not a constant: it grows with the stop's state and with every
+ * expiry notice. The bar publishes its own height as this custom property on the root (the page pads its bottom with it, see
+ * `BAR_CLEARANCE`), kept current by a ResizeObserver and removed when the bar goes. Until the first measure the pages fall back to the
+ * clearance the bar needed before notices existed, so a server-rendered page never starts with no room.
+ */
+export const BAR_HEIGHT_VAR = "--stop-bar-height";
+/** The class a page puts on its content so the last row scrolls clear of the bar (the fallback is the old fixed `pb-60`, 15rem). */
+export const BAR_CLEARANCE = "pb-[var(--stop-bar-height,15rem)]";
+
+function useBarHeightPublisher(): RefCallback<HTMLDivElement> {
+  return useCallback((bar: HTMLDivElement | null) => {
+    if (bar === null) return undefined;
+    const root = document.documentElement;
+    const publish = (): void => {
+      root.style.setProperty(BAR_HEIGHT_VAR, `${String(Math.ceil(bar.getBoundingClientRect().height))}px`);
+    };
+    publish();
+    // An engine without ResizeObserver keeps the height of the first measure; the bar still never leaves the screen (see `NOTICES_MAX`).
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    observer?.observe(bar);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty(BAR_HEIGHT_VAR);
+    };
+  }, []);
+}
+
+/**
+ * The notices are at most 40 % of the viewport and scroll inside that: with several expired crews on a short screen (a phone in landscape,
+ * 390 x 667) a bar of unbounded height would push the Stop button, or the first notice and its Close button, off the screen, and a fixed bar
+ * cannot be scrolled to. The Stop button never moves out of view; the notices scroll behind a keyboard-focusable region.
+ */
+const NOTICES_MAX = "max-h-[40dvh] overflow-y-auto overscroll-contain";
 const INNER = "mx-auto max-w-110 border-t-4 border-ink px-4 pt-3 pb-[calc(var(--s-3)+env(safe-area-inset-bottom))]";
 // The press target: an ink block with a second frame inside it (the stamp the screen's single primary action does not have).
 const PRESS = "block w-full touch-manipulation rounded-sign bg-ink p-1 font-body text-ground";
@@ -140,9 +175,11 @@ export interface StopWorkBarProps {
   readonly noCrew: "unavailable" | "none";
 }
 
-const NOTICE_LIGHT = { text: "text-ink-2", close: `${ACTION_SECONDARY} min-h-11 shrink-0 px-4 text-base` } as const;
+// `rule` is the hairline under the notices: without it the last notice runs into the state line below it ("Not sent. Tell the crew now."), which reads as part of that notice.
+const NOTICE_LIGHT = { text: "text-ink-2", rule: "border-hair", close: `${ACTION_SECONDARY} min-h-11 shrink-0 px-4 text-base` } as const;
 const NOTICE_DARK = {
   text: "text-ground",
+  rule: "border-ground",
   close:
     "flex min-h-11 shrink-0 touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-base font-semibold text-ground",
 } as const;
@@ -157,7 +194,13 @@ function ExpiredNotices({ notices, tone }: { notices: StopNotices; tone: typeof 
   const shell = useTranslations("shell");
   const prefix = useId();
   return (
-    <div role="status" data-expired-stops="" className={notices.expired.length === 0 ? undefined : "flex flex-col gap-3 pb-3"}>
+    // With notices the region scrolls (NOTICES_MAX), so it is a focusable scroll container: a keyboard user can reach the notices below the fold of it.
+    <div
+      role="status"
+      data-expired-stops=""
+      {...(notices.expired.length === 0 ? {} : { tabIndex: 0 })}
+      className={notices.expired.length === 0 ? undefined : `mb-3 flex flex-col gap-3 border-b pb-3 ${tone.rule} ${NOTICES_MAX}`}
+    >
       {notices.expired.map((notice) => {
         const id = `${prefix}-${notice.crewId}`;
         return (
@@ -187,6 +230,7 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
   const time = useTimeFormat();
   const [confirming, setConfirming] = useState(false);
   const clock = useClock();
+  const publishHeight = useBarHeightPublisher();
   // The target is always named: the crew's name, else its id, so the button and the confirmation never read as a bare "the crew".
   const label = crewName ?? work?.crewId ?? "";
   const at = work?.at === null || work?.at === undefined ? "" : time(new Date(work.at));
@@ -197,7 +241,7 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
 
   if (work === null) {
     return (
-      <div data-emergency="" className={BAR}>
+      <div ref={publishHeight} data-emergency="" className={BAR}>
         <div className={`${INNER} bg-ground`}>
           <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} />
           <p role="status" className="py-2 text-lg font-semibold text-ink">
@@ -213,7 +257,7 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
 
   if (stopped) {
     return (
-      <div data-emergency="" data-stop-state={undoOpen ? "undo" : "stopped"} className={BAR}>
+      <div ref={publishHeight} data-emergency="" data-stop-state={undoOpen ? "undo" : "stopped"} className={BAR}>
         <div className={`${INNER} border-ink bg-ink text-ground`}>
           <ExpiredNotices notices={notices} tone={NOTICE_DARK} />
           <div role="status" className="flex flex-col gap-1 pb-3">
@@ -268,7 +312,7 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
   }
 
   return (
-    <div data-emergency="" data-stop-state={work.state} className={BAR}>
+    <div ref={publishHeight} data-emergency="" data-stop-state={work.state} className={BAR}>
       <div className={`${INNER} bg-ground`}>
         <ExpiredNotices notices={notices} tone={NOTICE_LIGHT} />
         {work.state === "queued" ? (

@@ -41,3 +41,26 @@ export function requestFailure(url: string, failureText: string | null | undefin
   if (failureText === "net::ERR_ABORTED") return null;
   return `request failed ${url}${failureText === null || failureText === undefined || failureText === "" ? "" : ` (${failureText})`}`;
 }
+
+/**
+ * A hydration message, whatever its console type: React's production codes for a text, an attribute, a missing-parent or a
+ * tree mismatch (#418, #419, #422, #423, #425; #419 is the whole-root client re-render) and the development wording.
+ * The console collector records these in every type, so a build that logs one as `log` or `warning` still fails the gate.
+ */
+const HYDRATION = /Minified React error #(?:418|419|422|423|425)\b|hydrat(?:ion|ed|e)\b[^\n]*|did not match|didn't match/i;
+
+export function isHydrationText(text: string): boolean {
+  return HYDRATION.test(text) && !/^Download the React DevTools/i.test(text);
+}
+
+/**
+ * What to record for one console message, or null. A console error is recorded (but not the URL-less "Failed to load resource"
+ * line, which `responseError` and `requestFailure` report with its URL); a warning only when `warnings` is true, marked as one;
+ * a hydration message in ANY type always.
+ */
+export function consoleLineToRecord(type: string, text: string, warnings: boolean): string | null {
+  if (type === "error" && !isUrllessResourceLine(text)) return text;
+  if (isHydrationText(text)) return text;
+  if (warnings && type === "warning") return `warning: ${text}`;
+  return null;
+}

@@ -14,7 +14,7 @@ import { ACTION_PRIMARY } from "@/components/states/actions";
 import { DEMO_CREW_ID, isDemoMode } from "@/features/demo/constants";
 import { CrewStrips } from "@/features/supervisor/CrewStrips";
 import { FocalSentence } from "@/features/supervisor/FocalSentence";
-import { StopWorkBar } from "@/features/supervisor/StopWorkBar";
+import { BAR_CLEARANCE, StopWorkBar } from "@/features/supervisor/StopWorkBar";
 import { useCrewsModel, type CrewsModel } from "@/features/supervisor/useCrewsModel";
 import { useStopWork, type ServerStop } from "@/features/supervisor/useStopWork";
 
@@ -153,7 +153,7 @@ export function CrewsView() {
   }
 
   return (
-    <div className="flex flex-1 flex-col pb-60">
+    <div className={`flex flex-1 flex-col ${BAR_CLEARANCE}`}>
       {demo ? <SyntheticDemoBanner siteName={siteName} /> : null}
       {content}
       {demo && siteId !== null ? (

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { axeViolations } from "./axe.ts";
-import { isUrllessResourceLine, requestFailure, responseError, UNBUILT_CORE_ROUTES } from "./gate-console.ts";
+import { consoleLineToRecord, requestFailure, responseError, UNBUILT_CORE_ROUTES } from "./gate-console.ts";
 
 /*
  * The deterministic half of the design gate (F2 plan, "Design gate protocol" item 2). Every view's e2e calls `gateReport`
@@ -70,12 +70,14 @@ export { UNBUILT_CORE_ROUTES };
 /**
  * Starts collecting console errors, uncaught exceptions, HTTP errors (400 and up) and network-layer failures, each with its
  * URL (the console message for a failed resource does not say which one, and `response` never fires for a request that got
- * no response). Call before `page.goto`; pass the array to `gateReport`. The rules are in gate-console.ts.
+ * no response). Call before `page.goto`; pass the array to `gateReport`. The rules are in gate-console.ts. A hydration message
+ * of any console type is always recorded; `warnings: true` (the console-clean gate) also records every console warning.
  */
-export function watchConsole(page: Page): string[] {
+export function watchConsole(page: Page, { warnings = false }: { readonly warnings?: boolean } = {}): string[] {
   const errors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error" && !isUrllessResourceLine(message.text())) errors.push(message.text());
+    const line = consoleLineToRecord(message.type(), message.text(), warnings);
+    if (line !== null) errors.push(line);
   });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => {

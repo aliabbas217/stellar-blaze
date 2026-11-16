@@ -13,7 +13,7 @@ import { ErrorState } from "@/components/states/ErrorState";
 import { Skeleton } from "@/components/states/Skeletons";
 import { isDemoMode } from "@/features/demo/constants";
 import { FocalSentence } from "@/features/supervisor/FocalSentence";
-import { StopWorkBar } from "@/features/supervisor/StopWorkBar";
+import { BAR_CLEARANCE, StopWorkBar } from "@/features/supervisor/StopWorkBar";
 import { useStopWork, type ServerStop } from "@/features/supervisor/useStopWork";
 import { BlockRows } from "@/features/supervisor/plan/BlockRows";
 import { FloorBanner } from "@/features/supervisor/plan/FloorBanner";
@@ -259,7 +259,7 @@ export function PlanView({ crewId }: { readonly crewId: string }) {
   const restricted = state.status === "ready" ? state.plan.restricted_headcount : null;
 
   return (
-    <div className="flex flex-1 flex-col pb-60">
+    <div className={`flex flex-1 flex-col ${BAR_CLEARANCE}`}>
       {demo ? <SyntheticDemoBanner siteName={screen.siteName} /> : null}
       <BackLink />
       {!notFound ? (
