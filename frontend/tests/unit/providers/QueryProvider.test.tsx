@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { QueryProvider } from "@/providers/QueryProvider";
+import { QueryProvider, shouldRetryRead } from "@/providers/QueryProvider";
 
 function Probe() {
   const defaults = useQueryClient().getDefaultOptions().queries;
-  return <p>{`stale ${String(defaults?.staleTime)} retry ${String(defaults?.retry)}`}</p>;
+  return <p>{`stale ${String(defaults?.staleTime)} retry ${defaults?.retry === shouldRetryRead ? "one, not after the BFF limit fired" : String(defaults?.retry)}`}</p>;
 }
 
 it("renders its children and adds no markup of its own", () => {
@@ -17,14 +17,14 @@ it("renders its children and adds no markup of its own", () => {
   expect(container.innerHTML).toBe("<main>content</main>");
 });
 
-it("gives descendants a QueryClient with a 60 s stale time and one retry", () => {
+it("gives descendants a QueryClient with a 60 s stale time and one retry (behaviour: query-retry.test.tsx)", () => {
   render(
     <QueryProvider>
       <Probe />
     </QueryProvider>,
   );
 
-  expect(screen.getByText("stale 60000 retry 1")).toBeInTheDocument();
+  expect(screen.getByText("stale 60000 retry one, not after the BFF limit fired")).toBeInTheDocument();
 });
 
 it("keeps one QueryClient across re-renders of the provider", () => {

@@ -123,6 +123,11 @@ function mockWebServers(): NonNullable<PlaywrightTestConfig["webServer"]> {
         DEMO_EMPLOYER_TOKEN: "e2e-demo-employer-token",
         DEMO_WRITE_RATE_PER_MIN: "10000",
         DEMO_WRITE_GLOBAL_RATE_PER_MIN: "10000",
+        // The BFF's two upstream time limits (src/lib/upstream-timeouts.ts). Reads get 15 s, as a deployment that waits out a cold
+        // start would; Stop work and its undo get 3 s, so slow-api.spec.ts can show a Stop cut at its own limit well before the
+        // phone's own 8 s. A mock request is answered in milliseconds, so no other spec is near either.
+        UPSTREAM_READ_TIMEOUT_MS: "15000",
+        UPSTREAM_TIMEOUT_MS: "3000",
       },
     },
   ];

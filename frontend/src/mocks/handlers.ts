@@ -52,6 +52,10 @@ import {
  *               served (the contract's "validator-failed" state; every other operation is unaffected)
  *   unavailable the operations that list a 503 in the contract (every read of the day views, the day plan, the sign-off,
  *               the data request, plan validation) answer 503 `dependency-unavailable`
+ *   slow        a cold API (the scaled-to-zero hosting mode): every request that is not a Stop waits SLOW_READ_MS (longer than the
+ *               3 s after which a loading state says the service is waking up, shorter than the BFF's default read limit) and then
+ *               answers as normal; a Stop and its undo wait SLOW_STOP_MS, far past any safety limit, so only the BFF's own clock ends
+ *               them (and then answer 500 without changing any stop, so a stop the BFF gave up on never lands late)
  * Any other value is ignored. The employer routes answer 401 without an `Authorization: Bearer` header (the BFF adds
  * the demo token on its allow-list); the mock accepts any non-empty token. It does not rate limit: the BFF does.
  *
@@ -60,7 +64,7 @@ import {
  */
 
 type Schemas = components["schemas"];
-type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift" | "shift-not-legal" | "plan-invalid" | "unavailable";
+type Scenario = "error" | "stale" | "empty" | "fallback" | "suppressed" | "offseason" | "noshift" | "shift-not-legal" | "plan-invalid" | "unavailable" | "slow";
 type Info = Parameters<HttpResponseResolver>[0];
 
 const MOCK_REQUEST_ID = "mock-req-1";
@@ -149,6 +153,20 @@ function pushHostAllowed(endpoint: string): boolean {
   return PUSH_EXACT_HOSTS.includes(host) || PUSH_SUFFIXES.some((suffix) => host.endsWith(`.${suffix}`));
 }
 
+/** The `slow` scenario's wait for every request but a Stop: past the 3 s of the "waking up" line, inside the BFF's default 10 s read limit. */
+export const SLOW_READ_MS = 3_600;
+/** The `slow` scenario's wait for a Stop and its undo: past every safety limit (the phone's 8 s, the BFF's 10 s), so only the BFF's clock ends it. */
+export const SLOW_STOP_MS = 20_000;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Stop work (POST /crews/:id/stops) and its undo or resume (DELETE /crews/:id/stops/:stop_id). */
+function isStopRequest(request: Request): boolean {
+  return /\/crews\/[^/]+\/stops(\/[^/]+)?$/.test(new URL(request.url).pathname);
+}
+
 function scenarioOf(request: Request): Scenario | null {
   const value = request.headers.get(MOCK_SCENARIO_HEADER);
   return value === "error" ||
@@ -160,7 +178,8 @@ function scenarioOf(request: Request): Scenario | null {
     value === "noshift" ||
     value === "shift-not-legal" ||
     value === "plan-invalid" ||
-    value === "unavailable"
+    value === "unavailable" ||
+    value === "slow"
     ? value
     : null;
 }
@@ -189,8 +208,16 @@ function withScenario(
   resolve: (info: Info, scenario: Scenario | null) => Response | Promise<Response>,
   { lists503 = false }: { lists503?: boolean } = {},
 ): HttpResponseResolver {
-  return (info) => {
+  return async (info) => {
     const scenario = scenarioOf(info.request);
+    if (scenario === "slow") {
+      if (isStopRequest(info.request)) {
+        // Never creates or clears a stop, even late: a stop the BFF gave up on must not appear in the mock's state afterwards.
+        await wait(SLOW_STOP_MS);
+        return mockProblem(info.request, 500);
+      }
+      await wait(SLOW_READ_MS);
+    }
     if (scenario === "error") return mockProblem(info.request, 500);
     if (scenario === "unavailable" && lists503) return unavailableProblem(info.request);
     return resolve(info, scenario);
