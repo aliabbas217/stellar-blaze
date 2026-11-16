@@ -6,7 +6,7 @@ import hi from "../../messages/hi.json";
 import ne from "../../messages/ne.json";
 import ur from "../../messages/ur.json";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
-import { gateReport, watchConsole, type GateOptions, type GateReport } from "./gate.ts";
+import { gateReport, RECORDED_HERO_EXCEPTIONS, watchConsole, type GateOptions, type GateReport } from "./gate.ts";
 import { withScenario, type Scenario } from "./helpers/scenario.ts";
 
 /*
@@ -173,7 +173,8 @@ test("Today shows the emergency control and the protective lead together when of
 // measured when it was recorded (a floor that can only go up), not to 35 %: a ruling of the architect is still open for it. The ideal
 // and personal states meet 35 % (the Urdu word trim measured in the Nastaliq face took personal from 31.8 % to above the floor), and
 // the fallback's hero is the protective lead now (asserted above).
-const RECORDED_UR_EXCEPTIONS = { partial: 0.283 } as const;
+// F2 Task 22: with the real Urdu copy both the personal and the partial state are below 35 %, so both are recorded exceptions now, with
+// their measured numbers, kept in gate.ts beside the other recorded hero shares (RECORDED_HERO_EXCEPTIONS).
 const RECORDED_TOLERANCE = 0.01;
 
 const PROFILE = {
@@ -192,7 +193,7 @@ for (const [state, policyDown] of [
   ["personal", false],
   ["partial", true],
 ] as const) {
-  const recorded = state === "partial" ? RECORDED_UR_EXCEPTIONS.partial : null;
+  const recorded = RECORDED_HERO_EXCEPTIONS[`today-${state}:ur`] ?? null;
   const title = recorded === null ? `Today, Urdu, ${state}: the hero holds the 35% floor (Today)` : `Today, Urdu, ${state}: the hero share is a recorded exception (${(recorded * 100).toFixed(1)}%) and never lower (Today)`;
   test(title, async ({ page }) => {
     await page.addInitScript((stored) => {

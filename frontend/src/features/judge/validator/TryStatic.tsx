@@ -1,10 +1,10 @@
-import { useLocale } from "next-intl";
 import type { BanState } from "@/components/spine/ban-state";
 import { StaticModeSwitch } from "@/features/judge/live/StaticModeSwitch";
 import { TryPlanLayout } from "./TryPlanLayout";
 import { DEFAULT_ACCLIMATISED, DEFAULT_DAYS_PER_WEEK } from "./request";
 import { templateRuns } from "./runs";
 import type { RecordedPlanView } from "./view";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The SERVER-RENDERED first paint of `/replay/try`: the common roster on the replay day's heat, the three templates and the two
@@ -23,7 +23,7 @@ export function TryStatic({
   readonly dateLabel: string;
   readonly recorded: RecordedPlanView | null;
 }) {
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   return (
     <TryPlanLayout
       phase="idle"

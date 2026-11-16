@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, ViewTransition } from "react";
 import { Counter } from "@/components/provenance/Counter";
 import type { Proof } from "@/components/provenance/proof";
@@ -8,6 +8,7 @@ import { dayFormat } from "./day-format";
 import { SeasonRibbon, type SeasonRibbonProps } from "./SeasonRibbon";
 import type { TallyPoint } from "./tally";
 import "@/styles/view-transitions.css";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The season player: the hero of the scoreboard. The ribbon and the tally of days, hours and break hours reveal the
@@ -35,7 +36,7 @@ const noSubscription = (): (() => void) => () => undefined;
 
 export function SeasonPlayer({ ribbon, tally, proofs, limitC }: SeasonPlayerProps) {
   const t = useTranslations("judge.scoreboard");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   // False in the server HTML and until the island has hydrated, true after: a click before React is attached does nothing,
   // so the button says whether it is live (the e2e waits for it).
   const hydrated = useSyncExternalStore(

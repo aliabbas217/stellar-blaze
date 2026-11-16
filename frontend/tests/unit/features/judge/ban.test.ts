@@ -50,7 +50,8 @@ describe("SEASON_BAN against the contract", () => {
 
 describe("the catalogues build the midday break from SEASON_BAN, not from a literal", () => {
   const dir = path.join(frontendRoot, "messages");
-  const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+  // Locale files only: messages/review-manifest.json (F2 Task 22) sits in the same folder and is not a catalogue.
+  const files = readdirSync(dir).filter((f) => /^[a-z]{2}\.json$/.test(f));
 
   it("finds the six catalogues", () => {
     expect(files.sort()).toEqual(["ar.json", "bn.json", "en.json", "hi.json", "ne.json", "ur.json"]);

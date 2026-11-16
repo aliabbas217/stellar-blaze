@@ -4,6 +4,8 @@ import { useTranslations } from "next-intl";
 import { useId, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ACTION_PRIMARY } from "@/components/states/actions";
+import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import type { ProofDrawerProps } from "./ProofDrawer";
 import type { Proof } from "./proof";
 
@@ -53,6 +55,7 @@ function Chip({
   readonly field: boolean;
 }) {
   const t = useTranslations("states.proof");
+  const pageLanguage = useLocaleAttrs();
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
   const [Drawer, setDrawer] = useState<ComponentType<ProofDrawerProps> | null>(null);
@@ -83,6 +86,8 @@ function Chip({
   return (
     <>
       <button
+        // The default chip says "Proof" (judge.proof, English by design); a caller's own label ("Why Orange?") is in the page's language.
+        {...(label === undefined && labelContent === undefined ? CLAIMS_ENGLISH : pageLanguage)}
         ref={button}
         type="button"
         data-proof-id={id}

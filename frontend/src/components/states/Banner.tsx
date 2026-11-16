@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 
 /**
  * The one banner shape of the state components: a panel with a hairline frame and a 3 px rule on the inline start, the
@@ -13,8 +14,10 @@ export function Banner({
   /** A pictogram drawn before the text. */
   readonly icon?: ReactNode;
 }) {
+  const attrs = useLocaleAttrs();
   return (
     <div
+      {...attrs}
       role="status"
       className="flex items-start gap-3 rounded-sign border border-edge border-s-3 border-s-ink-2 bg-panel px-4 py-3 text-base text-ink-2"
     >

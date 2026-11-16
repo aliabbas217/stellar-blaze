@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 
 /**
  * "Synthetic demo site: no real people, no real data", with the demo site's name (ADR 0062, F2 decision D4). It sits on
@@ -8,9 +9,10 @@ import { useTranslations } from "next-intl";
  */
 export function SyntheticDemoBanner({ siteName }: { siteName: string | null }) {
   const t = useTranslations("shell.demo");
+  const attrs = useLocaleAttrs();
 
   return (
-    <div role="note" className="border-b border-edge bg-panel px-4 py-2 sm:px-6 font-body text-sm text-ink">
+    <div {...attrs} role="note" className="border-b border-edge bg-panel px-4 py-2 sm:px-6 font-body text-sm text-ink">
       <p className="font-semibold">{t("banner")}</p>
       {siteName === null ? null : (
         <p className="text-ink-2">

@@ -45,6 +45,7 @@ export function UnwellView({ clinicalReview = CLINICAL_REVIEW }: { readonly clin
               key={key}
               className="grid grid-cols-[2.5rem_1fr_auto] items-start gap-3 border-b border-hair py-3 text-xl leading-(--sign-leading-text) font-medium text-ink"
             >
+              {/* fixed-height-ok: a step-number circle holding one Western digit (aria-hidden; the step's sentence beside it is the text and sits in the free row) */}
               <span
                 aria-hidden="true"
                 className="grid size-9 place-items-center rounded-sign border-2 border-ink text-lg leading-none font-semibold tabular-nums"

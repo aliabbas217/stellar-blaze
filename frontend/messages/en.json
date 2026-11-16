@@ -2,7 +2,25 @@
   "_meta": {
     "review_status": "source",
     "safety_keys": [
+      "alerts.limitation",
       "judge.try.result.notFresh",
+      "levels.name.amber",
+      "levels.name.green",
+      "levels.name.orange",
+      "levels.name.red",
+      "levels.scale.fallback",
+      "levels.scale.live",
+      "levels.scale.none",
+      "levels.scale.stale",
+      "push.body",
+      "push.level.amber",
+      "push.level.green",
+      "push.level.orange",
+      "push.level.red",
+      "push.title.crew",
+      "push.title.site",
+      "shell.machineTranslation",
+      "states.stamp.notClinicallyReviewed",
       "supervisor.crews.focal.noLevel",
       "supervisor.crews.stale.body",
       "supervisor.crews.stale.title",
@@ -14,6 +32,7 @@
       "supervisor.plan.unsigned",
       "supervisor.stop.button",
       "supervisor.stop.expired",
+      "supervisor.stop.expiredClock",
       "supervisor.stop.failed",
       "supervisor.stop.failedDetail",
       "supervisor.stop.noActiveStop",
@@ -35,6 +54,7 @@
       "supervisor.stop.stoppedDetailLate",
       "supervisor.stop.undo",
       "supervisor.stop.undoFailed",
+      "today.limitation",
       "worker.alert.changed.heading",
       "worker.alert.changed.now",
       "worker.alert.changed.was",
@@ -54,12 +74,14 @@
       "worker.alert.spine.now",
       "worker.alert.spine.starts",
       "worker.alert.title",
+      "worker.nav.unwell",
       "worker.today.also.bottle",
       "worker.today.also.buddy",
       "worker.today.also.induction",
       "worker.today.also.noUnacclimatised",
       "worker.today.also.selfPaced",
       "worker.today.also.water",
+      "worker.today.draftWording",
       "worker.today.kicker.fallback",
       "worker.today.kicker.lastKnownHigher",
       "worker.today.kicker.protective",
@@ -214,8 +236,7 @@
       "on": "on",
       "off": "off"
     },
-    "draftTranslation": "Draft translation",
-    "draftTranslationNote": "This translation is a machine draft. A native speaker has not reviewed it yet.",
+    "machineTranslation": "Machine translation, not yet reviewed by a native speaker",
     "roleChooser": {
       "title": "Choose your role",
       "intro": "Heat-stress safety for outdoor workers. Pick the view that matches your job.",
@@ -768,6 +789,7 @@
       "queuedDetail": "The stop for <bdi>{crew}</bdi> is kept on this phone and sent when it is back online.",
       "failed": "Not sent. Tell the crew now.",
       "failedDetail": "Press Stop work to try again.",
+      "expiredClock": "Stop for <bdi>{crew}</bdi> was not sent. The time on this phone looked wrong when it was pressed, so it was not kept. Tell the crew now, by voice or radio, and press Stop again when you are online.",
       "expired": "Stop for <bdi>{crew}</bdi> was not sent. It waited 60 minutes without a connection and has expired. Tell the crew now, by voice or radio, and press Stop again when you are online.",
       "noCrew": "The crew list did not load. Tell the crew to stop work now.",
       "noCrews": "There are no crews at this site to stop."
@@ -784,6 +806,7 @@
   "states": {
     "retry": "Try again",
     "loading": "Loading",
+    "waking": "Waking up the service. The first load after a quiet period can take longer.",
     "noData": "No data",
     "offline": "You are offline",
     "error": {
@@ -955,6 +978,7 @@
         "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
         "defs": "A danger hour is an hour the station was in the ADOSH High or Red zone. Stellar Blaze warns when its corrected forecast puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; both thresholds are shown.",
         "caption": "Four ways to warn a crew, scored on the season",
+        "miniCaption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
         "columns": {
           "policy": "Policy",
           "missed": "Danger hours nobody was warned about",
@@ -1479,7 +1503,7 @@
         "heading": "The season on the station's own record",
         "label": "danger hours at Abu Dhabi airport, summer 2026",
         "interval": "{lo} to {hi}, 95% interval",
-        "definition": "A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}. Whether an hour was a danger hour is derived from the station's recorded observations; the thermal margin of {margin} W/m² is an assumption."
+        "definition": "A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}. Whether an hour was a danger hour is decided by observation-derived truth; the thermal margin of {margin} W/m² is an assumption."
       },
       "problem": {
         "eyebrow": "The problem",
@@ -1506,7 +1530,6 @@
         "eyebrow": "The scoreboard",
         "heading": "Four ways to warn a crew, judged on one summer",
         "body": "Each way to warn gets only the forecast it would have had about 24 hours ahead. The station's thermometers then say what happened.",
-        "caption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
         "open": "Open the scoreboard"
       },
       "ledeProof": "Every figure about the season and the scores comes from a recorded file, and its proof chip says which."

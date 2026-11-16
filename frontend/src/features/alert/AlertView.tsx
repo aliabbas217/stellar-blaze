@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/states/ErrorState";
 import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { LevelSignSkeleton, Skeleton } from "@/components/states/Skeletons";
 import { StaleBanner } from "@/components/states/StaleBanner";
+import { WakingLine } from "@/components/states/WakingLine";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import type { AlertParams } from "@/features/alert/alert-params";
 import { ChangedBracket } from "@/features/alert/ChangedBracket";
@@ -41,11 +42,14 @@ const SPINE_SKELETON = "calc(var(--t-16) * var(--sign-leading-text, var(--leadin
 export function AlertSkeleton() {
   const t = useTranslations("states");
   return (
-    <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
-      <LevelSignSkeleton size="hero" />
-      <Skeleton height={SPINE_SKELETON} />
-      <span className="sr-only">{t("loading")}</span>
-    </div>
+    <>
+      <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
+        <LevelSignSkeleton size="hero" />
+        <Skeleton height={SPINE_SKELETON} />
+        <span className="sr-only">{t("loading")}</span>
+      </div>
+      <WakingLine className="px-4 pt-3" />
+    </>
   );
 }
 

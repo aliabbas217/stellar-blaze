@@ -30,6 +30,40 @@ export const MIN_FIELD_LABEL_PX = 16;
 export const MIN_TARGET_PX = 24;
 export const MIN_FIELD_TARGET_PX = 44;
 export const MIN_HERO_SHARE = 0.35;
+
+/**
+ * Hero shares below the 35 % floor that were RECORDED instead of fixed (F2 Task 22, ruling 5), keyed `<state>:<locale>`, with the number
+ * measured at 390 x 844 when it was recorded. tests/e2e/hero-share.spec.ts holds each to its number minus RECORDED_HERO_TOLERANCE, so an
+ * exception can only improve; an entry is removed the day its state meets the floor. The Urdu "partial" Today state (a banner above the
+ * sign) is the older exception recorded in worker-today-notlive.spec.ts.
+ */
+export type HeroKey = {
+  readonly state: "today-live" | "today-personal" | "today-partial" | "today-not-live" | "alert" | "unwell" | "crews" | "plan";
+};
+export const RECORDED_HERO_EXCEPTIONS: Readonly<Record<string, number>> = {
+  // Today with a profile on the phone, Urdu, 390 x 844 (worker-today-notlive.spec.ts). With the real Urdu copy (F2 Task 22) the "your own
+  // level is higher" line (18 px at the Urdu leading of 2.5, 45 px) and, in the partial state, the three-line "not available" banner stand
+  // above the spine. Measured 2026-11-16: personal 30.2 % (was 35.5 % with English text in the Urdu catalogue), partial 23.0 % (was 28.3 %).
+  "today-personal:ur": 0.302,
+  "today-partial:ur": 0.23,
+  // Arabic, Today with a profile and the risk policy down (the three-line "not available" banner above the spine), measured in fix round 1
+  // (the first time hero-share.spec.ts measured personal and partial outside Urdu). The reviewer's estimate was 32 %. Hindi, Bengali and
+  // Nepali measure 35.1 % (above the floor by 0.1 point, so they are not exceptions, but one more line of copy there makes them one).
+  "today-partial:ar": 0.328,
+};
+export const RECORDED_HERO_TOLERANCE = 0.01;
+
+/** The `[data-hero]` area inside the first fold as a share of the fold (the same measure `gateReport` takes), or null when the page has none. */
+export async function heroShareOf(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const hero = document.querySelector("[data-hero]");
+    if (hero === null) return null;
+    const r = hero.getBoundingClientRect();
+    const w = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0));
+    const h = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+    return (w * h) / (window.innerWidth * window.innerHeight);
+  });
+}
 /** `root` is the document's own default name (the page cross-fade), not a shared element. */
 export const SHARED_TRANSITION_NAMES = ["root", "wordmark", "spine", "level", "unwell"] as const;
 

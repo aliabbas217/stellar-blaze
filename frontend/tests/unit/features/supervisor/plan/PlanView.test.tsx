@@ -215,9 +215,14 @@ describe("the plan screen: the ideal state", () => {
     await user.click(opener);
     expect(opener).toHaveAttribute("aria-expanded", "true");
     expect(within(ban).getByText(/Ministerial Resolution 44 of 2022/)).toBeVisible();
+    // The clause is the API's English text: in a right-to-left page it is an English, left-to-right block (F2 Task 22).
+    expect(within(ban).getByText(/Ministerial Resolution 44 of 2022/)).toHaveAttribute("lang", "en");
+    expect(within(ban).getByText(/Ministerial Resolution 44 of 2022/)).toHaveAttribute("dir", "ltr");
     expect(within(ban).getByText("P-H1")).toBeVisible();
     await user.click(within(work).getByRole("button"));
     expect(within(work).getByText(en.supervisor.plan.blocks.noClause)).toBeVisible();
+    // The "no clause" line is the app's own sentence, in the page's language: it is not marked English.
+    expect(within(work).getByText(en.supervisor.plan.blocks.noClause)).not.toHaveAttribute("lang");
   });
 
   it("the current block is marked at the replay time (at 09:30 the Medium work block holds now)", async () => {

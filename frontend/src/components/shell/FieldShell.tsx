@@ -59,7 +59,7 @@ export function FieldShell({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-110 flex-col bg-ground sm:my-6 sm:min-h-0 sm:border sm:border-hair">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hair px-4 py-2">
+      <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-hair px-4 py-2">
         <ViewTransition name="wordmark" share="morph" default="none">
           <FieldLink
             href="/"
@@ -71,9 +71,11 @@ export function FieldShell({
         {/* From sm up the wordmark takes its own line (basis-full above): beside it the name had about 90 px and a long word ("Mussafah") was cut. */}
         <div className="min-w-0 flex-1">
           {site === undefined ? null : (
-            // Two lines at most, then cut. The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a
-            // rule for every element of the page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
-            <p {...(site === null ? {} : { title: site })} className="line-clamp-2 font-body text-base leading-tight font-semibold text-ink">
+            // The name wraps and is never cut: the demo site's name ends in "(synthetic)", and a two-line clamp put its ellipsis exactly there
+            // when the Arabic sun-mode button left the name about 135 px (F2 Task 22 fix round 1). A long word breaks instead of overflowing.
+            // The <bdi> takes its line's height ("inherit"): the language's own leading (2.5 in Urdu) is a rule for every element of the
+            // page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
+            <p {...(site === null ? {} : { title: site })} className="font-body text-base leading-tight font-semibold break-words text-ink">
               {site === null ? t("shell.field.noSite") : <bdi className="leading-[inherit]">{site}</bdi>}
             </p>
           )}

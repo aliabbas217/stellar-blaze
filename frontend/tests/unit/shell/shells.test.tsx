@@ -64,6 +64,19 @@ describe("FieldShell", () => {
     expect(within(screen.getByRole("navigation", { name: "Language" })).getAllByRole("link")).toHaveLength(6);
   });
 
+  it("test_header_name_is_never_clamped: the demo site's '(synthetic)' marker is not cut by a line clamp (fix round 1; the real layout is asserted in rtl.spec.ts)", () => {
+    chrome();
+    renderWithIntl(
+      <FieldShell {...props}>
+        <main>page</main>
+      </FieldShell>,
+    );
+    const name = within(screen.getByRole("banner")).getByText("Mussafah M-14 yard (synthetic)").closest("p");
+    expect(name).not.toBeNull();
+    expect(name?.className).not.toMatch(/line-clamp|truncate|overflow-hidden|text-ellipsis/);
+    expect(name?.getAttribute("title")).toBe("Mussafah M-14 yard (synthetic)");
+  });
+
   it("renders the page and the dock, and owns no <main> of its own", () => {
     chrome();
     const { container } = renderWithIntl(

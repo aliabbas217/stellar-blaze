@@ -5,6 +5,7 @@ import { useId, useState, type ReactNode } from "react";
 import { PlanSwatch, type PlanBlockState } from "@/components/plan/PlanBars";
 import { formatClock } from "@/components/spine/geometry";
 import type { PlanBlock } from "@/features/supervisor/plan/plan-model";
+import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 
 /*
@@ -59,7 +60,8 @@ function Row({ block, current, past }: { readonly block: PlanBlock; readonly cur
         </svg>
       </button>
       <div id={panel} hidden={!open} className="flex flex-col gap-1 pb-3 ps-8 text-sm leading-(--sign-leading-text) text-ink-2">
-        <p>{block.clause === "" ? t("blocks.noClause") : sanitizeClause(block.clause)}</p>
+        {/* The clause is the API's English text of the law, whatever the page's language: an English (LTR) block. The "no clause" line is ours and keeps the page's language. */}
+        <p {...(block.clause === "" ? {} : CLAIMS_ENGLISH)}>{block.clause === "" ? t("blocks.noClause") : sanitizeClause(block.clause)}</p>
         <p>
           {t("blocks.rule")} <code dir="ltr" translate="no" className="font-mono text-ink-2">{block.ruleId}</code>
         </p>

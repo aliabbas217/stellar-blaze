@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { LevelMark } from "@/components/level/LevelSign";
 import type { Level } from "@/components/level/level";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "./actions";
 import { isDeferredRoute } from "./deferred-routes";
 
@@ -40,11 +41,12 @@ function usable(action: EmptyAction | undefined): EmptyAction | null {
  */
 export function EmptyState({ title, reason, primary, secondary, level }: EmptyStateProps) {
   const t = useTranslations("levels");
+  const attrs = useLocaleAttrs();
   const main = usable(primary);
   const other = usable(secondary);
 
   return (
-    <section className="flex flex-col items-start gap-3 rounded-sign border border-dashed border-edge px-6 py-8">
+    <section {...attrs} className="flex flex-col items-start gap-3 rounded-sign border border-dashed border-edge px-6 py-8">
       {level === undefined ? null : (
         <p className="flex items-center gap-2 text-base text-ink-2">
           <LevelMark level={level} />

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { DraftBadge } from "@/components/shell/DraftBadge";
+import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
 import { AlertsSettings } from "@/features/push/AlertsSettings";
 import { isPushDebug, siteIdFromSearch } from "@/features/push/site";
 
@@ -27,8 +27,9 @@ export default async function AlertsPage(props: PageProps<"/[locale]/worker/aler
   return (
     <main className="flex flex-col gap-4 p-4">
       <h1 className="font-display text-2xl">{t("title")}</h1>
-      <DraftBadge />
       <AlertsSettings vapidPublicKey={vapidPublicKey} siteId={siteIdFromSearch(search)} debug={isPushDebug(search.debug)} />
+      {/* The privacy area: where the worker removes the data on this phone. One quiet line, below the content (architect ruling 2026-11-15). */}
+      <MachineTranslationNotice />
     </main>
   );
 }

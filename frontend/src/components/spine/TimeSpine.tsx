@@ -172,6 +172,7 @@ export function TimeSpine({
           <SpineTicks {...axis} />
         </div>
         <div className="relative h-(--spine-length)">{band}</div>
+        {/* fixed-height-ok: the spine's length is its time axis (geometry); the labels inside are absolutely placed on it and the box does not clip (no overflow rule), so a taller Nastaliq label spills, never cuts */}
         <div className="relative h-(--spine-length) min-w-0">
           {waypointList}
           {labels}

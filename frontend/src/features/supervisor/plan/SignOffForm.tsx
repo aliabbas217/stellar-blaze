@@ -35,6 +35,9 @@ type DayPlan = components["schemas"]["DayPlan"];
 
 const bdi = (chunks: ReactNode): ReactNode => <bdi>{chunks}</bdi>;
 
+/** Private-use code point: stands where `{list}` goes while a sentence is formatted, never in any catalogue. */
+const LIST_SLOT = "";
+
 type Outcome =
   | { readonly kind: "none" }
   | { readonly kind: "ticks"; readonly left: number }
@@ -66,24 +69,35 @@ export default function SignOffForm({ crewId, date, items, zone }: SignOffFormPr
   const unticked = items.filter((item) => !ticked.has(item.id));
   const list = new Intl.ListFormat(locale, { type: "conjunction", style: "long" });
 
-  const label = (item: PlanAckItem): string => {
-    const base = t("signOff.itemText", {
+  // "Plan zone Medium, 06:00 to 09:00" with the zone and both clocks in a <bdi> each (the catalogue's `signOff.item`).
+  const itemSentence = (item: PlanAckItem): ReactNode =>
+    t.rich("signOff.item", {
       zone: t(`zone.${item.zone}`),
       from: formatClock(hourOfDay(new Date(item.startsAt), zone)),
       to: formatClock(hourOfDay(new Date(item.endsAt), zone)),
+      bdi,
     });
-    return base;
+  /**
+   * A sentence with a list of items in it ("N items need a tick: {list}."), the list joined with the language's own words but built of
+   * elements, so every item (and the clocks in it) is an isolate and no clock sits bare in Urdu or Arabic running text. The catalogue
+   * message is formatted once with a private-use slot where `{list}` goes, then split there (a message argument cannot be an element).
+   */
+  const withList = (sentence: (slot: string) => string, entries: readonly ReactNode[]): ReactNode => {
+    const [before = "", after = ""] = sentence(LIST_SLOT).split(LIST_SLOT);
+    const parts = list.formatToParts(entries.map((_, index) => String(index)));
+    return (
+      <>
+        {before}
+        {parts.map((part, index) => (part.type === "literal" ? part.value : <bdi key={index}>{entries[Number(part.value)]}</bdi>))}
+        {after}
+      </>
+    );
   };
   const labelNode = (item: PlanAckItem): ReactNode => {
     const cycle = cycleOfCode(item.textCode);
     return (
       <>
-        {t.rich("signOff.item", {
-          zone: t(`zone.${item.zone}`),
-          from: formatClock(hourOfDay(new Date(item.startsAt), zone)),
-          to: formatClock(hourOfDay(new Date(item.endsAt), zone)),
-          bdi,
-        })}
+        {itemSentence(item)}
         {cycle === null ? null : <span className="block text-sm text-ink-2">{crews("focal.cycle", { work: String(cycle.work), rest: String(cycle.rest) })}</span>}
       </>
     );
@@ -163,21 +177,21 @@ export default function SignOffForm({ crewId, date, items, zone }: SignOffFormPr
     });
   };
 
-  const intro =
+  const intro: ReactNode =
     items.length === 0
       ? t("signOff.none")
       : items.length === 1
-        ? t("signOff.itemsOne", { list: list.format(items.map(label)) })
-        : t("signOff.items", { count: String(items.length), list: list.format(items.map(label)) });
+        ? withList((slot) => t("signOff.itemsOne", { list: slot }), items.map(itemSentence))
+        : withList((slot) => t("signOff.items", { count: String(items.length), list: slot }), items.map(itemSentence));
 
-  let message: string | null = null;
+  let message: ReactNode = null;
   if (outcome.kind === "ticks") message = unticked.length === 1 ? t("signOff.tickOne") : t("signOff.tickMany", { count: String(unticked.length) });
   else if (outcome.kind === "missing") {
-    const named = outcome.ids.map((id) => {
+    const named = outcome.ids.map((id): ReactNode => {
       const item = items.find((candidate) => candidate.id === id);
-      return item === undefined ? id : label(item);
+      return item === undefined ? id : itemSentence(item);
     });
-    message = t("signOff.missing", { list: list.format(named) });
+    message = withList((slot) => t("signOff.missing", { list: slot }), named);
   } else if (outcome.kind === "offline") message = t("signOff.offline");
   else if (outcome.kind === "failed") message = t("signOff.failed");
 

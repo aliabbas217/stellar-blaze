@@ -1,7 +1,8 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 import { clockOf } from "./runs";
 import type { ViolationView } from "./view";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /**
  * The rules a plan breaks, as the API answered, numbered like the marks on the plan strip: the rule id in mono (an
@@ -10,13 +11,14 @@ import type { ViolationView } from "./view";
  */
 export function ViolationList({ violations }: { readonly violations: readonly ViolationView[] }) {
   const t = useTranslations("judge.try");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const list = new Intl.ListFormat(locale, { type: "conjunction" });
   return (
     <ol className="grid gap-3" data-violations="">
       {violations.map((violation, i) => (
         <li key={`${violation.ruleId}-${String(i)}`} className="grid gap-2 rounded-sign border border-hair bg-panel p-4" data-violation={i + 1}>
           <p className="flex flex-wrap items-center gap-3">
+            {/* fixed-height-ok: a numbered circle holding one Western digit; the accessible name carries the words */}
             <span
               aria-label={t("result.violation", { n: String(i + 1) })}
               className="flex size-6 items-center justify-center rounded-full border-2 border-signal text-sm font-semibold tabular-nums text-ink"

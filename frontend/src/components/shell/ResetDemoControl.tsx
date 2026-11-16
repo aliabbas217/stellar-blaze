@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { resetDemoMutation } from "@/api/queries";
 import { ResetDemoButton } from "@/components/shell/ResetDemoButton";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 
 /**
  * "Reset demo site": one tap, no confirm dialog, calls `reset_demo_site` (ADR 0062, 0066). Nothing is deleted: the API
@@ -42,6 +43,7 @@ export function ResetDemoControl({
     },
   });
 
+  const attrs = useLocaleAttrs();
   const [asked, setAsked] = useState(autoStart);
   const started = useRef(false);
   const { mutate } = reset;
@@ -57,7 +59,7 @@ export function ResetDemoControl({
   const rateLimited = status === 429;
 
   return (
-    <div className="flex flex-col gap-2 font-body text-sm text-ink">
+    <div {...attrs} className="flex flex-col gap-2 font-body text-sm text-ink">
       <ResetDemoButton
         busy={reset.isPending || (asked && siteId === undefined && !siteFailed)}
         onClick={() => {

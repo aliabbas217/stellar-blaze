@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 
 export type StampKind = "REPLAY" | "RECORDED" | "SIMULATED" | "DESIGNED" | "DEV_2025" | "NOT_CLINICALLY_REVIEWED";
 
@@ -27,9 +28,11 @@ const STAMPS = {
  */
 export function Stamp({ kind, detail }: StampProps) {
   const t = useTranslations("states.stamp");
+  const attrs = useLocaleAttrs();
   const { key, frame } = STAMPS[kind];
   return (
     <span
+      {...attrs}
       role="note"
       className={`inline-flex min-h-6 w-fit items-center gap-2 rounded-sign border px-2 text-xs font-medium ${frame}`}
     >

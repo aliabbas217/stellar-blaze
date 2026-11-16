@@ -9,6 +9,7 @@ import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ErrorState } from "@/components/states/ErrorState";
 import { LevelSignSkeleton, Skeleton } from "@/components/states/Skeletons";
+import { WakingLine } from "@/components/states/WakingLine";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import { ActionLead } from "@/features/today/ActionLead";
 import { ALSO_NEEDS_DRAFT_MARKER, alsoPictogram } from "@/features/today/action-codes";
@@ -34,12 +35,16 @@ const SKELETON_HOURS = 12;
 export function TodaySkeleton() {
   const t = useTranslations("states");
   return (
-    <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
-      <LevelSignSkeleton size="hero" />
-      <Skeleton height="calc(max(2.5rem, var(--t-22) * var(--sign-leading-text)) + var(--s-2) + var(--t-16) * var(--sign-leading-text))" />
-      <Skeleton height={spineHeight(SKELETON_HOURS)} />
-      <span className="sr-only">{t("loading")}</span>
-    </div>
+    <>
+      <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
+        <LevelSignSkeleton size="hero" />
+        <Skeleton height="calc(max(2.5rem, var(--t-22) * var(--sign-leading-text)) + var(--s-2) + var(--t-16) * var(--sign-leading-text))" />
+        <Skeleton height={spineHeight(SKELETON_HOURS)} />
+        <span className="sr-only">{t("loading")}</span>
+      </div>
+      {/* Outside the busy region (a change inside it is not announced). The forecast read can be waiting for a scaled-to-zero API. */}
+      <WakingLine className="px-4 pt-3" />
+    </>
   );
 }
 

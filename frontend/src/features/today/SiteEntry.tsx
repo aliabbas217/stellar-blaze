@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import { Skeleton } from "@/components/states/Skeletons";
+import { WakingLine } from "@/components/states/WakingLine";
 
 /**
  * What Today shows on a phone that has no site yet. There is no account and no sign-in: a worker joins by scanning the poster
@@ -38,10 +39,14 @@ export function SiteEntry({
           {t("demo")}
         </button>
       ) : status === "loading" ? (
-        <div role="status" aria-busy="true" className="flex w-full flex-col gap-2">
-          <Skeleton height="var(--target)" width="12rem" />
-          <span className="sr-only">{t("loading")}</span>
-        </div>
+        <>
+          <div role="status" aria-busy="true" className="flex w-full flex-col gap-2">
+            <Skeleton height="var(--target)" width="12rem" />
+            <span className="sr-only">{t("loading")}</span>
+          </div>
+          {/* The site list read can be waiting for a scaled-to-zero API. */}
+          <WakingLine />
+        </>
       ) : status === "failed" ? (
         <div role="alert" className="flex flex-col items-start gap-3">
           <p className="text-base text-ink-2">{t("chooseFailed")}</p>

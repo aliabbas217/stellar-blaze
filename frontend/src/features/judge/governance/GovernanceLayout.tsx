@@ -1,4 +1,4 @@
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { AccessLog } from "@/components/governance/AccessLog";
 import { Stamp } from "@/components/provenance/Stamp";
@@ -12,6 +12,7 @@ import { REQUEST_DATA_CLASS, SYNTHETIC_WORKER_REF, type Outcome } from "./answer
 import { clockTime, dayAndTime } from "./clock";
 import type { RecordedView } from "./recorded-view";
 import type { RunModel } from "./run";
+import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /*
  * The governance refusal, `/replay/governance`: a four-step sequence in time order (the employer's request, the service's
@@ -77,7 +78,7 @@ const BLANK_CLOCK = "--:--:--";
 
 export function GovernanceLayout({ run, recorded, siteName, siteId, pending, logFetching, sentBefore, notice, onSend, modeSwitch, reset }: GovernanceLayoutProps) {
   const t = useTranslations("judge.governance");
-  const locale = useLocale();
+  const locale = CLAIMS_LOCALE;
   const { answer, auditRow, logRows, shownRows, runLive } = run;
 
   const path = `/api/v1/sites/${siteId ?? recorded?.siteId ?? "{site_id}"}/data-requests`;

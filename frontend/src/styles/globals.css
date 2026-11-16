@@ -170,10 +170,16 @@
  * Urdu is the one locale with two web families: Nastaliq (--font-body) and Naskh as its
  * fallback (--font-body-secondary). next/font only takes literals, so it cannot chain them
  * itself; every other locale leaves --font-body-secondary unset and the fallback below applies.
+ *
+ * The first family is --font-display-latin, which is next/font's Archivo stack unless a locale says otherwise. Urdu and Arabic
+ * say "Archivo" alone (below): next/font's stack ends in `Archivo Fallback`, which is `@font-face { src: local(Arial) }` with no
+ * unicode-range, so with that stack Arial (an operating-system font) drew the Arabic script of every display heading before the
+ * body family was tried, and a phone without Arial drew something else. Archivo itself has no Arabic glyphs, so the script falls
+ * through to the locale body family (Nastaliq, Noto Sans Arabic) on every device, while Latin letters and digits stay Archivo.
  */
 @utility font-display {
   font-family:
-    var(--font-display, var(--font-display-fallback)), var(--font-body, var(--font-body-fallback)),
+    var(--font-display-latin, var(--font-display, var(--font-display-fallback))), var(--font-body, var(--font-body-fallback)),
     var(--font-body-secondary, var(--font-body-fallback)), var(--font-display-fallback);
 }
 
@@ -238,6 +244,25 @@
     line-height: var(--leading-ur);
   }
 
+  /* Display headings in Arabic script: Archivo for Latin letters and digits, the locale body family for the script (see font-display). */
+  :lang(ar),
+  :lang(ur) {
+    --font-display-latin: Archivo;
+  }
+
+  /*
+   * A claims block in a right-to-left or Indic page is English text (src/i18n/claims-english.tsx: the scoreboard, day, try,
+   * governance and proof copy stay English by design). It takes the English face and leading, not the page language's:
+   * line-height and font-family inherit, so without this an English paragraph in an Urdu page would be set at 2.5 in Nastaliq.
+   * The page's own element (<html lang="en">) already says this above; every other lang="en" is such a block.
+   */
+  [lang="en"]:not(:root) {
+    --font-body: var(--font-display);
+    --font-display-latin: var(--font-display);
+    font-family: var(--font-display, var(--font-body-fallback)), var(--font-body-fallback);
+    line-height: var(--leading-body);
+  }
+
   /*
    * The line heights the level sign sets its text with, one pair per language (Task 4 fix round 1). The sign and its
    * loading skeleton both compute their height from these two properties, so the skeleton is as tall as the sign in
@@ -248,6 +273,7 @@
   :lang(en) {
     --sign-leading-text: var(--leading-body);
     --sign-leading-word: var(--leading-solid);
+    --sign-leading-display: var(--leading-solid);
     --sign-word-size: var(--t-76);
     --sign-word-trim: 0px;
   }
@@ -257,6 +283,7 @@
   :lang(ar) {
     --sign-leading-text: var(--leading-ar);
     --sign-leading-word: var(--leading-ar);
+    --sign-leading-display: var(--leading-ar-display);
     --sign-word-size: var(--t-64);
     --sign-word-trim: calc(var(--t-64) * 0.15);
   }
@@ -264,6 +291,7 @@
   :lang(ur) {
     --sign-leading-text: var(--leading-ur);
     --sign-leading-word: var(--leading-ur);
+    --sign-leading-display: var(--leading-ur-display);
     --sign-word-size: var(--t-64);
     /* 0.75 em, measured on the face that ships (Noto Nastaliq Urdu, F2 W2): the nearest ink of the four level words is 10 px from the
        row above or below (tests/e2e/worker-today-notlive.spec.ts keeps it at 8 px or more). 0.5 em was measured in the fallback Naskh. */
@@ -275,6 +303,7 @@
   :lang(ne) {
     --sign-leading-text: var(--leading-body);
     --sign-leading-word: var(--leading-body);
+    --sign-leading-display: var(--leading-body);
     --sign-word-size: var(--t-76);
     --sign-word-trim: 0px;
   }
