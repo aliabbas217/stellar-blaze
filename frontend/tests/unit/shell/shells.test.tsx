@@ -135,7 +135,9 @@ describe("FieldShell", () => {
       expect(document.documentElement.dataset["theme"]).toBe("sun");
     });
     expect(meta.content).toBe(THEME_COLORS.sun);
-    expect(screen.getByRole("button", { name: "Sun mode: on" })).toBeInTheDocument();
+    // The toggle's label follows the theme by a render of its own: waiting for the attribute does not wait for the label (the runner
+    // failed here once in 8 runs, "Unable to find ... Sun mode: on", with the attribute already set), so ask with find*, which waits.
+    expect(await screen.findByRole("button", { name: "Sun mode: on" })).toBeInTheDocument();
   });
 
   it("re-applies on every route change, keeping the visitor's override", async () => {
@@ -157,7 +159,8 @@ describe("FieldShell", () => {
       expect(document.documentElement.dataset["theme"]).toBe("sun");
     });
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Sun mode: on" }));
+    // find*, not get*: the label follows the attribute by one more render (see the first test of this block).
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Sun mode: on" }));
     expect(document.documentElement.dataset["theme"]).toBeUndefined();
     expect(JSON.parse(window.localStorage.getItem(THEME_STORAGE_KEY) ?? "null")).toMatchObject({ theme: "night" });
 
