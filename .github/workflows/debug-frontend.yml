@@ -1,0 +1,47 @@
+# TEMPORARY bench for the PlanView failure on the runner. Lives only on the branch debug/ci-frontend and is deleted with it.
+# Same setup steps as the `frontend` job of ci.yml, then only the unit step: one job runs the failing file alone, the other the whole
+# suite as ci.yml does (so the two together say whether other test files take part).
+name: debug-frontend
+on:
+  push:
+    branches: [debug/ci-frontend]
+permissions:
+  contents: read
+jobs:
+  alone:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: node -v && nproc && cat /proc/cpuinfo | grep -m1 'model name' && free -m | head -2
+      - run: pnpm exec vitest run tests/unit/features/supervisor/plan/PlanView.test.tsx
+  full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --maxWorkers=4
