@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="worker">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Set up once · Worker · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* focus must not end up behind the sticky dock (WCAG 2.2 2.4.11) */
+  html[data-surface="worker"] { scroll-padding-block-end: calc(var(--space-24) + var(--space-12)); }
+  .worker a.link { display: inline-flex; align-items: center; min-block-size: var(--target-worker); }
+  .consent { border: var(--rule) solid var(--ink); }
+  .consent dt { font-weight: 600; }
+  .consent dd { color: var(--ink); }
+  .worker .check { align-items: center; min-block-size: var(--target-worker); }
+  .worker .check input { inline-size: var(--space-8); block-size: var(--space-8); }
+  .fs legend + * { margin-block-start: var(--space-2); }
+  .lbl { font-weight: 600; padding: 0; }
+  .err svg { inline-size: 1.25rem; block-size: 1.25rem; flex: none; }
+  .err { align-items: start; }
+  .sk-consent { block-size: calc(var(--space-24) * 3); }
+  .sk-label { block-size: var(--space-4); inline-size: 40%; }
+  .sk-input { block-size: var(--space-12); }
+  .sk-tiles { block-size: var(--space-24); }
+  .sk-btn { block-size: var(--space-12); }
+  /* a block that is itself a child of .stack gets its own inner rhythm from a grid gap, not a second --stack */
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  /* Urdu view: text with no Urdu string yet stays English and gets the Latin face (see script below) */
+  :where(html:lang(ur) [lang="en"]) { font-family: "Noto Sans", var(--font-body-fallback); line-height: var(--leading-body); unicode-bidi: plaintext; }
+  html:lang(ur) [lang="en"]:is(.t-headline, .t-title, .panel-title), html:lang(ur) [lang="en"] :is(.t-headline, .t-title, .panel-title) { font-family: var(--font-display); font-weight: 600; }
+  html:lang(ur) .btn--primary:has([lang="en"]), html:lang(ur) [lang="en"] .btn--primary { font-family: var(--font-display); font-size: var(--size-title); }
+  .proto-note { display: none; font-family: var(--font-mono); font-size: var(--size-label); background: var(--surface-raised); border: var(--rule-hairline) dashed var(--control); padding: var(--space-2) var(--space-3); }
+  html:lang(ur) .proto-note { display: block; }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error,invalid" data-langs="en,ur">
+<a class="skip-link" href="#main" data-t-ur="مواد پر جائیں">Skip to content</a>
+
+<main id="main" class="worker stack stack-6">
+  <header class="worker-top">
+    <p class="t-title">Stellar Blaze</p>
+    <span class="stamp stamp--quiet" data-t-ur="مسودہ ترجمہ">Placeholder</span>
+  </header>
+  <p class="proto-note" lang="en" dir="ltr">Prototype note, not product: text with no key in ur.json stays in English here. No Urdu has been invented.</p>
+
+  <!-- ERROR: the policy did not load. Typed values are kept in the form below. -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="err-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h1 id="err-h" class="t-headline" data-t-ur="کچھ غلط ہو گیا">Something went wrong</h1>
+    <p class="measure" data-t-ur="ہم اسے لوڈ نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔">We could not load this. Check your connection and try again.</p>
+    <p class="measure"><strong>The heat rules did not load. Your answers below are kept.</strong></p>
+    <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg><span data-t-ur="دوبارہ کوشش کریں">Try again</span></button>
+    <p class="reqid"><span class="t-num" data-t-ur="درخواست کی شناخت: ⟨req-id⟩">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label data-t-ur="کاپی کریں">Copy</span></button></p>
+  </section>
+
+
+  <!-- IDEAL, INVALID and ERROR share the form (invalid shows inline reasons; error keeps typed values) -->
+  <section data-state="ideal invalid error" class="stack stack-6" aria-label="Heat profile setup">
+    <div data-state="ideal invalid" class="vs-2">
+      <h1 id="setup-h" class="t-headline" data-t-ur="اپنا حرارتی پروفائل ترتیب دیں">Set up your heat profile</h1>
+      <p class="t-lead measure" data-t-ur="ایک بار بنا لیں تاکہ ہم آپ کی اپنی گرمی کی حد نکال سکیں۔ اس میں تقریباً ایک منٹ لگتا ہے۔">Set up once so we can work out your own heat limit. It takes about a minute.</p>
+    </div>
+
+    <section class="card consent vs-3" aria-labelledby="consent-h">
+      <h2 id="consent-h" class="panel-title cluster"><svg class="ico" width="24" height="24"><use href="#i-lock"/></svg><span data-t-ur="آپ کا پروفائل اسی فون پر رہتا ہے">Your profile stays on this phone</span></h2>
+      <dl class="stack stack-3">
+        <div class="vs-1"><dt data-t-ur="کیا محفوظ ہوتا ہے">What is stored</dt><dd data-t-ur="آپ کے کام کی قسم، گرمی میں کام شروع کرنے کی تاریخ، اور آپ کے لباس کا انتخاب۔ یہ صرف اسی فون پر محفوظ ہوتے ہیں۔">Your type of work, the date you started working in heat, and your clothing option. They are stored only on this phone.</dd></div>
+        <div class="vs-1"><dt data-t-ur="سرور کو کیا ملتا ہے">What the server gets</dt><dd data-t-ur="آپ کے پروفائل میں سے کچھ نہیں۔ اگر آپ الرٹس آن کریں تو آپ کی سائٹ کے لیے (اور اگر آپ نے ٹیم چُنی ہو تو آپ کی ٹیم کے لیے) ایک الرٹ سبسکرپشن بھیجی جاتی ہے۔ یہ آپ کے نام یا پروفائل سے منسلک نہیں ہوتی۔">Nothing from your profile. If you turn on alerts, an alert subscription for your site (and your crew, if you chose one) is sent. It is not linked to your name or profile.</dd></div>
+        <div class="vs-1"><dt data-t-ur="اسے کیسے استعمال کیا جاتا ہے">How it is used</dt><dd data-t-ur="اسے کبھی تادیبی یا ملازمت کے فیصلوں میں استعمال نہیں کیا جاتا۔">It is never used for discipline or employment decisions.</dd></div>
+        <div class="vs-1"><dt data-t-ur="واپس لینا">Taking it back</dt><dd data-t-ur="آپ کسی بھی وقت الرٹس کے صفحے سے اپنا ڈیٹا ہٹا سکتے ہیں۔">You can remove your data at any time from Alerts.</dd></div>
+      </dl>
+    </section>
+
+    <form id="setup" class="stack stack-6" action="worker-today.html" method="get" novalidate aria-label="Heat profile">
+      <div class="field">
+        <div class="check">
+          <input type="checkbox" id="agree" name="agree" aria-describedby="agree-err">
+          <label for="agree" data-t-ur="میں نے یہ پڑھ لیا ہے اور میں متفق ہوں">I have read this and I agree</label>
+        </div>
+        <p class="err" id="agree-err" data-state="invalid" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span data-t-ur="آگے بڑھنے کے لیے خانے پر نشان لگائیں۔">Tick the box to continue.</span></p>
+      </div>
+
+      <div class="field">
+        <label for="site" data-t-ur="سائٹ">Site</label>
+        <select class="select" id="site" name="site">
+          <option>Musaffah demo yard</option>
+          <option>⟨Another site from the site list⟩</option>
+        </select>
+      </div>
+
+      <fieldset class="fs">
+        <legend class="lbl" data-t-ur="کام کی قسم">Type of work</legend>
+        <div class="tiles">
+          <label class="tile"><input type="radio" name="work" value="light"><span><svg class="ico"><use href="#i-light"/></svg><b data-t-ur="ہلکا">Light</b></span></label>
+          <label class="tile"><input type="radio" name="work" value="moderate"><span><svg class="ico"><use href="#i-moderate"/></svg><b data-t-ur="درمیانہ">Moderate</b></span></label>
+          <label class="tile"><input type="radio" name="work" value="heavy" checked><span><svg class="ico"><use href="#i-heavy"/></svg><b data-t-ur="بھاری">Heavy</b></span></label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label for="start" data-t-ur="گرمی میں کام شروع کرنے کی تاریخ">Date you started working in heat</label>
+        <p class="hint" id="start-hint" data-t-ur="یہ جاننے کے لیے کہ آپ گرمی کے کتنے عادی ہیں۔ اسے شیئر نہیں کیا جاتا۔">Used to work out how used to the heat you are. It is not shared.</p>
+        <input class="input" type="date" id="start" name="start" aria-describedby="start-hint start-err-required start-err-future">
+        <p class="err" id="start-err-required" data-state="on-submit" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span data-t-ur="یہ خانہ ضروری ہے۔">This field is required.</span></p>
+        <p class="err" id="start-err-future" data-state="invalid" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span data-t-ur="تاریخ مستقبل کی نہیں ہو سکتی۔">The date cannot be in the future.</span></p>
+      </div>
+
+      <div class="field">
+        <label for="clothing" data-t-ur="لباس">Clothing</label>
+        <select class="select" id="clothing" name="clothing">
+          <option data-t-ur="عام کام کا لباس">Normal work clothes</option>
+          <option>Clothing option ⟨code⟩</option>
+        </select>
+      </div>
+
+      <button class="btn btn--primary btn--block" type="submit" data-t-ur="محفوظ کریں اور آگے بڑھیں">Save and continue</button>
+    </form>
+  </section>
+
+  <!-- LOADING: policy and sites loading; same blocks as the final layout -->
+  <section data-state="loading" class="stack stack-6" aria-busy="true" aria-label="Loading the setup form">
+    <h1 class="sr-only" data-t-ur="اپنا حرارتی پروفائل ترتیب دیں">Set up your heat profile</h1>
+    <div class="vs-2"><div class="skel sk-input"></div><div class="skel sk-label"></div></div>
+    <div class="skel sk-consent"></div>
+    <div class="vs-2"><div class="skel sk-label"></div><div class="skel sk-input"></div></div>
+    <div class="vs-2"><div class="skel sk-label"></div><div class="skel sk-tiles"></div></div>
+    <div class="vs-2"><div class="skel sk-label"></div><div class="skel sk-input"></div></div>
+    <div class="vs-2"><div class="skel sk-label"></div><div class="skel sk-input"></div></div>
+    <div class="skel sk-btn"></div>
+    <p class="sr-only" role="status" data-t-ur="لوڈ ہو رہا ہے">Loading</p>
+  </section>
+
+  <!-- EMPTY: no sites configured -->
+  <section data-state="empty" class="empty" aria-labelledby="empty-h">
+    <div class="cluster" aria-hidden="true">
+      <span class="sign lv-green sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-green"/></svg><b class="t-title">1</b></span></span>
+      <span class="sign lv-amber sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-amber"/></svg><b class="t-title">2</b></span></span>
+      <span class="sign lv-orange sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-orange"/></svg><b class="t-title">3</b></span></span>
+      <span class="sign lv-red sign--mini"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title">4</b></span></span>
+    </div>
+    <h1 id="empty-h" class="t-headline">No sites are set up for this demo yet</h1>
+    <p class="t-lead measure">Setup needs a site so we can match its forecast and rules. The demo yard works like a real site.</p>
+    <a class="btn btn--primary btn--block" href="worker-setup.html">Use the demo yard</a>
+    <a class="link" href="worker-today.html?state=partial" data-t-ur="ترتیب کے بغیر آج کی سائٹ کی سطح دیکھیں">See today's site level without setup</a>
+  </section>
+</main>
+
+<div class="worker-dock">
+<a class="unwell-fab" href="worker-unwell.html"><svg class="ico"><use href="#i-unwell"/></svg><span data-t-ur="طبیعت خراب ہے">I feel unwell</span></a>
+<nav class="bottom-bar" aria-label="Worker" data-aria-ur="کارکن">
+  <a href="worker-today.html" aria-current="page"><svg class="ico"><use href="#i-today"/></svg><span data-t-ur="آج">Today</span></a>
+  <a href="worker-alerts.html"><svg class="ico"><use href="#i-bell"/></svg><span data-t-ur="الرٹس">Alerts</span></a>
+  <a href="worker-data.html"><svg class="ico"><use href="#i-eye"/></svg><span data-t-ur="میرا ڈیٹا">My data</span></a>
+</nav>
+</div>
+<script src="assets/proto.js"></script>
+<script>
+  /* Prototype behaviour: validation on blur and on submit (Save stays enabled), typed values per state. */
+  (() => {
+    const form = document.getElementById("setup");
+    const agree = document.getElementById("agree");
+    const start = document.getElementById("start");
+    const show = (id, on) => document.getElementById(id).classList.toggle("is-shown", on);
+    const iso = (days) => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+    const dateProblem = () => (!start.value ? "required" : start.value > iso(0) ? "future" : null);
+    const paintDate = () => {
+      const p = dateProblem();
+      show("start-err-required", p === "required");
+      show("start-err-future", p === "future");
+      start.setAttribute("aria-invalid", p ? "true" : "false");
+      return p;
+    };
+    const state = document.body.dataset.current;
+    if (state === "invalid") { agree.checked = false; start.value = iso(30); start.setAttribute("aria-invalid", "true"); }
+    if (state === "error") { agree.checked = true; start.value = iso(-30); }
+    start.addEventListener("blur", () => { if (start.value || document.body.dataset.touched) paintDate(); });
+    start.addEventListener("change", paintDate);
+    agree.addEventListener("change", () => show("agree-err", !agree.checked && !!document.body.dataset.touched));
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      document.body.dataset.touched = "1";
+      const noConsent = !agree.checked;
+      show("agree-err", noConsent);
+      const p = paintDate();
+      if (noConsent) agree.focus();
+      else if (p) start.focus();
+      else location.href = form.getAttribute("action");
+    });
+  })();
+</script>
+<script>
+  /* Urdu view: any text without an Urdu string yet stays English and is marked lang="en" (never invented Urdu). */
+  (() => {
+    if (document.documentElement.lang !== "ur") return;
+    document.querySelectorAll("main *, .worker-dock *").forEach((el) => {
+      if (el.closest("[lang]:not(html)")) return;
+      if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) el.lang = "en";
+    });
+  })();
+</script>
+</body>
+</html>

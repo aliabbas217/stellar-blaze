@@ -1,0 +1,24 @@
+# Build context is backend/. The Dockerfile copies only pyproject.toml, uv.lock, src/, alembic/, alembic.ini, rulesets/,
+# models/, replay/, config/, fixtures/ and THIRD_PARTY_NOTICES.md, so this file keeps the context small and keeps secrets and local
+# state out of it. Never exclude rulesets/, models/, replay/ or config/: they ship inside the image (ADR 0009, ADR 0010).
+# `data` below is backend/data (the local silver and gold files, never shipped); replay snapshots are in replay/.
+
+# Local environments and caches
+.venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.import_linter_cache
+.numba-cache
+**/__pycache__
+**/*.pyc
+.coverage
+htmlcov
+
+# Secrets and local data (.env.example is documentation, not needed in the image)
+.env
+.env.*
+data
+
+# Not part of the runtime image
+tests

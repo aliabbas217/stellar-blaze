@@ -1,0 +1,195 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/supervisor-crews.html",
+  "when": "2026-11-12T01:04:20.238Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-crews\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-crews\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 8
+          },
+          {
+            "px": 13,
+            "n": 28
+          },
+          {
+            "px": 14,
+            "n": 4
+          },
+          {
+            "px": 16,
+            "n": 12
+          },
+          {
+            "px": 18,
+            "n": 2
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 28,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          },
+          {
+            "v": "1px",
+            "n": 1
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 77,
+            "n": 1
+          },
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 3,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Crews today · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-crews\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 61.8
+        },
+        "squint": {
+          "masses": 53,
+          "competitors": 1,
+          "dominance": 0.323,
+          "top": [
+            {
+              "cells": 214,
+              "weight": 80,
+              "cx": 0.608,
+              "cy": 0.75,
+              "bbox": [
+                0.556,
+                0.505,
+                0.667,
+                0.991
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 16.47,
+              "cx": 0.852,
+              "cy": 0.701,
+              "bbox": [
+                0.819,
+                0.673,
+                0.889,
+                0.729
+              ]
+            },
+            {
+              "cells": 41,
+              "weight": 15.72,
+              "cx": 0.852,
+              "cy": 0.571,
+              "bbox": [
+                0.819,
+                0.542,
+                0.889,
+                0.598
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 13.61,
+              "cx": 0.848,
+              "cy": 0.834,
+              "bbox": [
+                0.819,
+                0.804,
+                0.889,
+                0.86
+              ]
+            },
+            {
+              "cells": 24,
+              "weight": 9.61,
+              "cx": 0.121,
+              "cy": 0.314,
+              "bbox": [
+                0.042,
+                0.299,
+                0.181,
+                0.327
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.051,
+        "centroid": {
+          "x": 0.506,
+          "y": 0.551
+        },
+        "colourfulness": 41.1,
+        "luminanceSpread": 0.364,
+        "chromaProxy": 0.151,
+        "hierarchyByHueOnly": false,
+        "inkPct": 33.9,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

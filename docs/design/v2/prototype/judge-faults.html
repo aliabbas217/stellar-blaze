@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Break things · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.desk { max-width: var(--content-max); margin-inline: auto; padding: var(--s-4) clamp(16px, 3vw, 40px) var(--s-12); }
+.ev-tabs { display: flex; flex-wrap: wrap; gap: 0 var(--s-1); margin-bottom: var(--s-4); font-size: var(--t-13); }
+.ev-tabs span { color: var(--ink-3); display: inline-flex; align-items: center; min-height: 32px; margin-inline-end: var(--s-2); }
+.ev-tabs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--s-2); color: var(--ink-3); text-decoration: none; border-bottom: 2px solid transparent; }
+.ev-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.head { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.head h1 { max-width: 34ch; }
+.stepnav { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-12); padding-top: var(--s-4); border-top: 1px solid var(--hair); }
+.stepnav a:not(.btn) { color: var(--ink-2); font-size: var(--t-14); }
+.notes { margin-top: var(--s-6); padding-left: var(--s-4); color: var(--ink-3); font-size: var(--t-13); display: grid; gap: var(--s-1); max-width: 90ch; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: var(--s-6); align-items: start; }
+@media (max-width: 1000px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+/* hero: the fault timeline */
+.tl { padding: var(--s-4); view-transition-name: spine; }
+.tl-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-4); margin-bottom: var(--s-3); }
+.tl-h h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.tl-h .faint { font-size: var(--t-13); }
+.lanes { display: grid; grid-template-columns: 236px minmax(0, 1fr); }
+.lanes > * { min-width: 0; }
+.lane-k { display: flex; align-items: center; font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.fault { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: var(--s-2); width: 100%; min-height: 64px; padding: 0 var(--s-3) 0 0; border: 0; border-top: 1px solid var(--hair); background: transparent; color: var(--ink-2); text-align: start; font-size: var(--t-14); line-height: 1.3; }
+.fault .sw { width: 30px; height: 18px; border: 1px solid var(--edge); border-radius: 9px; position: relative; }
+.fault .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 6px; background: var(--ink-3); transition: transform var(--dur-1) var(--ease); }
+.fault[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+.fault[aria-pressed="true"] .sw { background: var(--signal); border-color: var(--signal); }
+.fault[aria-pressed="true"] .sw::after { background: var(--on-signal); transform: translateX(12px); }
+.fault:hover { color: var(--ink); }
+.track { border-top: 1px solid var(--hair); min-height: 64px; }
+.track svg, .axis svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.track .on { fill: var(--raised); stroke: var(--edge); stroke-width: 1; }
+.track .start { fill: var(--signal); }
+.track .t1 { font: 600 13px var(--sans); fill: var(--ink); }
+.track .t2 { font: 400 13px var(--sans); fill: var(--ink-2); }
+.track .off { stroke: var(--hair); stroke-width: 1; }
+.track .offt { font: 400 13px var(--sans); fill: var(--ink-3); }
+.lanes .r-slot { fill: var(--slot); } .lanes .r-slot-rule { stroke: var(--edge); stroke-width: 1; }
+.lanes .r-now { stroke: var(--ink); stroke-width: 2; }
+.lanes .r-tick { font: 400 12px var(--sans); fill: var(--ink-3); }
+.lanes .r-label { font: 500 12px var(--sans); fill: var(--ink-3); }
+@media (max-width: 760px) {
+  .lanes { grid-template-columns: minmax(0, 1fr); }
+  .lane-k { display: none; }
+  .track { border-top: 0; min-height: 56px; }
+}
+.reset-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--hair); }
+.reset-row p { font-size: var(--t-13); color: var(--ink-3); }
+
+/* preview: what the product shows */
+.pv { display: grid; gap: var(--s-4); }
+.pv h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.phone-mini { border: 1px solid var(--edge); border-radius: var(--r); background: var(--ground); color: var(--ink); padding: var(--s-4); display: grid; gap: var(--s-3); }
+.phone-mini .site { display: flex; justify-content: space-between; font-size: var(--t-13); color: var(--ink-3); }
+.phone-mini .k { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.phone-mini .level-word strong { font-size: var(--t-48); }
+.phone-mini .level-word span { font-size: var(--t-18); color: var(--ink-2); }
+.phone-mini .lead { font-size: var(--t-18); font-weight: 500; line-height: 1.3; }
+.phone-mini .notice { font-size: var(--t-14); }
+.phone-mini .unwell { min-height: 48px; font-size: var(--t-16); }
+.phone-mini.rules .level-word strong { font-size: var(--t-36); }
+.surface { border: 1px solid var(--edge); border-radius: var(--r); padding: var(--s-4); display: grid; gap: var(--s-3); }
+.surface .k { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.mic { display: flex; align-items: center; gap: var(--s-3); }
+.mic button { min-height: var(--target); }
+.refusal { font-size: var(--t-16); font-weight: 500; line-height: 1.4; }
+.form-mini { display: grid; gap: var(--s-2); }
+.form-mini label { font-size: var(--t-13); color: var(--ink-3); }
+.form-mini input { min-height: var(--target); padding: 0 var(--s-2); background: var(--ground-deep); border: 1px solid var(--edge); border-radius: var(--r); }
+.tag.rec { border-color: var(--ink-2); color: var(--ink); font-weight: 600; letter-spacing: 0.06em; }
+.floor { border-top: 1px solid var(--hair); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+.floor p { font-size: var(--t-14); }
+.floor code { overflow-wrap: anywhere; color: var(--ink-2); }
+.sk-h { height: 420px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Evidence you can try</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="desk" id="main">
+  <nav class="ev-tabs" aria-label="Evidence"><span>Try it yourself</span><a href="judge-validator.html">Try a plan</a><a href="judge-frontier.html">Roster frontier</a><a href="judge-climate.html">Warmer summer</a><a href="judge-governance.html">Governance</a><a href="judge-faults.html" aria-current="page">Break things</a></nav>
+  <header class="head">
+    <h1 class="j-h2">Break the system. Every failure says so, and falls back to something at least as safe as the midday break.</h1>
+  </header>
+
+  <div class="grid" data-when="loading" aria-busy="true" aria-label="Loading"><p class="skel sk-h">.</p><p class="skel sk-h">.</p></div>
+  <section class="empty" data-when="error" role="alert">
+    <h3>The replay day did not load</h3>
+    <p class="muted">The heat row for Thu 3 Sep could not be read. The fault switches below still work; only the heat row is missing.</p>
+    <p><a class="btn primary" href="judge-faults.html">Try again</a></p>
+    <p class="faint" style="font-size:var(--t-13)">Request id <span class="mono">req_91fd3c07</span> (prototype)</p>
+  </section>
+
+  <div class="grid" data-when="ideal empty error">
+    <section class="panel tl" aria-labelledby="tl-h">
+      <div class="tl-h"><h2 id="tl-h">Thu 3 Sep 2026, Mussafah M-14 yard. Now 11:10</h2><span class="faint" id="tl-sub">Faults start now and run to the end of the shift</span></div>
+      <div class="lanes" id="lanes">
+        <div class="lane-k">Heat by hour</div><div class="axis" id="axis"></div>
+      </div>
+      <div class="reset-row"><button class="btn" type="button" id="reset">Back to normal</button><p id="summary" role="status" aria-live="polite"></p></div>
+    </section>
+
+    <aside class="pv" aria-labelledby="pv-h">
+      <h2 id="pv-h">What the product shows</h2>
+      <div id="pv"></div>
+      <section class="floor" aria-label="The floor">
+        <p><strong>Never less protective than the midday break.</strong> Every fallback keeps 12:30 to 15:00 and a rest in shade every hour.</p>
+        <p class="faint" style="font-size:var(--t-13)"><code class="mono">test_fallback_is_never_less_protective_than_the_midday_ban</code> (as designed, ADR 0011 §8 class d; lands with the planner build)</p>
+      </section>
+      <a class="btn primary lg" href="judge-next.html">Next: what's next</a>
+    </aside>
+  </div>
+
+  <ul class="notes">
+    <li>Heat row: ECMWF IFS 0.25° forecast for Thu 3 Sep issued the evening before; level and instruction as on the worker's Today screen (real weather, assumed crew).</li>
+    <li>3 h and 48 h are the app's cache limits for a forecast. Banner and refusal wording is draft, awaiting review.</li>
+  </ul>
+  <nav class="stepnav" aria-label="Evidence pages"><a href="judge-governance.html">Back: governance</a><a href="index.html">All views</a></nav>
+</main>
+
+<script type="module">
+import { boot, spine, STATE, q, fmt } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+boot({ surface: 'desk', states: ['ideal', 'empty', 'loading', 'error'] });
+const $ = (id) => document.getElementById(id);
+const bar = $('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+
+const NOW = 11 + 10 / 60, FROM = 6, TO = 18;
+const FAULTS = [
+  { id: 'offline', name: 'Phone goes offline', at: NOW, t1: 'Offline', t2: 'Saved copy of today. I feel unwell works.' },
+  { id: 'stale', name: 'Forecast goes stale', at: 9, t1: 'Stale after 3 h', t2: 'Banner: forecast from 06:00, still the best.' },
+  { id: 'push', name: 'Push is denied', at: NOW, t1: 'No push on this phone', t2: 'The supervisor relays warnings.' },
+  { id: 'api', name: 'API is down', at: NOW, t1: 'API down', t2: 'Saved pages open. Demos show recorded runs.' },
+  { id: 'voice', name: 'Voice without our GPU', at: NOW, point: true, t1: 'Mic refused, audit row written', t2: 'The form still works.' },
+];
+const on = new Set();
+if (STATE === 'ideal') (q.get('fault') || 'offline').split(',').forEach((k) => FAULTS.some((f) => f.id === k) && on.add(k));
+let focus = [...on].pop() || null;
+
+// lanes: a switch + a track on the shared day axis
+const lanes = $('lanes');
+for (const f of FAULTS) lanes.insertAdjacentHTML('beforeend', `<button class="fault" type="button" aria-pressed="false" data-f="${f.id}"><span class="sw" aria-hidden="true"></span><span>${f.name}</span></button><div class="track" data-t="${f.id}" aria-hidden="true"></div>`);
+
+let DAY = null;
+try { if (STATE !== 'loading') { const s = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json'); DAY = s.wbgt_c_by_local_hour[s.days.indexOf('2026-09-03')]; } } catch { DAY = null; }
+
+function geom() { const w = Math.max(280, Math.round($('axis').clientWidth)); return { w, pos: (t) => 22 + (t - FROM) / (TO - FROM) * (w - 44), narrow: w < 520 }; }
+function draw() {
+  const { w, pos, narrow } = geom();
+  spine($('axis'), { values: DAY || [], from: FROM, to: TO, now: NOW, ban: [12.5, 15], orientation: 'h', width: w, length: 74, bandY: 22, band: 22, tickStep: narrow ? 3 : 2,
+    aria: 'Shift 06:00 to 18:00 on Thu 3 Sep. Now 11:10. Midday break 12:30 to 15:00.' });
+  const slot = (h) => `<rect class="r-slot" x="${pos(12.5)}" y="0" width="${pos(15) - pos(12.5)}" height="${h}"/><line class="r-slot-rule" x1="${pos(12.5)}" x2="${pos(12.5)}" y1="0" y2="${h}"/><line class="r-slot-rule" x1="${pos(15)}" x2="${pos(15)}" y1="0" y2="${h}"/>`;
+  for (const f of FAULTS) {
+    const el = lanes.querySelector(`[data-t="${f.id}"]`), H = narrow ? 56 : 64, x0 = pos(f.at), x1 = pos(TO), isOn = on.has(f.id);
+    let s = slot(H) + `<line class="r-now" x1="${pos(NOW)}" x2="${pos(NOW)}" y1="0" y2="${H}" style="opacity:.5"/>`;
+    if (narrow && isOn) s += `<text class="t1" x="${f.point ? x0 - 8 : x0 + 8}" y="14"${f.point ? ' text-anchor="end"' : ''}>${f.t1}</text>`;
+    const y = narrow ? 22 : 10, h = narrow ? 28 : 44;
+    if (!isOn) s += `<line class="off" x1="${pos(FROM)}" x2="${x1}" y1="${y + h / 2}" y2="${y + h / 2}"/>${narrow ? '' : `<text class="offt" x="${pos(FROM)}" y="${y + h / 2 - 6}">Off</text>`}`;
+    else if (f.point) {
+      s += `<rect class="start" x="${x0 - 4}" y="${y}" width="8" height="${h}" rx="1"/>`;
+      if (!narrow) s += `<text class="t1" x="${x0 - 12}" y="${y + 18}" text-anchor="end">${f.t1}</text><text class="t2" x="${x0 - 12}" y="${y + 36}" text-anchor="end">${f.t2}</text>`;
+    } else {
+      s += `<rect class="on" x="${x0}" y="${y}" width="${x1 - x0}" height="${h}" rx="2"/><rect class="start" x="${x0}" y="${y}" width="4" height="${h}"/>`;
+      if (!narrow) { const tx = x0 > pos(NOW) + 1 ? x0 + 12 : x0 + 12; s += `<text class="t1" x="${tx}" y="${y + 18}">${f.t1}</text><text class="t2" x="${tx}" y="${y + 36}">${f.t2}</text>`; }
+    }
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${H}" width="${w}" height="${H}">${s}</svg>`;
+  }
+  for (const b of lanes.querySelectorAll('[data-f]')) b.setAttribute('aria-pressed', String(on.has(b.dataset.f)));
+}
+
+const LVL = `<p class="k">Heat level now</p><p class="level-word"><strong>Orange</strong><span>until 17:00</span></p><div class="scale" role="img" aria-label="Level 3 of 4, Orange"><span>Green</span><span>Amber</span><span aria-current="true">Orange</span><span>Red</span></div><p class="lead">Work 20 min, rest 40 min in shade</p>`;
+const PROOF = `<button type="button" class="proof" data-proof='{"what":"Orange (ADOSH High zone, heavy work 20 work / 40 rest), 11:00 to 17:00, Crew B","protocol":"Level from the site policy: ADOSH TWL zones on the corrected forecast; Red = stop work (ADR 0011 §2.6)","script":"backend policy B3","file":"replay day 2026-09-03","label":"Real weather, assumed crew"}'>Why Orange?</button>`;
+function preview() {
+  const w = [];
+  if (on.has('offline')) w.push(`<div class="notice"><p><strong>Offline.</strong> Showing this morning's plan. "I feel unwell" still works.</p></div>`);
+  if (on.has('stale')) w.push(`<div class="notice"><p><strong>Forecast from 06:00, 5 h ago.</strong> Still the best we have. We will update when you are back online.</p></div>`);
+  if (on.has('push')) w.push(`<div class="notice"><p><strong>Warnings are off on this phone.</strong> Your supervisor relays them to the crew. <a href="worker-today.html">Turn on</a></p></div>`);
+  let h = '';
+  const anyWorker = on.has('offline') || on.has('stale') || on.has('push');
+  if (!on.size) h += `<div class="empty" style="padding:var(--s-6) var(--s-4)"><h3>Nothing is broken</h3><p class="muted">Switch a fault on and the worker's screen answers here. Start with the phone going offline.</p><button class="btn" type="button" data-pick="offline">Go offline</button></div>`;
+  if (anyWorker || !on.size) h += `<div class="phone-mini" data-theme="sun" aria-label="Worker's Today screen, sun mode at 11:10"><p class="site"><span>Worker · Today · Crew B</span><span>11:10</span></p>${w.join('')}${LVL}<p>${PROOF}</p><a class="unwell" href="worker-unwell.html">I feel unwell</a><a href="worker-today.html${on.has('offline') ? '?state=offline' : on.has('stale') ? '?state=stale' : ''}" style="font-size:var(--t-13)">Open the real screen</a></div>`;
+  if (on.has('api')) h += `<div class="surface"><p class="k">Judge pages, API down</p><p><span class="tag rec">RECORDED</span></p><p><strong>The API is not reachable.</strong> Showing the recorded run. The scoreboard, the day and this page are saved copies and open as normal.</p><a href="judge-governance.html?state=recorded" style="font-size:var(--t-13)">See the governance recorded run</a></div>`;
+  if (on.has('voice')) h += `<div class="surface"><p class="k">Supervisor site setup, live URL without our GPU</p><div class="mic"><button class="btn" type="button" aria-disabled="true">Speak the site</button></div><p class="refusal" role="status">Voice needs our private server, which isn't running here. Type in the form instead.</p><div class="form-mini"><label for="sn">Site name</label><input id="sn" placeholder="Mussafah M-14 yard"></div><p class="faint" style="font-size:var(--t-13)">Zero outbound calls and an audit row (ADR 0038 §3).</p></div>`;
+  $('pv').innerHTML = h;
+  $('summary').textContent = on.size ? `${on.size} ${on.size === 1 ? 'fault' : 'faults'} on: ${FAULTS.filter((f) => on.has(f.id)).map((f) => f.name).join(' · ')}.` : 'Normal: no faults.';
+}
+function render() { draw(); preview(); }
+lanes.addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (!b) return; const k = b.dataset.f; on.has(k) ? on.delete(k) : on.add(k); render(); });
+$('pv').addEventListener('click', (e) => { const b = e.target.closest('[data-pick]'); if (b) { on.add(b.dataset.pick); render(); } });
+$('reset').addEventListener('click', () => { on.clear(); render(); });
+let raf = 0; new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }).observe($('axis'));
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/judge-governance.html",
+  "when": "2026-11-12T01:03:06.766Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-governance\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-governance\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 3
+          },
+          {
+            "px": 13,
+            "n": 48
+          },
+          {
+            "px": 14,
+            "n": 33
+          },
+          {
+            "px": 16,
+            "n": 15
+          },
+          {
+            "px": 18,
+            "n": 2
+          },
+          {
+            "px": 22,
+            "n": 8
+          },
+          {
+            "px": 35,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          },
+          {
+            "v": "1px",
+            "n": 4
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 7,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 4,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-governance\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 64.4
+        },
+        "squint": {
+          "masses": 32,
+          "competitors": 2,
+          "dominance": 0.261,
+          "top": [
+            {
+              "cells": 46,
+              "weight": 31,
+              "cx": 0.136,
+              "cy": 0.463,
+              "bbox": [
+                0.042,
+                0.433,
+                0.222,
+                0.478
+              ]
+            },
+            {
+              "cells": 83,
+              "weight": 27.63,
+              "cx": 0.205,
+              "cy": 0.149,
+              "bbox": [
+                0.042,
+                0.119,
+                0.375,
+                0.179
+              ]
+            },
+            {
+              "cells": 47,
+              "weight": 8.78,
+              "cx": 0.631,
+              "cy": 0.341,
+              "bbox": [
+                0.556,
+                0.284,
+                0.708,
+                0.418
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 6.3,
+              "cx": 0.23,
+              "cy": 0.627,
+              "bbox": [
+                0.042,
+                0.627,
+                0.417,
+                0.627
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 5.29,
+              "cx": 0.319,
+              "cy": 0.466,
+              "bbox": [
+                0.278,
+                0.388,
+                0.403,
+                0.507
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.21,
+        "centroid": {
+          "x": 0.322,
+          "y": 0.389
+        },
+        "colourfulness": 4.9,
+        "luminanceSpread": 0.206,
+        "chromaProxy": 0.007,
+        "hierarchyByHueOnly": false,
+        "inkPct": 19.9,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-governance\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-governance\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 3
+          },
+          {
+            "px": 13,
+            "n": 48
+          },
+          {
+            "px": 14,
+            "n": 33
+          },
+          {
+            "px": 16,
+            "n": 15
+          },
+          {
+            "px": 18,
+            "n": 2
+          },
+          {
+            "px": 22,
+            "n": 8
+          },
+          {
+            "px": 28,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 2,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 23
+          },
+          {
+            "v": "1px",
+            "n": 4
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 114,
+            "n": 1
+          },
+          {
+            "px": 7,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 5,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-governance\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 48.6
+        },
+        "squint": {
+          "masses": 47,
+          "competitors": 5,
+          "dominance": 0.066,
+          "top": [
+            {
+              "cells": 49,
+              "weight": 20.39,
+              "cx": 0.39,
+              "cy": 0.449,
+              "bbox": [
+                0.278,
+                0.43,
+                0.514,
+                0.458
+              ]
+            },
+            {
+              "cells": 39,
+              "weight": 18.3,
+              "cx": 0.234,
+              "cy": 0.344,
+              "bbox": [
+                0.139,
+                0.327,
+                0.333,
+                0.355
+              ]
+            },
+            {
+              "cells": 44,
+              "weight": 17.76,
+              "cx": 0.142,
+              "cy": 0.45,
+              "bbox": [
+                0.042,
+                0.439,
+                0.25,
+                0.467
+              ]
+            },
+            {
+              "cells": 37,
+              "weight": 15.34,
+              "cx": 0.138,
+              "cy": 0.503,
+              "bbox": [
+                0.042,
+                0.486,
+                0.236,
+                0.514
+              ]
+            },
+            {
+              "cells": 37,
+              "weight": 14.67,
+              "cx": 0.835,
+              "cy": 0.504,
+              "bbox": [
+                0.75,
+                0.486,
+                0.917,
+                0.514
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.097,
+        "centroid": {
+          "x": 0.406,
+          "y": 0.477
+        },
+        "colourfulness": 10.3,
+        "luminanceSpread": 0.404,
+        "chromaProxy": 0.029,
+        "hierarchyByHueOnly": false,
+        "inkPct": 24.8,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "5 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.066)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 7% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

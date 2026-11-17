@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "risks": [
+    {
+      "tool": "bicep",
+      "ruleId": "use-recent-api-versions",
+      "resource": "infra/bicep/modules/environment.bicep",
+      "reason": "Microsoft.Insights/diagnosticSettings has only three API versions (2016-09-01, 2017-05-01-preview, 2021-05-01-preview); 2021-05-01-preview is the newest and the only one with logAnalyticsDestinationType Dedicated, which the resource-specific Container Apps log tables need. The linter would accept only the 2016 version. Revisit when Microsoft publishes a newer version.",
+      "date": "2026-11-15",
+      "reference": "https://learn.microsoft.com/en-us/azure/templates/microsoft.insights/diagnosticsettings"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.Log.Replication",
+      "resource": "Microsoft.OperationalInsights/workspaces/log-stellarblaze-demo",
+      "reason": "Single region by design: the demo keeps everything in UAE North (data residency, one resource group) and a cross-region workspace replica adds cost for no demo need.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.AvailabilityZone",
+      "resource": "Microsoft.App/managedEnvironments/cae-stellarblaze-demo",
+      "reason": "Zone redundancy needs a VNet-integrated environment; Stage 1 is the Consumption profile only with no VNet, no private endpoint and max one replica per app.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.PublicAccess",
+      "resource": "Microsoft.App/managedEnvironments/cae-stellarblaze-demo",
+      "reason": "The web app must be reachable from the internet for the judges; the api is internal-only (externalIngress false in main.bicep). Network isolation of the whole environment is Stage 2.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.PostgreSQL.GeoRedundantBackup",
+      "resource": "Microsoft.DBforPostgreSQL/flexibleServers/psql-sb-5f3e65afb63bb",
+      "reason": "Geo-redundant backup copies the data to the paired region; Stage 1 keeps all data in UAE North (ADR 0001: single region, data residency) and the Burstable B1MS server is the decided tier.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.PostgreSQL.AAD",
+      "resource": "Microsoft.DBforPostgreSQL/flexibleServers/psql-sb-5f3e65afb63bb",
+      "reason": "Stage 1 uses one administrator password (64 hex) that exists only in Container Apps secrets (main.bicep); a Microsoft Entra administrator and managed-identity database access are Stage 2 hardening.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.PostgreSQL.AADOnly",
+      "resource": "Microsoft.DBforPostgreSQL/flexibleServers/psql-sb-5f3e65afb63bb",
+      "reason": "Same decision as Azure.PostgreSQL.AAD: password authentication stays on for Stage 1 because the asyncpg URL carries the password; Entra-only authentication is Stage 2.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.PostgreSQL.ZoneRedundantHA",
+      "resource": "Microsoft.DBforPostgreSQL/flexibleServers/psql-sb-5f3e65afb63bb",
+      "reason": "Burstable B1MS is the decided tier (ADR 0001) and the Burstable tier does not offer zone-redundant high availability; HA is a Stage 2 pilot requirement.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.PostgreSQL.MaintenanceWindow",
+      "resource": "Microsoft.DBforPostgreSQL/flexibleServers/psql-sb-5f3e65afb63bb",
+      "reason": "Azure chooses the PostgreSQL maintenance window and the demo tolerates the restart; a custom window is a pilot requirement. (ADR 0001 rules out the Container Apps planned-maintenance window because of its USD 0.10/h meter: a different resource.)",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.RestrictIngress",
+      "resource": "Microsoft.App/containerApps/api",
+      "reason": "api ingress is internal to the environment (externalIngress false), so only web in the same environment can reach it; per-IP rules add nothing.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.RestrictIngress",
+      "resource": "Microsoft.App/containerApps/web",
+      "reason": "web is public by design for the judges (0.0.0.0/0 is the requirement).",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.MinReplicas",
+      "resource": "Microsoft.App/containerApps/api",
+      "reason": "ADR 0001: min replicas 1, max 1 during 20 Nov-11 Dec: in-process state stays coherent and the numba warm-up cost is paid once.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.MinReplicas",
+      "resource": "Microsoft.App/containerApps/web",
+      "reason": "ADR 0001: min replicas 1, max 1 during 20 Nov-11 Dec to keep the demo inside the idle-billing envelope.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ContainerApp.MinReplicas",
+      "resource": "Microsoft.App/containerApps/alerts",
+      "reason": "The alerts worker is a single long-running loop; a second replica would duplicate every alert delivery, so exactly one replica is intended.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ACR.GeoReplica",
+      "resource": "Microsoft.ContainerRegistry/registries/acrsb50425f359452e",
+      "reason": "Geo-replication is a Premium-only feature; Basic is enough for two images pulled from one region, and replication would copy images out of UAE North.",
+      "date": "2026-11-15"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ACR.MinSku",
+      "resource": "Microsoft.ContainerRegistry/registries/acrsb50425f359452e",
+      "reason": "Basic SKU is deliberate for the demo: two small images, one region, cost-minimal; Standard/Premium add throughput and features (replication, private link, quarantine) the demo does not use.",
+      "date": "2026-11-15"
+    },
+    {
+      "tool": "psrule",
+      "ruleId": "Azure.ACR.ExportPolicy",
+      "resource": "Microsoft.ContainerRegistry/registries/acrsb50425f359452e",
+      "reason": "Microsoft documents that disabling export needs a Premium registry with a private endpoint (data-loss-prevention page); ADR 0001 rules out private endpoints in Stage 1. The admin user and anonymous pull are already off in bootstrap-rg.bicep.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "checkov",
+      "ruleId": "CKV_AZURE_163",
+      "resource": "bootstrap.json#Microsoft.ContainerRegistry/registries.[variables('acrName')]",
+      "reason": "Registry image scanning is Microsoft Defender for Containers, a paid plan enabled at subscription level and outside this template; no Stage 1 decision includes it.",
+      "date": "2026-11-15"
+    },
+    {
+      "tool": "checkov",
+      "ruleId": "CKV_AZURE_166",
+      "resource": "bootstrap.json#Microsoft.ContainerRegistry/registries.[variables('acrName')]",
+      "reason": "Quarantine is a Premium-only registry feature; the demo registry is Basic, with the admin user and anonymous pull off (bootstrap-rg.bicep) and only the pull identity and the deployer able to reach images.",
+      "date": "2026-11-15"
+    },
+    {
+      "tool": "checkov",
+      "ruleId": "CKV_AZURE_139",
+      "resource": "bootstrap.json#Microsoft.ContainerRegistry/registries.[variables('acrName')]",
+      "reason": "Container Apps pulls from the registry over its public endpoint and Stage 1 has no private endpoint or VNet (ADR 0001); access is limited to the pull identity (AcrPull) with the admin user and anonymous pull disabled.",
+      "date": "2026-11-15",
+      "reference": "docs/decisions/0001-hosting-azure-uae-north.md"
+    },
+    {
+      "tool": "hadolint",
+      "ruleId": "DL3008",
+      "resource": "backend/Dockerfile",
+      "reason": "libgomp1 is installed from the Debian archive of a base image that is pinned by digest, so the package version is fixed by that digest and a hand-pinned apt version would only break when the digest is bumped.",
+      "date": "2026-11-15"
+    },
+    {
+      "tool": "hadolint",
+      "ruleId": "DL3066",
+      "resource": "frontend/Dockerfile",
+      "reason": "USER node is the official node image account (uid 1000 in /etc/passwd); no orchestrator here rejects a named user and libraries that look the uid up need the passwd entry.",
+      "date": "2026-11-15"
+    }
+  ]
+}

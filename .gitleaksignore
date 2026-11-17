@@ -1,0 +1,6 @@
+# False positive: a script filename (probe_seasonal_api.py) matched generic-api-key. Reviewed 2026-11-11.
+docs/research/2026-11-11-roster-feasibility.md:generic-api-key:297
+# False positive: a synthetic JWT test vector (header alg HS256, sub 1234567890, truncated signature) in the redaction tests. Reviewed 2026-11-11.
+backend/tests/unit/test_redaction.py:jwt:47
+# False positive: a SHA-256 of an Open-Meteo docs page next to the words 'previous-runs-api' matched generic-api-key (issue-time audit note, B2 Task 2). Reviewed 2026-11-14.
+docs/research/2026-11-13-previous-runs-issue-time-audit.md:generic-api-key:158

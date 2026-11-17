@@ -1,0 +1,89 @@
+/* Stellar Blaze v2-final "Qaylula" tokens. Three tiers: primitives (--ref-*), semantic (--*), themes.
+   Default theme = night (dark). [data-theme="sun"] = the high-contrast light theme the worker and supervisor
+   phone surfaces switch to while the sun is up at the site (see DESIGN.md §6). Contrast numbers in DESIGN.md §3 are
+   computed from these exact values. Heat colour is NOT here: it lives in heat.js ramps and is used on data only. */
+:root {
+  /* primitives: night (hue 245 tint, "Gulf night") */
+  --ref-night-0: oklch(0.145 0.014 245);
+  --ref-night-1: oklch(0.17 0.014 245);
+  --ref-night-2: oklch(0.205 0.014 245);
+  --ref-night-3: oklch(0.24 0.014 245);
+  --ref-night-slot: oklch(0.125 0.012 245);
+  --ref-night-hair: oklch(0.3 0.012 245);
+  --ref-night-edge: oklch(0.51 0.012 245);
+  --ref-mist-3: oklch(0.64 0.012 245);
+  --ref-mist-2: oklch(0.78 0.01 245);
+  --ref-mist-1: oklch(0.95 0.005 245);
+  --ref-signal-night: oklch(0.84 0.075 200);
+  /* primitives: sun */
+  --ref-sun-1: oklch(0.985 0.002 245);
+  --ref-sun-2: oklch(0.955 0.004 245);
+  --ref-sun-slot: oklch(0.925 0.006 245);
+  --ref-sun-hair: oklch(0.86 0.006 245);
+  --ref-sun-edge: oklch(0.62 0.01 245);
+  --ref-ink-3: oklch(0.48 0.012 245);
+  --ref-ink-2: oklch(0.38 0.012 245);
+  --ref-ink-1: oklch(0.18 0.012 245);
+  --ref-signal-sun: oklch(0.45 0.09 215);
+
+  /* semantic (night) */
+  --ground-deep: var(--ref-night-0);
+  --ground: var(--ref-night-1);
+  --panel: var(--ref-night-2);
+  --raised: var(--ref-night-3);
+  --slot: var(--ref-night-slot);          /* the qaylula slot: recessed, below ground */
+  --hair: var(--ref-night-hair);
+  --edge: var(--ref-night-edge);          /* control boundaries, >= 3:1 */
+  --ink: var(--ref-mist-1);
+  --ink-2: var(--ref-mist-2);
+  --ink-3: var(--ref-mist-3);
+  --signal: var(--ref-signal-night);      /* live / selected / needs you. Never heat. */
+  --on-signal: var(--ref-night-0);
+  --focus: var(--signal);
+  --scrim: oklch(0.1 0.01 245 / 0.72);
+  /* level marks (small marks only, always with the word) */
+  --lv-green: oklch(0.72 0.14 150);
+  --lv-amber: oklch(0.83 0.14 85);
+  --lv-orange: oklch(0.73 0.15 52);
+  --lv-red: oklch(0.66 0.19 27);
+  /* data viz (non-heat series) */
+  --viz-truth: var(--ink);
+  --viz-raw: var(--ink-3);
+  --viz-ours: var(--signal);
+  --viz-grid: var(--hair);
+
+  /* type */
+  --sans: "Archivo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace; /* codes, coordinates, hashes ONLY */
+  --t-12: 0.75rem; --t-13: 0.8125rem; --t-14: 0.875rem; --t-16: 1rem; --t-18: 1.125rem; --t-22: 1.375rem;
+  --t-28: 1.75rem; --t-36: 2.25rem; --t-48: 3rem; --t-64: 4rem; --t-76: 4.75rem;
+  /* space (4 px atom) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-12: 48px; --s-16: 64px; --s-24: 96px;
+  --r: 2px;
+  --target: 44px; --target-worker: 52px;
+  --content-max: 88rem; --measure: 66ch;
+  --dur-1: 150ms; --dur-2: 240ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+  color-scheme: dark;
+}
+[data-theme="sun"] {
+  --ground-deep: var(--ref-sun-2);
+  --ground: var(--ref-sun-1);
+  --panel: var(--ref-sun-2);
+  --raised: oklch(0.93 0.005 245);
+  --slot: var(--ref-sun-slot);
+  --hair: var(--ref-sun-hair);
+  --edge: var(--ref-sun-edge);
+  --ink: var(--ref-ink-1);
+  --ink-2: var(--ref-ink-2);
+  --ink-3: var(--ref-ink-3);
+  --signal: var(--ref-signal-sun);
+  --on-signal: var(--ref-sun-1);
+  --scrim: oklch(0.2 0.01 245 / 0.5);
+  --lv-green: oklch(0.55 0.13 150);
+  --lv-amber: oklch(0.64 0.14 72);
+  --lv-orange: oklch(0.6 0.16 48);
+  --lv-red: oklch(0.52 0.19 27);
+  color-scheme: light;
+}
+@media (prefers-reduced-motion: reduce) { :root { --dur-1: 0ms; --dur-2: 0ms; } }

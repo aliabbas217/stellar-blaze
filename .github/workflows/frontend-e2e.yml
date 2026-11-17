@@ -1,0 +1,108 @@
+# The frontend's browser checks, apart from the pull-request gate (ci.yml): the Playwright e2e suite (against the production build, served
+# the way the container serves it, with the mock API), the design lint, and Lighthouse (the per-URL matrix of ADR 0069).
+#
+# Why a separate workflow: the e2e suite is 1,164 tests (two projects) run one after the other (playwright.config.ts: workers 1, for the
+# service-worker push tests), about 8 s a test on a 2-vCPU runner in the one measured run; that is far longer than a pull request should
+# wait, and it had never run on Linux. Here it is cut into shards that run in parallel, started by hand:
+#   gh workflow run frontend-e2e.yml --ref <branch>                      (all shards, both projects)
+#   gh workflow run frontend-e2e.yml --ref <branch> -f project=mobile-chromium
+# No schedule on purpose: a private repository on the free plan has a monthly allowance of runner minutes, and one full run is several
+# hundred of them; add a `schedule:` once the cost of a run is known (read it from the run's timing in the Actions tab).
+name: frontend-e2e
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Which Playwright project the shards run (the mobile project is half the tests)
+        type: choice
+        default: all
+        options: [all, mobile-chromium, desktop-chromium]
+permissions:
+  contents: read
+concurrency:
+  group: frontend-e2e-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash # -eo pipefail
+    working-directory: frontend
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    env:
+      SHARDS: "6"
+      SHARD: ${{ matrix.shard }}
+      PROJECT: ${{ inputs.project }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # SB_REQUIRE_SCORED=1: a build without the held-out 2026 files fails here (as in ci.yml).
+      - run: pnpm build
+        env:
+          SB_REQUIRE_SCORED: "1"
+      # The full Chromium (not the headless shell): the push tests need a browser that honours a notification permission grant.
+      - run: pnpm exec playwright install --with-deps chromium
+      # Starts the mock API and the standalone production server itself (webServer in playwright.config.ts).
+      # SB_E2E_REQUIRE_WEBGL: the WebGL rows (landing contrast, scene) fail instead of skipping when the runner has no WebGL.
+      - name: Run this shard
+        env:
+          SB_E2E_REQUIRE_WEBGL: "1"
+        run: |
+          args=(--shard "${SHARD}/${SHARDS}")
+          if [ "$PROJECT" != "all" ] && [ -n "$PROJECT" ]; then args+=(--project "$PROJECT"); fi
+          pnpm e2e "${args[@]}"
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: e2e-report-${{ matrix.shard }}
+          overwrite: true
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          SB_REQUIRE_SCORED: "1"
+      - run: pnpm design:lint
+      - run: pnpm exec playwright install --with-deps chromium
+      # Starts the same stack (scripts/serve-stack.mjs), then audits the 14 URLs of lighthouserc.json (the whole demo, 3 runs each) against the
+      # per-URL matrix of ADR 0069. `--no-sandbox` is here and nowhere else (ADR 0063): the runner's Chrome cannot start its sandbox in a
+      # container. @lhci/cli is a devDependency, so its whole tree comes from the lockfile (exact pins, minimumReleaseAge), not from `pnpm dlx`.
+      - run: pnpm exec lhci autorun --collect.settings.chromeFlags="--no-sandbox"
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: lighthouse-report
+          overwrite: true
+          # .lighthouseci is a hidden folder: it is only uploaded with include-hidden-files.
+          path: frontend/.lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7

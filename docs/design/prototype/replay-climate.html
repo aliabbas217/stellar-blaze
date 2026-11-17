@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Same summer, warmer · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* proposed shared: proto.css defines .stack-2/3/6/8 only, so an undefined .stack-1/.stack-4 inherits the parent's --stack */
+  .stack-1 { --stack: var(--space-1); }
+  .stack-4 { --stack: var(--space-4); }
+  .row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); }
+  .trio { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
+  @media (min-width: 48rem) { .trio { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 64rem) { .trio { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .trio .card { display: grid; gap: var(--space-4); align-content: start; }
+  .pair { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
+  @media (min-width: 48rem) { .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .pair .card { display: grid; gap: var(--space-3); align-content: start; }
+
+  /* proposed shared: the focal stamp, one step up from .stamp */
+  .stamp-xl { font-family: var(--font-display); font-size: var(--size-headline); line-height: var(--leading-body); padding: var(--space-2) var(--space-4); border-width: var(--space-1); }
+
+  /* proposed shared: segmented control built from a radio group */
+  .seg { display: grid; gap: var(--space-2); grid-template-columns: 1fr; }
+  @media (min-width: 48rem) { .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .seg label { position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; }
+  .seg span {
+    display: flex; align-items: center; justify-content: center; text-align: center; min-block-size: var(--space-12);
+    padding: var(--space-2) var(--space-4); border: var(--rule) solid var(--control); border-radius: var(--radius-sign);
+    background: var(--surface); font-weight: 600; cursor: pointer;
+  }
+  .seg input:checked + span {
+    background: var(--action-soft); color: var(--on-action-soft); border-color: var(--action); border-width: var(--space-1);
+    padding: calc(var(--space-2) - var(--rule)) calc(var(--space-4) - var(--rule));
+  }
+  .seg input:focus-visible + span { outline: var(--focus-width) solid var(--focus); outline-offset: var(--focus-offset); }
+
+  /* a range counter: "### to ###" in one plate */
+  .counter__num { display: inline-block; font-variant-numeric: tabular-nums; }
+  .counter__num .to { font-family: var(--font-body); font-size: var(--size-title); font-weight: 600; }
+  .obs-line[hidden] { display: none; }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html">Try a plan</a></li>
+    <li><a href="replay-frontier.html">Frontier</a></li>
+    <li><a href="replay-climate.html" aria-current="step">Warmer summer</a></li>
+    <li><a href="replay-governance.html">Governance</a></li>
+    <li><a href="replay-faults.html">Break things</a></li>
+    <li><a href="replay-next.html">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-4">
+    <h1 class="t-display">The same summer, warmer</h1>
+    <p><span class="stamp stamp-xl">Sensitivity scenario on a real summer · not a forecast</span></p>
+    <p class="t-lead measure">We replay the real summer at the airport station with a stated rise in temperature and count how much heavier the same rules become. Nothing here says what a future summer will be.</p>
+  </header>
+
+  <aside class="banner" aria-label="Build note">
+    <svg class="ico"><use href="#i-info"/></svg>
+    <p><strong>Build note.</strong> SHOULD, cut first if the 16 Nov gate is not green. If it is cut, this page becomes one slide in the deck, computed the same way.</p>
+  </aside>
+
+  <!-- IDEAL -->
+  <section data-state="ideal" class="stack stack-6" aria-labelledby="tog-h">
+    <h2 id="tog-h" class="sr-only">Choose a warming level</h2>
+    <fieldset class="field">
+      <legend>Warming level</legend>
+      <div class="seg" id="gwl" style="margin-block-start: var(--space-2)">
+        <label><input type="radio" name="gwl" value="obs"><span>2026 as observed</span></label>
+        <label><input type="radio" name="gwl" value="15"><span>+1.5 °C global warming level</span></label>
+        <label><input type="radio" name="gwl" value="20" checked><span>+2.0 °C global warming level</span></label>
+      </div>
+    </fieldset>
+    <p class="t-label measure" id="gwl-live" role="status" aria-live="polite"></p>
+
+    <div class="row-head">
+      <h2 class="t-headline">What changes under the same rules</h2>
+      <span class="stamp stamp--quiet">Sensitivity scenario · not a forecast</span>
+    </div>
+
+    <div class="trio">
+      <article class="card" aria-labelledby="k1">
+        <div class="counter counter--danger" data-counter="hi">
+          <p class="counter__label" id="k1">High-zone working hours outside the ban</p>
+          <p class="counter__value"><span class="counter__num t-display" data-num>###</span><span class="slot-key" data-key></span></p>
+          <p class="counter__ci">hours over the summer <button class="proof" type="button" data-metric="High-zone working hours outside the ban"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+          <p class="counter__ci obs-line" data-obs>2026 as observed: <strong class="t-num">###</strong> <span class="slot-key">hi_now</span></p>
+        </div>
+      </article>
+      <article class="card" aria-labelledby="k2">
+        <div class="counter" data-counter="rest">
+          <p class="counter__label" id="k2">Rule-plan rest minutes per worker-day</p>
+          <p class="counter__value"><span class="counter__num t-display" data-num>###</span><span class="slot-key" data-key></span></p>
+          <p class="counter__ci">minutes, simulated on an assumed crew <button class="proof" type="button" data-metric="Rule-plan rest minutes per worker-day"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+          <p class="counter__ci obs-line" data-obs>2026 as observed: <strong class="t-num">###</strong> <span class="slot-key">rest_now</span></p>
+        </div>
+      </article>
+      <article class="card" aria-labelledby="k3">
+        <div class="counter" data-counter="cap">
+          <p class="counter__label" id="k3">Extra High-zone hours only because of the 44 °C cap</p>
+          <p class="counter__value"><span class="counter__num t-display" data-num>###</span><span class="slot-key" data-key></span></p>
+          <p class="counter__ci">hours over the summer <button class="proof" type="button" data-metric="High-zone hours only because of the 44 °C cap"><svg class="ico"><use href="#i-proof"/></svg>proof</button></p>
+          <p class="counter__ci obs-line" data-obs>2026 as observed: <strong class="t-num">###</strong> <span class="slot-key">cap_only_now</span></p>
+        </div>
+      </article>
+    </div>
+    <p class="t-label t-muted measure">The last counter is the part of the result that comes from one design choice, the 44 °C dry-bulb cap in the thermal work limit, not from the warming. It is shown apart so a reader can take it out.</p>
+  </section>
+
+  <section data-state="ideal" class="stack stack-4" aria-labelledby="br-h">
+    <h2 id="br-h" class="t-headline">Why every number is a range</h2>
+    <p class="t-lead measure">The temperature source has no humidity, and heat stress depends strongly on humidity. So each scenario runs twice, at the two ends of what humidity could do.</p>
+    <div class="pair">
+      <article class="card">
+        <h3 class="panel-title">Lower end: specific humidity held fixed</h3>
+        <p>The air keeps the moisture it had, so relative humidity falls as it warms. The observed dew point stays; only temperature rises.</p>
+      </article>
+      <article class="card">
+        <h3 class="panel-title">Upper end: relative humidity held fixed</h3>
+        <p>The air holds more moisture as it warms, so specific humidity rises about 6 to 7 % for each °C of warming.</p>
+      </article>
+    </div>
+    <p class="t-label measure">Near a warming sea the truth is plausibly between the two ends, so the result is shown as a range and never as one number. The end that drives each counter: ⟨bracket_driver⟩.</p>
+  </section>
+
+  <section data-state="ideal" class="stack stack-4" aria-labelledby="m-h">
+    <h2 id="m-h" class="t-headline">Where the temperature rise comes from</h2>
+    <dl class="kv measure">
+      <dt>Source</dt><dd>IPCC AR6 Atlas, regional monthly mean temperature (Iturbide et al., Sci Data 9, 629), CC BY 4.0.</dd>
+      <dt>Region</dt><dd>Arabian Peninsula including sea, the headline. Land only is reported next to it.</dd>
+      <dt>Framing</dt><dd>Global warming levels, not calendar years. The rise is the model median between today's level and the chosen level.</dd>
+      <dt>Rise applied</dt><dd class="t-num">⟨dT_gwl15⟩ °C and ⟨dT_gwl20⟩ °C, model range ⟨dT_lo⟩ to ⟨dT_hi⟩ <button class="proof" type="button" data-metric="Regional temperature rise per warming level" data-label="SENSITIVITY SCENARIO · NOT A FORECAST"><svg class="ico"><use href="#i-proof"/></svg>proof</button></dd>
+      <dt>Held at 2026</dt><dd>Radiation, wind, pressure, the daily shape and every rule.</dd>
+    </dl>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="replay-governance.html">See the governance refusal</a>
+      <a class="link" href="replay-frontier.html">Back to the frontier</a>
+    </div>
+  </section>
+
+  <!-- LOADING -->
+  <section data-state="loading" class="stack stack-6" aria-busy="true" aria-label="Loading the scenario">
+    <div class="skel" style="block-size: var(--space-12)"></div>
+    <div class="trio"><div class="skel" style="block-size: 13rem"></div><div class="skel" style="block-size: 13rem"></div><div class="skel" style="block-size: 13rem"></div></div>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY -->
+  <section data-state="empty" class="empty" aria-labelledby="e-h">
+    <svg class="ico empty__picto"><use href="#i-proof"/></svg>
+    <h2 id="e-h" class="t-headline">This scenario is not computed yet</h2>
+    <p class="measure">Until the scenario run exists it is shown as a slide in the deck, computed the same way and stamped the same way. No placeholder range is shown in its place.</p>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="#">Open the slide in the deck</a>
+      <a class="link" href="replay-next.html">See what comes next</a>
+    </div>
+  </section>
+
+  <!-- ERROR -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="x-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h2 id="x-h" class="t-headline">The scenario did not load</h2>
+    <p class="measure">The scenario file could not be read. The slide in the deck shows the same ranges.</p>
+    <div class="cluster cluster-4">
+      <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+      <a class="link" href="#">Open the slide in the deck</a>
+    </div>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>Airport station, not a worksite.</li>
+    <li>Crew of 20 is an assumed schedule.</li>
+    <li>One uniform rise is added to real hours, which understates changes in the hottest hours.</li>
+    <li>Humidity change is not in the source: shown as a range.</li>
+    <li>Not a forecast. TWL aligned with ADOSH zones, not certified.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* The toggle swaps which exporter keys each counter reads. Values stay ### until the scenario run exists. */
+  (() => {
+    const group = document.getElementById("gwl");
+    if (!group) return;
+    const live = document.getElementById("gwl-live");
+    const names = { obs: "2026 as observed", 15: "+1.5 °C global warming level", 20: "+2.0 °C global warming level" };
+    const key = { hi: "hi", rest: "rest", cap: "cap_only" };
+    const apply = (v) => {
+      const scenario = v !== "obs";
+      document.querySelectorAll("[data-counter]").forEach((c) => {
+        const k = key[c.dataset.counter];
+        c.querySelector("[data-num]").innerHTML = scenario ? '###<span class="to"> to </span>###' : "###";
+        c.querySelector("[data-key]").textContent = scenario ? `${k}_gwl${v}_lo, ${k}_gwl${v}_hi` : `${k}_now`;
+        c.querySelector("[data-obs]").hidden = !scenario;
+        const chip = c.querySelector(".proof");
+        chip.dataset.label = scenario ? "SENSITIVITY SCENARIO · NOT A FORECAST" : "REAL WEATHER · ASSUMED CREW";
+      });
+      live.textContent = scenario
+        ? `Showing ${names[v]}. Regional rise applied: ⟨dT_gwl${v}⟩ °C, shown as a range because humidity could go either way.`
+        : "Showing the real summer as observed. No warming added.";
+    };
+    group.addEventListener("change", (e) => apply(e.target.value));
+    const want = new URLSearchParams(location.search).get("gwl");
+    const start = ["obs", "15", "20"].includes(want) ? want : "20";
+    group.querySelector(`input[value="${start}"]`).checked = true;
+    apply(start);
+  })();
+</script>
+</body>
+</html>

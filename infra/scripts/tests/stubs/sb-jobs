@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Stub for `sb-jobs`, used by infra/scripts/tests/run.sh to run infra/bicep/scripts/migrate.sh without a database. The output
+# shapes are INVENTED from the backend CLI's documented behaviour (`config show` prints indent=2 JSON, `config propose` prints one
+# JSON object with version_id and sha256), not captured from a real run. Every call is recorded in $STUB_STATE_DIR/sbjobs.log
+# (one line per call). The active config is the file $STUB_STATE_DIR/active-interval (its content is the value of
+# alert_dispatch_interval_minutes, absent = the ruleset default, which `config show` then does not print).
+# Knobs (environment):
+#   STUB_ACTIVE_INTERVAL   value the active config starts with (default: none)
+#   STUB_SBJOBS_FAIL       a subcommand that exits 1: db-upgrade, site-load, show, validate, propose, activate
+#   STUB_PROPOSE_OUT       what `config propose` prints instead of {"version_id": 7, "sha256": "..."}
+#   STUB_ACTIVATE_NOOP=1   `config activate` succeeds but changes nothing
+#   STUB_SHOW_INTERVAL_LAST=1   `config show` prints the interval as the LAST key (no trailing comma); default: first, with one
+set -euo pipefail
+
+state="${STUB_STATE_DIR:?STUB_STATE_DIR is required}"
+printf '%s\n' "$*" >>"$state/sbjobs.log"
+if [ ! -e "$state/active-init" ]; then
+  : >"$state/active-init"
+  if [ -n "${STUB_ACTIVE_INTERVAL:-}" ]; then printf '%s' "$STUB_ACTIVE_INTERVAL" >"$state/active-interval"; fi
+fi
+
+fails() { [ "${STUB_SBJOBS_FAIL:-}" = "$1" ]; }
+
+case "$1 ${2:-}" in
+  "db upgrade")
+    if fails db-upgrade; then echo "stub: migration failed" >&2; exit 1; fi
+    echo '{"event": "migrate.done", "revision": "stubrev"}'
+    ;;
+  "site load")
+    if fails site-load; then echo "stub: site load failed" >&2; exit 1; fi
+    echo '{"site_id": "site-demo-mussafah", "changed": 0}'
+    ;;
+  "config show")
+    if fails show; then echo "stub: no active config" >&2; exit 1; fi
+    printf '{\n  "activation_id": 1,\n  "body": {\n    "schema_version": 1,\n    "tunables": {\n'
+    if [ ! -s "$state/active-interval" ]; then
+      printf '      "warning_theta": 0.3\n'
+    elif [ "${STUB_SHOW_INTERVAL_LAST:-}" = "1" ]; then
+      printf '      "warning_theta": 0.3,\n      "alert_dispatch_interval_minutes": %s\n' "$(cat "$state/active-interval")"
+    else
+      printf '      "alert_dispatch_interval_minutes": %s,\n      "warning_theta": 0.3\n' "$(cat "$state/active-interval")"
+    fi
+    printf '    }\n  }\n}\n'
+    ;;
+  "config validate")
+    if fails validate; then echo "stub: invalid config" >&2; exit 1; fi
+    [ -f "${3:?a file is required}" ] || exit 2
+    ;;
+  "config propose")
+    if fails propose; then echo "stub: propose refused" >&2; exit 1; fi
+    file="${3:?a file is required}"
+    cp "$file" "$state/proposed.toml"
+    if [ -n "${STUB_PROPOSE_OUT+x}" ]; then
+      printf '%s\n' "$STUB_PROPOSE_OUT"
+    else
+      printf '{"event": "config.proposed", "config_version": 6}\n{"version_id": 7, "sha256": "stubsha"}\n'
+    fi
+    ;;
+  "config activate")
+    if fails activate; then echo "stub: activate refused" >&2; exit 1; fi
+    if [ "${STUB_ACTIVATE_NOOP:-}" != "1" ]; then
+      value="$(sed -n 's/^alert_dispatch_interval_minutes = \([0-9][0-9]*\)$/\1/p' "$state/proposed.toml" | head -n 1)"
+      printf '%s' "$value" >"$state/active-interval"
+    fi
+    echo '{"activation_id": 2, "kind": "activate", "config_version_id": 7, "previous_activation_id": 1}'
+    ;;
+  *)
+    echo "sb-jobs stub: unhandled: $*" >&2
+    exit 2
+    ;;
+esac

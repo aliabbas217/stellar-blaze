@@ -1,0 +1,1015 @@
+{
+  "url": "http://127.0.0.1:8765/replay-season.html",
+  "when": "2026-11-11T12:33:24.064Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 162
+          },
+          {
+            "px": 16,
+            "n": 13
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 14
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 8
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 45
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Summer 2026 scoreboard · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 53.4
+        },
+        "squint": {
+          "masses": 37,
+          "competitors": 3,
+          "dominance": 0.211,
+          "top": [
+            {
+              "cells": 131,
+              "weight": 77.77,
+              "cx": 0.238,
+              "cy": 0.586,
+              "bbox": [
+                0.042,
+                0.551,
+                0.417,
+                0.626
+              ]
+            },
+            {
+              "cells": 127,
+              "weight": 73.99,
+              "cx": 0.651,
+              "cy": 0.584,
+              "bbox": [
+                0.458,
+                0.551,
+                0.833,
+                0.626
+              ]
+            },
+            {
+              "cells": 117,
+              "weight": 66.78,
+              "cx": 0.217,
+              "cy": 0.5,
+              "bbox": [
+                0.042,
+                0.467,
+                0.403,
+                0.523
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 30.98,
+              "cx": 0.249,
+              "cy": 0.085,
+              "bbox": [
+                0.194,
+                0.065,
+                0.306,
+                0.103
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 12.92,
+              "cx": 0.653,
+              "cy": 0.495,
+              "bbox": [
+                0.639,
+                0.467,
+                0.681,
+                0.523
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.112,
+        "centroid": {
+          "x": 0.389,
+          "y": 0.518
+        },
+        "colourfulness": 11.7,
+        "luminanceSpread": 0.478,
+        "chromaProxy": 0.03,
+        "hierarchyByHueOnly": false,
+        "inkPct": 31.3,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.211)."
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 166
+          },
+          {
+            "px": 16,
+            "n": 13
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 14
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 8
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 45
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Summer 2026 scoreboard · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 53.2
+        },
+        "squint": {
+          "masses": 32,
+          "competitors": 1,
+          "dominance": 0.311,
+          "top": [
+            {
+              "cells": 165,
+              "weight": 72.4,
+              "cx": 0.491,
+              "cy": 0.919,
+              "bbox": [
+                0.194,
+                0.9,
+                0.792,
+                0.95
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 18.07,
+              "cx": 0.494,
+              "cy": 0.244,
+              "bbox": [
+                0.403,
+                0.225,
+                0.583,
+                0.263
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 16.84,
+              "cx": 0.705,
+              "cy": 0.243,
+              "bbox": [
+                0.611,
+                0.225,
+                0.792,
+                0.263
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 15.71,
+              "cx": 0.127,
+              "cy": 0.242,
+              "bbox": [
+                0.042,
+                0.225,
+                0.222,
+                0.25
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 12.52,
+              "cx": 0.305,
+              "cy": 0.238,
+              "bbox": [
+                0.25,
+                0.225,
+                0.361,
+                0.263
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.078,
+        "centroid": {
+          "x": 0.426,
+          "y": 0.525
+        },
+        "colourfulness": 28.5,
+        "luminanceSpread": 0.415,
+        "chromaProxy": 0.092,
+        "hierarchyByHueOnly": false,
+        "inkPct": 40.9,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 166
+          },
+          {
+            "px": 16,
+            "n": 13
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 14
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 4
+          },
+          {
+            "px": 95,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 45
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Summer 2026 scoreboard · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 48.9
+        },
+        "squint": {
+          "masses": 26,
+          "competitors": 1,
+          "dominance": 0.369,
+          "top": [
+            {
+              "cells": 163,
+              "weight": 58.8,
+              "cx": 0.499,
+              "cy": 0.524,
+              "bbox": [
+                0.069,
+                0.507,
+                0.917,
+                0.537
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 14.13,
+              "cx": 0.572,
+              "cy": 0.903,
+              "bbox": [
+                0.514,
+                0.881,
+                0.625,
+                0.925
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 13.58,
+              "cx": 0.146,
+              "cy": 0.874,
+              "bbox": [
+                0.097,
+                0.851,
+                0.194,
+                0.896
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 13.19,
+              "cx": 0.358,
+              "cy": 0.876,
+              "bbox": [
+                0.306,
+                0.851,
+                0.417,
+                0.896
+              ]
+            },
+            {
+              "cells": 24,
+              "weight": 9.93,
+              "cx": 0.371,
+              "cy": 0.152,
+              "bbox": [
+                0.264,
+                0.149,
+                0.472,
+                0.164
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.086,
+        "centroid": {
+          "x": 0.423,
+          "y": 0.539
+        },
+        "colourfulness": 25.8,
+        "luminanceSpread": 0.304,
+        "chromaProxy": 0.085,
+        "hierarchyByHueOnly": false,
+        "inkPct": 37.7,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 162
+          },
+          {
+            "px": 16,
+            "n": 13
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 14
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 8
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 45
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Summer 2026 scoreboard · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 52.7
+        },
+        "squint": {
+          "masses": 33,
+          "competitors": 3,
+          "dominance": 0.206,
+          "top": [
+            {
+              "cells": 128,
+              "weight": 87.75,
+              "cx": 0.237,
+              "cy": 0.586,
+              "bbox": [
+                0.042,
+                0.551,
+                0.417,
+                0.626
+              ]
+            },
+            {
+              "cells": 124,
+              "weight": 82.83,
+              "cx": 0.65,
+              "cy": 0.584,
+              "bbox": [
+                0.458,
+                0.551,
+                0.833,
+                0.617
+              ]
+            },
+            {
+              "cells": 116,
+              "weight": 77.41,
+              "cx": 0.217,
+              "cy": 0.5,
+              "bbox": [
+                0.042,
+                0.467,
+                0.403,
+                0.523
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 33.29,
+              "cx": 0.249,
+              "cy": 0.085,
+              "bbox": [
+                0.194,
+                0.065,
+                0.306,
+                0.103
+              ]
+            },
+            {
+              "cells": 20,
+              "weight": 14.34,
+              "cx": 0.654,
+              "cy": 0.495,
+              "bbox": [
+                0.639,
+                0.467,
+                0.681,
+                0.523
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.099,
+        "centroid": {
+          "x": 0.401,
+          "y": 0.495
+        },
+        "colourfulness": 11,
+        "luminanceSpread": 0.606,
+        "chromaProxy": 0.03,
+        "hierarchyByHueOnly": false,
+        "inkPct": 46.2,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.206)."
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 166
+          },
+          {
+            "px": 16,
+            "n": 13
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 14
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 8
+          }
+        ],
+        "distinctFontSizes": 7,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 45
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Summer 2026 scoreboard · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 53.4
+        },
+        "squint": {
+          "masses": 40,
+          "competitors": 2,
+          "dominance": 0.173,
+          "top": [
+            {
+              "cells": 101,
+              "weight": 48.65,
+              "cx": 0.769,
+              "cy": 0.919,
+              "bbox": [
+                0.583,
+                0.9,
+                0.931,
+                0.938
+              ]
+            },
+            {
+              "cells": 64,
+              "weight": 34.3,
+              "cx": 0.175,
+              "cy": 0.919,
+              "bbox": [
+                0.069,
+                0.9,
+                0.278,
+                0.938
+              ]
+            },
+            {
+              "cells": 32,
+              "weight": 21.02,
+              "cx": 0.494,
+              "cy": 0.243,
+              "bbox": [
+                0.403,
+                0.225,
+                0.583,
+                0.263
+              ]
+            },
+            {
+              "cells": 33,
+              "weight": 20.31,
+              "cx": 0.705,
+              "cy": 0.243,
+              "bbox": [
+                0.611,
+                0.225,
+                0.792,
+                0.263
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 18.85,
+              "cx": 0.126,
+              "cy": 0.242,
+              "bbox": [
+                0.042,
+                0.225,
+                0.222,
+                0.25
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.074,
+        "centroid": {
+          "x": 0.427,
+          "y": 0.512
+        },
+        "colourfulness": 28.3,
+        "luminanceSpread": 0.515,
+        "chromaProxy": 0.093,
+        "hierarchyByHueOnly": false,
+        "inkPct": 43.8,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 17% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 166
+          },
+          {
+            "px": 16,
+            "n": 13
+          },
+          {
+            "px": 20,
+            "n": 1
+          },
+          {
+            "px": 25,
+            "n": 14
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          },
+          {
+            "px": 76,
+            "n": 4
+          },
+          {
+            "px": 95,
+            "n": 4
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 45
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Summer 2026 scoreboard · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-season\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 49.1
+        },
+        "squint": {
+          "masses": 32,
+          "competitors": 1,
+          "dominance": 0.355,
+          "top": [
+            {
+              "cells": 165,
+              "weight": 71.41,
+              "cx": 0.493,
+              "cy": 0.524,
+              "bbox": [
+                0.083,
+                0.507,
+                0.903,
+                0.537
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 17.21,
+              "cx": 0.786,
+              "cy": 0.875,
+              "bbox": [
+                0.736,
+                0.851,
+                0.847,
+                0.896
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 16.59,
+              "cx": 0.572,
+              "cy": 0.903,
+              "bbox": [
+                0.514,
+                0.881,
+                0.625,
+                0.925
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 16.06,
+              "cx": 0.145,
+              "cy": 0.874,
+              "bbox": [
+                0.083,
+                0.851,
+                0.194,
+                0.896
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 15.73,
+              "cx": 0.359,
+              "cy": 0.875,
+              "bbox": [
+                0.306,
+                0.851,
+                0.417,
+                0.896
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.088,
+        "centroid": {
+          "x": 0.439,
+          "y": 0.564
+        },
+        "colourfulness": 24.7,
+        "luminanceSpread": 0.408,
+        "chromaProxy": 0.083,
+        "hierarchyByHueOnly": false,
+        "inkPct": 48.4,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

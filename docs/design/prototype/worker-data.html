@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="worker">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My data · Worker · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* focus must not end up behind the sticky dock (WCAG 2.2 2.4.11) */
+  html[data-surface="worker"] { scroll-padding-block-end: calc(var(--space-24) + var(--space-12)); }
+  .worker a.link { display: inline-flex; align-items: center; min-block-size: var(--target-worker); }
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  .local { background: var(--surface); border: var(--rule) solid var(--ink); }
+  .section-title { display: flex; align-items: center; gap: var(--space-3); }
+  .section-title svg { inline-size: var(--space-6); block-size: var(--space-6); flex: none; }
+  .audit { display: grid; gap: var(--space-3); }
+  .audit .kv { margin: 0; }
+  .sk-row { block-size: calc(var(--space-24) * 2); }
+  .sk-line { block-size: var(--space-8); }
+  .sk-btn { block-size: var(--space-12); }
+  .empty--inline { border-color: var(--hairline); }
+  .modal__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error,no-profile">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main" class="worker stack stack-6">
+  <header class="worker-top">
+    <p class="t-title">Stellar Blaze</p>
+    <span class="stamp stamp--quiet">Placeholder</span>
+  </header>
+
+  <div class="vs-2">
+    <h1 class="t-headline">My data</h1>
+    <p class="t-lead measure">What this app keeps, where it keeps it, and who has asked for it.</p>
+  </div>
+
+  <!-- ON THIS PHONE (focal). Local data is always available, whatever the audit list does. -->
+  <section data-state="ideal loading empty error" class="card local vs-3" aria-labelledby="loc-h">
+    <h2 id="loc-h" class="panel-title section-title"><svg class="ico"><use href="#i-lock"/></svg>On this phone</h2>
+    <p class="measure">These three things stay on this phone. They are never sent to the server.</p>
+    <dl class="kv">
+      <dt>Type of work</dt><dd>Heavy</dd>
+      <dt>Date you started working in heat</dt><dd class="t-num">⟨date you entered⟩<span class="slot-key">profile.heat_start_date</span></dd>
+      <dt>Clothing</dt><dd>Normal work clothes</dd>
+    </dl>
+  </section>
+
+  <!-- NO PROFILE: nothing stored yet -->
+  <section data-state="no-profile" class="empty" aria-labelledby="loc2-h">
+    <svg class="ico empty__picto"><use href="#i-phone"/></svg>
+    <h2 id="loc2-h" class="t-headline">Nothing is stored on this phone</h2>
+    <p class="measure">Set up once and your own heat limit is worked out on this phone. It stays here.</p>
+    <a class="btn btn--primary" href="worker-setup.html">Set up now</a>
+  </section>
+
+  <!-- ON THE SERVER -->
+  <section class="card vs-3" aria-labelledby="srv-h">
+    <h2 id="srv-h" class="panel-title section-title"><svg class="ico"><use href="#i-bell"/></svg>On the server</h2>
+    <p data-state="ideal loading empty error"><strong>Alerts are on for this site.</strong> The server holds an anonymous alert subscription, not linked to your name or profile.</p>
+    <p data-state="no-profile"><strong>Alerts are off.</strong> Nothing about you is on the server.</p>
+    <dl class="kv" data-state="ideal loading empty error">
+      <dt>Site</dt><dd>Musaffah demo yard</dd>
+      <dt>Subscription</dt><dd><span class="stamp">On</span></dd>
+    </dl>
+    <p><a class="link" href="worker-alerts.html">Manage alerts</a></p>
+  </section>
+
+  <!-- WHO ASKED FOR YOUR DATA: the only section that loads from the server -->
+  <section class="vs-4" aria-labelledby="aud-h">
+    <h2 id="aud-h" class="panel-title section-title"><svg class="ico"><use href="#i-eye"/></svg>Who asked for your data</h2>
+
+    <div data-state="ideal" class="vs-3">
+      <ul class="vs-3" aria-label="Requests for your data, newest first">
+        <li class="card audit">
+          <p class="t-lead"><strong>An employer account asked for your individual data. Refused.</strong></p>
+          <dl class="kv t-label">
+            <dt>Time</dt><dd class="t-num">⟨time⟩<span class="slot-key">audit[0].at</span></dd>
+            <dt>Who</dt><dd>Employer account</dd>
+            <dt>What</dt><dd>Your individual data</dd>
+            <dt>Outcome</dt><dd><span class="stamp">Refused</span></dd>
+          </dl>
+        </li>
+      </ul>
+      <p class="t-label t-muted measure">Newest first. Employers have no route to individual data, so every request like this is refused and listed here.</p>
+    </div>
+
+    <div data-state="loading" class="vs-3" aria-busy="true" aria-label="Loading who asked">
+      <div class="skel sk-row"></div>
+      <div class="skel sk-row"></div>
+      <p class="sr-only" role="status">Loading</p>
+    </div>
+
+    <div data-state="empty no-profile" class="empty empty--inline">
+      <svg class="ico empty__picto"><use href="#i-eye"/></svg>
+      <p class="t-title">Nobody has asked for your data</p>
+      <p class="measure">If an employer asks, the request is refused and shown here.</p>
+      <a class="btn" data-state="no-profile" href="worker-setup.html">Set up</a>
+    </div>
+
+    <div data-state="error" class="error" role="alert">
+      <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+      <p class="t-title">The list of requests did not load</p>
+      <p class="measure">Check your connection and try again. What is on this phone is shown above.</p>
+      <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+      <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+    </div>
+  </section>
+
+  <!-- REMOVE: destructive, confirmed in a dialog -->
+  <section data-state="ideal loading empty error" id="remove" class="card vs-3" aria-labelledby="rm-sec-h">
+    <h2 id="rm-sec-h" class="panel-title">Remove my data from this phone</h2>
+    <p class="measure">Deletes your profile and turns off alerts. You can set up again at any time.</p>
+    <button class="btn btn--ink btn--block" type="button" data-open="remove-dialog"><svg class="ico"><use href="#i-close"/></svg>Remove my data from this phone</button>
+  </section>
+</main>
+
+<dialog class="modal" id="remove-dialog" aria-labelledby="rm-h">
+  <div class="vs-4">
+    <h2 id="rm-h" class="t-headline">Remove my data from this phone?</h2>
+    <p>This deletes your heat profile from this phone and turns off alerts. You can set up again at any time.</p>
+    <p>Nothing about you is stored on our server, so there is nothing else to delete.</p>
+    <div class="modal__actions">
+      <button class="btn" type="button" data-close autofocus>Cancel</button>
+      <a class="btn btn--ink" href="worker-today.html?state=empty">Remove my data</a>
+    </div>
+  </div>
+</dialog>
+
+<div class="worker-dock">
+<a class="unwell-fab" href="worker-unwell.html"><svg class="ico"><use href="#i-unwell"/></svg><span>I feel unwell</span></a>
+<nav class="bottom-bar" aria-label="Worker">
+  <a href="worker-today.html"><svg class="ico"><use href="#i-today"/></svg><span>Today</span></a>
+  <a href="worker-alerts.html"><svg class="ico"><use href="#i-bell"/></svg><span>Alerts</span></a>
+  <a href="worker-data.html" aria-current="page"><svg class="ico"><use href="#i-eye"/></svg><span>My data</span></a>
+</nav>
+</div>
+<script src="assets/proto.js"></script>
+</body>
+</html>

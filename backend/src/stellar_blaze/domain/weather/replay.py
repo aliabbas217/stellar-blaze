@@ -1,0 +1,127 @@
+"""The manifest of a replay snapshot: a frozen, hashed copy of the forecasts and observations of one summer.
+
+A snapshot is a directory ``replay/<snapshot_id>/`` holding ``forecasts.parquet`` (``FORECAST_SCHEMA``),
+``observations.parquet`` (the hourly truth, ``OBS_HOURLY_SCHEMA``, as the ingest stored it) and ``snapshot.json``, which
+is a ``ReplaySnapshot``. The builder (``jobs.replay_build``) writes it and the replay sources
+(``adapters.sources.replay``) read it, so the manifest lives here, below both. It is plain data: no I/O.
+"""
+
+import hashlib
+import re
+from collections.abc import Sequence
+from datetime import UTC
+from typing import Annotated, Final, Self
+
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+
+from stellar_blaze.domain.config.models import Sha256
+from stellar_blaze.domain.provenance import Provenance
+
+FORECASTS_FILE: Final = "forecasts.parquet"
+OBSERVATIONS_FILE: Final = "observations.parquet"
+MANIFEST_FILE: Final = "snapshot.json"
+REQUIRED_FILES: Final = (FORECASTS_FILE, OBSERVATIONS_FILE)
+
+HELD_OUT_SUMMERS: Final = frozenset({2026})
+"""Summers whose information a MODEL must never carry: the model loader refuses a model whose ``params.json`` lists one
+as a training summer or whose fold statistics hold one of these years (``adapters.compute.lgbm_corrector``), and the
+training and gold-data code keeps 2026 as the test summer (``ml.data``). This is permanent for the released model: no
+model may carry 2026. It is NOT the replay lock (``REPLAY_LOCKED_SUMMERS``): replay snapshots are display data and
+never feed a model, a threshold or a selection."""
+
+REPLAY_LOCKED_SUMMERS: Final = frozenset[int]()
+"""Summers no replay snapshot may hold a row of. The one definition for the replay side: the builder, the manifest
+model and both replay sources use it, so they cannot drift. It is empty since the architect's go-ahead of 2026-11-15
+(approved by Ali the same day), so that the demo can replay the real 2026 summer; the guards stay in place and a
+re-lock is a one-line edit here (``frozenset({2026})``), never a flag, an environment variable or a command-line
+option. Nothing under ``ml/`` may read a replay snapshot (``tests/unit/ml/test_replay_isolation.py``)."""
+
+SNAPSHOT_ID_PATTERN: Final = r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$"
+"""A snapshot id is a path component: lowercase letters and digits in groups joined by single ``-`` or ``_``."""
+_SNAPSHOT_ID = re.compile(SNAPSHOT_ID_PATTERN)
+MAX_SNAPSHOT_ID_LENGTH: Final = 64
+WINDOWS_RESERVED_NAMES: Final = frozenset(
+    {"con", "prn", "aux", "nul", *(f"com{n}" for n in range(1, 10)), *(f"lpt{n}" for n in range(1, 10))}
+)
+"""Windows device names: a directory of that name cannot be made portably (``replay/con/`` is the console there)."""
+
+
+def check_snapshot_id(value: str) -> str:
+    """``value`` if it is a safe snapshot id.
+
+    Raises:
+        ValueError: ``value`` is empty, longer than 64 characters or not a lowercase slug (so it could be a path such
+            as ``../x`` or hold a separator), or it is a Windows reserved device name (``con``, ``nul``, ``com1``...).
+    """
+    if value.casefold() in WINDOWS_RESERVED_NAMES:
+        raise ValueError(
+            f"a snapshot id must not be a Windows reserved device name ({', '.join(sorted(WINDOWS_RESERVED_NAMES))}), "
+            f"got {value!r}"
+        )
+    if len(value) > MAX_SNAPSHOT_ID_LENGTH or not _SNAPSHOT_ID.fullmatch(value):
+        raise ValueError(
+            f"a snapshot id must be a lowercase slug of at most {MAX_SNAPSHOT_ID_LENGTH} characters "
+            f"(letters, digits, single '-' or '_' between groups), got {value!r}"
+        )
+    return value
+
+
+SnapshotId = Annotated[str, AfterValidator(check_snapshot_id)]
+
+
+class ReplayFile(BaseModel):
+    """One stored file of the snapshot and the SHA-256 of its bytes."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    path: Annotated[str, StringConstraints(pattern=r"^[a-z_]+\.parquet$")]
+    sha256: Sha256
+
+
+def files_digest(files: Sequence[ReplayFile]) -> str:
+    """One SHA-256 for a snapshot's data: over the ``path:sha256`` lines of its files, in path order."""
+    listing = "".join(f"{file.path}:{file.sha256}\n" for file in sorted(files, key=lambda file: file.path))
+    return hashlib.sha256(listing.encode("ascii")).hexdigest()
+
+
+class ReplaySnapshot(BaseModel):
+    """``snapshot.json``: what the snapshot holds and the hashes that make it tamper-evident.
+
+    Attributes:
+        snapshot_id: The directory name.
+        created_at: When it was built; timezone-aware.
+        stations: ICAO identifiers whose rows it holds.
+        models: NWP model names whose forecasts it holds.
+        start: First hour of the window it covers (15 May 00:00 UTC of the summer).
+        end: Last hour of the window, inclusive (30 Sep 23:00 UTC).
+        files: The stored data files, relative to the directory, with the SHA-256 of their bytes.
+        provenance: Where the data came from (label ``REAL``: copied silver, no computation).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    snapshot_id: SnapshotId
+    created_at: AwareDatetime
+    stations: Annotated[list[str], Field(min_length=1)]
+    models: Annotated[list[str], Field(min_length=1)]
+    start: AwareDatetime
+    end: AwareDatetime
+    files: list[ReplayFile]
+    provenance: Provenance
+
+    @model_validator(mode="after")
+    def _window_and_files(self) -> Self:
+        years = set(range(self.start.astimezone(UTC).year, self.end.astimezone(UTC).year + 1))
+        locked = sorted(years & REPLAY_LOCKED_SUMMERS)  # every year in between, not only the endpoints
+        if locked:
+            raise ValueError(
+                f"the window {self.start.isoformat()} to {self.end.isoformat()} touches locked year(s) {locked}"
+            )
+        if self.end < self.start:
+            raise ValueError(f"end {self.end.isoformat()} is before start {self.start.isoformat()}")
+        paths = sorted(file.path for file in self.files)
+        if paths != sorted(REQUIRED_FILES):
+            raise ValueError(f"files must be exactly {sorted(REQUIRED_FILES)}, got {paths}")
+        if self.provenance.data_sha256 != files_digest(self.files):
+            raise ValueError("provenance.data_sha256 does not match the digest of the files listed")
+        return self

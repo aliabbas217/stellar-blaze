@@ -1,0 +1,76 @@
+# Ruleset ae-heat-0.1: the seed ruleset (ADR 0009 section 1, amended by ADR 0010).
+#
+# RELEASED, so it is immutable: lock.json holds the SHA-256 of this file and the loader refuses to start when a byte
+# differs. To change a value, add a new file with a new id that says `supersedes = ["ae-heat-0.1"]`; this one stays
+# pinnable for audit replay. B3 supersedes it with ae-heat-2026.1 (zone bias margin, withdrawal-limit decision,
+# labour-law windows, alert bands).
+#
+# Times in rulesets are written 12:30:00, not 12:30: TOML 1.0 (Python 3.13 tomllib) requires the seconds.
+
+[meta]
+id = "ae-heat-0.1"
+effective_from = 2024-01-01
+# effective_to is omitted: open-ended. When set it is exclusive.
+status = "released"
+jurisdiction = "ae"
+
+[[sources]]
+id = "niosh-2016"
+title = "NIOSH (2016) Criteria for a Recommended Standard: Occupational Exposure to Heat and Hot Environments, DHHS (NIOSH) Publication 2016-106"
+url = "https://www.cdc.gov/niosh/docs/2016-106/pdfs/2016-106.pdf"
+clause = "Table 3-2"
+accessed = 2026-11-11
+
+[[sources]]
+id = "adosh-twl"
+title = "ADOSH-SF CoP 11.0 Safety in the Heat, Technical Guideline v4.0 (Abu Dhabi Public Health Centre)"
+url = "https://www.adphc.gov.ae/-/media/Project/ADPHC/ADPHC/PDF/OSHAD-SF/Technical-Guidelines/Safety-in-the-Heat--Eng.pdf"
+clause = "Table 1"
+accessed = 2026-11-11
+
+[[sources]]
+id = "meteohazard-5633d57"
+title = "vorpalvorpal/meteoHazard, withdrawal limits on TWL (generate_twl.R), commit 5633d5719225d15d84f2608189e2b3d654dba73d; primary source not verified (ADR 0006)"
+url = "https://github.com/vorpalvorpal/meteoHazard/tree/5633d5719225d15d84f2608189e2b3d654dba73d"
+clause = "generate_twl.R: TWL capped at 115 W/m2 when dry bulb is above 44 C or natural wet bulb is above 32 C"
+accessed = 2026-11-11
+
+[[sources]]
+id = "adr-0006"
+title = "ADR 0006: Physics: Liljegren WBGT, guarded ISO 7933 PHS, in-house NIOSH RAL/REL, TWL ported from an MIT reference"
+url = "docs/decisions/0006-physics-wbgt-phs-niosh-twl.md"
+clause = "Consequences: measured bias of the TWL port against Miller and Bates (2007) Table 2"
+accessed = 2026-11-11
+
+# NIOSH (2016) Table 3-2 clothing adjustment factors in degrees C WBGT, relative to work clothes (ACGIH-derived). The
+# keys are the values of the Clothing enum (stellar_blaze.domain.physics.niosh); a test pins both.
+[niosh_clothing]
+source = "niosh-2016"
+values_c = { work_clothes = 0.0, cloth_coveralls = 0.0, double_layer_woven = 3.0, sms_coveralls = 0.5, polyolefin_coveralls = 1.0, limited_use_vapor_barrier = 11.0 }
+
+# ADOSH TWL zones in W/m2: at or above low_min is Low risk, from medium_min up to low_min is Medium, below medium_min is
+# High. The boundary convention (exactly 140 is Low, exactly 115 is Medium) is ours; the guideline prints "140 - 220 <",
+# "115 - 140" and "< 115". The bias margin that moves a reading before it is zoned is not a floor: see [tunables].
+[twl_zones]
+source = "adosh-twl"
+low_min_w_m2 = 140.0
+medium_min_w_m2 = 115.0
+
+# Withdrawal limits ported from the reference TWL implementation. Off in this ruleset: ADR 0006 leaves the decision to
+# B3 (a dry bulb above 44 C is common on a UAE summer afternoon, so switching it on moves many hours into High).
+[twl_withdrawal]
+source = "meteohazard-5633d57"
+enabled = false
+dry_bulb_c = 44.0
+natural_wet_bulb_c = 32.0
+cap_w_m2 = 115.0
+
+# Operating values that may change at runtime within [min, max] without a release (ADR 0010 section 4). The TWL margin
+# is subtracted from TWL before zoning, so a larger margin is more protective ("higher"); it can never go below 0, which
+# would zone above the ADOSH edges. B3 decides the default in ae-heat-2026.1 (ADR 0006 recommends about 7 W/m2).
+[tunables.twl_margin_w_m2]
+source = "adr-0006"
+default = 0.0
+min = 0.0
+max = 20.0
+safer = "higher"

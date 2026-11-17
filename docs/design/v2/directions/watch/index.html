@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar Blaze · Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="watch.css">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js" } }</script>
+<style>
+.console { display: grid; grid-template-columns: 312px minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr) auto; gap: var(--s-2); padding: var(--s-2); height: calc(100svh - 44px); min-height: 760px; }
+.col { display: flex; flex-direction: column; gap: var(--s-2); min-height: 0; }
+
+/* claim */
+.claim { padding: var(--s-4) var(--s-4) var(--s-4); }
+.claim h1 { font: 500 var(--t-22)/1.2 var(--sans); letter-spacing: -0.01em; }
+.claim p { margin-top: var(--s-3); color: var(--ink-2); font-size: var(--t-13); max-width: 40ch; }
+.claim .src { margin-top: var(--s-3); color: var(--ink-3); font: 400 var(--t-11)/1.5 var(--mono); }
+
+/* stations */
+.stations { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.stations ol { list-style: none; flex: 1; display: grid; grid-auto-rows: minmax(40px, 1fr); }
+.st { display: grid; grid-template-columns: 3px 44px minmax(0,1fr) 76px 52px; align-items: center; column-gap: var(--s-2); padding-inline-end: var(--s-3); border-bottom: 1px solid var(--hair); }
+.st:last-child { border-bottom: 0; }
+.st .bar { align-self: stretch; }
+.st.focus .bar { background: var(--signal); }
+.st .code { font: 500 var(--t-12)/1 var(--mono); letter-spacing: 0.03em; }
+.st.focus .code { color: var(--signal); }
+.st .nm { min-width: 0; line-height: 1.25; }
+.st .nm b { display: block; font-weight: 400; font-size: var(--t-12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st .nm span { font: 400 10px/1 var(--mono); color: var(--ink-3); letter-spacing: 0.03em; }
+.st svg { width: 76px; height: 26px; display: block; }
+.st .v { text-align: end; font: 500 var(--t-15)/1 var(--mono); }
+.st .v small { display: block; margin-top: 3px; font: 400 10px/1 var(--mono); color: var(--ink-3); }
+
+/* map */
+.mapp { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+#field, #fallback { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fallback { display: none; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.pin { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font: 500 10.5px/1 var(--mono); letter-spacing: 0.03em; padding: 3px 5px 2px; background: var(--g-150); border: 1px solid var(--hair-2); color: var(--ink); border-radius: var(--r); }
+.pin i { font-style: normal; color: var(--ink-2); margin-inline-start: 6px; }
+.pin.focus { border-color: var(--signal); color: var(--signal); }
+.grat { position: absolute; font: 400 10px/1 var(--mono); color: var(--ink-3); transform: translate(-50%, 0); white-space: nowrap; }
+.mapfoot { display: flex; align-items: end; gap: var(--s-6); padding: var(--s-2) var(--s-3) var(--s-3); border-top: 1px solid var(--hair); }
+.legend { width: 280px; }
+.legend .t { display: flex; justify-content: space-between; font: 400 var(--t-11)/1 var(--mono); color: var(--ink-3); margin-bottom: 6px; }
+.legend .ramp { position: relative; height: 8px; }
+.legend .lim { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--ink); }
+.legend .ticks { position: relative; height: 14px; margin-top: 4px; font: 400 10px/1 var(--mono); color: var(--ink-3); }
+.legend .ticks span { position: absolute; transform: translateX(-50%); }
+.mapfoot .note { flex: 1; color: var(--ink-3); font: 400 var(--t-11)/1.5 var(--mono); }
+
+/* focus readout */
+.focusp .body { padding: var(--s-3) var(--s-3) var(--s-3); display: grid; grid-template-columns: 1fr auto; gap: var(--s-1) var(--s-3); align-items: end; }
+.focusp .who { grid-column: 1 / -1; display: flex; gap: var(--s-2); align-items: baseline; font-size: var(--t-12); color: var(--ink-2); }
+.focusp .who b { font: 500 var(--t-12)/1 var(--mono); color: var(--signal); }
+.focusp .big { font: 300 48px/1 var(--sans); font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.02em; }
+.focusp .big small { font-size: var(--t-17); color: var(--ink-2); margin-inline-start: 4px; letter-spacing: 0; }
+.focusp .delta { text-align: end; font: 500 var(--t-15)/1.1 var(--mono); }
+.focusp .delta small { display: block; font: 400 10.5px/1.3 var(--sans); color: var(--ink-3); margin-top: 4px; }
+.focusp dl { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; margin-top: var(--s-2); border-top: 1px solid var(--hair); }
+.focusp dt, .focusp dd { padding: 7px 0; border-bottom: 1px solid var(--hair); font-size: var(--t-12); }
+.focusp dt { color: var(--ink-3); }
+.focusp dd { text-align: end; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.focusp dl > :nth-last-child(-n+2) { border-bottom: 0; padding-bottom: 0; }
+
+/* event log */
+.log { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.log ol { list-style: none; overflow: hidden; }
+.ev { display: grid; grid-template-columns: 3px 44px minmax(0, 1fr) auto; column-gap: var(--s-2); align-items: baseline; padding: 6px var(--s-3) 6px 0; border-bottom: 1px solid var(--hair); font-size: var(--t-12); line-height: 1.35; }
+.ev .bar { align-self: stretch; }
+.ev time { font: 500 var(--t-12)/1.35 var(--mono); }
+.ev.future { color: var(--ink-3); }
+.ev.future time { font-weight: 400; }
+.ev.now .bar { background: var(--signal); }
+.ev.now time { color: var(--signal); }
+
+/* scoreboard */
+.score table { width: 100%; border-collapse: collapse; }
+.score th, .score td { text-align: start; font-weight: 400; padding: 6px var(--s-2); border-bottom: 1px solid var(--hair); vertical-align: top; }
+.score th:first-child, .score td:first-child { padding-inline-start: var(--s-3); }
+.score thead th { font: 500 10px/1.2 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.score td { font-size: var(--t-12); line-height: 1.3; }
+.score td.p { font: 400 10.5px/1.3 var(--mono); color: var(--ink-3); white-space: nowrap; }
+.score tr:last-child td { border-bottom: 0; }
+.score tr.ours td:first-child { font-weight: 500; }
+
+/* timeline */
+.tl { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr) 200px; gap: var(--s-4); align-items: center; padding: var(--s-3) var(--s-3) var(--s-3); }
+.play { width: 36px; height: 36px; border-radius: var(--r); border: 1px solid var(--hair-2); background: transparent; display: grid; place-items: center; cursor: pointer; }
+.track { position: relative; height: 56px; cursor: pointer; touch-action: none; }
+.track .lbls, .track .cells { position: absolute; inset-inline: 0; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); }
+.track .lbls span { overflow: hidden; }
+.track .lbls { top: 0; font: 400 10px/1 var(--mono); color: var(--ink-3); }
+.track .lbls span { padding-inline-start: 3px; border-inline-start: 1px solid var(--hair); height: 14px; }
+.track .lbls span:not(:nth-child(3n+1)) { color: transparent; }
+.track .cells { top: 20px; height: 16px; gap: 1px; }
+.track .cells i { display: block; }
+.track .ban { position: absolute; top: 40px; height: 14px; border: 1px solid var(--hair-2); border-top: 0; font: 400 10px/1 var(--mono); color: var(--ink-2); padding: 3px 4px 0; white-space: nowrap; }
+.track .cursor { position: absolute; top: 14px; height: 28px; width: 2px; background: var(--signal); transform: translateX(-1px); }
+.tl .read { font: 400 var(--t-11)/1.5 var(--mono); color: var(--ink-3); }
+.tl .read b { display: block; font: 500 var(--t-15)/1.2 var(--mono); color: var(--ink); }
+
+/* below the fold: method */
+.method { display: grid; grid-template-columns: 312px repeat(3, minmax(0, 1fr)); gap: var(--s-2); padding: var(--s-6) var(--s-2) var(--s-12); border-top: 1px solid var(--hair); margin-top: var(--s-6); }
+.method h2 { font: 500 var(--t-17)/1.3 var(--sans); padding: 0 var(--s-4); }
+.method .panel { padding: var(--s-3) var(--s-4) var(--s-4); }
+.method h3 { font: 500 var(--t-11)/1 var(--sans); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); margin-bottom: var(--s-2); }
+.method p { color: var(--ink-2); font-size: var(--t-12); max-width: 52ch; }
+.method a.go { display: inline-block; margin-top: var(--s-3); font-size: var(--t-12); color: var(--ink); }
+
+@media (max-width: 1100px) {
+  .console { grid-template-columns: 1fr; grid-template-rows: none; height: auto; min-height: 0; }
+  .col { display: contents; }
+  .claim { order: 1; } .mapp { order: 2; } .tl { order: 3; } .focusp { order: 4; } .stations { order: 5; } .log { order: 6; } .score { order: 7; }
+  .stage { height: 380px; flex: none; }
+  .tl { grid-template-columns: auto minmax(0, 1fr); }
+  .tl .read { grid-column: 1 / -1; }
+  .track .lbls span:not(:nth-child(6n+1)) { color: transparent; }
+  .mapfoot { flex-direction: column; align-items: stretch; gap: var(--s-3); }
+  .legend { width: 100%; }
+  .top { gap: var(--s-3); }
+  .top nav, .mark span { display: none; }
+  .clock { margin-inline-start: auto; font-size: var(--t-11); }
+  #clock { display: none; } #clockS { display: inline !important; }
+  .pin.minor { display: none; }
+  .method { grid-template-columns: 1fr; padding-inline: var(--s-2); }
+  .method h2 { padding: 0 var(--s-2); }
+  .score td.p { white-space: normal; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="mark" href="index.html"><b>Stellar Blaze</b><span>Heat-stress forecasting · UAE outdoor work</span></a>
+  <p class="clock" aria-live="off"><i aria-hidden="true"></i><span id="clock">REPLAY · THU 3 SEP 2026 · 14:00 GST</span><span id="clockS" hidden>REPLAY · 3 SEP · 14:00</span></p>
+  <nav aria-label="Main"><a href="index.html" aria-current="page">Console</a><a href="#score">Scoreboard</a><a href="worker.html">Crew phone</a><a href="setup.html">Set up a site</a><a href="#method">Method</a></nav>
+</header>
+
+<main class="console" aria-label="Heat operations console, replay of 3 September 2026">
+  <div class="col">
+    <section class="panel claim" aria-labelledby="h1">
+      <h1 id="h1">Heat levels for every outdoor crew in the UAE, hour by hour.</h1>
+      <p>Legal shift plans and warnings in six languages. Summer 2026 is replayed against airport thermometers, on a summer the model never trained on.</p>
+      <p class="src">Replay day: 3 Sep 2026, the hottest OMAA day-1 forecast of the summer. Illustrative, not the pre-registered day.</p>
+    </section>
+    <section class="panel stations" aria-labelledby="hs">
+      <div class="ph"><h2 id="hs">Stations</h2><span class="meta">WBGT °C · 24 h</span></div>
+      <ol id="stations"></ol>
+    </section>
+  </div>
+
+  <div class="col">
+  <section class="panel mapp" aria-labelledby="hm">
+    <div class="ph"><h2 id="hm">WBGT field, sun-exposed</h2><span class="meta" id="mapmeta">IFS 0.25° day-1 · 374 cells</span></div>
+    <div class="stage" id="stage">
+      <canvas id="field" role="img" aria-label="Three-dimensional map of the UAE. Each column is one forecast grid cell; height and colour show WBGT at the replay hour."></canvas>
+      <canvas id="fallback" aria-hidden="true"></canvas>
+      <div class="labels" id="labels" aria-hidden="true"></div>
+    </div>
+    <div class="mapfoot">
+      <div class="legend" aria-hidden="true">
+        <p class="t"><span>WBGT °C</span><span>| heavy-work limit 26.6</span></p>
+        <div class="ramp" id="ramp"><span class="lim" id="lim"></span></div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <p class="note">Column height and colour = WBGT at the replay hour. Sea cells drawn flat. Dashed frame = 26.6 °C limit height. ECMWF IFS 0.25°, issued the day before; Liljegren WBGT.</p>
+    </div>
+  </section>
+
+  <section class="panel score" id="score" aria-labelledby="hsc">
+      <div class="ph"><h2 id="hsc">Season scoreboard</h2><span class="meta">metrics fixed before scoring</span></div>
+      <table>
+        <thead><tr><th>Policy</th><th>High-zone hours warned</th><th>False alarms</th><th>95 % interval</th></tr></thead>
+        <tbody>
+          <tr><td>Midday ban only</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+          <tr><td>Fixed WBGT 32 °C rule</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+          <tr><td>ADOSH zones, raw forecast</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+          <tr class="ours"><td>Stellar Blaze</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td><td class="p">scored 12 Nov</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel focusp" aria-labelledby="hf">
+      <div class="ph"><h2 id="hf">Needs attention</h2><span class="tag on" id="ftag">Hottest station</span></div>
+      <div class="body">
+        <p class="who"><b id="fcode">OMAA</b><span id="fname">Abu Dhabi Intl</span><span id="fsrc" class="mono" style="font-size:10px;color:var(--ink-3)">station series</span></p>
+        <p class="big" id="fval">39.4<small>°C</small></p>
+        <p class="delta" id="fdelta">+12.8<small>over heavy-work limit</small></p>
+        <dl>
+          <dt>Field peak now</dt><dd id="fpeak">39.3 °C · 24.50 N 54.75 E</dd>
+          <dt>Cells over 26.6 °C</dt><dd id="fcount">374 / 374</dd>
+          <dt>Midday ban</dt><dd id="fban">in force 12:30 to 15:00</dd>
+        </dl>
+      </div>
+    </section>
+    <section class="panel log" aria-labelledby="he">
+      <div class="ph"><h2 id="he">Event log</h2><span class="meta">derived from the data</span></div>
+      <ol id="events"></ol>
+    </section>
+  </div>
+
+  <section class="panel tl" aria-label="Day timeline">
+    <button class="play" id="play" type="button" aria-label="Pause the replay"></button>
+    <div class="track" id="track" role="slider" tabindex="0" aria-label="Replay hour" aria-valuemin="0" aria-valuemax="23" aria-valuenow="14">
+      <div class="lbls" id="tlbl"></div>
+      <div class="cells" id="tcells" title="OMAA hourly WBGT"></div>
+      <div class="ban" style="left:calc(12.5 / 24 * 100%);width:calc(2.5 / 24 * 100%)">midday ban</div>
+      <div class="cursor" id="cursor"></div>
+    </div>
+    <p class="read"><b id="tread">14:00 · OMAA 39.4 °C</b>strip = OMAA hourly WBGT, 3 Sep</p>
+  </section>
+</main>
+
+<section class="method" id="method" aria-labelledby="hmeth">
+  <h2 id="hmeth">How the numbers are made</h2>
+  <div class="panel"><h3>Forecast</h3><p>ECMWF IFS at 0.25°, the run issued the day before (Open-Meteo archive). The same forecast a site manager would have had the evening before.</p></div>
+  <div class="panel"><h3>Heat index</h3><p>Wet-bulb globe temperature in sun by the Liljegren method. The NIOSH limit for heavy work (415 W) is 26.6 °C WBGT.</p><a class="go" href="worker.html">See the crew phone</a></div>
+  <div class="panel"><h3>Scoring</h3><p>Four warning policies judged against airport thermometers on summer 2026, with metrics fixed before the summer was scored. Results land 12 Nov.</p><a class="go" href="setup.html">Set up a site in one sentence</a></div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { loadJSON, sampler, fieldMax, clipCoast, RAMP_DARK, css, STATIONS, reducedMotion, hasWebGL, hh } from '../_shared/heat.js';
+
+const LIMIT = 26.6; // NIOSH REL, heavy work 415 W, from the backend's niosh.rel_wbgt_c (per BRIEF)
+const BAN = [12.5, 15]; // UAE midday ban window; in force 15 Jun to 15 Sep, 3 Sep is inside
+const q = new URLSearchParams(location.search);
+const [field, coast, season] = await Promise.all([
+  loadJSON('uae_ifs025_d1_wbgt_2026-09-03.json'), loadJSON('coast.json'), loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json'),
+]);
+const S = sampler(field);
+const OMAA_DAY = season.wbgt_c_by_local_hour[season.days.indexOf(field.day_local)];
+const NLA = field.lat.length, NLO = field.lon.length, NCELL = NLA * NLO;
+const BOX = [field.lon[0], field.lat[0], field.lon.at(-1), field.lat.at(-1)];
+const LON0 = (BOX[0] + BOX[2]) / 2, LAT0 = (BOX[1] + BOX[3]) / 2, KX = Math.cos(LAT0 * Math.PI / 180);
+const X = (lo) => (lo - LON0) * KX, Z = (la) => -(la - LAT0);
+const H = (w) => Math.max(0.015, (w - 22) * 0.05);
+const fmt = (v) => v.toFixed(1);
+
+// ---- per-station day series (OMAA = station forecast series; others = the grid sampled at the station) ----
+const ST = Object.entries(STATIONS).map(([k, [la, lo, name]]) => ({
+  k, la, lo, name, src: k === 'OMAA' ? 'station series' : 'grid cell',
+  day: k === 'OMAA' ? OMAA_DAY : Array.from({ length: 24 }, (_, h) => S(la, lo, h)),
+}));
+const DMIN = 20, DMAX = 41;
+document.getElementById('stations').innerHTML = ST.map((s) => {
+  const mx = Math.max(...s.day), mh = s.day.indexOf(mx);
+  const pts = s.day.map((v, h) => `${(h / 23 * 76).toFixed(1)},${(26 - (v - DMIN) / (DMAX - DMIN) * 26).toFixed(1)}`).join(' ');
+  const ly = (26 - (LIMIT - DMIN) / (DMAX - DMIN) * 26).toFixed(1);
+  return `<li class="st" data-k="${s.k}"><span class="bar"></span><span class="code">${s.k}</span>
+    <span class="nm"><b>${s.name}</b><span>${s.src}</span></span>
+    <svg viewBox="0 0 76 26" role="img" aria-label="${s.name} 24-hour WBGT, max ${fmt(mx)} at ${hh(mh)}"><title>max ${fmt(mx)} °C at ${hh(mh)}</title><line x1="0" x2="76" y1="${ly}" y2="${ly}" stroke="oklch(0.4 0.006 250)" stroke-dasharray="2 2"/><polyline points="${pts}" fill="none" stroke="oklch(0.78 0.006 250)" stroke-width="1.25"/><circle class="dot" r="2.5" fill="oklch(0.84 0.075 200)"/></svg>
+    <span class="v num"><span class="now">.</span><small>°C now</small></span></li>`;
+}).join('');
+const rows = [...document.querySelectorAll('.st')];
+
+// ---- events, all derived from the data ----
+const cellsOver = (h) => { let n = 0; for (const r of field.wbgt_c) for (const c of r) if (c[h] > LIMIT) n++; return n; };
+const OV = Array.from({ length: 24 }, (_, h) => cellsOver(h));
+const FM = Array.from({ length: 24 }, (_, h) => fieldMax(field, h));
+const EV = [];
+const dmin = Math.min(...OMAA_DAY), dminH = OMAA_DAY.indexOf(dmin);
+if (OMAA_DAY[0] > LIMIT) EV.push([0, `OMAA ${fmt(OMAA_DAY[0])} °C: over the heavy-work limit at midnight`, 'OMAA']);
+else { const f = OMAA_DAY.findIndex((v) => v > LIMIT); if (f >= 0) EV.push([f, `OMAA passes the heavy-work limit, ${fmt(OMAA_DAY[f])} °C`, 'OMAA']); }
+EV.push([dminH, `OMAA low ${fmt(dmin)} °C${dmin > LIMIT ? ', still over the limit' : ''}`, 'OMAA']);
+const all = OV.findIndex((n) => n === NCELL); if (all >= 0) EV.push([all, `All ${NCELL} cells over 26.6 °C`, 'FIELD']);
+const f32 = OMAA_DAY.findIndex((v, h) => h >= dminH && v >= 32); if (f32 >= 0) EV.push([f32, `OMAA ${fmt(OMAA_DAY[f32])} °C: passes the fixed 32 °C rule`, 'OMAA']);
+EV.push([BAN[0], 'Midday ban in force until 15:00', 'RULESET']);
+const pk = Math.max(...OMAA_DAY), pkH = OMAA_DAY.indexOf(pk); EV.push([pkH, `OMAA peak of the day, ${fmt(pk)} °C`, 'OMAA']);
+const fpH = FM.reduce((b, m, h) => (m.v > FM[b].v ? h : b), 0);
+EV.push([fpH + 0.01, `Field peak ${fmt(FM[fpH].v)} °C, ${FM[fpH].la.toFixed(2)} N ${FM[fpH].lo.toFixed(2)} E`, 'FIELD']);
+EV.push([BAN[1], 'Midday ban ends', 'RULESET']);
+const lastAll = OV.lastIndexOf(NCELL); if (lastAll >= 0 && lastAll < 23) EV.push([lastAll + 1, `Cells over 26.6 °C fall to ${OV[lastAll + 1]} of ${NCELL}`, 'FIELD']);
+const l32 = OMAA_DAY.reduce((a, v, h) => (v >= 32 ? h : a), -1); if (l32 >= 0 && l32 < 23) EV.push([l32 + 1, `OMAA ${fmt(OMAA_DAY[l32 + 1])} °C: back under 32 °C`, 'OMAA']);
+EV.sort((a, b) => a[0] - b[0]);
+const evT = (t) => { const h = Math.floor(t), m = Math.round((t - h) * 60) >= 30 ? 30 : 0; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`; };
+document.getElementById('events').innerHTML = EV.map(([t, txt, src]) => `<li class="ev" data-t="${t}"><span class="bar"></span><time>${evT(t)}</time><span>${txt}</span><span class="tag">${src}</span></li>`).join('');
+const evEls = [...document.querySelectorAll('.ev')];
+
+// ---- legend, timeline ----
+const LMIN = 22, LMAX = 40;
+document.getElementById('ramp').style.background = `linear-gradient(90deg, ${Array.from({ length: 10 }, (_, i) => css(RAMP_DARK(LMIN + i * 2))).join(',')})`;
+document.getElementById('lim').style.left = `${(LIMIT - LMIN) / (LMAX - LMIN) * 100}%`;
+document.getElementById('ticks').innerHTML = [22, 26, 30, 34, 38].map((v) => `<span style="left:${(v - LMIN) / (LMAX - LMIN) * 100}%">${v}</span>`).join('');
+document.getElementById('tlbl').innerHTML = Array.from({ length: 24 }, (_, h) => `<span>${String(h).padStart(2, '0')}</span>`).join('');
+document.getElementById('tcells').innerHTML = OMAA_DAY.map((v, h) => `<i style="background:${css(RAMP_DARK(v))}" title="${hh(h)} ${fmt(v)} °C"></i>`).join('');
+
+let hour = q.has('h') ? +q.get('h') : 14, playing = !q.has('still') && !reducedMotion();
+const playBtn = document.getElementById('play'), track = document.getElementById('track');
+const ICON = { pause: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="1" width="3" height="10" fill="currentColor"/><rect x="7" y="1" width="3" height="10" fill="currentColor"/></svg>', play: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1l8 5-8 5z" fill="currentColor"/></svg>' };
+const setPlay = () => { playBtn.innerHTML = playing ? ICON.pause : ICON.play; playBtn.setAttribute('aria-label', playing ? 'Pause the replay' : 'Play the replay'); };
+setPlay();
+playBtn.onclick = () => { playing = !playing; setPlay(); };
+const fromX = (e) => { const r = track.getBoundingClientRect(); hour = Math.max(0, Math.min(23, Math.floor((e.clientX - r.left) / r.width * 24))); playing = false; setPlay(); };
+track.addEventListener('pointerdown', fromX);
+track.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') hour = (Math.floor(hour) + 1) % 24; else if (e.key === 'ArrowLeft') hour = (Math.floor(hour) + 23) % 24; else return; e.preventDefault(); playing = false; setPlay(); });
+
+let focusK = 'OMAA';
+function panels() {
+  const h = Math.floor(hour);
+  document.getElementById('clock').textContent = `REPLAY · THU 3 SEP 2026 · ${hh(h)} GST${playing ? '' : ' · PAUSED'}`;
+  document.getElementById('clockS').textContent = `REPLAY · 3 SEP · ${hh(h)} GST`;
+  // the station that needs attention = hottest station at this hour
+  let best = ST[0]; for (const s of ST) if (s.day[h] > best.day[h]) best = s; focusK = best.k;
+  rows.forEach((r, i) => { const s = ST[i]; r.classList.toggle('focus', s.k === focusK); r.querySelector('.now').textContent = fmt(s.day[h]);
+    const d = r.querySelector('.dot'); d.setAttribute('cx', (h / 23 * 76).toFixed(1)); d.setAttribute('cy', (26 - (s.day[h] - DMIN) / (DMAX - DMIN) * 26).toFixed(1)); });
+  document.getElementById('fcode').textContent = best.k; document.getElementById('fname').textContent = best.name; document.getElementById('fsrc').textContent = best.src;
+  document.getElementById('fval').innerHTML = `${fmt(best.day[h])}<small>°C</small>`;
+  const d = best.day[h] - LIMIT;
+  document.getElementById('fdelta').innerHTML = `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))}<small>${d >= 0 ? 'over' : 'under'} heavy-work limit</small>`;
+  document.getElementById('fpeak').textContent = `${fmt(FM[h].v)} °C · ${FM[h].la.toFixed(2)} N ${FM[h].lo.toFixed(2)} E`;
+  document.getElementById('fcount').textContent = `${OV[h]} / ${NCELL}`;
+  document.getElementById('fban').textContent = hour >= BAN[0] && hour < BAN[1] ? 'in force now, to 15:00' : hour < BAN[0] ? 'from 12:30 today' : 'ended 15:00';
+  let nowI = -1; evEls.forEach((e, i) => { const past = +e.dataset.t <= hour + 0.001; e.classList.toggle('future', !past); if (past) nowI = i; });
+  evEls.forEach((e, i) => e.classList.toggle('now', i === nowI));
+  document.getElementById('cursor').style.left = `${(hour + 0.5) / 24 * 100}%`;
+  document.getElementById('tread').textContent = `${hh(h)} · OMAA ${fmt(OMAA_DAY[h])} °C`;
+  track.setAttribute('aria-valuenow', h); track.setAttribute('aria-valuetext', `${hh(h)}, OMAA ${fmt(OMAA_DAY[h])} degrees`);
+}
+
+// ---- land mask: grid point inside any coast polygon ----
+const rings = coast.rings.map((r) => r.r);
+const inside = (lo, la, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > la) !== (yj > la) && lo < (xj - xi) * (la - yi) / (yj - yi) + xi) c = !c; } return c; };
+const LAND = []; for (let i = 0; i < NLA; i++) for (let j = 0; j < NLO; j++) LAND.push(rings.some((r) => inside(field.lon[j], field.lat[i], r)));
+const coastLines = clipCoast(coast, [BOX[0] - 0.125, BOX[1] - 0.125, BOX[2] + 0.125, BOX[3] + 0.125]);
+
+// ---- 2D fallback ----
+function drawFallback() {
+  const c = document.getElementById('fallback'); c.style.display = 'block';
+  const r = c.getBoundingClientRect(), w = c.width = r.width, ht = c.height = r.height, g = c.getContext('2d');
+  const s = Math.min(w / (5.6 * KX), ht / 4.4), ox = w / 2, oy = ht / 2, cw = 0.25 * s;
+  field.lat.forEach((la, i) => field.lon.forEach((lo, j) => { g.fillStyle = css(RAMP_DARK(field.wbgt_c[i][j][Math.floor(hour)])); g.fillRect(ox + X(lo) * s - cw * KX / 2 + 1, oy + Z(la) * s - cw / 2 + 1, cw * KX - 2, cw - 2); }));
+  g.strokeStyle = 'rgba(235,238,242,.85)'; g.lineWidth = 1;
+  for (const l of coastLines) { g.beginPath(); l.forEach(([lo, la], i) => g[i ? 'lineTo' : 'moveTo'](ox + X(lo) * s, oy + Z(la) * s)); g.stroke(); }
+}
+
+const labels = document.getElementById('labels');
+if (!hasWebGL() || q.has('fallback')) { panels(); drawFallback(); }
+else {
+  const canvas = document.getElementById('field'), stage = document.getElementById('stage');
+  const mobile = innerWidth < 900;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(mobile ? 34 : 26, 1, 0.1, 100);
+  scene.add(new THREE.AmbientLight(0xffffff, 1.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(-3, 5, 4); scene.add(sun);
+
+  // one instanced box per IFS cell; base at y=0
+  const CW = 0.25 * 0.84;
+  const box = new THREE.BoxGeometry(CW * KX, 1, CW); box.translate(0, 0.5, 0);
+  const cols = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial(), NCELL);
+  cols.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(cols);
+  const m4 = new THREE.Matrix4(), cc = new THREE.Color();
+
+  // ground plate, graticule, coast, limit frame
+  const LW = (BOX[2] - BOX[0] + 0.25) * KX, LD = BOX[3] - BOX[1] + 0.25;
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(LW, LD), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(...[0.115, 0.12, 0.13]) }));
+  plate.rotation.x = -Math.PI / 2; plate.position.y = -0.002; scene.add(plate);
+  const lineMat = (c, o) => new THREE.LineBasicMaterial({ color: c, transparent: o < 1, opacity: o });
+  const seg = (pts, mat) => { const g = new THREE.BufferGeometry().setFromPoints(pts.map((p) => new THREE.Vector3(...p))); const l = new THREE.LineSegments(g, mat); scene.add(l); return l; };
+  const gp = [];
+  for (let lo = Math.ceil(BOX[0]); lo <= BOX[2]; lo++) gp.push([X(lo), 0.001, Z(BOX[1] - 0.125)], [X(lo), 0.001, Z(BOX[3] + 0.125)]);
+  for (let la = Math.ceil(BOX[1]); la <= BOX[3]; la++) gp.push([X(BOX[0] - 0.125), 0.001, Z(la)], [X(BOX[2] + 0.125), 0.001, Z(la)]);
+  seg(gp, lineMat(0x5a5f66, 0.6));
+  for (const l of coastLines) { const g = new THREE.BufferGeometry().setFromPoints(l.map(([lo, la]) => new THREE.Vector3(X(lo), 0.004, Z(la)))); scene.add(new THREE.Line(g, lineMat(0x8a9099, 0.8))); }
+  // the same coast draped over the column tops, so the country reads from above
+  const drape = coastLines.map((l) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(l.length * 3), 3)); const ln = new THREE.Line(g, lineMat(0xf2f4f7, 0.95)); ln.userData.ll = l; ln.renderOrder = 2; scene.add(ln); return ln; });
+  const yL = H(LIMIT), x0 = X(BOX[0] - 0.125), x1 = X(BOX[2] + 0.125), z0 = Z(BOX[1] - 0.125), z1 = Z(BOX[3] + 0.125);
+  const frame = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([[x0, z0], [x1, z0], [x1, z0], [x1, z1], [x1, z1], [x0, z1], [x0, z1], [x0, z0]].map(([x, z]) => new THREE.Vector3(x, yL, z))), new THREE.LineDashedMaterial({ color: 0xc8ccd2, dashSize: 0.06, gapSize: 0.05, transparent: true, opacity: 0.7 }));
+  frame.computeLineDistances(); scene.add(frame);
+  // station pins: thin stems
+  const stemPos = new Float32Array(ST.length * 6), stemGeo = new THREE.BufferGeometry(); stemGeo.setAttribute('position', new THREE.BufferAttribute(stemPos, 3));
+  scene.add(new THREE.LineSegments(stemGeo, lineMat(0xe6e9ee, 1)));
+
+  const pinEls = ST.map((s) => { const e = document.createElement('div'); e.className = 'pin'; labels.appendChild(e); return e; });
+  const gratEls = [];
+  for (let lo = Math.ceil(BOX[0]); lo <= BOX[2]; lo++) gratEls.push({ p: [X(lo), 0, Z(BOX[1] - 0.125)], t: `${lo}° E`, side: false });
+  for (let la = Math.ceil(BOX[1]); la <= BOX[3]; la++) gratEls.push({ p: [X(BOX[0] - 0.125), 0, Z(la)], t: `${la}° N`, side: true });
+  gratEls.forEach((g) => { g.e = document.createElement('div'); g.e.className = 'grat'; g.e.textContent = g.t; labels.appendChild(g.e); });
+
+  function update() {
+    const h = hour;
+    let k = 0;
+    for (let i = 0; i < NLA; i++) for (let j = 0; j < NLO; j++, k++) {
+      const v = S(field.lat[i], field.lon[j], h);
+      m4.makeScale(1, LAND[k] ? H(v) : 0.012, 1); m4.setPosition(X(field.lon[j]), 0, Z(field.lat[i]));
+      cols.setMatrixAt(k, m4); const [r, g, b] = RAMP_DARK(v); cc.setRGB(r, g, b, THREE.SRGBColorSpace); cols.setColorAt(k, cc);
+    }
+    cols.instanceMatrix.needsUpdate = true; cols.instanceColor.needsUpdate = true;
+    ST.forEach((s, i) => { const y = H(S(s.la, s.lo, h)) + 0.01, top = y + 0.32; stemPos.set([X(s.lo), y, Z(s.la), X(s.lo), top, Z(s.la)], i * 6); });
+    stemGeo.attributes.position.needsUpdate = true;
+    for (const ln of drape) { const a = ln.geometry.attributes.position; ln.userData.ll.forEach(([lo, la], i) => a.setXYZ(i, X(lo), H(S(la, lo, h)) + 0.012, Z(la))); a.needsUpdate = true; }
+  }
+  const v3 = new THREE.Vector3();
+  function placeLabels() {
+    const w = canvas.clientWidth, ht = canvas.clientHeight, h = Math.floor(hour), placed = [];
+    const order = ST.map((s, i) => i).sort((a, b) => ST[b].la - ST[a].la);
+    for (const i of order) { const s = ST[i], e = pinEls[i];
+      v3.set(X(s.lo), H(S(s.la, s.lo, hour)) + 0.33, Z(s.la)).project(camera);
+      let x = (v3.x * 0.5 + 0.5) * w, y = (-v3.y * 0.5 + 0.5) * ht;
+      e.className = 'pin' + (s.k === focusK ? ' focus' : '') + (['OMAD', 'OMSJ', 'OMDW'].includes(s.k) && s.k !== focusK ? ' minor' : '');
+      e.innerHTML = mobile ? `${s.k}` : `${s.k}<i>${fmt(s.day[h])}</i>`;
+      const bw = e.offsetWidth;
+      if (mobile && e.classList.contains('minor')) continue;
+      for (let pass = 0; pass < 6; pass++) { let moved = false; for (const p of placed) if (Math.abs(p.x - x) < (bw + p.w) / 2 + 4 && Math.abs(p.y - y) < 20) { y = p.y - 21; moved = true; } if (!moved) break; }
+      placed.push({ x, y, w: bw });
+      e.style.left = `${x}px`; e.style.top = `${y}px`; }
+    for (const g of gratEls) { v3.set(...g.p).project(camera); const x = (v3.x * 0.5 + 0.5) * w, y = (-v3.y * 0.5 + 0.5) * ht;
+      g.e.style.left = `${x + (g.side ? -26 : 0)}px`; g.e.style.top = `${y + (g.side ? -5 : 6)}px`; g.e.style.display = x < 20 || x > w - 20 || y > ht - 12 ? 'none' : ''; }
+  }
+  // fixed, slightly oblique camera from the south-south-west (ops screens do not spin); distance fitted so the whole
+  // field box plus the tallest possible column stays inside the frame at any aspect ratio
+  const target = new THREE.Vector3(mobile ? 0.45 : 0, 0.25, 0.15), DIR = new THREE.Vector3(-0.25, 0.78, 1).normalize();
+  const fx0 = mobile ? X(52.4) : x0, fz1 = Z(26.2);
+  const corners = []; for (const x of [fx0, x1]) for (const z of [z0, fz1]) for (const y of [0, H(40)]) corners.push(new THREE.Vector3(x, y, z));
+  function fit() { for (let d = 4; d < 40; d += 0.1) { camera.position.copy(DIR).multiplyScalar(d).add(target); camera.lookAt(target); camera.updateMatrixWorld();
+      if (corners.every((c) => { v3.copy(c).project(camera); return Math.abs(v3.x) < 0.98 && Math.abs(v3.y) < 0.9; })) return; } }
+  function resize() { const w = stage.clientWidth, ht = stage.clientHeight; renderer.setSize(w, ht, false); camera.aspect = w / ht; camera.updateProjectionMatrix(); fit(); dirty = true; }
+  let dirty = true;
+  addEventListener('resize', resize); resize();
+  let t0 = performance.now(), last = -1;
+  function loop(now) {
+    const dt = Math.min(0.05, (now - t0) / 1000); t0 = now;
+    if (playing) hour = (hour + dt * 0.7) % 24;
+    if (Math.abs(hour - last) > 0.01 || dirty) { update(); panels(); renderer.render(scene, camera); placeLabels(); last = hour; dirty = false; }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  new IntersectionObserver(([e]) => { if (!e.isIntersecting && playing) { playing = false; setPlay(); } }).observe(canvas);
+}
+</script>
+</body>
+</html>

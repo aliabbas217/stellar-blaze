@@ -1,0 +1,216 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/supervisor-relay.html",
+  "when": "2026-11-12T01:04:43.519Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-relay\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-relay\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 2
+          },
+          {
+            "px": 13,
+            "n": 17
+          },
+          {
+            "px": 14,
+            "n": 10
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 17,
+            "n": 3
+          },
+          {
+            "px": 18,
+            "n": 4
+          },
+          {
+            "px": 22,
+            "n": 5
+          },
+          {
+            "px": 28,
+            "n": 1
+          },
+          {
+            "px": 78,
+            "n": 1
+          },
+          {
+            "px": 101,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 10,
+        "fontFamilies": [
+          "Archivo",
+          "Noto Sans Arabic",
+          "Noto Nastaliq Urdu",
+          "Noto Sans Devanagari",
+          "Noto Sans Bengali"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 35
+          }
+        ],
+        "distinctShadows": 1,
+        "offscaleSpacing": [
+          {
+            "px": 6,
+            "n": 5
+          },
+          {
+            "px": 10,
+            "n": 2
+          },
+          {
+            "px": 61,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          },
+          {
+            "px": 7,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 10,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Relay to Crew B · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\supervisor-relay\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 67.3
+        },
+        "squint": {
+          "masses": 38,
+          "competitors": 2,
+          "dominance": 0.249,
+          "top": [
+            {
+              "cells": 141,
+              "weight": 117.02,
+              "cx": 0.498,
+              "cy": 0.579,
+              "bbox": [
+                0.417,
+                0.523,
+                0.569,
+                0.636
+              ]
+            },
+            {
+              "cells": 131,
+              "weight": 93.47,
+              "cx": 0.404,
+              "cy": 0.266,
+              "bbox": [
+                0.25,
+                0.224,
+                0.556,
+                0.308
+              ]
+            },
+            {
+              "cells": 79,
+              "weight": 58.24,
+              "cx": 0.136,
+              "cy": 0.253,
+              "bbox": [
+                0.056,
+                0.196,
+                0.222,
+                0.308
+              ]
+            },
+            {
+              "cells": 83,
+              "weight": 57.1,
+              "cx": 0.647,
+              "cy": 0.285,
+              "bbox": [
+                0.583,
+                0.215,
+                0.708,
+                0.346
+              ]
+            },
+            {
+              "cells": 58,
+              "weight": 40.69,
+              "cx": 0.778,
+              "cy": 0.268,
+              "bbox": [
+                0.722,
+                0.224,
+                0.833,
+                0.308
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.06,
+        "centroid": {
+          "x": 0.443,
+          "y": 0.482
+        },
+        "colourfulness": 9.5,
+        "luminanceSpread": 0.614,
+        "chromaProxy": 0.035,
+        "hierarchyByHueOnly": false,
+        "inkPct": 29.8,
+        "findings": []
+      },
+      "consoleErrors": [
+        "Error: <rect> attribute width: A negative value is not valid. (\"-1.5000000000000053\")"
+      ]
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="supervisor">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crews today · Supervisor · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  .crumbs ol { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .crumbs li + li::before { content: "\203A" / ""; margin-inline-end: var(--space-2); }
+  .crumbs [aria-current="page"] { color: var(--ink); font-weight: 600; }
+
+  /* product top bar: site, date, theme (S1 and S2 share this) */
+  .desk-top__inner { padding-block: var(--space-2); }
+  .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); inline-size: 100%; }
+  @media (min-width: 48rem) { .tools { display: flex; flex-wrap: wrap; align-items: end; } }
+  @media (min-width: 64rem) { .tools { inline-size: auto; margin-inline-start: auto; } }
+  .tool { display: grid; gap: var(--space-1); min-inline-size: 0; }
+  .tool--site { grid-column: 1 / -1; }
+  .tool__label { font-size: var(--size-label); color: var(--ink-muted); }
+  .tool .select { min-block-size: var(--space-8); padding-block: var(--space-1); }
+  @media (min-width: 48rem) { .tool .select { inline-size: calc(var(--space-16) * 2); } .tool--site .select { inline-size: calc(var(--space-16) * 4); } }
+  .tool__val { display: flex; align-items: center; min-block-size: var(--space-8); gap: var(--space-1); }
+
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 2), 1fr)); gap: var(--space-4) var(--space-8); }
+  .strip p.cluster { gap: var(--space-3); }
+  .stamp svg { inline-size: 1rem; block-size: 1rem; flex: none; }
+
+  /* crew rows: cards under 64rem, one aligned row from 64rem */
+  .crews > li { display: grid; gap: var(--space-3) var(--space-4); grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id id" "level open" "plan plan" "band band"; align-items: start; }
+  .crew__id { grid-area: id; min-inline-size: 0; }
+  .crew__plan { grid-area: plan; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+  .crew__plan .crew__lbl { flex-basis: 100%; margin: 0; }
+  .crew__level { grid-area: level; }
+  .crew__open { grid-area: open; align-self: end; justify-self: end; }
+  .crew__band { grid-area: band; min-inline-size: 0; }
+  .crew__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crew__name a { text-decoration: none; }
+  .crew__name a:hover { text-decoration: underline; }
+  .crew:focus-within .crew__name { white-space: normal; overflow: visible; }
+  .crew__lbl { font-size: var(--size-label); color: var(--ink-muted); margin-block-end: var(--space-1); }
+  .crew-head { display: none; }
+  .crew .band .hr { font-size: var(--size-label); }
+  @media (min-width: 48rem) {
+    .crews > li { grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.5fr) auto; grid-template-areas: "id level plan open" "band band band band"; align-items: center; }
+    .crew__plan { display: grid; justify-items: start; text-align: start; }
+    .crew__open { align-self: center; }
+  }
+  @media (min-width: 64rem) {
+    .crews > li, .crew-head { grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 3.6fr) minmax(0, 1.4fr) var(--open-col); grid-template-areas: "id level band plan open"; align-items: center; }
+    .crew-head { display: grid; gap: var(--space-4); padding-inline: calc(var(--space-4) + var(--rule-hairline)); font-size: var(--size-label); font-weight: 600; color: var(--ink-muted); }
+    .crew__open { align-self: center; justify-self: stretch; }
+    .crew__lbl { position: absolute; inline-size: var(--rule-hairline); block-size: var(--rule-hairline); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
+  .crews { --open-col: calc(var(--space-16) + var(--space-8)); }
+  .crew-head { --open-col: calc(var(--space-16) + var(--space-8)); }
+  .iconline { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-2); align-items: start; }
+
+  .sk-strip { block-size: calc(var(--space-16) + var(--space-8)); }
+  .sk-row { block-size: calc(var(--space-24) * 2 + var(--space-8)); }
+  @media (min-width: 64rem) { .sk-row { block-size: calc(var(--space-24) + var(--space-8)); } }
+  .sk-line { block-size: var(--space-8); inline-size: 40%; }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error,partial">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Supervisor</span>
+    <form class="tools" aria-label="Site, date and theme" onsubmit="return false">
+      <div class="tool tool--site"><label class="tool__label" for="tool-site">Site</label>
+        <select class="select" id="tool-site" name="site"><option>Musaffah demo yard</option><option>⟨Another site⟩</option></select></div>
+      <div class="tool"><span class="tool__label">Date</span><p class="tool__val"><strong>Today</strong> <span class="t-num">⟨date⟩</span></p></div>
+      <div class="tool"><label class="tool__label" for="tool-theme">Theme</label>
+        <select class="select" id="tool-theme" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+    </form>
+  </div>
+</header>
+
+<main id="main" class="desk stack stack-8">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="index.html">Supervisor</a></li>
+      <li><a href="supervisor-crews.html" aria-current="page">Crews today</a></li>
+    </ol>
+  </nav>
+
+  <header class="vs-3">
+    <h1 class="t-display">Crews today</h1>
+    <p class="t-lead measure">Level now, today's band and plan status for each crew at this site.</p>
+    <p class="t-label t-muted measure">Crew totals only. This view never shows individual workers.</p>
+  </header>
+
+  <!-- PARTIAL: stale forecast -->
+  <div data-state="partial" class="banner" role="status">
+    <svg class="ico"><use href="#i-offline"/></svg>
+    <div class="vs-1">
+      <p><strong>Forecast last updated 09:40</strong></p>
+      <p class="t-label">It is more than 3 hours old, so crews see the rule plan until it refreshes. Stop work and alerts are not affected.</p>
+    </div>
+  </div>
+
+  <!-- SITE LEVEL NOW + NEXT CHANGE (shown whenever the site level is known) -->
+  <section data-state="ideal partial empty" class="card strip" aria-label="Site level">
+    <div class="vs-2">
+      <p class="t-label t-muted">Site level now</p>
+      <p class="cluster"><span class="sign lv-red sign--mini" role="img" aria-label="Level 4"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title" aria-hidden="true">4</b></span></span><strong class="t-title">Red</strong><span class="t-muted">until 17:00</span></p>
+    </div>
+    <div class="vs-2">
+      <p class="t-label t-muted">Next change</p>
+      <p class="cluster"><span class="sign lv-orange sign--mini" role="img" aria-label="Level 3"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-orange"/></svg><b class="t-title" aria-hidden="true">3</b></span></span><strong class="t-title">Orange</strong><span class="t-muted">at 17:00</span></p>
+    </div>
+  </section>
+
+  <!-- IDEAL + PARTIAL: crew rows -->
+  <section data-state="ideal partial" class="vs-4" aria-labelledby="crews-h">
+    <h2 id="crews-h" class="t-headline">Crews</h2>
+    <div class="crew-head" aria-hidden="true"><span>Crew</span><span>Level now</span><span>Today's band, 06:00 to 20:00</span><span>Plan</span><span></span></div>
+    <ul class="crews vs-3">
+      <li class="crew card">
+        <div class="crew__id">
+          <h3 class="t-title crew__name"><a href="supervisor-crew.html?state=signed" title="Crew A">Crew A</a></h3>
+          <p class="t-label">Members <span class="slot">###</span></p><span class="slot-key">crew.member_count</span>
+        </div>
+        <div class="crew__level">
+          <p class="crew__lbl">Level now</p>
+          <p class="cluster"><span class="sign lv-red sign--mini" role="img" aria-label="Level 4"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title" aria-hidden="true">4</b></span></span><strong>Red</strong></p>
+        </div>
+        <div class="crew__band">
+          <p class="crew__lbl">Today's band, 06:00 to 20:00</p>
+          <ol class="band band--compact" aria-label="Heat level by hour for Crew A">
+          <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+          <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+          <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+          <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+          <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+          <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+          <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+          <li aria-label="13:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">13</span></li>
+          <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+          <li aria-label="15:00, Red, level 4, now" aria-current="time"><div class="cell lv-red"><b>4</b></div><span class="hr">15</span></li>
+          <li aria-label="16:00, Red, level 4"><div class="cell lv-red"><b>4</b></div><span class="hr">16</span></li>
+          <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+          <li aria-label="18:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+          <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+          </ol>
+        </div>
+        <div class="crew__plan">
+          <p class="crew__lbl">Plan</p>
+          <span class="stamp">Signed</span>
+        </div>
+        <a class="btn crew__open" href="supervisor-crew.html?state=signed">Open<span class="sr-only"> Crew A</span></a>
+      </li>
+      <li class="crew card">
+        <div class="crew__id">
+          <h3 class="t-title crew__name"><a href="supervisor-crew.html?state=partial&amp;crew=Crew%20B" title="Crew B">Crew B</a></h3>
+          <p class="t-label">Members <span class="slot">###</span></p><span class="slot-key">crew.member_count</span>
+        </div>
+        <div class="crew__level">
+          <p class="crew__lbl">Level now</p>
+          <p class="cluster"><span class="sign lv-orange sign--mini" role="img" aria-label="Level 3"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-orange"/></svg><b class="t-title" aria-hidden="true">3</b></span></span><strong>Orange</strong></p>
+        </div>
+        <div class="crew__band">
+          <p class="crew__lbl">Today's band, 06:00 to 20:00</p>
+          <ol class="band band--compact" aria-label="Heat level by hour for Crew B">
+          <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+          <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+          <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+          <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+          <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+          <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+          <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+          <li aria-label="13:00, Orange, level 3, midday break" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">13</span></li>
+          <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+          <li aria-label="15:00, Orange, level 3, now" aria-current="time"><div class="cell lv-orange"><b>3</b></div><span class="hr">15</span></li>
+          <li aria-label="16:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">16</span></li>
+          <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+          <li aria-label="18:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+          <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+          </ol>
+        </div>
+        <div class="crew__plan">
+          <p class="crew__lbl">Plan</p>
+          <span class="stamp stamp--quiet">Unsigned</span><span class="t-label t-muted">Crews see the rule plan</span>
+        </div>
+        <a class="btn crew__open" href="supervisor-crew.html?state=partial&amp;crew=Crew%20B">Open<span class="sr-only"> Crew B</span></a>
+      </li>
+      <li class="crew card">
+        <div class="crew__id">
+          <h3 class="t-title crew__name"><a href="supervisor-crew.html?crew=Crew%20C" title="Crew C">Crew C</a></h3>
+          <p class="t-label">Members <span class="slot">###</span></p><span class="slot-key">crew.member_count</span>
+        </div>
+        <div class="crew__level">
+          <p class="crew__lbl">Level now</p>
+          <p class="cluster"><span class="sign lv-amber sign--mini" role="img" aria-label="Level 2"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-amber"/></svg><b class="t-title" aria-hidden="true">2</b></span></span><strong>Amber</strong></p>
+        </div>
+        <div class="crew__band">
+          <p class="crew__lbl">Today's band, 06:00 to 20:00</p>
+          <ol class="band band--compact" aria-label="Heat level by hour for Crew C">
+          <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+          <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+          <li aria-label="08:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">08</span></li>
+          <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+          <li aria-label="10:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">10</span></li>
+          <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+          <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+          <li aria-label="13:00, Orange, level 3, midday break" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">13</span></li>
+          <li aria-label="14:00, Orange, level 3, midday break" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">14</span></li>
+          <li aria-label="15:00, Amber, level 2, now" aria-current="time"><div class="cell lv-amber"><b>2</b></div><span class="hr">15</span></li>
+          <li aria-label="16:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">16</span></li>
+          <li aria-label="17:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">17</span></li>
+          <li aria-label="18:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">18</span></li>
+          <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+          </ol>
+        </div>
+        <div class="crew__plan">
+          <p class="crew__lbl">Plan</p>
+          <span class="stamp"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg>Changed since signed</span>
+        </div>
+        <a class="btn crew__open" href="supervisor-crew.html?crew=Crew%20C">Open<span class="sr-only"> Crew C</span></a>
+      </li>
+      <li class="crew card">
+        <div class="crew__id">
+          <h3 class="t-title crew__name"><a href="supervisor-crew.html?state=signed&amp;crew=Formwork%20and%20scaffolding%20crew%2C%20north%20gate%20extension" title="Formwork and scaffolding crew, north gate extension">Formwork and scaffolding crew, north gate extension</a></h3>
+          <p class="t-label">Members <span class="slot">###</span></p><span class="slot-key">crew.member_count</span>
+        </div>
+        <div class="crew__level">
+          <p class="crew__lbl">Level now</p>
+          <p class="cluster"><span class="sign lv-red sign--mini" role="img" aria-label="Level 4"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title" aria-hidden="true">4</b></span></span><strong>Red</strong></p>
+        </div>
+        <div class="crew__band">
+          <p class="crew__lbl">Today's band, 06:00 to 20:00</p>
+          <ol class="band band--compact" aria-label="Heat level by hour for Formwork and scaffolding crew, north gate extension">
+          <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+          <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+          <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+          <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+          <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+          <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+          <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+          <li aria-label="13:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">13</span></li>
+          <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+          <li aria-label="15:00, Red, level 4, now" aria-current="time"><div class="cell lv-red"><b>4</b></div><span class="hr">15</span></li>
+          <li aria-label="16:00, Red, level 4"><div class="cell lv-red"><b>4</b></div><span class="hr">16</span></li>
+          <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+          <li aria-label="18:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+          <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+          </ol>
+        </div>
+        <div class="crew__plan">
+          <p class="crew__lbl">Plan</p>
+          <span class="stamp">Signed</span>
+        </div>
+        <a class="btn crew__open" href="supervisor-crew.html?state=signed&amp;crew=Formwork%20and%20scaffolding%20crew%2C%20north%20gate%20extension">Open<span class="sr-only"> Formwork and scaffolding crew, north gate extension</span></a>
+      </li>
+      <li class="crew card">
+        <div class="crew__id">
+          <h3 class="t-title crew__name"><a href="supervisor-crew.html?state=suppressed&amp;crew=Crew%20E" title="Crew E">Crew E</a></h3>
+          <p class="suppressed iconline"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-lock"/></svg><span>Fewer than 5 people, detail hidden to protect privacy</span></p>
+        </div>
+        <div class="crew__level">
+          <p class="crew__lbl">Level now</p>
+          <p class="cluster"><span class="sign lv-red sign--mini" role="img" aria-label="Level 4"><span class="sign__plate"><svg class="ico sign__picto"><use href="#i-red"/></svg><b class="t-title" aria-hidden="true">4</b></span></span><strong>Red</strong></p>
+        </div>
+        <div class="crew__band">
+          <p class="crew__lbl">Today's band, 06:00 to 20:00</p>
+          <ol class="band band--compact" aria-label="Heat level by hour for Crew E">
+          <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+          <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+          <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+          <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+          <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+          <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+          <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+          <li aria-label="13:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">13</span></li>
+          <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+          <li aria-label="15:00, Red, level 4, now" aria-current="time"><div class="cell lv-red"><b>4</b></div><span class="hr">15</span></li>
+          <li aria-label="16:00, Red, level 4"><div class="cell lv-red"><b>4</b></div><span class="hr">16</span></li>
+          <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+          <li aria-label="18:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+          <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+          </ol>
+        </div>
+        <div class="crew__plan">
+          <p class="crew__lbl">Plan</p>
+          <span class="stamp stamp--quiet">Unsigned</span><span class="t-label t-muted">Crews see the rule plan</span>
+        </div>
+        <a class="btn crew__open" href="supervisor-crew.html?state=suppressed&amp;crew=Crew%20E">Open<span class="sr-only"> Crew E</span></a>
+      </li>
+    </ul>
+    <p class="t-label t-muted measure">Dashed outline on the band: midday break 12:30 to 15:00. Dark hour: now.</p>
+  </section>
+
+  <!-- LOADING: row skeletons at the final dimensions -->
+  <section data-state="loading" class="vs-4" aria-busy="true" aria-label="Loading crews">
+    <div class="skel sk-strip"></div>
+    <div class="skel sk-line"></div>
+    <ul class="vs-3">
+      <li class="skel sk-row"></li><li class="skel sk-row"></li><li class="skel sk-row"></li><li class="skel sk-row"></li>
+    </ul>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY: no crews yet; the site level above stays in view -->
+  <section data-state="empty" class="empty" aria-labelledby="empty-h">
+    <svg class="ico empty__picto"><use href="#i-crew"/></svg>
+    <h2 id="empty-h" class="t-headline">No crews yet</h2>
+    <p class="t-lead measure">Crews appear here once they are added for this site.</p>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="supervisor-crews.html">Open the demo yard</a>
+      <a class="link" href="#">Download the crew template (CSV)</a>
+    </div>
+  </section>
+
+  <!-- ERROR -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="err-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h2 id="err-h" class="t-headline">The crews did not load</h2>
+    <p class="measure">Check your connection and try again. Crews still see their rule plan and level warnings, and Stop work still works on each crew screen.</p>
+    <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Prototype behaviour: the theme select drives ?theme= (system removes it). */
+  (() => {
+    const theme = document.getElementById("tool-theme");
+    const t = new URLSearchParams(location.search).get("theme");
+    theme.value = t === "light" || t === "dark" ? t : "system";
+    theme.addEventListener("change", () => {
+      const p = new URLSearchParams(location.search);
+      if (theme.value === "system") p.delete("theme"); else p.set("theme", theme.value);
+      location.search = p.toString();
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,2 +1,28 @@
-﻿.superpowers/
+.superpowers/
 
+# Python
+__pycache__/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.import_linter_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and local config
+.env
+
+# Local data (Parquet training set, raw HTTP cache) and compiled-code caches
+backend/data/
+# Staging directory of a crashed replay build (jobs/replay_build.py: replay/.<snapshot_id>.building)
+backend/replay/.*.building/
+.numba-cache/
+
+# The dev out-of-fold sample parquet is regenerated, not committed. Its manifest (oof_samples_abu_dhabi.manifest.json:
+# rows, columns, SHA-256, command), selection.json and dev_skill.json stay tracked: no other pattern matches them.
+artifacts/eval/dev/*.parquet
+
+# The 2026 corrected OMAA series (sb-jobs evaluate-2026) is regenerated, not committed. Its manifest
+# (corrected_series_OMAA.manifest.json: rows, columns, SHA-256, command, commit) and the JSON results stay tracked.
+artifacts/eval/2026/*.parquet

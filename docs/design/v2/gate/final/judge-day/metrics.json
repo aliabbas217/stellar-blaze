@@ -1,0 +1,418 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/judge-day.html",
+  "when": "2026-11-12T01:02:25.354Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-day\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-day\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 23
+          },
+          {
+            "px": 13,
+            "n": 45
+          },
+          {
+            "px": 14,
+            "n": 63
+          },
+          {
+            "px": 16,
+            "n": 6
+          },
+          {
+            "px": 18,
+            "n": 5
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 46,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 9,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 3,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 23
+          },
+          {
+            "v": "18px",
+            "n": 1
+          },
+          {
+            "v": "10px",
+            "n": 1
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 5
+          },
+          {
+            "px": 14,
+            "n": 4
+          },
+          {
+            "px": 3,
+            "n": 2
+          },
+          {
+            "px": 426,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 13,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "One day · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-day\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 62.7
+        },
+        "squint": {
+          "masses": 24,
+          "competitors": 2,
+          "dominance": 0.176,
+          "top": [
+            {
+              "cells": 65,
+              "weight": 17.55,
+              "cx": 0.572,
+              "cy": 0.081,
+              "bbox": [
+                0.347,
+                0.075,
+                0.792,
+                0.09
+              ]
+            },
+            {
+              "cells": 95,
+              "weight": 15.56,
+              "cx": 0.242,
+              "cy": 0.596,
+              "bbox": [
+                0.056,
+                0.567,
+                0.472,
+                0.627
+              ]
+            },
+            {
+              "cells": 17,
+              "weight": 9.77,
+              "cx": 0.929,
+              "cy": 0.965,
+              "bbox": [
+                0.889,
+                0.955,
+                0.958,
+                0.985
+              ]
+            },
+            {
+              "cells": 57,
+              "weight": 9.22,
+              "cx": 0.178,
+              "cy": 0.775,
+              "bbox": [
+                0.042,
+                0.761,
+                0.319,
+                0.806
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 5.77,
+              "cx": 0.213,
+              "cy": 0.852,
+              "bbox": [
+                0.056,
+                0.851,
+                0.403,
+                0.866
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.034,
+        "centroid": {
+          "x": 0.467,
+          "y": 0.492
+        },
+        "colourfulness": 9.8,
+        "luminanceSpread": 0.182,
+        "chromaProxy": 0.027,
+        "hierarchyByHueOnly": false,
+        "inkPct": 20.2,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 18% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-day\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-day\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 21
+          },
+          {
+            "px": 13,
+            "n": 41
+          },
+          {
+            "px": 14,
+            "n": 60
+          },
+          {
+            "px": 16,
+            "n": 6
+          },
+          {
+            "px": 18,
+            "n": 5
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 24,
+            "n": 1
+          },
+          {
+            "px": 36,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 1
+          }
+        ],
+        "distinctFontSizes": 9,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 24
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 14,
+            "n": 4
+          },
+          {
+            "px": 10,
+            "n": 3
+          },
+          {
+            "px": 114,
+            "n": 1
+          },
+          {
+            "px": 3,
+            "n": 1
+          },
+          {
+            "px": 6,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 10,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "One day · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-day\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 74.9
+        },
+        "squint": {
+          "masses": 45,
+          "competitors": 1,
+          "dominance": 0.345,
+          "top": [
+            {
+              "cells": 171,
+              "weight": 133.51,
+              "cx": 0.82,
+              "cy": 0.945,
+              "bbox": [
+                0.694,
+                0.907,
+                0.944,
+                0.981
+              ]
+            },
+            {
+              "cells": 61,
+              "weight": 28.74,
+              "cx": 0.323,
+              "cy": 0.32,
+              "bbox": [
+                0.208,
+                0.299,
+                0.444,
+                0.336
+              ]
+            },
+            {
+              "cells": 49,
+              "weight": 24.52,
+              "cx": 0.759,
+              "cy": 0.321,
+              "bbox": [
+                0.667,
+                0.299,
+                0.847,
+                0.336
+              ]
+            },
+            {
+              "cells": 36,
+              "weight": 17.04,
+              "cx": 0.481,
+              "cy": 0.19,
+              "bbox": [
+                0.403,
+                0.168,
+                0.569,
+                0.206
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 16.2,
+              "cx": 0.119,
+              "cy": 0.255,
+              "bbox": [
+                0.042,
+                0.234,
+                0.208,
+                0.271
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.016,
+        "centroid": {
+          "x": 0.513,
+          "y": 0.491
+        },
+        "colourfulness": 9.1,
+        "luminanceSpread": 0.487,
+        "chromaProxy": 0.024,
+        "hierarchyByHueOnly": false,
+        "inkPct": 21.9,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [
+    {
+      "at": "dark@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 18% of visual weight (corpus p05 19%) — nothing leads the eye"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

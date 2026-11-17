@@ -1,0 +1,94 @@
+templates (legal, excl. baselines): 14596
+B0 -> B1 (legalising the common roster), share per worked hour removed, 6 clusters x 3 summers: >=28: 2.2% (range 0.3%..5.8%), >=30: 7.5% (range 1.8%..16.9%), >=32: 19.1% (range 8.1%..33.7%)
+sleep opp. commute 45 min, bedtime floor 21:00: B0 7.50 h, B1 7.50 h
+sleep opp. commute 45 min, bedtime floor 21:30: B0 7.00 h, B1 7.00 h
+sleep opp. commute 45 min, bedtime floor 22:00: B0 6.50 h, B1 6.50 h
+sleep opp. commute 90 min, bedtime floor 21:00: B0 6.75 h, B1 6.25 h
+sleep opp. commute 90 min, bedtime floor 21:30: B0 6.25 h, B1 6.25 h
+sleep opp. commute 90 min, bedtime floor 22:00: B0 5.75 h, B1 5.75 h
+
+4 headline stations x 3 summers, LOSO, share of exposure per worked hour avoided (vsB1 = vs legal default):
+                                                                    vsB1_28  vsB1_30  vsB1_32  vsB0_30  vsB0_32  no_change  sleep_h_at_floor
+commute_min scenario                                                                                                                        
+45          legal hours only (no sleep gate)                          0.279    0.570    0.870    0.595    0.890        0.0             2.250
+            v1 span sleep model >=7.5 h, no guard [SUPERSEDED]        0.082    0.104    0.037    0.171    0.223        0.0             6.000
+            sleep>=7.5 h, bedtime floor 21:00                         0.000    0.000    0.000    0.075    0.186        0.0             7.500
+            sleep>=7.5 h, bedtime floor 21:00, bus>=05:00             0.000    0.000    0.000    0.075    0.186        0.0             7.500
+            sleep no worse than legal default, bedtime floor 21:00    0.000    0.000    0.000    0.075    0.186        0.0             7.500
+            sleep>=7.5 h, bedtime floor 21:30                         0.000    0.000    0.000    0.075    0.186        1.0             7.000
+            sleep>=7.5 h, bedtime floor 21:30, bus>=05:00             0.000    0.000    0.000    0.075    0.186        1.0             7.000
+            sleep no worse than legal default, bedtime floor 21:30    0.010    0.037    0.108    0.108    0.270        0.0             7.000
+            sleep>=7.5 h, bedtime floor 22:00                         0.000    0.000    0.000    0.075    0.186        1.0             6.500
+            sleep>=7.5 h, bedtime floor 22:00, bus>=05:00             0.000    0.000    0.000    0.075    0.186        1.0             6.500
+            sleep no worse than legal default, bedtime floor 22:00    0.027    0.104    0.237    0.169    0.374        0.0             6.562
+90          legal hours only (no sleep gate)                          0.279    0.570    0.870    0.595    0.890        0.0             0.750
+            v1 span sleep model >=7.5 h, no guard [SUPERSEDED]        0.000    0.000    0.000    0.075    0.186        1.0             6.250
+            sleep>=7.5 h, bedtime floor 21:00                         0.000    0.000    0.000    0.075    0.186        1.0             6.250
+            sleep>=7.5 h, bedtime floor 21:00, bus>=05:00             0.000    0.000    0.000    0.075    0.186        1.0             6.250
+            sleep no worse than legal default, bedtime floor 21:00    0.024    0.038    0.020    0.111    0.204        0.0             6.250
+            sleep>=7.5 h, bedtime floor 21:30                         0.000    0.000    0.000    0.075    0.186        1.0             6.250
+            sleep>=7.5 h, bedtime floor 21:30, bus>=05:00             0.000    0.000    0.000    0.075    0.186        1.0             6.250
+            sleep no worse than legal default, bedtime floor 21:30    0.000    0.000    0.000    0.075    0.186        0.0             6.250
+            sleep>=7.5 h, bedtime floor 22:00                         0.000    0.000    0.000    0.075    0.186        1.0             5.750
+            sleep>=7.5 h, bedtime floor 22:00, bus>=05:00             0.000    0.000    0.000    0.075    0.186        1.0             5.750
+            sleep no worse than legal default, bedtime floor 22:00    0.010    0.037    0.108    0.108    0.270        0.0             5.750
+
+6 clusters x 3 summers, LOSO, share of exposure per worked hour avoided (vsB1 = vs legal default):
+                                                                    vsB1_28  vsB1_30  vsB1_32  vsB0_30  vsB0_32  no_change  sleep_h_at_floor
+commute_min scenario                                                                                                                        
+45          legal hours only (no sleep gate)                          0.313    0.608    0.885    0.633    0.904        0.0             2.250
+            v1 span sleep model >=7.5 h, no guard [SUPERSEDED]        0.093    0.112    0.040    0.179    0.228        0.0             6.000
+            sleep>=7.5 h, bedtime floor 21:00                         0.000    0.000    0.000    0.075    0.191        0.0             7.500
+            sleep>=7.5 h, bedtime floor 21:00, bus>=05:00             0.000    0.000    0.000    0.075    0.191        0.0             7.500
+            sleep no worse than legal default, bedtime floor 21:00    0.000    0.000    0.000    0.075    0.191        0.0             7.500
+            sleep>=7.5 h, bedtime floor 21:30                         0.000    0.000    0.000    0.075    0.191        1.0             7.000
+            sleep>=7.5 h, bedtime floor 21:30, bus>=05:00             0.000    0.000    0.000    0.075    0.191        1.0             7.000
+            sleep no worse than legal default, bedtime floor 21:30    0.009    0.037    0.108    0.108    0.275        0.0             7.000
+            sleep>=7.5 h, bedtime floor 22:00                         0.000    0.000    0.000    0.075    0.191        1.0             6.500
+            sleep>=7.5 h, bedtime floor 22:00, bus>=05:00             0.000    0.000    0.000    0.075    0.191        1.0             6.500
+            sleep no worse than legal default, bedtime floor 22:00    0.026    0.102    0.236    0.168    0.378        0.0             6.542
+90          legal hours only (no sleep gate)                          0.313    0.608    0.885    0.633    0.904        0.0             0.750
+            v1 span sleep model >=7.5 h, no guard [SUPERSEDED]        0.000    0.000    0.000    0.075    0.191        1.0             6.250
+            sleep>=7.5 h, bedtime floor 21:00                         0.000    0.000    0.000    0.075    0.191        1.0             6.250
+            sleep>=7.5 h, bedtime floor 21:00, bus>=05:00             0.000    0.000    0.000    0.075    0.191        1.0             6.250
+            sleep no worse than legal default, bedtime floor 21:00    0.035    0.044    0.016    0.116    0.205        0.0             6.250
+            sleep>=7.5 h, bedtime floor 21:30                         0.000    0.000    0.000    0.075    0.191        1.0             6.250
+            sleep>=7.5 h, bedtime floor 21:30, bus>=05:00             0.000    0.000    0.000    0.075    0.191        1.0             6.250
+            sleep no worse than legal default, bedtime floor 21:30    0.000    0.000    0.000    0.075    0.191        0.0             6.250
+            sleep>=7.5 h, bedtime floor 22:00                         0.000    0.000    0.000    0.075    0.191        1.0             5.750
+            sleep>=7.5 h, bedtime floor 22:00, bus>=05:00             0.000    0.000    0.000    0.075    0.191        1.0             5.750
+            sleep no worse than legal default, bedtime floor 22:00    0.009    0.037    0.108    0.108    0.275        0.0             5.750
+
+most common pick (headline):
+commute_min  scenario                                              
+45           legal hours only (no sleep gate)                                         04:30-09:00 + 18:30-22:00 (5/12)
+             v1 span sleep model >=7.5 h, no guard [SUPERSEDED]        05:00-10:00 + 11:00-12:00 + 15:00-17:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:00                                       06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:00, bus>=05:00                           06:00-11:00 + 15:00-18:00 (12/12)
+             sleep no worse than legal default, bedtime floor 21:00                  06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:30                                       06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:30, bus>=05:00                           06:00-11:00 + 15:00-18:00 (12/12)
+             sleep no worse than legal default, bedtime floor 21:30                  06:00-11:00 + 15:30-18:30 (11/12)
+             sleep>=7.5 h, bedtime floor 22:00                                       06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 22:00, bus>=05:00                           06:00-11:00 + 15:00-18:00 (12/12)
+             sleep no worse than legal default, bedtime floor 22:00                   06:00-10:30 + 15:30-19:00 (9/12)
+90           legal hours only (no sleep gate)                                         04:30-09:00 + 18:30-22:00 (5/12)
+             v1 span sleep model >=7.5 h, no guard [SUPERSEDED]                      06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:00                                       06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:00, bus>=05:00                           06:00-11:00 + 15:00-18:00 (12/12)
+             sleep no worse than legal default, bedtime floor 21:00     05:30-10:30 + 11:30-12:00 + 15:00-17:30 (8/12)
+             sleep>=7.5 h, bedtime floor 21:30                                       06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 21:30, bus>=05:00                           06:00-11:00 + 15:00-18:00 (12/12)
+             sleep no worse than legal default, bedtime floor 21:30                  06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 22:00                                       06:00-11:00 + 15:00-18:00 (12/12)
+             sleep>=7.5 h, bedtime floor 22:00, bus>=05:00                           06:00-11:00 + 15:00-18:00 (12/12)
+             sleep no worse than legal default, bedtime floor 22:00                  06:00-11:00 + 15:30-18:30 (11/12)
+
+Frontier (6 clusters, floor 21:30, gate 7.5 h, guard on):
+ commute_min  b1_sleep_h  b1_passes_sleep_gate  folds_no_change  folds  avoided_vs_legal_default_ge28  avoided_vs_legal_default_ge30  avoided_vs_legal_default_ge32
+          15        7.50                  True                0     18                         0.0262                         0.1021                         0.2358
+          30        7.25                 False               18     18                         0.0000                         0.0000                         0.0000
+          45        7.00                 False               18     18                         0.0000                         0.0000                         0.0000
+          60        6.75                 False               18     18                         0.0000                         0.0000                         0.0000
+          75        6.50                 False               18     18                         0.0000                         0.0000                         0.0000
+          90        6.25                 False               18     18                         0.0000                         0.0000                         0.0000

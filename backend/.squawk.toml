@@ -1,0 +1,5 @@
+# Squawk lints `alembic upgrade head --sql` (CI step; render it to a temp file, never into the repository).
+# prefer-text-field fires on Alembic's own bookkeeping table (alembic_version.version_num VARCHAR(32)), whose DDL we cannot
+# change; every column of our own migrations is text. Everything else stays on, including require-timeout-settings.
+excluded_rules = ["prefer-text-field"]
+pg_version = "18.0"

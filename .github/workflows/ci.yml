@@ -1,0 +1,319 @@
+# One workflow, one job per owner: `backend` (B1 plan, this block), `frontend` (added by the F1 plan as a sibling of
+# `backend`) and `infra` (added by the I1 plan). Do not edit the `backend` job from the F1 or I1 plans,
+# and do not edit their jobs from here. deploy.yml (I1) waits for this workflow by its name, `ci`.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # The interpreter the image ships (ARG PYTHON_IMAGE in backend/Dockerfile): CI tests what runs in production. UV_PYTHON
+      # outranks backend/.python-version, so every `uv sync` and `uv run` below uses it. Bump it with the Dockerfile.
+      UV_PYTHON: "3.13.15"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # the OpenAPI breaking-change report reads the base commit
+          persist-credentials: false  # pre-commit runs third-party hook code; it must not find the job token in .git
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install Python and the locked dependencies
+        run: |
+          uv python install "$UV_PYTHON"
+          uv sync --locked
+
+      - name: Lockfile is up to date
+        run: uv lock --check
+
+      # gitleaks is skipped here and runs in the next step: its hook is `gitleaks git --pre-commit --staged`, which scans the
+      # staged changes only, so on a fresh checkout it scans nothing (and pre-commit would first build it from Go source).
+      - name: Pre-commit hooks (whole repository)
+        working-directory: .
+        env:
+          SKIP: gitleaks
+        run: uv run --project backend pre-commit run --all-files --show-diff-on-failure
+
+      # The same gitleaks version as the hook (rev in .pre-commit-config.yaml; bump both together), over the whole history
+      # (hence fetch-depth: 0). It runs from the repository root, where gitleaks looks for .gitleaksignore; the flag says so.
+      - name: Secret scan (gitleaks, full history)
+        working-directory: .
+        run: |
+          version=8.30.1
+          # The archive's sha256 is pinned here, in the repository, and not read from a checksums file served next to the
+          # archive: a file from the same place proves nothing when that place is what an attacker controls. Taken on
+          # 2026-11-12 from gitleaks_8.30.1_checksums.txt of the v8.30.1 release; the release asset's `digest` in the GitHub
+          # API says the same. Change `version` and `sha256` together.
+          sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          archive="gitleaks_${version}_linux_x64.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
+          tool_dir="$RUNNER_TEMP/gitleaks"
+          mkdir -p "$tool_dir"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
+          (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" gitleaks)
+          "$tool_dir/gitleaks" git --redact --verbose --no-banner --gitleaks-ignore-path .gitleaksignore .
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run ruff format --check .
+
+      - name: Types (mypy strict)
+        run: uv run mypy src tests
+
+      - name: Import contracts (import-linter)
+        run: uv run lint-imports
+
+      - name: Dependency hygiene (deptry)
+        run: uv run deptry src
+
+      - name: Unit tests with coverage
+        run: uv run pytest -m unit --cov --cov-report=term-missing
+
+      - name: Integration tests (Postgres in Docker)
+        run: uv run pytest -m integration
+
+      - name: Lint the migrations (Squawk)
+        env:
+          SB_DATABASE_URL: postgresql+asyncpg://x:x@localhost/x  # offline --sql rendering never connects
+        run: |
+          uv run alembic upgrade head --sql > "$RUNNER_TEMP/migration.sql"
+          uv run squawk "$RUNNER_TEMP/migration.sql"
+
+      # --no-emit-project: without it the export starts with `-e .`, which pip-audit rejects ("does not contain a hash").
+      # --quiet: uv also prints the whole export (1,800 lines) to stdout when -o is given.
+      - name: Audit the locked dependencies (pip-audit)
+        run: |
+          uv export --locked --quiet --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+          uv run pip-audit --disable-pip --no-deps -r "$RUNNER_TEMP/req.txt"
+
+      # ADR 0009 section 5. Enforcing since B3 Task 0 froze v1 (ADR 0051 decision 6): a breaking change (ERR) fails the
+      # build, additive changes pass.
+      - name: OpenAPI breaking-change check (oasdiff)
+        working-directory: .
+        env:
+          # Pull requests compare with the base branch tip, pushes with the previous head. All zeros (the first push of
+          # a branch) or a base without the spec (the file is new) means there is nothing to compare with.
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          spec=backend/openapi/v1.json
+          if [ -z "${BASE_SHA}" ] || ! git cat-file -e "${BASE_SHA}:${spec}" 2>/dev/null; then
+            echo "no base spec: ${spec} does not exist at '${BASE_SHA}'; skipping"
+            exit 0
+          fi
+          version=1.35.0
+          # Pinned in the repository, not read from the release's checksums.txt (see the gitleaks step). Taken on 2026-11-12
+          # from checksums.txt of the v1.35.0 release; the release asset's `digest` in the GitHub API says the same.
+          # Change `version` and `sha256` together (ADR 0030 holds the version).
+          sha256=a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140
+          archive="oasdiff_${version}_linux_amd64.tar.gz"
+          url="https://github.com/oasdiff/oasdiff/releases/download/v${version}"
+          tool_dir="$RUNNER_TEMP/oasdiff"
+          mkdir -p "$tool_dir"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
+          (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" oasdiff)
+          "$tool_dir/oasdiff" breaking "${BASE_SHA}:${spec}" "${spec}" --fail-on ERR
+
+      - name: Build the image
+        run: docker build -t stellar-blaze-api:ci .
+
+      - name: Smoke-test the image
+        run: |
+          set -u
+          db_url=postgresql+asyncpg://x:x@localhost/x
+          container=sb-api-smoke
+          trap 'docker rm -f "$container" > /dev/null 2>&1 || true' EXIT
+
+          # Runs as the unprivileged user, and the migrations are one linear history (a second head breaks upgrade head).
+          test "$(docker run --rm stellar-blaze-api:ci id -u)" = "10001"
+          heads="$(docker run --rm -e SB_DATABASE_URL="$db_url" stellar-blaze-api:ci alembic heads)"
+          echo "$heads"
+          test "$(echo "$heads" | grep -c '(head)')" = "1"
+
+          # The server starts and answers; /health/live needs no database.
+          docker run -d --name "$container" -p 8000:8000 -e SB_DATABASE_URL="$db_url" stellar-blaze-api:ci
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://localhost:8000/api/v1/health/live; then
+              curl --fail --silent --show-error http://localhost:8000/api/v1/health/live
+              echo
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container"
+          echo "the API did not answer /api/v1/health/live within 30 s" >&2
+          exit 1
+
+  # The pull-request gate of the frontend: lint, types, catalogues, the API schema, the unit suite, the production build with its
+  # bundle budget, and the registered-tests check. The browser tests (Playwright e2e: 1,164 tests in two projects), the design lint
+  # and Lighthouse run in their own workflow, frontend-e2e.yml (manual and sharded): on a runner the e2e got through 118 tests in
+  # 16 minutes before the job limit cancelled it, and it had never run on Linux. The split defers a gate and deletes nothing; its ADR
+  # is still to be written.
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # package_json_file defaults to the repo-root package.json; this repo keeps it under frontend/.
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      # Every catalogue has exactly en's keys with the same placeholders and tags, review-manifest.json is current, and (the release flag)
+      # no Tier 1 string is still English. Tier 2 (the claims surfaces) is English by design and never blocks.
+      - run: pnpm i18n:check
+        env:
+          SB_REQUIRE_TRANSLATED: "1"
+      # Regenerates src/api/schema.d.ts from the OpenAPI source and fails when it differs from the committed file.
+      - run: pnpm api:check
+      # Four workers: with the default (every core) the full suite is load-sensitive and a few timing-bound tests fail under load that pass alone.
+      - run: pnpm test --maxWorkers=4
+      # SB_REQUIRE_SCORED=1: a build without the held-out 2026 files (or with an evaluation record that does not name them) fails here, not on the live site.
+      - run: pnpm build
+        env:
+          SB_REQUIRE_SCORED: "1"
+      # Reads the build output: 174,080 B gzip of first-load script per route, 199,680 B for the five ADR 0069 routes only (/worker, /worker/alerts,
+      # /worker/alert, /supervisor, /supervisor/crews/[crewId]); it fails on a route it cannot find, so a rename cannot drop a limit.
+      - run: pnpm bundle:check
+      # Lists the registered e2e tests (no browser, no server) and compares them with tests/e2e/registered-tests.json: a test that silently
+      # stops being registered (a describe closed too early) fails here instead of passing unnoticed. Regenerate on purpose with
+      # `pnpm e2e:registered --write`. The e2e run itself, the design lint and Lighthouse are in frontend-e2e.yml.
+      - run: pnpm e2e:registered
+
+  # Static checks of the hosting code (I1; docs/superpowers/plans/2026-11-11-i1-azure-infra.md Task 5). No Azure login and no
+  # secret: permissions are the workflow's read-only ones, and every value below is dummy and drawn at run time. The deploy is
+  # CHEAP BY DEFAULT (api scale to zero, small containers, capped logs): check-template.sh C3 and C12 hold those settings.
+  # Deliberately NOT run here: the docker rehearsal (`bash infra/local/rehearse.sh`, about 6 minutes plus the image builds; it
+  # is the manual rehearsal before a deploy), and the Pester suite (infra/scripts/tests/ps): it tests deploy-local.ps1, the
+  # native Windows path (LOCALAPPDATA, icacls, cmd.exe, backslash paths), so it cannot run on this Linux runner.
+  infra:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pinned, and checked against the digest GitHub publishes for the v0.49.2 asset bicep-linux-x64 (GitHub API, taken on
+      # 2026-11-15; Bicep publishes no checksums file). `az bicep install` does not verify what it downloads. BICEP_BIN makes
+      # the infra scripts use this copy and not the one the runner image happens to carry on PATH. Change the version and
+      # the sha256 together, and the same pair in .github/workflows/deploy.yml.
+      - name: Install Bicep (pinned, checksum verified)
+        run: |
+          sha256=0ab9de90c2493f206f8281bae74f9ee2d5ed3605548dab1adf41fef185e1f7c5
+          az bicep install --version v0.49.2
+          echo "${sha256}  ${HOME}/.azure/bin/bicep" | sha256sum -c -
+          echo "BICEP_BIN=${HOME}/.azure/bin/bicep" >> "$GITHUB_ENV"
+          az bicep version
+
+      - name: Bicep build and lint (bootstrap.bicep, main.bicep)
+        run: |
+          for template in bootstrap main; do
+            az bicep build --file "infra/bicep/${template}.bicep" --stdout > /dev/null
+            az bicep lint --file "infra/bicep/${template}.bicep"
+          done
+
+      # The parameter files read their values from the environment (readEnvironmentVariable), so they only evaluate with
+      # one. Random values, never literals: a secret scanner cannot tell a dummy literal from a real one.
+      - name: Bicep build-params (bootstrap, main phase 1, main phase 2)
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/params"
+          mkdir -p "$out"
+          acr="acrsbdummy"
+          subscription="00000000-0000-0000-0000-000000000000"
+          export BUDGET_CONTACT_EMAIL="ops@example.org"
+          az bicep build-params --file infra/bicep/bootstrap.bicepparam --outfile "$out/bootstrap.json"
+          export ACR_NAME="$acr"
+          export APPS_IDENTITY_ID="/subscriptions/${subscription}/resourceGroups/rg-dummy/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-dummy"
+          export POSTGRES_VERSION=18
+          PG_ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          VAPID_PRIVATE_KEY="$(openssl rand -hex 32)"
+          SB_ACCESS_TOKENS="$(printf '{"%s":{"actor":"demo-bff","role":"employer","employer_id":"emp-demo"}}' "$(openssl rand -hex 32)")"
+          DEMO_EMPLOYER_TOKEN="$(openssl rand -hex 32)"
+          export PG_ADMIN_PASSWORD VAPID_PRIVATE_KEY SB_ACCESS_TOKENS DEMO_EMPLOYER_TOKEN
+          export GIT_SHA="$GITHUB_SHA"
+          export API_IMAGE="${acr}.azurecr.io/sb-api:dummy" API_TARGET_PORT=8000 API_LIVE_PATH=/api/v1/health/live API_READY_PATH=/api/v1/health/ready API_IS_PLACEHOLDER=false
+          export WEB_IMAGE="${acr}.azurecr.io/sb-web:dummy" WEB_TARGET_PORT=3000 WEB_HEALTH_PATH=/api/healthz WEB_IS_PLACEHOLDER=false
+          export JOBS_IMAGE=mcr.microsoft.com/k8se/quickstart-jobs:latest
+          export VAPID_PUBLIC_KEY=dummy-vapid-public-key VAPID_SUBJECT=mailto:ops@example.org
+          for phase in false true; do
+            DEPLOY_APPS="$phase" az bicep build-params --file infra/bicep/main.bicepparam --outfile "$out/main-apps-${phase}.json"
+          done
+          # Cheap mode: the api scales to zero by default, and API_MIN_REPLICAS=1 keeps it warm. Both must evaluate.
+          export DEPLOY_APPS=true
+          for api_min in 0 1; do
+            API_MIN_REPLICAS="$api_min" az bicep build-params --file infra/bicep/main.bicepparam --outfile "$out/main-api-min-${api_min}.json"
+          done
+
+      # runner-provided shellcheck. The stubs have no extension, so they are listed by directory. infra/bicep/scripts/migrate.sh
+      # is the text of job-migrate (loaded into main.bicep), so it is checked as the file it is.
+      - name: ShellCheck
+        run: |
+          shopt -s nullglob
+          files=(infra/scripts/*.sh infra/scripts/tests/*.sh infra/scripts/tests/stubs/* infra/local/*.sh infra/render/*.sh infra/bicep/scripts/*.sh)
+          printf '%s\n' "${files[@]}"
+          shellcheck "${files[@]}"
+
+      # CI=true: a test that needs bicep fails here and does not skip (as it does on a machine without it).
+      - name: Self-tests of the infra scripts
+        env:
+          CI: "true"
+        run: bash infra/scripts/tests/run.sh
+
+      - name: Template assertions (check-template.sh)
+        run: bash infra/scripts/check-template.sh infra/bicep/main.bicep
+
+      - name: Database TLS in the template (check-db-tls.sh, ADR 0042)
+        run: bash infra/scripts/check-db-tls.sh --template infra/bicep/main.bicep
+
+      # The deploy workflow's own invariants (pinned actions, the push guard, image check before push, step order, no secret
+      # in a run block, minimal permissions). Line based: actionlint below is the syntax check.
+      - name: Deploy workflow invariants (check-workflow.sh)
+        run: bash infra/scripts/check-workflow.sh .github/workflows/deploy.yml
+
+      # A release binary whose sha256 is pinned here, in the repository, and not read from the checksums file served next to it
+      # (see the gitleaks step in `backend`). Taken on 2026-11-15 from actionlint_1.7.12_checksums.txt of the v1.7.12 release
+      # (v1.7.12, 2026-03-30, is the latest release); the release asset's `digest` in the GitHub API says the same. Change
+      # `version` and `sha256` together. It runs the runner's shellcheck over the `run:` blocks as well.
+      - name: Lint the workflows (actionlint)
+        run: |
+          version=1.7.12
+          sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          url="https://github.com/rhysd/actionlint/releases/download/v${version}"
+          tool_dir="$RUNNER_TEMP/actionlint"
+          mkdir -p "$tool_dir"
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors --output "$tool_dir/$archive" "$url/$archive"
+          (cd "$tool_dir" && echo "${sha256}  ${archive}" | sha256sum -c - && tar -xzf "$archive" actionlint)
+          "$tool_dir/actionlint" -color .github/workflows/*.yml

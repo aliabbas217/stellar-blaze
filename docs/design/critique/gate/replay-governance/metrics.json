@@ -1,0 +1,1290 @@
+{
+  "url": "http://127.0.0.1:8765/replay-governance.html",
+  "when": "2026-11-11T12:02:37.620Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "monospace"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 56.8
+        },
+        "squint": {
+          "masses": 43,
+          "competitors": 2,
+          "dominance": 0.151,
+          "top": [
+            {
+              "cells": 92,
+              "weight": 58.06,
+              "cx": 0.545,
+              "cy": 0.542,
+              "bbox": [
+                0.389,
+                0.514,
+                0.722,
+                0.561
+              ]
+            },
+            {
+              "cells": 86,
+              "weight": 52.11,
+              "cx": 0.456,
+              "cy": 0.461,
+              "bbox": [
+                0.333,
+                0.43,
+                0.583,
+                0.495
+              ]
+            },
+            {
+              "cells": 43,
+              "weight": 29,
+              "cx": 0.276,
+              "cy": 0.544,
+              "bbox": [
+                0.194,
+                0.523,
+                0.347,
+                0.561
+              ]
+            },
+            {
+              "cells": 46,
+              "weight": 27.87,
+              "cx": 0.104,
+              "cy": 0.626,
+              "bbox": [
+                0.042,
+                0.598,
+                0.167,
+                0.645
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 26.51,
+              "cx": 0.755,
+              "cy": 0.458,
+              "bbox": [
+                0.694,
+                0.43,
+                0.819,
+                0.477
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.116,
+        "centroid": {
+          "x": 0.387,
+          "y": 0.527
+        },
+        "colourfulness": 11.1,
+        "luminanceSpread": 0.498,
+        "chromaProxy": 0.029,
+        "hierarchyByHueOnly": false,
+        "inkPct": 30.7,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 15% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "monospace"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 42.4
+        },
+        "squint": {
+          "masses": 40,
+          "competitors": 1,
+          "dominance": 0.199,
+          "top": [
+            {
+              "cells": 94,
+              "weight": 39.21,
+              "cx": 0.163,
+              "cy": 0.943,
+              "bbox": [
+                0.056,
+                0.912,
+                0.264,
+                0.975
+              ]
+            },
+            {
+              "cells": 47,
+              "weight": 21.29,
+              "cx": 0.21,
+              "cy": 0.235,
+              "bbox": [
+                0.111,
+                0.212,
+                0.319,
+                0.263
+              ]
+            },
+            {
+              "cells": 41,
+              "weight": 17.55,
+              "cx": 0.725,
+              "cy": 0.233,
+              "bbox": [
+                0.639,
+                0.212,
+                0.819,
+                0.25
+              ]
+            },
+            {
+              "cells": 36,
+              "weight": 12.18,
+              "cx": 0.221,
+              "cy": 0.627,
+              "bbox": [
+                0.056,
+                0.625,
+                0.389,
+                0.637
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 10.78,
+              "cx": 0.893,
+              "cy": 0.234,
+              "bbox": [
+                0.847,
+                0.212,
+                0.944,
+                0.25
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.15,
+        "centroid": {
+          "x": 0.363,
+          "y": 0.439
+        },
+        "colourfulness": 16.9,
+        "luminanceSpread": 0.319,
+        "chromaProxy": 0.05,
+        "hierarchyByHueOnly": false,
+        "inkPct": 27.2,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "monospace"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 56.8
+        },
+        "squint": {
+          "masses": 30,
+          "competitors": 4,
+          "dominance": 0.134,
+          "top": [
+            {
+              "cells": 37,
+              "weight": 12.17,
+              "cx": 0.198,
+              "cy": 0.144,
+              "bbox": [
+                0.069,
+                0.134,
+                0.319,
+                0.149
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 11.08,
+              "cx": 0.139,
+              "cy": 0.598,
+              "bbox": [
+                0.083,
+                0.582,
+                0.194,
+                0.612
+              ]
+            },
+            {
+              "cells": 74,
+              "weight": 10.71,
+              "cx": 0.758,
+              "cy": 0.566,
+              "bbox": [
+                0.653,
+                0.478,
+                0.889,
+                0.657
+              ]
+            },
+            {
+              "cells": 30,
+              "weight": 10.23,
+              "cx": 0.449,
+              "cy": 0.144,
+              "bbox": [
+                0.347,
+                0.134,
+                0.556,
+                0.149
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 7.31,
+              "cx": 0.222,
+              "cy": 0.396,
+              "bbox": [
+                0.083,
+                0.388,
+                0.361,
+                0.403
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.137,
+        "centroid": {
+          "x": 0.39,
+          "y": 0.418
+        },
+        "colourfulness": 14.9,
+        "luminanceSpread": 0.152,
+        "chromaProxy": 0.046,
+        "hierarchyByHueOnly": false,
+        "inkPct": 27.2,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "4 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.134)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 13% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "monospace"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 56.5
+        },
+        "squint": {
+          "masses": 42,
+          "competitors": 2,
+          "dominance": 0.144,
+          "top": [
+            {
+              "cells": 90,
+              "weight": 64.51,
+              "cx": 0.548,
+              "cy": 0.542,
+              "bbox": [
+                0.389,
+                0.514,
+                0.722,
+                0.561
+              ]
+            },
+            {
+              "cells": 85,
+              "weight": 59.05,
+              "cx": 0.453,
+              "cy": 0.46,
+              "bbox": [
+                0.333,
+                0.43,
+                0.583,
+                0.495
+              ]
+            },
+            {
+              "cells": 63,
+              "weight": 43.54,
+              "cx": 0.133,
+              "cy": 0.627,
+              "bbox": [
+                0.042,
+                0.598,
+                0.236,
+                0.645
+              ]
+            },
+            {
+              "cells": 59,
+              "weight": 40.57,
+              "cx": 0.726,
+              "cy": 0.459,
+              "bbox": [
+                0.625,
+                0.43,
+                0.819,
+                0.477
+              ]
+            },
+            {
+              "cells": 44,
+              "weight": 32.56,
+              "cx": 0.274,
+              "cy": 0.544,
+              "bbox": [
+                0.194,
+                0.523,
+                0.347,
+                0.561
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.102,
+        "centroid": {
+          "x": 0.398,
+          "y": 0.505
+        },
+        "colourfulness": 10.6,
+        "luminanceSpread": 0.624,
+        "chromaProxy": 0.028,
+        "hierarchyByHueOnly": false,
+        "inkPct": 42.7,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 14% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "monospace"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 42.3
+        },
+        "squint": {
+          "masses": 49,
+          "competitors": 1,
+          "dominance": 0.21,
+          "top": [
+            {
+              "cells": 94,
+              "weight": 54.6,
+              "cx": 0.163,
+              "cy": 0.944,
+              "bbox": [
+                0.056,
+                0.912,
+                0.264,
+                0.975
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 25.16,
+              "cx": 0.21,
+              "cy": 0.235,
+              "bbox": [
+                0.111,
+                0.212,
+                0.319,
+                0.263
+              ]
+            },
+            {
+              "cells": 38,
+              "weight": 20.5,
+              "cx": 0.728,
+              "cy": 0.233,
+              "bbox": [
+                0.639,
+                0.212,
+                0.819,
+                0.25
+              ]
+            },
+            {
+              "cells": 28,
+              "weight": 13.25,
+              "cx": 0.195,
+              "cy": 0.627,
+              "bbox": [
+                0.056,
+                0.625,
+                0.333,
+                0.637
+              ]
+            },
+            {
+              "cells": 23,
+              "weight": 12.45,
+              "cx": 0.386,
+              "cy": 0.235,
+              "bbox": [
+                0.333,
+                0.212,
+                0.431,
+                0.25
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.104,
+        "centroid": {
+          "x": 0.396,
+          "y": 0.495
+        },
+        "colourfulness": 14.4,
+        "luminanceSpread": 0.447,
+        "chromaProxy": 0.044,
+        "hierarchyByHueOnly": false,
+        "inkPct": 53.3,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 55
+          },
+          {
+            "px": 16,
+            "n": 19
+          },
+          {
+            "px": 20,
+            "n": 4
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 6
+          },
+          {
+            "px": 49,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "monospace"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [
+          {
+            "sel": "a",
+            "w": 123,
+            "h": 20,
+            "text": "Prototype index"
+          },
+          {
+            "sel": "a",
+            "w": 49,
+            "h": 16,
+            "text": "ideal"
+          },
+          {
+            "sel": "a",
+            "w": 57,
+            "h": 16,
+            "text": "loading"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "empty"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "error"
+          },
+          {
+            "sel": "a",
+            "w": 41,
+            "h": 16,
+            "text": "light"
+          },
+          {
+            "sel": "a",
+            "w": 33,
+            "h": 16,
+            "text": "dark"
+          }
+        ],
+        "smallTargetCount": 7,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Governance refusal · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate\\replay-governance\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 57.1
+        },
+        "squint": {
+          "masses": 32,
+          "competitors": 1,
+          "dominance": 0.226,
+          "top": [
+            {
+              "cells": 121,
+              "weight": 30.04,
+              "cx": 0.749,
+              "cy": 0.566,
+              "bbox": [
+                0.653,
+                0.478,
+                0.889,
+                0.657
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 15.45,
+              "cx": 0.139,
+              "cy": 0.598,
+              "bbox": [
+                0.083,
+                0.582,
+                0.194,
+                0.612
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 14.97,
+              "cx": 0.198,
+              "cy": 0.144,
+              "bbox": [
+                0.069,
+                0.134,
+                0.319,
+                0.149
+              ]
+            },
+            {
+              "cells": 29,
+              "weight": 12.62,
+              "cx": 0.449,
+              "cy": 0.144,
+              "bbox": [
+                0.347,
+                0.134,
+                0.556,
+                0.149
+              ]
+            },
+            {
+              "cells": 42,
+              "weight": 11.08,
+              "cx": 0.222,
+              "cy": 0.396,
+              "bbox": [
+                0.083,
+                0.388,
+                0.361,
+                0.403
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.114,
+        "centroid": {
+          "x": 0.408,
+          "y": 0.433
+        },
+        "colourfulness": 13.8,
+        "luminanceSpread": 0.258,
+        "chromaProxy": 0.044,
+        "hierarchyByHueOnly": false,
+        "inkPct": 37.6,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": false,
+    "blockers": [
+      {
+        "rule": "touch-target",
+        "detail": "light@390: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@768: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "light@1440: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@390: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@768: 7 interactive target(s) under 24px"
+      },
+      {
+        "rule": "touch-target",
+        "detail": "dark@1440: 7 interactive target(s) under 24px"
+      }
+    ]
+  },
+  "composition": [
+    {
+      "at": "light@1440",
+      "id": "everything-shouts",
+      "severity": "major",
+      "detail": "4 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.134)."
+    },
+    {
+      "at": "light@1440",
+      "id": "no-dominant-mass",
+      "severity": "major",
+      "detail": "heaviest mass holds only 13% of visual weight (corpus p05 19%) — nothing leads the eye"
+    }
+  ],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

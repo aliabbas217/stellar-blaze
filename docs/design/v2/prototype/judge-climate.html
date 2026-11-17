@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warmer summer · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.desk { max-width: var(--content-max); margin-inline: auto; padding: var(--s-4) clamp(16px, 3vw, 40px) var(--s-12); }
+.ev-tabs { display: flex; flex-wrap: wrap; gap: 0 var(--s-1); margin-bottom: var(--s-4); font-size: var(--t-13); }
+.ev-tabs span { color: var(--ink-3); display: inline-flex; align-items: center; min-height: 32px; margin-inline-end: var(--s-2); }
+.ev-tabs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--s-2); color: var(--ink-3); text-decoration: none; border-bottom: 2px solid transparent; }
+.ev-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.head { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.eyebrow { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.head h1 { max-width: 36ch; }
+.scen { font-size: var(--t-16); color: var(--ink); font-weight: 600; }
+.stepnav { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-12); padding-top: var(--s-4); border-top: 1px solid var(--hair); }
+.stepnav a:not(.btn) { color: var(--ink-2); font-size: var(--t-14); }
+.notes { margin-top: var(--s-6); padding-left: var(--s-4); color: var(--ink-3); font-size: var(--t-13); display: grid; gap: var(--s-1); max-width: 90ch; }
+
+.season { position: relative; padding: var(--s-4); view-transition-name: spine; }
+.season-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4); margin-bottom: var(--s-3); }
+.season-h h2 { font: 600 var(--t-14)/1.3 var(--sans); }
+.season-h .faint { font-size: var(--t-13); }
+.ramp { margin-inline-start: auto; display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-12); color: var(--ink-3); }
+.ramp svg { display: inline-block; }
+#rib svg { width: 100%; height: auto; display: block; overflow: visible; }
+#rib .rl { font: 600 14px var(--sans); fill: var(--ink); }
+#rib .rl2 { font: 400 13px var(--sans); fill: var(--ink-3); }
+#rib .iso { stroke: var(--hair); stroke-width: 1; }
+#rib .iso-t { font: 400 12px var(--sans); fill: var(--ink-3); }
+#rib .pk { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+#rib .pend-r { fill: var(--ground-deep); stroke: var(--edge); stroke-width: 1; stroke-dasharray: 4 4; }
+#rib .pend-t { font: 500 14px var(--sans); fill: var(--ink-2); }
+#rib .ban { stroke: var(--edge); stroke-width: 1; }
+#rib .ban-t { font: 500 13px var(--sans); fill: var(--ink-3); }
+#rib .mo { font: 400 12px var(--sans); fill: var(--ink-3); }
+#rib .hov { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.tip { position: absolute; pointer-events: none; z-index: 5; padding: var(--s-2) var(--s-3); background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); font-size: var(--t-13); white-space: nowrap; }
+.below { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.1fr); gap: var(--s-6); margin-top: var(--s-6); align-items: start; }
+@media (max-width: 1100px) { .below { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .below { grid-template-columns: 1fr; } }
+.below h3 { font: 600 var(--t-14)/1.3 var(--sans); margin-bottom: var(--s-2); }
+.below p { font-size: var(--t-14); color: var(--ink-2); }
+.counters { list-style: none; padding: 0; }
+.counters li { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-14); }
+.counters li span:last-child { color: var(--ink-3); white-space: nowrap; }
+.go { display: grid; gap: var(--s-3); align-content: start; }
+.sk-r { height: 380px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Evidence you can try</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="desk" id="main">
+  <nav class="ev-tabs" aria-label="Evidence"><span>Try it yourself</span><a href="judge-validator.html">Try a plan</a><a href="judge-frontier.html">Roster frontier</a><a href="judge-climate.html" aria-current="page">Warmer summer</a><a href="judge-governance.html">Governance</a><a href="judge-faults.html">Break things</a></nav>
+  <header class="head">
+    <p class="eyebrow">Same summer, warmer · Abu Dhabi (OMAA), 15 May to 30 Sep 2026</p>
+    <h1 class="j-h2">The real 2026 summer, replayed with +1.5 and +2.0 °C of global warming under the same rules.</h1>
+    <p class="scen">Sensitivity scenario on a real summer, not a forecast.</p>
+  </header>
+
+  <div data-when="loading" aria-busy="true" aria-label="Loading the season"><p class="skel sk-r">.</p></div>
+  <section class="empty" data-when="error" role="alert">
+    <h3>The season did not load</h3>
+    <p class="muted">The 2026 daily peaks could not be read. The scenario rows are not computed yet either, so nothing is lost by moving on.</p>
+    <p><a class="btn primary" href="judge-climate.html">Try again</a></p>
+    <p class="faint" style="font-size:var(--t-13)">Request id <span class="mono">req_5b20d7aa</span> (prototype)</p>
+  </section>
+  <section class="empty" data-when="empty">
+    <h3>Shown as a slide</h3>
+    <p class="muted">The warmer-summer run was cut from the live build (it is the first cut, ADR 0034 §8). The deck carries it as one slide, computed the same way and labelled the same way: sensitivity scenario on a real summer, not a forecast.</p>
+    <p><a class="btn primary" href="judge-governance.html">Next: governance refusal</a></p>
+  </section>
+
+  <div data-when="ideal">
+    <section class="panel season" aria-labelledby="sea-h">
+      <div class="season-h">
+        <h2 id="sea-h">Daily peak heat, one cell per day</h2>
+        <span class="faint" id="sea-sub"></span>
+        <span class="ramp" id="ramp" aria-hidden="true"></span>
+      </div>
+      <div id="rib"></div>
+      <div class="tip" id="tip" hidden></div>
+    </section>
+
+    <div class="below">
+      <section aria-labelledby="m1"><h3 id="m1">Where the rise comes from</h3><p>IPCC AR6 Atlas, Arabian Peninsula region including sea (land only reported next to it). Global warming levels, not calendar years. Model median rise between today's level and the chosen one. <button class="proof" type="button" data-proof='{"what":"Regional temperature rise per warming level: not computed yet","protocol":"Climate method pre-registered 12 Nov (ADR 0034 §3, §5)","script":"climate what-if, lands 17 Nov if the 16 Nov gate is green","file":"none yet","sha":"none yet","label":"Sensitivity scenario on a real summer, not a forecast"}'>proof</button></p></section>
+      <section aria-labelledby="m2"><h3 id="m2">Why each result is a range</h3><p>The rise has no humidity in it. Each scenario runs twice: specific humidity held (the air keeps its moisture) and relative humidity held (about 6 to 7 % more moisture per °C). Truth near a warming sea is plausibly between.</p></section>
+      <section aria-labelledby="m3"><h3 id="m3">What it will count</h3>
+        <ul class="counters">
+          <li><span>High-zone working hours outside the midday break</span><span class="pend"><i aria-hidden="true"></i>pending</span></li>
+          <li><span>Rule-plan rest minutes per worker-day</span><span class="pend"><i aria-hidden="true"></i>pending</span></li>
+          <li><span>High-zone hours only from the 44 °C cap</span><span class="pend"><i aria-hidden="true"></i>pending</span></li>
+        </ul>
+      </section>
+      <div class="go">
+        <a class="btn primary lg" href="judge-governance.html">Next: governance refusal</a>
+        <p class="faint" style="font-size:var(--t-13)">Radiation, wind, the daily shape and every rule stay at 2026. One uniform rise understates change in the hottest hours.</p>
+      </div>
+    </div>
+  </div>
+
+  <ul class="notes">
+    <li>2026 row: ECMWF IFS 0.25° day-ahead forecast at OMAA, daily maximum WBGT by the backend's Liljegren module. A forecast, not station truth; truth is scored 12 Nov.</li>
+    <li>No warmed number is drawn until the scenario run exists. Airport station, not a worksite.</li>
+  </ul>
+  <nav class="stepnav" aria-label="Story"><a href="judge-frontier.html">Back: roster frontier</a><a href="index.html">All views</a></nav>
+</main>
+
+<script type="module">
+import { boot, STATE } from './assets/kit.js';
+import { loadJSON, RAMP_DARK, css } from './assets/heat.js';
+{ const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn'); menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); }; }
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error'] });
+const $ = (id) => document.getElementById(id);
+const setView = (s) => { for (const el of document.querySelectorAll('[data-when]')) el.hidden = !el.dataset.when.split(/\s+/).includes(s); };
+
+let S = null;
+if (STATE === 'ideal') { try { S = await loadJSON('omaa_2026_ifs_d1_wbgt_dailymax.json'); } catch { setView('error'); } }
+if (S) {
+  const days = S.days, v = S.wbgt_daily_max;
+  let pi = 0; v.forEach((x, i) => { if (x > v[pi]) pi = i; });
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dfmt = (d) => `${Number(d.slice(8))} ${MON[Number(d.slice(5, 7)) - 1]}`;
+  $('sea-sub').innerHTML = `Peak ${v[pi].toFixed(1)} °C WBGT on ${dfmt(days[pi])} <button class="proof" type="button" data-proof='${JSON.stringify({ what: `Season peak forecast WBGT ${v[pi].toFixed(1)} °C on ${days[pi]}, OMAA`, protocol: 'Day-1 forecast as issued the evening before (Open-Meteo Previous Runs, ecmwf_ifs025)', script: 'stellar_blaze wbgt_liljegren', file: 'data/omaa_2026_ifs_d1_wbgt_dailymax.json', sha: '7ec6c2ae84d77e30a522fd6eed0b1df80c91e5204f7a891eca173b1853f9f794', label: 'Real forecast, not station truth' })}'>proof</button>`;
+  // ramp key
+  let k = ''; for (let t = 26; t <= 40; t++) k += `<rect x="${(t - 26) * 8}" y="0" width="8" height="10" fill="${css(RAMP_DARK(t))}"/>`;
+  $('ramp').innerHTML = `26 °C<svg width="120" height="10" viewBox="0 0 120 10">${k}</svg>40 °C`;
+
+  const draw = () => {
+    const el = $('rib'), w = Math.max(300, Math.round(el.clientWidth)), compact = w < 640;
+    const L = 34, R = 4, n = days.length, cw = (w - L - R) / n, x = (i) => L + i * cw;
+    const pk0 = 24, pkH = compact ? 70 : 96, lo = 26, hi = 40, Yp = (t) => pk0 + pkH * (1 - (t - lo) / (hi - lo));
+    const r1 = pk0 + pkH + 8, rh = compact ? 30 : 40, gap = compact ? 52 : 46;
+    const r2 = r1 + rh + gap, r3 = r2 + rh + gap, axisY = r3 + rh + 18, H = axisY + 30;
+    const di = (d) => days.indexOf(d);
+    let s = `<text class="rl" x="${L}" y="14">2026 as replayed</text>${compact ? '' : `<text class="rl2" x="${L + 136}" y="14">day-ahead forecast, real</text>`}`;
+    for (let t = lo; t <= hi; t++) s += `<line class="iso" x1="${L}" x2="${w - R}" y1="${Yp(t)}" y2="${Yp(t)}"${t % 2 ? ' style="opacity:.45"' : ''}/>${t % (compact ? 4 : 2) === 0 ? `<text class="iso-t" x="${L - 6}" y="${Yp(t) + 4}" text-anchor="end">${t}</text>` : ''}`;
+    s += `<path class="pk" d="M${v.map((t, i) => `${(x(i) + cw / 2).toFixed(1)},${Yp(Math.min(hi, Math.max(lo, t))).toFixed(1)}`).join(' L')}"/>`;
+    v.forEach((t, i) => { s += `<rect x="${x(i).toFixed(2)}" y="${r1}" width="${Math.max(0.6, cw - (cw > 4 ? 1 : 0)).toFixed(2)}" height="${rh}" fill="${css(RAMP_DARK(t))}"/>`; });
+    const pend = (y, lab) => `<text class="rl" x="${L}" y="${y - 10}">${lab}</text><rect class="pend-r" x="${L}" y="${y}" width="${w - L - R}" height="${rh}" rx="2"/><text class="pend-t" x="${(L + w - R) / 2}" y="${y + rh / 2 + 5}" text-anchor="middle">${compact ? 'Pending: runs 17 Nov' : 'Pending. Runs 17 Nov if the 16 Nov build gate is green (ADR 0034)'}</text>`;
+    s += pend(r2, '+1.5 °C global warming level') + pend(r3, '+2.0 °C global warming level');
+    // the ban season, framed by the slot's two rules
+    const b0 = x(di('2026-06-15')), b1 = x(di('2026-09-15') + 1);
+    for (const y of [r1, r2, r3]) s += `<line class="ban" x1="${b0}" x2="${b0}" y1="${y - 5}" y2="${y + rh + 5}"/><line class="ban" x1="${b1}" x2="${b1}" y1="${y - 5}" y2="${y + rh + 5}"/>`;
+    s += `<line class="ban" x1="${b0}" x2="${b0}" y1="${axisY + 8}" y2="${axisY + 26}"/><line class="ban" x1="${b1}" x2="${b1}" y1="${axisY + 8}" y2="${axisY + 26}"/>`;
+    s += `<text class="ban-t" x="${(b0 + b1) / 2}" y="${axisY + 22}" text-anchor="middle">${compact ? 'Midday break in force' : 'Midday break in force, 15 Jun to 15 Sep'}</text>`;
+    for (const [d, m] of [['2026-05-15', compact ? 'May' : '15 May'], ...(compact ? [] : [['2026-06-01', 'Jun']]), ['2026-07-01', 'Jul'], ['2026-08-01', 'Aug'], ['2026-09-01', 'Sep']]) s += `<text class="mo" x="${x(di(d))}" y="${axisY}" text-anchor="${d.endsWith('15') ? 'start' : 'middle'}">${m}</text>`;
+    s += `<text class="mo" x="${w - R}" y="${axisY}" text-anchor="end">30 Sep</text><rect class="hov" id="hov" x="0" y="${r1}" width="${cw}" height="${rh}" visibility="hidden"/>`;
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${H}" width="${w}" height="${H}" role="img" aria-label="Daily peak WBGT at OMAA, 15 May to 30 Sep 2026, from ${Math.min(...v).toFixed(1)} to ${v[pi].toFixed(1)} °C, peak on ${dfmt(days[pi])}. The +1.5 and +2.0 °C rows are pending.">${s}</svg>`;
+    const svg = el.querySelector('svg'), tip = $('tip'), hov = svg.querySelector('#hov');
+    svg.onpointermove = (e) => {
+      const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left) * (w / r.width), i = Math.floor((mx - L) / cw);
+      if (i < 0 || i >= n) { tip.hidden = true; hov.setAttribute('visibility', 'hidden'); return; }
+      hov.setAttribute('x', x(i)); hov.setAttribute('visibility', 'visible');
+      tip.hidden = false; tip.textContent = `${dfmt(days[i])}: peak ${v[i].toFixed(1)} °C WBGT (forecast)`;
+      const box = el.parentElement.getBoundingClientRect();
+      tip.style.left = `${Math.min(e.clientX - box.left + 12, box.width - tip.offsetWidth - 8)}px`; tip.style.top = `${e.clientY - box.top - 40}px`;
+    };
+    svg.onpointerleave = () => { tip.hidden = true; hov.setAttribute('visibility', 'hidden'); };
+  };
+  let raf = 0; new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }).observe($('rib'));
+  draw();
+}
+</script>
+</body>
+</html>

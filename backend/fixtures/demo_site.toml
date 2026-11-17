@@ -1,0 +1,83 @@
+# SIMULATED. The frozen demo site (ADR 0057 section 2): not a real site, employer or crew. Loaded by
+# `sb-jobs site load backend/fixtures/demo_site.toml`. The SHA-256 of this file is the pre-registration section 11.1
+# slot <demo_site_sha256>: changing any byte after the freeze addendum makes the Plans row "not pre-registered".
+# A demo reset (ADR 0066) starts a new epoch and does not touch this file.
+#
+# Members are groups: `count` identical members per [[crews.members]] table (default 1).
+#   days_on_site / days_away / away_reason / experienced / juvenile: the inputs of the acclimatization rules
+#   (PERSONAL data class, ADR 0010 section 8; they stay in the crew_member table and never reach the API).
+# headcount is the declared head count of the crew and must equal the number of members listed (the loader refuses a
+# mismatch, an unsorted or overlapping shift, and a shift outside the planner's 04:00-22:00 day grid).
+# Commute 45 min is read by the plans scoring from this file (it is not stored in the database).
+
+commute_minutes = 45
+
+[site]
+id = "site-demo-mussafah"
+name = "Mussafah M-14 yard (synthetic)"
+timezone = "Asia/Dubai"
+station = "OMAA"
+lat = 24.36
+lon = 54.50
+employer_id = "emp-demo"
+synthetic = true
+# SYNTHETIC numbers (ADR 0065): NANP fiction numbers, never a UAE number, because a `tel:` link dials for real on a
+# phone. The architect may replace them (which changes this file's SHA-256).
+supervisor_phone = "+12025550143"
+first_aider_phone = "+12025550144"
+
+# All crews work the published shift L1 (06:00-11:00 and 15:00-18:00), six days a week.
+
+# Rebar fixing, heavy, 12 members: 2 new (day 2 on site), the rest experienced.
+[[crews]]
+id = "crew-a"
+name = "Crew A"
+task_label = "Rebar fixing"
+workload = "heavy"
+days_per_week = 6
+headcount = 12
+shift = [{ start = "06:00", end = "11:00" }, { start = "15:00", end = "18:00" }]
+members = [
+  { count = 2, days_on_site = 2, days_away = 0, away_reason = "none", experienced = false, juvenile = false },
+  { count = 10, days_on_site = 90, days_away = 0, away_reason = "none", experienced = true, juvenile = false },
+]
+
+# Concrete pour, heavy, 20 members, all experienced adults: the scored crew (pre-registration section 7.2).
+[[crews]]
+id = "crew-b"
+name = "Crew B"
+task_label = "Concrete pour"
+workload = "heavy"
+days_per_week = 6
+headcount = 20
+shift = [{ start = "06:00", end = "11:00" }, { start = "15:00", end = "18:00" }]
+members = [
+  { count = 20, days_on_site = 90, days_away = 0, away_reason = "none", experienced = true, juvenile = false },
+]
+
+# Formwork, moderate, 9 members: 1 returning after 10 days away.
+[[crews]]
+id = "crew-c"
+name = "Crew C"
+task_label = "Formwork"
+workload = "moderate"
+days_per_week = 6
+headcount = 9
+shift = [{ start = "06:00", end = "11:00" }, { start = "15:00", end = "18:00" }]
+members = [
+  { count = 1, days_on_site = 1, days_away = 10, away_reason = "leave", experienced = true, juvenile = false },
+  { count = 8, days_on_site = 90, days_away = 0, away_reason = "none", experienced = true, juvenile = false },
+]
+
+# Survey and inspection, light, 4 members: below k_exposure (5), the suppressed crew.
+[[crews]]
+id = "crew-d"
+name = "Crew D"
+task_label = "Survey and inspection"
+workload = "light"
+days_per_week = 6
+headcount = 4
+shift = [{ start = "06:00", end = "11:00" }, { start = "15:00", end = "18:00" }]
+members = [
+  { count = 4, days_on_site = 90, days_away = 0, away_reason = "none", experienced = true, juvenile = false },
+]

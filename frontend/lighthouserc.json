@@ -1,0 +1,222 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/serve-stack.mjs",
+      "startServerReadyPattern": "Ready in",
+      "startServerReadyTimeout": 60000,
+      "url": [
+        "http://127.0.0.1:3000/en",
+        "http://127.0.0.1:3000/en?static",
+        "http://127.0.0.1:3000/en/replay",
+        "http://127.0.0.1:3000/en/replay/day",
+        "http://127.0.0.1:3000/en/replay/try",
+        "http://127.0.0.1:3000/en/replay/governance",
+        "http://127.0.0.1:3000/en/replay/proof/forecast.hours_over_limit",
+        "http://127.0.0.1:3000/en/worker",
+        "http://127.0.0.1:3000/en/worker?site=site-demo-mussafah&crew=crew-b",
+        "http://127.0.0.1:3000/en/worker/alerts",
+        "http://127.0.0.1:3000/en/worker/alert?audience=site&target=site-demo-mussafah&level=orange&valid_from=2026-09-03T06%3A00%3A00Z",
+        "http://127.0.0.1:3000/en/worker/unwell",
+        "http://127.0.0.1:3000/en/supervisor",
+        "http://127.0.0.1:3000/en/supervisor/crews/crew-b"
+      ],
+      "numberOfRuns": 3
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": "^http://127\\.0\\.0\\.1:3000/en$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.8,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 3000,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 200,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "resource-summary:script:size": [
+              "error",
+              {
+                "maxNumericValue": 174080,
+                "aggregationMethod": "median-run"
+              }
+            ]
+          }
+        },
+        {
+          "matchingUrlPattern": "^http://127\\.0\\.0\\.1:3000/en(\\?static|/replay(/[^?]*)?|/worker/unwell)$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.9,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 2500,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 200,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "resource-summary:script:size": [
+              "error",
+              {
+                "maxNumericValue": 174080,
+                "aggregationMethod": "median-run"
+              }
+            ]
+          }
+        },
+        {
+          "matchingUrlPattern": "^http://127\\.0\\.0\\.1:3000/en/worker(\\?site=[^&]+&crew=[^&]+|/alerts|/alert\\?.+)?$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.8,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 3500,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 350,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "resource-summary:script:size": [
+              "error",
+              {
+                "maxNumericValue": 199680,
+                "aggregationMethod": "median-run"
+              }
+            ]
+          }
+        },
+        {
+          "matchingUrlPattern": "^http://127\\.0\\.0\\.1:3000/en/supervisor(/crews/[^/?]+)?$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.75,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 4000,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 450,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "resource-summary:script:size": [
+              "error",
+              {
+                "maxNumericValue": 199680,
+                "aggregationMethod": "median-run"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci"
+    }
+  }
+}

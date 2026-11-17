@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Stub for docker, used by infra/scripts/tests/run.sh. Never starts a container. Records its arguments (one per line)
+# in $STUB_DOCKER_LOG when set. Behaviour is chosen by $STUB_SCENARIO:
+#   dockerfail   exit 1 and print what a Python traceback of a missing CA would look like on stderr
+#   anything else: exit 0
+set -euo pipefail
+
+if [ -n "${STUB_DOCKER_LOG:-}" ]; then
+  printf '%s\n' "$@" >"$STUB_DOCKER_LOG"
+fi
+if [ "${STUB_SCENARIO:-ok}" = "dockerfail" ]; then
+  echo "missing root CA(s): DigiCert Global Root G2" >&2
+  exit 1
+fi

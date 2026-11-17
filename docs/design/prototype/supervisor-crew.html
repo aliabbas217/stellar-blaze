@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="supervisor">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crew plan · Supervisor · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  html { scroll-padding-block-end: calc(var(--space-24) + var(--space-4)); } /* focus must not end up behind the sticky Stop work bar (WCAG 2.2 2.4.11) */
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  .crumbs ol { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .crumbs li + li::before { content: "\203A" / ""; margin-inline-end: var(--space-2); }
+  .crumbs [aria-current="page"] { color: var(--ink); font-weight: 600; }
+  .banner .btn svg, .banner .reqid svg { inline-size: 1.25rem; block-size: 1.25rem; }
+  .stamp svg { inline-size: 1rem; block-size: 1rem; flex: none; }
+
+  /* product top bar: site, date, theme */
+  .desk-top__inner { padding-block: var(--space-2); }
+  .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); inline-size: 100%; }
+  @media (min-width: 48rem) { .tools { display: flex; flex-wrap: wrap; align-items: end; } }
+  @media (min-width: 64rem) { .tools { inline-size: auto; margin-inline-start: auto; } }
+  .tool { display: grid; gap: var(--space-1); min-inline-size: 0; }
+  .tool--site { grid-column: 1 / -1; }
+  .tool__label { font-size: var(--size-label); color: var(--ink-muted); }
+  .tool .select { min-block-size: var(--space-8); padding-block: var(--space-1); }
+  @media (min-width: 48rem) { .tool .select { inline-size: calc(var(--space-16) * 2); } .tool--site .select { inline-size: calc(var(--space-16) * 4); } }
+  .tool__val { display: flex; align-items: center; min-block-size: var(--space-8); gap: var(--space-1); }
+
+  /* head: crew name + level now */
+  .head { display: grid; gap: var(--space-4); }
+  @media (min-width: 48rem) { .head { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
+
+  /* plan timeline: types differ by fill, border style and label, never by level colour */
+  .tl-strip { position: relative; padding-block-start: var(--space-6); }
+  .tl { display: flex; gap: var(--shade-cell-gap); block-size: var(--space-16); }
+  .tl > li { flex-basis: 0; flex-shrink: 1; min-inline-size: 0; }
+  .tl > li.is-selected { outline: var(--focus-width) solid var(--focus); outline-offset: var(--focus-offset); position: relative; z-index: 1; }
+  .m15 { flex-grow: 15; }
+  .m20 { flex-grow: 20; }
+  .m30 { flex-grow: 30; }
+  .m40 { flex-grow: 40; }
+  .m45 { flex-grow: 45; }
+  .m60 { flex-grow: 60; }
+  .m120 { flex-grow: 120; }
+  .m150 { flex-grow: 150; }
+  .seg { display: grid; place-items: center; block-size: 100%; inline-size: 100%; overflow: hidden; }
+  .seg__label { display: none; font-weight: 700; font-size: var(--size-label); white-space: nowrap; }
+  @media (min-width: 48rem) { .tl > li[data-long] .seg__label { display: block; } }
+  .k-work { background: var(--ink); color: var(--surface); }
+  .k-rest { background: var(--surface); color: var(--ink); border: var(--rule) solid var(--ink); }
+  .k-break { background: var(--surface-raised); color: var(--ink); border: var(--space-1) double var(--ink); }
+  .k-ban { background: var(--viz-ban), var(--surface); color: var(--ink); border: var(--rule) dashed var(--ink); }
+  .k-ban .seg__label { background: var(--surface); padding-inline: var(--space-2); }
+  .k-stop { background: var(--ink-muted); color: var(--surface); border: var(--rule) solid var(--ink); }
+  .tl-now { position: absolute; inset-block: 0; inset-inline-start: calc(100% * 9 / 11); border-inline-start: var(--rule) solid var(--ink); pointer-events: none; }
+  .tl-now span { position: absolute; inset-block-start: 0; inset-inline-start: 0; background: var(--ink); color: var(--surface); font-size: var(--size-label); font-weight: 700; padding-inline: var(--space-2); white-space: nowrap; }
+  .tl-axis { display: flex; font-size: var(--size-label); color: var(--ink-muted); font-variant-numeric: tabular-nums; margin-block-start: var(--space-1); }
+  .tl-axis li { flex: 1 1 0; min-inline-size: 0; }
+  .swatch { display: inline-block; flex: none; inline-size: var(--space-8); block-size: var(--space-4); }
+  .legend .swatch { vertical-align: middle; }
+  .seg-btn { display: inline-flex; align-items: center; gap: var(--space-2); min-block-size: var(--space-8); padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: start; }
+  .seg-btn[aria-pressed="true"] { text-decoration: underline; text-decoration-thickness: var(--rule); text-underline-offset: 0.2em; }
+  .why th, .why td { vertical-align: middle; }
+  .why th[scope="row"], .why td:nth-child(2) { white-space: nowrap; }
+  @media (max-width: 47.99rem) {
+    .why thead { position: absolute; inline-size: var(--rule-hairline); block-size: var(--rule-hairline); overflow: hidden; clip-path: inset(50%); }
+    .why, .why tbody { display: block; }
+    .why tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); padding-block: var(--space-3); border-block-end: var(--rule-hairline) solid var(--hairline); }
+    .why th, .why td { display: block; padding: 0; border: 0; }
+    .why td:nth-child(3) { grid-column: 1 / -1; }
+  }
+  .kv--pay { grid-template-columns: minmax(0, 1fr) auto; }
+  .kv--pay dd { text-align: end; }
+  .kv--pay .slot-key { text-align: end; }
+
+  /* page columns */
+  .cols { display: grid; gap: var(--space-8); }
+  @media (min-width: 64rem) { .cols { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: start; } }
+  .side { display: grid; gap: var(--space-8); align-content: start; }
+  .iconline { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-2); align-items: start; }
+  .check input { inline-size: var(--space-6); block-size: var(--space-6); }
+  .signform fieldset { display: grid; gap: var(--space-3); }
+  .signform legend { font-weight: 600; margin-block-end: var(--space-2); }
+  .err svg { inline-size: 1.25rem; block-size: 1.25rem; flex: none; }
+
+  /* Stop work: always visible, never behind a dialog */
+  .stopbar { position: sticky; inset-block-end: 0; z-index: 10; background: var(--surface); border-block-start: var(--rule) solid var(--ink); }
+  .stopbar__inner { max-inline-size: var(--content-max); margin-inline: auto; padding: var(--space-3) var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: center; justify-content: space-between; }
+  @media (min-width: 48rem) { .stopbar__inner { padding-inline: var(--space-8); } }
+  .stopbar .btn--stop { min-block-size: var(--space-16); padding-inline: var(--space-8); }
+  .stopbar .btn--stop svg { inline-size: var(--space-6); block-size: var(--space-6); }
+  .btn[hidden], [hidden] { display: none; }
+  .toast { max-inline-size: var(--content-max); margin-inline: auto; padding: var(--space-3) var(--space-4) 0; }
+  @media (min-width: 48rem) { .toast { padding-inline: var(--space-8); } }
+
+  .sk-band { block-size: calc(var(--space-16) + var(--space-8)); }
+  .sk-tl { block-size: calc(var(--space-16) + var(--space-12)); }
+  .sk-table { block-size: calc(var(--space-24) * 3); }
+  .sk-card { block-size: calc(var(--space-24) * 2); }
+  .sk-line { block-size: var(--space-8); inline-size: 40%; }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error,partial,signed,stale,suppressed">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Supervisor</span>
+    <form class="tools" aria-label="Site, date and theme" onsubmit="return false">
+      <div class="tool tool--site"><label class="tool__label" for="tool-site">Site</label>
+        <select class="select" id="tool-site" name="site"><option>Musaffah demo yard</option><option>⟨Another site⟩</option></select></div>
+      <div class="tool"><span class="tool__label">Date</span><p class="tool__val"><strong>Today</strong> <span class="t-num">⟨date⟩</span></p></div>
+      <div class="tool"><label class="tool__label" for="tool-theme">Theme</label>
+        <select class="select" id="tool-theme" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+    </form>
+  </div>
+</header>
+
+<main id="main" class="desk stack stack-8">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="index.html">Supervisor</a></li>
+      <li><a href="supervisor-crews.html">Crews today</a></li>
+      <li><a href="supervisor-crew.html" aria-current="page" data-crew>Crew A</a></li>
+    </ol>
+  </nav>
+
+  <header class="head">
+    <div class="vs-2">
+      <h1 class="t-display" data-crew>Crew A</h1>
+      <p class="t-label">Members <span class="slot">###</span> <span class="slot-key">crew.member_count</span></p>
+    </div>
+    <div class="vs-2">
+      <p class="t-label t-muted">Crew level now</p>
+      <article class="sign lv-red" aria-label="Crew level now: Red, level 4, until 17:00">
+        <div class="sign__plate sign__plate--wide">
+          <div class="sign__num"><svg class="ico sign__picto"><use href="#i-red"/></svg><span class="t-numeral">4</span></div>
+          <p class="sign__name">Red</p>
+          <p class="sign__when t-num">Until 17:00</p>
+        </div>
+      </article>
+    </div>
+  </header>
+
+  <!-- FLOOR BANNER: on every plan view, every state (ADR 0011 section 7, invariant 2) -->
+  <aside class="banner banner--floor" aria-label="Planning floor">
+    <svg class="ico"><use href="#i-info"/></svg>
+    <p><strong>Green is not permission to extend work. Legal and ADOSH minimums still apply. Advisory only; the employer remains the duty-holder.</strong></p>
+  </aside>
+
+  <!-- PARTIAL: unsigned fallback -->
+  <div data-state="partial" class="banner" role="status">
+    <svg class="ico"><use href="#i-warn"/></svg>
+    <div class="vs-1">
+      <p><strong>Unsigned. Crews see the rule plan.</strong></p>
+      <p class="t-label">Alerts and Stop work do not wait for sign-off. Sign below when you have read the plan.</p>
+    </div>
+  </div>
+  <!-- STALE: forecast too old, rule plan shown -->
+  <div data-state="stale" class="banner" role="status">
+    <svg class="ico"><use href="#i-offline"/></svg>
+    <div class="vs-1">
+      <p><strong>Forecast last updated 09:40</strong></p>
+      <p class="t-label">It is more than 3 hours old, so this is the rule plan, never less protective than the midday ban. Crews see the same plan.</p>
+    </div>
+  </div>
+
+  <!-- IDEAL, PARTIAL, SIGNED, STALE, SUPPRESSED: the plan -->
+  <div data-state="ideal partial signed stale suppressed" class="stack stack-8">
+
+    <section class="vs-3" aria-labelledby="band-h">
+      <h2 id="band-h" class="panel-title">Crew level by hour</h2>
+      <div class="band-scroll" tabindex="0" role="region" aria-label="Crew level by hour, scrolls sideways on narrow screens">
+        <ol class="band" aria-label="Crew level by hour, 06:00 to 20:00">
+        <li aria-label="06:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">06</span></li>
+        <li aria-label="07:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">07</span></li>
+        <li aria-label="08:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">08</span></li>
+        <li aria-label="09:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">09</span></li>
+        <li aria-label="10:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">10</span></li>
+        <li aria-label="11:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">11</span></li>
+        <li aria-label="12:00, Orange, level 3, midday break from 12:30" class="is-ban"><div class="cell lv-orange"><b>3</b></div><span class="hr">12</span></li>
+        <li aria-label="13:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">13</span></li>
+        <li aria-label="14:00, Red, level 4, midday break" class="is-ban"><div class="cell lv-red"><b>4</b></div><span class="hr">14</span></li>
+        <li aria-label="15:00, Red, level 4, now" aria-current="time"><div class="cell lv-red"><b>4</b></div><span class="hr">15</span></li>
+        <li aria-label="16:00, Red, level 4"><div class="cell lv-red"><b>4</b></div><span class="hr">16</span></li>
+        <li aria-label="17:00, Orange, level 3"><div class="cell lv-orange"><b>3</b></div><span class="hr">17</span></li>
+        <li aria-label="18:00, Amber, level 2"><div class="cell lv-amber"><b>2</b></div><span class="hr">18</span></li>
+        <li aria-label="19:00, Green, level 1"><div class="cell lv-green"><b>1</b></div><span class="hr">19</span></li>
+        </ol>
+      </div>
+      <p id="band-note" class="t-label t-muted">Dashed outline: midday break 12:30 to 15:00. Dark hour: now. Range for the next hour: level ⟨low⟩ to ⟨high⟩ <span class="slot-key">crew.level_range_next_hour</span></p>
+      <p><span>Share of crew above Amber</span>
+        <strong data-state="ideal partial signed stale"> <span class="slot">###</span> <span class="slot-key">crew.share_above_amber</span></strong>
+        <span data-state="suppressed" class="suppressed iconline"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-lock"/></svg><span>Fewer than 5 people, detail hidden to protect privacy</span></span></p>
+    </section>
+
+    <section class="vs-4" aria-labelledby="plan-h">
+      <div class="spread">
+        <h2 id="plan-h" class="t-headline">Plan for today</h2>
+        <p class="cluster">
+          <span class="stamp" data-state="partial">Unsigned fallback</span>
+          <span class="stamp" data-state="stale">Rule plan fallback</span>
+          <span class="stamp stamp--quiet">Placeholder plan, pattern only</span>
+        </p>
+      </div>
+      <ul class="legend" aria-label="Block types">
+        <li><span class="swatch k-work" aria-hidden="true"></span>Work</li>
+        <li><span class="swatch k-rest" aria-hidden="true"></span>ADOSH rest</li>
+        <li><span class="swatch k-break" aria-hidden="true"></span>Art. 18 break</li>
+        <li><span class="swatch k-ban" aria-hidden="true"></span>Ban</li>
+        <li><span class="swatch k-stop" aria-hidden="true"></span>Stopped</li>
+      </ul>
+      <div class="tl-wrap" aria-hidden="true">
+        <div class="tl-strip">
+          <div class="tl-now"><span>Now</span></div>
+          <ol class="tl">
+        <li class="m120" data-long><span class="seg k-work"><span class="seg__label">Work</span></span></li>
+        <li class="m15"><span class="seg k-rest"><span class="seg__label">ADOSH rest</span></span></li>
+        <li class="m45"><span class="seg k-work"><span class="seg__label">Work</span></span></li>
+        <li class="m15"><span class="seg k-rest"><span class="seg__label">ADOSH rest</span></span></li>
+        <li class="m45"><span class="seg k-work"><span class="seg__label">Work</span></span></li>
+        <li class="m40"><span class="seg k-rest"><span class="seg__label">ADOSH rest</span></span></li>
+        <li class="m20"><span class="seg k-work"><span class="seg__label">Work</span></span></li>
+        <li class="m60" data-long><span class="seg k-break"><span class="seg__label">Art. 18</span></span></li>
+        <li class="m30"><span class="seg k-work"><span class="seg__label">Work</span></span></li>
+        <li class="m150" data-long><span class="seg k-ban"><span class="seg__label">Ban</span></span></li>
+        <li class="m120" data-long><span class="seg k-stop"><span class="seg__label">Stopped</span></span></li>
+          </ol>
+        </div>
+        <ol class="tl-axis">
+        <li>06</li>
+        <li>07</li>
+        <li>08</li>
+        <li>09</li>
+        <li>10</li>
+        <li>11</li>
+        <li>12</li>
+        <li>13</li>
+        <li>14</li>
+        <li>15</li>
+        <li>16</li>
+        </ol>
+      </div>
+      <p class="t-label t-muted measure">Blocks are grouped from 5 minute ticks. The table lists every block with the clause behind it. Pick a block name to find it on the strip.</p>
+    </section>
+
+    <div class="cols">
+      <section class="vs-3" aria-labelledby="why-h">
+        <h2 id="why-h" class="panel-title">Why each block is there</h2>
+        <div class="table-scroll">
+          <table class="table why" role="table">
+            <caption class="sr-only">Plan blocks with their time and the clause behind each</caption>
+            <thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Block</th><th scope="col" role="columnheader">Time</th><th scope="col" role="columnheader">Clause</th></tr></thead>
+            <tbody role="rowgroup">
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="0"><span class="swatch k-work" aria-hidden="true"></span><span>Work</span></button></th>
+          <td class="t-num" role="cell">06:00 to 08:00</td>
+          <td role="cell">ADOSH Table 1, Low zone: self-paced work</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="1"><span class="swatch k-rest" aria-hidden="true"></span><span>ADOSH rest</span></button></th>
+          <td class="t-num" role="cell">08:00 to 08:15</td>
+          <td role="cell">ADOSH Table 1, Medium zone, heavy work: 45 work / 15 rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="2"><span class="swatch k-work" aria-hidden="true"></span><span>Work</span></button></th>
+          <td class="t-num" role="cell">08:15 to 09:00</td>
+          <td role="cell">ADOSH Table 1, Medium zone, heavy work: 45 work / 15 rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="3"><span class="swatch k-rest" aria-hidden="true"></span><span>ADOSH rest</span></button></th>
+          <td class="t-num" role="cell">09:00 to 09:15</td>
+          <td role="cell">ADOSH Table 1, Medium zone, heavy work: 45 work / 15 rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="4"><span class="swatch k-work" aria-hidden="true"></span><span>Work</span></button></th>
+          <td class="t-num" role="cell">09:15 to 10:00</td>
+          <td role="cell">ADOSH Table 1, Medium zone, heavy work: 45 work / 15 rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="5"><span class="swatch k-rest" aria-hidden="true"></span><span>ADOSH rest</span></button></th>
+          <td class="t-num" role="cell">10:00 to 10:40</td>
+          <td role="cell">ADOSH Table 1, High zone, heavy work: 20 work / 40 rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="6"><span class="swatch k-work" aria-hidden="true"></span><span>Work</span></button></th>
+          <td class="t-num" role="cell">10:40 to 11:00</td>
+          <td role="cell">ADOSH Table 1, High zone, heavy work: 20 work / 40 rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="7"><span class="swatch k-break" aria-hidden="true"></span><span>Art. 18 break</span></button></th>
+          <td class="t-num" role="cell">11:00 to 12:00</td>
+          <td role="cell">Art. 18: a 1 hour break before 5 hours of work in a row. Ban time and ADOSH rest are not credited (protective reading, open question for counsel)</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="8"><span class="swatch k-work" aria-hidden="true"></span><span>Work</span></button></th>
+          <td class="t-num" role="cell">12:00 to 12:30</td>
+          <td role="cell">ADOSH Table 1, ⟨zone⟩, ⟨workload⟩: ⟨work⟩ work / ⟨rest⟩ rest</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="9"><span class="swatch k-ban" aria-hidden="true"></span><span>Ban</span></button></th>
+          <td class="t-num" role="cell">12:30 to 15:00</td>
+          <td role="cell">Midday ban, MR 44/2022 Art. 3: no outdoor work 12:30 to 15:00, 15 Jun to 15 Sep</td>
+        </tr>
+        <tr role="row">
+          <th scope="row" role="rowheader"><button class="seg-btn" type="button" aria-pressed="false" data-seg="10"><span class="swatch k-stop" aria-hidden="true"></span><span>Stopped</span></button></th>
+          <td class="t-num" role="cell">15:00 to 17:00</td>
+          <td role="cell">Stop-work rule: all work stops while the level is Red. A crew lead can also stop at any time</td>
+        </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="side">
+        <section class="card vs-3" aria-labelledby="pay-h">
+          <div class="spread"><h2 id="pay-h" class="panel-title">Pay impact</h2><span class="stamp stamp--quiet">Display only</span></div>
+          <dl class="kv kv--pay">
+            <dt>Paid hours</dt><dd><span class="slot">###</span><span class="slot-key">pay.paid_hours</span></dd>
+            <dt>Overtime</dt><dd><span class="slot">###</span><span class="slot-key">pay.overtime_hours</span></dd>
+            <dt>ADOSH rest and heat stops, priced as paid working time</dt><dd><span class="slot">###</span><span class="slot-key">pay.rest_paid_minutes</span></dd>
+          </dl>
+          <p class="t-label t-muted">Shown for information. It never blocks, delays or needs approval for a stop, a rest or a plan.</p>
+        </section>
+
+        <section class="card vs-4" id="signoff" aria-labelledby="so-h">
+          <h2 id="so-h" class="panel-title">Sign-off</h2>
+
+          <div data-state="signed" class="vs-3">
+            <div class="banner" role="status">
+              <svg class="ico"><use href="#i-proof"/></svg>
+              <div class="vs-1"><p><strong>Signed by ⟨supervisor name⟩ at ⟨time⟩</strong></p><p class="t-label">Crews see this plan. Sign-off is on the record for the employer of record.</p></div>
+            </div>
+          </div>
+
+          <form id="signform" class="signform vs-4" data-state="ideal partial stale suppressed" novalidate aria-label="Sign off this plan">
+            <fieldset>
+              <legend>Acknowledge each item to sign</legend>
+              <div class="check"><input type="checkbox" id="ack1" name="ack"><label for="ack1">Changed since the last accepted plan: ⟨change⟩ <span class="slot-key">plan.changed_items</span></label></div>
+              <div class="check"><input type="checkbox" id="ack2" name="ack"><label for="ack2">Medium zone work, 08:15 to 10:00</label></div>
+              <div class="check"><input type="checkbox" id="ack3" name="ack"><label for="ack3">High zone work, 10:40 to 11:00</label></div>
+            </fieldset>
+            <div class="field">
+              <label for="reason">Reason code, only if you deviate from this plan</label>
+              <select class="select" id="reason" name="reason">
+                <option>No deviation</option>
+                <option>⟨Reason code 1 from the reviewed list⟩</option>
+                <option>⟨Reason code 2 from the reviewed list⟩</option>
+                <option>⟨Reason code 3 from the reviewed list⟩</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="signer">Your name, as supervisor of the employer of record</label>
+              <input class="input" id="signer" name="signer" autocomplete="name">
+            </div>
+            <p class="err" id="so-err" data-state="on-submit" role="alert"><svg class="ico"><use href="#i-warn"/></svg><span>Tick every item and enter your name to sign.</span></p>
+            <button class="btn btn--primary" type="submit">Sign off this plan</button>
+            <p class="t-label t-muted">Signing never delays an alert or a stop.</p>
+          </form>
+        </section>
+
+        <section class="vs-3" aria-label="Crew relay">
+          <p class="t-label t-muted measure">Brief the crew: a full-screen level, a bulletin, audio and a printable card.</p>
+          <a class="btn btn--primary" data-state="signed" href="supervisor-relay.html" data-relay><svg class="ico"><use href="#i-speaker"/></svg>Open crew relay</a>
+          <a class="btn" data-state="ideal partial stale suppressed" href="supervisor-relay.html" data-relay><svg class="ico"><use href="#i-speaker"/></svg>Open crew relay</a>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING: timeline and panels at their final dimensions -->
+  <section data-state="loading" class="vs-4" aria-busy="true" aria-label="Loading the plan">
+    <div class="skel sk-line"></div>
+    <div class="skel sk-band"></div>
+    <div class="skel sk-line"></div>
+    <div class="skel sk-tl"></div>
+    <div class="skel sk-table"></div>
+    <div class="skel sk-card"></div>
+    <p class="sr-only" role="status">Loading</p>
+  </section>
+
+  <!-- EMPTY: no tasks entered -->
+  <section data-state="empty" class="empty" aria-labelledby="empty-h">
+    <svg class="ico empty__picto"><use href="#i-today"/></svg>
+    <h2 id="empty-h" class="t-headline">Add today's tasks to get a plan</h2>
+    <p class="t-lead measure">A plan needs the tasks this crew will do, so rest and breaks can be placed around them. The level above does not need tasks.</p>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="supervisor-crew.html">Use the common roster</a>
+      <a class="link" href="#">Import tasks (CSV)</a>
+    </div>
+  </section>
+
+  <!-- ERROR: planner failure. Crews are never left blank. -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="err-h">
+    <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+    <h2 id="err-h" class="t-headline">The plan did not load</h2>
+    <p class="measure"><strong>Crews see the rule plan meanwhile.</strong> Alerts and Stop work are not affected.</p>
+    <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+    <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+  </section>
+</main>
+
+<!-- Stop work: sticky, visible in every state; no confirmation dialog, a 10 second undo instead -->
+<div class="stopbar">
+  <div id="toast" class="toast" hidden>
+    <div class="banner" role="status">
+      <svg class="ico"><use href="#i-stop"/></svg>
+      <p><strong data-crew>Crew A</strong>: work is stopped and crews are alerted. An audit row is written. <button class="btn btn--sm" type="button" id="undo">Undo <span id="undo-n" class="t-num">10</span></button></p>
+    </div>
+  </div>
+  <div class="stopbar__inner">
+    <p class="t-label"><strong data-crew>Crew A</strong>. Stops work for this crew now. No approval needed.</p>
+    <button class="btn btn--stop" type="button" id="stop"><svg class="ico"><use href="#i-stop"/></svg>Stop work</button>
+  </div>
+</div>
+
+<script src="assets/proto.js"></script>
+<script>
+  /* Prototype behaviour: theme select, crew name from ?crew=, block highlight, sign-off check, stop with undo. */
+  (() => {
+    const params = new URLSearchParams(location.search);
+    const crew = params.get("crew") || "Crew A";
+    document.querySelectorAll("[data-crew]").forEach((el) => (el.textContent = crew));
+    document.querySelectorAll("[data-relay]").forEach((a) => (a.href = "supervisor-relay.html?crew=" + encodeURIComponent(crew)));
+    document.title = crew + " · Crew plan · Supervisor · Stellar Blaze prototype";
+
+    const theme = document.getElementById("tool-theme");
+    const t = params.get("theme");
+    theme.value = t === "light" || t === "dark" ? t : "system";
+    theme.addEventListener("change", () => {
+      const p = new URLSearchParams(location.search);
+      if (theme.value === "system") p.delete("theme"); else p.set("theme", theme.value);
+      location.search = p.toString();
+    });
+
+    const segs = [...document.querySelectorAll(".tl > li")];
+    const btns = [...document.querySelectorAll(".seg-btn")];
+    btns.forEach((b) => b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      btns.forEach((x, i) => { x.setAttribute("aria-pressed", "false"); segs[i].classList.remove("is-selected"); });
+      if (on) { b.setAttribute("aria-pressed", "true"); segs[+b.dataset.seg].classList.add("is-selected"); }
+    }));
+
+    const form = document.getElementById("signform");
+    const err = document.getElementById("so-err");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const acks = [...form.querySelectorAll('input[name="ack"]')];
+      const signer = document.getElementById("signer");
+      const missing = acks.find((c) => !c.checked);
+      const ok = !missing && signer.value.trim();
+      err.classList.toggle("is-shown", !ok);
+      if (missing) missing.focus(); else if (!signer.value.trim()) signer.focus();
+      if (ok) { params.set("state", "signed"); location.search = params.toString(); }
+    });
+
+    const stop = document.getElementById("stop");
+    const toast = document.getElementById("toast");
+    const undo = document.getElementById("undo");
+    const n = document.getElementById("undo-n");
+    let timer = null;
+    stop.addEventListener("click", () => {
+      toast.hidden = false;
+      let left = 10; n.textContent = left; undo.hidden = false;
+      clearInterval(timer);
+      timer = setInterval(() => { left -= 1; n.textContent = left; if (left <= 0) { clearInterval(timer); undo.hidden = true; } }, 1000);
+    });
+    undo.addEventListener("click", () => { clearInterval(timer); toast.hidden = true; });
+  })();
+</script>
+</body>
+</html>

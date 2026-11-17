@@ -1,0 +1,235 @@
+{
+  "evaluation_set": "dev_2025",
+  "evaluation_label": "DEV 2025, LOCO out-of-fold: not the result",
+  "station": "OMAA",
+  "site_id": "site-demo-mussafah",
+  "crew_id": "crew-b",
+  "crew_label": "SIMULATED crew: 20 experienced adults, heavy work",
+  "headcount": 20,
+  "roster": "L1: 06:00-11:00 + 15:00-18:00 GST",
+  "season_start": "2025-07-01",
+  "season_end": "2025-07-10",
+  "n_days": 10,
+  "ruleset_id": "ae-heat-2026.1",
+  "ruleset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fixture_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "rows": [
+    {
+      "plan": "naive",
+      "label": "Ban only",
+      "violation_minutes_per_season": {
+        "value": 240,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 220,
+          "hi": 260
+        }
+      },
+      "high_cycled_share": {
+        "value": 0.12,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 0.07,
+          "hi": 0.17
+        }
+      },
+      "missed_protection_ticks": {
+        "value": 410,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 385,
+          "hi": 435
+        }
+      },
+      "rest_minutes_added_vs_naive": {
+        "value": 0,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": null
+      }
+    },
+    {
+      "plan": "ban_only",
+      "label": "Ban only",
+      "violation_minutes_per_season": {
+        "value": 240,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 220,
+          "hi": 260
+        }
+      },
+      "high_cycled_share": {
+        "value": 0.12,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 0.07,
+          "hi": 0.17
+        }
+      },
+      "missed_protection_ticks": {
+        "value": 410,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 385,
+          "hi": 435
+        }
+      },
+      "rest_minutes_added_vs_naive": {
+        "value": 0,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": null
+      }
+    },
+    {
+      "plan": "rule_raw",
+      "label": "Rules on raw forecast",
+      "violation_minutes_per_season": {
+        "value": 90,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 70,
+          "hi": 110
+        }
+      },
+      "high_cycled_share": {
+        "value": 0.46,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 0.41,
+          "hi": 0.51
+        }
+      },
+      "missed_protection_ticks": {
+        "value": 160,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 135,
+          "hi": 185
+        }
+      },
+      "rest_minutes_added_vs_naive": {
+        "value": 55,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 40,
+          "hi": 70
+        }
+      }
+    },
+    {
+      "plan": "rule_corrected",
+      "label": "Rules on corrected forecast",
+      "violation_minutes_per_season": {
+        "value": 30,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 10,
+          "hi": 50
+        }
+      },
+      "high_cycled_share": {
+        "value": 0.71,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 0.66,
+          "hi": 0.76
+        }
+      },
+      "missed_protection_ticks": {
+        "value": 70,
+        "n": 1080,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 45,
+          "hi": 95
+        }
+      },
+      "rest_minutes_added_vs_naive": {
+        "value": 80,
+        "n": 10,
+        "anchor": "#73-plans-row",
+        "ci": {
+          "lo": 65,
+          "hi": 95
+        }
+      }
+    }
+  ],
+  "identical_by_construction": [
+    "naive",
+    "ban_only"
+  ],
+  "verdicts": [
+    {
+      "id": "H6",
+      "primary": true,
+      "statement": "SYNTHETIC H6: the corrected-forecast plan has fewer violation minutes than ban only (shape fixture, not a result).",
+      "outcome": "supported",
+      "comparisons": [
+        {
+          "metric": "violation_minutes_per_season",
+          "subject": "rule_corrected",
+          "baseline": "naive",
+          "difference": {
+            "value": -210,
+            "n": 10,
+            "anchor": "#73-plans-row",
+            "ci": {
+              "lo": -262.5,
+              "hi": -157.5
+            }
+          }
+        }
+      ],
+      "text": "SYNTHETIC H6: the corrected-forecast plan has fewer violation minutes than ban only (shape fixture, not a result). Supported on made-up numbers."
+    },
+    {
+      "id": "H7",
+      "primary": false,
+      "statement": "SYNTHETIC H7: the corrected-forecast plan misses fewer protection ticks than the raw-forecast plan (shape fixture, not a result).",
+      "outcome": "supported",
+      "comparisons": [
+        {
+          "metric": "missed_protection_ticks",
+          "subject": "rule_corrected",
+          "baseline": "rule_raw",
+          "difference": {
+            "value": -90,
+            "n": 10,
+            "anchor": "#73-plans-row",
+            "ci": {
+              "lo": -112.5,
+              "hi": -67.5
+            }
+          }
+        }
+      ],
+      "text": "SYNTHETIC H7: the corrected-forecast plan misses fewer protection ticks than the raw-forecast plan (shape fixture, not a result). Supported on made-up numbers."
+    }
+  ],
+  "provenance": {
+    "protocol_path": "docs/protocol/synthetic-shape-fixture.md",
+    "protocol_anchor": "#synthetic-shape-fixture",
+    "script": "tests.fixtures.eval.synthetic",
+    "function": "build_synthetic_eval",
+    "git_sha": "0000000000000000000000000000000000000000",
+    "data_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "model_id": "synthetic-shape-fixture",
+    "label": "SIMULATED",
+    "generated_at": "2026-11-14T00:00:00Z"
+  }
+}

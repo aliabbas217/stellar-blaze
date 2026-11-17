@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="demo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Governance refusal · Replay · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* proposed shared: proto.css defines .stack-2/3/6/8 only, so an undefined .stack-1/.stack-4 inherits the parent's --stack */
+  .stack-1 { --stack: var(--space-1); }
+  .stack-4 { --stack: var(--space-4); }
+  .panes { display: grid; gap: var(--space-8); grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 64rem) { .panes { grid-template-columns: minmax(0, 1fr) minmax(0, 24rem); } }
+
+  /* proposed shared: an HTTP status plate (ink frame, no level colour: a refusal is not a heat level) */
+  .status { display: flex; align-items: center; gap: var(--space-4); inline-size: fit-content; max-inline-size: 100%;
+            padding: var(--space-2) var(--space-4); border: var(--rim-width) solid var(--sign-rim); border-radius: var(--radius-sign); background: var(--surface-raised); }
+  .status svg { inline-size: var(--space-8); block-size: var(--space-8); flex: none; }
+  .status .code { font-family: var(--font-display); font-weight: 700; font-size: var(--size-display); line-height: var(--leading-solid); font-variant-numeric: tabular-nums; }
+  .status .word { font-family: var(--font-display); font-weight: 600; font-size: var(--size-headline); letter-spacing: var(--tracking-signage); text-transform: uppercase; }
+
+  /* proposed shared: formatted problem+json body */
+  .problem { margin: 0; padding: var(--space-4); border: var(--rule-hairline) solid var(--hairline); border-radius: var(--radius-sign); background: var(--surface);
+             font-family: var(--font-mono); font-size: var(--size-label); line-height: var(--leading-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .problem .k { color: var(--ink-muted); }
+
+  /* employer console frame */
+  .console { display: grid; gap: var(--space-4); }
+  .console .field + .field { margin-block-start: 0; }
+
+  /* worker audit list inside the phone */
+  .phone .worker-top { flex-wrap: wrap; }
+  .audit { display: grid; gap: var(--space-3); }
+  .audit .card { display: grid; gap: var(--space-2); }
+
+  /* CI test names, plain list items */
+  .tests { display: grid; gap: 0; border-block-start: var(--rule-hairline) solid var(--hairline); }
+  .tests li { display: grid; gap: var(--space-1) var(--space-6); padding-block: var(--space-3); border-block-end: var(--rule-hairline) solid var(--hairline); }
+  @media (min-width: 64rem) { .tests li { grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); align-items: baseline; } }
+  .tests code { font-family: var(--font-mono); font-size: var(--size-label); overflow-wrap: anywhere; }
+</style>
+</head>
+<body data-states="ideal,loading,empty,error">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="desk-top">
+  <div class="desk-top__inner">
+    <a class="brand" href="index.html">Stellar Blaze</a>
+    <span class="t-label t-muted">Replay: summer 2026, replayed honestly</span>
+  </div>
+</header>
+<nav class="rail" aria-label="Replay steps">
+  <ol>
+    <li><a href="replay-season.html">Season</a></li>
+    <li><a href="replay-day.html">Day</a></li>
+    <li><a href="replay-validator.html">Try a plan</a></li>
+    <li><a href="replay-frontier.html">Frontier</a></li>
+    <li><a href="replay-climate.html">Warmer summer</a></li>
+    <li><a href="replay-governance.html" aria-current="step">Governance</a></li>
+    <li><a href="replay-faults.html">Break things</a></li>
+    <li><a href="replay-next.html">What's next</a></li>
+  </ol>
+</nav>
+
+<main id="main" class="desk stack stack-8">
+  <header class="stack stack-3">
+    <h1 class="t-display">An employer asks for one worker's data</h1>
+    <p class="t-lead measure">There is no route for an employer to reach an individual's heat risk. Send the request and watch what the system answers, and what the worker is then shown.</p>
+    <p class="cluster">
+      <span class="stamp">Simulated session</span>
+      <span class="stamp stamp--quiet">Placeholder ids</span>
+    </p>
+  </header>
+
+  <div class="panes">
+    <!-- LEFT: employer console -->
+    <div class="stack stack-6">
+      <h2 class="t-headline">Employer console</h2>
+      <form id="req" class="card console" novalidate aria-labelledby="req-h">
+        <p class="t-label t-muted">Signed in as an employer account, ⟨employer⟩.</p>
+        <h3 id="req-h" class="panel-title">Request individual heat risk for worker ⟨id⟩</h3>
+        <div class="field">
+          <label for="wid">Worker id</label>
+          <input class="input t-mono" id="wid" name="wid" value="⟨worker-id⟩" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="purpose">Purpose</label>
+          <select class="select" id="purpose" name="purpose">
+            <option>Safety check</option>
+            <option>Attendance and pay</option>
+            <option>Performance review</option>
+          </select>
+          <p class="hint">Any purpose gets the same answer.</p>
+        </div>
+        <div><button class="btn btn--primary" type="submit" id="send">Send request</button></div>
+      </form>
+
+      <section class="stack stack-4" aria-labelledby="resp-h" aria-live="polite">
+        <h3 id="resp-h" class="t-title">Response</h3>
+
+        <div data-state="empty" class="empty">
+          <svg class="ico empty__picto"><use href="#i-lock"/></svg>
+          <p class="t-headline">Send the request to see what happens</p>
+          <p class="measure">Nothing has been sent, so nothing is recorded and the worker's list on the right is empty.</p>
+          <button class="btn btn--primary" type="button" data-send>Send the request</button>
+        </div>
+
+        <div data-state="loading" class="stack stack-3" aria-busy="true">
+          <div class="skel" style="block-size: var(--space-12); max-inline-size: 16rem"></div>
+          <div class="skel" style="block-size: 11rem"></div>
+          <p class="sr-only" role="status">Waiting for the API</p>
+        </div>
+
+        <div data-state="ideal" class="stack stack-4">
+          <p class="status" id="status403" tabindex="-1"><svg class="ico"><use href="#i-lock"/></svg><span class="code">403</span><span class="word">Forbidden</span></p>
+          <p class="t-mono t-label">content-type: application/problem+json</p>
+          <pre class="problem" tabindex="0" aria-label="Problem body"><code>{
+  <span class="k">"type"</span>: "https://⟨api-host⟩/problems/⟨problem-type⟩",
+  <span class="k">"title"</span>: "Employers have no route to individual data",
+  <span class="k">"status"</span>: 403,
+  <span class="k">"detail"</span>: "Individual heat risk is worked out on the worker's phone. No employer role has an endpoint that returns it, for any purpose.",
+  <span class="k">"request_id"</span>: "⟨req-id⟩"
+}</code></pre>
+          <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+          <p class="measure">The refusal was written to the audit list. The worker sees it on the right.</p>
+          <p><button class="btn btn--sm" type="button" data-reset>Start again</button></p>
+        </div>
+
+        <div data-state="error" class="error" role="alert">
+          <svg class="ico empty__picto"><use href="#i-warn"/></svg>
+          <p class="t-headline">The console could not reach the API</p>
+          <p class="measure">Nothing was sent, so nothing was recorded. The recorded run shows the same answer.</p>
+          <div class="cluster cluster-4">
+            <button class="btn btn--primary" type="button" data-send><svg class="ico"><use href="#i-retry"/></svg>Try again</button>
+            <a class="link" href="?state=ideal">Show the recorded run</a>
+          </div>
+          <p class="reqid"><span class="t-num">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT: the worker's phone, My data -->
+    <div class="stack stack-4">
+      <h2 class="t-headline">The worker's phone</h2>
+      <div class="phone stack stack-4" role="group" aria-label="Worker app, My data">
+        <div class="worker-top">
+          <div><p class="t-label t-muted">My data</p><p class="t-title">Musaffah demo yard</p></div>
+          <span class="stamp stamp--quiet">Placeholder data</span>
+        </div>
+        <section class="stack stack-3" aria-labelledby="who-h">
+          <h3 id="who-h" class="panel-title">Who asked for your data</h3>
+
+          <div data-state="empty loading error" class="stack stack-3">
+            <p class="cluster" aria-hidden="true"><svg class="ico" width="32" height="32"><use href="#i-eye"/></svg></p>
+            <p class="t-lead">Nobody has asked for your data.</p>
+            <p class="t-label t-muted">If an employer asks, it is refused and shown here.</p>
+          </div>
+
+          <ol data-state="ideal" class="audit" aria-label="Requests, newest first">
+            <li class="card card--refused">
+              <p class="cluster"><span class="stamp">New</span><span class="stamp stamp--quiet">Refused</span></p>
+              <p class="t-lead">An employer account asked for your individual data. Refused. <span class="t-num">⟨time⟩</span></p>
+              <dl class="kv t-label"><dt>Who</dt><dd>Employer account</dd><dt>What</dt><dd>Individual heat risk</dd><dt>Outcome</dt><dd>Refused</dd></dl>
+            </li>
+          </ol>
+        </section>
+      </div>
+      <p data-state="ideal" class="t-label t-muted measure">The same row appears in the worker's My data screen, newest first, with no action needed from them.</p>
+      <p data-state="empty loading error" class="t-label t-muted measure">A refused request appears here as a new row, newest first, with no action needed from the worker.</p>
+    </div>
+  </div>
+
+  <section class="stack stack-4" aria-labelledby="ci-h">
+    <h2 id="ci-h" class="t-headline">What proves it, in the build</h2>
+    <p class="t-muted measure">These tests fail the build if the refusal, the audit row or the purpose limits ever stop holding. Names are as designed; the tests land with the governance build.</p>
+    <ul class="tests">
+      <li><code>test_employer_has_no_route_to_individual_risk</code><span>Every employer-role request for one worker's risk gets 403 problem+json, whatever the purpose.</span></li>
+      <li><code>test_refusal_writes_audit_row</code><span>Each refusal appends an audit row the worker can see.</span></li>
+      <li><code>test_purpose_limitation_no_export_joins_stop_events_to_a_named_worker</code><span>No export joins stop events or plan adherence to a named worker.</span></li>
+      <li><code>test_individual_data_never_reaches_supervisor_or_employer_views</code><span>Supervisor and employer views carry no individual data.</span></li>
+      <li><code>test_personal_fields_rejected_by_the_managed_llm_adapter</code><span>Acclimatisation and juvenile fields are typed Personal and cannot reach a hosted language model.</span></li>
+      <li><code>import contract: sb.employer must not import sb.health</code><span>A structural check that the employer code has no path to health data at all.</span></li>
+    </ul>
+    <div class="cluster cluster-4">
+      <a class="btn btn--primary" href="replay-faults.html">Break things</a>
+      <a class="link" href="replay-climate.html">Back to the warmer summer</a>
+    </div>
+  </section>
+
+  <hr class="rule">
+  <ul class="disclosures" aria-label="Disclosures">
+    <li>The employer session, worker id, time and request id are placeholders.</li>
+    <li>Individual heat level is worked out on the worker's phone and is not stored on the server.</li>
+    <li>Test names are as designed, not yet in the repository.</li>
+  </ul>
+</main>
+
+<script src="assets/proto.js"></script>
+<script>
+  (() => {
+    const form = document.getElementById("req");
+    const btn = document.getElementById("send");
+    const setState = (s) => {
+      document.querySelectorAll("[data-state]").forEach((el) => el.classList.toggle("is-shown", el.dataset.state.split(/\s+/).includes(s)));
+      document.body.dataset.current = s;
+    };
+    const send = () => {
+      btn.setAttribute("aria-busy", "true");
+      setState("loading");
+      setTimeout(() => {
+        setState("ideal");
+        btn.removeAttribute("aria-busy");
+        document.getElementById("status403")?.focus();
+      }, 700);
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); send(); });
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("[data-send]")) send();
+      if (e.target.closest("[data-reset]")) { setState("empty"); btn.focus(); }
+    });
+    if (document.body.dataset.current === "loading") btn.setAttribute("aria-busy", "true");
+  })();
+</script>
+</body>
+</html>

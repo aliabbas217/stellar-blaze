@@ -1,0 +1,1005 @@
+{
+  "url": "http://127.0.0.1:8765/replay-day.html",
+  "when": "2026-11-11T12:18:00.814Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 101
+          },
+          {
+            "px": 16,
+            "n": 52
+          },
+          {
+            "px": 20,
+            "n": 8
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "The pre-registered day · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 51.4
+        },
+        "squint": {
+          "masses": 47,
+          "competitors": 1,
+          "dominance": 0.146,
+          "top": [
+            {
+              "cells": 96,
+              "weight": 56.36,
+              "cx": 0.67,
+              "cy": 0.584,
+              "bbox": [
+                0.528,
+                0.551,
+                0.806,
+                0.607
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 34.33,
+              "cx": 0.115,
+              "cy": 0.499,
+              "bbox": [
+                0.042,
+                0.467,
+                0.194,
+                0.523
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 33.44,
+              "cx": 0.308,
+              "cy": 0.502,
+              "bbox": [
+                0.236,
+                0.467,
+                0.389,
+                0.533
+              ]
+            },
+            {
+              "cells": 54,
+              "weight": 32.58,
+              "cx": 0.67,
+              "cy": 0.5,
+              "bbox": [
+                0.597,
+                0.467,
+                0.736,
+                0.523
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 30.98,
+              "cx": 0.249,
+              "cy": 0.085,
+              "bbox": [
+                0.194,
+                0.065,
+                0.306,
+                0.103
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.118,
+        "centroid": {
+          "x": 0.397,
+          "y": 0.557
+        },
+        "colourfulness": 11.3,
+        "luminanceSpread": 0.492,
+        "chromaProxy": 0.029,
+        "hierarchyByHueOnly": false,
+        "inkPct": 32.9,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 15% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 107
+          },
+          {
+            "px": 16,
+            "n": 52
+          },
+          {
+            "px": 20,
+            "n": 8
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "The pre-registered day · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 43.8
+        },
+        "squint": {
+          "masses": 64,
+          "competitors": 3,
+          "dominance": 0.087,
+          "top": [
+            {
+              "cells": 26,
+              "weight": 14.72,
+              "cx": 0.725,
+              "cy": 0.242,
+              "bbox": [
+                0.653,
+                0.225,
+                0.792,
+                0.263
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 13.65,
+              "cx": 0.318,
+              "cy": 0.243,
+              "bbox": [
+                0.25,
+                0.225,
+                0.389,
+                0.263
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 13.62,
+              "cx": 0.479,
+              "cy": 0.242,
+              "bbox": [
+                0.417,
+                0.225,
+                0.556,
+                0.263
+              ]
+            },
+            {
+              "cells": 15,
+              "weight": 9.1,
+              "cx": 0.303,
+              "cy": 0.014,
+              "bbox": [
+                0.278,
+                0,
+                0.333,
+                0.025
+              ]
+            },
+            {
+              "cells": 18,
+              "weight": 8.78,
+              "cx": 0.175,
+              "cy": 0.246,
+              "bbox": [
+                0.139,
+                0.225,
+                0.222,
+                0.263
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.115,
+        "centroid": {
+          "x": 0.409,
+          "y": 0.43
+        },
+        "colourfulness": 9.1,
+        "luminanceSpread": 0.265,
+        "chromaProxy": 0.019,
+        "hierarchyByHueOnly": false,
+        "inkPct": 34.7,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.087)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 9% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 107
+          },
+          {
+            "px": 16,
+            "n": 52
+          },
+          {
+            "px": 20,
+            "n": 8
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "The pre-registered day · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\light-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.975,
+          "coveragePct": 45.4
+        },
+        "squint": {
+          "masses": 20,
+          "competitors": 1,
+          "dominance": 0.334,
+          "top": [
+            {
+              "cells": 169,
+              "weight": 32.83,
+              "cx": 0.497,
+              "cy": 0.658,
+              "bbox": [
+                0.139,
+                0.597,
+                0.875,
+                0.746
+              ]
+            },
+            {
+              "cells": 65,
+              "weight": 20.32,
+              "cx": 0.281,
+              "cy": 0.153,
+              "bbox": [
+                0.069,
+                0.134,
+                0.472,
+                0.194
+              ]
+            },
+            {
+              "cells": 44,
+              "weight": 7.82,
+              "cx": 0.256,
+              "cy": 0.4,
+              "bbox": [
+                0.111,
+                0.388,
+                0.458,
+                0.418
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 5.87,
+              "cx": 0.263,
+              "cy": 0.239,
+              "bbox": [
+                0.083,
+                0.239,
+                0.444,
+                0.239
+              ]
+            },
+            {
+              "cells": 31,
+              "weight": 5.3,
+              "cx": 0.402,
+              "cy": 0.328,
+              "bbox": [
+                0.194,
+                0.328,
+                0.611,
+                0.328
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.159,
+        "centroid": {
+          "x": 0.364,
+          "y": 0.417
+        },
+        "colourfulness": 9.9,
+        "luminanceSpread": 0.181,
+        "chromaProxy": 0.024,
+        "hierarchyByHueOnly": false,
+        "inkPct": 32,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 101
+          },
+          {
+            "px": 16,
+            "n": 52
+          },
+          {
+            "px": 20,
+            "n": 8
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "The pre-registered day · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 50.9
+        },
+        "squint": {
+          "masses": 47,
+          "competitors": 2,
+          "dominance": 0.138,
+          "top": [
+            {
+              "cells": 93,
+              "weight": 62.91,
+              "cx": 0.67,
+              "cy": 0.584,
+              "bbox": [
+                0.528,
+                0.551,
+                0.806,
+                0.607
+              ]
+            },
+            {
+              "cells": 77,
+              "weight": 53.15,
+              "cx": 0.626,
+              "cy": 0.5,
+              "bbox": [
+                0.514,
+                0.467,
+                0.736,
+                0.523
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 38.3,
+              "cx": 0.116,
+              "cy": 0.499,
+              "bbox": [
+                0.042,
+                0.467,
+                0.194,
+                0.523
+              ]
+            },
+            {
+              "cells": 53,
+              "weight": 37.24,
+              "cx": 0.308,
+              "cy": 0.502,
+              "bbox": [
+                0.236,
+                0.467,
+                0.389,
+                0.533
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 33.29,
+              "cx": 0.249,
+              "cy": 0.085,
+              "bbox": [
+                0.194,
+                0.065,
+                0.306,
+                0.103
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.096,
+        "centroid": {
+          "x": 0.408,
+          "y": 0.527
+        },
+        "colourfulness": 10.8,
+        "luminanceSpread": 0.622,
+        "chromaProxy": 0.029,
+        "hierarchyByHueOnly": false,
+        "inkPct": 47.9,
+        "findings": [
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 14% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-768.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-768-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 107
+          },
+          {
+            "px": 16,
+            "n": 52
+          },
+          {
+            "px": 20,
+            "n": 8
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "The pre-registered day · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-768-viewport.png",
+        "dimensions": {
+          "w": 768,
+          "h": 853
+        },
+        "grid": {
+          "w": 72,
+          "h": 80
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 43.9
+        },
+        "squint": {
+          "masses": 76,
+          "competitors": 3,
+          "dominance": 0.075,
+          "top": [
+            {
+              "cells": 26,
+              "weight": 17.35,
+              "cx": 0.725,
+              "cy": 0.242,
+              "bbox": [
+                0.653,
+                0.225,
+                0.792,
+                0.263
+              ]
+            },
+            {
+              "cells": 26,
+              "weight": 16.55,
+              "cx": 0.318,
+              "cy": 0.243,
+              "bbox": [
+                0.25,
+                0.225,
+                0.389,
+                0.263
+              ]
+            },
+            {
+              "cells": 25,
+              "weight": 16,
+              "cx": 0.479,
+              "cy": 0.242,
+              "bbox": [
+                0.417,
+                0.225,
+                0.556,
+                0.263
+              ]
+            },
+            {
+              "cells": 18,
+              "weight": 10.47,
+              "cx": 0.175,
+              "cy": 0.246,
+              "bbox": [
+                0.139,
+                0.225,
+                0.222,
+                0.263
+              ]
+            },
+            {
+              "cells": 15,
+              "weight": 10.12,
+              "cx": 0.303,
+              "cy": 0.014,
+              "bbox": [
+                0.278,
+                0,
+                0.333,
+                0.025
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.088,
+        "centroid": {
+          "x": 0.425,
+          "y": 0.454
+        },
+        "colourfulness": 7.9,
+        "luminanceSpread": 0.409,
+        "chromaProxy": 0.017,
+        "hierarchyByHueOnly": false,
+        "inkPct": 53.4,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "3 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.075)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 8% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 14,
+            "n": 107
+          },
+          {
+            "px": 16,
+            "n": 52
+          },
+          {
+            "px": 20,
+            "n": 8
+          },
+          {
+            "px": 25,
+            "n": 9
+          },
+          {
+            "px": 31,
+            "n": 5
+          },
+          {
+            "px": 49,
+            "n": 5
+          }
+        ],
+        "distinctFontSizes": 6,
+        "fontFamilies": [
+          "ui-monospace",
+          "Noto Sans",
+          "Barlow Condensed",
+          "Noto Nastaliq Urdu"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 37
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [],
+        "offscaleSpacingTotal": 0,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "The pre-registered day · Replay · Stellar Blaze prototype",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\critique\\gate-r2\\replay-day\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 46
+        },
+        "squint": {
+          "masses": 18,
+          "competitors": 1,
+          "dominance": 0.319,
+          "top": [
+            {
+              "cells": 163,
+              "weight": 44.22,
+              "cx": 0.499,
+              "cy": 0.657,
+              "bbox": [
+                0.139,
+                0.597,
+                0.875,
+                0.746
+              ]
+            },
+            {
+              "cells": 55,
+              "weight": 23.63,
+              "cx": 0.275,
+              "cy": 0.153,
+              "bbox": [
+                0.069,
+                0.134,
+                0.472,
+                0.179
+              ]
+            },
+            {
+              "cells": 62,
+              "weight": 16.91,
+              "cx": 0.329,
+              "cy": 0.34,
+              "bbox": [
+                0.111,
+                0.328,
+                0.611,
+                0.358
+              ]
+            },
+            {
+              "cells": 59,
+              "weight": 16,
+              "cx": 0.256,
+              "cy": 0.4,
+              "bbox": [
+                0.111,
+                0.388,
+                0.458,
+                0.418
+              ]
+            },
+            {
+              "cells": 27,
+              "weight": 8.24,
+              "cx": 0.263,
+              "cy": 0.239,
+              "bbox": [
+                0.083,
+                0.239,
+                0.444,
+                0.239
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.126,
+        "centroid": {
+          "x": 0.392,
+          "y": 0.435
+        },
+        "colourfulness": 8.4,
+        "luminanceSpread": 0.28,
+        "chromaProxy": 0.02,
+        "hierarchyByHueOnly": false,
+        "inkPct": 47,
+        "findings": []
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

@@ -1,0 +1,9 @@
+# A runtime config seed with nothing pinned: every tunable is the ruleset default. Tests of the `sb-jobs config`
+# mechanics (seed, show, history, rollback) use it so that they do not depend on what the git default
+# (backend/config/runtime/default.toml) pins; tests of the product default read that file itself.
+
+schema_version = 1
+
+[tunables]
+
+[flags]

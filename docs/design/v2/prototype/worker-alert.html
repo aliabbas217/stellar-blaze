@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heat warning · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&family=Noto+Nastaliq+Urdu:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+/* W3 alert card. Hero = the changed segment of the shift spine, enlarged, with the new level and its start time. */
+.top { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hair); }
+.top .site { font-weight: 600; font-size: var(--t-16); line-height: 1.2; }
+.top .crew { color: var(--ink-3); font-size: var(--t-13); }
+.top .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.now { padding: var(--s-4) var(--s-4) 0; view-transition-name: level; }
+.now .k { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); font-size: var(--t-16); color: var(--ink-2); font-weight: 500; }
+.now .level-word strong { font-size: var(--t-76); }
+.now .level-word span { font-size: var(--t-22); color: var(--ink-2); }
+.now .scale { margin-top: var(--s-3); }
+.hero { padding: var(--s-4) var(--s-4) 0; view-transition-name: spine; }
+.hero svg { direction: ltr; }
+.hero .r-tick { font-size: calc(16px * var(--k, 1)) !important; font-weight: 500 !important; fill: var(--ink-2) !important; }
+.hero .r-label { font-size: calc(16px * var(--k, 1)) !important; }
+.now .scale > span { font-size: var(--t-16); }
+.why { align-items: center; }
+.why .proof { min-height: 44px; font-size: var(--t-14); padding: 0 var(--s-3); }
+.hero .seg-big { font: 500 24px var(--sans); fill: var(--ink); letter-spacing: -0.01em; }
+.hero .seg-was { font: 400 18px var(--sans); fill: var(--ink-2); }
+.hero .seg-now { font: 500 calc(16px * var(--k, 1)) var(--sans); fill: var(--ink); }
+.hero .ur { font-family: "Noto Nastaliq Urdu", serif; font-weight: 600; }
+.hero .bracket { stroke: var(--ink); stroke-width: 2; fill: none; }
+.hero .dim { fill: var(--ground); opacity: 0.6; }
+.act { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2); padding: var(--s-4); }
+.act .btn { min-height: 56px; font-size: var(--t-22); font-weight: 500; }
+.act .play { padding: 0 var(--s-4); gap: var(--s-2); }
+.act .play.blocked { background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+.audio-note { grid-column: 1 / -1; font-size: var(--t-16); color: var(--ink-2); }
+.todo { padding: 0 var(--s-4); }
+.todo h2 { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; padding: var(--s-2) 0; border-top: 1px solid var(--hair); }
+.todo ol { list-style: none; padding: 0; }
+.todo li { display: grid; grid-template-columns: 40px 1fr; gap: var(--s-3); align-items: center; padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); font-size: var(--t-22); font-weight: 500; line-height: 1.25; }
+.basis { padding: var(--s-3) 0 0; font-size: var(--t-18); color: var(--ink-2); }
+.why { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-3) 0; font-size: var(--t-13); color: var(--ink-3); }
+.banner { margin: var(--s-3) var(--s-4) 0; font-size: var(--t-16); }
+.notice > svg { width: 20px; height: 20px; flex: none; margin-top: 3px; }
+.empty p { font-size: var(--t-18); }
+.sk-hero { height: 300px; margin: var(--s-4); }
+html[lang="ur"] body { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif; }
+html[lang="ur"] [lang="ur"] { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif; line-height: 2.5; font-weight: 600; }
+html[lang="ur"] .now .level-word strong[lang="ur"] { font-size: 3.25rem; letter-spacing: 0; }
+html[lang="ur"] [lang="en"] { font-family: var(--sans); unicode-bidi: isolate; }
+html[lang="ur"] :is(p, h2, h3, li, a.btn)[lang="en"], html[lang="ur"] :is(p, li) > span[lang="en"]:only-child { unicode-bidi: plaintext; }
+html[lang="ur"] .now .level-word { align-items: center; }
+bdi.t { unicode-bidi: isolate; direction: ltr; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+.dock .unwell { view-transition-name: unwell; } /* morphs into the Call hero on worker-unwell */
+</style>
+</head>
+<body class="phone-page">
+<div class="phone">
+  <header class="top">
+    <div><p class="site" lang="en">Mussafah M-14 yard</p><p class="crew" lang="en">Crew B · concrete pour</p></div>
+    <p class="clock"><bdi class="t">09:42</bdi></p>
+    <button class="sun-toggle" type="button" data-sun-toggle></button>
+  </header>
+
+  <main>
+    <div class="notice banner" data-when="partial"><p><strong data-t="today.hero.personalUnavailable">Your own level is not available right now, so the site level is shown.</strong></p></div>
+    <div class="notice banner" data-when="offline"><svg data-clock></svg><p><strong data-t="states.offline">You are offline</strong> <span lang="en">This warning reached the phone at 09:40 and is saved here.</span></p></div>
+
+    <div data-when="loading" aria-busy="true"><div class="now"><p class="k">Heat warning</p><p class="skel" style="height:72px;width:60%;margin-top:6px">.</p></div><div class="skel sk-hero">.</div></div>
+
+    <!-- empty: the warning's time window is over -->
+    <section class="act" data-when="empty" style="display:block;padding-top:var(--s-6)">
+      <div class="empty" lang="en"><h3>This warning ended at 17:00</h3><p class="muted">A warning only applies in its time window. The levels for the rest of today are on Today.</p><a class="btn primary lg" href="worker-today.html">See today's levels</a></div>
+    </section>
+
+    <div data-when="ideal personal partial blocked offline">
+      <section class="now" aria-labelledby="lv">
+        <p class="k" id="kicker"></p>
+        <p class="level-word" id="lv"><strong id="lvword">Orange</strong><span lang="en" id="lvwhen">from 10:00</span></p>
+        <div class="scale" id="scale" role="img" aria-label="Level 3 of 4, Orange"><span data-t="levels.name.green">Green</span><span data-t="levels.name.amber">Amber</span><span data-t="levels.name.orange" aria-current="true">Orange</span><span data-t="levels.name.red">Red</span></div>
+      </section>
+
+      <section class="hero ribbon" id="seg" aria-label="What changed in your shift"></section>
+
+      <section class="act">
+        <button class="btn play" type="button" id="play"></button>
+        <a class="btn signal" id="gotit" href="worker-today.html" lang="en">Got it</a>
+        <p class="audio-note" id="audionote" lang="en"></p>
+      </section>
+
+      <section class="todo" aria-labelledby="todo">
+        <h2 id="todo" lang="en">From 10:00</h2>
+        <ol>
+          <li><svg data-icon="shade"></svg><span lang="en">Work 20 min, rest 40 min in shade</span></li>
+          <li><svg data-icon="water"></svg><span lang="en">Drink 1.2 litres of water every hour</span></li>
+          <li><svg data-icon="buddy"></svg><span lang="en">Never work alone</span></li>
+        </ol>
+        <p class="basis" id="basis"></p>
+        <p class="why"><span lang="en">Draft wording, awaiting clinical review</span><button type="button" class="proof" lang="en" data-proof='{"what":"Orange from 10:00 to 17:00, site level, Crew B (heavy work)","protocol":"Level from the site policy: ADOSH TWL zones on the corrected forecast (Orange = ADOSH High zone, heavy work 20 on, 40 rest; Red = all work stops, ADR 0011 §2.6). Design state until policy B3 scores it","script":"backend policy B3","file":"replay day 2026-09-03","label":"Real weather, assumed crew. Push payload carries only the level code and site/crew id (ADR 0004 Tier A)"}'>Why Orange?</button></p>
+      </section>
+    </div>
+  </main>
+
+  <div class="dock"><div class="dock-in">
+    <a class="unwell" href="worker-unwell.html"><span id="cross"></span><span lang="en">I feel unwell</span></a>
+    <nav class="tabs" aria-label="Sections"><a href="worker-today.html" data-t="worker.nav.today">Today</a><a href="worker-alerts.html" data-t="worker.nav.alerts">Alerts</a><a href="worker-data.html" lang="en">My data</a></nav>
+  </div></div>
+</div>
+<script type="module">
+import { boot, spine, ICON, q, STATE } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+// Urdu only from frontend/messages/ur.json (machine draft); the rest stays English, marked lang="en".
+const UR = { 'levels.name.green': 'سبز', 'levels.name.amber': 'امبر', 'levels.name.orange': 'نارنجی', 'levels.name.red': 'سرخ',
+  'push.title.site': 'سائٹ کا گرمی الرٹ: نارنجی', 'today.hero.site': 'سائٹ کی سطح، جو اس سائٹ پر سب کے لیے ایک ہی ہے۔', 'today.hero.personal': 'آپ کی اپنی سطح، اسی فون پر نکالی گئی۔',
+  'today.hero.personalUnavailable': 'آپ کی اپنی سطح ابھی دستیاب نہیں، اس لیے سائٹ کی سطح دکھائی گئی ہے۔', 'states.offline': 'آپ آف لائن ہیں',
+  'worker.nav.today': 'آج', 'worker.nav.alerts': 'الرٹس', 'shell.draftTranslation': 'مسودہ ترجمہ', 'today.band.now': 'اب' };
+const RTL = q.get('lang') === 'ur', html = document.documentElement;
+html.lang = RTL ? 'ur' : 'en'; html.dir = RTL ? 'rtl' : 'ltr';
+const tr = (k, en) => (RTL && UR[k]) ? { text: UR[k], lang: 'ur' } : { text: en, lang: 'en' };
+for (const el of document.querySelectorAll('[data-t]')) { const t = tr(el.dataset.t, el.textContent); el.textContent = t.text; el.lang = t.lang; }
+
+// replay clock: Thu 3 Sep 2026, 09:42 GST; the push arrived 09:40 for Orange from 10:00 (site level from the assets/crews.js proxy bands, same as the supervisor screens)
+boot({ surface: 'field', at: new Date(Date.UTC(2026, 8, 3, 5, 42)), states: ['ideal', 'personal', 'partial', 'blocked', 'offline', 'loading', 'empty'] });
+const link = (l) => { const u = new URL(location.href); u.searchParams.set('lang', l); return u.pathname.split('/').pop() + u.search; };
+document.querySelector('.proto .menu')?.insertAdjacentHTML('beforeend', `<p>Language</p><div><a href="${link('en')}">en</a><a href="${link('ur')}">ur (RTL)</a></div>`);
+
+const personal = STATE === 'personal';
+const k = RTL ? tr('push.title.site', '') : { text: personal ? 'For you: new to this heat' : 'Site heat warning · sent 09:40', lang: 'en' };
+document.getElementById('kicker').innerHTML = `<span lang="${k.lang}">${k.text}</span>` + (RTL ? `<span class="tag" lang="ur">${UR['shell.draftTranslation']}</span>` : '');
+const w = tr('levels.name.orange', 'Orange'); const word = document.getElementById('lvword'); word.textContent = w.text; word.lang = w.lang;
+document.getElementById('lvwhen').textContent = 'from 10:00';
+const basisKey = personal ? 'today.hero.personal' : 'today.hero.site';
+const b = tr(basisKey, personal ? 'Your own level, worked out on this phone. ADOSH Table 1: no unacclimatised person works in the Medium or High zone, so no work for you until 18:00.' : 'Site level, the same for everyone at this site.');
+document.getElementById('basis').innerHTML = `<span lang="${b.lang}">${b.text}</span>`;
+
+// audio (FR §5): autoplay is attempted; if the browser blocks it, a 56 px Play is the first thing after the hero
+const blocked = STATE === 'blocked';
+const play = document.getElementById('play');
+play.innerHTML = ICON.speaker + `<span lang="en">${blocked ? 'Play' : 'Play again'}</span>`;
+play.classList.toggle('blocked', blocked);
+// one filled screen action (signal, the Listen grammar); the dock's ink "I feel unwell" stays the emergency control
+document.getElementById('gotit').classList.toggle('signal', !blocked);
+play.setAttribute('aria-label', blocked ? 'Play the warning' : 'Play the warning again');
+document.getElementById('audionote').textContent = blocked ? 'The sound did not start on its own. Tap Play to hear it.' : 'Played at 09:42. The phone also vibrated.';
+
+const CLOCK = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 5v5.4l3.6 2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+for (const s of document.querySelectorAll('[data-clock]')) s.outerHTML = CLOCK;
+for (const s of document.querySelectorAll('[data-icon]')) s.outerHTML = ICON[s.dataset.icon].replace('<svg', '<svg class="pict"');
+document.getElementById('cross').outerHTML = ICON.cross;
+
+function mirror(svg) {
+  const W = svg.viewBox.baseVal.width;
+  for (const n of svg.querySelectorAll('rect,line,text,path')) {
+    if (n.tagName === 'text') { n.setAttribute('x', W - +n.getAttribute('x')); const a = n.getAttribute('text-anchor') || 'start'; n.setAttribute('text-anchor', a === 'start' ? 'end' : a === 'end' ? 'start' : 'middle'); }
+    else if (n.tagName === 'rect') n.setAttribute('x', W - +n.getAttribute('x') - +n.getAttribute('width'));
+    else if (n.tagName === 'line') { n.setAttribute('x1', W - +n.getAttribute('x1')); n.setAttribute('x2', W - +n.getAttribute('x2')); }
+    else n.setAttribute('transform', `translate(${W} 0) scale(-1 1)`);
+  }
+}
+
+const el = document.getElementById('seg');
+if (el && !el.closest('[hidden]')) {
+  const s = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+  const day = s.wbgt_c_by_local_hour[s.days.indexOf('2026-09-03')];
+  const W = 358, L = 292, from = 8, to = 18, bandY = 84, band = 140, now = 9 + 42 / 60;
+  const end = 17;
+  spine(el, { values: day, from, to, now, ban: [12.5, 15], orientation: 'h', width: W, length: L, bandY, band, tickStep: 2,
+    aria: `Changed: Amber until 10:00, then Orange from 10:00 to ${end}:00. Midday break 12:30 to 15:00 by law. Now 09:42, Orange starts in 18 minutes.` });
+  const svg = el.querySelector('svg'), pos = (t) => 22 + (t - from) / (to - from) * (W - 44);
+  svg.style.setProperty('--k', Math.max(1, W / Math.max(1, svg.getBoundingClientRect().width)).toFixed(3));
+  svg.querySelectorAll('.r-label').forEach((n) => n.remove());
+  svg.querySelectorAll('.r-tick').forEach((n) => n.setAttribute('y', +n.getAttribute('y') + 8));
+  const a = pos(10), z = pos(end);
+  const T = (cls, x, y, en, ur, anchor = 'start') => { const t = RTL && ur ? { s: ur, c: ' ur' } : { s: en, c: '' }; return `<text class="${cls}${t.c}" x="${x}" y="${y}" text-anchor="${anchor}">${t.s}</text>`; };
+  let o = '';
+  // dim what did not change, frame what did
+  o += `<rect class="dim" x="${pos(from)}" y="${bandY - 9}" width="${a - pos(from)}" height="${band + 18}"/>`;
+  if (end < to) o += `<rect class="dim" x="${z}" y="${bandY - 9}" width="${pos(to) - z}" height="${band + 18}"/>`;
+  o += `<rect class="bracket" x="${a}" y="${bandY - 10}" width="${z - a}" height="${band + 20}"/>`;
+  o += `<path class="bracket" d="M${a} 60v-8h${z - a}v8"/>`;
+  o += T('seg-was', pos(from), 40, 'was Amber', null);
+  o += T('seg-big', (a + z) / 2, 38, `10:00 to ${end}:00`, null, 'middle');
+  const mid = (pos(12.5) + pos(15)) / 2;
+  o += `<text class="r-label" x="${mid}" y="${bandY + band / 2 - 4}" text-anchor="middle">Midday</text><text class="r-label" x="${mid}" y="${bandY + band / 2 + 16}" text-anchor="middle">break</text>`;
+  o += T('seg-now', pos(now), L - 4, 'Now 09:42', null, 'middle');
+  svg.insertAdjacentHTML('beforeend', o);
+  if (RTL) mirror(svg);
+}
+</script>
+</body>
+</html>

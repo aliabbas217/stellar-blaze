@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-surface="worker">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alerts · Worker · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  /* page layout only; every value is a token */
+  /* focus must not end up behind the sticky dock (WCAG 2.2 2.4.11) */
+  html[data-surface="worker"] { scroll-padding-block-end: calc(var(--space-24) + var(--space-12)); }
+  .worker a.link { display: inline-flex; align-items: center; min-block-size: var(--target-worker); }
+  .vs-1, .vs-2, .vs-3, .vs-4 { display: grid; gap: var(--vs); align-content: start; }
+  .vs-1 { --vs: var(--space-1); } .vs-2 { --vs: var(--space-2); } .vs-3 { --vs: var(--space-3); } .vs-4 { --vs: var(--space-4); }
+  .state { border: var(--rule) solid var(--ink); background: var(--surface); }
+  .iconline { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-3); align-items: start; }
+  .state__head { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-4); align-items: center; }
+  .state__icon { inline-size: var(--space-12); block-size: var(--space-12); }
+  .steps > li { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-4); align-items: center; }
+  .stepnum {
+    display: grid; place-items: center; inline-size: var(--space-12); block-size: var(--space-12);
+    background: var(--ink); color: var(--surface); border-radius: var(--radius-sign);
+    font-family: var(--font-display); font-weight: 700; font-size: var(--size-title); line-height: var(--leading-solid);
+  }
+  .sk-line { block-size: var(--space-8); }
+  .sk-line--wide { block-size: var(--space-12); inline-size: 80%; }
+  /* Urdu view: text with no Urdu string yet stays English and gets the Latin face (see script below) */
+  :where(html:lang(ur) [lang="en"]) { font-family: "Noto Sans", var(--font-body-fallback); line-height: var(--leading-body); unicode-bidi: plaintext; }
+  html:lang(ur) [lang="en"]:is(.t-headline, .t-title, .panel-title), html:lang(ur) [lang="en"] :is(.t-headline, .t-title, .panel-title) { font-family: var(--font-display); font-weight: 600; }
+  html:lang(ur) .btn--primary:has([lang="en"]), html:lang(ur) [lang="en"] .btn--primary { font-family: var(--font-display); font-size: var(--size-title); }
+  .proto-note { display: none; font-family: var(--font-mono); font-size: var(--size-label); background: var(--surface-raised); border: var(--rule-hairline) dashed var(--control); padding: var(--space-2) var(--space-3); }
+  html:lang(ur) .proto-note { display: block; }
+</style>
+</head>
+<body data-states="ideal,loading,idle,denied,ios-install,unsupported,insecure,error" data-langs="en,ur">
+<a class="skip-link" href="#main" data-t-ur="مواد پر جائیں">Skip to content</a>
+
+<main id="main" class="worker stack stack-6">
+  <header class="worker-top">
+    <p class="t-title">Stellar Blaze</p>
+    <span class="stamp stamp--quiet" data-t-ur="مسودہ ترجمہ">Placeholder</span>
+  </header>
+  <p class="proto-note" lang="en" dir="ltr">Prototype note, not product: text with no key in ur.json stays in English here. No Urdu has been invented.</p>
+
+  <div class="vs-2">
+    <h1 class="t-headline" data-t-ur="الرٹس">Alerts</h1>
+    <p class="t-lead measure" data-t-ur="جب آپ کی سائٹ یا ٹیم کی سطح بدلے تو اس فون پر وارننگ حاصل کریں۔">Get a warning on this phone when your site or crew level changes.</p>
+  </div>
+
+  <!-- SUBSCRIBED (ideal): the switch and its state sentence are the focal point -->
+  <section data-state="ideal" class="card state vs-4" aria-label="Alert status">
+    <div class="state__head">
+      <svg class="ico state__icon"><use href="#i-bell"/></svg>
+      <p class="t-headline" role="status" data-t-ur="اس سائٹ کے لیے الرٹس آن ہیں۔">Alerts are on for this site.</p>
+    </div>
+    <button class="btn btn--block" type="button"><span data-t-ur="الرٹس بند کریں">Turn off alerts</span></button>
+  </section>
+
+  <!-- IDLE: off, one clear next step -->
+  <section data-state="idle" class="card state vs-4" aria-label="Alert status">
+    <div class="state__head">
+      <svg class="ico state__icon" viewBox="0 0 24 24"><use href="#i-bell"/><path d="M3 3 21 21"/></svg>
+      <p class="t-headline" role="status" data-t-ur="الرٹس بند ہیں۔">Alerts are off.</p>
+    </div>
+    <button class="btn btn--primary btn--block" type="button"><svg class="ico"><use href="#i-bell"/></svg><span data-t-ur="الرٹس آن کریں">Turn on alerts</span></button>
+  </section>
+
+  <!-- LOADING: the state is not known yet; the busy button keeps its label -->
+  <section data-state="loading" class="card state vs-4" aria-busy="true" aria-label="Alert status">
+    <div class="state__head">
+      <svg class="ico state__icon" viewBox="0 0 24 24"><use href="#i-bell"/><path d="M3 3 21 21"/></svg>
+      <div class="vs-2"><div class="skel sk-line sk-line--wide"></div><div class="skel sk-line"></div></div>
+    </div>
+    <button class="btn btn--primary btn--block" type="button" aria-busy="true"><svg class="ico"><use href="#i-bell"/></svg><span data-t-ur="الرٹس آن کریں">Turn on alerts</span></button>
+    <p class="sr-only" role="status" data-t-ur="براہِ کرم انتظار کریں">Please wait</p>
+  </section>
+
+  <!-- DENIED: how to allow, plus the fallback -->
+  <section data-state="denied" class="card state vs-4" role="status" aria-labelledby="den-h">
+    <div class="state__head">
+      <svg class="ico state__icon" viewBox="0 0 24 24"><use href="#i-bell"/><path d="M3 3 21 21"/></svg>
+      <h2 id="den-h" class="t-headline" data-t-ur="الرٹس بلاک ہیں">Alerts are blocked</h2>
+    </div>
+    <p data-t-ur="آپ نے اس ایپ کے الرٹس بلاک کر دیے ہیں۔ انہیں آن کرنے کے لیے اس سائٹ کی براؤزر سیٹنگز کھولیں اور اطلاعات کی اجازت دیں، پھر واپس آئیں۔">You blocked alerts for this app. To turn them on, open your browser settings for this site and allow notifications, then come back.</p>
+    <p class="iconline"><svg class="ico" width="24" height="24" aria-hidden="true"><use href="#i-crew"/></svg><span>Your supervisor will tell you, and Today still works when you open it.</span></p>
+    <button class="btn btn--primary btn--block" type="button"><svg class="ico"><use href="#i-retry"/></svg><span data-t-ur="دوبارہ کوشش کریں">Try again</span></button>
+    <a class="link" href="worker-today.html" data-t-ur="آج کی سطحیں کھولیں">Open today's levels</a>
+  </section>
+
+  <!-- IOS NOT INSTALLED: three steps -->
+  <section data-state="ios-install" class="card state vs-4" aria-labelledby="ios-h">
+    <div class="state__head">
+      <svg class="ico state__icon"><use href="#i-today"/></svg>
+      <h2 id="ios-h" class="t-headline" data-t-ur="پہلے ایپ کو ہوم اسکرین پر شامل کریں">Add the app to your Home Screen first</h2>
+    </div>
+    <p data-t-ur="آئی فون پر الرٹس صرف ایپ کو ہوم اسکرین پر شامل کرنے کے بعد کام کرتے ہیں۔">On iPhone, alerts only work after the app is added to the Home Screen.</p>
+    <ol class="steps vs-3">
+      <li><span class="stepnum" aria-hidden="true">1</span><span class="t-lead" data-t-ur="Safari میں شیئر بٹن پر ٹیپ کریں۔">Tap the Share button in Safari.</span></li>
+      <li><span class="stepnum" aria-hidden="true">2</span><span class="t-lead" data-t-ur="«ہوم اسکرین میں شامل کریں» منتخب کریں۔">Choose Add to Home Screen.</span></li>
+      <li><span class="stepnum" aria-hidden="true">3</span><span class="t-lead" data-t-ur="ایپ کو ہوم اسکرین سے کھولیں اور الرٹس آن کریں۔">Open the app from your Home Screen and turn on alerts.</span></li>
+    </ol>
+    <a class="link" href="worker-today.html" data-t-ur="آج کی سطحیں کھولیں">Open today's levels</a>
+  </section>
+
+  <!-- UNSUPPORTED -->
+  <section data-state="unsupported" class="card state vs-4" aria-labelledby="uns-h">
+    <div class="state__head">
+      <svg class="ico state__icon"><use href="#i-warn"/></svg>
+      <h2 id="uns-h" class="t-headline" data-t-ur="اس فون پر الرٹس دستیاب نہیں">Alerts are not available on this phone</h2>
+    </div>
+    <p data-t-ur="یہ براؤزر الرٹس وصول نہیں کر سکتا۔ آپ پھر بھی ایپ کھول کر آج کی سطحیں دیکھ سکتے ہیں۔">This browser cannot receive alerts. You can still open the app to see today's levels.</p>
+    <a class="btn btn--primary btn--block" href="worker-today.html" data-t-ur="آج کی سطحیں کھولیں">Open today's levels</a>
+  </section>
+
+  <!-- INSECURE ORIGIN -->
+  <section data-state="insecure" class="card state vs-4" aria-labelledby="ins-h">
+    <div class="state__head">
+      <svg class="ico state__icon"><use href="#i-lock"/></svg>
+      <h2 id="ins-h" class="t-headline" data-t-ur="الرٹس کے لیے محفوظ کنکشن چاہیے">Alerts need a secure connection</h2>
+    </div>
+    <p data-t-ur="الرٹس آن کرنے کے لیے ایپ کو اس کے محفوظ پتے (https) سے کھولیں۔">Open the app from its secure address (https) to turn on alerts.</p>
+  </section>
+
+  <!-- ERROR: plain words, retry, request id -->
+  <section data-state="error" class="error" role="alert" aria-labelledby="err-h">
+    <svg class="ico empty__picto" viewBox="0 0 24 24"><use href="#i-bell"/><path d="M3 3 21 21"/></svg>
+    <h2 id="err-h" class="t-headline" data-t-ur="ہم الرٹس آن نہیں کر سکے۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔">We could not turn alerts on. Try again in a moment.</h2>
+    <button class="btn btn--primary" type="button"><svg class="ico"><use href="#i-retry"/></svg><span data-t-ur="دوبارہ کوشش کریں">Try again</span></button>
+    <p class="reqid"><span class="t-num" data-t-ur="درخواست کی شناخت: ⟨req-id⟩">Request ID ⟨req-id⟩</span><button class="btn btn--sm" type="button" data-copy="⟨req-id⟩"><svg class="ico"><use href="#i-copy"/></svg><span data-copy-label data-t-ur="کاپی کریں">Copy</span></button></p>
+  </section>
+
+  <p class="t-label t-muted measure" data-t-ur="ایپ بند ہونے پر آپ کو صرف سائٹ اور ٹیم کی وارننگز ملتی ہیں۔ آپ کا ذاتی خطرہ ایپ کھولنے یا وارننگ پر ٹیپ کرنے پر نظر آتا ہے۔ یہ اسی فون پر نکالا جاتا ہے اور سرور کو کبھی نہیں بھیجا جاتا۔">When the app is closed you get site and crew warnings only. Your personal risk shows when you open the app or tap a warning. It is worked out on this phone and never sent to the server.</p>
+
+  <section class="vs-2" aria-label="Your data">
+    <a class="btn btn--block" href="worker-data.html#remove" data-t-ur="میرا ڈیٹا اس فون سے ہٹائیں">Remove my data from this phone</a>
+    <p class="t-label t-muted measure" data-t-ur="آپ کا پروفائل مٹا دیتا ہے اور الرٹس بند کر دیتا ہے۔ آپ کسی بھی وقت دوبارہ ترتیب دے سکتے ہیں۔">Deletes your profile and turns off alerts. You can set up again at any time.</p>
+  </section>
+</main>
+
+<div class="worker-dock">
+<a class="unwell-fab" href="worker-unwell.html"><svg class="ico"><use href="#i-unwell"/></svg><span data-t-ur="طبیعت خراب ہے">I feel unwell</span></a>
+<nav class="bottom-bar" aria-label="Worker" data-aria-ur="کارکن">
+  <a href="worker-today.html"><svg class="ico"><use href="#i-today"/></svg><span data-t-ur="آج">Today</span></a>
+  <a href="worker-alerts.html" aria-current="page"><svg class="ico"><use href="#i-bell"/></svg><span data-t-ur="الرٹس">Alerts</span></a>
+  <a href="worker-data.html"><svg class="ico"><use href="#i-eye"/></svg><span data-t-ur="میرا ڈیٹا">My data</span></a>
+</nav>
+</div>
+<script src="assets/proto.js"></script>
+<script>
+  /* Urdu view: any text without an Urdu string yet stays English and is marked lang="en" (never invented Urdu). */
+  (() => {
+    if (document.documentElement.lang !== "ur") return;
+    document.querySelectorAll("main *, .worker-dock *").forEach((el) => {
+      if (el.closest("[lang]:not(html)")) return;
+      if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) el.lang = "en";
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,1417 @@
+{
+  "_meta": {
+    "review_status": "machine-draft"
+  },
+  "common": {
+    "appName": "Stellar Blaze",
+    "appDescription": "السلامة من الإجهاد الحراري للعاملين في الأماكن المكشوفة في الإمارات.",
+    "spine": {
+      "slotTitle": "استراحة الظهيرة",
+      "slotRange": "<bdi>{from}</bdi> إلى <bdi>{to}</bdi>، بحكم القانون",
+      "outline": "استراحة الظهيرة بحكم القانون: غير سارية حتى <bdi>{date}</bdi>",
+      "outlineNoDate": "استراحة الظهيرة بحكم القانون: غير سارية"
+    },
+    "spineKit": {
+      "kicker": "Stellar Blaze · design kit · {locale}",
+      "title": "Time spine kit",
+      "lead": "The time spine in each orientation, on each surface, with the midday break in force and out of season, in both themes (sun toggle) and both directions (language switcher).",
+      "back": "Component kit",
+      "sample": {
+        "now": "Now",
+        "shiftEnd": "Shift ends"
+      }
+    },
+    "specimen": {
+      "kicker": "Stellar Blaze · نموذج التصميم · {locale}",
+      "title": "Qaylula",
+      "lead": "أداة داكنة لحرارة النهار. لون الحرارة يظهر على البيانات فقط، واستراحة الظهيرة محفورة في الزمن نفسه.",
+      "levelsHeading": "المستويات",
+      "bandHeading": "محور الوقت",
+      "bandNote": "الشريط الغائر هو استراحة الظهيرة، وهو الشكل الوحيد الواقع تحت مستوى الأرضية. المستوى كلمة وعلامة صغيرة، وليس لوحة ملونة. والساعة الحالية معكوسة الألوان.",
+      "typeHeading": "الخطوط",
+      "tokensHeading": "رموز التصميم في السمتين",
+      "sunTheme": "الشمس",
+      "nightTheme": "الليل",
+      "phrase": "مستوى الحرارة اليوم",
+      "time": "13:05"
+    },
+    "kit": {
+      "kicker": "Stellar Blaze · component kit · {locale}",
+      "title": "Component kit",
+      "lead": "Every shared component in every state. Use the controls above to change the theme and the language. Development only.",
+      "sections": {
+        "levelSign": {
+          "title": "Level sign",
+          "note": "The level is a word, a position on the four-step scale and a small mark. Stale and fallback signs are dashed, never hatched."
+        },
+        "levelScale": {
+          "title": "Level scale",
+          "note": "Four segments, the current one marked. With labels for the hero sign, without for the mini sign."
+        },
+        "pictograms": {
+          "title": "Pictograms",
+          "note": "Solid shapes on a 24 grid in the text color. They sit beside words and are never the only message."
+        },
+        "states": {
+          "title": "States",
+          "note": "Empty, error, stale, offline, pending and missing provenance, and skeletons that reserve the final height."
+        },
+        "stamps": {
+          "title": "Stamps",
+          "note": "Where a screen shows replayed, recorded, simulated, designed or development data, a stamp says so."
+        },
+        "proof": {
+          "title": "Proof chip and drawer",
+          "note": "Every scored number carries a chip that opens where it comes from. No provenance block means no number. Press a chip to open the drawer, then Recount to hash the file in this browser."
+        },
+        "evidence": {
+          "title": "Evidence components",
+          "note": "The scoreboard table, counters, verdict, season ribbon, day chart and roster frontier. Ribbon and counts are drawn from the recorded forecast file; scored cells are sample numbers with a sample proof, never a result."
+        }
+      },
+      "sample": {
+        "kickerNow": "Site level now",
+        "kickerStale": "Last known level",
+        "kickerFallback": "Forecast expired",
+        "untilNow": "until <bdi>17:00</bdi>",
+        "untilStale": "at <bdi>06:00</bdi>",
+        "emptyTitle": "No shift today",
+        "emptyReason": "Your next shift starts tomorrow at 06:00. The forecast for tomorrow arrives at 18:00 tonight.",
+        "emptyPrimary": "Open Today",
+        "emptySecondary": "Alert settings",
+        "errorGuidance": "Until it loads, follow the site rules. Rest in shade every hour and drink water.",
+        "offlineAge": "1 h 30 min",
+        "staleAge": "5 h",
+        "pendingWhat": "The 2026 scoreboard",
+        "missingWhat": "Hours of work under the ban",
+        "stampDetail": "3 Sep 2026",
+        "medicalLabel": "Medical help",
+        "proofWhat": "Alerts per shift, P3 protect",
+        "proofValue": "2.6 alerts per shift",
+        "proofChangedWhat": "Alerts per shift, file changed after export",
+        "verdictSample": "Sample outcome sentence for the kit. It is not a result."
+      },
+      "spineLink": "Time spine kit"
+    },
+    "accessLog": {
+      "label": "طلبات مرفوضة للحصول على بيانات فردية في هذا الموقع",
+      "refused": "رُفض طلب للحصول على بيانات صحية لعامل"
+    }
+  },
+  "shell": {
+    "skipToContent": "تخطَّ إلى المحتوى",
+    "close": "إغلاق",
+    "language": "اللغة",
+    "locales": {
+      "en": "English",
+      "ar": "العربية",
+      "ur": "اردو",
+      "hi": "हिन्दी",
+      "bn": "বাংলা",
+      "ne": "नेपाली"
+    },
+    "sun": {
+      "current": "وضع الشمس: {state}",
+      "on": "مفعّل",
+      "off": "متوقف"
+    },
+    "machineTranslation": "ترجمة آلية لم يراجعها بعد متحدث أصلي",
+    "roleChooser": {
+      "title": "اختر دورك",
+      "intro": "السلامة من الإجهاد الحراري للعاملين في الأماكن المكشوفة. اختر العرض المناسب لعملك.",
+      "demoNote": "هذا عرض تجريبي. لا يوجد تسجيل دخول، وجميع البيانات المعروضة اصطناعية.",
+      "worker": {
+        "title": "عامل",
+        "line": "مستوى الحرارة اليوم في موقعك، وحدّك الشخصي."
+      },
+      "supervisor": {
+        "title": "مشرف",
+        "line": "الجداول الزمنية للحرارة لفرقك. إجماليات الفريق فقط، وليس الأفراد."
+      },
+      "hse": {
+        "title": "السلامة والصحة المهنية (HSE)",
+        "line": "نظرة عامة على السلامة من الحرارة في الموقع."
+      }
+    },
+    "notFound": {
+      "title": "الصفحة غير موجودة",
+      "body": "هذه الصفحة غير موجودة أو تم نقلها.",
+      "home": "العودة إلى البداية"
+    },
+    "demo": {
+      "banner": "موقع تجريبي اصطناعي: لا أشخاص حقيقيون ولا بيانات حقيقية",
+      "reset": {
+        "button": "إعادة ضبط الموقع التجريبي",
+        "done": "أُعيد ضبط الموقع التجريبي (حقبة جديدة {epoch}).",
+        "unavailable": "إعادة الضبط غير متاحة في هذا النشر.",
+        "failed": "تعذّرت إعادة ضبط الموقع التجريبي. حاول مرة أخرى.",
+        "rateLimited": "إعادة الضبط مسموحة مرة واحدة في الدقيقة. حاول بعد قليل."
+      },
+      "mode": {
+        "label": "مصدر البيانات",
+        "live": "مباشر",
+        "replay": "إعادة تشغيل",
+        "liveUnavailable": "الوضع المباشر غير مشغَّل في هذا النشر"
+      }
+    },
+    "field": {
+      "noSite": "لم يُختر موقع",
+      "clockLabel": "الوقت في الموقع",
+      "pendingClock": "--:--"
+    },
+    "desk": {
+      "menu": "الرئيسية",
+      "nav": {
+        "story": "القصة",
+        "scoreboard": "لوحة النتائج",
+        "day": "يوم واحد",
+        "try": "جرّب خطة",
+        "governance": "الحوكمة",
+        "crews": "للفرق"
+      }
+    }
+  },
+  "worker": {
+    "nav": {
+      "label": "تنقّل العامل",
+      "today": "اليوم",
+      "alerts": "التنبيهات",
+      "unwell": "أشعر بتوعك",
+      "myData": "بياناتي",
+      "backToToday": "العودة إلى اليوم"
+    },
+    "today": {
+      "title": "اليوم",
+      "kicker": {
+        "site": "مستوى الموقع الآن",
+        "personal": "مستواك الآن",
+        "stale": "آخر مستوى معروف",
+        "fallback": "لا توجد توقعات حديثة: خطة وقائية",
+        "noHour": "لا توجد توقعات لهذه الساعة",
+        "protective": "المستوى الوقائي",
+        "lastKnownHigher": "آخر مستوى معروف: <bdi>{level}</bdi>"
+      },
+      "until": "حتى <bdi>{time}</bdi>",
+      "personalHigher": "مستواك الشخصي أعلى من مستوى الموقع.",
+      "lead": {
+        "cycle": "اعمل {work} دقيقة، واسترح {rest} دقيقة في الظل",
+        "shade": "استرح في الظل",
+        "stop": "أوقف العمل",
+        "siteRules": "اتبع قواعد الموقع",
+        "protective": "قواعد الموقع: استرح في الظل كل ساعة، واشرب الماء"
+      },
+      "draftWording": "صياغة مسودة بانتظار المراجعة السريرية",
+      "also": {
+        "heading": "وأيضًا الآن",
+        "water": "اشرب الماء",
+        "buddy": "لا تعمل وحدك أبدًا",
+        "selfPaced": "العمل بإيقاع ذاتي: يجب السماح للعمال بتعديل وتيرة عملهم بحسب الظروف البيئية.",
+        "noUnacclimatised": "لا يعمل أي شخص غير متأقلم مع الحرارة",
+        "induction": "مطلوب تدريب تعريفي للمخاطر العالية يؤكد على الترطيب والتعرف على علامات الإجهاد الحراري",
+        "bottle": "توفير زجاجة مياه شخصية (بسعة 2 لتر) في الموقع في جميع الأوقات"
+      },
+      "why": {
+        "level": "لماذا <bdi>{level}</bdi>؟",
+        "siteRules": "لماذا قواعد الموقع؟"
+      },
+      "proofWhat": {
+        "level": "المستوى {level} الآن، من التوقعات",
+        "siteRules": "قواعد الموقع، لأنه تعذّر حساب مستوى"
+      },
+      "turnOnWarnings": "فعّل التحذيرات",
+      "spine": {
+        "now": "الآن",
+        "breakIn": "الاستراحة بعد {duration}",
+        "backToWork": "العودة إلى العمل {time}",
+        "shiftEnds": "تنتهي الوردية {time}",
+        "noBreakAfter": "لا استراحة ظهيرة بحكم القانون بعد {date}",
+        "noBreakUntil": "لا استراحة ظهيرة بحكم القانون حتى {date}",
+        "aria": "مستوى الحرارة حسب الساعة، من {from} إلى {to}. {waypoints}"
+      },
+      "age": {
+        "hoursMinutes": "{hours} ساعة و{minutes} دقيقة",
+        "hours": "{hours} ساعة",
+        "minutes": "{minutes} دقيقة"
+      },
+      "entry": {
+        "title": "امسح رمز فريقك",
+        "reason": "وجّه الكاميرا إلى الملصق في الموقع، أو افتح الرابط في مجموعة فريقك. بلا حساب وبلا كتابة.",
+        "demo": "شاهد الموقع التجريبي",
+        "loading": "جارٍ العثور على الموقع التجريبي",
+        "unavailable": "تعذّر تحميل الموقع التجريبي. تحقق من اتصالك وحاول مرة أخرى.",
+        "chooseFailed": "تعذّر حفظ اختيارك على هذا الهاتف. حاول مرة أخرى.",
+        "pinFailed": "تعذّر على هذا الهاتف حفظ الموقع. أعد تحميل الصفحة وحاول مرة أخرى."
+      },
+      "noShift": {
+        "title": "لا وردية لـ{crew} اليوم",
+        "titleNoCrew": "لا وردية اليوم",
+        "reason": "ليس لفريقك وردية في هذا التاريخ. ما زال مستوى الموقع ساريًا.",
+        "primary": "فعّل التحذيرات"
+      },
+      "errorRules": "إلى أن يتم التحميل، اتبع قواعد الموقع: استرح في الظل كل ساعة، واشرب الماء."
+    },
+    "alert": {
+      "title": "تحذير من الحرارة",
+      "kicker": {
+        "site": "تحذير حرارة للموقع",
+        "crew": "تحذير حرارة للفريق"
+      },
+      "from": "من <bdi>{time}</bdi>",
+      "changed": {
+        "heading": "ما الذي تغيّر في ورديتك",
+        "was": "كان <bdi>{previous}</bdi>، والآن <bdi>{level}</bdi>",
+        "now": "الآن <bdi>{level}</bdi>"
+      },
+      "spine": {
+        "now": "الآن",
+        "starts": "{level} من {time}",
+        "ends": "حتى {time}",
+        "aria": "مستوى الحرارة حسب الساعة. {summary}"
+      },
+      "personalHigher": "مستواك أعلى: <bdi>{level}</bdi>",
+      "doNow": "ما الذي عليك فعله",
+      "gotIt": "فهمت",
+      "ended": {
+        "title": "انتهى هذا التحذير في {time}",
+        "reason": "قد يكون المستوى تغيّر منذ إرسال التنبيه. افتح «اليوم» لترى المستوى الآن.",
+        "primary": "افتح «اليوم»"
+      },
+      "saved": "التوقعات غير متاحة الآن. هذا هو المستوى الذي أعطاه التنبيه، محفوظًا على هذا الهاتف.",
+      "notCovered": "لا تُظهر أحدث التوقعات هذا التحذير. هذا هو المستوى الذي أعطاه التنبيه، محفوظًا على هذا الهاتف."
+    },
+    "unwell": {
+      "title": "أشعر بتوعك",
+      "worksOffline": "الاتصال الهاتفي يعمل بلا إنترنت. ويحتاج إلى إشارة هاتف.",
+      "privacy": "لا يُرسَل شيء مما تفعله في هذه الشاشة إلى جهة عملك. اتصل بمشرفك الآن.",
+      "timer": {
+        "tappedAt": "ضغطت في <bdi>{time}</bdi>",
+        "elapsed": "الوقت منذ الضغط",
+        "tap": "اضغط",
+        "minutes": "{count} دقيقة"
+      },
+      "offline": {
+        "title": "غير متصل",
+        "body": "ما زال الاتصال الهاتفي يعمل. فهو لا يحتاج إلى إنترنت."
+      },
+      "calls": {
+        "label": "اطلب المساعدة",
+        "emergency": {
+          "title": "اتصل بـ998",
+          "detail": "الإسعاف"
+        },
+        "supervisor": {
+          "title": "اتصل بمشرفك",
+          "absent": "سيظهر هنا رقم مشرف موقعك عندما يضيفه موقعك",
+          "unknown": "يُحفظ رقم مشرف موقعك على هذا الهاتف عندما تفتح «اليوم» وأنت متصل"
+        },
+        "firstAider": {
+          "title": "اتصل بمسعف الموقع",
+          "absent": "سيظهر هنا رقم مسعف موقعك عندما يضيفه موقعك",
+          "unknown": "يُحفظ رقم مسعف موقعك على هذا الهاتف عندما تفتح «اليوم» وأنت متصل",
+          "askNearby": "اطلب من أقرب شخص إليك أن يتصل بالمسعف."
+        },
+        "demo": {
+          "emergency": "تجريبي: كان هذا سيتصل بـ998 (الإسعاف)",
+          "supervisor": "تجريبي: كان هذا سيتصل بمشرفك",
+          "firstAider": "تجريبي: كان هذا سيتصل بمسعف الموقع",
+          "noCall": "لا يُجرى أي اتصال في النسخة التجريبية.",
+          "synthetic": "رقم اصطناعي"
+        }
+      },
+      "steps": {
+        "heading": "الإسعاف الأولي لضربة الحرارة، بحسب ADOSH",
+        "one": "اتصل برقم جهة الاتصال في حالات الطوارئ وأبلغ المشرف",
+        "two": "انقل الموظف المريض إلى مكان بارد ومظلل",
+        "three": "بَرِّد الموظف بوسائل مثل: بلّ ملابسه بالماء؛ ورشّه بالماء أو مسحه بالإسفنج أو جعله يستحم بالماء؛ وتهوية جسده.",
+        "source": "ترجمة عن النص الإنجليزي الحرفي لـ ADOSH-SF Technical Guideline, Safety in the Heat v4.0, section 4.5(c).",
+        "reviewed": "راجعه استشاري سريري مستقل، <bdi>{date}</bdi>"
+      },
+      "numbersSavedOn": "الأرقام محفوظة في {date}"
+    }
+  },
+  "today": {
+    "title": "اليوم",
+    "limitation": "عند إغلاق التطبيق تصلك تحذيرات الموقع والفريق فقط. يظهر مستوى الخطر الشخصي عند فتح التطبيق أو النقر على تحذير. ويُحتسب على هذا الهاتف ولا يُرسل أبدًا إلى الخادم.",
+    "alertsLink": "التنبيهات والإشعارات",
+    "empty": {
+      "title": "أعدّ ملفك الحراري",
+      "reason": "أعدّه مرة واحدة لنحسب حدّ الحرارة الخاص بك. يستغرق الأمر نحو دقيقة.",
+      "primary": "ابدأ الإعداد الآن",
+      "secondary": "اعرض مستوى الموقع اليوم دون إعداد"
+    },
+    "hero": {
+      "personal": "مستواك الشخصي، محسوب على هذا الهاتف.",
+      "site": "مستوى الموقع، وهو نفسه للجميع في هذا الموقع.",
+      "personalUnavailable": "مستواك الشخصي غير متاح الآن، لذا يُعرض مستوى الموقع."
+    },
+    "band": {
+      "heading": "مستوى الحرارة حسب الساعة",
+      "now": "الآن"
+    },
+    "footer": {
+      "policy": "المستويات: السياسة {version}",
+      "versions": "المستويات: السياسة {policy}، الإعداد {config}"
+    }
+  },
+  "profile": {
+    "title": "ملفك الحراري",
+    "consent": {
+      "title": "ملفك يبقى على هذا الهاتف",
+      "storedHeading": "ما الذي يُحفظ",
+      "stored": "نوع عملك، وتاريخ بدئك العمل في الحرارة، وخيار ملابسك. تُحفظ على هذا الهاتف فقط.",
+      "serverHeading": "ما الذي يصل إلى الخادم",
+      "server": "لا شيء من ملفك. إذا فعّلت التنبيهات يُرسل اشتراك تنبيه لموقعك (ولفريقك إن اخترت فريقًا). وهو غير مرتبط باسمك ولا بملفك.",
+      "useHeading": "كيف يُستخدم",
+      "use": "لا يُستخدم أبدًا في قرارات تأديبية أو قرارات التوظيف.",
+      "revokeHeading": "التراجع",
+      "revoke": "يمكنك حذف بياناتك في أي وقت من صفحة التنبيهات.",
+      "agree": "قرأت هذا وأوافق"
+    },
+    "form": {
+      "heading": "أعدّ ملفك الحراري",
+      "site": "الموقع",
+      "crew": "الفريق (اختياري)",
+      "noCrew": "بلا فريق",
+      "workload": "نوع العمل",
+      "startDate": "تاريخ بدئك العمل في الحرارة",
+      "startDateHint": "يُستخدم لمعرفة مدى تأقلمك مع الحرارة. ولا تتم مشاركته.",
+      "clothing": "الملابس",
+      "submit": "حفظ ومتابعة"
+    },
+    "workload": {
+      "light": "خفيف",
+      "moderate": "متوسط",
+      "heavy": "شاق"
+    },
+    "clothing": {
+      "work_clothes": "ملابس العمل العادية",
+      "fallback": "خيار الملابس {code}"
+    },
+    "errors": {
+      "required": "هذا الحقل مطلوب.",
+      "futureDate": "لا يمكن أن يكون التاريخ في المستقبل.",
+      "consent": "ضع علامة في المربع للمتابعة."
+    }
+  },
+  "alerts": {
+    "title": "التنبيهات",
+    "intro": "احصل على تحذير على هذا الهاتف عندما يتغير مستوى موقعك أو فريقك.",
+    "limitation": "عند إغلاق التطبيق تصلك تحذيرات الموقع والفريق فقط. يظهر مستوى الخطر الشخصي عند فتح التطبيق أو النقر على تحذير. ويُحتسب على هذا الهاتف ولا يُرسل أبدًا إلى الخادم.",
+    "enable": "تفعيل التنبيهات",
+    "disable": "إيقاف التنبيهات",
+    "working": "يرجى الانتظار",
+    "noSite": "اختر موقعك أولًا. تُرسل التنبيهات لموقع واحد.",
+    "state": {
+      "idle": "التنبيهات متوقفة.",
+      "subscribed": "التنبيهات مفعّلة لهذا الموقع.",
+      "error": "تعذّر تفعيل التنبيهات. حاول مرة أخرى بعد قليل.",
+      "disableError": "تعذّر إيقاف التنبيهات. حاول مرة أخرى بعد قليل.",
+      "hostNotAllowed": "خدمة الإشعارات في هذا المتصفح غير مدعومة، لذلك لا يمكن تفعيل التنبيهات هنا."
+    },
+    "unsupported": {
+      "title": "التنبيهات غير متاحة على هذا الهاتف",
+      "body": "لا يستطيع هذا المتصفح استقبال التنبيهات. لا يزال بإمكانك فتح التطبيق لمعرفة مستويات اليوم."
+    },
+    "insecure": {
+      "title": "التنبيهات تحتاج إلى اتصال آمن",
+      "body": "افتح التطبيق من عنوانه الآمن (https) لتفعيل التنبيهات."
+    },
+    "denied": {
+      "title": "التنبيهات محظورة",
+      "body": "لقد حظرت التنبيهات لهذا التطبيق. لتفعيلها افتح إعدادات المتصفح لهذا الموقع واسمح بالإشعارات، ثم عد إلى هنا."
+    },
+    "install": {
+      "title": "أضف التطبيق إلى الشاشة الرئيسية أولًا",
+      "body": "على الآيفون لا تعمل التنبيهات إلا بعد إضافة التطبيق إلى الشاشة الرئيسية.",
+      "step1": "اضغط على زر المشاركة في Safari.",
+      "step2": "اختر «إضافة إلى الشاشة الرئيسية».",
+      "step3": "افتح التطبيق من الشاشة الرئيسية ثم فعّل التنبيهات."
+    },
+    "removeData": {
+      "button": "احذف بياناتي من هذا الهاتف",
+      "hint": "يحذف ملفك ويوقف التنبيهات. يمكنك الإعداد من جديد في أي وقت.",
+      "confirmTitle": "هل تريد حذف بياناتك من هذا الهاتف؟",
+      "confirm": "نعم، احذفها",
+      "cancel": "لا، احتفظ بها",
+      "done": "تم حذف بياناتك من هذا الهاتف.",
+      "failed": "تعذّر إكمال حذف بياناتك من هذا الهاتف. قد تكون التنبيهات ما زالت تعمل، أو قد تبقى بيانات محفوظة. تحقق من اتصالك وحاول مرة أخرى.",
+      "pending": "تم حذف بياناتك من هذا الهاتف. لم نتمكن بعد من الوصول إلى الخادم لإلغاء اشتراكك في التنبيهات. ستُعاد المحاولة في كل مرة تفتح فيها التنبيهات.",
+      "removing": "جارٍ حذف بياناتك من هذا الهاتف. يرجى الانتظار."
+    },
+    "debug": {
+      "heading": "تفاصيل الاشتراك",
+      "copy": "نسخ",
+      "copied": "تم النسخ",
+      "share": "مشاركة"
+    }
+  },
+  "push": {
+    "title": {
+      "site": "تنبيه حرارة الموقع: {level}",
+      "crew": "تنبيه حرارة الفريق: {level}"
+    },
+    "body": "افتح التطبيق لمعرفة مستواك الشخصي.",
+    "level": {
+      "green": "أخضر",
+      "amber": "كهرماني",
+      "orange": "برتقالي",
+      "red": "أحمر"
+    }
+  },
+  "supervisor": {
+    "title": "الفرق",
+    "site": "الموقع",
+    "privacyNote": "إجماليات الفريق فقط. لا يعرض هذا العرض أي عامل بمفرده.",
+    "members": "الأعضاء",
+    "openTimeline": "فتح الجدول الزمني",
+    "back": "كل الفرق",
+    "empty": {
+      "title": "لا توجد فرق بعد",
+      "reason": "تظهر الفرق هنا بمجرد إضافتها لهذا الموقع.",
+      "primary": "افتح الموقع التجريبي",
+      "secondary": "تنزيل قالب الفريق (CSV)"
+    },
+    "timeline": {
+      "title": "الجدول الزمني لحرارة الفريق",
+      "levelRow": "مستوى الفريق",
+      "shareRow": "نسبة الفريق فوق الكهرماني",
+      "date": "التاريخ"
+    },
+    "suppressed": "أقل من {k} أشخاص، أُخفيت التفاصيل لحماية الخصوصية",
+    "crews": {
+      "pageTitle": "الفرق اليوم",
+      "kicker": "تحتاج إليك أولًا",
+      "kickerOff": "أعلى مستوى، خارج الوردية الآن",
+      "strips": {
+        "aria": "الفرق اليوم، الأسوأ أولًا. الآن {now}.",
+        "ariaBreak": "الفرق اليوم، الأسوأ أولًا. استراحة الظهيرة من {from} إلى {to}. الآن {now}.",
+        "legend": "ارتفاع الشريط هو مستوى الفريق. اللون هو حرارة الساعة. تُرسم ساعات الوردية فقط.",
+        "now": "الآن"
+      },
+      "focal": {
+        "workingCycleBreak": "<bdi>{crew}</bdi> عند المستوى <bdi>{level}</bdi> حتى <bdi>{until}</bdi> (<bdi>{cycle}</bdi>)؛ استراحة الظهيرة بعد <bdi>{breakIn}</bdi>.",
+        "workingCycle": "<bdi>{crew}</bdi> عند المستوى <bdi>{level}</bdi> حتى <bdi>{until}</bdi> (<bdi>{cycle}</bdi>).",
+        "workingBreak": "<bdi>{crew}</bdi> عند المستوى <bdi>{level}</bdi> حتى <bdi>{until}</bdi>؛ استراحة الظهيرة بعد <bdi>{breakIn}</bdi>.",
+        "working": "<bdi>{crew}</bdi> عند المستوى <bdi>{level}</bdi> حتى <bdi>{until}</bdi>.",
+        "off": "<bdi>{crew}</bdi> خارج الوردية الآن. يعود في <bdi>{start}</bdi> إلى المستوى <bdi>{level}</bdi>.",
+        "offNoStart": "<bdi>{crew}</bdi> خارج الوردية الآن.",
+        "stopped": "أوقف <bdi>{crew}</bdi> العمل في <bdi>{time}</bdi>.",
+        "noLevel": "لا يوجد مستوى لـ<bdi>{crew}</bdi> الآن. اتبعوا الخطة الوقائية.",
+        "cycle": "عمل {work}، راحة {rest}"
+      },
+      "duration": {
+        "minutes": "{minutes} دقيقة",
+        "hours": "{hours} ساعة",
+        "hoursMinutes": "{hours} ساعة و{minutes} دقيقة"
+      },
+      "row": {
+        "working": "<bdi>{level}</bdi> حتى <bdi>{until}</bdi>",
+        "off": "خارج الوردية، <bdi>{level}</bdi> في <bdi>{start}</bdi>",
+        "offNoStart": "خارج الوردية الآن",
+        "none": "بلا مستوى",
+        "stopped": "توقف العمل <bdi>{time}</bdi>",
+        "noShift": "لا وردية اليوم",
+        "plan": {
+          "signed": "الخطة موقَّعة",
+          "unsigned": "الخطة غير موقَّعة",
+          "changed": "تغيّرت الخطة منذ التوقيع"
+        },
+        "runs": "المستويات حسب الساعة: {runs}.",
+        "run": "{level} من {from} إلى {to}",
+        "openPlan": "افتح الخطة"
+      },
+      "primary": "افتح خطة <bdi>{crew}</bdi>",
+      "footnote": {
+        "one": "<bdi>{crews}</bdi> فيه أقل من <bdi>{k}</bdi> أشخاص، لذلك أُخفيت تفاصيله الصحية لحماية الخصوصية. مستواه معروض.",
+        "many": "<bdi>{crews}</bdi> فيها أقل من <bdi>{k}</bdi> أشخاص، لذلك أُخفيت تفاصيلها الصحية لحماية الخصوصية. مستوياتها معروضة."
+      },
+      "stale": {
+        "title": "لا توجد توقعات حديثة: خطة وقائية",
+        "body": "ترى الفرق الخطة الوقائية إلى أن تتحدث التوقعات. لا يتأثر «أوقف العمل»."
+      },
+      "offline": {
+        "title": "أنت غير متصل",
+        "body": "قد يكون ما على الشاشة قديمًا. يُحفظ «أوقف العمل» على هذا الهاتف ويُرسل عند عودة الاتصال."
+      },
+      "error": {
+        "title": "لم تُحمَّل حالة الفرق"
+      },
+      "empty": {
+        "title": "لا فرق في هذا الموقع بعد",
+        "reason": "تظهر الفرق هنا عند إضافتها لهذا الموقع.",
+        "primary": "العودة إلى البداية"
+      }
+    },
+    "plan": {
+      "pageTitle": "خطة الفريق",
+      "back": "كل الفرق",
+      "title": "خطة <bdi>{crew}</bdi>",
+      "titleGeneric": "خطة الفريق",
+      "kicker": "مستوى الفريق الآن",
+      "workload": {
+        "light": "عمل خفيف",
+        "moderate": "عمل متوسط",
+        "heavy": "عمل شاق"
+      },
+      "people": "<bdi>{count}</bdi> أشخاص",
+      "peopleHidden": "أقل من <bdi>{k}</bdi> أشخاص، التفاصيل الصحية مخفية",
+      "restrictions": {
+        "one": "قيود مُعلنة لعضو <bdi>1</bdi>",
+        "many": "قيود مُعلنة لـ<bdi>{count}</bdi> أعضاء"
+      },
+      "unsigned": "غير موقَّعة. ترى الفرق خطة القواعد، موسومة بأنها بديل غير موقَّع. لا ينتظر التنبيه ولا «أوقف العمل» توقيعك.",
+      "changed": "تغيّرت منذ التوقيع في <bdi>{time}</bdi>. ترى الفرق خطة القواعد الحالية، موسومة بأنها تغيّرت منذ التوقيع. لا ينتظر التنبيه ولا «أوقف العمل» توقيعك.",
+      "changedNoTime": "تغيّرت منذ التوقيع. ترى الفرق خطة القواعد الحالية، موسومة بأنها تغيّرت منذ التوقيع. لا ينتظر التنبيه ولا «أوقف العمل» توقيعك.",
+      "floorBanner": "المستوى الأخضر ليس إذنًا بتمديد العمل. تظل الحدود الدنيا القانونية وحدود ADOSH سارية. للاسترشاد فقط؛ وصاحب العمل يظل صاحب الواجب.",
+      "strip": {
+        "aria": "خطة {crew}، من {from} إلى {to}، مقابل حرارة اليوم. كل كتلة مدرجة أسفل المخطط.",
+        "slot": "استراحة الظهيرة",
+        "outline": "استراحة الظهيرة بحكم القانون: غير سارية حتى {date}",
+        "outlineUnknown": "استراحة الظهيرة بحكم القانون: غير سارية",
+        "heatNote": "اللون خلف الأشرطة هو الحرارة المتوقعة لكل ساعة."
+      },
+      "legend": {
+        "work": "عمل",
+        "rest": "استراحة في الظل",
+        "art18": "استراحة المادة 18",
+        "ban": "استراحة الظهيرة",
+        "stopped": "أوقف العمل",
+        "now": "الآن"
+      },
+      "state": {
+        "work": "عمل",
+        "adoshRest": "استراحة في الظل",
+        "art18Break": "استراحة المادة 18",
+        "ban": "استراحة الظهيرة",
+        "stopped": "أوقف العمل",
+        "off": "خارج الوردية"
+      },
+      "blocks": {
+        "heading": "كل كتلة، وسبب وجودها",
+        "range": "<bdi>{from}</bdi> إلى <bdi>{to}</bdi>",
+        "now": "الآن",
+        "rule": "القاعدة",
+        "noClause": "لم يصل نص بند مع هذه الكتلة."
+      },
+      "zone": {
+        "medium": "متوسط",
+        "high": "مرتفع",
+        "red": "أحمر"
+      },
+      "signOff": {
+        "heading": "وقّع خطة اليوم",
+        "intro": "البنود في مناطق الخطة المتوسطة والمرتفعة والحمراء تحتاج إلى علامة لكل منها. التوقيع لا يؤخر تنبيهًا ولا إيقافًا للعمل.",
+        "zoneNote": "تُحدَّد منطقة الخطة لكل كتلة من قراءة الحرارة الوقائية للخطة. أما المستوى المعروض أعلاه فهو التحذير الساعي، لذا قد يختلفان.",
+        "none": "لا بند في هذه الخطة يحتاج إلى علامة.",
+        "itemsOne": "بند واحد يحتاج إلى علامة: {list}.",
+        "items": "{count} بنود تحتاج إلى علامة: {list}.",
+        "item": "منطقة الخطة <bdi>{zone}</bdi>، من <bdi>{from}</bdi> إلى <bdi>{to}</bdi>",
+        "itemText": "منطقة الخطة {zone}، من {from} إلى {to}",
+        "tickOne": "ضع علامة على بند واحد آخر لتوقّع",
+        "tickMany": "ضع علامة على {count} بنود أخرى لتوقّع",
+        "submit": "وقّع",
+        "sending": "جارٍ التوقيع",
+        "missing": "ما زالت هذه البنود تحتاج إلى علامة: {list}.",
+        "failed": "لم يُسجَّل التوقيع. حاول مرة أخرى. لا ينتظر التنبيه ولا «أوقف العمل» التوقيع.",
+        "offline": "لا توجد إشارة. لم يُرسَل التوقيع. لا ينتظر التنبيه ولا «أوقف العمل» التوقيع.",
+        "signed": "وقّعه مشرف الموقع <bdi>{time}</bdi>. ترى الفرق هذه الخطة.",
+        "signedNoTime": "موقَّعة. ترى الفرق هذه الخطة."
+      },
+      "loading": "جارٍ تحميل الخطة",
+      "empty": {
+        "title": "لا خطة لهذا الفريق اليوم",
+        "reason": "لا توجد ساعات وردية للتخطيط. لا يتأثر التنبيه ولا «أوقف العمل».",
+        "primary": "كل الفرق"
+      },
+      "error": {
+        "title": "لم تُحمَّل الخطة",
+        "detail": "ترى الفرق خطة القواعد في هذه الأثناء. لا يتأثر التنبيه ولا «أوقف العمل»."
+      },
+      "refreshFailed": {
+        "title": "تعذّر تحديث هذه الخطة.",
+        "body": "تُعرض آخر خطة قرأها هذا الهاتف. قد تكون قديمة. التوقيع متوقف إلى أن تُحمَّل الخطة.",
+        "retry": "حاول مرة أخرى"
+      },
+      "invalid": {
+        "title": "لم تجتز هذه الخطة فحص القواعد ولذلك لا تُعرض.",
+        "detail": "ترى الفرق بديل قواعد الموقع، وهو لا يقل حماية عن حظر الظهيرة أبدًا. التوقيع متوقف إلى أن تجتاز خطة الفحص."
+      },
+      "notLegal": {
+        "title": "هذه الوردية غير قانونية كما هي مخططة",
+        "detail": "الوردية المنشورة للفريق تخالف قاعدة وردية بذاتها، لذلك لا يمكن إعداد خطة إلى أن تُصحَّح الوردية. لا يتأثر التنبيه ولا «أوقف العمل».",
+        "rules": "القواعد التي تخالفها الوردية"
+      },
+      "notFound": {
+        "title": "لم يُعثر على هذا الفريق",
+        "reason": "لا يوجد في هذا الموقع فريق بهذا الرابط.",
+        "primary": "كل الفرق"
+      }
+    },
+    "stop": {
+      "region": "أوقف العمل",
+      "button": "أوقف العمل، <bdi>{crew}</bdi>",
+      "sending": "جارٍ إرسال الإيقاف",
+      "recorded": "أوقف <bdi>{crew}</bdi> العمل <bdi>{time}</bdi>. سُجّل الإيقاف. يصل الإشعار إلى الفرق خلال نحو ست دقائق. أبلغ الفريق الآن.",
+      "undo": "تراجع ({seconds} ث)",
+      "undoFailed": "لم يُرسَل التراجع. حاول مرة أخرى، أو استخدم «استئناف العمل».",
+      "stoppedBar": "توقف العمل <bdi>{time}</bdi>",
+      "stoppedDetail": "<bdi>{crew}</bdi>. سُجّل الإيقاف. يصل الإشعار إلى الفرق خلال نحو ست دقائق. أبلغ الفريق الآن.",
+      "stoppedDetailLate": "<bdi>{crew}</bdi>. أبلغ الفريق الآن.",
+      "resume": "استئناف العمل",
+      "resumeTitle": "استئناف العمل لـ<bdi>{crew}</bdi>؟",
+      "resumeBody": "هذا ينهي الإيقاف المسجَّل في <bdi>{time}</bdi>.",
+      "resumeConfirm": "استئناف العمل",
+      "resumeCancel": "إبقاء العمل متوقفًا",
+      "resumeFailed": "لم يُرسَل الاستئناف. حاول مرة أخرى.",
+      "noActiveStop": "لا يوجد إيقاف نشط لهذا الفريق (استُؤنف العمل فعلًا، أو أُعيد ضبط النسخة التجريبية).",
+      "queued": "لم يُرسَل: لا توجد إشارة. أبلغ الفريق الآن.",
+      "queuedDetail": "يُحفظ إيقاف <bdi>{crew}</bdi> على هذا الهاتف ويُرسل عند عودة الاتصال.",
+      "failed": "لم يُرسَل. أبلغ الفريق الآن.",
+      "failedDetail": "اضغط «أوقف العمل» للمحاولة مرة أخرى.",
+      "expiredClock": "لم يُرسَل إيقاف <bdi>{crew}</bdi>. بدا الوقت على هذا الهاتف غير صحيح عند الضغط، لذلك لم يُحفَظ. أبلغ الفريق الآن، بالصوت أو باللاسلكي، واضغط «أوقف العمل» مرة أخرى عندما تكون متصلًا.",
+      "expired": "لم يُرسَل إيقاف <bdi>{crew}</bdi>. انتظر 60 دقيقة بلا اتصال وانتهت صلاحيته. أبلغ الفريق الآن، بالصوت أو باللاسلكي، واضغط «أوقف العمل» مرة أخرى عندما تكون متصلًا.",
+      "noCrew": "لم تُحمَّل قائمة الفرق. قل للفريق أن يوقف العمل الآن.",
+      "noCrews": "لا توجد فرق في هذا الموقع لإيقافها."
+    }
+  },
+  "hse": {
+    "title": "نظرة عامة على HSE",
+    "empty": {
+      "title": "نظرة عامة على HSE",
+      "reason": "عرض HSE الشامل للموقع قادم في الإصدار التالي. يمكنك في الأثناء معاينة عرض المشرف.",
+      "primary": "معاينة عرض المشرف"
+    }
+  },
+  "states": {
+    "retry": "حاول مرة أخرى",
+    "loading": "جارٍ التحميل",
+    "waking": "جارٍ تشغيل الخدمة. قد يستغرق التحميل الأول بعد فترة من عدم الاستخدام وقتًا أطول.",
+    "noData": "لا توجد بيانات",
+    "offline": "أنت غير متصل بالإنترنت",
+    "error": {
+      "title": "حدث خطأ ما",
+      "detail": "تعذّر تحميل هذا. تحقق من اتصالك وحاول مرة أخرى.",
+      "requestId": "معرّف الطلب: {id}",
+      "copy": "نسخ معرّف الطلب",
+      "copied": "تم النسخ"
+    },
+    "stale": {
+      "title": "آخر تحديث {time}",
+      "detail": "قد تكون هذه البيانات قديمة. تُحدَّث المستويات عند عودة الاتصال."
+    },
+    "staleBanner": {
+      "title": "آخر مستوى معروف",
+      "body": "حُدِّث <bdi>{time}</bdi>، قبل <bdi>{age}</bdi>. قد يكون قديمًا."
+    },
+    "offlineBanner": {
+      "title": "أنت غير متصل",
+      "body": "يُعرض ما حفظه هذا الهاتف.",
+      "lastKnown": "حُدِّث <bdi>{time}</bdi>، قبل <bdi>{age}</bdi>."
+    },
+    "pendingBanner": "{what} لم يُسجَّل بعد. تظهر الأرقام هنا عندما يُسجَّل.",
+    "missingProvenance": "لا يُعرض {what} لأن مصدره مفقود.",
+    "requestIdLabel": "معرّف الطلب",
+    "stamp": {
+      "replay": "إعادة تشغيل",
+      "recorded": "مسجَّل",
+      "simulated": "محاكى",
+      "designed": "مصمَّم",
+      "dev2025": "DEV 2025",
+      "notClinicallyReviewed": "لم يُراجَع سريريًا"
+    },
+    "proof": {
+      "chip": "Proof",
+      "lock": {
+        "note": "Held-out 2026 run: the protocol was committed and locked before the models were scored.",
+        "hash": "SHA-256 of the lock the run started under",
+        "protocolCommit": "Commit of the pre-registered protocol",
+        "amendmentsNote": "Changes to the protocol and the freeze addendum, each committed before 2026 was scored. They are listed with their commit and fingerprint; read them with the protocol, they are not summarized here."
+      },
+      "chipAria": "Proof for {what}",
+      "loadFailed": "The proof could not be opened. Try again.",
+      "title": "Where this number comes from",
+      "close": "Close",
+      "rows": {
+        "number": "Number",
+        "protocol": "Protocol line",
+        "script": "Script",
+        "file": "Result file",
+        "sha": "SHA-256",
+        "label": "Label",
+        "model": "Model",
+        "lock": "Pre-registration",
+        "generated": "Generated",
+        "amendments": "Amendments and freeze"
+      },
+      "sha": {
+        "file": "Of the file this page drew",
+        "source": "Of the data the exporter read"
+      },
+      "notRecorded": "Not recorded",
+      "labels": {
+        "real": "REAL",
+        "realAssumedCrew": "REAL weather + assumed crew",
+        "simulated": "SIMULATED",
+        "dev2025": "DEV 2025, LOCO out-of-fold: not the result",
+        "recorded": "RECORDED"
+      },
+      "recount": {
+        "button": "Recount in this browser",
+        "busy": "Recounting",
+        "match": "Matches",
+        "mismatch": "Does not match: report this",
+        "unpublished": "This file is not published here, so it cannot be recounted.",
+        "failed": "The file could not be read, so nothing was recounted."
+      },
+      "syntheticShape": "synthetic shape"
+    }
+  },
+  "levels": {
+    "label": "مستوى الحرارة",
+    "name": {
+      "green": "أخضر",
+      "amber": "كهرماني",
+      "orange": "برتقالي",
+      "red": "أحمر"
+    },
+    "cellLabel": "{time}، {name}، المستوى {index}",
+    "banActive": "فترة حظر العمل",
+    "siteRules": "قواعد الموقع",
+    "scale": {
+      "live": "المستوى {index} من 4، {name}",
+      "stale": "آخر مستوى معروف {index} من 4، {name}",
+      "fallback": "مستوى بديل {index} من 4، {name}",
+      "none": "لا مستوى، تسري قواعد الموقع"
+    }
+  },
+  "actions": {
+    "draft": "مسودة",
+    "pending": "صياغة الإجراء لهذا المستوى بانتظار المراجعة."
+  },
+  "offline": {
+    "title": "أنت غير متصل بالإنترنت",
+    "body": "هذه الصفحة غير محفوظة على هذا الهاتف بعد. الصفحات التي فتحتها سابقًا تعمل.",
+    "openToday": "افتح مستويات اليوم"
+  },
+  "judge": {
+    "island": {
+      "loadFailed": "تعذّر التحميل. حاول مرة أخرى."
+    },
+    "scoreboard": {
+      "title": "Summer 2026, replayed honestly",
+      "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded.",
+      "facts": "Forecast made about 24 hours ahead · Scored against station thermometers",
+      "skip": "Skip to the scores",
+      "season": {
+        "heading": "The season: recorded raw forecast, before correction",
+        "aria": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
+        "ariaNoBreak": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
+        "limit": "Heavy-work limit {limit} °C",
+        "slot": "Midday break in force, {from} to {to}, {start} to {end}",
+        "slotShort": "Midday break in force",
+        "peak": "{value} °C, {day}, {hour}, the hottest raw forecast",
+        "coolest": "Coolest day still peaked at {value} °C, {day}",
+        "tableToggle": "Show the daily numbers as a table",
+        "tableCaption": "Daily peak forecast, one row per day",
+        "columns": {
+          "day": "Day",
+          "peak": "Peak, °C",
+          "over": "Working hours over the limit",
+          "inBreak": "Midday break in force"
+        },
+        "yes": "Yes",
+        "no": "No",
+        "caption": "Recorded raw forecast, before correction. These are not hours that were actually over the limit: what the station recorded is scored below."
+      },
+      "tally": {
+        "through": "Through {date}",
+        "final": "Through {date}, final",
+        "daysOf": "of {total}",
+        "days": "days the raw forecast peak was above {limit} °C",
+        "hours": "working hours the raw forecast put above the limit",
+        "inBreak": "of those inside the midday break",
+        "whatDays": "Days the recorded raw forecast peaked above the limit, before correction",
+        "whatHours": "Working hours the recorded raw forecast put above the limit, before correction",
+        "whatInBreak": "Raw-forecast hours above the limit inside the midday break, before correction"
+      },
+      "player": {
+        "play": "Play the season",
+        "pause": "Pause",
+        "resume": "Resume",
+        "note": "Plays {days} days in 8 seconds. Counts of the recorded raw forecast, before correction, not hours that were actually over the limit. The scores below compare warnings with what the station recorded.",
+        "reducedMotion": "Animation is off on this device, so the whole season is shown."
+      },
+      "verdict": {
+        "heading": "What the season showed",
+        "pending": "Chosen from the pre-registered outcome table after the single scoring run.",
+        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change.",
+        "other": "Other pre-registered checks, as the scoring run wrote them",
+        "lead2": "The same check on the forecast issued by 18:00 the evening before",
+        "plansHeading": "Plans, as the scoring run wrote them",
+        "priorNow": "Supported on 2026 (pre-registered).",
+        "priorSupported": "On the 2025 development run, the prior run, this check was supported too.",
+        "priorNotSupported": "On the 2025 development run, the prior run, this check was not supported."
+      },
+      "warnings": {
+        "heading": "Warnings",
+        "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
+        "defs": "A danger hour is an hour the station was in the ADOSH High or Red zone. Stellar Blaze warns when its corrected forecast puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; both thresholds are shown.",
+        "caption": "Four ways to warn a crew, scored on the season",
+        "miniCaption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
+        "columns": {
+          "policy": "Policy",
+          "missed": "Danger hours nobody was warned about",
+          "falseAlarm": "False-alarm hours",
+          "warned": "Share of danger hours warned",
+          "falseShare": "Share of warnings that were false alarms"
+        },
+        "whatMissed": "Danger hours nobody was warned about, {policy}",
+        "whatFalseAlarm": "False-alarm hours, {policy}",
+        "whatWarned": "Share of danger hours warned, {policy}",
+        "whatFalseShare": "Share of warnings that were false alarms, {policy}",
+        "pending": "Warnings, summer 2026: danger hours nobody was warned about, false alarms and the two shares",
+        "policies": {
+          "P0": {
+            "label": "Baseline: ban only",
+            "sub": "{start} to {end} by law, nothing else. It never warns on a worked hour.",
+            "code": "P0"
+          },
+          "P1": {
+            "label": "Fixed 32 °C rule",
+            "sub": "Stop when the raw forecast reaches 32 °C",
+            "code": "P1"
+          },
+          "P2": {
+            "label": "ADOSH zones on the raw forecast",
+            "sub": "The regulator's zones, no correction",
+            "code": "P2"
+          },
+          "P3_protect": {
+            "label": "Stellar Blaze",
+            "sub": "Corrected forecast, warns at the protective threshold",
+            "code": "P3, protective"
+          },
+          "P3_balanced": {
+            "label": "Stellar Blaze, balanced",
+            "sub": "Corrected forecast, warns at the balanced threshold",
+            "code": "P3, balanced"
+          }
+        },
+        "lead2": {
+          "heading": "Stricter check: forecast issued by 18:00 the evening before",
+          "sub": "The same ways to warn, on the forecast issued by 18:00 Gulf time the evening before.",
+          "caption": "Ways to warn a crew, scored on the season with the forecast issued by 18:00 the evening before"
+        },
+        "truth": "On the station's own record the season had {value} danger hours ({lo} to {hi}, 95% interval). A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}, at Abu Dhabi airport (OMAA), summer 2026; the thermal margin of {margin} W/m² is an assumption.",
+        "truthWhat": "Danger hours in the season, from the station record",
+        "rowSub": "{code}. {sub}",
+        "tradeoff": {
+          "missed": "Danger hours missed: Stellar Blaze at the protective threshold (theta {theta}) missed {a}, which is {c0} ban only ({p0}{o0}), {c2} ADOSH zones on the raw forecast ({p2}{o2}) and {c1} the fixed 32 °C rule ({p1}{o1}).",
+          "falseAlarm": "False-alarm hours: {a}, which is {c1} the fixed 32 °C rule ({p1}{o1}) and {c2} ADOSH zones on the raw forecast ({p2}{o2}).",
+          "balanced": "At the balanced threshold (theta {theta}) Stellar Blaze and ADOSH zones on the raw forecast cannot be told apart: danger hours missed {m1} and {m2}, false-alarm hours {f1} and {f2}, with overlapping 95% intervals.",
+          "cmp": {
+            "fewer": "fewer than",
+            "more": "more than",
+            "same": "the same as"
+          },
+          "overlap": "; the 95% intervals overlap"
+        }
+      },
+      "plans": {
+        "heading": "Plans",
+        "sub": "Each shift plan checked by the independent validator against what the station recorded.",
+        "defs": "Rest minutes added are a simulated cost on an assumed crew. We report rule-violation minutes and make no claim about health outcomes.",
+        "caption": "Shift plans, checked on the season",
+        "columns": {
+          "plan": "Plan",
+          "violation": "Rule-violation minutes per worker-season",
+          "cycled": "Share of High-zone heavy work planned as cycled",
+          "missed": "Minutes worked in a milder plan zone than the truth",
+          "rest": "Rest minutes added per worker-season"
+        },
+        "whatViolation": "Rule-violation minutes per worker-season, {plan}",
+        "whatCycled": "Share of High-zone heavy work planned as cycled, {plan}",
+        "whatMissed": "Minutes worked in a milder plan zone than the truth, {plan}",
+        "whatRest": "Rest minutes added per worker-season, {plan}",
+        "pending": "Plans, summer 2026: rule-violation minutes, cycled share, missed protection and rest minutes",
+        "roster": "Roster: {roster}",
+        "rows": {
+          "merged": {
+            "label": "Baseline: ban only (= working every shift minute outside the midday break, on the legal roster)",
+            "sub": "The legal minimum. Working through and ban only are the same plan."
+          },
+          "rule_raw": {
+            "label": "Rule plan on the raw forecast",
+            "sub": "ADOSH cycles from the raw forecast"
+          },
+          "rule_corrected": {
+            "label": "Rule plan on our corrected forecast",
+            "sub": "The protective quantile of the corrected forecast"
+          }
+        },
+        "tradeoff": "Rule-violation minutes per worker-season fall from {from} with ban only to {to} on the corrected plan. It adds {rest} rest minutes per worker-season against ban only; the rule plan on the raw forecast adds {restRaw}. {days} scored days, simulated crew."
+      },
+      "table": {
+        "notScored": "not scored yet",
+        "ours": "This is the Stellar Blaze row.",
+        "interval": "95% interval {lo} to {hi}",
+        "notComputed": "not computed",
+        "baselineNoInterval": "baseline, no interval"
+      },
+      "partial": {
+        "title": "The Plans table is not on this page yet",
+        "reason": "The Plans file has not been written. The table appears here as soon as it is."
+      },
+      "empty": {
+        "title": "The scoring run has not written its file yet",
+        "reason": "Results appear after the single pre-registered run. Until then, one forecast number on this page shows exactly how a proof is read.",
+        "primary": "See how a number is proved"
+      },
+      "error": {
+        "title": "The scoreboard file could not be read",
+        "reason": "The season chart above is drawn from a separate recorded file. Nothing on this page is guessed in the meantime.",
+        "primary": "Try again"
+      },
+      "limits": {
+        "station": "Abu Dhabi airport only (OMAA), one summer the models had not seen.",
+        "crew": "The crew of {size} is an assumed schedule.",
+        "truth": "Truth is station temperature, humidity and wind plus modelled sunshine.",
+        "twl": "Thermal work limit aligned with ADOSH zones, not certified.",
+        "simulated": "Simulated crew, real weather."
+      },
+      "loading": "Loading the season",
+      "factsHeldOut": "Held-out 2026, every choice fixed on 2024-2025 data",
+      "units": {
+        "missed_danger_hours": "hours over the season",
+        "false_alarm_hours": "hours over the season",
+        "pod": "of danger hours were warned about",
+        "far": "of warnings were false alarms",
+        "violation_minutes_per_season": "minutes per worker-season",
+        "high_cycled_share": "of High-zone heavy work planned as cycled",
+        "missed_protection_ticks": "minutes in a milder plan zone than the truth",
+        "rest_minutes_added_vs_naive": "minutes per worker-season"
+      },
+      "evaluation": {
+        "line": "Scored once on summer 2026, under a protocol locked before the run.",
+        "what": "The 2026 evaluation: held-out and pre-registered"
+      }
+    },
+    "frontier": {
+      "sub": "Each point is a daily roster. Higher means more summer hours at 30 °C or more per scheduled hour; further right means more sleep. Pick a one-way commute.",
+      "whatPending": "The roster frontier analysis",
+      "loading": "Loading the roster frontier",
+      "commute": "One-way commute",
+      "commuteValue": "{minutes} min",
+      "aria": "Heat exposure against sleep for rosters at a {minutes} minute commute, with the legal default and the common practice roster marked.",
+      "xAxis": "Sleep per night, hours",
+      "yAxis": "Summer hours at 30 °C WBGT or more, per scheduled hour",
+      "gate": "{hours} h sleep gate",
+      "baselineLegal": "Legal default",
+      "baselineCommon": "Common practice",
+      "bestTitle": "On top of the legal default",
+      "bestUnit": "fewer hours at 30 °C or more, on top of the legal default, with sleep kept at {hours} h or more",
+      "legalTitle": "Making the common roster legal",
+      "legalUnit": "fewer hours at 30 °C or more on average in the analysis, going from common practice to the legal default. This gain belongs to the law, not to Stellar Blaze.",
+      "whatBest": "Share of hours at 30 °C or more avoided against the legal default at a {minutes} minute commute",
+      "whatLegal": "Share of hours at 30 °C or more avoided by making the common roster legal, on average in the analysis",
+      "tableToggle": "Show the roster numbers as a table",
+      "tableCaption": "Rosters at a {minutes} minute commute",
+      "columns": {
+        "roster": "Roster",
+        "sleep": "Sleep, hours",
+        "exposure": "Hours at 30 °C or more per scheduled hour"
+      },
+      "headingGain": "At a {minutes} minute commute the analysis finds {gain} fewer hours at 30 °C or more on top of the legal default, with sleep kept at {hours} h or more. Going from common practice to the legal default cuts them by {legal} on average in the analysis.",
+      "headingMissing": "The analysis has no result for a {minutes} minute commute",
+      "headingPending": "The roster frontier",
+      "bestMissing": "The analysis has no result for this commute.",
+      "headingNoGainFails": "At a {minutes} minute commute the analysis finds no gain on top of the legal default. The legal default itself leaves {sleep} h of sleep there, under the {hours} h sleep gate. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
+      "headingNoGainPasses": "At a {minutes} minute commute the analysis finds no gain on top of the legal default: in {noChange} of {folds} cross-validation folds it was not beaten. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
+      "bestNoneFails": "No gain on top of the legal default at this commute. The legal default itself leaves {sleep} h of sleep, under the {hours} h sleep gate.",
+      "bestNonePasses": "No gain on top of the legal default at this commute: it was not beaten in {noChange} of {folds} cross-validation folds.",
+      "unitsNote": "Each percentage is a relative reduction in hours at 30 °C WBGT or more, against the legal default or against common practice. The sleep gate is the least sleep a roster may leave a worker: {hours} h a night."
+    },
+    "day": {
+      "title": "One day, hour by hour, chosen by a rule before we looked",
+      "lede": "The raw forecast as made about 24 hours ahead, against what the station then recorded and what we would have said.",
+      "dayShown": "Day shown: {date}",
+      "dayShownPending": "Day shown until the scoring run picks the scored day: {date}, the hottest raw forecast of the recorded season.",
+      "heatHeading": "Heat by hour",
+      "chart": {
+        "aria": "WBGT by hour at {station} on {date}, {from} to {to}. {series} Heavy-work limit {limit} degrees. {peak}",
+        "ariaRaw": "Raw forecast made about 24 hours ahead.",
+        "ariaOurs": "Our 5 to 95 percent range.",
+        "ariaTruth": "Station truth.",
+        "ariaPeak": "Raw forecast peak {value} degrees at {hour}.",
+        "limit": "Heavy-work limit {limit} °C",
+        "slot": "Midday break",
+        "outline": "Midday break by law: not in force until {date}",
+        "outlineUnknown": "Midday break by law: not in force on this date",
+        "raw": "Raw forecast, made about 24 hours ahead",
+        "ours": "Ours (5 to 95 % range)",
+        "truth": "Station truth",
+        "peak": "Raw forecast peak {value} °C at {hour}"
+      },
+      "laterSeries": "Ours (5 to 95 % range) and station truth: added by the scoring run",
+      "rule": {
+        "heading": "Which day is scored",
+        "body": "The protocol fixes it by rule, on truth only: the day with the most observed High-zone working hours outside the midday break, ties to the earliest date. We show it whatever our forecast did.",
+        "pending": "Until the scoring run writes the day file, this page draws the hottest raw forecast of the recorded season and only the series that exist.",
+        "read": "Read the day rule",
+        "what": "The scored day and how it is chosen",
+        "candidates": "{count} candidate days met the conditions.",
+        "runnerUp": "Runner-up: {date}."
+      },
+      "table": {
+        "toggle": "Show the hours as a table",
+        "caption": "Heat by hour on the day shown, degrees C WBGT",
+        "hour": "Hour",
+        "raw": "Raw forecast",
+        "ours": "Ours (5 to 95 %)",
+        "truth": "Station truth",
+        "inBreak": "Midday break",
+        "yes": "yes",
+        "from": "from {time}",
+        "range": "{lo} to {hi}",
+        "notScored": "not scored yet"
+      },
+      "counters": {
+        "heading": "What the station recorded, and who called it",
+        "sub": "Called means the forecast put that hour in the High or Red zone. These numbers come from the one scoring run; the page ships unchanged whatever they are.",
+        "pending": "The tally for the day the protocol picks",
+        "high": "High or Red zone working hours on the day",
+        "outside": "Of those, outside {start} to {end}",
+        "raw": "Called by ADOSH zones on the raw forecast",
+        "ours": "Called by Stellar Blaze, protective threshold",
+        "hours": "hours",
+        "balanced": "Called by Stellar Blaze, balanced threshold",
+        "p1": "Called by the fixed 32 °C rule on the raw forecast",
+        "of": "{n} of {total}"
+      },
+      "error": {
+        "title": "The day file could not be read",
+        "reason": "The season scoreboard still works. Nothing here is guessed in the meantime.",
+        "primary": "Try again"
+      },
+      "loading": "Loading the day",
+      "titlePending": "One day, hour by hour"
+    },
+    "try": {
+      "title": "Try a plan against the rules",
+      "lede": "Pick a roster or write your own. The independent validator checks it against the day's heat and the labour rules, and answers with the rules the plan breaks.",
+      "independent": "The validator is independent: it shares no code with the planners that make our plans, so a plan cannot pass because the planner and the checker agree with themselves.",
+      "day": "Checked on {date}, the replay day, for a crew of {headcount} doing heavy work.",
+      "dayLive": "Checked on {date}, today at the site, for a crew of {headcount} doing heavy work.",
+      "templates": {
+        "heading": "Start from a roster",
+        "common": "Common roster",
+        "legal": "Legal default",
+        "straight": "Straight through",
+        "custom": "Your own times"
+      },
+      "assumptions": {
+        "heading": "Assumptions about the crew",
+        "note": "The check needs these two. They are filled in for you and you can change them.",
+        "acclimatised": "Crew is heat-acclimatised",
+        "acclimatisedNote": "Off means everyone is new to the heat, the protective default.",
+        "days": "Working days per week",
+        "daysNote": "Used for the weekly hours rule.",
+        "daysProblem": "Use a whole number from 1 to 7."
+      },
+      "runs": {
+        "heading": "Work times",
+        "run": "Run {n}",
+        "start": "Start",
+        "end": "End",
+        "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
+        "none": "Add at least one run of work to check a plan.",
+        "placeholder": "hh:mm",
+        "problem": {
+          "format": "Write the time as hh:mm, for example 06:00.",
+          "grid": "Use a multiple of 5 minutes, for example 06:05.",
+          "order": "The end must be after the start."
+        },
+        "range": "{from} to {to}"
+      },
+      "strip": {
+        "heading": "The plan on the day's heat",
+        "heatNote": "The colour behind the plan is the raw forecast of the day, hour by hour.",
+        "aria": "Work plan on {date}: {runs}. {marks}",
+        "ariaMarksOne": "1 rule broken, numbered on the plan.",
+        "ariaMarks": "{count} rules broken, numbered on the plan.",
+        "ariaNoMarks": "Not checked yet.",
+        "ariaClean": "No rule broken.",
+        "slot": "Midday break",
+        "outline": "Midday break by law: not in force until {date}",
+        "outlineUnknown": "Midday break by law: not in force on this date",
+        "noHeat": "No recorded forecast colour is drawn for this day: the recorded forecast is for another day."
+      },
+      "check": "Check this plan",
+      "checking": "Checking the plan",
+      "notReady": "The demo site is still loading. Try again in a moment.",
+      "noDay": "The day to check could not be read from the site's forecast. Try again in a moment.",
+      "result": {
+        "heading": "What the validator found",
+        "brokenOne": "1 rule broken",
+        "broken": "{count} rules broken",
+        "zero": "0 rules broken",
+        "zeroNote": "Every rule it checked passed for this plan.",
+        "checked": "What was checked",
+        "checkedNote": "These rules were evaluated on this plan, including the ones it passed.",
+        "violation": "Rule {n}",
+        "when": "When",
+        "clause": "Clause",
+        "notFresh": "No fresh forecast: protective plan"
+      },
+      "recorded": {
+        "button": "Show a recorded result",
+        "noteMock": "Recorded against the demo mock on {date}, not the live validator. It is what the validator said for the common roster, not a check of your times.",
+        "note": "Recorded on {date}. It is what the validator said for the common roster, not a check of your times.",
+        "hide": "Hide the recorded result"
+      },
+      "error": {
+        "title": "The validator did not answer.",
+        "reason": "Your times are kept. Nothing was checked, so this is not a result.",
+        "retry": "Try again",
+        "requestId": "Request id"
+      },
+      "invalid": {
+        "title": "The roster could not be read.",
+        "reason": "The validator could not read these lines. Nothing was checked.",
+        "line": "Run {line}"
+      },
+      "loading": "Loading the checker"
+    },
+    "story": {
+      "label": "القصة",
+      "chapter": "الخطوة {n} من {total}: {label}",
+      "back": "السابق: {label}",
+      "next": "التالي: {label}",
+      "copy": "انسخ رابط هذه الخطوة",
+      "copied": "تم نسخ الرابط",
+      "copyFailed": "تعذّر نسخ الرابط",
+      "steps": {
+        "problem": "المشكلة",
+        "scoreboard": "لوحة النتائج",
+        "day": "يوم واحد",
+        "proof": "الدليل",
+        "product": "المنتج"
+      }
+    },
+    "proof": {
+      "title": "Proof sheet",
+      "back": "Back to the scoreboard",
+      "openSheet": "Open the proof sheet",
+      "rowsHeading": "Where it comes from",
+      "timelineHeading": "The number's timeline",
+      "timeline": {
+        "forecast": "Forecast made",
+        "protocol": "Protocol committed",
+        "run": "Scoring run",
+        "shown": "Shown here"
+      },
+      "notes": {
+        "forecastAhead": "About 24 hours ahead of each day, by the ECMWF model.",
+        "notAForecast": "Not a forecast: recorded station observations and a roster model.",
+        "protocolCommitted": "The pre-registration, commit {commit}, before 2026 was scored.",
+        "noProtocolForecast": "No scoring protocol: this count is made from the recorded forecast file.",
+        "noProtocolAnalysis": "No scoring protocol: this is a recorded analysis, not a scored result.",
+        "runScored": "The single scoring run wrote this file.",
+        "runDev": "The 2025 development run wrote this file. It is not the result.",
+        "runNotScoring": "Not a scoring run: nothing here is scored.",
+        "shown": "This page reads the file whose fingerprint is above.",
+        "runSynthetic": "Not a scoring run: a script wrote this file with made-up numbers, only to check the layout.",
+        "protocolDev": "The pre-registration. This is a development run: it is not the held-out result."
+      },
+      "emptyTitle": "No provenance recorded for this number",
+      "emptyReason": "No provenance recorded for this number. It is not shown as a result.",
+      "emptyAction": "Open a number that has proof",
+      "unreadableTitle": "The file behind this number could not be read",
+      "unreadableReason": "The number exists but its result file could not be read, so it is not shown. Nothing here is guessed."
+    },
+    "governance": {
+      "eyebrow": "Governance refusal",
+      "title": "When an employer asks for individual health data, the answer is no, and every worker at the site can see that it was asked.",
+      "lede": "The service holds no individual health data, so it refuses every such request and writes the refusal to a log that every worker at the site can read. Press the button to watch it happen, in time order.",
+      "sequence": "What happens, in time order",
+      "request": {
+        "who": "Employer console",
+        "title": "The employer asks",
+        "subject": "Whose data",
+        "subjectValue": "One worker",
+        "dataClass": "Kind of data",
+        "dataClassHealth": "Health",
+        "workerRef": "Worker reference",
+        "refNote": "A made-up example. The service discards the reference: it is never stored, logged or shown.",
+        "send": "Send the employer's request",
+        "sendAgain": "Send again",
+        "caption": "Each send is a real call to the demo API and adds one row to the log. Nothing is sent until you press the button.",
+        "dataClassPersonal": "Personal",
+        "dataClassExposure": "Exposure"
+      },
+      "answer": {
+        "who": "API",
+        "title": "The service answers",
+        "waiting": "Waiting for the API",
+        "none": "Nothing sent yet.",
+        "refused": "Refused",
+        "type": "Problem type",
+        "problemTitle": "Title",
+        "detail": "Detail",
+        "detailRefused": "Individual health data is not held by this service and is never released to an employer.",
+        "requestId": "Request ID"
+      },
+      "audit": {
+        "who": "Audit log",
+        "title": "The audit row",
+        "none": "Nothing recorded.",
+        "when": "Time",
+        "what": "Entry",
+        "whatValue": "Data request",
+        "askedBy": "Asked by",
+        "askedByValue": "An employer account",
+        "outcome": "Outcome",
+        "outcomeValue": "Refused",
+        "why": "Why",
+        "whyValue": "A worker's health data is never released to an employer, whatever the reason given.",
+        "rules": "Rules in force",
+        "model": "Model",
+        "noModel": "none loaded",
+        "note": "The log is append-only and tamper-evident: an edited row is detected. It never records whose data was asked for."
+      },
+      "phone": {
+        "who": "Worker's phone",
+        "title": "Who asked for individual data",
+        "empty": "Nobody has asked for individual data at this site.",
+        "emptyHint": "If an employer asks, it is refused and shown here.",
+        "note": "Every worker at this site sees the same list. It says an employer asked at the site, never whose data.",
+        "sourceLive": "From the demo API's log",
+        "sourceRecorded": "From the recorded run",
+        "count": "The newest {shown} of {total} rows, from the demo API's log",
+        "countRecorded": "The newest {shown} of {total} rows, from the recorded run",
+        "liveBlockTitle": "Live rows from the demo API",
+        "liveBlockNote": "Written by sends to the demo API, by any visitor. They are not part of the recorded run above."
+      },
+      "notes": {
+        "times": "Times are Dubai time. Each step shows when it happened.",
+        "privacy": "A worker's heat level is worked out on the worker's phone and is not stored on the server."
+      },
+      "resetNote": "Reset starts a new demo epoch for this synthetic site. Nothing is deleted: the audit log stays append-only.",
+      "back": "Back to the scoreboard",
+      "proves": {
+        "title": "What proves it in the build",
+        "data_request_403_and_audit_row": "A data request gets a 403 problem and writes one audit row.",
+        "transparency_log_shows_refusal": "The worker-visible log shows the refusal and never whose data was asked for.",
+        "verify_detects_edited_row": "Editing a stored audit row is detected when the log is verified."
+      },
+      "status": {
+        "recorded": "This is a recorded run against the demo API. Press the button to run it live.",
+        "live": {
+          "title": "Live.",
+          "reason": "This run was just made against the demo API, and the log below is the log the API returned."
+        },
+        "noRun": {
+          "title": "No recorded run is available.",
+          "reason": "Press the button to make the request live."
+        },
+        "limited": "Not sent. Try again in a minute.",
+        "unauthorized": {
+          "title": "The request was not accepted.",
+          "reason": "This deployment has no demo employer token, so the call needed a sign-in it did not have. Nothing was recorded."
+        },
+        "failed": {
+          "title": "Nothing was sent, so nothing was recorded.",
+          "reason": "The demo API could not be reached. The last run stays on screen."
+        },
+        "requestId": "Request ID",
+        "unexpected": {
+          "title": "The API did not refuse the request.",
+          "reason": "This page does not report that as a result. Nothing is shown as a refusal."
+        },
+        "notReady": "The demo site is still loading. Try again in a moment.",
+        "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
+        "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
+      }
+    },
+    "landing": {
+      "metaTitle": "حرارة توقف العمل، متوقعة قبل نحو 24 ساعة",
+      "skip": "انتقل إلى لوحة النتائج",
+      "kicker": "صيف 2026، معاد تشغيله مقابل مقاييس حرارة المطار",
+      "title": "حرارة توقف العمل، متوقعة قبل نحو 24 ساعة.",
+      "lede": "مستويات حرارة ساعة بساعة، وخطط ورديات قانونية وتحذيرات بست لغات، لفرق العمل في موقع العمل، وردية بوردية.",
+      "primary": "شاهد لوحة النتائج",
+      "secondary": "خذني في جولة",
+      "apps": {
+        "heading": "افتح التطبيقين",
+        "note": "كلاهما يعمل ببيانات اصطناعية في هذه النسخة التجريبية."
+      },
+      "field": {
+        "region": "حقل الحرارة المتوقعة فوق الإمارات، {day}",
+        "readout": "قراءة الحقل في الساعة المحددة",
+        "hottest": "أسخن خلية في الشبكة عند {hour}",
+        "where": "{lat} شمالًا {lon} شرقًا",
+        "station": "مطار أبوظبي (OMAA)، سلسلة توقعاته الخاصة",
+        "limit": "حد العمل الشاق (NIOSH)",
+        "cells": "خلايا الشبكة فوق الحد",
+        "cellsOf": "{n} من {total}",
+        "degrees": "°C",
+        "sourcePeak": "WBGT في الشمس من توقعات ECMWF الصادرة في اليوم السابق، كما سُجّلت، قبل أي تصحيح. {day} فيه أعلى ذروة يومية في التوقعات الخام للصيف، ويُعرض للتوضيح، لا بوصفه اليوم الذي قيّمناه.",
+        "sourcePlain": "WBGT في الشمس من توقعات ECMWF الصادرة في اليوم السابق، كما سُجّلت، قبل أي تصحيح. يُعرض {day} للتوضيح، لا بوصفه اليوم الذي قيّمناه.",
+        "proofWhat": "حقل الحرارة المتوقعة، {day}، كل ساعة",
+        "stations": {
+          "OMAA": "أبوظبي",
+          "OMDB": "دبي",
+          "OMAL": "العين",
+          "OMFJ": "الفجيرة"
+        },
+        "scrubber": {
+          "label": "ساعة اليوم، {day}",
+          "valueText": "{hour}: أسخن خلية في الشبكة {hottest} درجة، مطار أبوظبي {station}",
+          "play": "شغّل اليوم",
+          "pause": "أوقف اليوم مؤقتًا",
+          "when": "{day}، بتوقيت الخليج"
+        },
+        "loading": "جارٍ تحميل حقل التوقعات",
+        "error": {
+          "title": "لم تُحمَّل ملفات التوقعات",
+          "reason": "ما زالت لوحة النتائج وصفحات الدليل تعمل. أعد التحميل لتجرّب الحقل مرة أخرى.",
+          "primary": "شاهد لوحة النتائج"
+        }
+      },
+      "hook": {
+        "heading": "الموسم في سجل المحطة نفسها",
+        "label": "ساعات خطر في مطار أبوظبي، صيف 2026",
+        "interval": "من {lo} إلى {hi}، فاصل ثقة 95%",
+        "definition": "ساعة الخطر هي ساعة تقع في منطقة ADOSH المرتفعة أو الحمراء خلال النهار الفعلي للعمل، {hours}. يُحسم ما إذا كانت الساعة ساعة خطر بالحقيقة المشتقة من الرصد؛ وهامش الحرارة البالغ {margin} واط/م² افتراض."
+      },
+      "problem": {
+        "eyebrow": "المشكلة",
+        "heading": "استراحة الظهيرة لا تغطي إلا جزءًا من الساعات الحارة",
+        "body1": "من {from} إلى {to} يمنع القانون العمل في الخارج من {start} إلى {end}. وتضع التوقعات الخام المسجَّلة ساعات عمل فوق حد العمل الشاق خارج تلك النافذة أيضًا.",
+        "body2": "يحتاج الفريق إلى معرفة أي الساعات، لا أي الأشهر. وهذه هي التوقعات التي نقدمها له قبل نحو 24 ساعة.",
+        "ofHours": "من أصل {total} ساعة عمل",
+        "calendarAria": "كل ساعة عمل، من {start} إلى {end}، على مدى {days} يومًا من {from} إلى {to}، من التوقعات الخام المسجَّلة قبل التصحيح. {over} من {n} ساعة فوق حد العمل الشاق البالغ {limit} °C؛ وتظهر استراحة الظهيرة أسفل الخط في الأيام التي تسري فيها.",
+        "legendSlot": "استراحة الظهيرة، بحكم القانون",
+        "legendHot": "ملوّن: فوق {limit} °C، والأفتح أسخن",
+        "legendCool": "رمادي: ليس فوق الحد",
+        "tableToggle": "اعرض الأعداد في جدول",
+        "tableCaption": "ساعات العمل في التوقعات الخام المسجَّلة فوق الحد، حسب الشهر",
+        "columns": {
+          "period": "الأيام",
+          "hours": "ساعات العمل",
+          "over": "فوق الحد",
+          "inBreak": "داخل استراحة الظهيرة"
+        },
+        "period": "من {from} إلى {to}",
+        "bridge": "هذه الساعات البالغ عددها {over} وساعات الخطر البالغ عددها {danger} في أعلى هذه الصفحة تعدّ أشياء مختلفة مقابل حدود مختلفة: هنا التوقعات الخام المسجَّلة مقابل حد العمل الشاق البالغ {limit} °C، وهناك الحرارة التي رصدتها المحطة مقابل منطقة ADOSH المرتفعة أو الحمراء."
+      },
+      "season": {
+        "eyebrow": "لوحة النتائج",
+        "heading": "أربع طرق لتحذير فريق، مقيَّمة على صيف واحد",
+        "body": "تحصل كل طريقة تحذير على التوقعات التي كانت ستتوفر لها قبل نحو 24 ساعة فقط. ثم تقول مقاييس حرارة المحطة ما حدث.",
+        "open": "افتح لوحة النتائج"
+      },
+      "ledeProof": "كل رقم عن الموسم والنتائج يأتي من ملف مسجَّل، وتذكر شارة الدليل أي ملف."
+    }
+  }
+}

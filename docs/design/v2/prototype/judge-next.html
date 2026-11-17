@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's next · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.tl { --cols: 14; display: grid; grid-template-columns: 260px repeat(var(--cols), minmax(0, 1fr)); border-top: 1px solid var(--edge); }
+.tl .m { grid-row: 1; padding: var(--s-2) 0 var(--s-2) 4px; font-size: var(--t-12); color: var(--ink-3); border-inline-start: 1px solid var(--hair); }
+.tl .m.y { color: var(--ink-2); font-weight: 500; }
+.tl .grp { grid-column: 1 / -1; padding: var(--s-4) 0 var(--s-1); font-size: var(--t-13); color: var(--ink-3); font-weight: 500; display: flex; align-items: center; gap: var(--s-2); border-bottom: 1px solid var(--hair); }
+.tl .nm { grid-column: 1; padding: 10px var(--s-4) 10px 0; font-size: var(--t-14); font-weight: 500; border-bottom: 1px solid var(--hair); }
+.tl .lane { grid-column: 2 / -1; position: relative; border-bottom: 1px solid var(--hair); min-height: 44px; }
+.tl .mark { position: absolute; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--t-13); color: var(--ink-2); }
+.tl .span { position: absolute; top: 50%; height: 6px; transform: translateY(-50%); background: var(--ink-3); }
+.tl .span.shadow { background: transparent; border: 1px dashed var(--ink-3); height: 8px; }
+.tl .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.tl .slotrow { grid-column: 2 / -1; position: relative; height: 34px; }
+.tl .slotrow .s { position: absolute; top: 4px; height: 24px; background: var(--slot); border-inline: 1px solid var(--edge); display: grid; place-items: center; font-size: var(--t-12); color: var(--ink-3); font-weight: 500; white-space: nowrap; overflow: hidden; }
+.g { width: 12px; height: 12px; border-radius: 1px; flex: none; display: inline-block; }
+.g.exists { background: var(--ink); }
+.g.designed { border: 2px solid var(--ink-2); }
+.g.pilot { border: 1px dashed var(--ink-2); }
+.g.rejected { background: linear-gradient(45deg, transparent 44%, var(--ink-3) 44% 56%, transparent 56%); border: 1px solid var(--ink-3); }
+.key { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); margin-top: var(--s-3); color: var(--ink-2); font-size: var(--t-13); }
+.key span { display: inline-flex; gap: var(--s-2); align-items: center; }
+.items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+.item { padding: var(--s-4); background: var(--panel); border: 1px solid var(--hair); border-radius: var(--r); display: grid; gap: var(--s-2); align-content: start; }
+.item h3 { font: 600 var(--t-16)/1.3 var(--sans); display: flex; gap: var(--s-2); align-items: center; }
+.item .st { color: var(--ink-3); font-size: var(--t-13); font-weight: 500; }
+.item dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--s-1) var(--s-3); font-size: var(--t-14); }
+.item dt { color: var(--ink-3); } .item dd { color: var(--ink-2); }
+.vlist { display: none; list-style: none; padding: 0; border-inline-start: 2px solid var(--edge); margin-inline-start: 6px; }
+.vlist li { position: relative; padding: 0 0 var(--s-4) var(--s-6); display: grid; gap: 2px; }
+.vlist li .g { position: absolute; inset-inline-start: -7px; top: 4px; background-color: var(--ground); }
+.vlist li .g.exists { background: var(--ink); }
+.vlist time { color: var(--ink-3); font-size: var(--t-13); }
+.vlist b { font-weight: 500; font-size: var(--t-14); }
+.vlist .slotli { margin: 0 0 var(--s-4) -2px; padding: var(--s-2) var(--s-4); background: var(--slot); border-block: 1px solid var(--edge); color: var(--ink-3); font-size: var(--t-13); }
+@media (max-width: 900px) { .tl { display: none; } .vlist { display: block; } .items { grid-template-columns: 1fr; } .item dl { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body class="j-has-story">
+<a class="skip" href="judge-season.html">Skip to the scoreboard</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">What is built, designed, or waits for a pilot</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html" aria-current="page">What's next</a></nav>
+</header>
+
+<main class="j-page">
+  <div class="j-head">
+    <h1 class="j-h1">Seven next steps, placed on the calendar they depend on</h1>
+    <p class="j-lede">Each step says what exists today and what would start it. Positions are the earliest start if the trigger happens, our estimate; nothing here is claimed as done.</p>
+  </div>
+
+  <div data-when="loading"><div class="skel" style="height:420px">.</div></div>
+
+  <section aria-labelledby="h-tl" data-when="ideal">
+    <h2 class="sr-only" id="h-tl">Roadmap timeline, November 2026 to December 2027</h2>
+    <div class="tl" id="tl" role="img" aria-label="Roadmap from November 2026 to December 2027. The 2027 midday break, 15 June to 15 September, is cut into the axis."></div>
+    <ol class="vlist" id="vlist"></ol>
+    <p class="key"><span><i class="g exists"></i>Exists</span><span><i class="g designed"></i>Designed, not built</span><span><i class="g pilot"></i>Needs a pilot partner</span><span><i class="g rejected"></i>Rejected for now</span><span>Dashed bar: four weeks in shadow mode, warnings logged, not acted on</span></p>
+  </section>
+
+  <section class="j-sec" aria-labelledby="h-it" data-when="ideal">
+    <h2 id="h-it">Each step, in full</h2>
+    <p class="sub">Grouped by how far each one is from real.</p>
+    <div class="items" id="items"></div>
+    <p class="j-src" style="margin-top:var(--s-4)">ADPHC has not been contacted. Status marks are our own reading of how far each step is from real.</p>
+  </section>
+
+  <section class="j-sec" data-when="empty"><div class="empty"><h3>No roadmap steps are recorded</h3><p class="muted">The roadmap is read from the decision records. Add a step there and it appears here with its status and trigger.</p><a class="btn primary" href="judge-season.html">Back to the scoreboard</a></div></section>
+  <section class="j-sec" data-when="error"><div class="empty"><h3>The roadmap did not load</h3><p class="muted">The scoreboard and proof pages are not affected.</p><a class="btn primary" href="judge-next.html">Try again</a><p class="faint" style="font-size:var(--t-13)">Request ID <span class="mono">req-5e20aa</span></p></div></section>
+</main>
+<nav class="j-story" id="story" aria-label="Story"></nav>
+
+<script type="module">
+import { boot } from './assets/kit.js';
+import { storyNav } from './assets/judge.js';
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error'] });
+storyNav(document.getElementById('story'), 'next');
+const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+
+// content carried over from v1 replay-next.html; positions = earliest start if the trigger happens (estimate)
+const STEPS = [
+  { s: 'exists', g: 'Exists', name: 'Production forecast data path', at: 2026.9, mark: 'built and probed on 11 Nov', next: 'Run production forecasts on ECMWF open data, which allows commercial use (CC BY 4.0).', now: 'Probe scripts and the forecast-source port. Probed on 11 Nov: an open archive on AWS holds the past days we need.', trig: 'Any commercial pilot. The free tier we use today is non-commercial.' },
+  { s: 'designed', g: 'Designed', name: 'Self-hosted language model', at: 2027.2, mark: 'when a UAE GPU is in place', next: 'Run a language model on our own servers for anything that touches personal data, for example Arabic and Urdu questions from supervisors.', now: 'The routing rule: personal data never leaves our infrastructure. A compliance drafter that sees aggregates only.', trig: 'A pilot needs Arabic or Urdu supervisor questions and answers, and a GPU inside the UAE (parked).' },
+  { s: 'designed', g: 'Designed', name: 'Regulator view', at: 2027.8, mark: 'after a pilot summer', next: 'A view for the regulator of hours by site and zone: High-zone hours, plans signed, stops. Small groups are hidden.', now: 'The aggregation rules: groups under 10 (health) or 5 (exposure) are hidden, and every employer sees only its own crews.', trig: 'Interest from the Abu Dhabi regulator and a data-sharing agreement.' },
+  { s: 'pilot', g: 'Needs a pilot', name: 'Pilot with a regulator partner', at: 2027.37, to: 2027.75, shadow: 2027.45, mark: 'four weeks in shadow, then live to Sep', next: 'One site group near the airport cluster, one summer. Four weeks in shadow mode first, then live. Outcomes from incident records and site clinic visits, small groups hidden.', now: 'A pilot one-pager.', trig: 'A contractor HSE lead says yes, and the health department research route is confirmed. ADPHC has not been contacted.' },
+  { s: 'pilot', g: 'Needs a pilot', name: 'Validation away from the airport', at: 2027.45, mark: 'sensor on the pilot site', next: 'Check the forecast and the zones against on-site globe and wet-bulb sensors at a real worksite.', now: "Nothing. Today's claim stops at held-out airport stations.", trig: 'The pilot site installs a sensor.' },
+  { s: 'pilot', g: 'Needs a pilot', name: 'Consented wearable signal', at: 2027.5, mark: 'with consented devices', next: 'A per-worker adapter for consented wearable data. Personal strain is worked out on the phone.', now: 'The observation port, with real station adapters, an in-memory one and contract tests.', trig: 'A pilot employer with consented devices, and a freedom-to-operate check against a wearable-strain patent.' },
+  { s: 'rejected', g: 'Rejected for now', name: 'Weeks 2 to 4 outlook', at: null, mark: 'no date: nothing to back-test', next: 'An outlook for weeks 2 to 4, to plan rosters further ahead.', now: 'Nothing, by design. No open archive lets us back-test it, and week-to-week heat anomalies carry almost no memory beyond the first week.', trig: 'An open extended-range hindcast archive that can be back-tested.' },
+];
+const T0 = 2026 + 10 / 12, T1 = 2028, pct = (t) => ((t - T0) / (T1 - T0)) * 100;
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const label = (t) => { const y = Math.floor(t), m = Math.floor((t - y) * 12 + 1e-6); return `${MON[m]} ${y}`; };
+let h = '<div class="nm" style="grid-row:1;border:0"></div>';
+for (let k = 0; k < 14; k++) { const m = (10 + k) % 12, y = 2026 + Math.floor((10 + k) / 12); h += `<span class="m${m === 0 || k === 0 ? ' y' : ''}" style="grid-column:${k + 2}">${MON[m]}${m === 0 || k === 0 ? ` ${y}` : ''}</span>`; }
+// the 2027 midday break, cut into the axis (15 Jun to 15 Sep)
+const b0 = 2027 + (5 + 14 / 30) / 12, b1 = 2027 + (8 + 14 / 30) / 12;
+h += `<div class="nm" style="border:0;padding:0"></div><div class="slotrow"><span class="s" style="left:${pct(b0)}%;width:${pct(b1) - pct(b0)}%">Midday break 2027, by law</span><span class="now" style="left:${pct(2026 + 10.4 / 12)}%"></span></div>`;
+let grp = '';
+for (const s of STEPS) {
+  if (s.g !== grp) { grp = s.g; h += `<p class="grp"><i class="g ${s.s}"></i>${s.g}</p>`; }
+  const x = s.at == null ? 96 : s.to ? pct(s.at) - 0.6 : pct(s.at), right = x > 70 || !!s.to;
+  h += `<div class="nm">${s.name}</div><div class="lane">${s.at === 2026.9 ? `<span class="now" style="left:${pct(2026 + 10.4 / 12)}%"></span>` : ''}`;
+  if (s.to) h += `<span class="span shadow" style="left:${pct(s.at)}%;width:${pct(s.shadow) - pct(s.at)}%"></span><span class="span" style="left:${pct(s.shadow)}%;width:${pct(s.to) - pct(s.shadow)}%"></span>`;
+  h += `<span class="mark" style="${right ? `right:${100 - x}%;flex-direction:row-reverse` : `left:calc(${x}% - 6px)`}"><i class="g ${s.s}"></i>${s.at == null ? '' : `<b style="font-weight:500;color:var(--ink)">${s.at === 2026.9 ? 'Now' : label(s.at)}</b>`}<span>${s.mark}</span></span></div>`;
+}
+document.getElementById('tl').innerHTML = h;
+// phone: the same spine, vertical
+const ord = [...STEPS].sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999));
+let v = '', slotDone = false;
+for (const s of ord) { if (!slotDone && s.at != null && s.at > b0 - 0.1 && s.at > 2027.4) { v += '<li class="slotli">Midday break 2027, 15 Jun to 15 Sep, by law</li>'; slotDone = true; }
+  v += `<li><i class="g ${s.s}"></i><time>${s.at == null ? 'No date' : s.at === 2026.9 ? 'Now' : `Earliest ${label(s.at)}`}</time><b>${s.name}</b></li>`; }
+document.getElementById('vlist').innerHTML = v;
+document.getElementById('items').innerHTML = STEPS.map((s) => `<article class="item"><p class="st">${s.g}</p><h3><i class="g ${s.s}"></i>${s.name}</h3><dl><dt>Next step</dt><dd>${s.next}</dd><dt>Exists now</dt><dd>${s.now}</dd><dt>Trigger</dt><dd>${s.trig}</dd></dl></article>`).join('');
+</script>
+</body>
+</html>

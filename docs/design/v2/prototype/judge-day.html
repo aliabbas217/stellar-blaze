@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One day · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s-8); align-items: start; }
+.rule { margin-top: var(--s-6); display: grid; gap: var(--s-2); padding: var(--s-4) var(--s-4); background: var(--panel); border: 1px solid var(--hair); border-radius: var(--r); }
+.rule b { font-weight: 600; }
+.rule p { color: var(--ink-2); font-size: var(--t-14); max-width: 80ch; }
+/* the worker card as the crew saw it: phone frame on desktop, full width on a phone */
+.phonef { border: 1px solid var(--edge); border-radius: 18px; padding: 10px; background: var(--ground-deep); }
+.phonef .scr { border-radius: 10px; overflow: hidden; background: var(--ground); border: 1px solid var(--hair); }
+.wtop { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--hair); }
+.wtop p { font-size: var(--t-14); font-weight: 600; } .wtop span { color: var(--ink-3); font-size: var(--t-13); font-weight: 400; display: block; }
+.wtop .clk { font-size: var(--t-18); font-weight: 500; }
+.wnow { padding: 12px 14px 0; view-transition-name: level; }
+.wnow .k { font-size: var(--t-13); color: var(--ink-3); }
+.wnow .level-word strong { font-size: var(--t-48); }
+.wnow .level-word span { font-size: var(--t-16); color: var(--ink-2); }
+.wnow .scale { margin-top: 10px; }
+.wspine { padding: 4px 6px 0; view-transition-name: spine; }
+.wspine svg .wp { font: 500 13px var(--sans); fill: var(--ink); }
+.wspine svg .wp2 { font: 400 12px var(--sans); fill: var(--ink-2); }
+.wlead { padding: 4px 14px 14px; font-size: var(--t-18); font-weight: 500; line-height: 1.3; }
+.cardnote { color: var(--ink-3); font-size: var(--t-13); margin-top: var(--s-3); }
+.counters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-6); }
+.counters div { border-top: 1px solid var(--edge); padding-top: var(--s-3); display: grid; gap: var(--s-2); align-content: start; }
+.counters .lbl { color: var(--ink-2); font-size: var(--t-14); }
+.counters .pend { font-size: var(--t-14); }
+.counters .ours { border-top-color: var(--signal); }
+.cta { display: flex; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-4); }
+@media (max-width: 1000px) { .split { grid-template-columns: 1fr; } .counters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .phonef { border: 0; padding: 0; background: none; border-radius: 0; } .phonef .scr { border-radius: var(--r); } }
+</style>
+</head>
+<body class="j-has-story">
+<a class="skip" href="judge-season.html">Skip to the scoreboard</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">One day, chosen before we looked</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html" aria-current="page">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+
+<main class="j-page">
+  <div class="j-head">
+    <h1 class="j-h1">One day, hour by hour, chosen by a rule before we looked</h1>
+    <p class="j-lede">The raw forecast as it stood the evening before, against what the station then recorded and what we would have said.</p>
+  </div>
+
+  <div data-when="loading" class="split"><div class="skel" style="height:420px">.</div><div class="skel" style="height:520px">.</div></div>
+
+  <div class="split" data-when="ideal">
+    <section aria-labelledby="h-c">
+      <h2 class="sr-only" id="h-c">Heat by hour</h2>
+      <div class="j-chart" id="day"></div>
+      <p class="j-legend" style="margin-top:var(--s-3)"><span><i class="sw"></i>Raw forecast as issued, Thu 3 Sep 2026</span><span><i class="sw lim"></i>Heavy-work limit 26.6 °C</span><span><i class="sw slot"></i>Midday break, 12:30 to 15:00</span><span class="later">Ours (5 to 95 % range) and station truth: added by the scoring run</span></p>
+      <div class="rule">
+        <b>Which day is scored</b>
+        <p>The protocol fixes it by rule, on truth only: the 2026 day with the most observed High-zone working hours outside the midday break, ties to the earliest date. We show it whatever our forecast did. Until the scoring run writes <span class="mono">demo_day.json</span>, this page draws 3 Sep, the hottest raw forecast of the summer, and only the series that exists.</p>
+        <p><button class="proof" type="button" data-proof='{"what":"The scored day and its four counts","protocol":"Day rule committed 12 Nov 2026, before 2026 was scored: most observed High-zone working hours outside the ban; ties to the earliest date","script":"backend/eval/demo_day.py","file":"demo_day.json","label":"Pending: written once by the scoring run"}'>Read the day rule</button></p>
+      </div>
+      <details class="j-alt"><summary>Show the hours as a table</summary><table class="tbl" id="tbl"></table></details>
+    </section>
+
+    <aside aria-labelledby="h-w">
+      <h2 class="label" id="h-w" style="margin-bottom:var(--s-2)">What the crew saw on their phone</h2>
+      <a class="phonef" href="worker-today.html" style="display:block;text-decoration:none" aria-label="Open the worker's Today screen">
+        <div class="scr">
+          <div class="wtop"><p>Mussafah M-14 yard<span>Crew B · concrete pour</span></p><p class="clk">11:10</p></div>
+          <div class="wnow"><p class="k">Heat level now</p><p class="level-word"><strong>Orange</strong><span>until 17:00</span></p>
+            <div class="scale" role="img" aria-label="Level 3 of 4, Orange"><span>Green</span><span>Amber</span><span aria-current="true">Orange</span><span>Red</span></div></div>
+          <div class="wspine ribbon" id="wspine"></div>
+          <p class="wlead">Rest 40 min in shade every hour</p>
+        </div>
+      </a>
+      <p class="cardnote">The prototype's worker screen for this day. Its level is a design state until the scoring run writes the day file; the weather under it is real.</p>
+      <div class="cta"><a class="btn" href="worker-today.html">Open the crew's phone</a></div>
+    </aside>
+  </div>
+
+  <section class="j-sec" aria-labelledby="h-n" data-when="ideal">
+    <h2 id="h-n">What the station recorded, and who called it</h2>
+    <p class="sub">Called means the evening-before forecast put that hour in the High zone. These four numbers come from the one scoring run; the page ships unchanged whatever they are.</p>
+    <div id="n-pend"></div>
+    <div class="counters">
+      <div><span class="lbl">High-zone hours on the day</span><span class="pend">not yet scored</span></div>
+      <div><span class="lbl">Of those, outside 12:30 to 15:00</span><span class="pend">not yet scored</span></div>
+      <div><span class="lbl">Called by the raw forecast</span><span class="pend">not yet scored</span></div>
+      <div class="ours"><span class="lbl">Called by Stellar Blaze</span><span class="pend">not yet scored</span></div>
+    </div>
+  </section>
+
+  <section class="j-sec" data-when="empty"><div class="empty"><h3>The scored day is not written yet</h3><p class="muted">The rule that picks it is fixed in the protocol. The day, its chart and its four counts appear after the scoring run.</p><a class="btn primary" href="judge-proof.html?n=outcome">Read the day rule</a></div></section>
+  <section class="j-sec" data-when="error"><div class="empty"><h3>The day file could not be read</h3><p class="muted">The season scoreboard still works. Nothing here is guessed in the meantime.</p><a class="btn primary" href="judge-day.html">Try again</a><p class="faint" style="font-size:var(--t-13)">Request ID <span class="mono">req-41d09e</span></p></div></section>
+</main>
+<nav class="j-story" id="story" aria-label="Story"></nav>
+
+<script type="module">
+import { boot, spine, q, fmt } from './assets/kit.js';
+import { loadData, dayChart, storyNav, pendingBanner, LIMIT } from './assets/judge.js';
+boot({ surface: 'desk', states: ['ideal', 'loading', 'empty', 'error'] });
+storyNav(document.getElementById('story'), 'day');
+const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+document.getElementById('n-pend').innerHTML = pendingBanner('The scored day and its four counts', 'demo_day.json', 'backend/eval/demo_day.py');
+if ((q.get('state') || 'ideal') === 'ideal') {
+  const S = (await loadData('omaa_2026_ifs_d1_wbgt_hourly.json')).json, DAY = S.wbgt_c_by_local_hour[S.days.indexOf('2026-09-03')];
+  const draw = () => dayChart(document.getElementById('day'), DAY, { ban: [12.5, 15], from: 5, to: 20, height: innerWidth < 640 ? 300 : 420,
+    aria: `Raw forecast WBGT at Abu Dhabi airport, Thu 3 Sep 2026, 05:00 to 20:00. Over the 26.6 °C limit every hour; peak 39.4 °C at 14:00. Our range and station truth are added by the scoring run.` });
+  draw(); addEventListener('resize', draw);
+  document.getElementById('tbl').innerHTML = `<thead><tr><th>Hour</th><th class="n">Raw forecast, °C</th><th class="n">Ours <span class="pend">(not yet scored)</span></th><th class="n">Station truth <span class="pend">(not yet scored)</span></th><th>Midday break</th></tr></thead><tbody>${Array.from({ length: 16 }, (_, k) => k + 5).map((h) => `<tr><td>${fmt(h)}</td><td class="n">${DAY[h].toFixed(1)}</td><td class="n"></td><td class="n"></td><td>${h >= 12 && h < 15 ? (h === 12 ? 'from 12:30' : 'yes') : ''}</td></tr>`).join('')}</tbody>`;
+  // the worker's spine, same component and transition name as worker-today
+  const el = document.getElementById('wspine'), now = 11 + 10 / 60, L = 250;
+  spine(el, { values: DAY, from: 6, to: 18, now, ban: [12.5, 15], orientation: 'v', width: 330, length: L, bandX: 56, band: 40, tickStep: 3, aria: 'Shift 06:00 to 18:00. Now 11:10. Midday break 12:30 to 15:00. Shift ends 18:00.' });
+  const svg = el.querySelector('svg'), pos = (t) => 18 + (t - 6) / 12 * (L - 36);
+  svg.querySelectorAll('.r-label, .r-tick').forEach((n) => { if (+n.getAttribute('x') > 100) n.remove(); });
+  const wp = (t, a, b) => `<line x1="108" x2="120" y1="${pos(t)}" y2="${pos(t)}" stroke="var(--ink)"/><text class="wp" x="126" y="${pos(t) + 4}">${a}</text>${b ? `<text class="wp2" x="126" y="${pos(t) + 20}">${b}</text>` : ''}`;
+  svg.insertAdjacentHTML('beforeend', wp(now, `Now · ${DAY[11].toFixed(1)} °C in sun`) + wp(12.5, 'Break in 1 h 20 min', '12:30 to 15:00, by law') + wp(15, 'Back to work 15:00') + wp(18, 'Shift ends 18:00'));
+}
+</script>
+</body>
+</html>

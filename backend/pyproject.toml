@@ -1,0 +1,247 @@
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14"]
+build-backend = "uv_build"
+
+[project]
+name = "stellar-blaze"
+version = "0.1.0"
+requires-python = ">=3.13,<3.15"
+dependencies = [
+    # API
+    "fastapi==0.162.4",
+    "pydantic==2.14.3",
+    "pydantic-settings==2.16.2",
+    "uvicorn[standard]==0.54.0",
+    "typer==0.29.0",
+    # persistence
+    "sqlalchemy[asyncio]==2.1.8",
+    "asyncpg==0.32.0",
+    "alembic==1.20.1",
+    # data
+    "numpy==2.5.4",
+    "polars==2.0.0",          # deliberately one behind 2.1.0 (silent Parquet-filter regression, polars #30655)
+    "duckdb==2.0.0",
+    "pyarrow==26.0.1",
+    # physics, optimisation, inference
+    "thermofeel==2.3.0",
+    "pythermalcomfort==4.8.1",  # wrap phs(): NaN hang and zero-division bugs (#524, #523)
+    "ortools==9.15.6755",
+    "lightgbm==4.7.0",
+    # outbound HTTP
+    "httpx2==2.16.0",
+    "stamina==26.1.0",
+    # observability
+    "structlog==26.1.0",
+    "asgi-correlation-id==5.0.1",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-exporter-otlp-proto-http==1.45.2",
+    "opentelemetry-instrumentation-fastapi==0.66b2",
+    "opentelemetry-instrumentation-sqlalchemy==0.66b2",  # needs skip_dep_check=True on SQLAlchemy 2.1
+    "pywebpush==2.5.0",
+]
+
+[project.scripts]
+sb-jobs = "stellar_blaze.jobs.cli:app"
+
+[dependency-groups]
+# Training and calibration only (not in the API image)
+train = [
+    "scikit-learn==1.9.1",
+    "scipy==1.18.1",
+    "mapie==1.6.0",
+    "scoringrules==0.12.0",
+]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1.post1",
+    "pytest-cov==7.1.0",
+    "pytest-socket==0.8.1",
+    "hypothesis==6.170.15",
+    "time-machine==3.6.0",
+    "testcontainers[postgres]==4.15.0",
+    "pvlib==0.16.1",
+    "mypy==2.4.1",
+    "ruff==0.17.4",
+    "pre-commit==4.7.0",
+    "commitizen==4.19.3",
+    "pip-audit==2.10.1",
+    "deptry==0.25.1",
+    "import-linter==2.16",
+    "squawk-cli==2.71.0",
+    "asyncpg-stubs==0.32.0",
+    "pandas-stubs==3.1.0.261029",
+    "scipy-stubs==1.18.1.1",
+]
+# Optional, off by default
+tts = ["azure-cognitiveservices-speech==1.53.0"]   # build-time clip rendering
+llm = ["openai==3.49.0"]                            # self-hosted OpenAI-compatible endpoints
+scheduler = ["apscheduler==3.11.3"]                 # only if no platform cron (single replica)
+sentry = ["sentry-sdk==2.74.0"]                     # opt-in; see scrubbing settings in section 1
+drn = ["torch==2.15.0"]                             # CPU wheel via the explicit index below
+
+[tool.uv]
+default-groups = ["dev", "train"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[[tool.mypy.overrides]]
+module = ["pythermalcomfort.*", "mapie.*", "sklearn.*", "scoringrules.*", "pyarrow.*", "pywebpush.*", "http_ece.*"]
+ignore_missing_imports = true
+
+# Deviation from the stack doc section 7 block above (preflight finding F7): pvlib ships no py.typed.
+# It is a dev-only independent oracle for the solar-position tests, never imported by src.
+[[tool.mypy.overrides]]
+module = ["pvlib.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra", "--allow-hosts=127.0.0.1,::1"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["unit", "integration", "e2e", "regression", "slow"]
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "N", "S", "ASYNC", "DTZ", "PT", "RUF", "PTH", "T20", "SLF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.coverage.run]
+source = ["stellar_blaze"]
+branch = true
+
+[tool.importlinter]
+root_package = "stellar_blaze"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: api and jobs > application > ports > domain"
+type = "layers"
+layers = [
+    "stellar_blaze.api | stellar_blaze.jobs",
+    "stellar_blaze.application",
+    "stellar_blaze.ports",
+    "stellar_blaze.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain is pure: no I/O libraries and no outer layers"
+type = "forbidden"
+source_modules = ["stellar_blaze.domain"]
+forbidden_modules = [
+    "httpx2",
+    "sqlalchemy",
+    "asyncpg",
+    "fastapi",
+    "typer",
+    "stellar_blaze.adapters",
+    "stellar_blaze.application",
+    "stellar_blaze.api",
+    "stellar_blaze.jobs",
+]
+
+[[tool.importlinter.contracts]]
+name = "Application does not know adapters, api or jobs"
+type = "forbidden"
+source_modules = ["stellar_blaze.application"]
+forbidden_modules = [
+    "stellar_blaze.adapters",
+    "stellar_blaze.api",
+    "stellar_blaze.jobs",
+]
+
+[[tool.importlinter.contracts]]
+name = "Adapters do not know application, api or jobs"
+type = "forbidden"
+source_modules = ["stellar_blaze.adapters"]
+forbidden_modules = [
+    "stellar_blaze.application",
+    "stellar_blaze.api",
+    "stellar_blaze.jobs",
+]
+
+[[tool.importlinter.contracts]]
+name = "Entrypoints reach swappable adapters only through composition"
+type = "forbidden"
+source_modules = ["stellar_blaze.api", "stellar_blaze.jobs"]
+forbidden_modules = [
+    "stellar_blaze.adapters.sources",
+    "stellar_blaze.adapters.fakes",
+    "stellar_blaze.adapters.compute",
+    "stellar_blaze.adapters.config",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Serving layers do not import training code"
+type = "forbidden"
+source_modules = [
+    "stellar_blaze.api",
+    "stellar_blaze.application",
+    "stellar_blaze.domain",
+    "stellar_blaze.ports",
+    "stellar_blaze.adapters",
+]
+forbidden_modules = [
+    "stellar_blaze.ml",
+    "mapie",
+    "sklearn",
+    "scoringrules",
+]
+
+[[tool.importlinter.contracts]]
+name = "The independent validator does not know the planner or the compute adapters"
+type = "forbidden"
+source_modules = ["stellar_blaze.domain.validator"]
+forbidden_modules = ["stellar_blaze.domain.planner", "stellar_blaze.adapters.compute"]
+
+[[tool.importlinter.contracts]]
+name = "The planner does not know the validator"
+type = "forbidden"
+source_modules = ["stellar_blaze.domain.planner"]
+forbidden_modules = ["stellar_blaze.domain.validator"]
+
+# Transitive dependencies imported directly on purpose, instead of adding a new pin: errors.py (Task 2) uses starlette
+# types, and starlette is pinned by fastapi==0.162.4; the Web Push channel (Task 11) shares one aiohttp.ClientSession
+# across a dispatch run, and aiohttp is pinned by pywebpush==2.5.0 (which also passes it to its own calls).
+[tool.deptry.per_rule_ignores]
+DEP003 = ["starlette", "aiohttp", "pydantic_core"]
+# pydantic_core: `api/models.py` annotates pydantic's own `__get_pydantic_json_schema__` hook with `CoreSchema`, a type
+# that pydantic does not re-export; pydantic pins pydantic-core exactly, so it cannot drift from the declared pydantic.
+# Training-group packages (not in the API image): offline training code under stellar_blaze/ml/ imports sklearn,
+# scoringrules and mapie (import-linter contract 6 keeps these three out of the serving layers), and
+# domain/forecast/sampling.py imports scipy, which reaches the API image through lightgbm.
+DEP004 = ["sklearn", "scoringrules", "mapie", "scipy"]
+DEP002 = [
+    # runtime-loaded or used from B2/B3; remove each when first imported
+    "uvicorn",
+    "pyarrow",
+    "ortools",
+    "duckdb",
+]

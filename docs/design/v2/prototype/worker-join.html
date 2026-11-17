@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Join your crew · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&family=Noto+Nastaliq+Urdu:wght@500&family=Noto+Sans+Devanagari:wght@500&family=Noto+Sans+Bengali:wght@500&family=Noto+Sans+Arabic:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css">
+<style>
+/* W0 / W1' / W7. The QR lands straight on Today (0 taps, 0 fields). W0 is a redirect and never a page; this file shows
+   the first-run Today it lands on, the optional 3-chip personalise sheet, and the in-app-browser screen. */
+.top { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hair); }
+.top .site { font-weight: 600; font-size: var(--t-16); line-height: 1.2; }
+.top .crew { color: var(--ink-3); font-size: var(--t-13); }
+.top .clock { margin-inline-start: auto; font-size: var(--t-22); font-weight: 500; letter-spacing: -0.01em; }
+.langs { padding: 2px var(--s-3); border-bottom: 1px solid var(--hair); }
+.joined { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin: var(--s-3) var(--s-4) 0; padding: var(--s-2) var(--s-3); border: 1px solid var(--edge); border-inline-start: 3px solid var(--signal); border-radius: var(--r); font-size: var(--t-16); }
+.joined a { font-weight: 500; white-space: nowrap; }
+.now { padding: var(--s-3) var(--s-4) 0; view-transition-name: level; }
+.now .k { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; }
+.now .level-word strong { font-size: var(--t-76); }
+.now .level-word span { font-size: var(--t-22); color: var(--ink-2); }
+.now .scale { margin-top: var(--s-3); }
+.hero { padding: var(--s-2) var(--s-2) 0; view-transition-name: spine; }
+.hero svg .r-tick { font-size: 13px; }
+.hero svg .wp { font: 500 15px var(--sans); fill: var(--ink); }
+.hero svg .wp2 { font: 400 14px var(--sans); fill: var(--ink-2); }
+.act { padding: var(--s-3) var(--s-4) var(--s-4); display: grid; gap: var(--s-2); }
+.act .btn { min-height: 56px; font-size: var(--t-22); font-weight: 500; width: 100%; }
+.act .lead { font-size: var(--t-22); font-weight: 500; line-height: 1.25; display: grid; grid-template-columns: 40px 1fr; gap: var(--s-3); align-items: center; }
+.line { font-size: var(--t-16); color: var(--ink-2); }
+.empty p { font-size: var(--t-18); }
+.sk-hero { height: 300px; margin: var(--s-3) var(--s-4); }
+/* W7: in-app browser */
+.w7 { padding: var(--s-4) var(--s-4) 0; display: grid; gap: var(--s-3); }
+.w7 .k { font-size: var(--t-16); color: var(--ink-2); font-weight: 500; }
+.w7 h1 { font-size: var(--t-28); font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; }
+.w7 .row { display: grid; grid-template-columns: 1fr auto; gap: var(--s-2); }
+.w7 .row .btn { min-height: 56px; font-size: var(--t-18); }
+.w7 .sitelv { border-top: 1px solid var(--hair); padding-top: var(--s-3); }
+.w7 .sitelv .level-word strong { font-size: var(--t-48); }
+.hero-h { padding: 0 var(--s-4); view-transition-name: spine; }
+.hero-h svg .r-label { font-size: 12px; }
+/* W1' sheet */
+dialog.sheet { margin: auto auto 0; width: min(440px, 100vw); max-width: 100vw; max-height: 92dvh; border: 0; border-top: 1px solid var(--edge); background: var(--panel); color: var(--ink); padding: var(--s-4) var(--s-4) calc(var(--s-4) + env(safe-area-inset-bottom)); }
+dialog.sheet::backdrop { background: var(--scrim); }
+dialog.sheet[open] { animation: sheet-in var(--dur-2) var(--ease); }
+@keyframes sheet-in { from { transform: translateY(32px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { dialog.sheet[open] { animation: fade var(--dur-1) linear; } @keyframes fade { from { opacity: 0; } } ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+.sheet h2:focus { outline: none; }
+.sheet h2 { font-size: var(--t-22); font-weight: 500; line-height: 1.2; }
+.sheet .sub { font-size: var(--t-16); color: var(--ink-2); margin-top: var(--s-1); }
+.sheet fieldset { border: 0; padding: 0; margin: var(--s-4) 0 0; }
+.sheet legend { display: flex; justify-content: space-between; width: 100%; font-size: var(--t-16); font-weight: 600; padding-bottom: var(--s-2); }
+.sheet legend small { font-size: var(--t-14); font-weight: 500; color: var(--ink-3); }
+.sheet legend small.saved { color: var(--signal); }
+.chips { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--s-2); }
+.chips.grid3 { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chip { position: relative; display: grid; place-items: center; text-align: center; min-height: 56px; padding: var(--s-2); border: 1px solid var(--edge); border-radius: var(--r); background: var(--ground); font-size: var(--t-18); font-weight: 500; line-height: 1.2; cursor: pointer; transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease); }
+.chip small { display: block; font-size: var(--t-13); font-weight: 400; color: var(--ink-3); margin-top: 2px; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip:has(input:checked) { border: 2px solid var(--ink); background: var(--raised); }
+.chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.chip.dflt:has(input:checked) { border-style: dashed; }
+.sheet .stays { display: flex; gap: var(--s-2); align-items: center; margin-top: var(--s-4); font-size: var(--t-16); color: var(--ink-2); }
+.sheet .stays svg { width: 18px; height: 18px; flex: none; }
+.sheet .btn { width: 100%; min-height: 56px; font-size: var(--t-22); margin-top: var(--s-3); }
+.sheet .notice { margin-top: var(--s-3); font-size: var(--t-16); }
+.dock .unwell { view-transition-name: unwell; } /* morphs into the Call hero on worker-unwell */
+</style>
+</head>
+<body class="phone-page">
+<div class="phone">
+  <header class="top">
+    <div><p class="site">Mussafah M-14 yard</p><p class="crew">Crew B · concrete pour</p></div>
+    <p class="clock">06:42</p>
+    <button class="sun-toggle" type="button" data-sun-toggle></button>
+  </header>
+  <nav class="langs" aria-label="Language" data-when="ideal sheet partial error loading">
+    <button aria-pressed="true" lang="en">EN</button><button lang="ur">اردو</button><button lang="hi">हिन्दी</button><button lang="bn">বাংলা</button><button lang="ne">नेपाली</button><button lang="ar">العربية</button>
+  </nav>
+
+  <main>
+    <!-- loading: the redirect is storing site + crew; skeleton at the final size of Today -->
+    <div data-when="loading" aria-busy="true"><div class="now"><p class="k">Joining Crew B</p><p class="skel" style="height:72px;width:60%;margin-top:6px">.</p></div><div class="skel sk-hero">.</div></div>
+
+    <!-- empty: the crew code was rotated by the supervisor -->
+    <section class="act" data-when="empty" style="padding-top:var(--s-6)">
+      <div class="empty"><h3>This crew code has changed</h3><p class="muted">Your supervisor made a new one. Scan the code on today's poster, or ask in your crew's group.</p><a class="btn primary lg" href="worker-today.html">See the demo yard</a></div>
+    </section>
+
+    <!-- W7: opened inside WhatsApp or another in-app browser; no dead end, the site level is still shown -->
+    <section class="w7" data-when="inapp">
+      <p class="k">Opened inside WhatsApp</p>
+      <h1>Open in your browser to get warnings on this phone</h1>
+      <div class="row"><a class="btn signal" href="#" id="openin">Open in Chrome</a><button class="btn" type="button" id="copy">Copy link</button></div>
+      <div class="sitelv now" style="padding-inline:0">
+        <p class="k">Site level now</p>
+        <p class="level-word"><strong>Green</strong><span>Amber from 08:00</span></p>
+      </div>
+    </section>
+    <section class="hero-h ribbon" id="hspine" data-when="inapp" aria-label="Today 06:00 to 18:00"></section>
+
+    <!-- first-run Today (0 taps after the scan) -->
+    <div data-when="ideal sheet partial error">
+      <p class="joined"><span>You joined Crew B. No account.</span><a href="worker-join.html?state=sheet" id="mine">Make it mine</a></p>
+      <section class="now" aria-labelledby="lv">
+        <p class="k">Site level now · Amber from 08:00</p>
+        <p class="level-word" id="lv"><strong>Green</strong></p>
+        <div class="scale" role="img" aria-label="Level 1 of 4, Green"><span aria-current="true">Green</span><span>Amber</span><span>Orange</span><span>Red</span></div>
+      </section>
+      <section class="hero ribbon" id="spine" aria-label="Your shift today"></section>
+      <section class="act">
+        <button class="btn signal" type="button"><span data-speaker></span><span>Listen</span></button>
+      </section>
+    </div>
+  </main>
+
+  <!-- W1': optional; each answer saves at once on this phone; unanswered = the protective default -->
+  <dialog class="sheet" id="sheet" aria-labelledby="sh-h">
+    <h2 id="sh-h" tabindex="-1" autofocus>Make it yours</h2>
+    <p class="sub">Three taps, all optional. Your level gets more exact.</p>
+    <fieldset>
+      <legend>Your work <small id="s-work">Not answered: Heavy, the safest</small></legend>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="work" value="light">Light<small>Sitting, light arm work</small></label>
+        <label class="chip"><input type="radio" name="work" value="moderate">Moderate</label>
+        <label class="chip dflt"><input type="radio" name="work" value="heavy" checked>Heavy<small>Carry, climb, lift</small></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Time in this heat <small id="s-acc">Not answered: New, the safest</small></legend>
+      <div class="chips">
+        <label class="chip dflt"><input type="radio" name="acc" value="new" checked>New<small>Or back after 14 days away</small></label>
+        <label class="chip"><input type="radio" name="acc" value="exp">Experienced</label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Language <small>From your crew</small></legend>
+      <div class="chips grid3">
+        <label class="chip"><input type="radio" name="lang" value="en" checked><span lang="en">English</span></label>
+        <label class="chip"><input type="radio" name="lang" value="ur"><span lang="ur">اردو</span></label>
+        <label class="chip"><input type="radio" name="lang" value="hi"><span lang="hi">हिन्दी</span></label>
+        <label class="chip"><input type="radio" name="lang" value="bn"><span lang="bn">বাংলা</span></label>
+        <label class="chip"><input type="radio" name="lang" value="ne"><span lang="ne">नेपाली</span></label>
+        <label class="chip"><input type="radio" name="lang" value="ar"><span lang="ar">العربية</span></label>
+      </div>
+    </fieldset>
+    <div class="notice" id="saveerr" hidden role="alert"><div><p><strong>Could not save on this phone.</strong> Its storage is full. Your answers stay here.</p><button class="btn" type="button" style="width:auto;min-height:44px;font-size:var(--t-16);margin:var(--s-2) 0 0">Try again</button></div></div>
+    <p class="stays"><span data-lock></span>This stays on this phone. Nothing is sent.</p>
+    <button class="btn primary" type="button" data-close>Done</button>
+  </dialog>
+
+  <div class="dock"><div class="dock-in">
+    <a class="unwell" href="worker-unwell.html"><span id="cross"></span>I feel unwell</a>
+    <nav class="tabs" aria-label="Sections"><a href="worker-today.html" aria-current="page">Today</a><a href="worker-alerts.html">Alerts</a><a href="worker-data.html">My data</a></nav>
+  </div></div>
+</div>
+<script type="module">
+import { boot, spine, ICON, STATE } from './assets/kit.js';
+import { loadJSON } from './assets/heat.js';
+// replay: the crew scans the poster at the bus, Thu 3 Sep 2026 06:42 GST (02:42 UTC; sun up at 05:53 local)
+boot({ surface: 'field', at: new Date(Date.UTC(2026, 8, 3, 2, 42)), states: ['ideal', 'sheet', 'partial', 'error', 'inapp', 'loading', 'empty'] });
+document.getElementById('cross').outerHTML = ICON.cross;
+for (const s of document.querySelectorAll('[data-speaker]')) s.outerHTML = ICON.speaker;
+for (const s of document.querySelectorAll('[data-lock]')) s.outerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8V6a4 4 0 0 1 8 0v2h1.5v10h-11V8zm2 0h4V6a2 2 0 0 0-4 0z" fill="currentColor"/></svg>';
+
+// sheet behaviour: each tap saves at once; the legend says "Saved" or names the protective default
+const sheet = document.getElementById('sheet');
+const label = { work: ['s-work', 'Not answered: Heavy, the safest'], acc: ['s-acc', 'Not answered: New, the safest'] };
+for (const name of ['work', 'acc']) for (const r of sheet.querySelectorAll(`input[name=${name}]`)) r.addEventListener('change', () => {
+  const s = document.getElementById(label[name][0]); s.textContent = 'Saved'; s.classList.add('saved');
+  sheet.querySelectorAll(`input[name=${name}]`).forEach((x) => x.closest('.chip').classList.remove('dflt'));
+});
+sheet.querySelector('[data-close]').onclick = () => sheet.close();
+sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.close(); });
+document.getElementById('mine').addEventListener('click', (e) => { e.preventDefault(); sheet.showModal(); });
+if (['sheet', 'partial', 'error'].includes(STATE)) sheet.showModal();
+if (STATE === 'partial' || STATE === 'error') { const m = sheet.querySelector('input[value=moderate]'); m.checked = true; m.dispatchEvent(new Event('change')); }
+if (STATE === 'error') { document.getElementById('saveerr').hidden = false; const s = document.getElementById('s-work'); s.textContent = 'Not saved yet'; s.classList.remove('saved'); }
+
+// W7: Android intent to open the same URL in Chrome; copy link as the universal fallback
+document.getElementById('openin').href = `intent://${location.host}${location.pathname.replace('worker-join', 'worker-today')}#Intent;scheme=${location.protocol.replace(':', '')};package=com.android.chrome;end`;
+document.getElementById('copy').onclick = async (e) => { try { await navigator.clipboard.writeText(location.href); e.target.textContent = 'Copied'; } catch { e.target.textContent = 'Copy failed'; } };
+
+// real IFS day-1 WBGT for Thu 3 Sep (OMAA). Level change times are a design state (policy B3 pending).
+const s = await loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json');
+const day = s.wbgt_c_by_local_hour[s.days.indexOf('2026-09-03')];
+const v = document.getElementById('spine');
+if (!v.closest('[hidden]')) {
+  const L = 250, now = 6 + 42 / 60;
+  spine(v, { values: day, from: 6, to: 18, now, ban: [12.5, 15], orientation: 'v', width: 400, length: L, bandX: 64, band: 46, tickStep: 2,
+    aria: 'Shift 06:00 to 18:00. Now 06:42, Green. Amber from 08:00, Orange from 10:00 to 17:00. Midday break 12:30 to 15:00 by law. Shift ends 18:00.' });
+  const svg = v.querySelector('svg'), pos = (t) => 18 + (t - 6) / 12 * (L - 36);
+  svg.querySelectorAll('.r-label').forEach((n) => n.remove());
+  svg.querySelectorAll('.r-tick').forEach((n) => { if (n.getAttribute('x') > 100) n.remove(); });
+  const wp = (t, a, b) => `<line x1="122" x2="138" y1="${pos(t)}" y2="${pos(t)}" stroke="var(--ink)"/><text class="wp" x="146" y="${pos(t) + 5}">${a}</text>${b ? `<text class="wp2" x="146" y="${pos(t) + 23}">${b}</text>` : ''}`;
+  svg.insertAdjacentHTML('beforeend', wp(now, `Now · WBGT ${day[6].toFixed(1)} °C`) + wp(8, 'Amber from 08:00', '') + wp(10, 'Orange from 10:00', 'Work 20, rest 40') + wp(12.5, 'Midday break 12:30', 'to 15:00, by law') + wp(18, 'Shift ends 18:00'));
+}
+const h = document.getElementById('hspine');
+if (!h.closest('[hidden]')) {
+  spine(h, { values: day, from: 6, to: 18, now: 6.7, ban: [12.5, 15], orientation: 'h', width: 358, length: 150, bandY: 34, band: 74, tickStep: 3,
+    aria: 'Today 06:00 to 18:00. Now 06:42, Green. Amber from 08:00, Orange from 10:00 to 17:00. Midday break 12:30 to 15:00 by law.' });
+}
+</script>
+</body>
+</html>

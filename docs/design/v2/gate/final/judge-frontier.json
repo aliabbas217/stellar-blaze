@@ -1,0 +1,380 @@
+{
+  "url": "http://127.0.0.1:8766/prototype/judge-frontier.html",
+  "when": "2026-11-12T01:02:53.158Z",
+  "source": {
+    "gate": 0,
+    "advisory": 0,
+    "byRule": {}
+  },
+  "renders": [
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-frontier\\dark-1440.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-frontier\\dark-1440-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 33
+          },
+          {
+            "px": 13,
+            "n": 46
+          },
+          {
+            "px": 14,
+            "n": 97
+          },
+          {
+            "px": 16,
+            "n": 5
+          },
+          {
+            "px": 18,
+            "n": 4
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 35,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 22
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 2,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-frontier\\dark-1440-viewport.png",
+        "dimensions": {
+          "w": 1440,
+          "h": 1337
+        },
+        "grid": {
+          "w": 72,
+          "h": 67
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 50.8
+        },
+        "squint": {
+          "masses": 22,
+          "competitors": 1,
+          "dominance": 0.369,
+          "top": [
+            {
+              "cells": 90,
+              "weight": 50.53,
+              "cx": 0.803,
+              "cy": 0.589,
+              "bbox": [
+                0.653,
+                0.567,
+                0.958,
+                0.612
+              ]
+            },
+            {
+              "cells": 90,
+              "weight": 29.79,
+              "cx": 0.216,
+              "cy": 0.15,
+              "bbox": [
+                0.042,
+                0.119,
+                0.431,
+                0.179
+              ]
+            },
+            {
+              "cells": 65,
+              "weight": 13.66,
+              "cx": 0.169,
+              "cy": 0.702,
+              "bbox": [
+                0.042,
+                0.657,
+                0.306,
+                0.746
+              ]
+            },
+            {
+              "cells": 45,
+              "weight": 10.6,
+              "cx": 0.793,
+              "cy": 0.324,
+              "bbox": [
+                0.653,
+                0.313,
+                0.944,
+                0.343
+              ]
+            },
+            {
+              "cells": 15,
+              "weight": 4.17,
+              "cx": 0.444,
+              "cy": 0.725,
+              "bbox": [
+                0.403,
+                0.716,
+                0.486,
+                0.746
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.047,
+        "centroid": {
+          "x": 0.505,
+          "y": 0.453
+        },
+        "colourfulness": 4.8,
+        "luminanceSpread": 0.267,
+        "chromaProxy": 0.007,
+        "hierarchyByHueOnly": false,
+        "inkPct": 19.9,
+        "findings": []
+      },
+      "consoleErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "screenshot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-frontier\\dark-390.png",
+      "viewportShot": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-frontier\\dark-390-viewport.png",
+      "metrics": {
+        "overflowX": false,
+        "overflowCulprits": [],
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "scrollLocked": false,
+        "fontSizes": [
+          {
+            "px": 12,
+            "n": 21
+          },
+          {
+            "px": 13,
+            "n": 46
+          },
+          {
+            "px": 14,
+            "n": 97
+          },
+          {
+            "px": 16,
+            "n": 5
+          },
+          {
+            "px": 18,
+            "n": 4
+          },
+          {
+            "px": 22,
+            "n": 1
+          },
+          {
+            "px": 28,
+            "n": 1
+          },
+          {
+            "px": 48,
+            "n": 2
+          }
+        ],
+        "distinctFontSizes": 8,
+        "fontFamilies": [
+          "Archivo",
+          "IBM Plex Mono"
+        ],
+        "distinctRadii": 1,
+        "radii": [
+          {
+            "v": "2px",
+            "n": 23
+          }
+        ],
+        "distinctShadows": 0,
+        "offscaleSpacing": [
+          {
+            "px": 10,
+            "n": 1
+          },
+          {
+            "px": 14,
+            "n": 1
+          },
+          {
+            "px": 114,
+            "n": 1
+          }
+        ],
+        "offscaleSpacingTotal": 3,
+        "smallTargets": [],
+        "smallTargetCount": 0,
+        "ghostText": [],
+        "ghostTextCount": 0,
+        "title": "Roster frontier · Stellar Blaze",
+        "lang": "en"
+      },
+      "axe": {
+        "violations": []
+      },
+      "perception": {
+        "file": "D:\\dev\\stellar-blaze-f1\\docs\\design\\v2\\gate\\final\\judge-frontier\\dark-390-viewport.png",
+        "dimensions": {
+          "w": 390,
+          "h": 581
+        },
+        "grid": {
+          "w": 72,
+          "h": 107
+        },
+        "ground": {
+          "luminance": 0.05,
+          "coveragePct": 48.7
+        },
+        "squint": {
+          "masses": 37,
+          "competitors": 6,
+          "dominance": 0.067,
+          "top": [
+            {
+              "cells": 44,
+              "weight": 20.75,
+              "cx": 0.147,
+              "cy": 0.536,
+              "bbox": [
+                0.042,
+                0.523,
+                0.264,
+                0.551
+              ]
+            },
+            {
+              "cells": 41,
+              "weight": 17.98,
+              "cx": 0.517,
+              "cy": 0.482,
+              "bbox": [
+                0.361,
+                0.477,
+                0.639,
+                0.495
+              ]
+            },
+            {
+              "cells": 39,
+              "weight": 16.5,
+              "cx": 0.228,
+              "cy": 0.688,
+              "bbox": [
+                0.083,
+                0.682,
+                0.361,
+                0.701
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 15.51,
+              "cx": 0.124,
+              "cy": 0.589,
+              "bbox": [
+                0.042,
+                0.579,
+                0.208,
+                0.598
+              ]
+            },
+            {
+              "cells": 35,
+              "weight": 15.31,
+              "cx": 0.435,
+              "cy": 0.375,
+              "bbox": [
+                0.347,
+                0.364,
+                0.514,
+                0.393
+              ]
+            }
+          ]
+        },
+        "equilibrium": 0.113,
+        "centroid": {
+          "x": 0.387,
+          "y": 0.497
+        },
+        "colourfulness": 10.6,
+        "luminanceSpread": 0.411,
+        "chromaProxy": 0.03,
+        "hierarchyByHueOnly": false,
+        "inkPct": 24,
+        "findings": [
+          {
+            "id": "everything-shouts",
+            "severity": "major",
+            "detail": "6 masses within 70% of the heaviest; across 20 shipped products the 95th percentile is 2. No single focal point survives the squint (dominance 0.067)."
+          },
+          {
+            "id": "no-dominant-mass",
+            "severity": "major",
+            "detail": "heaviest mass holds only 7% of visual weight (corpus p05 19%) — nothing leads the eye"
+          }
+        ]
+      },
+      "consoleErrors": []
+    }
+  ],
+  "verdict": {
+    "pass": true,
+    "blockers": []
+  },
+  "composition": [],
+  "compositionNote": "composition judged only at 1440px — the perception baseline is calibrated there"
+}

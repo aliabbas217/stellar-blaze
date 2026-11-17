@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Every view · Stellar Blaze prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/judge.css">
+<style>
+.groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-8) var(--s-12); margin-top: var(--s-8); }
+.groups section h2 { font: 600 var(--t-16)/1.3 var(--sans); padding-bottom: var(--s-2); border-bottom: 1px solid var(--edge); }
+.groups section p.d { color: var(--ink-3); font-size: var(--t-13); margin: var(--s-2) 0; }
+.groups ul { list-style: none; padding: 0; }
+.groups li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; border-bottom: 1px solid var(--hair); }
+.groups li a { display: block; padding: 10px 0; font-weight: 500; text-decoration: none; }
+.groups li a:hover { text-decoration: underline; }
+.groups li span { color: var(--ink-3); font-size: var(--t-13); white-space: nowrap; }
+.groups li.missing a { color: var(--ink-3); font-weight: 400; }
+.how { color: var(--ink-2); max-width: 70ch; }
+@media (max-width: 1000px) { .groups { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .groups { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<a class="skip" href="judge-season.html">Skip to the scoreboard</a>
+<header class="bar" id="bar">
+  <a class="wordmark" href="index.html">Stellar Blaze</a>
+  <span class="ctx">Prototype, every view</span>
+  <button class="btn menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav id="nav" aria-label="Main"><a href="index.html?step=problem">The story</a><a href="judge-season.html">Scoreboard</a><a href="judge-day.html">One day</a><a href="judge-proof.html">Proof</a><a href="worker-today.html">For crews</a><a href="judge-next.html">What's next</a></nav>
+</header>
+<main class="j-page">
+  <div class="j-head">
+    <h1 class="j-h1">Every view in the v2 prototype</h1>
+    <p class="how">Grouped by who uses it. Each view has a small Prototype control on the right edge to switch its states (loading, empty, error and the rest) and, on phone views, sun and night. Phone views are meant at 390 px wide; desk views at 1440.</p>
+    <p><a class="btn primary" href="index.html">Start at the landing</a></p>
+  </div>
+  <div class="groups" id="groups"></div>
+</main>
+<script type="module">
+import { boot } from './assets/kit.js';
+boot({ surface: 'desk', states: ['ideal'] });
+const bar = document.getElementById('bar'), menu = bar.querySelector('.menu-btn');
+menu.onclick = () => { bar.classList.toggle('open'); menu.setAttribute('aria-expanded', bar.classList.contains('open')); };
+const G = [
+  ['Worker', 'Phone, outdoors; sun mode while the sun is up', [['worker-today', 'Today'], ['worker-join', 'Join from the crew code'], ['worker-alerts', 'Alerts on and off'], ['worker-alert', 'An alert'], ['worker-unwell', 'I feel unwell'], ['worker-data', 'My data']]],
+  ['Supervisor', 'Phone or tablet on site', [['supervisor-setup', 'Set up a site'], ['supervisor-roster', 'Roster from a spreadsheet'], ['supervisor-qr', 'Crew codes'], ['supervisor-crews', 'Crews today'], ['supervisor-plan', 'Crew plan'], ['supervisor-relay', 'Relay to the crew']]],
+  ['HSE and admin', 'Desktop', [['hse', 'HSE week'], ['admin', 'Runtime settings']]],
+  ['Judges: the story', 'Desktop, works on a phone', [['index', 'Landing and story'], ['judge-season', 'Season scoreboard'], ['judge-day', 'One day'], ['judge-proof', 'Proof sheet'], ['judge-next', "What's next"]]],
+  ['Judges: go deeper', 'Desktop', [['judge-validator', 'Try a plan'], ['judge-frontier', 'Roster frontier'], ['judge-climate', 'Same summer, warmer'], ['judge-governance', 'Governance refusal'], ['judge-faults', 'Break things']]],
+];
+document.getElementById('groups').innerHTML = G.map(([t, d, items]) => `<section aria-label="${t}"><h2>${t}</h2><p class="d">${d}</p><ul>${items.map(([f, n]) => `<li data-f="${f}"><a href="${f}.html">${n}</a><span class="mono">${f}</span></li>`).join('')}</ul></section>`).join('');
+</script>
+</body>
+</html>

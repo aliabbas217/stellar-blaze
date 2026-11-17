@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+# Stub for the Azure CLI, used by infra/scripts/tests/run.sh. Never contacts Azure.
+# The canned JSON below is INVENTED to exercise the scripts; it is not captured from real Azure output.
+# Behaviour is chosen by $STUB_SCENARIO:
+#   ok           everything passes, PostgreSQL 18 offered
+#   pg17         as ok, but no "18" version entry in list-skus
+#   p1_compact   as ok, but the location list holds the short name "uaenorth"
+#   nolocation   managedEnvironments is not offered in UAE North
+#   nob1ms       list-skus has no Standard_B1ms
+#   noreg        Microsoft.Consumption is NotRegistered
+#   noowner      the role assignment list is empty
+#   tls_require  the stored sb-database-url secret ends ssl=require (check-db-tls --deployed)
+#   tls_noenv    the deployed containers have no PGSSLROOTCERT entry
+#   tls_alerts   only the alerts app has the weak secret
+#   dedicated, api_external, max3, other_region   smoke test shortcuts (see the knobs below)
+# The stored secret below is a made-up URL; the tests assert that no script ever prints it.
+set -euo pipefail
+
+scenario="${STUB_SCENARIO:-ok}"
+args=("$@")
+joined="$*"
+
+# value of the flag $1 (e.g. -n), empty when absent
+flag_value() {
+  local flag="$1" i
+  for ((i = 0; i < ${#args[@]} - 1; i++)); do
+    if [ "${args[$i]}" = "$flag" ]; then
+      printf '%s' "${args[$((i + 1))]}"
+      return 0
+    fi
+  done
+}
+
+if [ -n "${STUB_AZ_LOG:-}" ]; then
+  printf '%s\n' "$joined" >>"$STUB_AZ_LOG"
+fi
+
+# ---- calls of the deploy scripts (resolve, migrate, healthcheck, smoke, restart, cold start) -----------------------------
+# Knobs (environment; a name with _API / _WEB / _ALERTS applies to that app only, e.g. STUB_MAX_REPLICAS_API=3):
+#   STUB_STATE_DIR          a per-test directory for counters and markers (the harness sets it; STUB_AZ_LOG there records calls)
+#   containerapp show:      STUB_LATEST STUB_LATEST_READY STUB_APP_IMAGE STUB_MIN_REPLICAS STUB_MAX_REPLICAS
+#                           STUB_INGRESS_EXTERNAL STUB_WEB_FQDN
+#                           (min replicas default to 0 for the api, which scales to zero in cheap mode, and 1 for web and alerts)
+#   containerapp revision show: STUB_REV_IMAGE STUB_PROV STUB_RUNNING STUB_HEALTH STUB_TRAFFIC STUB_REPLICAS
+#                           STUB_REVISION_MISSING=1 (the revision cannot be read)
+#                           STUB_HEALTH_SEQ="Unhealthy Healthy" (healthState of the 1st, 2nd, ... call; the last repeats)
+#   job-migrate:            STUB_JOB_IMAGE STUB_JOB_MISSING=1 STUB_JOB_START_SILENT=1 STUB_JOB_START_FAIL=1
+#                           STUB_MIGRATE_STATUSES="Failed Running+Succeeded" (final status per execution; "+" separates the
+#                           statuses of successive polls of one execution; the last word repeats for later executions)
+#                           STUB_JOB_START_NONE=1 (start prints `None`, as `-o tsv` does for a null)
+#                           STUB_JOB_OLD_EXECUTIONS="job-migrate-old1" (executions of an EARLIER deploy: listed from the start and
+#                             `execution show` answers STUB_JOB_OLD_STATUS, default Succeeded, for them)
+#                           STUB_JOB_LIST_LAG=N (a started execution is missing from the list for its first N list calls;
+#                             a huge N means it never appears) STUB_JOB_LIST_FAIL=1 (the list call fails)
+#                           STUB_JOB_START_REUSES_OLD=1 (start answers the name of the first old execution)
+#   smoke:                  STUB_ENV_NAME STUB_PROFILES STUB_PROFILE_TYPES STUB_PRIVATE_ENDPOINTS STUB_EXTRA_RESOURCE="name:location"
+#   restart / cold start:   STUB_REPLICAS_ZERO=1 (the app has no replica at all: `replica list` is empty)
+#                           STUB_REPLICA_LIST_EMPTY_AFTER=N (`replica list` names a replica for its first N calls, then none: the
+#                             app scales down while a script waits; unset = the replica stays) STUB_UPDATE_FAIL=1
+#                           STUB_REPLICAS_STATIC=1 (a restart never replaces the replicas)
+#                           STUB_RESTART_FAIL=1 (`revision restart` fails and restarts nothing)
+#                           STUB_REPLICA_LIST_FAIL=1 (`replica list` fails: an az error, not an empty list)
+# Scenarios dedicated, api_external, max3 and other_region are shortcuts for the smoke tests.
+# shellcheck disable=SC2034  # read through the indirect expansion in knob
+case "$scenario" in
+  api_external) STUB_INGRESS_EXTERNAL_API=true ;;
+  max3) STUB_MAX_REPLICAS_API=3 ;;
+  *) ;;
+esac
+state_dir="${STUB_STATE_DIR:-}"
+
+# One pass over the arguments, no subshell (a fork costs about 60 ms under Git Bash, and the smoke tests make hundreds of calls).
+app_name=""
+query=""
+revision_arg=""
+exec_name_arg=""
+for ((i = 0; i < ${#args[@]} - 1; i++)); do
+  case "${args[$i]}" in
+    -n) app_name="${args[$((i + 1))]}" ;;
+    --query) query="${args[$((i + 1))]}" ;;
+    --revision) revision_arg="${args[$((i + 1))]}" ;;
+    --job-execution-name) exec_name_arg="${args[$((i + 1))]}" ;;
+    *) ;;
+  esac
+done
+app_upper="${app_name^^}"
+
+need_state() {
+  if [ -z "$state_dir" ]; then
+    echo "az stub: STUB_STATE_DIR is required for: $joined" >&2
+    exit 2
+  fi
+}
+
+# knob <NAME> <default>: sets REPLY to $STUB_<NAME>_<APP> if set, else $STUB_<NAME>, else the default.
+knob() {
+  local app_var="STUB_$1_${app_upper}" any_var="STUB_$1"
+  REPLY="${!app_var:-${!any_var:-$2}}"
+}
+
+case "$app_name" in
+  web) default_image='reg.example/sb-web:abc' ;;
+  *) default_image='reg.example/sb-api:abc' ;;
+esac
+default_latest="${app_name}--rev1"
+if [ -n "$state_dir" ] && [ -e "$state_dir/updated-$app_name" ]; then
+  default_latest="${app_name}--rev2"
+fi
+
+# word_of <list> <n>: sets REPLY to the n-th (1-based) space separated word, the last word when n is beyond the end.
+word_of() {
+  local -a words
+  read -r -a words <<<"$1"
+  local n="$2"
+  if [ "$n" -gt "${#words[@]}" ]; then n="${#words[@]}"; fi
+  REPLY="${words[$((n - 1))]}"
+}
+
+# bump <file>: increment a counter file; sets REPLY to the new value.
+bump() {
+  need_state
+  local n=0
+  if [ -f "$state_dir/$1" ]; then read -r n <"$state_dir/$1"; fi
+  n=$((n + 1))
+  printf '%s' "$n" >"$state_dir/$1"
+  REPLY="$n"
+}
+
+serve_deploy_call() {
+  case "$joined" in
+    "containerapp show "*)
+      case "$query" in
+        *latestReadyRevisionName*)
+          knob LATEST "$default_latest"
+          local latest="$REPLY"
+          knob LATEST_READY "$latest"
+          printf '%s\n%s\n' "$latest" "$REPLY"
+          ;;
+        *latestRevisionName*)
+          knob LATEST "$default_latest"
+          printf '%s\n' "$REPLY"
+          ;;
+        *"containers[0].image"*)
+          knob APP_IMAGE "$default_image"
+          printf '%s\n' "$REPLY"
+          ;;
+        *minReplicas*)
+          case "$app_name" in
+            api) knob MIN_REPLICAS 0 ;;
+            *) knob MIN_REPLICAS 1 ;;
+          esac
+          local min_r="$REPLY"
+          knob MAX_REPLICAS 1
+          case "$query" in
+            *maxReplicas*) printf '%s\n%s\n' "$min_r" "$REPLY" ;;
+            *) printf '%s\n' "$min_r" ;; # a query for minReplicas alone gets the one value
+          esac
+          ;;
+        *ingress.external*)
+          case "$app_name" in
+            api) knob INGRESS_EXTERNAL false ;;
+            web) knob INGRESS_EXTERNAL true ;;
+            *) knob INGRESS_EXTERNAL None ;;
+          esac
+          printf '%s\n' "$REPLY"
+          ;;
+        *ingress.fqdn*)
+          case "$app_name" in
+            web) printf '%s\n' "${STUB_WEB_FQDN:-web.stub.uaenorth.azurecontainerapps.io}" ;;
+            api) printf 'api.internal.stub.uaenorth.azurecontainerapps.io\n' ;;
+            *) printf 'None\n' ;;
+          esac
+          ;;
+        *) return 1 ;;
+      esac
+      ;;
+    "containerapp revision show "*)
+      knob LATEST "$default_latest"
+      if [ "$revision_arg" != "$REPLY" ] || [ "${STUB_REVISION_MISSING:-}" = "1" ]; then
+        echo "ERROR: (ResourceNotFound) revision $revision_arg of $app_name does not exist (latest is $REPLY)" >&2
+        exit 3
+      fi
+      local health_default="Healthy" traffic_default="100"
+      if [ "$app_name" = "alerts" ]; then
+        health_default="None"
+        traffic_default="None"
+      fi
+      knob APP_IMAGE "$default_image"
+      knob REV_IMAGE "$REPLY"
+      local rev_image="$REPLY" prov running health traffic replicas seq_var seq
+      knob PROV Provisioned
+      prov="$REPLY"
+      knob RUNNING Running
+      running="$REPLY"
+      knob HEALTH "$health_default"
+      health="$REPLY"
+      seq_var="STUB_HEALTH_SEQ_${app_upper}"
+      seq="${!seq_var:-${STUB_HEALTH_SEQ:-}}"
+      if [ -n "$seq" ]; then
+        bump "health-$app_name"
+        word_of "$seq" "$REPLY"
+        health="$REPLY"
+      fi
+      knob TRAFFIC "$traffic_default"
+      traffic="$REPLY"
+      knob REPLICAS 1
+      replicas="$REPLY"
+      printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$rev_image" "$prov" "$running" "$health" "$traffic" "$replicas"
+      ;;
+    "containerapp revision restart "*)
+      need_state
+      knob RESTART_FAIL 0
+      if [ "$REPLY" = "1" ]; then
+        echo "ERROR: stub restart failure: the replica of $app_name is gone" >&2
+        exit 1
+      fi
+      : >"$state_dir/restarted-$app_name"
+      ;;
+    "containerapp replica list "*)
+      need_state
+      knob REPLICA_LIST_FAIL 0
+      if [ "$REPLY" = "1" ]; then
+        echo "ERROR: stub replica list failure for $app_name" >&2
+        exit 1
+      fi
+      knob REPLICAS_ZERO 0
+      local zero="$REPLY" empty_after="" empty_var="STUB_REPLICA_LIST_EMPTY_AFTER_${app_upper}" listed=0
+      empty_after="${!empty_var:-${STUB_REPLICA_LIST_EMPTY_AFTER:-}}"
+      if [ -n "$empty_after" ]; then
+        bump "replica-list-$app_name"
+        listed="$REPLY"
+      fi
+      if [ "$zero" = "1" ]; then
+        :
+      elif [ -n "$empty_after" ] && [ "$listed" -gt "$empty_after" ]; then
+        :
+      elif [ -e "$state_dir/restarted-$app_name" ] && [ "${STUB_REPLICAS_STATIC:-}" != "1" ]; then
+        printf '%s-replica-new\n' "$app_name"
+      else
+        printf '%s-replica-old\n' "$app_name"
+      fi
+      ;;
+    "containerapp update "*)
+      need_state
+      if [ "${STUB_UPDATE_FAIL:-}" = "1" ]; then
+        echo "ERROR: stub update failure" >&2
+        exit 1
+      fi
+      : >"$state_dir/updated-$app_name"
+      ;;
+    "containerapp env list "*) printf '%s\n' "${STUB_ENV_NAME:-cae-test}" ;;
+    "containerapp env show "*)
+      local profiles="${STUB_PROFILES:-Consumption}" types
+      if [ "$scenario" = "dedicated" ]; then profiles="Consumption D4"; fi
+      types="${STUB_PROFILE_TYPES:-$profiles}"
+      # shellcheck disable=SC2086  # the lists are space separated on purpose: one output line per word
+      case "$query" in
+        *workloadProfileType*) printf '%s\n' $types ;;
+        *) printf '%s\n' $profiles ;;
+      esac
+      ;;
+    "network private-endpoint list "*)
+      # shellcheck disable=SC2086  # a space separated list, one output line per word
+      if [ -n "${STUB_PRIVATE_ENDPOINTS:-}" ]; then printf '%s\n' $STUB_PRIVATE_ENDPOINTS; fi
+      ;;
+    "resource list "*)
+      printf 'api\tuaenorth\nweb\tuaenorth\npg-test\tUAE North\n'
+      if [ "$scenario" = "other_region" ]; then printf 'stray-db\twesteurope\n'; fi
+      if [ -n "${STUB_EXTRA_RESOURCE:-}" ]; then printf '%s\t%s\n' "${STUB_EXTRA_RESOURCE%%:*}" "${STUB_EXTRA_RESOURCE#*:}"; fi
+      ;;
+    "containerapp job show "*)
+      case "$query" in
+        *"containers[0].image"*)
+          if [ "${STUB_JOB_MISSING:-}" = "1" ]; then
+            echo "ERROR: (ResourceNotFound) The Resource 'Microsoft.App/jobs/${app_name}' was not found." >&2
+            exit 3
+          fi
+          printf '%s\n' "${STUB_JOB_IMAGE:-reg.example/sb-api:abc}"
+          ;;
+        *) return 1 ;;
+      esac
+      ;;
+    "containerapp job start "*)
+      if [ "${STUB_JOB_START_FAIL:-}" = "1" ]; then
+        echo "ERROR: stub job start failure" >&2
+        exit 1
+      fi
+      bump executions
+      if [ "${STUB_JOB_START_REUSES_OLD:-}" = "1" ]; then
+        printf '%s\n' "${STUB_JOB_OLD_EXECUTIONS%% *}"
+      elif [ "${STUB_JOB_START_NONE:-}" = "1" ]; then
+        printf 'None\n'
+      elif [ "${STUB_JOB_START_SILENT:-}" != "1" ]; then
+        printf 'job-migrate-exec%s\n' "$REPLY"
+      fi
+      ;;
+    "containerapp job execution list "*)
+      need_state
+      if [ "${STUB_JOB_LIST_FAIL:-}" = "1" ]; then
+        echo "ERROR: stub job execution list failure" >&2
+        exit 1
+      fi
+      local old_name started=0 listed_n n
+      for old_name in ${STUB_JOB_OLD_EXECUTIONS:-}; do printf '%s\n' "$old_name"; done
+      if [ -f "$state_dir/executions" ]; then
+        read -r started <"$state_dir/executions"
+        # an execution can be missing from the list for a while after its start: it appears from list call
+        # STUB_JOB_LIST_LAG + 1 on (counted from the first list call after the start)
+        bump "list-calls-after-start-$started"
+        listed_n="$REPLY"
+        if [ "$listed_n" -gt "${STUB_JOB_LIST_LAG:-0}" ]; then
+          for ((n = 1; n <= started; n++)); do printf 'job-migrate-exec%s\n' "$n"; done
+        fi
+      fi
+      ;;
+    "containerapp job execution show "*)
+      local old_name_shown
+      for old_name_shown in ${STUB_JOB_OLD_EXECUTIONS:-}; do
+        if [ "$exec_name_arg" = "$old_name_shown" ]; then
+          # the execution of an EARLIER deploy: it ended long ago
+          printf '%s\n' "${STUB_JOB_OLD_STATUS:-Succeeded}"
+          return 0
+        fi
+      done
+      local exec_n="${exec_name_arg##*exec}" word
+      word_of "${STUB_MIGRATE_STATUSES:-Succeeded}" "$exec_n"
+      word="${REPLY//+/ }"
+      bump "poll-$exec_n"
+      word_of "$word" "$REPLY"
+      printf '%s\n' "$REPLY"
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+if serve_deploy_call; then
+  exit 0
+fi
+
+case "$joined" in
+  "provider show "*)
+    provider="$(flag_value -n)"
+    case "$joined" in
+      *managedEnvironments*)
+        case "$scenario" in
+          nolocation) printf '["East US","West Europe","North Europe"]\n' ;;
+          p1_compact) printf '["uaenorth","westeurope"]\n' ;;
+          *) printf '["East US","UAE North","West Europe"]\n' ;;
+        esac
+        ;;
+      *registrationState*)
+        if [ "$scenario" = "noreg" ] && [ "$provider" = "Microsoft.Consumption" ]; then
+          printf 'NotRegistered\n'
+        else
+          printf 'Registered\n'
+        fi
+        ;;
+      *) echo "az stub: unhandled: $joined" >&2; exit 2 ;;
+    esac
+    ;;
+  "postgres flexible-server list-skus "*)
+    case "$scenario" in
+      nob1ms) printf '[{"name":"Standard_D2ds_v4","supportedServerVersions":[{"name":"17"}]}]\n' ;;
+      pg17) printf '[{"name":"Standard_B1ms","supportedServerVersions":[{"name":"17"},{"name":"16"}]}]\n' ;;
+      *) printf '[{"name":"Standard_B1ms","supportedServerVersions":[{"name":"18"},{"name":"17"}]}]\n' ;;
+    esac
+    ;;
+  "account show "*)
+    case "$joined" in
+      *"--query id"*) printf '00000000-0000-0000-0000-000000000000\n' ;;
+      *user.name*) printf 'operator@example.org\n' ;;
+      *) echo "az stub: unhandled: $joined" >&2; exit 2 ;;
+    esac
+    ;;
+  "role assignment list "*)
+    if [ "$scenario" != "noowner" ]; then
+      printf 'Owner\n'
+    fi
+    ;;
+  "containerapp secret list "* | "containerapp job secret list "*)
+    app="$(flag_value -n)"
+    if [ "$scenario" = "tls_require" ] || { [ "$scenario" = "tls_alerts" ] && [ "$app" = "alerts" ]; }; then
+      printf 'postgresql+asyncpg://sbadmin:STUBPASSWORD@stub.postgres.database.azure.com:5432/stellar_blaze?ssl=require\n'
+    else
+      printf 'postgresql+asyncpg://sbadmin:STUBPASSWORD@stub.postgres.database.azure.com:5432/stellar_blaze?ssl=verify-full\n'
+    fi
+    ;;
+  "containerapp show "* | "containerapp job show "*)
+    if [ "$scenario" = "tls_noenv" ]; then
+      printf '\n'
+    else
+      printf '/etc/ssl/certs/ca-certificates.crt\n'
+    fi
+    ;;
+  "bicep build "*)
+    printf '{"stub":"az-bicep-build","args":"%s"}\n' "$joined"
+    ;;
+  *)
+    echo "az stub: unhandled: $joined" >&2
+    exit 2
+    ;;
+esac

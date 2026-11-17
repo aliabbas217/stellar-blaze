@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>New site · Stellar Blaze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..700&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css"><link rel="stylesheet" href="assets/base.css"><link rel="stylesheet" href="assets/supervisor.css">
+<style>
+.setup { max-width: 1240px; margin-inline: auto; min-height: 100svh; background: var(--ground); }
+.grid { display: grid; gap: var(--s-6); padding: var(--s-4) var(--s-4) var(--s-16); grid-template-areas: "hero" "side" "form"; align-content: start; }
+.hero { grid-area: hero; } .side { grid-area: side; } .form { grid-area: form; }
+/* 1440: sentence + fields left, the forecast tile + week right, both heroes in the first fold */
+@media (min-width: 1024px) { .grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-rows: auto 1fr; grid-template-areas: "hero side" "form side"; gap: var(--s-6) var(--s-12); padding: var(--s-6) var(--s-8) var(--s-16); } .side { border-inline-start: 1px solid var(--hair); padding-inline-start: var(--s-8); align-self: start; } }
+.side { view-transition-name: spine; }
+/* landing display step: 28 px at 390, 36 px at desk (400 weight, tight tracking) */
+.hero h1 { font: 400 var(--t-28)/1.12 var(--sans); letter-spacing: -0.015em; color: var(--ink); text-wrap: balance; }
+@media (min-width: 1024px) { .hero h1 { font-size: var(--t-36); } }
+.say { margin-top: var(--s-3); display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.say .sentence { flex: 1 1 100%; }
+.say.off .sentence { display: none; }
+.sentence { grid-column: 1 / -1; min-height: 96px; outline: 0; padding: var(--s-4); border: 1px solid var(--edge); border-radius: var(--r); background: var(--panel); font-size: var(--t-22); line-height: 1.6; letter-spacing: -0.005em; }
+@media (min-width: 1024px) { .sentence { font-size: var(--t-28); line-height: 1.45; padding: var(--s-5) var(--s-6); letter-spacing: -0.01em; } }
+.sentence:empty::before { content: attr(data-ph); color: var(--ink-3); }
+.sentence:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sentence .ph { color: var(--ink-3); }
+.sentence u { white-space: nowrap; text-decoration: none; border-bottom: 2px solid var(--signal); padding-bottom: 1px; cursor: default; }
+.sentence u.hot, .sentence u:hover { background: color-mix(in oklch, var(--signal) 16%, transparent); }
+.sentence s.pii { text-decoration: line-through 2px; color: var(--ink-2); background: color-mix(in oklch, var(--ink) 8%, transparent); }
+.ix { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; margin-inline-start: 4px; border: 1px solid var(--signal); border-radius: var(--r); font: 600 12px/1 var(--sans); color: var(--signal); vertical-align: 0.5em; letter-spacing: 0; }
+.say .btn { min-height: 48px; }
+.notice-q { margin-top: var(--s-2); font-size: var(--t-13); color: var(--ink-3); max-width: 70ch; }
+.refuse { margin-top: var(--s-3); }
+.legend { font-size: var(--t-13); color: var(--ink-3); margin-bottom: var(--s-2); max-width: 70ch; }
+.fields { border-top: 1px solid var(--edge); }
+.f .prov .dflt { color: var(--ink-3); }
+.f { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 2px var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--hair); align-items: baseline; }
+@media (min-width: 700px) { .f { grid-template-columns: 28px 9.5rem minmax(0, 1fr) auto; } .f .prov { text-align: end; } }
+.f .ix2 { font: 600 12px var(--sans); color: var(--signal); border: 1px solid var(--signal); border-radius: var(--r); height: 20px; display: grid; place-items: center; align-self: center; }
+.f .ix2.none { border-color: transparent; }
+.f .lab { font-size: var(--t-14); color: var(--ink-3); }
+.f .val { font-size: var(--t-18); grid-column: 2; }
+
+.f .val small { display: block; font-size: var(--t-13); color: var(--ink-3); }
+.f .prov { grid-column: 2 / -1; font-size: var(--t-13); color: var(--ink-3); }
+.f .prov.need { color: var(--ink); font-weight: 600; }
+.f .prov a, .f .prov button { color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; min-height: 24px; }
+@media (max-width: 699px) { .fields.plain .f > * { grid-column: 1 / -1; } .fields.plain .ix2 { display: none; } }
+.f.hot { background: color-mix(in oklch, var(--signal) 8%, transparent); }
+.f.conflict { border-inline-start: 2px solid var(--signal); padding-inline-start: var(--s-2); }
+.ctl-row { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); grid-column: 2 / -1; }
+.step { display: inline-flex; align-items: center; border: 1px solid var(--edge); border-radius: var(--r); }
+.step button { width: var(--target); height: var(--target); background: none; border: 0; font-size: var(--t-22); }
+.step output { min-width: 3ch; text-align: center; font-size: var(--t-18); }
+.ask { margin-top: var(--s-6); padding: var(--s-4); border: 1px solid var(--signal); border-radius: var(--r); }
+.ask p { font-size: var(--t-18); font-weight: 500; }
+.acts { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-top: var(--s-6); align-items: center; }
+/* the action stays reachable while the fields run below the fold */
+.acts { position: sticky; bottom: 0; z-index: 5; background: var(--ground); padding-block: var(--s-3); border-top: 1px solid var(--hair); }
+.acts .btn.primary { min-width: 220px; }
+@media (max-width: 699px) { .acts .btn { width: 100%; } }
+.side .k { margin-bottom: var(--s-2); }
+.tile svg { width: 100%; height: auto; }
+.tile .lbl { font-family: var(--mono); font-weight: 500; --fs: 12px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; }
+.tile .site { font-family: var(--sans); font-weight: 600; --fs: 14px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; }
+.cellfacts { display: grid; grid-template-columns: auto 1fr; gap: var(--s-1) var(--s-4); margin-top: var(--s-3); font-size: var(--t-14); }
+.cellfacts dt { color: var(--ink-3); }
+.week { margin-top: var(--s-4); }
+.tile .lbl, .tile .site { font-size: calc(var(--fs, 12px) * var(--k, 1)); }
+.week .d, .week .v { font-size: calc(var(--fs, 12px) * var(--k, 1)); }
+.week svg { width: 100%; height: auto; overflow: visible; }
+.week .d { font-family: var(--sans); font-weight: 600; --fs: 13px; fill: var(--ink); }
+.week .v { font-family: var(--sans); font-weight: 400; --fs: 12px; fill: var(--ink-3); }
+.banner { margin: 0 0 var(--s-3); }
+@media (min-width: 700px) { .f .val { grid-column: 3; } .f .prov { grid-column: 4; text-align: end; } .f .ctl-row { grid-column: 3 / -1; } }
+</style>
+</head>
+<body>
+<div class="setup">
+  <div id="top"></div>
+  <main class="grid">
+      <div class="notice banner" data-when="offline" style="grid-column:1/-1"><strong>Offline.</strong> This form works here and is saved when you are back. The sentence reader needs a connection.</div>
+      <section class="hero" aria-labelledby="h1">
+        <h1 id="h1">Describe the site in one sentence.</h1>
+        <div class="say">
+          <div class="sentence" id="sentence" role="textbox" aria-multiline="true" aria-labelledby="h1" tabindex="0" data-ph="Two crews, 40 workers, Mussafah, concrete work this week"></div>
+          <button class="btn" type="button" id="mic" aria-label="Speak instead"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" stroke="currentColor" stroke-width="2" fill="none"/></svg><span>Speak</span></button>
+          <button class="btn" type="button" id="read" aria-describedby="readnote">Read it</button>
+        </div>
+        <p class="notice-q" id="readnote" data-when="ideal filled question conflict loading error">Read on our own server, never sent to another company, deleted once you confirm. Use crew letters, not names. Prefer the form? It is right below.</p>
+        <div class="notice refuse" data-when="refused" role="status"><strong>Voice needs our private server, which isn't running here. Type in the form instead.</strong></div>
+        <div class="notice refuse" data-when="pii" role="alert"><div><strong>Please remove names and numbers that identify people. We only need counts.</strong> Nothing was sent; the marked words stay on this device.</div></div>
+        <div class="notice refuse" data-when="error" role="alert"><div><strong>We could not read that sentence. Nothing was saved.</strong> The form below still works. <button class="btn" type="button" onclick="location.reload()">Try again</button> <span class="reqid">Request ID c42a-77e0</span></div></div>
+        <div class="ask" id="ask" data-when="question" role="group" aria-labelledby="askq"><p id="askq">One thing I need: when does the shift start?</p><div class="chipset" style="margin-top:var(--s-3)"><a href="?state=filled">06:00</a><a href="?state=filled">07:00</a><button type="button">Other</button></div></div>
+      </section>
+    <aside class="side" aria-label="Where and when">
+      <p class="k">The site's forecast cell</p>
+      <div class="tile" id="tile"></div>
+      <div class="week" id="weekwrap"><p class="k">The week the site runs</p><div id="week"></div><p class="provline" id="weeknote"></p></div>
+      <dl class="cellfacts" id="facts"></dl>
+    </aside>
+    <section class="form" aria-label="Site details">
+      <p class="legend" id="legend"></p>
+      <div class="fields" id="fields"></div>
+      <div class="acts" data-when="ideal filled question conflict pii refused offline error">
+        <a class="btn lg" href="supervisor-qr.html" id="create">Create site</a>
+        <a class="btn lg" href="supervisor-roster.html">Add roster (CSV)</a>
+        <p class="provline">Nothing is saved until you press Create site. Every change after that is logged.</p>
+      </div>
+    </section>
+  </main>
+</div>
+<script type="module">
+import { boot, STATE } from './assets/kit.js';
+import { loadJSON, clipCoast, STATIONS, RAMP_DARK, RAMP_LIGHT, css } from './assets/heat.js';
+import { REPLAY, SITE, topbar, fmt } from './assets/crews.js';
+const desk = matchMedia('(min-width: 1024px)').matches;
+document.getElementById('top').innerHTML = topbar({ title: 'New site', sub: 'Al Noor Contracting · replay day' });
+boot({ surface: desk ? 'desk' : 'field', at: REPLAY.at, states: ['ideal', 'filled', 'question', 'conflict', 'pii', 'refused', 'loading', 'error', 'offline'] });
+const ramp = document.documentElement.dataset.theme === 'sun' ? RAMP_LIGHT : RAMP_DARK;
+
+// nearest station, computed (haversine)
+const km = (a, b, c, d) => { const r = Math.PI / 180, x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 12742 * Math.asin(Math.sqrt(x)); };
+const near = Object.entries(STATIONS).map(([k, [la, lo, n]]) => ({ k, n, d: km(SITE.lat, SITE.lon, la, lo) })).sort((a, b) => a.d - b.d)[0];
+
+// ---- the sentence and its fields: render(st) so "Read it" completes in place (no dead-end skeleton) ----
+const PH = 'Two crews, 40 workers, Mussafah, concrete work this week';
+const S = {
+  understood: [['Two crews', 2], ['40 workers', 3], ['Mussafah', 1], ['concrete work', 4], ['this week', 5]],
+  conflict: 'Crews of 20 and 30, 40 workers, Mussafah, concrete work this week',
+  pii: 'Ravi\'s crew and Imran\'s crew, call 0501234567, Mussafah, concrete work this week',
+};
+const sentence = document.getElementById('sentence'), readBtn = document.getElementById('read'), createBtn = document.getElementById('create');
+const mark = (txt, pairs) => pairs.reduce((h, [p, i]) => h.replace(p, `<u data-i="${i}">${p}<span class="ix" aria-hidden="true">${i}</span></u>`), txt);
+const live = ['refused', 'offline'].includes(STATE);
+const dates = 'Thu 3 to Sun 6 Sep 2026';
+const stepper = (v, label) => `<span class="step" role="group" aria-label="${label}"><button type="button" aria-label="Fewer">−</button><output>${v}</output><button type="button" aria-label="More">+</button></span>`;
+const D = '<span class="dflt">default</span>';
+// one filled action at a time: "Read it" while the sentence is empty or typed, "Create site" once the fields are filled
+const primary = (which) => { readBtn.classList.toggle('primary', which === 'read'); createBtn.classList.toggle('primary', which === 'create'); };
+let typed = '';
+
+function sentenceFor(st) {
+  sentence.contentEditable = 'false';
+  if (st === 'ideal') { sentence.textContent = ''; sentence.contentEditable = 'plaintext-only'; }
+  else if (st === 'pii') sentence.innerHTML = S.pii.replace("Ravi's crew", '<s class="pii">Ravi\'s crew</s>').replace("Imran's crew", '<s class="pii">Imran\'s crew</s>').replace('0501234567', '<s class="pii">0501234567</s>');
+  else if (st === 'conflict') sentence.innerHTML = mark(S.conflict, [['Crews of 20 and 30', 2], ['40 workers', 3], ['Mussafah', 1], ['concrete work', 4], ['this week', 5]]);
+  else if (live) sentence.innerHTML = `<span class="ph">The sentence reader is off on this server.</span>`;
+  else sentence.innerHTML = mark(PH, S.understood);
+}
+
+function fields(st) {
+  const F = [], row = (o) => F.push(o);
+  const understood = ['filled', 'question', 'conflict', 'loading'].includes(st);
+  if (st === 'loading') {
+    for (const [i, l] of [[1, 'Site'], [2, 'Crews'], [3, 'Workers'], [4, 'Work'], [5, 'Dates']]) row({ i, lab: l, val: '<span class="skel" style="display:inline-block;width:12rem">.</span>', prov: 'reading on our own server' });
+  } else if (understood) {
+    row({ i: 1, lab: 'Site', val: `Mussafah<small>${SITE.lat.toFixed(2)} N ${SITE.lon.toFixed(2)} E · nearest station ${near.k} ${near.n}, ${Math.round(near.d)} km</small>`, prov: 'from your sentence · <button type="button">move the pin</button>' });
+    if (st === 'conflict') {
+      row({ i: 2, lab: 'Crews', val: '2: Crew A and Crew B', prov: 'from your sentence' });
+      row({ i: 3, lab: 'Workers', cls: 'conflict', val: 'You said 40 workers, but 20 and 30 make 50.', prov: 'ask', ctl: '<span class="chipset"><button type="button">40 in all</button><button type="button">50: crews of 20 and 30</button></span>' });
+    } else {
+      row({ i: 2, lab: 'Crews', val: '2: Crew A and Crew B', prov: 'from your sentence' });
+      row({ i: 3, lab: 'Workers', val: '40, split 20 and 20', prov: 'assumed: <button type="button">confirm</button>' });
+    }
+    row({ i: 4, lab: 'Work', val: 'Concrete pour<small>Heavy work, from the ruleset table (not clinically reviewed)</small>', prov: 'inferred' });
+    row({ i: 5, lab: 'Dates', val: dates, prov: 'inferred from “this week”' });
+  } else {
+    // short form: the live path (fail-closed), offline, error, PII, and the empty start
+    row({ lab: 'Site', val: st === 'ideal' ? 'Not set yet' : 'Mussafah<small>24.36 N 54.50 E, from your location</small>', prov: st === 'ideal' ? '' : 'from your phone', ctl: st === 'ideal' || live ? '<button class="btn" type="button">Use my location</button><button class="btn" type="button" style="border-color:transparent">Pick on the map</button>' : '' });
+    row({ lab: 'Crews', val: live ? '' : '1', prov: D, ctl: live ? stepper(2, 'Crews') : '' });
+    row({ lab: 'Workers', val: live ? '' : '10 per crew', prov: D, ctl: live ? stepper(10, 'Workers per crew') : '' });
+    row({ lab: 'Work', val: live ? 'Applies to all crews' : 'Not set, counted as heavy', prov: D, ctl: live ? '<span class="chipset"><button type="button" aria-pressed="true">Concrete pour</button><button type="button">Rebar fixing</button><button type="button">Formwork</button><button type="button">More</button></span>' : '' });
+    row({ lab: 'Dates', val: 'From today, Thu 3 Sep 2026', prov: D });
+  }
+  const shiftAnswered = st === 'filled';
+  row({ lab: 'Shift', val: shiftAnswered ? '06:00 to 18:00<small>Work stops for the midday break</small>' : st === 'question' ? 'Start not known yet' : '06:00 to 11:00 and 15:00 to 18:00', prov: shiftAnswered ? 'your answer' : st === 'question' ? 'ask' : D, ctl: live ? '<span class="chipset"><button type="button" aria-pressed="true">06:00</button><button type="button">07:00</button><button type="button">Other</button></span>' : '' });
+  row({ lab: 'Midday break', val: `In force: ${fmt(SITE.ban[0])} to ${fmt(SITE.ban[1])}<small>Until 15 Sep 2026</small>`, prov: 'by law' });
+  row({ lab: 'Acclimatisation', val: 'Everyone counted as new', prov: D });
+  row({ lab: 'Crew languages', val: 'English', prov: 'from your phone' });
+  const el = document.getElementById('fields');
+  el.classList.toggle('plain', !F.some((f) => f.i));
+  el.setAttribute('aria-busy', st === 'loading' ? 'true' : 'false');
+  el.innerHTML = F.map((f) => `<div class="f ${f.cls || ''}" ${f.i ? `data-i="${f.i}"` : ''}><span class="ix2 ${f.i ? '' : 'none'}" aria-hidden="true">${f.i || ''}</span><span class="lab">${f.lab}</span><span class="val">${f.val}</span>${f.prov === 'ask' ? '<span class="prov need">Pick one</span>' : `<span class="prov">${f.prov}</span>`}${f.ctl ? `<div class="ctl-row">${f.ctl}</div>` : ''}</div>`).join('');
+  document.getElementById('legend').textContent = [understood ? 'Each number matches an underlined phrase in your sentence.' : '',
+    F.some((f) => f.prov === D) ? 'Rows marked default are protective starting values; change any of them here or later, every change is logged.' : ''].filter(Boolean).join(' ');
+}
+
+function wire() {
+  const hot = (i, on) => document.querySelectorAll(`[data-i="${i}"]`).forEach((n) => n.classList.toggle('hot', on));
+  document.querySelectorAll('u[data-i], .f[data-i]').forEach((n) => { n.addEventListener('mouseenter', () => hot(n.dataset.i, true)); n.addEventListener('mouseleave', () => hot(n.dataset.i, false)); });
+}
+
+let cur = STATE, drawMap = null;
+function render(st) {
+  cur = st;
+  sentenceFor(st); fields(st); wire();
+  if (drawMap) drawMap(st !== 'ideal');
+  const filled = ['filled', 'question', 'conflict'].includes(st) || live;
+  primary(filled ? 'create' : st === 'loading' ? null : 'read');
+  readBtn.setAttribute('aria-busy', st === 'loading' ? 'true' : 'false');
+  readBtn.textContent = st === 'loading' ? 'Reading' : filled ? 'Read again' : 'Read it';
+  if (st === 'conflict' || st === 'pii') createBtn.setAttribute('aria-disabled', 'true'); else createBtn.removeAttribute('aria-disabled');
+}
+if (live) { document.querySelector('.say').hidden = true; document.getElementById('h1').textContent = 'Set up the site.'; document.getElementById('mic').setAttribute('aria-disabled', 'true'); readBtn.setAttribute('aria-disabled', 'true'); sentence.removeAttribute('tabindex'); }
+sentence.addEventListener('input', () => { typed = sentence.textContent.trim(); });
+// "Read it": reads in place, then lands on the understood fields (numbered phrases wired to numbered rows)
+readBtn.onclick = () => {
+  if (live || cur === 'loading') return;
+  typed = sentence.textContent.trim();
+  render('loading');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(() => render('filled'), reduce ? 200 : 1400);
+};
+render(STATE);
+
+// ---- map tile: IFS 0.25° cells around the site, 3 Sep at the site's peak hour ----
+// SVG labels: the viewBox scales down at 390, so font-size is set in viewBox units from the rendered scale (k >= 1)
+const [field, coast, series] = await Promise.all([loadJSON('uae_ifs025_d1_wbgt_2026-09-03.json'), loadJSON('coast.json'), loadJSON('omaa_2026_ifs_d1_wbgt_hourly.json')]);
+const box = [53.85, 23.9, 55.15, 24.85], kx = Math.cos(24.4 * Math.PI / 180), Wt = 480, sc = Wt / ((box[2] - box[0]) * kx), Ht = Math.round((box[3] - box[1]) * sc);
+const X = (lo) => (lo - box[0]) * kx * sc, Y = (la) => (box[3] - la) * sc;
+const ci = field.lat.indexOf(24.25), cj = field.lon.indexOf(54.5), cell = field.wbgt_c[ci][cj];
+const pkH = cell.indexOf(Math.max(...cell));
+const kOf = (el, vb) => Math.max(1, vb / Math.max(1, el.clientWidth));
+const tileEl = document.getElementById('tile');
+drawMap = (pin) => {
+  const k = kOf(tileEl, Wt);
+  let t = '';
+  field.lat.forEach((la, i) => field.lon.forEach((lo, j) => {
+    if (lo < box[0] - 0.2 || lo > box[2] + 0.2 || la < box[1] - 0.2 || la > box[3] + 0.2) return;
+    t += `<rect x="${X(lo - 0.125)}" y="${Y(la + 0.125)}" width="${X(lo + 0.125) - X(lo - 0.125) + 0.5}" height="${Y(la - 0.125) - Y(la + 0.125) + 0.5}" fill="${css(ramp(field.wbgt_c[i][j][pkH]))}"/>`;
+  }));
+  for (const l of clipCoast(coast, [box[0] - 0.3, box[1] - 0.3, box[2] + 0.3, box[3] + 0.3])) t += `<polyline points="${l.map(([lo, la]) => `${X(lo).toFixed(1)},${Y(la).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="1" opacity="0.75"/>`;
+  t += `<rect x="${X(54.375)}" y="${Y(24.375)}" width="${X(54.625) - X(54.375)}" height="${Y(24.125) - Y(24.375)}" fill="none" stroke="var(--ink)" stroke-width="2"/>`;
+  for (const s of ['OMAA', 'OMAD']) { const [la, lo] = STATIONS[s]; t += `<rect x="${X(lo) - 3 * k}" y="${Y(la) - 3 * k}" width="${6 * k}" height="${6 * k}" fill="var(--ground)" stroke="var(--ink)"/><text class="lbl" x="${X(lo) + 7 * k}" y="${Y(la) - 6 * k}">${s}</text>`; }
+  if (pin) t += `<circle cx="${X(SITE.lon)}" cy="${Y(SITE.lat)}" r="${6 * k}" fill="var(--signal)" stroke="var(--ground)" stroke-width="2"/><text class="site" x="${X(SITE.lon) + 10 * k}" y="${Y(SITE.lat) + 22 * k}">Mussafah</text>`;
+  tileEl.innerHTML = `<svg viewBox="0 0 ${Wt} ${Ht}" style="--k:${k.toFixed(3)}" role="img" aria-label="Forecast map around Abu Dhabi, IFS 0.25 degree cells at ${fmt(pkH)} on 3 Sep 2026. The site's cell is outlined.">${t}</svg>`;
+};
+document.getElementById('facts').innerHTML = `<dt>Cell</dt><dd><span class="mono">24.25 N 54.50 E</span>, IFS 0.25°</dd><dt>Peak, 3 Sep</dt><dd>${cell[pkH].toFixed(1)} °C WBGT at ${fmt(pkH)}, forecast the day before</dd><dt>Nearest station</dt><dd><span class="mono">${near.k}</span> ${near.n}, ${Math.round(near.d)} km</dd><dt>Rules</dt><dd>ADOSH, UAE federal</dd>`;
+
+// ---- the week: four mini spines, 06:00 to 18:00, with the midday slot (in force to 15 Sep) ----
+const days = ['2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06'], names = ['Thu 3', 'Fri 4', 'Sat 5', 'Sun 6'];
+const wk = document.getElementById('week');
+const Ww = 480, colW = Ww / 4, bh = 64;
+const drawWeek = () => {
+  const k = kOf(wk, Ww), top = Math.round(13 * k + 10), y1 = top + bh;
+  let w = '';
+  days.forEach((d, i) => {
+    const v = series.wbgt_c_by_local_hour[series.days.indexOf(d)], x0 = i * colW + 4, cw = colW - 12, px = (h) => x0 + (h - 6) / 12 * cw;
+    for (let h = 6; h < 18; h++) w += `<rect x="${px(h) + 0.5}" y="${top}" width="${px(h + 1) - px(h) - 1}" height="${bh}" fill="${css(ramp(v[h]))}"/>`;
+    w += `<rect x="${px(12.5)}" y="${top - 6}" width="${px(15) - px(12.5)}" height="${bh + 12}" fill="var(--slot)"/><line x1="${px(12.5)}" x2="${px(12.5)}" y1="${top - 6}" y2="${y1 + 6}" stroke="var(--edge)"/><line x1="${px(15)}" x2="${px(15)}" y1="${top - 6}" y2="${y1 + 6}" stroke="var(--edge)"/>`;
+    w += `<text class="d" x="${x0}" y="${top - 9}">${names[i]}</text><text class="v" x="${x0}" y="${y1 + 10 + 12 * k}">${k > 1.15 ? '' : 'Peak '}${Math.max(...v.slice(6, 18)).toFixed(1)} °C</text>`;
+    if (i === 0) w += `<line x1="${px(REPLAY.now)}" x2="${px(REPLAY.now)}" y1="${top - 4}" y2="${y1 + 4}" stroke="var(--ink)" stroke-width="2"/>`;
+  });
+  wk.innerHTML = `<svg viewBox="0 0 ${Ww} ${Math.round(y1 + 16 + 13 * k)}" style="--k:${k.toFixed(3)}" role="img" aria-label="Thu 3 to Sun 6 September, 06:00 to 18:00 each day, midday break 12:30 to 15:00 in force every day">${w}</svg>`;
+};
+const redraw = () => { drawMap(cur !== 'ideal' && cur !== 'loading' ? true : cur === 'loading'); drawWeek(); };
+redraw(); addEventListener('resize', redraw);
+document.getElementById('weeknote').textContent = 'Each day 06:00 to 18:00, with its peak WBGT; the recess is the midday break, in force every day this week. Real IFS forecast at OMAA (replay); a live site uses its own cell.';
+</script>
+</body>
+</html>
