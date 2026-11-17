@@ -1314,7 +1314,10 @@ function Get-GateFailure {
     $replicas = Get-RevisionValue -Revision $Snapshot.Revision -Path 'replicas'
     if ($AllowScaleToZero -and $Kind -eq 'Ingress' -and $null -ne $replicas -and [int]$replicas -eq 0) { return $failures.ToArray() }
     $running = [string](Get-RevisionValue -Revision $Snapshot.Revision -Path 'runningState')
-    if ($running -ne 'Running') { $failures.Add("revision runningState is '$running', expected Running") }
+    # RunningAtMaxScale is how Container Apps reports a healthy revision whose replica count has reached maxReplicas. web and the
+    # alerts worker are pinned at 1 / 1, so a healthy one ALWAYS reads RunningAtMaxScale (seen live on France Central, 2026-11-17);
+    # only the api, which may scale 0 to 1, reads plain Running. healthState, replicas, traffic and the image are still checked.
+    if ($running -ne 'Running' -and $running -ne 'RunningAtMaxScale') { $failures.Add("revision runningState is '$running', expected Running or RunningAtMaxScale") }
     $health = [string](Get-RevisionValue -Revision $Snapshot.Revision -Path 'healthState')
     if ($Kind -eq 'Worker') {
         if ($health -ne 'Healthy' -and $health -ne 'None') { $failures.Add("revision healthState is '$health', expected Healthy or None") }
