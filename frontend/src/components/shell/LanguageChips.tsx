@@ -2,11 +2,12 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { getPathname, usePathname } from "@/i18n/navigation";
+import { CHIP } from "@/components/states/actions";
 import { routing } from "@/i18n/routing";
 
 /**
  * The six languages as one row of chips, each in its own name and script (endonyms), the active one marked with
- * `aria-current`. The field screens show them directly because a worker must find their language without opening a menu.
+ * `aria-current`; the current one is a filled pill with a check mark (the CHIP of components/states/actions.ts). The field screens show them directly because a worker must find their language without opening a menu.
  *
  * A chip is a plain link: choosing a language loads a new document, as in LocaleSwitcher, because the [locale] layout owns
  * <html> and a soft navigation between locales would re-mount it and lose `data-theme`. The click keeps the query string
@@ -18,7 +19,7 @@ export function LanguageChips() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label={t("language")} className="flex gap-0.5 overflow-x-auto border-b border-hair px-3 py-0.5">
+    <nav aria-label={t("language")} className="flex gap-1 overflow-x-auto border-b border-hair px-2 py-1">
       {routing.locales.map((code) => {
         const href = getPathname({ href: pathname, locale: code });
         return (
@@ -35,7 +36,7 @@ export function LanguageChips() {
               // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a full load is intended, see above
               window.location.assign(`${href}${search}${hash}`);
             }}
-            className="inline-flex min-h-(--target) min-w-(--target) flex-none items-center justify-center rounded-sign border border-transparent px-2.5 font-body text-base text-ink-2 no-underline aria-[current=true]:border-ink aria-[current=true]:font-semibold aria-[current=true]:text-ink"
+            className={`${CHIP} min-w-(--target) px-2 font-body text-base`}
           >
             {t(`locales.${code}`)}
           </a>

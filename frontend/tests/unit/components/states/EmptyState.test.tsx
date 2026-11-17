@@ -128,7 +128,8 @@ describe("EmptyState", () => {
         />,
       );
       expect(screen.queryByRole("link", { name: "Parked" })).not.toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Built" }).className).toContain("bg-ink");
+      // the promoted action is the primary tier: the signal fill
+      expect(screen.getByRole("link", { name: "Built" }).className).toContain("bg-signal");
       promoted.unmount();
 
       renderWithIntl(

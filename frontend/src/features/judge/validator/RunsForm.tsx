@@ -65,10 +65,10 @@ export function RunsForm({ runs, rowProblems, templateId, acclimatised, daysPerW
                         handlers.onTemplate(template.id);
                       },
                     })}
-                className="inline-flex min-h-(--target) flex-col items-start justify-center rounded-sign border border-edge px-4 py-2 text-start text-base text-ink aria-pressed:border-ink aria-pressed:font-semibold"
+                className="group/tpl inline-flex min-h-(--target) flex-col items-start justify-center rounded-ctl bg-panel px-4 py-2 text-start text-base text-ink inset-ring-[1.5px] inset-ring-hair transition-transform duration-(--dur-press) active:scale-[0.985] aria-pressed:bg-ink aria-pressed:font-semibold aria-pressed:text-ground aria-pressed:inset-ring-0"
               >
                 <span>{t(`templates.${template.id}`)}</span>
-                <span className="text-sm font-normal text-ink-3 tabular-nums">{list.format(template.runs.map(rangeText))}</span>
+                <span className="text-sm font-normal text-ink-3 tabular-nums group-aria-pressed/tpl:text-ground">{list.format(template.runs.map(rangeText))}</span>
               </button>
             ))}
           </div>

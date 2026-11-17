@@ -204,9 +204,9 @@ describe("AlertsSettings: supported", () => {
     expect(region).toBeDefined();
   });
 
-  it("gives every button a 48 px target (min-h-12), above the 44 px a gloved hand needs", () => {
+  it("gives every button a 52 px target (min-h-(--target-field)), above the 44 px a gloved hand needs", () => {
     setup({});
-    for (const button of screen.getAllByRole("button")) expect(button.className).toContain("min-h-12");
+    for (const button of screen.getAllByRole("button")) expect(button.className).toContain("min-h-(--target-field)");
   });
 });
 
@@ -677,13 +677,13 @@ describe("AlertsSettings: removing the worker's data", () => {
     });
   });
 
-  it("gives the question's buttons the same 48 px target (min-h-12) as every other button", async () => {
+  it("gives the question's buttons the same 52 px target (min-h-(--target-field)) as every other button", async () => {
     stubRevoke();
     setup({});
-    expect(removeData()?.className).toContain("min-h-12");
+    expect(removeData()?.className).toContain("min-h-(--target-field)");
 
     await userEvent.click(removeData() as HTMLElement);
-    for (const button of within(screen.getByRole("group")).getAllByRole("button")) expect(button.className).toContain("min-h-12");
+    for (const button of within(screen.getByRole("group")).getAllByRole("button")) expect(button.className).toContain("min-h-(--target-field)");
   });
 
   it("is shown in Arabic from the Arabic messages", async () => {

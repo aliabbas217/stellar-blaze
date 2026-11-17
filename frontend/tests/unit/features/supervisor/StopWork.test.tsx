@@ -828,12 +828,14 @@ describe("Stop work: copy that holds while it is true, and a target that is alwa
     Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
   });
 
-  it("the Stop bar carries its own emergency framing: the octagon mark and a heavy rule, not the primary action's plain ink button", async () => {
+  it("the Stop bar carries its own emergency framing: the octagon mark and the Stop tier (the only ink slab, 56 px, rounded), not the primary action's signal fill", async () => {
     renderCrews();
     const button = await press();
 
     expect(button.querySelector("[data-stop-mark]")).not.toBeNull();
-    expect(stopBar().innerHTML).toContain("border-t-4");
+    for (const token of ["bg-ink", "min-h-(--target-stop)", "rounded-ctl", "w-full"]) expect(button.className).toContain(token);
+    expect(button.className).not.toContain("bg-signal");
+    expect(stopBar().innerHTML).toContain("border-t");
     expect(button.getAttribute("aria-hidden")).toBeNull();
   });
 });

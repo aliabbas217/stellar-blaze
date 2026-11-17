@@ -1,3 +1,4 @@
+import { ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 import { num, VIEW_H, VIEW_W } from "./chart-geometry";
 
 /*
@@ -157,7 +158,7 @@ export function FrontierChart({ data, commuteMin, labels, formatHours }: Frontie
       </div>
 
       <details className="text-ink-2" data-frontier-table="">
-        <summary className="inline-flex min-h-(--target) cursor-pointer items-center rounded-sign border border-edge px-4 text-base text-ink hover:bg-panel">
+        <summary className={`${ACTION_SECONDARY_DENSE} cursor-pointer`}>
           {labels.tableToggle}
         </summary>
         <div

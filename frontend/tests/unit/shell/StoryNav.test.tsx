@@ -107,9 +107,9 @@ describe("StoryNav", () => {
     expect(screen.queryByRole("link", { name: /^Back:/ })).toBeNull();
   });
 
-  it("has 48 px targets on every link and button", () => {
+  it("has 44 px or larger targets on every link and button (min-h-(--target) or min-h-(--target-field))", () => {
     const { container } = renderWithIntl(<StoryNav current="scoreboard" />);
-    for (const target of container.querySelectorAll("a, button")) expect(target.className, target.textContent).toContain("min-h-12");
+    for (const target of container.querySelectorAll("a, button")) expect(target.className, target.textContent).toMatch(/min-h-\(--target(-field)?\)/);
   });
 
   it("copies the link of the page without its query and says so", async () => {

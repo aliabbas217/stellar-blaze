@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { ACTION_SECONDARY_DENSE, NAV_TAB } from "@/components/states/actions";
 import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import { CopyStepLink } from "./CopyStepLink";
 import { STORY_STEPS, type StoryStepId } from "./story-steps";
@@ -20,7 +21,7 @@ export function StoryNav({ current }: { readonly current: StoryStepId }) {
   const next = built.find((step) => step.index > position);
   const label = (id: StoryStepId): string => t(`steps.${id}`);
   const action =
-    "inline-flex min-h-12 items-center justify-center rounded-sign border border-edge bg-ground px-4 text-base text-ink no-underline hover:bg-panel";
+    ACTION_SECONDARY_DENSE;
 
   return (
     <nav {...attrs} aria-label={t("label")} data-story-nav="" className="flex flex-col gap-4 border-t border-hair pt-6">
@@ -32,12 +33,12 @@ export function StoryNav({ current }: { readonly current: StoryStepId }) {
               <FieldLink
                 href={step.href}
                 aria-current={step.id === current ? "step" : undefined}
-                className="inline-flex min-h-12 items-center rounded-sign border border-transparent px-3 text-base text-ink-2 no-underline hover:text-ink aria-[current=step]:border-ink aria-[current=step]:font-semibold aria-[current=step]:text-ink"
+                className={`${NAV_TAB} text-base`}
               >
                 {label(step.id)}
               </FieldLink>
             ) : (
-              <span className="inline-flex min-h-12 items-center px-3 text-base text-ink-3">{label(step.id)}</span>
+              <span className="inline-flex min-h-(--target) items-center px-3 text-base text-ink-3">{label(step.id)}</span>
             )}
           </li>
         ))}

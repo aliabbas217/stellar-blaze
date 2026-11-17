@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
+import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
 import {
   readRevokeActive,
   readRevokeIncomplete,
@@ -26,14 +27,13 @@ import { usePush } from "@/features/push/usePush";
 const noopSubscribe = () => () => undefined;
 
 /*
- * A plain <button>, 48 px tall (min-h-12: a gloved hand needs 44), from tokens only. Not the shadcn Button: its class
- * merging (the `cn` package) alone adds about 10 KB gzip to the route, which this screen cannot afford inside the 170 KB
- * worker budget. The design phase decides which button the composed screen uses and what that costs.
+ * A plain <button> of the control tiers (components/states/actions.ts: 52 px, the signal fill for the one next step, the tonal fill
+ * and edge ring for an alternative), from tokens only. Not the shadcn Button: its class merging (the `cn` package) alone adds about
+ * 10 KB gzip to the route, which this screen cannot afford inside the 170 KB worker budget.
  */
-const BUTTON_BASE = "min-h-12 rounded-sign px-4 font-body text-base disabled:opacity-50";
 const BUTTON_VARIANTS = {
-  primary: "bg-ink text-ground",
-  secondary: "border border-edge bg-ground text-ink",
+  primary: ACTION_PRIMARY,
+  secondary: ACTION_SECONDARY,
 } as const;
 
 function ActionButton({
@@ -50,7 +50,7 @@ function ActionButton({
   children: ReactNode;
 }) {
   return (
-    <button ref={ref} type="button" disabled={disabled} onClick={onClick} className={`${BUTTON_BASE} ${BUTTON_VARIANTS[variant]}`}>
+    <button ref={ref} type="button" disabled={disabled} onClick={onClick} className={`${BUTTON_VARIANTS[variant]} font-body`}>
       {children}
     </button>
   );

@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useImperativeHandle, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import { percentAt, pct, screenPercent } from "@/components/spine/geometry";
+import { LOOK_SECONDARY } from "@/components/states/actions";
 import { TimeSpine, type BanState } from "@/components/spine/TimeSpine";
 import { hourLabel } from "./field-data";
 
@@ -120,7 +121,7 @@ export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabe
             type="button"
             onClick={onToggle}
             aria-label={playing ? t("pause") : t("play")}
-            className="grid size-(--target) touch-manipulation place-items-center rounded-sign border border-edge bg-ground text-ink hover:bg-panel"
+            className={`${LOOK_SECONDARY} grid size-(--target) touch-manipulation place-items-center rounded-ctl`}
           >
             {playing ? (
               <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">

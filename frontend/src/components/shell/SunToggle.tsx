@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useSyncExternalStore } from "react";
+import { CHIP } from "@/components/states/actions";
 import { setTheme } from "@/lib/sun/route-theme";
 import { nextLocalMidnight, THEME_STORAGE_KEY, type ThemeName, type ThemeOverride } from "@/lib/sun/theme-storage";
 
@@ -54,7 +55,7 @@ export function SunToggle() {
         persist(next);
         applyTheme(next);
       }}
-      className="inline-flex min-h-(--target) min-w-(--target) touch-manipulation items-center justify-center rounded-sign border border-edge bg-ground px-4 font-body text-sm text-ink"
+      className={`${CHIP} min-w-(--target) px-3 font-body text-sm`}
     >
       {t("current", { state: t(theme === "sun" ? "on" : "off") })}
     </button>

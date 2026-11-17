@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { ViewTransition } from "react";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { ACTION_SECONDARY, ACTION_STOP, SEGMENT, SEGMENTS } from "@/components/states/actions";
 import "@/styles/view-transitions.css";
 
 /**
@@ -47,7 +48,7 @@ export function WorkerDock({ myDataEnabled = MY_DATA_TAB_ENABLED }: { myDataEnab
           // On the sheet itself the emergency link would point at the page the worker is on; the way out is back to Today.
           <FieldLink
             href="/worker"
-            className="flex min-h-14 w-full items-center justify-center rounded-sign border-2 border-ink bg-ground px-4 font-body text-lg font-semibold text-ink no-underline"
+            className={`${ACTION_SECONDARY} w-full font-body`}
           >
             {t("backToToday")}
           </FieldLink>
@@ -57,22 +58,22 @@ export function WorkerDock({ myDataEnabled = MY_DATA_TAB_ENABLED }: { myDataEnab
               href="/worker/unwell"
               data-emergency=""
               transitionTypes={["nav-forward"]}
-              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-sign bg-ink px-4 font-body text-lg font-semibold text-ground no-underline"
+              className={`${ACTION_STOP} font-body`}
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="size-8 flex-none rounded-sign bg-ground p-1.5 text-ink">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 flex-none">
                 <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" fill="currentColor" />
               </svg>
               <span>{t("unwell")}</span>
             </FieldLink>
           </ViewTransition>
         )}
-        <nav aria-label={t("label")} className="mt-1.5 flex">
+        <nav aria-label={t("label")} className={`mt-1.5 ${SEGMENTS}`}>
           {tabs.map((tab) => (
             <FieldLink
               key={tab.href}
               href={tab.href}
               aria-current={tab.current ? "page" : undefined}
-              className="flex min-h-12 flex-1 items-center justify-center border-t-2 border-transparent font-body text-base text-ink-3 no-underline aria-[current=page]:border-ink aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+              className={`${SEGMENT} font-body`}
             >
               {tab.label}
             </FieldLink>

@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ACTION_PRIMARY } from "@/components/states/actions";
+import { ACTION_PRIMARY_DENSE } from "@/components/states/actions";
 import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import type { ProofDrawerProps } from "./ProofDrawer";
@@ -98,8 +98,8 @@ function Chip({
         {...(variant === "primary" ? { "data-primary": "" } : {})}
         className={
           variant === "primary"
-            ? `${ACTION_PRIMARY} gap-2`
-            : `inline-flex items-center gap-1 rounded-sign border border-edge bg-transparent text-ink-2 hover:border-ink-2 hover:text-ink ${
+            ? `${ACTION_PRIMARY_DENSE} gap-2`
+            : `inline-flex items-center gap-1 rounded-pill bg-panel text-ink-2 inset-ring-[1.5px] inset-ring-hair hover:text-ink hover:inset-ring-ink-3 ${
                 field ? "min-h-(--target) min-w-(--target) touch-manipulation px-3 text-base" : "min-h-7 min-w-7 px-2 text-xs"
               }`
         }

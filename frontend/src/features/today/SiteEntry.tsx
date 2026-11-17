@@ -35,7 +35,7 @@ export function SiteEntry({
       <h2 className="font-display text-2xl font-medium text-ink">{t("title")}</h2>
       <p className="max-w-(--measure) text-lg leading-(--sign-leading-text) text-ink-2">{t("reason")}</p>
       {status === "ready" ? (
-        <button type="button" data-primary="" onClick={onDemoYard} className={`${ACTION_PRIMARY} touch-manipulation`}>
+        <button type="button" data-primary="" onClick={onDemoYard} className={ACTION_PRIMARY}>
           {t("demo")}
         </button>
       ) : status === "loading" ? (
@@ -50,14 +50,14 @@ export function SiteEntry({
       ) : status === "failed" ? (
         <div role="alert" className="flex flex-col items-start gap-3">
           <p className="text-base text-ink-2">{t("chooseFailed")}</p>
-          <button type="button" data-primary="" onClick={onDemoYard} className={`${ACTION_PRIMARY} touch-manipulation`}>
+          <button type="button" data-primary="" onClick={onDemoYard} className={ACTION_PRIMARY}>
             {retry}
           </button>
         </div>
       ) : (
         <div role="alert" className="flex flex-col items-start gap-3">
           <p className="text-base text-ink-2">{t("unavailable")}</p>
-          <button type="button" onClick={onRetry} className={`${ACTION_PRIMARY} touch-manipulation`}>
+          <button type="button" onClick={onRetry} className={ACTION_PRIMARY}>
             {retry}
           </button>
         </div>

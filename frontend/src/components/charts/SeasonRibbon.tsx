@@ -1,4 +1,5 @@
 import { memo, useId } from "react";
+import { ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 import { IsothermBands } from "./IsothermBands";
 import { leftPct, num, topPct, VIEW_H, VIEW_W, xOfIndex, yOf } from "./chart-geometry";
 
@@ -252,7 +253,7 @@ interface TableProps {
 const RibbonTable = memo(function RibbonTable({ days, dayLabels, peaks, perDay, ban, labels }: TableProps) {
   return (
     <details className="group text-ink-2" data-ribbon-table="">
-      <summary className="inline-flex min-h-(--target) cursor-pointer items-center rounded-sign border border-edge px-4 text-base text-ink hover:bg-panel">
+      <summary className={`${ACTION_SECONDARY_DENSE} cursor-pointer`}>
         {labels.tableToggle}
       </summary>
       {/* keyboard-focusable scroll container: 139 rows do not fit a phone */}

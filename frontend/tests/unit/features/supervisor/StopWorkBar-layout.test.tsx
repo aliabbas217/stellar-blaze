@@ -171,7 +171,7 @@ describe("the expiry notices region", () => {
       expect(notice.className).toContain("flex-col");
       expect(notice.className).not.toContain("justify-between");
       expect(close?.className).toContain("w-full");
-      expect(close?.className).toContain("min-h-11");
+      expect(close?.className).toContain("min-h-(--target)");
       expect(close?.getAttribute("aria-describedby")).toBe(text?.id);
     }
   });

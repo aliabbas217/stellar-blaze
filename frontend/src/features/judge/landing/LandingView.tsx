@@ -196,10 +196,10 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
             </h1>
             <p data-contrast="body" data-contrast-name="lede" className="max-w-[44ch] text-lg text-ink-2 max-[899px]:hidden">{t("lede")}</p>
             <div className="flex flex-wrap gap-3 max-[899px]:flex-col">
-              <FieldLink href="/replay" data-primary="" data-avoid="" className={`${ACTION_PRIMARY} min-h-12 text-lg`}>
+              <FieldLink href="/replay" data-primary="" data-avoid="" className={ACTION_PRIMARY}>
                 {t("primary")}
               </FieldLink>
-              <FieldLink href="#problem" data-avoid="" className={`${ACTION_SECONDARY} min-h-12 text-lg`}>
+              <FieldLink href="#problem" data-avoid="" className={ACTION_SECONDARY}>
                 {t("secondary")}
               </FieldLink>
             </div>

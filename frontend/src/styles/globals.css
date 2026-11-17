@@ -60,7 +60,8 @@
   --color-viz-ours: var(--viz-ours);
   --color-viz-grid: var(--viz-grid);
 
-  /* The type scale of tokens.css (12, 14, 16, 18, 22, 28, 36, 48, 64, 76 px) under Tailwind's step names. */
+  /* The type scale of tokens.css (12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 44, 48, 56, 64, 76 px). The original steps keep
+     Tailwind's names; the steps added with the control system are named by their size (text-20, text-24, text-32, text-44, text-56). */
   --text-xs: var(--t-12);
   --text-sm: var(--t-14);
   --text-base: var(--t-16);
@@ -71,16 +72,29 @@
   --text-4xl: var(--t-48);
   --text-5xl: var(--t-64);
   --text-6xl: var(--t-76);
+  --text-20: var(--t-20);
+  --text-24: var(--t-24);
+  --text-32: var(--t-32);
+  --text-44: var(--t-44);
+  --text-56: var(--t-56);
 
-  /* One corner radius everywhere; components built for other radii (shadcn) still land on it. */
+  /*
+   * Two radii, by what the shape is for (DESIGN.md, Shape). What you read is cut at --r (2 px: the data marks, via rounded-sign
+   * and the xs to md steps below); what you press is rounded. The shadcn steps follow the same rule: lg, xl and 2xl, which the
+   * generated controls use (buttons, selects, switches), land on --r-ctl; 3xl and 4xl, which they use for cards and sheets,
+   * on --r-card. Utilities for the system's own names: rounded-ctl, rounded-card, rounded-pill.
+   */
   --radius-xs: var(--r);
   --radius-sm: var(--r);
   --radius-md: var(--r);
-  --radius-lg: var(--r);
-  --radius-xl: var(--r);
-  --radius-2xl: var(--r);
-  --radius-3xl: var(--r);
-  --radius-4xl: var(--r);
+  --radius-lg: var(--r-ctl);
+  --radius-xl: var(--r-ctl);
+  --radius-2xl: var(--r-ctl);
+  --radius-3xl: var(--r-card);
+  --radius-4xl: var(--r-card);
+  --radius-ctl: var(--r-ctl);
+  --radius-card: var(--r-card);
+  --radius-pill: var(--r-pill);
 }
 
 /*
