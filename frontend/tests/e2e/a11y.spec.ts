@@ -22,9 +22,11 @@ interface PageUnderTest {
 const pages: PageUnderTest[] = [
   { path: "/en", heading: en.judge.landing.title },
   { path: "/ar", heading: ar.judge.landing.title },
-  { path: "/en/worker", heading: en.worker.today.title },
-  { path: "/en/worker/alerts", heading: en.alerts.title, enable: en.alerts.enable },
-  { path: "/ur/worker/alerts", heading: ur.alerts.title, enable: ur.alerts.enable },
+  // The join page (the way in for a phone with no site); Today with no site hands on to it. Its demo-yard button exists once the site list is in.
+  { path: "/en/worker/join", heading: en.worker.join.pageTitle, enable: en.worker.join.demo },
+  { path: "/ur/worker/join", heading: ur.worker.join.pageTitle, enable: ur.worker.join.demo },
+  { path: "/en/worker/alerts?site=site-demo-mussafah", heading: en.alerts.title, enable: en.alerts.enable },
+  { path: "/ur/worker/alerts?site=site-demo-mussafah", heading: ur.alerts.title, enable: ur.alerts.enable },
   { path: "/en/supervisor", heading: en.supervisor.title },
   { path: "/en/hse", heading: en.hse.title },
   { path: "/en/offline", heading: en.offline.title },

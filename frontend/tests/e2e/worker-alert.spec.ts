@@ -62,16 +62,16 @@ test("the alert card shows the level, from when, what changed and what to do, an
 
   await expect(page.locator("[data-primary]")).toHaveCount(1);
   await page.getByRole("link", { name: en.worker.alert.gotIt }).click();
-  // Today: this phone has no site pinned (the tap came from a notification, not from a join), so Today offers the way in.
-  await expect(page).toHaveURL(/\/en\/worker$/);
-  await expect(page.getByRole("heading", { name: en.worker.today.entry.title })).toBeVisible();
+  // Today: this phone has no site pinned (the tap came from a notification, not from a join), so Today hands on to the join page.
+  await expect(page).toHaveURL(/\/en\/worker\/join$/);
+  await expect(page.getByRole("heading", { level: 1, name: en.worker.join.pageTitle })).toBeVisible();
 });
 
 test("the alert card for a warning that is over says when it ended, with a way to Today", async ({ page }) => {
   await openAlert(page, { path: alertPath("en", "amber", AMBER_FROM_NINE) });
   await expect(page.getByRole("heading", { name: "This warning ended at 10:00" })).toBeVisible();
   await page.getByRole("link", { name: en.worker.alert.ended.primary }).click();
-  await expect(page).toHaveURL(/\/en\/worker$/);
+  await expect(page).toHaveURL(/\/en\/worker(\/join)?$/);
 });
 
 test("the alert card sends a link that is not a warning to Today, in the same language", async ({ page }) => {

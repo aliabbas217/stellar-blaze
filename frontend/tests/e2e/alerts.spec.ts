@@ -188,9 +188,10 @@ test.describe("alerts page states", () => {
     await stubPush(page, { answer: "granted" });
 
     await page.goto("/en/worker/alerts");
-    // Without ?debug=push there is no site: Enable is off and the screen says why.
-    await expect(enable(page)).toBeDisabled();
+    // Without ?debug=push and with no pin there is no site: no greyed Enable, the screen says why and links to the join page.
     await expect(page.getByText(en.alerts.noSite)).toBeVisible();
+    await expect(enable(page)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: en.worker.join.pageTitle })).toHaveAttribute("href", "/en/worker/join");
 
     await page.goto(`/en/worker/alerts?site=${SITE_DEMO}`);
     await enable(page).click();
