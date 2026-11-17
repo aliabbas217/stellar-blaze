@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { lint } from "@google/design.md/linter";
-import { loadTokens, resolveTheme, rulesOf, tokensFor } from "../../utils/colour";
+import { loadTokens, oklchToHex, resolveTheme, rulesOf, tokensFor } from "../../utils/colour";
 
 /*
  * Guards the design contract. DESIGN.md and src/styles/tokens.css carry the same values by hand, the sun block must
@@ -129,11 +129,17 @@ describe("tokens.css structure", () => {
   });
 
   it("has the interface's non-colour tokens with the prototype's values", () => {
+    // two radii by function: 2 px is for data marks only, 12 and 16 px and the pill are what a hand presses (DESIGN.md 5.1)
     expect(rootTokens["r"]).toBe("2px");
+    expect(rootTokens["r-ctl"]).toBe("12px");
+    expect(rootTokens["r-card"]).toBe("16px");
+    expect(rootTokens["r-pill"]).toBe("999px");
     expect(rootTokens["target"]).toBe("44px");
     expect(rootTokens["target-field"]).toBe("52px");
+    expect(rootTokens["target-stop"]).toBe("56px");
     expect(rootTokens["dur-1"]).toBe("150ms");
     expect(rootTokens["dur-2"]).toBe("240ms");
+    expect(rootTokens["dur-press"]).toBe("120ms");
     expect(rootTokens["ease"]).toBe("cubic-bezier(0.2, 0, 0, 1)");
     const steps = ["s-1", "s-2", "s-3", "s-4", "s-5", "s-6", "s-8", "s-10", "s-12", "s-16", "s-24"];
     expect(steps.map((name) => rootTokens[name])).toEqual([
@@ -155,7 +161,7 @@ describe("tokens.css structure", () => {
     const media = topLevel.find((r) => r.selector === "@media (prefers-reduced-motion: reduce)");
     expect(media).toBeDefined();
     const inner = tokensFor(rulesOf(media?.body ?? ""), ":root");
-    expect(inner).toEqual({ "dur-1": "0ms", "dur-2": "0ms" });
+    expect(inner).toEqual({ "dur-1": "0ms", "dur-2": "0ms", "dur-press": "0ms" });
   });
 
   it("test_type_scale_has_no_13px_step", () => {
@@ -167,10 +173,15 @@ describe("tokens.css structure", () => {
       ["t-14", "0.875rem"],
       ["t-16", "1rem"],
       ["t-18", "1.125rem"],
+      ["t-20", "1.25rem"],
       ["t-22", "1.375rem"],
+      ["t-24", "1.5rem"],
       ["t-28", "1.75rem"],
+      ["t-32", "2rem"],
       ["t-36", "2.25rem"],
+      ["t-44", "2.75rem"],
       ["t-48", "3rem"],
+      ["t-56", "3.5rem"],
       ["t-64", "4rem"],
       ["t-76", "4.75rem"],
     ]);
@@ -265,7 +276,25 @@ describe("DESIGN.md matches tokens.css", () => {
       expect(d.unit).toBe("px");
       expect(`${String(d.value)}px`, `spacing.${step}`).toBe(rootTokens[`s-${step}`]);
     }
-    expect(`${String(report.designSystem.rounded.get("r")?.value)}px`).toBe(rootTokens["r"]);
+    for (const name of ["r", "r-ctl", "r-card", "r-pill"]) {
+      expect(`${String(report.designSystem.rounded.get(name)?.value)}px`, `rounded.${name}`).toBe(rootTokens[name]);
+    }
+  });
+
+  it("gives each control tier its documented size and radius, and only Stop is a solid ink fill", () => {
+    const components = report.designSystem.components;
+    const heights = { "button-primary": "52px", "button-secondary": "52px", "button-quiet": "44px", "button-stop": "56px" } as const;
+    for (const [name, height] of Object.entries(heights)) {
+      const props = components.get(name)?.properties;
+      const dimension = props?.get("height") as { value: number; unit: string } | undefined;
+      expect(`${String(dimension?.value)}${dimension?.unit ?? ""}`, `components.${name}.height`).toBe(height);
+    }
+    // the field primary is the signal fill; the ink fill belongs to Stop (and to the selected chip, a pill, not a slab)
+    const fill = (name: string) => (components.get(name)?.properties.get("backgroundColor") as { hex: string } | undefined)?.hex;
+    expect(fill("button-primary")).toBe(designHex("signal"));
+    expect(fill("button-stop")).toBe(designHex("ink"));
+    // every other button tier is a tonal fill, never ink
+    for (const name of ["button-primary", "button-secondary", "button-quiet"]) expect(fill(name), name).not.toBe(designHex("ink"));
   });
 
   it("resets letter-spacing to zero for any language that is not English", () => {
@@ -374,5 +403,59 @@ describe("DESIGN.md section 3 contrast table", () => {
         }
       }
     }
+  });
+});
+
+describe("control state fills (hover, pressed, busy)", () => {
+  // A second, independent computation of the mixes in scripts/contrast.mjs: color-mix(in oklch) is a linear mix of the oklch
+  // components with the hue along the shorter arc; the mixed oklch value is then rendered with the same converter the rest of this
+  // file uses. The percentages are read from tokens.css, so changing a --mix-* token re-runs the check on the new value.
+  const oklch = (value: string): [number, number, number] => {
+    const m = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(value);
+    if (m?.[1] === undefined || m[2] === undefined || m[3] === undefined) throw new Error(`not an oklch() value: ${value}`);
+    return [Number(m[1]), Number(m[2]), Number(m[3])];
+  };
+  const primitiveOf = (theme: Theme, token: string): string => {
+    const source = theme === "night" ? semanticNight : semanticSun;
+    const ref = /^var\(--(ref-[\w-]+)\)$/.exec(source[token] ?? "")?.[1];
+    const value = ref === undefined ? undefined : primitives[ref];
+    if (value === undefined) throw new Error(`--${token} does not resolve to a primitive`);
+    return value;
+  };
+  const mix = (theme: Theme, base: string, other: string, percent: string): string => {
+    const p = Number.parseFloat(rootTokens[percent] ?? "") / 100;
+    const [l1, c1, h1] = oklch(primitiveOf(theme, base));
+    const [l2, c2, h2] = oklch(primitiveOf(theme, other));
+    let dh = h2 - h1;
+    if (dh > 180) dh -= 360;
+    if (dh < -180) dh += 360;
+    return oklchToHex(`oklch(${String(l1 + (l2 - l1) * p)} ${String(c1 + (c2 - c1) * p)} ${String((h1 + dh * p + 360) % 360)})`);
+  };
+
+  const STATES: readonly [string, string, string, string, string][] = [
+    ["primary hover", "on-signal", "signal", "ink", "mix-primary-hover"],
+    ["primary pressed", "on-signal", "signal", "ink", "mix-primary-press"],
+    ["secondary hover", "ink", "raised", "ink", "mix-secondary-hover"],
+    ["secondary pressed", "ink", "raised", "ink", "mix-secondary-press"],
+    ["quiet hover", "ink", "ground", "ink", "mix-quiet-hover"],
+    ["stop hover", "ground", "ink", "ground", "mix-stop-hover"],
+    ["stop pressed", "ground", "ink", "ground", "mix-stop-press"],
+  ];
+  const printed = JSON.parse(
+    execFileSync(process.execPath, [path.join(frontendRoot, "scripts/contrast.mjs"), "--json"], { encoding: "utf8" }),
+  ) as { states: Record<Theme, Record<string, number>> };
+
+  describe.each(["night", "sun"] as const)("%s", (theme) => {
+    it.each(STATES)("%s keeps its text at 4.5:1 or more and scripts/contrast.mjs agrees", (label, text, base, other, percent) => {
+      const computed = contrast(color(theme, text), mix(theme, base, other, percent));
+      expect(computed, label).toBeGreaterThanOrEqual(4.5);
+      expect(Math.abs((printed.states[theme][label] ?? 0) - computed), `${label}: script vs test`).toBeLessThanOrEqual(0.02);
+    });
+
+    it("keeps every busy control (85 % opacity over the ground) at 4.5:1", () => {
+      for (const label of ["primary busy (85 % opacity)", "secondary busy (85 % opacity)", "stop busy (85 % opacity)"]) {
+        expect(printed.states[theme][label], `${theme} ${label}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
   });
 });
