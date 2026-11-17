@@ -7,6 +7,7 @@ import { DemoProvider } from "@/features/demo/DemoProvider";
 import { CrewsView } from "@/features/supervisor/CrewsView";
 import { PlanView } from "@/features/supervisor/plan/PlanView";
 import { resetDemoStateHard } from "@/mocks/fixtures";
+import { server } from "@/mocks/node";
 import { renderWithIntl } from "../../../utils/intl";
 
 /*
@@ -24,17 +25,55 @@ const bff: Middleware = {
 
 /** What `apiClient.GET` threw in the current test, with when: `call()` turns every exception into "Network error" and keeps none of it. */
 const thrownByGet: string[] = [];
+/** What the mock server saw in the current test (its life-cycle events, with when), to tell "answered", "not matched" and "never seen". */
+const mockServerLog: string[] = [];
+const MOCK_SERVER_EVENTS = ["request:start", "request:match", "request:unhandled", "request:end", "response:mocked", "response:bypass"] as const;
+let listeners: [string, (event: unknown) => void][] = [];
+let fetchAtStart: typeof fetch | undefined;
+
+function nowMs(): string {
+  return `${String(Math.round(performance.now()))} ms`;
+}
 
 function recordWhatGetThrows(): void {
   thrownByGet.length = 0;
+  fetchAtStart = globalThis.fetch;
   const original = apiClient.GET.bind(apiClient) as unknown as (...args: unknown[]) => Promise<unknown>;
   vi.spyOn(apiClient, "GET").mockImplementation(((...args: unknown[]) =>
     original(...args).catch((error: unknown) => {
-      const at = `${String(Math.round(performance.now()))} ms`;
       const what = error instanceof Error ? `${error.name}: ${error.message}; cause: ${String(error.cause)}\n${error.stack ?? ""}` : String(error);
-      thrownByGet.push(`${String(args[0])} threw at ${at}: ${what}`);
+      const fetchNow = globalThis.fetch === fetchAtStart ? "the same fetch as at the start of the test" : "NOT the fetch of the start of the test";
+      thrownByGet.push(`${String(args[0])} threw at ${nowMs()} (${fetchNow}): ${what}`);
       throw error;
     })) as never);
+}
+
+function recordWhatTheMockServerSees(): void {
+  mockServerLog.length = 0;
+  listeners = MOCK_SERVER_EVENTS.map((name) => {
+    const listener = (event: unknown): void => {
+      const request = (event as { request?: Request }).request;
+      mockServerLog.push(`${nowMs()} ${name} ${request === undefined ? "" : `${request.method} ${new URL(request.url).pathname}`}`);
+    };
+    server.events.on(name, listener);
+    return [name, listener];
+  });
+}
+
+/**
+ * Starts recording what `apiClient.GET` throws and what the mock server sees, for the rest of the CURRENT test (both are undone after
+ * it). Opt-in on purpose: wrapping every GET adds microtask hops and listeners that made a timing-bound Stop work focus test fail
+ * one run in three, so only the test that is being investigated pays for it. Call it before `renderPlan`: the failing request is
+ * the first one.
+ */
+export function recordDiagnostics(): void {
+  recordWhatGetThrows();
+  recordWhatTheMockServerSees();
+}
+
+function stopRecordingTheMockServer(): void {
+  for (const [name, listener] of listeners) server.events.removeListener(name as (typeof MOCK_SERVER_EVENTS)[number], listener);
+  listeners = [];
 }
 
 export function installSupervisorTestEnvironment(): void {
@@ -42,10 +81,10 @@ export function installSupervisorTestEnvironment(): void {
     resetDemoStateHard();
     window.localStorage.clear();
     apiClient.use(bff);
-    recordWhatGetThrows();
   });
   afterEach(() => {
     apiClient.eject(bff);
+    stopRecordingTheMockServer();
     vi.restoreAllMocks();
   });
 }
@@ -78,7 +117,12 @@ export function describeQueries(): string {
     fetchStatus: query.state.fetchStatus,
     error: query.state.error === null ? null : String(query.state.error),
   }));
-  return `${JSON.stringify(rows)}\nwhat apiClient.GET threw in this test: ${thrownByGet.length === 0 ? "nothing" : thrownByGet.join("\n---\n")}`;
+  const seenByTheMockServer = mockServerLog.length === 0 ? "nothing" : `\n${mockServerLog.join("\n")}`;
+  return [
+    JSON.stringify(rows),
+    `what apiClient.GET threw in this test: ${thrownByGet.length === 0 ? "nothing" : thrownByGet.join("\n---\n")}`,
+    `what the mock server saw in this test (${nowMs()} now): ${seenByTheMockServer}`,
+  ].join("\n");
 }
 
 export function renderPlan(crewId: string): RenderResult {

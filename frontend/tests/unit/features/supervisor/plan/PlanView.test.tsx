@@ -9,7 +9,7 @@ import en from "../../../../../messages/en.json";
 import { apiClient } from "@/api/client";
 import { crewDayPlan, crewStops, crewTimeline, forecastToday, listCrews, REPLAY_DATE, SITE_DEMO } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
-import { describeQueries, installSupervisorTestEnvironment, renderPlan, stopBar, textOf } from "../support";
+import { describeQueries, installSupervisorTestEnvironment, recordDiagnostics, renderPlan, stopBar, textOf } from "../support";
 
 /*
  * The supervisor's plan screen with sign-off (F2 Task 20), through the real hooks and MSW. Crew B is the demo crew (unsigned, heavy
@@ -644,6 +644,7 @@ describe("the plan screen: forecast, k and restrictions", () => {
   });
 
   it("a fresh forecast draws the heat of each hour on the strip, from the API's own numbers", async () => {
+    recordDiagnostics();
     renderPlan("crew-b");
     try {
       await waitFor(() => {
