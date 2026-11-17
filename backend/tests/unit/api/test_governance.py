@@ -5,6 +5,7 @@ import logging
 import pytest
 
 from stellar_blaze.config import Settings
+from tests.privacy import contains_standalone
 from tests.unit.api.support import OTHER_TOKEN, SITE, World, bearer, client_for, make_world
 
 pytestmark = pytest.mark.unit
@@ -44,7 +45,9 @@ def test_data_request_403_and_audit_row(settings: Settings, caplog: pytest.LogCa
     assert row.config_sha256
     everywhere = response.text + row.model_dump_json() + caplog.text
     assert WORKER_REF not in everywhere
-    assert "4471" not in everywhere
+    assert "AliKhan" not in everywhere
+    # not a bare `in`: random hex in a log holds "4471" by chance (tests/privacy.py)
+    assert not contains_standalone(everywhere, "4471")
 
 
 def test_data_request_validates_then_drops_the_reference(settings: Settings) -> None:
