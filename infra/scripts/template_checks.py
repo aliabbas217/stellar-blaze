@@ -120,18 +120,34 @@ BOOTSTRAP_OPTIONAL_ENV = (
     "LOCATION",
     "GITHUB_OWNER",
     "GITHUB_REPO",
+    "GITHUB_OWNER_ID",
+    "GITHUB_REPO_ID",
     "OPERATOR_PRINCIPAL_ID",
     "BUDGET_MONTH",
 )
 OPERATOR_ID = "11111111-1111-4111-8111-111111111111"
 GITHUB_OWNER = "Foo"  # mixed case on purpose: the OIDC subject is case-sensitive
 GITHUB_REPO = "bar-Baz"
+GITHUB_OWNER_ID = "1001"  # the numeric ids of the immutable subject GitHub issues for repositories created after 15 July 2026
+GITHUB_REPO_ID = "2002"
 BUDGET_MONTH_OVERRIDE = "2026-12"
 BOOTSTRAP_SCENARIOS: dict[str, dict[str, str | None]] = {
     "boot-full": {
         "GITHUB_OWNER": GITHUB_OWNER,
         "GITHUB_REPO": GITHUB_REPO,
         "OPERATOR_PRINCIPAL_ID": OPERATOR_ID,
+    },
+    "boot-immutable": {
+        "GITHUB_OWNER": GITHUB_OWNER,
+        "GITHUB_REPO": GITHUB_REPO,
+        "GITHUB_OWNER_ID": GITHUB_OWNER_ID,
+        "GITHUB_REPO_ID": GITHUB_REPO_ID,
+    },
+    # Only one of the two ids: the classic subject, never a half-formed immutable one.
+    "boot-half-id": {
+        "GITHUB_OWNER": GITHUB_OWNER,
+        "GITHUB_REPO": GITHUB_REPO,
+        "GITHUB_OWNER_ID": GITHUB_OWNER_ID,
     },
     "boot-bare": {},
     "boot-month": {"BUDGET_MONTH": BUDGET_MONTH_OVERRIDE},
@@ -1183,6 +1199,23 @@ def check_b2(ws: Workspace) -> list[str]:
         problems.append(
             f"boot-bare: a federated credential is created although githubOwner is empty: {sorted(bare)}"
         )
+    # GitHub issues the IMMUTABLE subject (owner and repository ids) for repositories created after 15 July 2026; a credential with
+    # the classic subject then fails the sign-in with AADSTS700213 (found on the first deploy, 2026-11-17).
+    for scenario, want in (
+        (
+            "boot-immutable",
+            f"repo:{GITHUB_OWNER}@{GITHUB_OWNER_ID}/{GITHUB_REPO}@{GITHUB_REPO_ID}:environment:demo",
+        ),
+        ("boot-half-id", f"repo:{GITHUB_OWNER}/{GITHUB_REPO}:environment:demo"),
+    ):
+        subjects = [
+            res["properties"].get("subject")
+            for res in _resources(ws.snapshot(scenario), FEDERATED_CREDENTIAL).values()
+        ]
+        if subjects != [want]:
+            problems.append(
+                f"{scenario}: subject is {subjects!r}, expected exactly {[want]!r}"
+            )
     return problems
 
 

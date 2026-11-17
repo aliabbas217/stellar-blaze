@@ -566,6 +566,16 @@ test_check_template_b2_fails_when_a_credential_exists_without_an_owner() {
   expect_c_fail b2-owner B2 modules/bootstrap-rg.bicep 's/= if (!empty(githubOwner)) {/= {/' "although githubOwner is empty"
 }
 
+test_check_template_b2_fails_when_the_immutable_ids_are_ignored() {
+  bicep_ready || return 0
+  expect_c_fail b2-immutable B2 modules/bootstrap-rg.bicep 's/^var immutableSubject = .*/var immutableSubject = false/' "boot-immutable: subject is"
+}
+
+test_check_template_b2_fails_when_one_id_is_enough_for_the_immutable_subject() {
+  bicep_ready || return 0
+  expect_c_fail b2-half B2 modules/bootstrap-rg.bicep 's/^var immutableSubject = .*/var immutableSubject = !empty(githubOwnerId) || !empty(githubRepoId)/' "boot-half-id: subject is"
+}
+
 test_check_template_b3_fails_when_the_operator_gets_a_role_unasked() {
   bicep_ready || return 0
   expect_c_fail b3-operator B3 modules/bootstrap-rg.bicep 's/= if (!empty(operatorPrincipalId)) {/= {/' "boot-bare: unexpected role assignment"
@@ -1657,6 +1667,26 @@ test_smoke_s6_follows_expect_location() {
   assert_out_has "FAIL S6 resources outside westeurope: api(uaenorth)"
 }
 
+test_smoke_s6_defaults_to_the_region_of_the_resource_group() {
+  # The first pipeline-driven deploy (France Central) failed S6 because the default was the constant uaenorth.
+  STUB_RG_LOCATION=francecentral STUB_RESOURCES_REGION=francecentral run_smoke rg-test --no-wait
+  assert_rc 0
+  assert_out_has "PASS S6 all 3 resources are in francecentral"
+}
+
+test_smoke_s6_still_catches_a_resource_outside_the_region_of_the_group() {
+  # the group is in France Central, the resources (the stub default) are in UAE North: that is a stray, not a pass
+  STUB_RG_LOCATION=francecentral run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S6 resources outside francecentral: api(uaenorth)"
+}
+
+test_smoke_s6_fails_when_the_region_of_the_group_cannot_be_read() {
+  STUB_RG_MISSING=1 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S6 cannot read the region of resource group rg-test"
+}
+
 test_smoke_reports_fail_s7_when_plain_http_is_served() {
   STUB_CURL_RULES="" run_smoke rg-test --no-wait
   assert_rc 1
@@ -2586,6 +2616,8 @@ tests=(
   test_check_template_b1_fails_when_budget_month_is_ignored
   test_check_template_b2_fails_when_the_subject_loses_its_case
   test_check_template_b2_fails_when_a_credential_exists_without_an_owner
+  test_check_template_b2_fails_when_the_immutable_ids_are_ignored
+  test_check_template_b2_fails_when_one_id_is_enough_for_the_immutable_subject
   test_check_template_b3_fails_when_the_operator_gets_a_role_unasked
   test_check_template_b3_fails_when_the_apps_identity_cannot_pull
   test_check_template_b4_fails_when_the_admin_user_is_enabled
@@ -2700,6 +2732,9 @@ tests=(
   test_smoke_reports_fail_s2_when_max_replicas_is_3
   test_smoke_reports_fail_s6_on_a_resource_in_another_region
   test_smoke_s6_follows_expect_location
+  test_smoke_s6_defaults_to_the_region_of_the_resource_group
+  test_smoke_s6_still_catches_a_resource_outside_the_region_of_the_group
+  test_smoke_s6_fails_when_the_region_of_the_group_cannot_be_read
   test_smoke_reports_fail_s7_when_plain_http_is_served
   test_smoke_s7_accepts_a_refusal
   test_smoke_reports_fail_s5_when_the_worker_is_not_running

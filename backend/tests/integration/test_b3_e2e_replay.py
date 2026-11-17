@@ -37,6 +37,7 @@ from tests.integration.b3_app import (
     running_app,
     sb_jobs,
 )
+from tests.privacy import contains_standalone
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -274,7 +275,9 @@ def test_the_demo_day_runs_end_to_end_on_postgres_in_replay_mode(
         assert len(refusal["config_sha256"]) == 64
         everywhere = refused.text + str(rows(settings, "SELECT * FROM audit_event")) + caplog.text
         assert WORKER_REF not in everywhere
-        assert "4471" not in everywhere
+        assert "AliKhan" not in everywhere
+        # not a bare `in`: random hex holds "4471" by chance (tests/privacy.py)
+        assert not contains_standalone(everywhere, "4471")
 
         listed = client.get(f"/api/v1/sites/{SITE}/transparency-log").json()["entries"]
         assert [(e["kind"], e["outcome"]) for e in listed] == [("data_request.refused", "refused")]

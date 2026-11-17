@@ -21,6 +21,7 @@ from tests.integration.b3_app import (
     running_app,
     sb_jobs,
 )
+from tests.privacy import contains_standalone
 
 pytestmark = pytest.mark.integration
 
@@ -76,7 +77,10 @@ def test_refusal_is_logged_listed_for_the_active_epoch_only_and_the_chain_verifi
     assert demo_reset["epoch_id"] is None  # the reset belongs to no epoch (contract tests); it is never worker-visible
     assert refused_first["epoch_id"] != refused_second["epoch_id"]
     assert WORKER_REF not in str(rows(settings, "SELECT * FROM audit_event"))
-    assert "4471" not in caplog.text
+    # not a bare `in`: the log holds random hex (hashes, request ids) and four digits occur inside one by chance;
+    # this very line failed a CI run on "...d4471908531..." (tests/privacy.py)
+    assert not contains_standalone(caplog.text, "4471")
+    assert "AliKhan" not in caplog.text
     assert WORKER_REF not in caplog.text
 
     second = sb_jobs("audit", "verify")
