@@ -73,10 +73,14 @@ const rel = (path: string) => path.slice(SRC.length + 1).replaceAll("\\", "/");
 describe("where the machine-translation line is mounted", () => {
   const sources = files(SRC).map((path) => ({ path: rel(path), text: readFileSync(path, "utf8") }));
 
-  it("is mounted on exactly the placed surfaces: Alerts (worker privacy area), the two supervisor screens' foot, the landing foot", () => {
+  it("is mounted on exactly the placed surfaces: Alerts (worker privacy area), the two supervisor screens' foot, the landing foot, and (S7) the safety view, the role entries, the front door and the tour", () => {
     const mounts = sources.filter(({ path, text }) => !path.endsWith("MachineTranslationNotice.tsx") && /<MachineTranslationNotice\b/.test(text)).map(({ path }) => path).sort();
     expect(mounts).toEqual([
+      "app/[locale]/(hse)/hse/HseView.tsx",
       "app/[locale]/(worker)/worker/(app)/alerts/page.tsx",
+      "app/[locale]/start/page.tsx",
+      "app/[locale]/tour/page.tsx",
+      "components/shell/RoleEntry.tsx",
       "features/judge/landing/LandingView.tsx",
       "features/supervisor/CrewsView.tsx",
       "features/supervisor/plan/PlanView.tsx",
