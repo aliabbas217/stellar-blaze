@@ -5,11 +5,12 @@ import { ProofChip } from "@/components/provenance/ProofChip";
 import { ScoreboardTable } from "@/components/provenance/ScoreboardTable";
 import { Counter } from "@/components/provenance/Counter";
 import { proofFromProvenance, proofFromStaticFile } from "@/components/provenance/proof";
+import { buildStory } from "@/components/provenance/proof-story";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
-import { makeFormat, toPolicyRows } from "@/features/judge/adapters";
+import { makeFormat, storySeason, toPolicyRows } from "@/features/judge/adapters";
 import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { SEASON_BAN, banStateFor } from "@/features/judge/ban";
 import type { EvalData } from "@/features/judge/data";
@@ -80,6 +81,7 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
     ban: banStateFor(SEASON_BAN, day, locale),
     // The file's own words are the proof's protocol and script (it says plainly that this day is an illustration, not the scored day).
     proof: proofFromStaticFile(field.file, t("field.proofWhat", { day: dayLabel }), {
+      story: buildStory("field", { day }),
       protocol: field.grid.why,
       script: field.grid.physics,
       label: "RECORDED",
@@ -101,10 +103,21 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
           interval: t("hook.interval", { lo: format.one(truthMetric.ci.lo), hi: format.one(truthMetric.ci.hi) }),
           // The hour range stays one LTR run inside an Arabic or Urdu sentence (LRI ... PDI): "06:00-14:59 UTC", never reversed.
           definition: t("hook.definition", { hours: `${LRI}${policy.working_hours_utc}${PDI}`, margin: format.whole(policy.margin_w_m2) }),
-          proof: proofFromProvenance(policy.provenance, truthMetric.anchor, ts("warnings.truthWhat"), file),
+          proof: proofFromProvenance(policy.provenance, truthMetric.anchor, ts("warnings.truthWhat"), file, {
+            story: buildStory("truth", {
+              ...storySeason(policy),
+              marginWm2: policy.margin_w_m2,
+              range: { lo: format.one(truthMetric.ci.lo), hi: format.one(truthMetric.ci.hi), unit: "hours" },
+            }),
+          }),
         }
       : null;
-  const evaluationProof = scored && data?.record != null ? proofFromProvenance(policy.provenance, "", ts("evaluation.what"), file) : null;
+  const evaluationProof =
+    scored && data?.record != null
+      ? proofFromProvenance(policy.provenance, "", ts("evaluation.what"), file, {
+          story: buildStory("evaluation", { ...storySeason(policy), amendments: data.record.amendments.length }),
+        })
+      : null;
   const text = policyTableText(ts);
   const miniRows = scored
     ? toPolicyRows(policy, 1, { file, format, text }).map((row) => ({ ...row, cells: row.cells.slice(0, 2) }))
@@ -114,7 +127,12 @@ export function LandingView({ field, hourly, data, dir }: LandingViewProps) {
     { key: "false_alarm_hours", heading: ts("warnings.columns.falseAlarm") },
   ];
   const tradeoff = scored ? policyTradeoff(policy, 1, format, ts) : null;
-  const verdictProof = scored ? proofFromProvenance(policy.provenance, "", ts("verdict.heading"), file) : null;
+  const verdictProof = scored
+    ? proofFromProvenance(policy.provenance, "", ts("verdict.heading"), file, {
+        story: buildStory("verdict", storySeason(policy)),
+        audit: { verdicts: policy.verdicts.filter((verdict) => verdict.primary || verdict.id === "H5").map((verdict) => verdict.text) },
+      })
+    : null;
   const verdicts = scored ? policy.verdicts.filter((verdict) => verdict.primary || verdict.id === "H5") : [];
 
   // ---- chapter 1: the heat calendar and its month table (counts from the same functions as the scoreboard) ----

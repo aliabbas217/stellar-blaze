@@ -6,6 +6,7 @@ import { Counter } from "@/components/provenance/Counter";
 import { ScoreboardTable, type ScoreRow } from "@/components/provenance/ScoreboardTable";
 import { Verdict } from "@/components/provenance/Verdict";
 import type { Proof } from "@/components/provenance/proof";
+import { buildStory } from "@/components/provenance/proof-story";
 import { PendingBanner } from "@/components/states/PendingBanner";
 import { banStateFrom } from "@/components/spine/ban-state";
 import { DaySkeleton } from "@/features/judge/DaySkeleton";
@@ -29,6 +30,17 @@ import { Cell, CellGrid } from "./Cell";
 
 const SAMPLE_PROOF: Proof = {
   what: "Sample number",
+  story: buildStory("policy", {
+    policy: "P3_protect",
+    metric: "missed_danger_hours",
+    lead: 1,
+    station: "OMAA",
+    seasonStart: "2026-05-15",
+    seasonEnd: "2026-09-30",
+    nDays: 100,
+    marginWm2: null,
+    range: null,
+  }),
   protocol: "kit specimen, not a protocol line",
   protocolHref: null,
   script: "kit/sections/evidence.tsx",

@@ -116,10 +116,14 @@ test("demo journey, judge: scoreboard, a proof chip and its sheet, the day, try 
   await chip.click();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toBeVisible();
-  await expect(drawer.locator("dt", { hasText: "SHA-256" }).locator("xpath=following-sibling::dd[1]").locator("code").first()).toHaveText(/^[0-9a-f]{64}$/);
-  await drawer.getByRole("link", { name: "Open the proof sheet" }).click();
-  await expect(page).toHaveURL(/\/en\/replay\/proof\/[^/]+$/);
+  // the drawer tells the story in plain words; the fingerprint is one deliberate step away, under For auditors
+  await expect(drawer).toContainText("Made by");
+  await expect(drawer.locator("dt", { hasText: "SHA-256" })).toHaveCount(0);
+  await drawer.getByRole("link", { name: "For auditors" }).click();
+  await expect(page).toHaveURL(/\/en\/replay\/proof\/[^/]+#audit$/);
   await expect(page.locator("[data-sheet-number]")).toBeVisible();
+  await expect(page.locator("details#audit")).toHaveJSProperty("open", true);
+  await expect(page.locator("details#audit dt", { hasText: "SHA-256" }).locator("xpath=following-sibling::dd[1]").locator("code").first()).toHaveText(/^[0-9a-f]{64}$/);
   await page.getByRole("link", { name: "Back to the scoreboard" }).first().click();
   await expect(page).toHaveURL(/\/en\/replay$/);
 

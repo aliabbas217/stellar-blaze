@@ -13,6 +13,7 @@ import { readoutText } from "@/features/judge/landing/FieldReadout";
 import { LandingView } from "@/features/judge/landing/LandingView";
 import urMessages from "../../../../../messages/ur.json";
 import { renderWithIntl } from "../../../../utils/intl";
+import { SAMPLE_STORY } from "../../../../utils/story";
 
 /*
  * The landing page on the REAL committed files: the hero's first HTML (skip link first, the h1, one primary action, the
@@ -117,7 +118,7 @@ describe("the landing page", () => {
     expect(readout?.querySelector("[data-readout-station]")).toHaveTextContent(`${expected.station} °C`);
     expect(readout).toHaveTextContent("26.6 °C");
     expect(readout).toHaveTextContent("not as the day we scored");
-    expect(within(readout as HTMLElement).getByRole("button", { name: /^Proof for The forecast heat field/ })).toBeInTheDocument();
+    expect(within(readout as HTMLElement).getByRole("button", { name: /^Where from: The forecast heat field/ })).toBeInTheDocument();
   });
 
   it("the hook is the station's danger-hour count read from the scored file, with its definition and a proof (never typed, never the 58 percent)", () => {
@@ -135,7 +136,7 @@ describe("the landing page", () => {
     expect(hook).toHaveTextContent("is decided by observation-derived truth");
     expect(hook).not.toHaveTextContent("recorded observations");
     expect(hook).toHaveTextContent("ADOSH High or Red zone");
-    expect(within(hook as HTMLElement).getByRole("button", { name: /Proof for/ })).toBeInTheDocument();
+    expect(within(hook as HTMLElement).getByRole("button", { name: /Where from/ })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/58/);
   });
 
@@ -181,7 +182,7 @@ describe("the landing page", () => {
       const item = counts.querySelector(`[data-count="${id}"]`) as HTMLElement;
       expect(item, id).not.toBeNull();
       expect(item).toHaveTextContent(value.toLocaleString("en-US"));
-      expect(within(item).getByRole("button", { name: /^Proof for/ }), id).toBeInTheDocument();
+      expect(within(item).getByRole("button", { name: /^Where from/ }), id).toBeInTheDocument();
     }
     expect(counts).toHaveTextContent(`of ${facts.n.toLocaleString("en-US")} working hours`);
     // the counts are labelled as the recorded raw forecast before correction, never as hours that were over a limit
@@ -254,6 +255,7 @@ describe("the live field island", () => {
     ban: { kind: "in-force", fromHour: 12.5, toHour: 15 } as const,
     proof: {
       what: "The forecast heat field",
+      story: SAMPLE_STORY,
       protocol: "p",
       protocolHref: null,
       script: "s",

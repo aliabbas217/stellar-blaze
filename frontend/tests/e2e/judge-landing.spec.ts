@@ -229,12 +229,14 @@ test("landing chapters: counts with proofs, the calendar and the scoreboard teas
   await expect(counts).toContainText("1,624");
   await expect(counts).toContainText("279");
   await expect(counts).toContainText("of 1,807 working hours");
-  await expect(counts.getByRole("button", { name: /^Proof for/ })).toHaveCount(3);
-  // a proof chip opens its drawer with the file's fingerprint
-  await counts.getByRole("button", { name: /^Proof for/ }).first().click();
+  await expect(counts.getByRole("button", { name: /^Where from/ })).toHaveCount(3);
+  // a where-from chip opens its drawer with the plain story (the file and its fingerprint are under For auditors, on the sheet)
+  await counts.getByRole("button", { name: /^Where from/ }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("omaa_2026_ifs_d1_wbgt_hourly.json");
+  await expect(dialog).toContainText("Made by");
+  await expect(dialog).toContainText("recorded forecast");
+  expect(await dialog.innerText()).not.toMatch(/[A-Za-z0-9_-]+\.json|[0-9a-f]{40,}|src\//);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   // the table alternative

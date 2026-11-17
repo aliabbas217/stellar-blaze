@@ -1,6 +1,7 @@
 import type { components } from "@/api/schema";
 import type { ScoreCell, ScoreRow } from "@/components/provenance/ScoreboardTable";
-import { proofFromProvenance, type Proof } from "@/components/provenance/proof";
+import { proofFromProvenance, type Proof, type ProofAudit } from "@/components/provenance/proof";
+import { buildStory, type ProofStory, type Season, type StoryRange } from "@/components/provenance/proof-story";
 
 /*
  * Exporter files to table rows. The only place a `PolicyScoreboard` or a `PlanScoreboard` becomes cells: it formats
@@ -118,6 +119,23 @@ function notComputed(metric: Metric): boolean {
   return metric.n === 0 && metric.ci === null;
 }
 
+/**
+ * The likely range for the story: the same numbers, scale and formatter as the table cell shows, so the story can never say a different
+ * interval. None where the cell shows none (no interval, or a baseline's single point, which is not a measured uncertainty).
+ */
+function storyRange(metric: Metric, scale: number, show: (v: number) => string, unit: StoryRange["unit"], baseline: boolean): StoryRange | null {
+  if (metric.ci === null) return null;
+  if (baseline && metric.ci.lo === metric.ci.hi && metric.ci.lo === metric.value) return null;
+  return { lo: show(metric.ci.lo * scale), hi: show(metric.ci.hi * scale), unit };
+}
+
+/** What a cell needs besides the metric to tell its story: built by the row builder, which holds the file. */
+interface CellStory {
+  readonly story: (range: StoryRange | null) => ProofStory;
+  readonly unit: StoryRange["unit"];
+  readonly audit?: ProofAudit;
+}
+
 function cell(
   metric: Metric,
   scale: number,
@@ -127,11 +145,16 @@ function cell(
   provenance: Schemas["Provenance"],
   ctx: AdapterContext,
   metricKey: string,
-  baseline = false,
+  baseline: boolean,
+  tell: CellStory,
 ): ScoreCell {
   if (notComputed(metric)) return { value: "", what, proof: null, notComputed: true };
   const { value, interval } = shown(metric, scale, show, ctx.text, baseline);
-  const proof: Proof | null = proofFromProvenance(provenance, metric.anchor, what, ctx.file, { claim });
+  const proof: Proof | null = proofFromProvenance(provenance, metric.anchor, what, ctx.file, {
+    claim,
+    story: tell.story(storyRange(metric, scale, show, tell.unit, baseline)),
+    ...(tell.audit === undefined ? {} : { audit: tell.audit }),
+  });
   const unit = ctx.text.unit?.(metricKey);
   return { value, ...(unit === undefined ? {} : { unit }), ...(interval === null ? {} : { interval }), what, proof };
 }
@@ -145,10 +168,16 @@ export function toPolicyRows(sb: PolicyScoreboard, lead: PolicyLead, ctx: Adapte
   const result = sb.leads.find((l) => l.lead_days === lead);
   if (result === undefined) return [];
   const f = ctx.format;
+  const season = storySeason(sb);
   return result.rows.map((row) => {
     const { label, sub } = ctx.text.row(row.policy);
+    const audit: ProofAudit = { policy: policyAudit(row.policy, sb) };
     const at = (key: PolicyMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key, lead), sb.provenance, ctx, key, row.policy === "P0");
+      cell(row[key], scale, show, ctx.text.what(key, label), policyClaim(row.policy, key, lead), sb.provenance, ctx, key, row.policy === "P0", {
+        story: (range) => buildStory("policy", { ...season, policy: row.policy, metric: key, lead, marginWm2: sb.margin_w_m2, range }),
+        unit: key === "pod" || key === "far" ? "share" : "hours",
+        audit,
+      });
     return {
       id: row.policy,
       label,
@@ -177,8 +206,12 @@ export function toPlanRows(sb: PlanScoreboard, ctx: AdapterContext): ScoreRow[] 
     const { label, sub } = isMerged ? ctx.text.row("merged") : knownRow(ctx.text, row.plan, row.label);
     // ban only (and naive, which is ban only on the legal roster) is a baseline by construction: its single-point intervals are not measured
     const baseline = row.plan === "naive" || row.plan === "ban_only";
+    const season = storySeason(sb);
     const at = (key: PlanMetric, scale: number, show: (v: number) => string): ScoreCell =>
-      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key, baseline);
+      cell(row[key], scale, show, ctx.text.what(key, label), planClaim(row.plan, key), sb.provenance, ctx, key, baseline, {
+        story: (range) => buildStory("plan", { ...season, plan: isMerged ? "merged" : row.plan, metric: key, headcount: sb.headcount, range }),
+        unit: key === "high_cycled_share" ? "share" : "minutes",
+      });
     rows.push({
       id,
       label,
@@ -198,6 +231,18 @@ export function toPlanRows(sb: PlanScoreboard, ctx: AdapterContext): ScoreRow[] 
 /** A plan that has no message of its own (naive or ban_only shown alone) falls back to the label the file carries. */
 function knownRow(text: TableText, plan: PlanId, fileLabel: string): { label: string; sub: string } {
   return plan === "rule_raw" || plan === "rule_corrected" ? text.row(plan) : { label: fileLabel, sub: "" };
+}
+
+/** The place and period a scored file covers, for the story (the station code is turned into a name there and never printed). */
+export function storySeason(sb: { readonly station: string; readonly season_start: string; readonly season_end: string; readonly n_days: number }): Season {
+  return { station: sb.station, seasonStart: sb.season_start, seasonEnd: sb.season_end, nDays: sb.n_days };
+}
+
+/** The auditor-only name of a policy and its threshold: the code the scoring run uses and, for our two settings, theta. */
+function policyAudit(policy: PolicyId, sb: PolicyScoreboard): NonNullable<ProofAudit["policy"]> {
+  if (policy === "P3_protect") return { code: "P3, protective", threshold: `theta ${String(sb.theta_protect)}` };
+  if (policy === "P3_balanced") return { code: "P3, balanced", threshold: `theta ${String(sb.theta_balanced)}` };
+  return { code: policy };
 }
 
 /** The Warnings rows with no numbers, for the pending table: the same four policies in the same order. */

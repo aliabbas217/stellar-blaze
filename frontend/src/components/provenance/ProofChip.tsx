@@ -10,7 +10,7 @@ import type { ProofDrawerProps } from "./ProofDrawer";
 import type { Proof } from "./proof";
 
 /**
- * The small "Proof" button beside a scored number. It renders nothing without a proof: the caller shows
+ * The small "Where from" button beside a number. It renders nothing without a proof: the caller shows
  * `MissingProvenance` instead of the number (see `Proved`), because a number without provenance is not shown.
  *
  * It is a plain button: the proof stays in React state, never in an attribute (no JSON in the markup), and
@@ -18,7 +18,7 @@ import type { Proof } from "./proof";
  * import and portals it to <body> (a <dialog> is not valid inside the <p> or <button> a number often sits in); later
  * clicks reopen the same one. When it closes, focus goes back here.
  *
- * `label` replaces the word "Proof" on the button ("Why Orange?"); the accessible name stays "Proof for <what>". `field` is
+ * `label` replaces the words "Where from" on the button ("Why Orange?"); the accessible name of the default chip is "Where this number comes from: <what>". `field` is
  * the phone size: 44 px target and 16 px text, for the worker screens (a desk chip is 28 px). `variant="primary"` is the desk
  * primary action (a screen whose one action is "read how this is proved"): the same drawer, the primary button of the state
  * components, and `data-primary` for the design gate.
@@ -86,7 +86,7 @@ function Chip({
   return (
     <>
       <button
-        // The default chip says "Proof" (judge.proof, English by design); a caller's own label ("Why Orange?") is in the page's language.
+        // The default chip says "Where from" (states.proof, English by design); a caller's own label ("Why Orange?") is in the page's language.
         {...(label === undefined && labelContent === undefined ? CLAIMS_ENGLISH : pageLanguage)}
         ref={button}
         type="button"

@@ -53,7 +53,7 @@ const all: Claim[] = [
   ...rowClaims(toPlanRows(plans, ctx("plan_scoreboard"))),
   ...forecastClaims(
     seasonFacts(series, SEASON_BAN, HEAVY_WORK_LIMIT_WBGT_C),
-    { file: { path: "static/omaa_2026_ifs_d1_wbgt_hourly.json", sha256: "f".repeat(64) }, protocol: "recorded forecast" },
+    { file: { path: "static/omaa_2026_ifs_d1_wbgt_hourly.json", sha256: "f".repeat(64) }, protocol: "recorded forecast", series, limit: HEAVY_WORK_LIMIT_WBGT_C },
     format,
     { daysOverLimit: "days", hoursOverLimit: "hours", hoursInBreak: "break" },
   ),
@@ -65,21 +65,29 @@ const all: Claim[] = [
   ),
 ];
 
-describe("the protocol line of the timeline comes from the evaluation record", () => {
-  it("names the commit of the record, not a typed one", () => {
+const evaluation = {
+  lockSha256: "a".repeat(64),
+  protocolCommit: "abcdef0123456789abcdef0123456789abcdef01",
+  amendments: [{ path: "docs/research/x-amendment-1.md", commit: "1".repeat(40), sha256: "2".repeat(64) }],
+  freeze: { path: "docs/research/x-freeze.md", commit: "3".repeat(40), sha256: "4".repeat(64) },
+};
+
+describe("the timeline of a scored number comes from the evaluation record, in three steps", () => {
+  it("names the commit of the record, not a typed one, and lists the amendments in the auditor record", () => {
     const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
     if (claim === undefined) throw new Error("no claim");
-    const evaluation = {
-      lockSha256: "a".repeat(64),
-      protocolCommit: "abcdef0123456789abcdef0123456789abcdef01",
-      amendments: [{ path: "docs/research/x-amendment-1.md", commit: "1".repeat(40), sha256: "2".repeat(64) }],
-      freeze: { path: "docs/research/x-freeze.md", commit: "3".repeat(40), sha256: "4".repeat(64) },
-    };
     const withRecord: Claim = { ...claim, proof: { ...claim.proof, evaluation } };
-    renderWithIntl(<ProofSheet claim={withRecord} source="2026" />);
-    expect(screen.getByText("The pre-registration, commit abcdef0, before 2026 was scored.")).toBeInTheDocument();
+    const { container } = renderWithIntl(<ProofSheet claim={withRecord} source="2026" />);
+    expect([...container.querySelectorAll("[data-timeline] li")].map((li) => li.getAttribute("data-step"))).toEqual(["plan", "run", "shown"]);
+    expect(screen.getByText("The test plan, commit abcdef0, was locked before 2026 was scored.")).toBeInTheDocument();
+    expect(screen.getByText("Plan written down and locked")).toBeInTheDocument();
+    expect(screen.getByText("Scored once on summer 2026")).toBeInTheDocument();
+    expect(screen.getByText("Shown here as scored")).toBeInTheDocument();
     expect(screen.getByText("x-amendment-1.md (1111111)")).toBeInTheDocument();
     expect(screen.getByText("x-freeze.md (3333333)")).toBeInTheDocument();
+    // the timeline is in "For auditors", not in the story
+    expect(container.querySelector("[data-timeline]")?.closest("details")?.id).toBe("audit");
+    expect(container.querySelector("[data-story] [data-timeline]")).toBeNull();
   });
 });
 
@@ -110,8 +118,8 @@ describe("claims", () => {
 describe("ProofSheet", () => {
   it("test_unknown_claim_is_the_empty_state", () => {
     const { container } = renderWithIntl(<ProofSheet claim={null} source="2026" />);
-    expect(screen.getByRole("heading", { name: "No provenance recorded for this number" })).toBeInTheDocument();
-    expect(screen.getByText("No provenance recorded for this number. It is not shown as a result.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "This number is not shown" })).toBeInTheDocument();
+    expect(screen.getByText("This number is not shown because its record is incomplete.")).toBeInTheDocument();
     // a way forward: a number that has proof (a route that exists), and the scoreboard
     expect(screen.getByRole("link", { name: "Open a number that has proof" })).toHaveAttribute("href", "/replay/proof/forecast.hours_over_limit");
     expect(screen.getByRole("link", { name: "Back to the scoreboard" })).toHaveAttribute("href", "/replay");
@@ -120,50 +128,80 @@ describe("ProofSheet", () => {
     expect(screen.queryByRole("button", { name: /Recount/ })).toBeNull();
   });
 
-  it("shows the number large, the proof rows, the four-step timeline and a back link", () => {
+  it("shows the number large, the plain story first, the record under For auditors, and a back link", () => {
     const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
     if (claim === undefined) throw new Error("no claim");
     const { container } = renderWithIntl(<ProofSheet claim={claim} source="2026" />);
     expect(within(container.querySelector("[data-sheet-number]") as HTMLElement).getByText(claim.value)).toBeInTheDocument();
-    expect([...container.querySelectorAll("[data-timeline] li")].map((li) => li.getAttribute("data-step"))).toEqual([
-      "forecast",
-      "protocol",
-      "run",
-      "shown",
-    ]);
-    expect(screen.getByText("About 24 hours ahead of each day, by the ECMWF model.")).toBeInTheDocument();
-    // these claims carry no evaluation record: the sheet does not say a protocol was committed before a held-out run
-    expect(screen.getByText("The pre-registration. This is a development run: it is not the held-out result.")).toBeInTheDocument();
-    expect(screen.getByText("The single scoring run wrote this file.")).toBeInTheDocument();
-    expect(screen.getByText(claim.proof.protocol)).toBeInTheDocument();
-    expect(screen.getByText(claim.proof.file)).toBeInTheDocument();
+    const story = container.querySelector("[data-sheet-story]") as HTMLElement;
+    for (const row of ["Made by", "About", "How we counted", "It shows", "It does not show"]) expect(within(story).getByText(row)).toBeInTheDocument();
+    // the story carries no path, no hash, no function name, no placeholder
+    expect(story.textContent).not.toContain(claim.proof.protocol);
+    expect(story.textContent).not.toContain(claim.proof.file);
+    expect(story.textContent).not.toMatch(/Not recorded|[0-9a-f]{40,}/);
+    // the technical record is behind a closed For auditors block with its own id
+    const audit = container.querySelector("details#audit") as HTMLDetailsElement;
+    expect(audit).not.toBeNull();
+    expect(audit.open).toBe(false);
+    expect(within(audit).getByText("For auditors: the full record")).toBeInTheDocument();
+    expect(within(audit).getByText(claim.proof.protocol)).toBeInTheDocument();
+    expect(within(audit).getByText(claim.proof.file)).toBeInTheDocument();
+    expect(within(audit).getByText("Policy code and threshold").nextElementSibling?.textContent).toMatch(/^P3, protective, theta /);
     expect(screen.getByRole("link", { name: "Back to the scoreboard" })).toHaveAttribute("href", "/replay");
     expect(container.querySelector("[data-primary]")).toBeNull();
+    // a number with no evaluation record has no timeline at all (no four-step list, no contradictions)
+    expect(container.querySelector("[data-timeline]")).toBeNull();
   });
 
-  it("does not call a forecast count a scored result, and does not claim a protocol for it", () => {
+  it("opens For auditors when the page is reached by #audit", () => {
+    const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
+    if (claim === undefined) throw new Error("no claim");
+    window.location.hash = "#audit";
+    try {
+      const { container } = renderWithIntl(<ProofSheet claim={claim} source="2026" />);
+      expect((container.querySelector("details#audit") as HTMLDetailsElement).open).toBe(true);
+    } finally {
+      window.location.hash = "";
+    }
+  });
+
+  it("says what a forecast count is in one line, and neither calls it a scored result nor prints a scoring-run contradiction", () => {
     const claim = all.find((c) => c.id === "forecast.hours_over_limit");
     if (claim === undefined) throw new Error("no claim");
-    renderWithIntl(<ProofSheet claim={claim} source="2026" />);
-    expect(screen.getByText("No scoring protocol: this count is made from the recorded forecast file.")).toBeInTheDocument();
-    expect(screen.getByText("Not a scoring run: nothing here is scored.")).toBeInTheDocument();
+    const { container } = renderWithIntl(<ProofSheet claim={claim} source="2026" />);
+    expect(screen.getByText("This is a count made from a recorded forecast file. It is not a scored result.")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/No scoring protocol|Not a scoring run|Not recorded/);
+    expect(container.querySelector("[data-timeline]")).toBeNull();
     expect(screen.queryByText("The single scoring run wrote this file.")).toBeNull();
+    // the recorded forecast file has no exporter block: nothing is "incomplete", and no empty row is printed
+    expect(container.querySelector("[data-story-incomplete]")).toBeNull();
+    expect(container.querySelector("[data-audit-rows]")?.textContent).not.toMatch(/Model|Generated/);
+  });
+
+  it("says once, in one plain sentence, that a record is incomplete, and prints no placeholder", () => {
+    const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
+    if (claim === undefined) throw new Error("no claim");
+    const { container } = renderWithIntl(<ProofSheet claim={{ ...claim, proof: { ...claim.proof, fileSha256: null } }} source="2026" />);
+    expect(screen.getAllByText("Some technical details for this number were not recorded. The figures above are unaffected.")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Not recorded");
   });
 
   it("says a development run is not the result", () => {
     const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
     if (claim === undefined) throw new Error("no claim");
-    renderWithIntl(<ProofSheet claim={claim} source="dev-2025" />);
-    expect(screen.getByText("The 2025 development run wrote this file. It is not the result.")).toBeInTheDocument();
+    // a development file lives under eval/dev (that is what makes its label DEV 2025, whatever its provenance block says)
+    const dev: Claim = { ...claim, proof: { ...claim.proof, file: "eval/dev/policy_scoreboard.2025.json", label: "DEV 2025" } };
+    renderWithIntl(<ProofSheet claim={dev} source="dev-2025" />);
+    expect(screen.getByText("A development run on 2025 data. This is not the result.")).toBeInTheDocument();
     expect(screen.getByText("DEV 2025")).toBeInTheDocument();
   });
 
-  it("says a made-up shape file is not a scoring run, in its own words, and not that the 2025 run wrote it", () => {
+  it("says a made-up shape file is made up, in its own words, and does not call it a scoring run", () => {
     const claim = all.find((c) => c.id === "policy.p3.missed_danger_hours");
     if (claim === undefined) throw new Error("no claim");
     renderWithIntl(<ProofSheet claim={claim} source="synthetic-shape" />);
-    expect(screen.getByText("Not a scoring run: a script wrote this file with made-up numbers, only to check the layout.")).toBeInTheDocument();
-    expect(screen.queryByText(/The 2025 development run wrote this file/)).toBeNull();
+    expect(screen.getByText("These numbers are made up, only to check the layout. No scoring run wrote them.")).toBeInTheDocument();
+    expect(screen.queryByText(/The single scoring run wrote this file/)).toBeNull();
     expect(screen.getByText("DEV 2025")).toBeInTheDocument();
   });
 
@@ -179,7 +217,7 @@ describe("ProofSheet", () => {
     const { container } = renderWithIntl(<ProofSheet claim={null} source="none" unreadable />);
     expect(container.querySelector("[data-sheet-state=unreadable]")).not.toBeNull();
     expect(screen.getByRole("heading", { name: "The file behind this number could not be read" })).toBeInTheDocument();
-    expect(screen.queryByText(/No provenance recorded/)).toBeNull();
+    expect(screen.queryByText(/not shown because its record is incomplete/)).toBeNull();
     expect(screen.getByRole("link", { name: "Back to the scoreboard" })).toHaveAttribute("href", "/replay");
     expect(container.querySelector("[data-sheet-number]")).toBeNull();
   });
@@ -199,12 +237,14 @@ describe("ProofSheet", () => {
     if (base === undefined) throw new Error("no claim");
     const claim: Claim = { ...base, proof: { ...base.proof, file: "static/recount-sample.json", fileSha256: sha } };
     const { unmount } = renderWithIntl(<ProofSheet claim={claim} source="2026" />);
+    await userEvent.click(screen.getByText("For auditors: the full record"));
     await userEvent.click(screen.getByRole("button", { name: "Recount in this browser" }));
     await waitFor(() => {
       expect(screen.getByText("Matches")).toBeInTheDocument();
     });
     unmount();
     renderWithIntl(<ProofSheet claim={{ ...claim, proof: { ...claim.proof, fileSha256: "0".repeat(64) } }} source="2026" />);
+    await userEvent.click(screen.getByText("For auditors: the full record"));
     await userEvent.click(screen.getByRole("button", { name: "Recount in this browser" }));
     await waitFor(() => {
       expect(screen.getByText("Does not match: report this")).toBeInTheDocument();

@@ -4,9 +4,11 @@ import { ScoreboardTable, type ScoreRow } from "@/components/provenance/Scoreboa
 import { Verdict } from "@/components/provenance/Verdict";
 import type { Proof } from "@/components/provenance/proof";
 import { renderWithIntl } from "../../../utils/intl";
+import { SAMPLE_STORY } from "../../../utils/story";
 
 const proof: Proof = {
   what: "Danger hours nobody was warned about, Stellar Blaze",
+  story: SAMPLE_STORY,
   protocol: "docs/research/preregistration.md#72-warnings-row",
   protocolHref: null,
   script: "backend.eval.policy_scoreboard:build @ 661b373a1b2c",

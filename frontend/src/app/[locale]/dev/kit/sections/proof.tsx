@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { Proved } from "@/components/provenance/Proved";
 import type { Proof, ProofLabel } from "@/components/provenance/proof";
+import { buildStory } from "@/components/provenance/proof-story";
 import { EvalSourceStamp } from "@/features/judge/EvalSourceStamp";
 import { DATA_MANIFEST } from "@/features/judge/manifest.generated";
 import { Cell, CellGrid } from "./Cell";
@@ -9,9 +10,23 @@ import { Cell, CellGrid } from "./Cell";
 // A real published file, so "Recount in this browser" on the first chip answers Matches against the bytes served.
 const RECOUNTABLE = "static/omaa_2026_ifs_d1_wbgt_hourly.json";
 
+// A specimen story (made-up numbers, like the rest of the kit): it only has to show the five lines and the stamp.
+const SAMPLE_STORY = buildStory("policy", {
+  policy: "P3_protect",
+  metric: "missed_danger_hours",
+  lead: 1,
+  station: "OMAA",
+  seasonStart: "2026-05-15",
+  seasonEnd: "2026-09-30",
+  nDays: 100,
+  marginWm2: 7,
+  range: { lo: "10.0", hi: "20.0", unit: "hours" },
+});
+
 function sample(what: string, label: ProofLabel, overrides: Partial<Proof> = {}): Proof {
   return {
     what,
+    story: SAMPLE_STORY,
     protocol: "docs/protocol/preregistration.md#72-warnings-row",
     protocolHref: null,
     script: "backend.eval.policy_scoreboard:build_policy_scoreboard @ 661b373a1b2c",

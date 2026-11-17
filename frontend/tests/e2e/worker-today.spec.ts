@@ -57,6 +57,20 @@ test("QR-less demo entry reaches a level in two taps (Today)", async ({ page }) 
   await expect(page.getByRole("heading", { name: en.levels.name.orange, level: 2 })).toBeVisible();
 });
 
+test("the why-drawer of Today says where the level comes from in plain words and prints no technical field outside For auditors (Today)", async ({ page }) => {
+  await openToday(page);
+  await page.getByRole("button", { name: /^Why / }).click();
+  const drawer = page.getByRole("dialog", { name: "Where this number comes from" });
+  await expect(drawer).toBeVisible();
+  for (const row of ["Made by", "About", "It does not show"]) await expect(drawer.getByText(row, { exact: true })).toBeVisible();
+  // the worker never meets the ruleset, the configuration or an API operation name in the main layer
+  expect(await drawer.innerText()).not.toMatch(/policy=|config=|get_site_forecast|ae-heat|Not recorded/);
+  // they are one deliberate step away, behind For auditors, as words
+  await drawer.getByText("For auditors: the full record").click();
+  await expect(drawer.getByText(/^Ruleset .*, configuration \d+$/)).toBeVisible();
+  await expect(drawer.getByText("Script")).toHaveCount(0);
+});
+
 test("out of season Today has no slot (Today)", async ({ page }) => {
   await openToday(page, { scenario: "offseason" });
   await expect(page.getByText("No midday break by law after 15 Sep")).toBeVisible();
