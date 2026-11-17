@@ -52,7 +52,7 @@ export function RoleDoor({ className = "" }: { readonly className?: string }) {
               data-role={role}
               className="group flex min-h-(--target-field) w-full items-start gap-3 rounded-card bg-panel p-4 text-ink no-underline inset-ring-[1.5px] inset-ring-edge transition-transform duration-(--dur-press) hover:bg-[color-mix(in_oklch,var(--panel),var(--ink)_var(--mix-secondary-hover))] active:translate-y-px active:scale-[0.985]"
             >
-              <span aria-hidden="true" className="grid size-11 flex-none place-items-center rounded-ctl bg-raised text-ink">
+              <span aria-hidden="true" className="grid min-h-11 min-w-11 flex-none place-items-center rounded-ctl bg-raised text-ink">
                 {ICONS[role]}
               </span>
               <span className="grid min-w-0 flex-1 gap-1">

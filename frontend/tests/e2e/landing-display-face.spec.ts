@@ -177,9 +177,9 @@ for (const locale of LOCALES) {
         }
       }
       console.log(`landing display face ${locale} ${size.name}: ${perRoute.join(" | ")}`);
-      // Non-vacuous: the landing's h1 and two h2 are always found, and so are display texts on other surfaces (a route with no
+      // Non-vacuous: the landing's h1 is always found (its chapters are English blocks, which this probe skips), and so are display texts on other surfaces (a route with no
       // Arabic-script display text, such as one whose headings are Latin, is listed above with 0 and proves nothing about itself).
-      expect(perRoute[0], `${locale} ${size.name}: the landing's three display headings were found`).toMatch(/: ([3-9]|\d\d) headings$/);
+      expect(perRoute[0], `${locale} ${size.name}: the landing's display heading (the h1; the chapters are English blocks) was found`).toMatch(/: ([1-9]|\d\d) headings$/);
       expect(probed, `${locale} ${size.name}: display texts on the field, supervisor and judge surfaces were probed too`).toBeGreaterThanOrEqual(8);
       expect(drawnByLocale, `${locale} ${size.name}: the locale family drew Arabic-script glyphs`).toBeGreaterThan(0);
       expect(violations, `${locale} ${size.name}: an Arabic-script display glyph is drawn by something other than the locale family`).toEqual([]);

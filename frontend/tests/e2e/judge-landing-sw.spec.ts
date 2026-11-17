@@ -87,7 +87,7 @@ async function holdIdleUntilClaimed(page: Page): Promise<void> {
 }
 
 async function settle(page: Page): Promise<string> {
-  const stage = page.locator("[data-hero][data-field-path]");
+  const stage = page.locator("[data-field-stage][data-field-path]");
   await expect(stage).toBeAttached({ timeout: 20_000 });
   try {
     await expect(stage).toHaveAttribute("data-field-path", "webgl", { timeout: 9_000 });
@@ -200,7 +200,7 @@ test.describe("landing and the service worker", () => {
     expect(["webgl", "2d"]).toContain(path);
     if (path === "webgl") for (const href of locations) expect(href).toContain("#params=");
     expect(uncaught, "an uncaught error on the page").toEqual([]);
-    const report = await gateReport(page, { consoleErrors: [], spine: true });
+    const report = await gateReport(page, { consoleErrors: [], spine: true, hero: false });
     expect(report.failures).toEqual([]);
     await context.setOffline(false);
     await context.close();
@@ -219,7 +219,7 @@ test.describe("landing and the service worker", () => {
     await page.waitForTimeout(700);
     expect(path, "the scene's worker cannot start: the 2D field of the same data is the page").toBe("2d");
     expect(uncaught, "an uncaught error on the page").toEqual([]);
-    const report = await gateReport(page, { consoleErrors: [], spine: true });
+    const report = await gateReport(page, { consoleErrors: [], spine: true, hero: false });
     expect(report.failures).toEqual([]);
     await context.close();
   });
