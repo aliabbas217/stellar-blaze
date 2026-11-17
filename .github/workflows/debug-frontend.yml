@@ -1,9 +1,5 @@
-# TEMPORARY bench for the PlanView failure on the runner. Lives only on the branch debug/ci-frontend and is deleted with it.
-# Same setup steps as the `frontend` job of ci.yml, then only the unit step as ci.yml runs it. Three variants in parallel:
-#   baseline  the code as it is (expected to fail: the control)
-#   settle    after every test of PlanView.test.tsx, wait a few macrotasks, so that an asynchronous teardown has finished
-#   nohang    skip the one test whose request never answers (it leaves a pending connection behind)
-# Which of them passes says whether the first request of a test is lost to the teardown of the one before it.
+# TEMPORARY bench on the branch debug/ci-frontend (deleted with it). The frontend unit step as ci.yml runs it, twice in parallel, to
+# confirm that the fix of the PlanView failure holds with the default timeouts and is not a lucky pass.
 name: debug-frontend
 on:
   push:
@@ -15,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [baseline, settle, nohang]
+        copy: [1, 2, 3]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -32,25 +28,4 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Apply the variant
-        env:
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          file=tests/unit/features/supervisor/plan/PlanView.test.tsx
-          case "$VARIANT" in
-            settle)
-              cat >> "$file" <<'EOF'
-
-          afterEach(async () => {
-            for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 20));
-          });
-          EOF
-              ;;
-            nohang)
-              sed -i 's|it("while the plan loads, the skeleton is shown and Stop work is already live"|it.skip("while the plan loads, the skeleton is shown and Stop work is already live"|' "$file"
-              grep -c 'it.skip("while the plan loads' "$file"
-              ;;
-            *) echo "baseline: no change" ;;
-          esac
-          git diff --stat
       - run: pnpm test --maxWorkers=4
