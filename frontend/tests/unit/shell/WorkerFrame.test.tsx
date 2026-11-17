@@ -65,7 +65,8 @@ describe("Change crew", () => {
     renderFrame();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Settings/ }));
-    const link = within(await screen.findByRole("dialog", { name: "Settings" })).getByRole("link", { name: "Change crew" });
+    // The sheet's rows and "Change crew" are a module loaded on the first opening (SettingsSheetBody.tsx): wait for the link.
+    const link = await within(await screen.findByRole("dialog", { name: "Settings" })).findByRole("link", { name: "Change crew" });
     expect(link).toHaveAttribute("href", "/en/worker/join");
   });
 
@@ -76,7 +77,7 @@ describe("Change crew", () => {
     renderFrame();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Settings/ }));
-    await user.click(within(await screen.findByRole("dialog", { name: "Settings" })).getByRole("link", { name: "Change crew" }));
+    await user.click(await within(await screen.findByRole("dialog", { name: "Settings" })).findByRole("link", { name: "Change crew" }));
 
     await waitFor(() => {
       expect(assign).toHaveBeenCalledTimes(1);

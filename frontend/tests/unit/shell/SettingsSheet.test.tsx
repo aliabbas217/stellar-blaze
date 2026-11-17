@@ -63,7 +63,10 @@ const midnight = new Date(2026, 10, 15, 0, 0, 0, 0).getTime();
 
 async function openSheet(user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })) {
   await user.click(screen.getByRole("button", { name: /Settings/ }));
-  return { user, sheet: await screen.findByRole("dialog", { name: "Settings" }) };
+  const sheet = await screen.findByRole("dialog", { name: "Settings" });
+  // The rows, the colours and Change crew are a module loaded on the first opening (SettingsSheetBody.tsx): wait for it.
+  await within(sheet).findByRole("group", { name: "Screen colors" });
+  return { user, sheet };
 }
 
 describe("the pill", () => {

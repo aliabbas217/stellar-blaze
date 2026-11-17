@@ -1,11 +1,8 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useRef, useState, type ReactNode } from "react";
-import { ScreenColors } from "@/components/shell/ScreenColors";
+import { Component, lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ACTION_QUIET, ACTION_SECONDARY_DENSE } from "@/components/states/actions";
-import { getPathname, usePathname } from "@/i18n/navigation";
-import { routing } from "@/i18n/routing";
 
 /**
  * The header's one language pill and the settings sheet it opens (redesign S5, decision D4; it replaces the six always-visible
@@ -17,9 +14,14 @@ import { routing } from "@/i18n/routing";
  *   Screen colors  Automatic, Bright, Night (ScreenColors.tsx);
  *   Change crew    a link, only where the shell is given one (the worker app).
  *
- * A language row is a plain link, exactly as the old chip was: choosing a language loads a new document, because the [locale] layout
- * owns <html> and a soft navigation between locales would re-mount it and lose `data-theme`. The tap keeps the query string and the
- * hash (`?demo=`, `?at=`, `?site=`); a modified or middle click is left to the browser (new tab). The locale is then persisted by the
+ * Those three live in SettingsSheetBody.tsx, a module of its own loaded on the first opening, so that the header every field
+ * route shares carries only the pill, the dialog and its title in its first load (the 170 KB ceiling of every route that is not a
+ * data screen, and the data screens' too, depend on it: with the rows in the header /hse was 660 B over). The browser's idle time
+ * after the page has loaded is used to fetch the module, so the tap finds it ready, and offline it comes from the service
+ * worker's runtime cache; if it cannot be loaded at all the sheet still opens with its title and Close, and closes. A language row
+ * is a plain link, exactly as the old chip was: choosing a language loads a new document, because the [locale] layout owns <html>
+ * and a soft navigation between locales would re-mount it and lose `data-theme`. The tap keeps the query string and the hash
+ * (`?demo=`, `?at=`, `?site=`); a modified or middle click is left to the browser (new tab). The locale is then persisted by the
  * route (the cookie the i18n middleware sets), as it was for the chips.
  *
  * The sheet's content mounts only while it is open, so a closed sheet costs the page nothing and ScreenColors reads the phone's
@@ -34,6 +36,22 @@ export interface ChangeCrew {
   readonly onActivate?: () => void | Promise<void>;
 }
 
+const loadBody = () => import("./SettingsSheetBody");
+const SettingsSheetBody = lazy(() => loadBody().then((module) => ({ default: module.SettingsSheetBody })));
+
+/** A body that failed to load leaves the sheet with its title and Close instead of taking the page down with it. */
+class BodyBoundary extends Component<{ readonly children: ReactNode }, { readonly failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  override render(): ReactNode {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 function Chevron() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 flex-none">
@@ -42,50 +60,18 @@ function Chevron() {
   );
 }
 
-function Check() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 flex-none">
-      <path fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="square" d="M4.5 12.5l5 5 10-11" />
-    </svg>
-  );
-}
-
-function LanguageRows() {
-  const t = useTranslations("shell");
-  const locale = useLocale();
-  const pathname = usePathname();
-
-  return (
-    <nav aria-label={t("language")} className="flex flex-col gap-2">
-      <h3 className="text-base leading-(--sign-leading-text) font-medium text-ink-3">{t("language")}</h3>
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {routing.locales.map((code) => {
-          const href = getPathname({ href: pathname, locale: code });
-          return (
-            <li key={code}>
-              <a
-                href={href}
-                lang={code}
-                hrefLang={code}
-                aria-current={code === locale ? "true" : undefined}
-                onClick={(event) => {
-                  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                  event.preventDefault();
-                  const { search, hash } = window.location;
-                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a full load is intended, see above
-                  window.location.assign(`${href}${search}${hash}`);
-                }}
-                className="flex min-h-(--target-stop) items-center justify-between gap-3 rounded-ctl bg-panel px-4 text-lg font-medium text-ink no-underline aria-[current=true]:bg-ink aria-[current=true]:font-semibold aria-[current=true]:text-ground"
-              >
-                <span>{t(`locales.${code}`)}</span>
-                {code === locale ? <Check /> : null}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
+/** Fetch the body when the browser is idle after the page is up (no work on the critical path, nothing if the phone saves data). */
+function usePrefetchBody(): void {
+  useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (connection?.saveData === true) return;
+    const idle = typeof window.requestIdleCallback === "function";
+    const id = idle ? window.requestIdleCallback(() => void loadBody().catch(() => undefined)) : window.setTimeout(() => void loadBody().catch(() => undefined), 1500);
+    return () => {
+      if (idle) window.cancelIdleCallback(id);
+      else window.clearTimeout(id);
+    };
+  }, []);
 }
 
 export function SettingsSheet({ changeCrew }: { readonly changeCrew?: ChangeCrew }): ReactNode {
@@ -95,6 +81,7 @@ export function SettingsSheet({ changeCrew }: { readonly changeCrew?: ChangeCrew
   const dialog = useRef<HTMLDialogElement>(null);
   const pill = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  usePrefetchBody();
 
   return (
     <>
@@ -143,28 +130,11 @@ export function SettingsSheet({ changeCrew }: { readonly changeCrew?: ChangeCrew
                 {t("close")}
               </button>
             </header>
-            <LanguageRows />
-            <ScreenColors />
-            {changeCrew === undefined ? null : (
-              <a
-                href={changeCrew.href}
-                data-change-crew=""
-                onClick={(event) => {
-                  if (changeCrew.onActivate === undefined || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                  event.preventDefault();
-                  const href = event.currentTarget.href;
-                  // Whatever the callback does, the worker still lands on the chooser: a failure here must never be a dead link.
-                  void Promise.resolve(changeCrew.onActivate())
-                    .catch(() => undefined)
-                    .then(() => {
-                      window.location.assign(href);
-                    });
-                }}
-                className={`${ACTION_SECONDARY_DENSE} w-full`}
-              >
-                {t("settings.changeCrew")}
-              </a>
-            )}
+            <BodyBoundary>
+              <Suspense fallback={null}>
+                <SettingsSheetBody {...(changeCrew === undefined ? {} : { changeCrew })} />
+              </Suspense>
+            </BodyBoundary>
           </div>
         ) : null}
       </dialog>
