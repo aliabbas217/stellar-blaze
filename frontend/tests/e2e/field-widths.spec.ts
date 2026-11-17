@@ -55,8 +55,16 @@ const FRAME_WITH = (ready: (page: Page, locale: Locale) => ReturnType<Page["getB
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
   await expect(ready(page, locale)).toBeVisible();
 };
-/** Worker today with no crew chosen: the entry asks for the QR code, and offers the demo yard once the site list has loaded. */
-const SITE_ENTRY = FRAME_WITH((page, locale) => page.getByRole("button", { name: MESSAGES[locale].worker.today.entry.demo }));
+/** The join page with no code (the picker), where Today with no crew chosen hands on to: the demo yard is offered once the site list has loaded. */
+const JOIN_PICKER = FRAME_WITH((page, locale) => page.getByRole("button", { name: MESSAGES[locale].worker.join.demo }));
+/** The join page's confirm card: its "Yes" button exists once the site and the crew have been read. */
+const JOIN_CONFIRM = FRAME_WITH((page, locale) => page.getByRole("button", { name: MESSAGES[locale].worker.join.confirm }));
+/** The join page at one site: the crews are rows (links that carry `c=`) once the crews have been read. */
+const JOIN_CREWS = FRAME_WITH((page) => page.locator("main a[href*='c=crew-']").first());
+/** A garbled code: the page says it did not work, and the picker is under it. */
+const JOIN_BAD_CODE = FRAME_WITH((page, locale) => page.getByText(MESSAGES[locale].worker.join.badCode));
+/** The alerts page with no site: the way to the join page replaces the greyed button. */
+const ALERTS_JOIN = FRAME_WITH((page, locale) => page.getByRole("link", { name: MESSAGES[locale].worker.join.pageTitle }));
 /** A screen whose forecast failed: the error state, which only exists after the failed request. */
 const LOAD_ERROR = FRAME_WITH((page, locale) => page.getByText(MESSAGES[locale].states.error.title));
 /** The alerts page: its Enable button is decided by the browser after hydration (as in a11y.spec.ts). */
@@ -72,12 +80,16 @@ const PLAN = async (page: Page): Promise<void> => {
 
 const SCREENS: readonly Screen[] = [
   { name: "today (pinned crew)", path: `/worker${PIN}`, settled: FRAME },
-  { name: "today (no QR: empty)", path: "/worker", settled: SITE_ENTRY },
+  { name: "today (no pin: hands on to the join page)", path: "/worker", settled: JOIN_PICKER },
+  { name: "join (crew link: confirm)", path: `/worker/join?s=${SITE_DEMO}&c=crew-c`, settled: JOIN_CONFIRM },
+  { name: "join (one site: crews)", path: `/worker/join?s=${SITE_DEMO}`, settled: JOIN_CREWS },
+  { name: "join (garbled code)", path: "/worker/join?s=%3Cb%3E&c=x", settled: JOIN_BAD_CODE },
   { name: "today (stale forecast)", path: `/worker${PIN}`, scenario: "stale", settled: FRAME },
   { name: "today (API error)", path: `/worker${PIN}`, scenario: "error", settled: LOAD_ERROR },
   { name: "alert card", path: `/worker/alert?audience=site&target=${SITE_DEMO}&level=orange&valid_from=${VALID_FROM}`, settled: FRAME },
   { name: "unwell sheet", path: "/worker/unwell", settled: FRAME },
-  { name: "alerts page", path: "/worker/alerts", settled: ALERTS_ENABLE },
+  { name: "alerts page", path: `/worker/alerts?site=${SITE_DEMO}`, settled: ALERTS_ENABLE },
+  { name: "alerts page (no site: the way to join)", path: "/worker/alerts", settled: ALERTS_JOIN },
   { name: "supervisor crews", path: "/supervisor", settled: CREWS },
   { name: "supervisor crew plan", path: "/supervisor/crews/crew-b?at=09:30", settled: PLAN },
 ];

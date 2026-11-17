@@ -188,7 +188,7 @@ export function TodayView() {
     case "loading":
       return <TodaySkeleton />;
     case "no-site":
-      return <SiteEntry status={model.entry} onDemoYard={model.demoYard} onRetry={model.retrySites} />;
+      return <SiteEntry />;
     case "error":
       return (
         <div className="px-4 pt-6">

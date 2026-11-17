@@ -3,13 +3,16 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
+import { FieldLink } from "@/components/shell/FieldLink";
 import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
+import { joinHref } from "@/features/join/link";
 import {
   readRevokeActive,
   readRevokeIncomplete,
   subscribeRevokeActive,
   subscribeRevokeIncomplete,
 } from "@/features/profile/revoke-marker";
+import { useSitePin } from "@/features/profile/site-pin";
 import { isRevokeComplete, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
 import { InstallCard } from "@/features/push/InstallCard";
@@ -73,8 +76,15 @@ export interface AlertsSettingsProps {
   readonly debug: boolean;
 }
 
-export function AlertsSettings(props: AlertsSettingsProps) {
+export function AlertsSettings({ siteId: siteFromLink, ...rest }: AlertsSettingsProps) {
   const t = useTranslations("alerts.removeData");
+  // The site to subscribe for: the one named in the address (`?site=`, the spike), else the one this phone is pinned to (what the join page
+  // wrote). Without the pin a worker who had just joined was told to "choose your site first" on the one screen that turns warnings on.
+  // The crew comes from the pin only when the site is the pinned one: a crew of another site is never sent with it.
+  const pin = useSitePin();
+  const siteId = siteFromLink ?? pin?.siteId ?? null;
+  const crewId = pin !== null && siteId === pin.siteId ? pin.crewId : null;
+  const props = { ...rest, siteId, crewId };
   // What the last removal of the worker's data reported, and a counter that starts the alerts section again after it:
   // the alerts state machine holds the browser's subscription in React state, which a removal made behind its back
   // would leave saying "on". Both live here, above the key, so that they survive that restart.
@@ -151,14 +161,15 @@ export function AlertsSettings(props: AlertsSettingsProps) {
 function AlertsPanel({
   vapidPublicKey,
   siteId,
+  crewId,
   debug,
   afterRemoval,
   onRemoving,
   onRemoved,
-}: AlertsSettingsProps & { afterRemoval: boolean; onRemoving: () => void; onRemoved: (outcome: RevokeOutcome) => void }) {
+}: AlertsSettingsProps & { crewId: string | null; afterRemoval: boolean; onRemoving: () => void; onRemoved: (outcome: RevokeOutcome) => void }) {
   const t = useTranslations("alerts");
   const capability = useSyncExternalStore(noopSubscribe, readCapability, () => null);
-  const push = usePush({ vapidPublicKey, siteId });
+  const push = usePush({ vapidPublicKey, siteId, crewId });
 
   return (
     <div className="flex flex-col gap-6">
@@ -297,6 +308,7 @@ function Explanation({ title, body }: { title: string; body: string }) {
 function Controls({ push, siteId }: { push: ReturnType<typeof usePush>; siteId: string | null }) {
   const t = useTranslations("alerts");
   const tStates = useTranslations("states");
+  const tJoin = useTranslations("worker.join");
 
   const canDisable = push.state === "subscribed" || (push.state === "error" && push.failure === "disable");
 
@@ -339,9 +351,13 @@ function Controls({ push, siteId }: { push: ReturnType<typeof usePush>; siteId: 
         >
           {t("disable")}
         </ActionButton>
+      ) : siteId === null ? (
+        // No site to subscribe for: the way to one, not a greyed button (redesign S6a). The join page finds the site and the crew.
+        <FieldLink href={joinHref()} data-primary="" className={`${ACTION_PRIMARY} font-body`}>
+          {tJoin("pageTitle")}
+        </FieldLink>
       ) : (
         <ActionButton
-          disabled={siteId === null}
           onClick={() => {
             void push.enable();
           }}

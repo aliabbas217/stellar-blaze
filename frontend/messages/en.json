@@ -363,12 +363,6 @@
         "minutes": "{minutes} min"
       },
       "entry": {
-        "title": "Scan your crew's code",
-        "reason": "Point your camera at the poster on site, or open the link in your crew's group. No account, nothing to type.",
-        "demo": "See the demo yard",
-        "loading": "Finding the demo yard",
-        "unavailable": "The demo yard could not be loaded. Check your connection and try again.",
-        "chooseFailed": "Your choice could not be saved on this phone. Try again.",
         "pinFailed": "This phone could not save the site. Reload the page to try again."
       },
       "noShift": {
@@ -378,6 +372,22 @@
         "primary": "Turn on warnings"
       },
       "errorRules": "Until it loads, follow the site rules: rest in shade every hour, drink water."
+    },
+    "join": {
+      "pageTitle": "Join your crew",
+      "confirmTitle": "Is this your crew?",
+      "confirm": "Yes, this is my crew",
+      "other": "No, choose another",
+      "note": "This phone remembers your site and crew. There is no account, and we do not ask for your name, phone number or email.",
+      "workplaces": "Choose your workplace",
+      "demoOnly": "Only the demo yard is listed for now.",
+      "crews": "Choose your crew",
+      "crewMissing": "Your crew is not listed? Ask your supervisor to show you the crew code.",
+      "demo": "Just looking? Try the demo yard",
+      "badCode": "This code did not work. It may be old or damaged. Choose your workplace and crew below.",
+      "unknownSite": "We could not find that workplace. Choose it from the list.",
+      "unknownCrew": "We could not find that crew at {site}. Choose it from the list.",
+      "saveFailed": "Your choice could not be saved on this phone. Try again."
     },
     "alert": {
       "title": "Heat warning",

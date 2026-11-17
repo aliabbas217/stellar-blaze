@@ -272,7 +272,7 @@ test.describe("unwell sheet: offline", () => {
     await page.setViewportSize(PHONE);
     await loadControlled(page, "/en/worker");
     // One visit to Today: the demo yard is one tap and puts the site's numbers on this phone (the pin's contacts).
-    await page.getByRole("button", { name: en.worker.today.entry.demo }).click();
+    await page.getByRole("button", { name: en.worker.join.demo }).click();
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("sb-profile-v1") ?? ""), { timeout: 10_000 })
       .toContain(SUPERVISOR);

@@ -9,6 +9,7 @@ import { templateRuns } from "@/features/judge/validator/runs";
 import { AlertSkeleton } from "@/features/alert/AlertView";
 import { CrewsSkeleton } from "@/features/supervisor/CrewsView";
 import { PlanSkeleton } from "@/features/supervisor/plan/PlanView";
+import { JoinSkeleton } from "@/features/join/JoinView";
 import { SiteEntry } from "@/features/today/SiteEntry";
 import { TodaySkeleton } from "@/features/today/TodayView";
 import { REPLAY_DATE } from "@/features/demo/constants";
@@ -64,11 +65,9 @@ function tryLoading(phase: "loading" | "idle") {
   );
 }
 
-const noop = () => undefined;
-
 const LIVE: readonly (readonly [string, () => ReactNode])[] = [
   ["worker Today", () => <TodaySkeleton />],
-  ["the worker's site list (Today before a site is chosen)", () => <SiteEntry status="loading" onDemoYard={noop} onRetry={noop} />],
+  ["the join page's loading state (the site list and the crew, read before a site is chosen)", () => <JoinSkeleton />],
   ["the alert card", () => <AlertSkeleton />],
   ["the supervisor crews list", () => <CrewsSkeleton />],
   ["the supervisor crew plan", () => <PlanSkeleton />],
@@ -79,8 +78,8 @@ const LIVE: readonly (readonly [string, () => ReactNode])[] = [
 const NOT_LIVE: readonly (readonly [string, () => ReactNode])[] = [
   ["the scoreboard's loading state (committed JSON)", () => <ScoreboardSkeleton />],
   ["the day's loading state (committed JSON)", () => <DaySkeleton />],
-  ["the site list once it failed", () => <SiteEntry status="unavailable" onDemoYard={noop} onRetry={noop} />],
-  ["the site list once a demo site is known", () => <SiteEntry status="ready" onDemoYard={noop} onRetry={noop} />],
+  // Today with no site only hands over to the join page, which owns the waiting: the placeholder says nothing about a slow API.
+  ["Today's hand-over to the join page", () => <SiteEntry />],
   ["try a plan before anything is pressed", () => tryLoading("idle")],
   ["the governance answer when not pending", () => <AnswerCard answer={null} pending={false} />],
 ];

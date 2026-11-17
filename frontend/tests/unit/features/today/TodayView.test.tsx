@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
@@ -28,9 +27,11 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(search),
   usePathname: () => "/en/worker",
 }));
+const replace = vi.fn();
+const router = { replace };
 vi.mock("@/i18n/navigation", () => ({
   usePathname: () => "/en/worker",
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => router,
   Link: ({ href, children, prefetch, ...props }: { href: string; children: ReactNode; prefetch?: boolean; className?: string }) => (
     <a href={`/en${href}`} data-prefetch={String(prefetch)} {...props}>
       {children}
@@ -67,6 +68,7 @@ const profile: Profile = {
 };
 
 beforeEach(() => {
+  replace.mockClear();
   search = "";
   window.localStorage.clear();
   resetSitePinForTests();
@@ -121,20 +123,16 @@ describe("Today: no site yet", () => {
     vi.restoreAllMocks(); // the W2 tests below make the store chunk fail: that must not leak into the next test
   });
 
-  it("W2: a demo-yard tap whose store chunk cannot load says so and offers the tap again, then works when the chunk loads", async () => {
-    const chunk = vi.spyOn(chooseSite, "chooseDeviceSite").mockRejectedValueOnce(new Error("Loading chunk failed"));
+  it("S6a: no site on the phone and none in the link hands over to the join page (replace), and offers one real link to it meanwhile", async () => {
     renderToday();
-    const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "See the demo yard" }));
-    expect(await screen.findByText("Your choice could not be saved on this phone. Try again.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith("/worker/join");
+    });
+    expect(screen.getByRole("link", { name: "Join your crew" })).toHaveAttribute("href", "/en/worker/join");
+    // The old dead end is gone: no demo button here, and nothing was pinned.
+    expect(screen.queryByRole("button", { name: /demo yard/i })).toBeNull();
     expect(useProfile.getState().site).toBeNull();
-
-    // The retry is the same tap, and it is a real button of the same size, not a dead end.
-    chunk.mockRestore();
-    await user.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await orange()).toBeInTheDocument();
-    expect(useProfile.getState().site).toMatchObject({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID });
   });
 
   it("W2: a site in the link that cannot be saved on the phone still shows the level, with one calm line", async () => {
@@ -146,33 +144,6 @@ describe("Today: no site yet", () => {
     expect(await screen.findByText("This phone could not save the site. Reload the page to try again.")).toBeInTheDocument();
   });
 
-  it("test_demo_yard_entry_pins_site_and_crew: the demo yard is one tap, and it shows a level", async () => {
-    renderToday();
-
-    expect(await screen.findByRole("heading", { name: "Scan your crew's code" })).toBeInTheDocument();
-    await userEvent.setup().click(await screen.findByRole("button", { name: "See the demo yard" }));
-
-    // The pin also takes the site's call numbers (synthetic on the demo site) for the unwell sheet to use offline (F2 Task 18).
-    await waitFor(() => {
-      expect(useProfile.getState().site?.contacts).toMatchObject(DEMO_CONTACTS);
-    });
-    expect(useProfile.getState().site).toMatchObject({ siteId: SITE_DEMO, crewId: DEMO_CREW_ID });
-    // Dated when the phone saved them, so the sheet can say how old they are when it is offline.
-    expect(Date.parse(useProfile.getState().site?.contacts?.savedAt ?? "")).not.toBeNaN();
-    expect(await orange()).toBeInTheDocument();
-  });
-
-  it("the entry is the one primary action, and it is not disabled while the demo yard is being found", async () => {
-    renderToday();
-    const entry = await screen.findByRole("heading", { name: "Scan your crew's code" });
-    const section = entry.closest("section");
-    expect(section).not.toBeNull();
-    await waitFor(() => {
-      expect(within(section as HTMLElement).getByRole("button", { name: "See the demo yard" })).toBeEnabled();
-    });
-    expect(section?.querySelectorAll("[data-primary]")).toHaveLength(1);
-  });
-
   it("?site= and ?crew= pin the phone (a shared link, an e2e) and show that site's level", async () => {
     search = `?site=${SITE_DEMO}&crew=crew-a`;
     renderToday();
@@ -182,15 +153,6 @@ describe("Today: no site yet", () => {
       expect(useProfile.getState().site?.contacts).toMatchObject(DEMO_CONTACTS);
     });
     expect(useProfile.getState().site).toMatchObject({ siteId: SITE_DEMO, crewId: "crew-a" });
-  });
-
-  it("when the site list cannot be loaded it says so and offers the retry, never a dead button", async () => {
-    server.use(http.get("*/api/v1/sites", () => HttpResponse.json({ type: "urn:x", title: "down", status: 503 }, { status: 503 })));
-    renderToday();
-
-    expect(await screen.findByText(/demo yard could not be loaded/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "See the demo yard" })).toBeNull();
   });
 });
 
@@ -591,16 +553,16 @@ describe("Today: states", () => {
     // Synchronously after the first render: the forecast has not arrived, so the screen is the skeleton, and a pinned phone must
     // never flash the entry for a phone that has no site.
     expect(container.querySelectorAll('[data-today-skeleton] [data-skeleton]')).toHaveLength(2);
-    expect(screen.queryByRole("heading", { name: "Scan your crew's code" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Join your crew" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Orange" })).toBeNull();
     // ...and the skeleton goes when the level comes.
     await orange();
     expect(container.querySelector("[data-today-skeleton]")).toBeNull();
   });
 
-  it("an unpinned phone shows the entry at once, not a skeleton that never ends", async () => {
+  it("an unpinned phone hands over to the join page at once, not a Today skeleton that never ends", async () => {
     const { container } = renderToday();
-    expect(await screen.findByRole("heading", { name: "Scan your crew's code" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Join your crew" })).toBeInTheDocument();
     expect(container.querySelector("[data-today-skeleton]")).toBeNull();
   });
 });

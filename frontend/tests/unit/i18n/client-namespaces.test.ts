@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { HSE_NAMESPACES, SUPERVISOR_NAMESPACES, WORKER_APP_NAMESPACES, WORKER_SHEET_NAMESPACES } from "@/i18n/client-namespaces";
+import { HSE_NAMESPACES, SUPERVISOR_NAMESPACES, WORKER_APP_NAMESPACES, WORKER_JOIN_NAMESPACES, WORKER_SHEET_NAMESPACES } from "@/i18n/client-namespaces";
 import { pickMessages } from "@/i18n/pick-messages";
 import { routing } from "@/i18n/routing";
 
@@ -71,6 +71,12 @@ const surfaces = {
     paths: WORKER_SHEET_NAMESPACES,
     features: ["features/unwell"],
     shared: sharedComponents([...DESK_ONLY, ...PROOF]),
+  },
+  // The join page (S6a): the shell with the language pill and the state components, plus its own copy. No dock, no proof drawer, no levels.
+  "worker join": {
+    paths: WORKER_JOIN_NAMESPACES,
+    features: ["features/join"],
+    shared: sharedComponents([...DESK_ONLY, ...PROOF, ...DOCK, "components/level", "components/states/EmptyState.tsx"]),
   },
   supervisor: {
     paths: SUPERVISOR_NAMESPACES,

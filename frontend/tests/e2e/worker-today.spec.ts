@@ -51,11 +51,12 @@ async function openToday(page: Page, { locale = "en", theme = "sun", scenario, q
 test("QR-less demo entry reaches a level in two taps (Today)", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await page.goto("/en");
-  // Tap one: the worker role on the landing page. Tap two: the demo yard.
+  // Tap one: the worker role on the landing page. A phone with no site is handed on to the join page, which keeps the demo yard as its one
+  // quiet option. Tap two: the demo yard.
   await page.getByRole("link", { name: en.shell.roleChooser.worker.title }).click();
-  await expect(page).toHaveURL(/\/en\/worker$/);
-  await expect(page.getByRole("heading", { name: en.worker.today.entry.title })).toBeVisible();
-  await page.getByRole("button", { name: en.worker.today.entry.demo }).click();
+  await expect(page).toHaveURL(/\/en\/worker\/join$/);
+  await expect(page.getByRole("heading", { level: 1, name: en.worker.join.pageTitle })).toBeVisible();
+  await page.getByRole("button", { name: en.worker.join.demo }).click();
 
   await expect(page.getByRole("heading", { name: en.levels.name.orange, level: 2 })).toBeVisible();
   // The phone is pinned to the demo yard and its scored crew; the header says so and a reload stays there.
@@ -169,12 +170,16 @@ test("the settings sheet opens from the one language pill, holds six languages, 
   await expect(page.locator("html")).toHaveAttribute("lang", "ar");
 });
 
-test("Change crew lets go of the pin and opens the first-run chooser (Today)", async ({ page }) => {
+test("Change crew lets go of the pin and opens the join page (Today)", async ({ page }) => {
   await openToday(page);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("sb-profile-v1") ?? "")).toContain("crew-b");
   const sheet = await openSettings(page);
   await sheet.getByRole("link", { name: en.shell.settings.changeCrew }).click();
-  await expect(page).toHaveURL(/\/en\/worker$/);
-  await expect(page.getByRole("heading", { name: en.worker.today.entry.title })).toBeVisible();
+  await expect(page).toHaveURL(/\/en\/worker\/join$/);
+  await expect(page.getByRole("heading", { level: 1, name: en.worker.join.pageTitle })).toBeVisible();
+  // The old choice is gone from the phone: the join page did not re-pin it from the address that was left.
+  await expect(page.getByRole("button", { name: en.worker.join.demo })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("sb-profile-v1") ?? "")).not.toContain("crew-b");
 });
 
 test("Today shows a stale forecast as the protective plan, with the last known level secondary, never as live (Today)", async ({ page }) => {
@@ -333,10 +338,4 @@ test("Today draws a last known level as secondary: no heat in the spine, no line
   await expect(page.getByText(/^Work \d+ min, rest/)).toHaveCount(0);
 });
 
-test("Today passes the design gate at 390: the empty state, en, night and sun", async ({ page }) => {
-  for (const theme of ["night", "sun"] as const) {
-    const errors = await openToday(page, { theme, query: "" });
-    await expect(page.getByRole("button", { name: en.worker.today.entry.demo })).toBeVisible();
-    await gate(page, errors, { hero: false, locale: "en" }, `empty-en-${theme}`);
-  }
-});
+// The empty state of Today (no site on the phone) is now the join page's: its design gate is in worker-join.spec.ts.

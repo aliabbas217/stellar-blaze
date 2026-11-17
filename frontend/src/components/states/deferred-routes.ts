@@ -20,7 +20,6 @@ export const DEFERRED_ROUTES = [
   "/supervisor/roster",
   "/supervisor/qr",
   "/supervisor/relay",
-  "/worker/join",
   "/worker/listen",
   "/replay/climate",
   "/replay/faults",

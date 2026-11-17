@@ -8,6 +8,7 @@ import type { ChangeCrew } from "@/components/shell/SettingsSheet";
 import { WorkerDock } from "@/components/shell/WorkerDock";
 import { DemoClock } from "@/features/demo/DemoClock";
 import { useDemo } from "@/features/demo/DemoProvider";
+import { joinHref } from "@/features/join/link";
 import { useSitePin } from "@/features/profile/site-pin";
 import { getPathname } from "@/i18n/navigation";
 
@@ -23,9 +24,9 @@ import { getPathname } from "@/i18n/navigation";
  * name arrives from the page that has the crew's timeline (`useFieldCrewLabel`). Both keep the profile store and an extra
  * request out of the layout of every worker page (F2 Part 0, the route script budget).
  *
- * "Change crew" (settings sheet): the only chooser a phone has today is the first-run screen, which a pinned phone never sees, so the
- * link first lets go of the pin as the page leaves (the profile store is loaded only now, on the tap, as chooseDeviceSite does) and then
- * opens `/worker` without a query. Slice S6a replaces the destination with the join screen. Nothing else on the phone is touched.
+ * "Change crew" (settings sheet): opens the join page (`/worker/join`, redesign S6a), where the worker finds the site and the crew. The link
+ * first lets go of the pin as the page leaves (the profile store is loaded only now, on the tap, as chooseDeviceSite does), so that Today
+ * does not hold the old choice while the worker picks another. Nothing else on the phone is touched.
  */
 export function WorkerFrame({ children }: { children: ReactNode }) {
   const pin = useSitePin();
@@ -35,7 +36,7 @@ export function WorkerFrame({ children }: { children: ReactNode }) {
   const { name, demo } = site === null ? { name: pin?.siteId ?? null, demo: false } : splitDemoName(site.name, site.synthetic);
   const changeCrew = useMemo<ChangeCrew>(
     () => ({
-      href: getPathname({ href: "/worker", locale }),
+      href: getPathname({ href: joinHref(), locale }),
       onActivate: async () => {
         // The store is loaded now, so the pin can be dropped synchronously at the last moment: when this page is leaving. Dropped sooner
         // it is undone at once: Today pins whatever `?site=` the address still names, and re-pins a phone that has none. `setState` (not
