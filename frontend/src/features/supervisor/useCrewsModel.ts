@@ -107,9 +107,11 @@ export function useCrewsModel(): { readonly model: CrewsModel; readonly siteId: 
   });
 
   // First pass without plans picks the focal crew; its day plan, once fetched, adds the cycle.
+  // The focal crew is only settled once EVERY timeline is in (the ranking changes as each arrives), so its plan is asked for then and not
+  // before: each plan read draws on the shared upstream pool, and one asked for a crew that stops being the focal one is wasted.
   const ranked = useMemo(() => buildCrewModels(crewList, timelines, undefined, now, zone), [crewList, timelines, now, zone]);
   const focalId = ranked[0]?.crew.id ?? null;
-  const planQuery = useQuery({ ...crewDayPlanQueryOptions(focalId ?? ""), enabled: focalId !== null && !clockPending, staleTime: STALE_MS, retry: false });
+  const planQuery = useQuery({ ...crewDayPlanQueryOptions(focalId ?? ""), enabled: focalId !== null && !clockPending && !timelinesPending, staleTime: STALE_MS, retry: false });
   const plans = useMemo(() => (focalId === null || planQuery.data === undefined ? undefined : { [focalId]: planQuery.data }), [focalId, planQuery.data]);
   const crews = useMemo(() => buildCrewModels(crewList, timelines, plans, now, zone), [crewList, timelines, plans, now, zone]);
 

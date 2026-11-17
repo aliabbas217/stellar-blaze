@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
-import { http, HttpResponse } from "msw/http";
+import { delay, http, HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { crewTimeline, forecastToday, listCrews, REPLAY_DATE, SITE_DEMO, STALE_AGE_MS } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
@@ -55,11 +55,38 @@ describe("Crews: ready", () => {
     search = "at=09:30";
     renderCrews();
 
-    // 09:30: Amber until 10:00 (the 09:00 hour), the 45 minute Medium cycle from the plan, break at 12:30 in 3 h.
-    expect(textOf(await focal())).toBe("Crew A is Amber until 10:00 (work 45, rest 15); midday break in 3 h.");
+    // 09:30: Amber until 10:00 (the 09:00 hour), the 45 minute Medium cycle from the plan, break at 12:30 in 3 h. The plan is asked for once the
+    // focal crew is settled (every timeline in), so the cycle joins the sentence a moment after it.
+    await waitFor(() => {
+      expect(textOf(document.querySelector("h2"))).toBe("Crew A is Amber until 10:00 (work 45, rest 15); midday break in 3 h.");
+    });
     // A crew on shift does need the supervisor first.
     expect(textOf((await focal()).closest("section"))).toContain("Needs you first");
     expect(textOf(document.body)).not.toContain("Highest level, off shift now");
+  });
+
+  it("asks for ONE day plan, the final focal crew's, however the timelines arrive (each plan read draws on the shared upstream pool)", async () => {
+    search = "at=09:30";
+    const planReads: string[] = [];
+    const lateness: Record<string, number> = { "crew-a": 160, "crew-b": 120, "crew-c": 80, "crew-d": 0 };
+    server.use(
+      http.get("*/api/v1/crews/:crew_id/timeline", async ({ params }) => {
+        await delay(lateness[String(params["crew_id"])] ?? 0);
+        return undefined;
+      }),
+      http.get("*/api/v1/crews/:crew_id/day-plan", ({ params }) => {
+        planReads.push(String(params["crew_id"]));
+        return undefined;
+      }),
+    );
+    renderCrews();
+
+    await focal();
+    await waitFor(() => {
+      expect(textOf(document.querySelector("h2"))).toContain("Crew A is Amber until 10:00 (work 45, rest 15)");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(planReads, "the focal crew moves as timelines arrive; only the settled one may be read").toEqual(["crew-a"]);
   });
 
   it("ranks by the crews' levels: a red crew leads, whatever the order the API listed them in", async () => {
