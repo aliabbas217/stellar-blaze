@@ -968,8 +968,8 @@
       "loadFailed": "লোড করা যায়নি। আবার চেষ্টা করুন।"
     },
     "scoreboard": {
-      "title": "Summer 2026, replayed honestly",
-      "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded.",
+      "title": "How four ways of warning a crew would have done last summer",
+      "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded. We wrote down how we would be judged before we ran the test, and ran it once.",
       "facts": "Forecast made about 24 hours ahead · Scored against station thermometers",
       "skip": "Skip to the scores",
       "season": {
@@ -1013,23 +1013,71 @@
       },
       "verdict": {
         "heading": "What the season showed",
-        "pending": "Chosen from the pre-registered outcome table after the single scoring run.",
-        "note": "It is written the same way whether we won or lost. If our policy loses to the regulator's own zones, this sentence says so and the page does not change.",
-        "other": "Other pre-registered checks, as the scoring run wrote them",
+        "pending": "Not available until the scored run has produced its results.",
+        "note": "This sentence is built the same way whether we did well or badly, from the numbers in the scored results. The exact sentence the scoring run wrote is under For auditors.",
+        "other": "Other checks, written down before we ran the test",
         "lead2": "The same check on the forecast issued by 18:00 the evening before",
-        "plansHeading": "Plans, as the scoring run wrote them",
-        "priorNow": "Supported on 2026 (pre-registered).",
-        "priorSupported": "On the 2025 development run, the prior run, this check was supported too.",
-        "priorNotSupported": "On the 2025 development run, the prior run, this check was not supported."
+        "plansHeading": "Plan checks, written down before we ran the test",
+        "priorNow": "Met on summer 2026.",
+        "priorSupported": "On the 2025 development run, made while we were building, this check was met too.",
+        "priorNotSupported": "On the 2025 development run, made while we were building, this check was not met.",
+        "plain": {
+          "lead2Intro": "On the stricter forecast, issued by 18:00 the evening before:",
+          "primaryMet": "This was the main check and it was met.",
+          "primaryNotMet": "This was the main check and it was not met.",
+          "met": "This check was met.",
+          "notMet": "This check was not met.",
+          "unknown": "The details of this check are under For auditors.",
+          "noClaim": "We do not claim to beat the regulator's zones.",
+          "H4": {
+            "missed": {
+              "fewer": "Against the midday break alone, our protective setting missed {a} fewer danger hours (likely range {lo} to {hi} fewer).",
+              "more": "Against the midday break alone, our protective setting missed {a} more danger hours (likely range {lo} to {hi} more).",
+              "unclear": "Against the midday break alone, the difference in danger hours missed is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+            },
+            "falseAlarms": {
+              "fewer": "It raised {a} fewer false-alarm hours than the fixed 32 °C rule (likely range {lo} to {hi} fewer).",
+              "more": "It raised {a} more false-alarm hours than the fixed 32 °C rule (likely range {lo} to {hi} more).",
+              "unclear": "Against the fixed 32 °C rule, the difference in false-alarm hours is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+            }
+          },
+          "H5": {
+            "missed": {
+              "fewer": "Against the regulator's own zones on the raw forecast, our protective setting missed {a} fewer danger hours (likely range {lo} to {hi} fewer).",
+              "more": "Against the regulator's own zones on the raw forecast, our protective setting missed {a} more danger hours (likely range {lo} to {hi} more).",
+              "unclear": "Against the regulator's own zones on the raw forecast, the difference in danger hours missed is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+            },
+            "falseAlarms": {
+              "fewer": "It raised {a} fewer false-alarm hours (likely range {lo} to {hi} fewer).",
+              "more": "It raised {a} more false-alarm hours (likely range {lo} to {hi} more).",
+              "unclear": "The difference in false-alarm hours is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+            },
+            "reason": {
+              "falseAlarms": "That is more extra false alarms than we had allowed in advance.",
+              "missed": "This check also needed a clear drop in danger hours missed, and the range did not show one."
+            }
+          },
+          "H6": {
+            "fewer": "Against the midday break alone, the plan built from our corrected forecast had {a} fewer minutes worked against the rules, per worker per season (likely range {lo} to {hi} fewer).",
+            "more": "Against the midday break alone, the plan built from our corrected forecast had {a} more minutes worked against the rules, per worker per season (likely range {lo} to {hi} more).",
+            "unclear": "Against the midday break alone, the difference in minutes worked against the rules is too small to tell apart (likely range {lo} to {hi}, which includes zero).",
+            "crew": "Real weather, assumed crew of {headcount} doing heavy work."
+          },
+          "H7": {
+            "fewer": "Against the plan built from the raw forecast, the plan built from our corrected forecast treated {a} fewer minutes as safer than the station's record (likely range {lo} to {hi} fewer).",
+            "more": "Against the plan built from the raw forecast, the plan built from our corrected forecast treated {a} more minutes as safer than the station's record (likely range {lo} to {hi} more).",
+            "unclear": "Against the plan built from the raw forecast, the difference in minutes treated as safer than the station's record is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+          }
+        }
       },
       "warnings": {
         "heading": "Warnings",
         "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
-        "defs": "A danger hour is an hour the station was in the ADOSH High or Red zone. Stellar Blaze warns when its corrected forecast puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; both thresholds are shown.",
+        "defs": "A danger hour is an hour the station recorded in the High or Red zone of ADOSH, Abu Dhabi's workplace-safety authority. Stellar Blaze warns when its corrected forecast (the weather model's forecast, adjusted for known local errors) puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; the protective and the balanced setting use two different thresholds.",
         "caption": "Four ways to warn a crew, scored on the season",
         "miniCaption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
         "columns": {
-          "policy": "Policy",
+          "policy": "Way to warn",
           "missed": "Danger hours nobody was warned about",
           "falseAlarm": "False-alarm hours",
           "warned": "Share of danger hours warned",
@@ -1042,29 +1090,24 @@
         "pending": "Warnings, summer 2026: danger hours nobody was warned about, false alarms and the two shares",
         "policies": {
           "P0": {
-            "label": "Baseline: ban only",
-            "sub": "{start} to {end} by law, nothing else. It never warns on a worked hour.",
-            "code": "P0"
+            "label": "Midday break only",
+            "sub": "{start} to {end} by law, nothing else. It never warns on a worked hour."
           },
           "P1": {
             "label": "Fixed 32 °C rule",
-            "sub": "Stop when the raw forecast reaches 32 °C",
-            "code": "P1"
+            "sub": "Stop when the raw forecast reaches 32 °C"
           },
           "P2": {
-            "label": "ADOSH zones on the raw forecast",
-            "sub": "The regulator's zones, no correction",
-            "code": "P2"
+            "label": "Regulator's zones, raw forecast",
+            "sub": "ADOSH's heat zones applied to the raw weather forecast, no correction"
           },
           "P3_protect": {
-            "label": "Stellar Blaze",
-            "sub": "Corrected forecast, warns at the protective threshold",
-            "code": "P3, protective"
+            "label": "Stellar Blaze, protective setting",
+            "sub": "Our corrected forecast, warning at the protective threshold"
           },
           "P3_balanced": {
-            "label": "Stellar Blaze, balanced",
-            "sub": "Corrected forecast, warns at the balanced threshold",
-            "code": "P3, balanced"
+            "label": "Stellar Blaze, balanced setting",
+            "sub": "Our corrected forecast, warning at the balanced threshold"
           }
         },
         "lead2": {
@@ -1072,59 +1115,70 @@
           "sub": "The same ways to warn, on the forecast issued by 18:00 Gulf time the evening before.",
           "caption": "Ways to warn a crew, scored on the season with the forecast issued by 18:00 the evening before"
         },
-        "truth": "On the station's own record the season had {value} danger hours ({lo} to {hi}, 95% interval). A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}, at Abu Dhabi airport (OMAA), summer 2026; the thermal margin of {margin} W/m² is an assumption.",
+        "truth": "On the station's own record the season had {value} danger hours (likely range {lo} to {hi}). A danger hour is an hour the station recorded in the High or Red zone of ADOSH, Abu Dhabi's workplace-safety authority, during working daytime ({hours}), at Abu Dhabi airport, summer 2026. The count uses a safety margin of {margin} W/m² that we chose; it is not a measurement at a worksite.",
         "truthWhat": "Danger hours in the season, from the station record",
-        "rowSub": "{code}. {sub}",
         "tradeoff": {
-          "missed": "Danger hours missed: Stellar Blaze at the protective threshold (theta {theta}) missed {a}, which is {c0} ban only ({p0}{o0}), {c2} ADOSH zones on the raw forecast ({p2}{o2}) and {c1} the fixed 32 °C rule ({p1}{o1}).",
-          "falseAlarm": "False-alarm hours: {a}, which is {c1} the fixed 32 °C rule ({p1}{o1}) and {c2} ADOSH zones on the raw forecast ({p2}{o2}).",
-          "balanced": "At the balanced threshold (theta {theta}) Stellar Blaze and ADOSH zones on the raw forecast cannot be told apart: danger hours missed {m1} and {m2}, false-alarm hours {f1} and {f2}, with overlapping 95% intervals.",
-          "cmp": {
-            "fewer": "fewer than",
-            "more": "more than",
-            "same": "the same as"
+          "balanced": "At the balanced setting Stellar Blaze and the regulator's zones cannot be told apart: danger hours missed {m1} and {m2}, false-alarm hours {f1} and {f2}, with overlapping likely ranges.",
+          "extremes": "The fixed 32 °C rule misses the fewest danger hours ({m}) but raises the most false alarms ({f}).",
+          "extremesOverlap": {
+            "both": "Its likely ranges overlap those of our protective setting on both counts.",
+            "missed": "Its likely range for missed hours overlaps that of our protective setting.",
+            "falseAlarms": "Its likely range for false alarms overlaps that of our protective setting."
           },
-          "overlap": "; the 95% intervals overlap"
-        }
+          "regulator": "The regulator's zones on the raw forecast {fa} and {missed}.",
+          "fa": {
+            "fewer": "raise fewer false alarms than Stellar Blaze at the protective setting ({r} hours against {o}{ov})",
+            "more": "raise more false alarms than Stellar Blaze at the protective setting ({r} hours against {o}{ov})",
+            "same": "raise the same number of false alarms as Stellar Blaze at the protective setting ({r} hours{ov})"
+          },
+          "missed": {
+            "fewer": "miss fewer danger hours ({r} against {o}{ov})",
+            "more": "miss more danger hours ({r} against {o}{ov})",
+            "same": "miss the same number of danger hours ({r}{ov})"
+          },
+          "rangesOverlap": "; the likely ranges overlap"
+        },
+        "falseAlarmDef": "A false-alarm hour is an hour that a way of warning would have warned about, when the station did not record it as dangerous.",
+        "rangeGloss": "A likely range is a 95% interval: if the test were repeated many times, 95 of every 100 ranges built this way would contain the true value."
       },
       "plans": {
         "heading": "Plans",
-        "sub": "Each shift plan checked by the independent validator against what the station recorded.",
-        "defs": "Rest minutes added are a simulated cost on an assumed crew. We report rule-violation minutes and make no claim about health outcomes.",
+        "sub": "Each shift plan checked by an independent rule checker against what the station recorded.",
+        "defs": "Extra rest minutes are a simulated cost on an assumed crew. We count minutes worked against the rules and make no claim about health outcomes.",
         "caption": "Shift plans, checked on the season",
         "columns": {
           "plan": "Plan",
-          "violation": "Rule-violation minutes per worker-season",
-          "cycled": "Share of High-zone heavy work planned as cycled",
-          "missed": "Minutes worked in a milder plan zone than the truth",
-          "rest": "Rest minutes added per worker-season"
+          "violation": "Minutes a worker would have worked against the rules, per season",
+          "cycled": "Share of dangerous-hour heavy work that the plan broke into work and rest",
+          "missed": "Minutes the plan treated as safer than the station's record",
+          "rest": "Extra rest minutes per worker, per season"
         },
-        "whatViolation": "Rule-violation minutes per worker-season, {plan}",
-        "whatCycled": "Share of High-zone heavy work planned as cycled, {plan}",
-        "whatMissed": "Minutes worked in a milder plan zone than the truth, {plan}",
-        "whatRest": "Rest minutes added per worker-season, {plan}",
-        "pending": "Plans, summer 2026: rule-violation minutes, cycled share, missed protection and rest minutes",
-        "roster": "Roster: {roster}",
+        "whatViolation": "Minutes a worker would have worked against the rules, per season, {plan}",
+        "whatCycled": "Share of dangerous-hour heavy work broken into work and rest, {plan}",
+        "whatMissed": "Minutes the plan treated as safer than the station's record, {plan}",
+        "whatRest": "Extra rest minutes per worker, per season, {plan}",
+        "pending": "Plans, summer 2026: minutes against the rules, share broken into work and rest, minutes treated as safer, extra rest",
+        "roster": "Real weather, assumed crew of {headcount} doing heavy work. Work times: {roster}",
         "rows": {
           "merged": {
-            "label": "Baseline: ban only (= working every shift minute outside the midday break, on the legal roster)",
-            "sub": "The legal minimum. Working through and ban only are the same plan."
+            "label": "Midday break only (working every minute of the shift outside the break, on the legal roster)",
+            "sub": "The legal minimum. Working straight through and the midday break only are the same plan."
           },
           "rule_raw": {
             "label": "Rule plan on the raw forecast",
-            "sub": "ADOSH cycles from the raw forecast"
+            "sub": "ADOSH work-and-rest cycles from the raw forecast"
           },
           "rule_corrected": {
             "label": "Rule plan on our corrected forecast",
-            "sub": "The protective quantile of the corrected forecast"
+            "sub": "Work-and-rest cycles from our corrected forecast, protective setting"
           }
         },
-        "tradeoff": "Rule-violation minutes per worker-season fall from {from} with ban only to {to} on the corrected plan. It adds {rest} rest minutes per worker-season against ban only; the rule plan on the raw forecast adds {restRaw}. {days} scored days, simulated crew."
+        "tradeoff": "Minutes worked against the rules, per worker per season, fall from {from} with the midday break only to {to} on the plan built from our corrected forecast. That plan adds {rest} rest minutes per worker per season; the plan built from the raw forecast adds {restRaw}. {days} scored days, assumed crew."
       },
       "table": {
         "notScored": "not scored yet",
         "ours": "This is the Stellar Blaze row.",
-        "interval": "95% interval {lo} to {hi}",
+        "interval": "likely range {lo} to {hi}",
         "notComputed": "not computed",
         "baselineNoInterval": "baseline, no interval"
       },
@@ -1134,8 +1188,8 @@
       },
       "empty": {
         "title": "The scoring run has not written its file yet",
-        "reason": "Results appear after the single pre-registered run. Until then, one forecast number on this page shows exactly how a proof is read.",
-        "primary": "See how a number is proved"
+        "reason": "Results appear after the scored run. Until then, one forecast number on this page shows exactly how a number is traced.",
+        "primary": "See where a number comes from"
       },
       "error": {
         "title": "The scoreboard file could not be read",
@@ -1143,27 +1197,30 @@
         "primary": "Try again"
       },
       "limits": {
-        "station": "Abu Dhabi airport only (OMAA), one summer the models had not seen.",
+        "station": "Abu Dhabi airport only, one summer the models had not seen.",
         "crew": "The crew of {size} is an assumed schedule.",
-        "truth": "Truth is station temperature, humidity and wind plus modelled sunshine.",
+        "truth": "What counts as the truth is the station's temperature, humidity and wind, plus modelled sunshine.",
         "twl": "Thermal work limit aligned with ADOSH zones, not certified.",
         "simulated": "Simulated crew, real weather."
       },
       "loading": "Loading the season",
-      "factsHeldOut": "Held-out 2026, every choice fixed on 2024-2025 data",
+      "factsHeldOut": "Held-out 2026: every choice was fixed on 2024 and 2025 data",
       "units": {
         "missed_danger_hours": "hours over the season",
         "false_alarm_hours": "hours over the season",
         "pod": "of danger hours were warned about",
         "far": "of warnings were false alarms",
-        "violation_minutes_per_season": "minutes per worker-season",
-        "high_cycled_share": "of High-zone heavy work planned as cycled",
-        "missed_protection_ticks": "minutes in a milder plan zone than the truth",
-        "rest_minutes_added_vs_naive": "minutes per worker-season"
+        "violation_minutes_per_season": "minutes per worker, per season",
+        "high_cycled_share": "of dangerous-hour heavy work broken into work and rest",
+        "missed_protection_ticks": "minutes the plan treated as safer than the station's record",
+        "rest_minutes_added_vs_naive": "extra minutes per worker, per season"
       },
       "evaluation": {
-        "line": "Scored once on summer 2026, under a protocol locked before the run.",
-        "what": "The 2026 evaluation: held-out and pre-registered"
+        "line": "Tested on summer 2026. Every setting was chosen using 2024 and 2025 data only. The test plan was written down and locked before the scored run.",
+        "changesNone": "No changes were made to the plan after it was locked.",
+        "changesOne": "One later change to the plan is logged for auditors.",
+        "changesMany": "{amendments} later changes to the plan are logged for auditors.",
+        "what": "The 2026 test: held out, with the plan written down first"
       }
     },
     "frontier": {
@@ -1202,10 +1259,10 @@
       "unitsNote": "Each percentage is a relative reduction in hours at 30 °C WBGT or more, against the legal default or against common practice. The sleep gate is the least sleep a roster may leave a worker: {hours} h a night."
     },
     "day": {
-      "title": "One day, hour by hour, chosen by a rule before we looked",
+      "title": "One day, hour by hour: {date}",
       "lede": "The raw forecast as made about 24 hours ahead, against what the station then recorded and what we would have said.",
       "dayShown": "Day shown: {date}",
-      "dayShownPending": "Day shown until the scoring run picks the scored day: {date}, the hottest raw forecast of the recorded season.",
+      "dayShownPending": "Day shown until the scored day is available: {date}, the hottest raw forecast of the recorded season.",
       "heatHeading": "Heat by hour",
       "chart": {
         "aria": "WBGT by hour at {station} on {date}, {from} to {to}. {series} Heavy-work limit {limit} degrees. {peak}",
@@ -1222,14 +1279,14 @@
         "truth": "Station truth",
         "peak": "Raw forecast peak {value} °C at {hour}"
       },
-      "laterSeries": "Ours (5 to 95 % range) and station truth: added by the scoring run",
+      "laterSeries": "Ours (5 to 95 % range) and station truth: added once the scored day is available",
       "rule": {
         "heading": "Which day is scored",
-        "body": "The protocol fixes it by rule, on truth only: the day with the most observed High-zone working hours outside the midday break, ties to the earliest date. We show it whatever our forecast did.",
-        "pending": "Until the scoring run writes the day file, this page draws the hottest raw forecast of the recorded season and only the series that exist.",
+        "body": "The rule: the day with the most working hours in the High or Red zone (ADOSH's top two heat levels) outside the midday break, judged on the station's records only. Ties go to the earliest date. We show it whatever our forecast did.",
+        "pending": "Until the scored day is available, this page draws the hottest raw forecast of the recorded season and only the series that exist.",
         "read": "Read the day rule",
         "what": "The scored day and how it is chosen",
-        "candidates": "{count} candidate days met the conditions.",
+        "candidates": "{count} days were considered.",
         "runnerUp": "Runner-up: {date}."
       },
       "table": {
@@ -1246,16 +1303,16 @@
         "notScored": "not scored yet"
       },
       "counters": {
-        "heading": "What the station recorded, and who called it",
-        "sub": "Called means the forecast put that hour in the High or Red zone. These numbers come from the one scoring run; the page ships unchanged whatever they are.",
-        "pending": "The tally for the day the protocol picks",
-        "high": "High or Red zone working hours on the day",
-        "outside": "Of those, outside {start} to {end}",
-        "raw": "Called by ADOSH zones on the raw forecast",
-        "ours": "Called by Stellar Blaze, protective threshold",
+        "heading": "What the station recorded, and who warned about it",
+        "sub": "Warned about means the forecast, made about 24 hours ahead, put that hour in the High or Red zone. These numbers come from the one scored run; the page is the same whatever they are.",
+        "pending": "The tally for the scored day",
+        "high": "Working hours the station recorded in the High or Red zone that day",
+        "outside": "Of those, outside the midday break ({start} to {end})",
+        "raw": "Warned about by the regulator's zones, raw forecast",
+        "ours": "Warned about by Stellar Blaze, protective setting",
         "hours": "hours",
-        "balanced": "Called by Stellar Blaze, balanced threshold",
-        "p1": "Called by the fixed 32 °C rule on the raw forecast",
+        "balanced": "Warned about by Stellar Blaze, balanced setting",
+        "p1": "Warned about by the fixed 32 °C rule",
         "of": "{n} of {total}"
       },
       "error": {
@@ -1264,13 +1321,14 @@
         "primary": "Try again"
       },
       "loading": "Loading the day",
-      "titlePending": "One day, hour by hour"
+      "titlePending": "One day, hour by hour",
+      "scoredNote": "We chose this day by a fixed rule, from the station's data alone, before looking at our own results. One day is an illustration, not proof of skill."
     },
     "try": {
       "title": "Try a plan against the rules",
-      "lede": "Pick a roster or write your own. The independent validator checks it against the day's heat and the labour rules, and answers with the rules the plan breaks.",
-      "independent": "The validator is independent: it shares no code with the planners that make our plans, so a plan cannot pass because the planner and the checker agree with themselves.",
-      "day": "Checked on {date}, the replay day, for a crew of {headcount} doing heavy work.",
+      "lede": "Pick a roster or write your own. An independent rule checker tests it against the day's heat and the labour rules, and lists the rules the plan breaks.",
+      "independent": "This rule checker is independent: it shares no code with the planner that builds our plans, so a plan cannot pass just because it was built by us.",
+      "day": "Checked on {date}, the demo day (a recorded day, replayed), for a crew of {headcount} doing heavy work.",
       "dayLive": "Checked on {date}, today at the site, for a crew of {headcount} doing heavy work.",
       "templates": {
         "heading": "Start from a roster",
@@ -1321,7 +1379,7 @@
       "notReady": "The demo site is still loading. Try again in a moment.",
       "noDay": "The day to check could not be read from the site's forecast. Try again in a moment.",
       "result": {
-        "heading": "What the validator found",
+        "heading": "What the rule checker found",
         "brokenOne": "1 rule broken",
         "broken": "{count} rules broken",
         "zero": "0 rules broken",
@@ -1335,19 +1393,19 @@
       },
       "recorded": {
         "button": "Show a recorded result",
-        "noteMock": "Recorded against the demo mock on {date}, not the live validator. It is what the validator said for the common roster, not a check of your times.",
-        "note": "Recorded on {date}. It is what the validator said for the common roster, not a check of your times.",
+        "noteMock": "Recorded against the demo mock on {date}, not the live rule checker. It is what the rule checker said for the common roster, not a check of your times.",
+        "note": "Recorded on {date}. It is what the rule checker said for the common roster, not a check of your times.",
         "hide": "Hide the recorded result"
       },
       "error": {
-        "title": "The validator did not answer.",
+        "title": "The rule checker did not answer.",
         "reason": "Your times are kept. Nothing was checked, so this is not a result.",
         "retry": "Try again",
         "requestId": "Request id"
       },
       "invalid": {
         "title": "The roster could not be read.",
-        "reason": "The validator could not read these lines. Nothing was checked.",
+        "reason": "The rule checker could not read these lines. Nothing was checked.",
         "line": "Run {line}"
       },
       "loading": "Loading the checker"
@@ -1438,7 +1496,7 @@
         "rules": "Rules in force",
         "model": "Model",
         "noModel": "none loaded",
-        "note": "The log is append-only and tamper-evident: an edited row is detected. It never records whose data was asked for."
+        "note": "The log is tamper-evident: each entry includes the one before it, so a change shows. Nothing is ever deleted from it, and it never records whose data was asked for."
       },
       "phone": {
         "who": "Worker's phone",
@@ -1457,7 +1515,7 @@
         "times": "Times are Dubai time. Each step shows when it happened.",
         "privacy": "A worker's heat level is worked out on the worker's phone and is not stored on the server."
       },
-      "resetNote": "Reset starts a new demo epoch for this synthetic site. Nothing is deleted: the audit log stays append-only.",
+      "resetNote": "Reset starts the demo site fresh. Nothing is deleted: the log keeps every earlier entry.",
       "back": "Back to the scoreboard",
       "proves": {
         "title": "What proves it in the build",

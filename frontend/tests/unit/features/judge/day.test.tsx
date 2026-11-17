@@ -63,7 +63,7 @@ describe("DayView: the series that exist", () => {
     expect(container.querySelector("[data-series=ours]")).toBeNull();
     expect(container.querySelector("[data-series=truth]")).toBeNull();
     expect(container.querySelector("[data-day-shown=pending]")).not.toBeNull();
-    expect(screen.getByText("Ours (5 to 95 % range) and station truth: added by the scoring run")).toBeInTheDocument();
+    expect(screen.getByText("Ours (5 to 95 % range) and station truth: added once the scored day is available")).toBeInTheDocument();
     // legend: no empty entries for series that do not exist
     expect(container.querySelectorAll("[data-legend] li")).toHaveLength(1);
     // five ### counters under ONE banner, no number and no proof chip among them
@@ -105,8 +105,8 @@ describe("DayView: counters have a proof or are not shown", () => {
     const whole = (v: number): string => (Number.isInteger(v) ? String(v) : v.toFixed(1));
     expect(text).toContain(whole(syntheticDay.high_hours));
     expect(text).toContain(`${whole(syntheticDay.p3_hits)} of ${whole(syntheticDay.high_hours)}`);
-    expect(text).toContain("Called by ADOSH zones on the raw forecast");
-    expect(text).toContain("Called by the fixed 32 °C rule on the raw forecast");
+    expect(text).toContain("Warned about by the regulator's zones, raw forecast");
+    expect(text).toContain("Warned about by the fixed 32 °C rule");
     expect(text).not.toMatch(/[0-9]\.0(?![0-9])/);
   });
 

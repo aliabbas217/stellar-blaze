@@ -16,6 +16,7 @@ import { DATA_MANIFEST } from "@/features/judge/manifest.generated";
 import { parseRosterFrontier } from "@/features/judge/roster-frontier";
 import { planTableText, policyTableText } from "@/features/judge/table-text";
 import { renderWithIntl } from "../../../utils/intl";
+import { JARGON } from "../../../utils/jargon";
 import { SAMPLE_STORY } from "../../../utils/story";
 import messages from "../../../../messages/en.json";
 
@@ -292,26 +293,6 @@ describe.runIf(ledger !== null)("buildStory against the submission ledger (numbe
 });
 
 // ---- 2. no jargon, anywhere a story can reach the reader ----
-
-/** What must never reach the main layer (docs/design/redesign-2026-11-17/01b-content-audit.md section 5, plus the leaks the owner saw). */
-const JARGON: readonly [name: string, pattern: RegExp][] = [
-  ["file extension", /\.(json|md|ts|tsx|py|mjs|csv)\b/i],
-  ["path", /\b(src|docs|eval|static|data|backend|tests)\//i],
-  ["SHA", /\bsha(-?\d+)?\b/i],
-  ["fingerprint", /[0-9a-f]{40,64}/i],
-  ["protocol", /protocol/i],
-  ["theta", /\btheta\b/i],
-  ["policy code", /\bP[0-3]\b/],
-  ["hypothesis id", /\bH[0-9]\b/],
-  ["lead N", /\blead[ -]?[0-9]\b/i],
-  ["epoch", /\bepoch\b/i],
-  ["fixture", /fixture/i],
-  ["ADR", /\bADR\b/],
-  ["export key", /[a-z]+_[a-z0-9]+/],
-  ["placeholder", /Not recorded|\bnull\b|\bundefined\b|\bNaN\b|\{|\}/],
-  ["policy=config=", /policy=|config=/],
-  ["function name", /\bget_[a-z_]+|\bbuild_[a-z_]+/],
-];
 
 describe("the jargon detectors see what they claim to (an empty result means something)", () => {
   it.each([

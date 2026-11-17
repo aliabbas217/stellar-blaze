@@ -1,6 +1,7 @@
 import { useTranslations } from "next-intl";
 import { DayChart } from "@/components/charts/DayChart";
 import { Counter } from "@/components/provenance/Counter";
+import { longDate } from "@/components/provenance/proof-story";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -55,8 +56,9 @@ export function DayView({ data, failed = false, hourly }: DayViewProps) {
   return (
     <main id="main-content" className="mx-auto flex w-full max-w-(--content-max) flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
       <header className="flex flex-col gap-3">
-        <h1 className="max-w-(--measure) font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{model.scored ? t("title") : t("titlePending")}</h1>
+        <h1 className="max-w-(--measure) font-display text-3xl leading-solid font-normal tracking-display sm:text-4xl">{model.scored ? t("title", { date: longDate(model.date) }) : t("titlePending")}</h1>
         <p className="max-w-(--measure) text-lg text-ink-2">{t("lede")}</p>
+        {model.scored ? <p className="max-w-(--measure) text-base text-ink-2" data-day-rule-note="">{t("scoredNote")}</p> : null}
         <EvalSourceStamp source={source} />
       </header>
 

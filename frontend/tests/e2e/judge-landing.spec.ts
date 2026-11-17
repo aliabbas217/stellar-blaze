@@ -75,7 +75,7 @@ test("landing to scoreboard in one click, in under 10 s", async ({ page }) => {
   const started = Date.now();
   await page.getByRole("link", { name: "See the scoreboard" }).first().click();
   await expect(page).toHaveURL(/\/en\/replay$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Summer 2026, replayed honestly");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("How four ways of warning a crew would have done last summer");
   expect(Date.now() - started).toBeLessThan(10_000);
 });
 
@@ -245,7 +245,7 @@ test("landing chapters: counts with proofs, the calendar and the scoreboard teas
   // chapter 2: the mini scoreboard carries the baseline label and both unfavourable and favourable verdicts
   const table = page.locator("#scoreboard table[data-scoreboard]");
   await expect(table.locator("tbody tr")).toHaveCount(5);
-  await expect(table).toContainText("Baseline: ban only");
+  await expect(table).toContainText("Midday break only");
   await expect(page.locator('[data-verdict-id="H5"]')).toContainText("not supported");
   const report = await gateReport(page, { consoleErrors: errors, hero: false });
   expect(report.failures).toEqual([]);

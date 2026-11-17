@@ -208,7 +208,7 @@ describe("the landing page", () => {
     const { container } = view();
     const table = container.querySelector("#scoreboard table[data-scoreboard]") as HTMLElement;
     for (const row of ["P0", "P1", "P2", "P3_protect", "P3_balanced"]) expect(table.querySelector(`[data-row="${row}"]`), row).not.toBeNull();
-    expect(table).toHaveTextContent("Baseline: ban only");
+    expect(table).toHaveTextContent("Midday break only");
     expect(table.querySelector('[data-row="P3_protect"] th')).toHaveTextContent("Stellar Blaze");
     const missed = policy.leads.find((lead) => lead.lead_days === 1)?.rows.find((row) => row.policy === "P1")?.missed_danger_hours.value;
     expect(table.querySelector('[data-row="P1"]')).toHaveTextContent((missed ?? NaN).toFixed(1));
