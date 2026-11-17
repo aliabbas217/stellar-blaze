@@ -111,9 +111,9 @@ describe("Counter", () => {
 });
 
 describe("Verdict", () => {
-  it("says the outcome is chosen after the scoring run when there is no sentence", () => {
+  it("says the outcome is not available until the scored run when there is no sentence", () => {
     renderWithIntl(<Verdict sentence={null} proof={null} />);
-    expect(screen.getByText("Chosen from the pre-registered outcome table after the single scoring run.")).toBeInTheDocument();
+    expect(screen.getByText("Not available until the scored run has produced its results.")).toBeInTheDocument();
   });
 
   it("shows the sentence exactly as written, with its proof", () => {

@@ -13,12 +13,13 @@ import { makeFormat, pendingPlanRows, pendingPolicyRows, storySeason, toPlanRows
 import { EvalSourceStamp } from "./EvalSourceStamp";
 import { FrontierSection } from "./FrontierSection";
 import { FORECAST_CLAIMS } from "./claims";
-import { VerdictList } from "./VerdictList";
+import { VerdictList, type VerdictItem } from "./VerdictList";
 import type { EvalData } from "./data";
 import type { HourlyData } from "./hourly";
 import { buildSeasonView } from "./season-view";
 import { policyTradeoff } from "./policy-tradeoff";
 import { planTableText, policyTableText } from "./table-text";
+import { plainPlanVerdicts, plainPolicyVerdicts, type PlainVerdict } from "./verdict-plain";
 import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /**
@@ -74,8 +75,20 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
   const planRows: ScoreRow[] =
     plans !== null && files?.plans != null ? toPlanRows(plans, { file: files.plans, format, text: planText }) : pendingPlanRows(planText);
 
-  // The outcome sentence is the file's own (`HypothesisVerdict.text` of the primary hypothesis); never composed here.
+  // The verdict sentences are plain, composed by fixed templates from the structured fields of the export (verdict-plain.ts); the sentence the
+  // runner wrote stays exactly as written in the proof's auditor layer ("Exactly as the scoring run wrote it").
+  // The keys are built by the templates and looked up dynamically, so the typed key check cannot see them: the unit tests render every
+  // verdict against the English catalogue with a throwing `onError`.
+  const say = t as unknown as (key: string, values?: Readonly<Record<string, string>>) => string;
+  const item = (verdict: PlainVerdict): VerdictItem => ({
+    id: verdict.id,
+    text: verdict.lines.map((l) => say(`verdict.plain.${l.key}`, l.values)).join(" "),
+    result: verdict.outcome,
+  });
+  const plainPolicy = policy === null ? [] : plainPolicyVerdicts(policy, format).map(item);
+  const plainPlans = plans === null ? [] : plainPlanVerdicts(plans, format).map(item);
   const primary = policy?.verdicts.find((verdict) => verdict.primary) ?? null;
+  const primaryPlain = plainPolicy.find((verdict) => verdict.id === primary?.id) ?? null;
   const verdictProof =
     primary !== null && policy !== null && files?.policy != null
       ? proofFromProvenance(policy.provenance, "", t("verdict.heading"), files.policy, {
@@ -98,9 +111,9 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
           audit: { verdicts: plans.verdicts.map((verdict) => verdict.text) },
         })
       : null;
-  const lead1Verdicts = (policy?.verdicts ?? []).filter((verdict) => !verdict.primary && verdict.id !== "H4-lead2");
-  const lead2Verdicts = (policy?.verdicts ?? []).filter((verdict) => verdict.id === "H4-lead2");
-  const planVerdicts = plans?.verdicts ?? [];
+  const lead1Verdicts = plainPolicy.filter((verdict) => verdict.id !== primary?.id && verdict.id !== "H4-lead2");
+  const lead2Verdicts = plainPolicy.filter((verdict) => verdict.id === "H4-lead2");
+  const planVerdicts = plainPlans;
   // The prior run: H4 on the 2025 development run, from the evaluation record (written by script). Never "robust", never "consistently".
   const prior = data?.record?.prior_run.h4_outcome ?? null;
   const priorCaption =
@@ -126,6 +139,8 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
         })
       : null;
 
+  // How many later changes the plan's record lists: said only when the record is there, never assumed to be none.
+  const amendments = data?.record?.amendments.length ?? null;
   // The held-out run's own label and lock, through the proof chip (the drawer shows the lock hash and the protocol commit).
   const evaluationProof =
     data?.source === "2026" && data.record !== null && policy !== null && files?.policy != null
@@ -187,7 +202,9 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
         <EvalSourceStamp source={source} />
         {evaluationProof === null ? null : (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-2" data-evaluation="">
-            <span>{t("evaluation.line")}</span>
+            <span>
+              {t("evaluation.line")}{amendments === null ? "" : ` ${amendments === 0 ? t("evaluation.changesNone") : amendments === 1 ? t("evaluation.changesOne") : t("evaluation.changesMany", { amendments: format.whole(amendments) })}`}
+            </span>
             <ProofChip proof={evaluationProof} />
           </p>
         )}
@@ -202,7 +219,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
         <EmptyState title={t("error.title")} reason={t("error.reason")} primary={{ label: t("error.primary"), href: "/replay" }} />
       ) : (
         <>
-          <Verdict sentence={primary?.text ?? null} proof={verdictProof} stamp={<EvalSourceStamp source={source} />} caption={priorCaption} />
+          <Verdict sentence={primaryPlain?.text ?? null} outcome={primaryPlain?.result ?? null} proof={verdictProof} stamp={<EvalSourceStamp source={source} />} caption={priorCaption} />
 
           {noScoredFile ? (
             <EmptyState
@@ -224,11 +241,6 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
                 {truthProof === null ? null : <ProofChip proof={truthProof} />}
               </p>
             )}
-            {warningsTradeoff === null ? null : (
-              <p className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="">
-                {warningsTradeoff}
-              </p>
-            )}
             {policy === null ? <PendingBanner what={t("warnings.pending")} /> : null}
             <ScoreboardTable
               caption={t("warnings.caption")}
@@ -237,19 +249,26 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
               rows={policyRows}
               pending={policy === null}
             />
+            {warningsTradeoff === null ? null : (
+              <p className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="">
+                {warningsTradeoff}
+              </p>
+            )}
             <VerdictList heading={t("verdict.other")} items={lead1Verdicts} proof={policyProof} what={t("verdict.other")} />
-            <p className="max-w-(--measure) text-sm text-ink-3">{t("warnings.defs")}</p>
+            <p className="max-w-(--measure) text-sm text-ink-3">
+              {t("warnings.falseAlarmDef")} {t("warnings.defs")} {t("warnings.rangeGloss")}
+            </p>
 
             {lead2Rows.length === 0 ? null : (
               <div className="flex flex-col gap-4 border-t border-hair pt-6" data-lead="2">
                 <h3 className="text-lg font-semibold text-ink">{t("warnings.lead2.heading")}</h3>
                 <p className="max-w-(--measure) text-base text-ink-2">{t("warnings.lead2.sub")}</p>
+                <ScoreboardTable caption={t("warnings.lead2.caption")} rowHeading={t("warnings.columns.policy")} columns={policyColumns} rows={lead2Rows} />
                 {lead2Tradeoff === null ? null : (
                   <p className="max-w-(--measure) text-base text-ink" data-warnings-tradeoff="2">
                     {lead2Tradeoff}
                   </p>
                 )}
-                <ScoreboardTable caption={t("warnings.lead2.caption")} rowHeading={t("warnings.columns.policy")} columns={policyColumns} rows={lead2Rows} />
                 <VerdictList heading={t("verdict.lead2")} items={lead2Verdicts} proof={policyProof} what={t("verdict.lead2")} />
               </div>
             )}
@@ -272,7 +291,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
                 {plans === null ? <PendingBanner what={t("plans.pending")} /> : null}
                 {plans === null ? null : (
                   <p className="max-w-(--measure) text-sm text-ink-3">
-                    {plans.crew_label} · <bdi>{t("plans.roster", { roster: plans.roster })}</bdi>
+                    <bdi>{t("plans.roster", { headcount: format.whole(plans.headcount), roster: plans.roster.replace(/^L\d+:\s*/, "") })}</bdi>
                   </p>
                 )}
                 {tradeoff === null ? null : (

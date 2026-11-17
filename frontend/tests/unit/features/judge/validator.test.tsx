@@ -315,7 +315,7 @@ describe("TryGate: the lazy island", () => {
     await waitFor(() => {
       expect(container.querySelector("[data-try]")?.getAttribute("data-try")).toBe("error");
     });
-    expect(screen.getByText("The validator did not answer.")).toBeInTheDocument();
+    expect(screen.getByText("The rule checker did not answer.")).toBeInTheDocument();
     expect(screen.getByText("req-e02b61d9")).toBeInTheDocument();
     // the times the visitor chose are still there
     expect([...container.querySelectorAll<HTMLInputElement>("[data-run] input")].map((input) => input.value)).toEqual(["06:00", "11:00", "15:00", "18:00", "", ""]);
@@ -400,7 +400,7 @@ describe("TryGate: the lazy island", () => {
     // the page draws the API's day: its label, today (live mode), the break not in force before 15 June, and no recorded heat for another day
     expect(container.textContent).toContain("Checked on Sun 14 Jun, today at the site");
     expect(container.querySelector("[data-slot=in-force]")).toBeNull();
-    expect(container.textContent).not.toContain("the replay day");
+    expect(container.textContent).not.toContain("the demo day");
   });
 
   it("when the day the API reports is the day the server drew, nothing is re-drawn and the replay sentence stays", async () => {
@@ -409,7 +409,7 @@ describe("TryGate: the lazy island", () => {
     await waitFor(() => {
       expect(container.querySelector("[data-try]")?.getAttribute("data-try")).toBe("answer");
     });
-    expect(container.textContent).toContain("Checked on Thu 3 Sep, the replay day");
+    expect(container.textContent).toContain("Checked on Thu 3 Sep, the demo day (a recorded day, replayed)");
     expect(container.querySelector("[data-slot=in-force]")).not.toBeNull();
   });
 
@@ -522,6 +522,6 @@ describe("TryGate: the lazy island", () => {
     const text = container.querySelector("main")?.textContent ?? "";
     expect(text).not.toMatch(/B0_common|—|–|ADR \d|HANDOFF|\bB[123]\b|compliant|illness prevented/);
     expect(text).toContain("independent");
-    expect(text).toContain("shares no code with the planners");
+    expect(text).toContain("shares no code with the planner that builds our plans");
   });
 });

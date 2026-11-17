@@ -11,11 +11,12 @@ import { DATA_MANIFEST } from "@/features/judge/manifest.generated";
 import { ScoreboardView } from "@/features/judge/ScoreboardView";
 import { AuditRows } from "@/components/provenance/ProofRows";
 import { planTableText, policyTableText } from "@/features/judge/table-text";
+import { JARGON } from "../../../utils/jargon";
 import { renderWithIntl } from "../../../utils/intl";
 
 /*
  * The REAL held-out 2026 files (data/eval/2026, copied by scripts/sync-eval-data.mjs from the B3 run) through the real screens.
- * What is pinned: the verdict sentences are the files' own, the truth stays mixed on screen (nothing a verdict does not say),
+ * What is pinned: the verdicts are plain sentences composed from the files' fields (verdict-plain.test.tsx pins each number), the truth stays mixed on screen (nothing a verdict does not say),
  * the plan cut always comes with its rest cost, a metric with no denominator is "not computed" and never a zero, the label and
  * the lock reach the proof, and no screen carries a phrase the architect's claim rules forbid.
  */
@@ -78,18 +79,25 @@ describe("ScoreboardView on the real 2026 data", () => {
   const view = () =>
     renderWithIntl(<ScoreboardView data={data} hourly={hourly} frontierSource={frontierSource} />);
 
-  it("test_verdict_text_is_rendered_verbatim_from_the_file: every sentence the runner wrote, none composed, H5 not hidden", () => {
+  it("test_verdict_is_plain_and_the_runners_sentence_is_not_on_the_page: every check has a plain sentence, the file's flag is the data attribute, H5 not hidden", () => {
     const { container } = view();
     const text = container.textContent;
     for (const verdict of [...policy.verdicts, ...plans.verdicts]) {
-      expect(text, verdict.id).toContain(verdict.text);
+      // the main layer never prints the runner's sentence (it is in the proof's auditor layer); every verdict has its plain sentence, with the file's own flag
+      expect(text, verdict.id).not.toContain(verdict.text);
+      const li = container.querySelector(`[data-verdict-id="${verdict.id}"]`) ?? container.querySelector("[data-verdict=written]");
+      expect(li?.getAttribute("data-verdict-outcome"), verdict.id).toBe(verdict.outcome === "supported" ? "met" : "notMet");
     }
-    // the file says H5 is not supported: that sentence is on the page
+    // the file says H5 is not supported: the page says so in plain words, and never claims to beat the regulator's zones
     const h5 = policy.verdicts.find((verdict) => verdict.id === "H5");
     expect(h5?.outcome).toBe("negative");
-    expect(text).toContain("H5 not supported at lead 1 (secondary)");
-    // the lead-2 stamp is carried only under the lead-2 table, where the file's own sentence allows it
-    expect(container.querySelector("[data-lead='2']")?.textContent).toContain("issued by 18:00 GST the evening before");
+    const h5Text = container.querySelector('[data-verdict-id="H5"]')?.textContent ?? "";
+    expect(h5Text).toContain("This check was not met.");
+    expect(h5Text).toContain("We do not claim to beat the regulator's zones.");
+    expect(h5Text).not.toContain("was met");
+    // the stricter forecast's check stays under the lead-2 table
+    expect(container.querySelector("[data-lead='2']")?.textContent).toContain("issued by 18:00 the evening before");
+    expect(container.querySelector("[data-lead='2'] [data-verdict-id='H4-lead2']")?.textContent).toContain("On the stricter forecast");
   });
 
   it("shows all four policies and P3 at both thetas, at lead 1 and at lead 2, each number with an interval", () => {
@@ -102,7 +110,7 @@ describe("ScoreboardView on the real 2026 data", () => {
     // POD with its interval and no target claim: 0.80..0.82 of danger hours at lead 1
     const lead1 = policy.leads.find((lead) => lead.lead_days === 1)?.rows.find((row) => row.policy === "P3_protect");
     expect(lead1?.pod.value).toBeCloseTo(0.8, 1);
-    expect(p3).toContain("95% interval");
+    expect(p3).toContain("likely range");
   });
 
   it("test_not_computed_rows_never_show_zero: the false-alarm share of the policy that never warns is 'not computed'", () => {
@@ -137,25 +145,35 @@ describe("ScoreboardView on the real 2026 data", () => {
     expect(sentence).toContain("31,680");
     expect(sentence).toContain("13,560");
     expect(sentence).toContain("138 scored days");
-    expect(sentence).toContain("simulated crew");
+    expect(sentence).toContain("assumed crew");
     // the table keeps the rest column next to the violation column
-    expect(container.querySelector("#plans")?.textContent).toContain("Rest minutes added per worker-season");
+    expect(container.querySelector("#plans")?.textContent).toContain("Extra rest minutes per worker, per season");
   });
 
-  it("labels the evaluation held-out and pre-registered, ban only as a baseline, and keeps the site and crew honesty lines", () => {
+  it("labels the evaluation held-out and written down first, the midday break as a baseline, and keeps the site and crew honesty lines", () => {
     const { container } = view();
     const text = container.textContent;
-    expect(text).toContain("Held-out 2026, every choice fixed on 2024-2025 data");
-    expect(container.querySelector("[data-evaluation]")?.textContent).toContain("under a protocol locked before the run");
-    expect(text).toContain("Baseline: ban only");
-    expect(text).toContain("Abu Dhabi airport only (OMAA), one summer the models had not seen.");
+    expect(text).toContain("Held-out 2026: every choice was fixed on 2024 and 2025 data");
+    const evaluation = container.querySelector("[data-evaluation]")?.textContent ?? "";
+    expect(evaluation).toContain("The test plan was written down and locked before the scored run.");
+    // the number of later changes is the evaluation record's own count, never typed
+    expect(evaluation).toContain(`${String(record.amendments.length)} later changes to the plan are logged for auditors.`);
+    expect(text).toContain("Midday break only");
+    expect(text).toContain("Abu Dhabi airport only, one summer the models had not seen.");
     expect(text).toContain("Simulated crew, real weather.");
     expect(text).not.toMatch(/DEV 2025|###/);
     expect(container.querySelector("[data-scoreboard=pending]")).toBeNull();
     // the H4 result is not a stable one: the page says so by naming the prior run, never "robust"
     expect(container.querySelector("[data-verdict-caption]")?.textContent).toBe(
-      "Supported on 2026 (pre-registered). On the 2025 development run, the prior run, this check was not supported.",
+      "Met on summer 2026. On the 2025 development run, made while we were building, this check was not met.",
     );
+  });
+
+  it("carries no jargon in the rendered page: no code, path, fingerprint, protocol, theta, hypothesis id, lead number, epoch or export key", () => {
+    const { container } = view();
+    // links (the proof-sheet hrefs are attributes, not text) are not part of the text; the text is what a reader reads
+    const text = container.textContent;
+    for (const [name, pattern] of JARGON) expect(pattern.test(text), `${name}: ${pattern.exec(text)?.[0] ?? ""}`).toBe(false);
   });
 
   it("prints no export key and no forbidden claim", () => {
@@ -187,10 +205,17 @@ describe("ScoreboardView on the real 2026 data", () => {
 });
 
 describe("DayView on the real 2026 day", () => {
+  it("carries no jargon in the rendered page", () => {
+    const { container } = renderWithIntl(<DayView data={data} hourly={hourly} />);
+    const text = container.textContent;
+    for (const [name, pattern] of JARGON) expect(pattern.test(text), `${name}: ${pattern.exec(text)?.[0] ?? ""}`).toBe(false);
+  });
+
   it("draws the day the file says, with six counters (both thetas) each with a proof, and no pending copy", () => {
     const { container } = renderWithIntl(<DayView data={data} hourly={hourly} />);
     expect(container.querySelector("[data-day-shown=scored]")?.textContent).toContain("Sun 14 Jun");
-    expect(container.querySelector("h1")?.textContent).toBe("One day, hour by hour, chosen by a rule before we looked");
+    expect(container.querySelector("h1")?.textContent).toBe("One day, hour by hour: 14 June 2026");
+    expect(container.querySelector("[data-day-rule-note]")?.textContent).toContain("before looking at our own results");
     const ids = [...container.querySelectorAll("[data-counter-id]")].map((el) => el.getAttribute("data-counter-id"));
     expect(ids).toEqual(["high", "outside", "p1", "raw", "ours", "balanced"]);
     for (const el of container.querySelectorAll("[data-counter-id]")) expect(el.querySelector("[data-proof-id]")).not.toBeNull();
@@ -201,7 +226,7 @@ describe("DayView on the real 2026 day", () => {
     expect(counter("raw")).toContain("5 of 7");
     expect(counter("ours")).toContain("6 of 7");
     expect(counter("balanced")).toContain("5 of 7");
-    expect(counter("raw")).toContain("ADOSH zones");
+    expect(counter("raw")).toContain("Warned about by the regulator's zones");
     expect(hitsBy(day, "P1")).toBe(7);
     const text = container.textContent;
     expect(text).not.toMatch(/added by the scoring run|###|DEV 2025/);
@@ -218,7 +243,7 @@ describe("DayView on the real 2026 day", () => {
   it("the pending state keeps the neutral heading: the rule claim belongs to the scored day (Part G3 I2)", () => {
     const { container } = renderWithIntl(<DayView data={{ ...data, day: null, files: { ...data.files, day: null } }} hourly={hourly} />);
     expect(container.querySelector("h1")?.textContent).toBe("One day, hour by hour");
-    expect(container.textContent).not.toContain("chosen by a rule before we looked");
+    expect(container.textContent).not.toContain("before looking at our own results");
   });
 });
 
