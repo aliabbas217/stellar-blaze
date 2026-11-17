@@ -272,7 +272,9 @@ test_find_bicep_fails_when_there_is_none() {
     printf 'skip %s (bicep found on the restricted PATH)\n' "${FUNCNAME[0]}"
     return 0
   fi
-  PATH="$restricted" HOME="$work/no-home" lib_run "find_bicep"
+  # BICEP_BIN="": find_bicep honours $BICEP_BIN first, and a caller that exports it (the CI job does, for the pinned copy) would
+  # make "there is none" false; an empty value counts as unset there (the same reason test_bicep_build_falls_back_to_az uses env -u)
+  BICEP_BIN="" PATH="$restricted" HOME="$work/no-home" lib_run "find_bicep"
   assert_rc 1
   [ -z "$out" ] || fail "find_bicep printed something although there is no bicep"
 }
