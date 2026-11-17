@@ -11,3 +11,6 @@ export const WORKER_SHEET_NAMESPACES = ["_meta.review_status", "common", "shell"
 
 /** The supervisor crews and plan screens. */
 export const SUPERVISOR_NAMESPACES = ["_meta.review_status", "common", "shell", "supervisor", "states", "levels"] as const;
+
+/** The safety view (HSE): the shell, its own copy, the state components (the empty state reads `levels`) and the demo controls' copy (`shell.demo`). */
+export const HSE_NAMESPACES = ["_meta.review_status", "common", "shell", "hse", "states", "levels"] as const;

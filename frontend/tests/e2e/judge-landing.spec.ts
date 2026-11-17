@@ -77,7 +77,8 @@ test("landing first focusable element is the skip link, and it goes to the score
 test("landing to scoreboard in one click, in under 10 s", async ({ page }) => {
   await open(page);
   const started = Date.now();
-  await page.getByRole("link", { name: /^I am reviewing this/ }).click();
+  // The reviewing tile opens the 3-minute tour (S7); the scoreboard is one click away in the header menu.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Scoreboard" }).click();
   await expect(page).toHaveURL(/\/en\/replay$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("How four ways of warning a crew would have done last summer");
   expect(Date.now() - started).toBeLessThan(10_000);
@@ -111,14 +112,15 @@ for (const [name, viewport] of [
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Plan tomorrow's heat tonight.");
     const door = page.getByRole("navigation", { name: "Who is this for?" }).getByRole("link");
     await expect(door).toHaveText([/^I work on a site/, /^I run a crew/, /^I look after safety/, /^I am reviewing this/]);
-    for (const href of await door.evaluateAll((els) => els.map((el) => el.getAttribute("href")))) expect(href).toMatch(/\/en\/(worker|supervisor|hse|replay|tour)(\/enter)?$/);
+    expect(await door.evaluateAll((els) => els.map((el) => el.getAttribute("href")))).toEqual(["/en/worker", "/en/supervisor/enter", "/en/hse/enter", "/en/tour"]);
     // the first tile is in the first fold on both screens, and every tile is at least 44 px tall
     const first = await door.first().boundingBox();
     expect((first?.y ?? 0) + (first?.height ?? 0), "the first door tile is inside the first fold").toBeLessThanOrEqual(viewport.height);
     for (const height of await door.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))) expect(height).toBeGreaterThanOrEqual(44);
     // the hero's copy and the door carry no digit: the first number on the page is not a statistic
     const copy = await page.locator("[data-contrast-name=kicker], #landing-title, [data-contrast-name=lede], [data-role-door]").allInnerTexts();
-    expect(copy.join(" ")).not.toMatch(/\d/);
+    // "3-minute" (the tour tile) is a length of time, not a statistic.
+    expect(copy.join(" ").replace("A 3-minute tour", "")).not.toMatch(/\d/);
     await expect(page.locator("[data-hook], [data-field-readout]")).toHaveCount(0);
     await shot(page, "hero", viewport);
     await shotAs(page, `full-${name}-night.png`, true);

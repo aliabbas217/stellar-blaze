@@ -89,7 +89,8 @@ describe("the landing page: the hero", () => {
   it("no statistic before a person: the copy and the door of the hero carry no digit, and the old hook and readout are gone", () => {
     const { container } = view();
     const copy = [...container.querySelectorAll("[data-contrast-name=kicker], #landing-title, [data-contrast-name=lede], [data-role-door]")].map((el) => el.textContent).join(" ");
-    expect(copy).not.toMatch(/\d/);
+    // "3-minute" (the tour tile) is a length of time, not a statistic: it is the one digit the hero may carry.
+    expect(copy.replace("A 3-minute tour", "")).not.toMatch(/\d/);
     expect(container.querySelector("[data-hook]")).toBeNull();
     expect(container.querySelector("[data-field-readout]")).toBeNull();
     expect(container.querySelector("[data-hours-bridge]")).toBeNull();
@@ -101,12 +102,12 @@ describe("the landing page: the hero", () => {
     const tiles = [...door.querySelectorAll<HTMLAnchorElement>("a")];
     expect(tiles.map((a) => a.getAttribute("data-role"))).toEqual(["worker", "crew", "safety", "review"]);
     expect(tiles.map((a) => a.getAttribute("href"))).toEqual([ROLE_DOOR_DESTINATIONS.worker, ROLE_DOOR_DESTINATIONS.crew, ROLE_DOOR_DESTINATIONS.safety, ROLE_DOOR_DESTINATIONS.review]);
-    expect(Object.values(ROLE_DOOR_DESTINATIONS)).toEqual(["/worker", "/supervisor", "/hse", "/replay"]);
+    expect(Object.values(ROLE_DOOR_DESTINATIONS)).toEqual(["/worker", "/supervisor/enter", "/hse/enter", "/tour"]);
     expect(tiles.map((a) => a.querySelector("span:nth-of-type(2) > span:first-child")?.textContent)).toEqual(["I work on a site", "I run a crew", "I look after safety", "I am reviewing this"]);
     expect(tiles[0]).toHaveTextContent("See today's heat and when to rest. No account.");
     expect(tiles[1]).toHaveTextContent("See tonight's plan for your crews. Stop work in one tap.");
     expect(tiles[2]).toHaveTextContent("See which crews planned, signed and stopped.");
-    expect(tiles[3]).toHaveTextContent("See how it was tested, then try anything.");
+    expect(tiles[3]).toHaveTextContent("A 3-minute tour, then try anything.");
     for (const a of tiles) expect(a.className).toMatch(/min-h-\(--target-field\)/); // 52 px, never below the 44 px target
     expect(door.closest("[data-landing-hero]")).not.toBeNull();
     expect(screen.getByRole("navigation", { name: "Who is this for?" })).toBe(door);
@@ -321,13 +322,12 @@ describe("the landing page: what it says", () => {
     const { container } = view();
     const hrefs = [...container.querySelectorAll("a[href]")].map((a) => a.getAttribute("href") ?? "");
     expect(hrefs.length).toBeGreaterThan(14);
-    const known = new Set(["/", "/replay", "/replay/day", "/replay/try", "/replay/governance", "/supervisor", "/worker", "/hse", "#main-content"]);
+    const known = new Set(["/", "/replay", "/replay/day", "/replay/try", "/replay/governance", "/supervisor", "/worker", "/supervisor/enter", "/hse/enter", "/tour", "#main-content"]);
     for (const href of hrefs) {
       if (href.startsWith("/replay/proof/")) continue;
       expect(known.has(href), href).toBe(true);
-      // `/hse` is on the deferred list but is the F1 placeholder page that exists today: the role door names it on purpose (the plan, S2) until S7 rewrites it
-      // and takes it off the list. Every other target must be a built view.
-      if (href !== ROLE_DOOR_DESTINATIONS.safety) expect(isDeferredRoute(href), href).toBe(false);
+      // Every target is a built view: the role entries and the tour are real pages now, and `/hse` has left the deferred list (S7).
+      expect(isDeferredRoute(href), href).toBe(false);
     }
   });
 

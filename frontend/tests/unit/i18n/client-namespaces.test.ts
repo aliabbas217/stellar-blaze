@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { SUPERVISOR_NAMESPACES, WORKER_APP_NAMESPACES, WORKER_SHEET_NAMESPACES } from "@/i18n/client-namespaces";
+import { HSE_NAMESPACES, SUPERVISOR_NAMESPACES, WORKER_APP_NAMESPACES, WORKER_SHEET_NAMESPACES } from "@/i18n/client-namespaces";
 import { pickMessages } from "@/i18n/pick-messages";
 import { routing } from "@/i18n/routing";
 
@@ -77,6 +77,13 @@ const surfaces = {
     features: ["features/supervisor", "features/demo"],
     shared: sharedComponents([...DESK_ONLY, ...PROOF, ...DOCK]),
   },
+  // The safety view's own client code sits in its route group (src/app/[locale]/(hse)), which this scan does not read: its namespaces are
+  // `hse`, `states` and `shell`, kept right by the e2e console gate. What it mounts from shared code and the demo feature is scanned here.
+  "safety view": {
+    paths: HSE_NAMESPACES,
+    features: ["features/demo"],
+    shared: sharedComponents([...DESK_ONLY, ...PROOF, ...DOCK]),
+  },
 } as const;
 
 const OTHER_SURFACES = ["features/judge", ...DESK_ONLY];
@@ -113,9 +120,10 @@ describe("client message namespaces of the field route groups", () => {
   });
 
   it("the lists leave out the judge's own namespaces (the point: 6.9 KB gzip the field routes never read)", () => {
-    for (const { paths } of Object.values(surfaces)) {
+    for (const [name, { paths }] of Object.entries(surfaces)) {
       const listed: readonly string[] = paths;
-      for (const leftOut of ["judge", "hse", "offline"]) expect(listed).not.toContain(leftOut);
+      // The safety view reads its own `hse` namespace, so only the others leave it out.
+      for (const leftOut of name === "safety view" ? ["judge", "offline"] : ["judge", "hse", "offline"]) expect(listed, name).not.toContain(leftOut);
     }
   });
 

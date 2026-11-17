@@ -7,14 +7,14 @@ import { routing } from "@/i18n/routing";
  * These are guesses at the URLs the parked views will have, taken from the parking-lot rows of the F2 plan (HSE week,
  * site setup, roster import, crew codes and join, relay, config admin, Listen, climate what-if, break-things panel,
  * next steps). The judge views live under `/replay` ((judge) is a route group with no URL segment). None of them
- * exists in src/app yet, with one exception: `/hse` is an F1 placeholder page, not the parked HSE week view.
+ * exists in src/app yet. (`/hse` left this list in redesign S7: the minimal safety view is built; the parked HSE WEEK view it once stood for is
+ * still a separate, unbuilt page.)
  * RE-CHECK each entry when its view is built: the same change must take it out of this list (the unit test fails if a
  * guarded path becomes a real route).
  *
  * Not here on purpose: `/worker/alerts`, a built F1 route that Today's primary action goes to.
  */
 export const DEFERRED_ROUTES = [
-  "/hse",
   "/admin",
   "/supervisor/setup",
   "/supervisor/roster",

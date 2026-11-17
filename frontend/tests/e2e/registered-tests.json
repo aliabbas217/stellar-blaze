@@ -441,6 +441,30 @@
       "hero share: unwell, ur, sun"
     ]
   },
+  "hse.spec.ts": {
+    "mobile-chromium": [
+      "hse: Replay or Live and Reset are in a closed Demo controls section, and the address can open it",
+      "hse: empty state is actionable and leads to the front door",
+      "hse: error state > hse: error state says what failed and its retry loads the crews",
+      "hse: lists each crew of the demo site with its plan and whether work is stopped, as the API returns it",
+      "hse: reads well at desk width and has no horizontal scroll",
+      "hse: the boundary panel says employer requests are refused and logged, and its link opens the refusal",
+      "tour: five numbered stops in order, each Open link and the Where from go to a page that answers",
+      "tour: the first stop opens the story, and the Demo controls link opens the safety view's controls",
+      "tour: the review tile on the landing page leads here"
+    ],
+    "desktop-chromium": [
+      "hse: Replay or Live and Reset are in a closed Demo controls section, and the address can open it",
+      "hse: empty state is actionable and leads to the front door",
+      "hse: error state > hse: error state says what failed and its retry loads the crews",
+      "hse: lists each crew of the demo site with its plan and whether work is stopped, as the API returns it",
+      "hse: reads well at desk width and has no horizontal scroll",
+      "hse: the boundary panel says employer requests are refused and logged, and its link opens the refusal",
+      "tour: five numbered stops in order, each Open link and the Where from go to a page that answers",
+      "tour: the first stop opens the story, and the Demo controls link opens the safety view's controls",
+      "tour: the review tile on the landing page leads here"
+    ]
+  },
   "judge-day.spec.ts": {
     "mobile-chromium": [
       "day page counters carry both thetas and the not-in-force outline is named in words, 1440 wide",
@@ -881,6 +905,30 @@
       "removing my data leaves no API entry, page URL or expiration row on the phone, with the service worker running",
       "when the expiration record cannot be cleared it says it could not finish, and never that the data was removed",
       "with the API out of reach it says the registration is still owed, keeps only its id, and settles it when Alerts opens again"
+    ]
+  },
+  "role-entry.spec.ts": {
+    "mobile-chromium": [
+      "role entry: a deep link with no role chosen is never blocked or redirected, and offers Choose a role",
+      "role entry: a role chosen on one screen stays a label only: another screen still opens, and the badge does not move the page",
+      "role entry: ar hse entry is right-to-left, in the page language, with no overflow and the required sentence",
+      "role entry: ar supervisor entry is right-to-left, in the page language, with no overflow and the required sentence",
+      "role entry: the crew lead enters in one tap, sees the badge, and Switch role clears it and returns to the front door",
+      "role entry: the front door shows the four doors in order, the crew and safety doors go to their entries, the review door to the tour",
+      "role entry: the safety officer enters in one tap and sees the badge on the safety view",
+      "role entry: ur hse entry is right-to-left, in the page language, with no overflow and the required sentence",
+      "role entry: ur supervisor entry is right-to-left, in the page language, with no overflow and the required sentence"
+    ],
+    "desktop-chromium": [
+      "role entry: a deep link with no role chosen is never blocked or redirected, and offers Choose a role",
+      "role entry: a role chosen on one screen stays a label only: another screen still opens, and the badge does not move the page",
+      "role entry: ar hse entry is right-to-left, in the page language, with no overflow and the required sentence",
+      "role entry: ar supervisor entry is right-to-left, in the page language, with no overflow and the required sentence",
+      "role entry: the crew lead enters in one tap, sees the badge, and Switch role clears it and returns to the front door",
+      "role entry: the front door shows the four doors in order, the crew and safety doors go to their entries, the review door to the tour",
+      "role entry: the safety officer enters in one tap and sees the badge on the safety view",
+      "role entry: ur hse entry is right-to-left, in the page language, with no overflow and the required sentence",
+      "role entry: ur supervisor entry is right-to-left, in the page language, with no overflow and the required sentence"
     ]
   },
   "rtl.spec.ts": {

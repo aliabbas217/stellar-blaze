@@ -175,6 +175,12 @@
         "governance": "الحوكمة",
         "crews": "للفرق"
       }
+    },
+    "role": {
+      "crew": "تجريبي: قائد الفريق",
+      "officer": "تجريبي: مسؤول السلامة",
+      "switch": "تغيير الدور",
+      "choose": "اختر دورًا"
     }
   },
   "worker": {
@@ -680,11 +686,39 @@
     }
   },
   "hse": {
-    "title": "نظرة عامة على HSE",
+    "title": "عرض السلامة",
     "empty": {
-      "title": "نظرة عامة على HSE",
-      "reason": "عرض HSE الشامل للموقع قادم في الإصدار التالي. يمكنك في الأثناء معاينة عرض المشرف.",
-      "primary": "معاينة عرض المشرف"
+      "title": "لا فرق لعرضها",
+      "reason": "لم تُرجع الخدمة أي فرق لهذا الموقع.",
+      "primary": "العودة إلى البداية"
+    },
+    "lead": "خطة كل فريق، وهل توقف عمله.",
+    "table": {
+      "caption": "فرق الموقع التجريبي",
+      "crew": "الفريق",
+      "plan": "الخطة",
+      "work": "العمل"
+    },
+    "plan": {
+      "signed": "موقَّعة",
+      "unsigned": "غير موقَّعة",
+      "changed": "تغيّرت بعد التوقيع"
+    },
+    "work": {
+      "stopped": "متوقف",
+      "running": "غير متوقف"
+    },
+    "privacy": "لا تحتفظ الخدمة بأي بيانات صحية لأي عامل بمفرده.",
+    "boundary": {
+      "title": "ما لا يمكنك رؤيته هنا",
+      "body": "إذا طلب صاحب العمل سجل عامل بمفرده، يُرفض الطلب ويُسجَّل.",
+      "link": "اطّلع على الرفض"
+    },
+    "error": {
+      "title": "تعذّر تحميل الفرق"
+    },
+    "demo": {
+      "title": "عناصر التحكم التجريبية"
     }
   },
   "states": {
@@ -1579,7 +1613,7 @@
         },
         "review": {
           "title": "أراجع هذا العمل",
-          "line": "اطّلع على كيفية اختباره، ثم جرّب ما تشاء."
+          "line": "جولة من 3 دقائق، ثم جرّب ما تشاء."
         },
         "note": "هذا عرض تجريبي. الفرق والأشخاص مختلَقون. لا يحتاج العمال إلى حساب أبدًا."
       },
@@ -1671,6 +1705,53 @@
           "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
+        }
+      }
+    },
+    "roleEntry": {
+      "demoAccess": "دخول تجريبي. يمكن لأي شخص الدخول.",
+      "production": "في النشر الفعلي تكون هذه الشاشة تسجيل دخول: رابط دعوة من صاحب العمل، ثم تسجيل الدخول الخاص بشركتك.",
+      "change": "اختر دورًا آخر",
+      "crew": {
+        "title": "قائد الفريق، تجريبي",
+        "sees": "ستطّلع على خطة الليلة لكل فريق وعلى الخطط الموقَّعة. يمكنك إيقاف العمل لفريق ما، ثم التراجع عن ذلك.",
+        "button": "افتح شاشة الفرق"
+      },
+      "officer": {
+        "title": "مسؤول السلامة، تجريبي",
+        "sees": "ستطّلع على الفرق التي لها خطة، والخطط الموقَّعة، والفرق التي أوقفت العمل. وستطّلع أيضًا على ما لا تستطيع هذه الخدمة أن تعرضه لك عن أي عامل بمفرده.",
+        "button": "افتح عرض السلامة"
+      }
+    },
+    "start": {
+      "lead": "اختر ما يناسبك."
+    },
+    "tour": {
+      "title": "جولة من 3 دقائق",
+      "lead": "خمس محطات بهذا الترتيب. تفتح كل محطة الشاشة الحقيقية.",
+      "open": "افتح هذه الشاشة",
+      "controls": "للتبديل بين إعادة التشغيل والوضع المباشر، أو لإعادة ضبط الموقع التجريبي، استخدم عناصر التحكم التجريبية في عرض السلامة.",
+      "controlsLink": "افتح عناصر التحكم التجريبية",
+      "steps": {
+        "story": {
+          "title": "The story",
+          "text": "Why plan the night before, and how the warnings were checked on a summer held out of every choice."
+        },
+        "worker": {
+          "title": "The worker's phone",
+          "text": "What a worker sees: today's heat level and when to rest. There is no account to make."
+        },
+        "crew": {
+          "title": "The crew lead's screen",
+          "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "boundary": {
+          "title": "The refusal",
+          "text": "Ask, as an employer, for one worker's health record. The service refuses and logs the request."
+        },
+        "scoreboard": {
+          "title": "The scoreboard",
+          "text": "Every way of warning side by side, including where Stellar Blaze does worse."
         }
       }
     }

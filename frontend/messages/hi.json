@@ -175,6 +175,12 @@
         "governance": "शासन",
         "crews": "टीमों के लिए"
       }
+    },
+    "role": {
+      "crew": "डेमो: टीम लीड",
+      "officer": "डेमो: सुरक्षा अधिकारी",
+      "switch": "भूमिका बदलें",
+      "choose": "भूमिका चुनें"
     }
   },
   "worker": {
@@ -680,11 +686,39 @@
     }
   },
   "hse": {
-    "title": "एचएसई अवलोकन",
+    "title": "सुरक्षा दृश्य",
     "empty": {
-      "title": "एचएसई अवलोकन",
-      "reason": "पूरी साइट का एचएसई दृश्य अगले रिलीज़ में आ रहा है। तब तक आप सुपरवाइज़र दृश्य का पूर्वावलोकन कर सकते हैं।",
-      "primary": "सुपरवाइज़र दृश्य का पूर्वावलोकन करें"
+      "title": "दिखाने के लिए कोई टीम नहीं",
+      "reason": "सेवा ने इस साइट के लिए कोई टीम नहीं लौटाई।",
+      "primary": "शुरुआत पर वापस जाएँ"
+    },
+    "lead": "हर टीम की योजना, और यह कि उसका काम रुका है या नहीं।",
+    "table": {
+      "caption": "डेमो साइट की टीमें",
+      "crew": "टीम",
+      "plan": "योजना",
+      "work": "काम"
+    },
+    "plan": {
+      "signed": "हस्ताक्षरित",
+      "unsigned": "हस्ताक्षर नहीं हुए",
+      "changed": "हस्ताक्षर के बाद बदली"
+    },
+    "work": {
+      "stopped": "रुका हुआ",
+      "running": "रुका नहीं"
+    },
+    "privacy": "यह सेवा किसी भी एक कामगार का कोई स्वास्थ्य डेटा नहीं रखती।",
+    "boundary": {
+      "title": "जो आप यहाँ नहीं देख सकते",
+      "body": "अगर कोई नियोक्ता किसी एक कामगार का रिकॉर्ड माँगे, तो अनुरोध अस्वीकार किया जाता है और दर्ज कर लिया जाता है।",
+      "link": "इनकार देखें"
+    },
+    "error": {
+      "title": "हम टीमें लोड नहीं कर सके"
+    },
+    "demo": {
+      "title": "डेमो नियंत्रण"
     }
   },
   "states": {
@@ -1579,7 +1613,7 @@
         },
         "review": {
           "title": "मैं इसकी समीक्षा कर रहा हूँ",
-          "line": "देखें इसे कैसे परखा गया, फिर जो चाहें आज़माएँ।"
+          "line": "3 मिनट का टूर, फिर जो चाहें आज़माएँ।"
         },
         "note": "यह एक डेमो है। टीमें और लोग काल्पनिक हैं। कामगारों को कभी खाते की ज़रूरत नहीं।"
       },
@@ -1671,6 +1705,53 @@
           "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
+        }
+      }
+    },
+    "roleEntry": {
+      "demoAccess": "डेमो पहुँच। कोई भी अंदर आ सकता है।",
+      "production": "असली डिप्लॉयमेंट में यह स्क्रीन साइन-इन होती है: आपके नियोक्ता का आमंत्रण लिंक, फिर आपकी कंपनी का अपना साइन-इन।",
+      "change": "कोई और भूमिका चुनें",
+      "crew": {
+        "title": "टीम लीड, डेमो",
+        "sees": "आप हर टीम की आज रात की योजना देखेंगे, और यह भी कि किन योजनाओं पर हस्ताक्षर हुए हैं। आप किसी टीम का काम रोक सकते हैं, और उसे वापस भी ले सकते हैं।",
+        "button": "टीमों की स्क्रीन खोलें"
+      },
+      "officer": {
+        "title": "सुरक्षा अधिकारी, डेमो",
+        "sees": "आप देखेंगे कि किन टीमों की योजना है, किन योजनाओं पर हस्ताक्षर हुए हैं और किन टीमों ने काम रोका है। आप यह भी देखेंगे कि यह सेवा किसी एक कामगार के बारे में आपको क्या नहीं दिखा सकती।",
+        "button": "सुरक्षा दृश्य खोलें"
+      }
+    },
+    "start": {
+      "lead": "जो आपके लिए ठीक हो, वही चुनें।"
+    },
+    "tour": {
+      "title": "3 मिनट का टूर",
+      "lead": "पाँच पड़ाव, इसी क्रम में। हर एक असली स्क्रीन खोलता है।",
+      "open": "यह स्क्रीन खोलें",
+      "controls": "रीप्ले और लाइव के बीच बदलने या डेमो साइट रीसेट करने के लिए सुरक्षा दृश्य में डेमो नियंत्रण का उपयोग करें।",
+      "controlsLink": "डेमो नियंत्रण खोलें",
+      "steps": {
+        "story": {
+          "title": "The story",
+          "text": "Why plan the night before, and how the warnings were checked on a summer held out of every choice."
+        },
+        "worker": {
+          "title": "The worker's phone",
+          "text": "What a worker sees: today's heat level and when to rest. There is no account to make."
+        },
+        "crew": {
+          "title": "The crew lead's screen",
+          "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "boundary": {
+          "title": "The refusal",
+          "text": "Ask, as an employer, for one worker's health record. The service refuses and logs the request."
+        },
+        "scoreboard": {
+          "title": "The scoreboard",
+          "text": "Every way of warning side by side, including where Stellar Blaze does worse."
         }
       }
     }
