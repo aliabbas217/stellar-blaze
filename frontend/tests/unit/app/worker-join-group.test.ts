@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 /*
  * The join page's route group (redesign S6a). It is a group of its own, beside `(app)` and `(sheet)`, because it needs a third thing: the
- * field shell with the language pill and TanStack Query, but NO dock (a worker with no crew has no Today, Alerts or unwell tab to go to)
- * and NO demo context (it would read the site list a second time). The URL is `/<locale>/worker/join`; a route group is not a segment.
+ * field shell with the language pill, but NO dock (a worker with no crew has no Today, Alerts or unwell tab to go to)
+ * and NO demo context (it would read the site list a second time) and no query client (its two reads are a plain effect). The URL is `/<locale>/worker/join`; a route group is not a segment.
  * tests/e2e/worker-join.spec.ts pins the behaviour on the production build.
  */
 
@@ -22,11 +22,10 @@ describe("the worker join route group", () => {
     expect(existsSync(join(WORKER, "(sheet)/join"))).toBe(false);
   });
 
-  it("mounts the field shell and the query client, and no dock, no demo context and no clock", () => {
+  it("mounts the field shell, and no query client (TanStack Query alone puts the route over its budget), no dock, no demo context and no clock", () => {
     const layout = code("(join)/layout.tsx");
     expect(layout).toMatch(/FieldShell/);
-    expect(layout).toMatch(/QueryProvider/);
-    expect(layout).not.toMatch(/dock|WorkerDock|DemoProvider|DemoClock|useDemo/);
+    expect(layout).not.toMatch(/QueryProvider|dock|WorkerDock|DemoProvider|DemoClock|useDemo/);
   });
 
   it("reads only the namespaces the page uses", () => {

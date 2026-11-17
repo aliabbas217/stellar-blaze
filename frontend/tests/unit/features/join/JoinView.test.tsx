@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse } from "msw";
@@ -39,12 +38,7 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 
 function renderJoin() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return renderWithIntl(
-    <QueryClientProvider client={client}>
-      <JoinView />
-    </QueryClientProvider>,
-  );
+  return renderWithIntl(<JoinView />);
 }
 
 /** Every request the mock API saw while a test ran, so "nothing is sent" is a measurement. */

@@ -1,10 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { crewsQueryOptions } from "@/api/queries";
 import type { ApiProblem } from "@/api/problem";
 import type { components } from "@/api/schema";
 import { Banner } from "@/components/states/Banner";
@@ -14,10 +12,10 @@ import { WakingLine } from "@/components/states/WakingLine";
 import { splitDemoName } from "@/components/shell/site-name";
 import { ACTION_QUIET } from "@/components/states/actions";
 import { DEMO_CREW_ID, pickDemoSite } from "@/features/demo/constants";
-import { sitesQueryOptions } from "@/features/demo/sites";
 import { CrewPicker, RowsSkeleton, SitePicker } from "@/features/join/Picker";
 import { StepCrew } from "@/features/join/StepCrew";
 import { parseJoinLink, type JoinLink } from "@/features/join/link";
+import { useSiteCrews, useSites } from "@/features/join/reads";
 import { resolveCrewLink } from "@/features/join/resolve";
 import { chooseDeviceSite } from "@/features/profile/choose-site";
 import { useRouter } from "@/i18n/navigation";
@@ -96,14 +94,14 @@ function DemoYard({ site }: { readonly site: Site | null }): ReactNode {
 /** A code that points at a crew: the confirm card, or what is wrong with the code and the picker below it. */
 function CodeView({ siteId, crewId }: { readonly siteId: string; readonly crewId: string }): ReactNode {
   const t = useTranslations("worker.join");
-  const sites = useQuery(sitesQueryOptions());
+  const sites = useSites();
   const siteKnown = sites.data?.some((site) => site.id === siteId) === true;
-  const crews = useQuery({ ...crewsQueryOptions(siteId), enabled: siteKnown });
+  const crews = useSiteCrews(siteId, siteKnown);
 
   const target = useMemo(() => resolveCrewLink({ siteId, crewId, sites: sites.data, crews: crews.data }), [siteId, crewId, sites.data, crews.data]);
 
-  if (sites.isError) return <LoadError problem={sites.error} onRetry={() => void sites.refetch()} />;
-  if (crews.isError) return <LoadError problem={crews.error} onRetry={() => void crews.refetch()} />;
+  if (sites.error !== null) return <LoadError problem={sites.error} onRetry={sites.refetch} />;
+  if (crews.error !== null) return <LoadError problem={crews.error} onRetry={crews.refetch} />;
   if (target.status === "loading") return <JoinSkeleton />;
   if (target.status === "ready") return <StepCrew site={target.site} crew={target.crew} />;
 
@@ -114,7 +112,7 @@ function CodeView({ siteId, crewId }: { readonly siteId: string; readonly crewId
       <Banner>
         <p>{target.status === "unknown-site" ? t("unknownSite") : t("unknownCrew", { site: splitDemoName(target.site.name, target.site.synthetic).name })}</p>
       </Banner>
-      {target.status === "unknown-crew" ? <CrewPicker site={target.site} /> : <SitePicker sites={sites.data ?? []} />}
+      {target.status === "unknown-crew" ? <CrewPicker site={target.site} crews={crews} /> : <SitePicker sites={sites.data ?? []} />}
       <DemoYard site={demoSite} />
     </>
   );
@@ -123,12 +121,13 @@ function CodeView({ siteId, crewId }: { readonly siteId: string; readonly crewId
 /** No usable crew in the link: the picker (a site list, or one site's crews when the link names only a site). */
 function PickerView({ link }: { readonly link: JoinLink }): ReactNode {
   const t = useTranslations("worker.join");
-  const sites = useQuery(sitesQueryOptions());
-
-  if (sites.isError) return <LoadError problem={sites.error} onRetry={() => void sites.refetch()} />;
-
+  const sites = useSites();
   const list = sites.data;
   const named = link.kind === "site" && list !== undefined ? list.find((site) => site.id === link.siteId) : undefined;
+  const crews = useSiteCrews(named?.id ?? "", named !== undefined);
+
+  if (sites.error !== null) return <LoadError problem={sites.error} onRetry={sites.refetch} />;
+
   return (
     <>
       <h1 className="font-display text-3xl leading-(--sign-leading-display) font-semibold text-ink">{t("pageTitle")}</h1>
@@ -141,7 +140,7 @@ function PickerView({ link }: { readonly link: JoinLink }): ReactNode {
           <p>{t("unknownSite")}</p>
         </Banner>
       ) : null}
-      {list === undefined ? <RowsSkeleton /> : named !== undefined ? <CrewPicker site={named} /> : <SitePicker sites={list} />}
+      {list === undefined ? <RowsSkeleton /> : named !== undefined ? <CrewPicker site={named} crews={crews} /> : <SitePicker sites={list} />}
       <DemoYard site={list === undefined ? null : pickDemoSite(list)} />
     </>
   );

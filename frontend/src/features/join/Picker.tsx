@@ -1,9 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { crewsQueryOptions } from "@/api/queries";
 import type { components } from "@/api/schema";
 import { ErrorState } from "@/components/states/ErrorState";
 import { Skeleton } from "@/components/states/Skeletons";
@@ -11,6 +9,7 @@ import { WakingLine } from "@/components/states/WakingLine";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { splitDemoName } from "@/components/shell/site-name";
 import { joinHref } from "@/features/join/link";
+import type { Read } from "@/features/join/reads";
 
 /*
  * The picker of the join page (redesign S6a): the worker has no code (a torn poster, a new phone) and finds the site, then the crew.
@@ -22,6 +21,7 @@ import { joinHref } from "@/features/join/link";
  */
 
 type Site = components["schemas"]["Site"];
+type Crew = components["schemas"]["Crew"];
 
 const ROW =
   "flex min-h-(--target-field) w-full items-center justify-between gap-3 rounded-ctl bg-panel px-4 py-2 text-start text-lg font-medium text-ink no-underline active:scale-[0.985]";
@@ -75,23 +75,14 @@ export function SitePicker({ sites }: { readonly sites: readonly Site[] }): Reac
   );
 }
 
-export function CrewPicker({ site }: { readonly site: Site }): ReactNode {
+/** The crews of `site`, from a read the caller holds (so a code that named a missing crew does not read the list twice). */
+export function CrewPicker({ site, crews }: { readonly site: Site; readonly crews: Read<Crew[]> }): ReactNode {
   const t = useTranslations("worker.join");
   const states = useTranslations("states");
-  const crews = useQuery(crewsQueryOptions(site.id));
   const { name } = splitDemoName(site.name, site.synthetic);
 
-  if (crews.isError) {
-    return (
-      <ErrorState
-        title={states("error.title")}
-        detail={states("error.detail")}
-        onRetry={() => {
-          void crews.refetch();
-        }}
-        requestId={crews.error.problem.request_id ?? null}
-      />
-    );
+  if (crews.error !== null) {
+    return <ErrorState title={states("error.title")} detail={states("error.detail")} onRetry={crews.refetch} requestId={crews.error.problem.request_id ?? null} />;
   }
 
   return (
