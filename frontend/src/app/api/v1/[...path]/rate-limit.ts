@@ -169,21 +169,52 @@ export function resolveLimits(env: Readonly<Record<string, string | undefined>>)
   };
 }
 
+const IPV4_OCTET = String.raw`(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)`;
+const IPV4 = String.raw`${IPV4_OCTET}(?:\.${IPV4_OCTET}){3}`;
+const PORT = String.raw`(?:6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3})`;
+/** An IPv6 address: hex groups with colons (`::` allowed), the last group possibly an embedded IPv4 (`::ffff:1.2.3.4`). */
+const IPV6 = String.raw`(?:[0-9a-fA-F]{0,4}:){2,7}(?:[0-9a-fA-F]{0,4}|${IPV4})`;
+/** `a.b.c.d` or `a.b.c.d:port`. */
+const IPV4_ENTRY = new RegExp(String.raw`^(${IPV4})(?::${PORT})?$`);
+/** `[ipv6]` or `[ipv6]:port`: an IPv6 address that carries a port is always bracketed (RFC 3986). */
+const IPV6_BRACKETED_ENTRY = new RegExp(String.raw`^\[(${IPV6})\](?::${PORT})?$`);
+/** A bare IPv6 address, which cannot carry a port. */
+const IPV6_BARE_ENTRY = new RegExp(`^(${IPV6})$`);
+
 /**
- * The client of a request, for the per-client counter: the `hops`-th entry of `x-forwarded-for` counted from the RIGHT.
+ * The address of one `x-forwarded-for` entry, or null when the entry is not one. Some ingresses append the client's SOURCE
+ * PORT ("203.0.113.5:54321", "[2001:db8::1]:443"), and a port is different on every connection: used as it stands it would
+ * give one client a new counter per connection and no per-client limit would ever apply. The port is stripped; a bare IPv4 or
+ * IPv6 is kept; anything else (empty, only a port, a non-numeric port, a name) is not an address. IPv6 is lowercased so that
+ * its spellings share one key.
+ */
+function addressOf(entry: string): string | null {
+  const v4 = IPV4_ENTRY.exec(entry);
+  if (v4?.[1] !== undefined) return v4[1];
+  const bracketed = IPV6_BRACKETED_ENTRY.exec(entry);
+  if (bracketed?.[1] !== undefined) return bracketed[1].toLowerCase();
+  const bare = IPV6_BARE_ENTRY.exec(entry);
+  return bare?.[1] === undefined ? null : bare[1].toLowerCase();
+}
+
+/**
+ * The client of a request, for the per-client counter: the `hops`-th entry of `x-forwarded-for` counted from the RIGHT,
+ * reduced to its address (`addressOf`: a source port the ingress appended is dropped).
  *
  * Topology assumption: each trusted proxy APPENDS the address it received the request from, so the entry `hops` from the
  * right is the address the outermost trusted proxy saw, and everything left of it is whatever the caller wrote. With
- * one ingress (the default) that is the last entry; behind a CDN and an ingress it is the second from the right. A
- * header with fewer entries than `hops`, a missing header and `hops` of 0 (no trusted proxy: the header is entirely
- * caller-controlled) all share one "unknown" counter, the strictest choice; the global counter is the backstop either way.
+ * one ingress (the default) that is the last entry; behind a CDN and an ingress it is the second from the right. The
+ * entry is chosen FIRST and only then normalised: nothing left of it is ever read, so what the caller prepends cannot
+ * change the key. A header with fewer entries than `hops`, a missing header, `hops` of 0 (no trusted proxy: the header
+ * is entirely caller-controlled) and a selected entry that is not an address all share one "unknown" counter, the
+ * strictest choice; the global counter is the backstop either way.
  */
 export function clientKey(headers: Headers, hops = 1): string {
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded === null || hops < 1) return "unknown";
   const entries = forwarded.split(",").map((entry) => entry.trim());
   const entry = entries[entries.length - hops];
-  return entry === undefined || entry === "" ? "unknown" : entry;
+  return (entry === undefined ? null : addressOf(entry)) ?? "unknown";
 }
 
 interface Limiters {

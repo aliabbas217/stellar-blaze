@@ -160,6 +160,70 @@ describe("clientKey", () => {
   });
 });
 
+describe("clientKey with a source port in the entry (Azure Container Apps ingress)", () => {
+  const header = (value: string) => new Headers({ "x-forwarded-for": value });
+
+  it("one client address with a different port on every connection is ONE key", () => {
+    const keys = [54321, 54322, 40000, 1, 65535].map((port) => clientKey(header(`203.0.113.5:${String(port)}`)));
+    expect(new Set(keys)).toEqual(new Set(["203.0.113.5"]));
+    expect(clientKey(header("203.0.113.5:54321"))).toBe(clientKey(header("203.0.113.5")));
+  });
+
+  it("forged left entries still never change the key, with or without a port on the selected one", () => {
+    const honest = clientKey(header("203.0.113.5:54321"));
+    for (const forged of ["1.1.1.1", "2.2.2.2:9999", "[2001:db8::9]:1", "garbage, 3.3.3.3"]) {
+      expect(clientKey(header(`${forged}, 203.0.113.5:54321`))).toBe(honest);
+      expect(clientKey(header(`${forged}, 203.0.113.5:61000`))).toBe(honest);
+    }
+  });
+
+  it("only the selected entry is reduced: with two hops the second from the right, port stripped", () => {
+    expect(clientKey(header("6.6.6.6, 203.0.113.5:1111, 198.51.100.9:2222"), 2)).toBe("203.0.113.5");
+    expect(clientKey(header("6.6.6.6, 203.0.113.5:1111, 198.51.100.9:2222"), 1)).toBe("198.51.100.9");
+  });
+
+  it("IPv6: a bracketed address loses its port, a bare one is kept, and the spellings of the case share a key", () => {
+    expect(clientKey(header("[2001:db8::1]:443"))).toBe("2001:db8::1");
+    expect(clientKey(header("[2001:db8::1]:50000"))).toBe("2001:db8::1");
+    expect(clientKey(header("[2001:db8::1]"))).toBe("2001:db8::1");
+    expect(clientKey(header("2001:db8::1"))).toBe("2001:db8::1");
+    expect(clientKey(header("2001:DB8::1"))).toBe("2001:db8::1");
+    expect(clientKey(header("[::1]:8080"))).toBe("::1");
+    expect(clientKey(header("::ffff:203.0.113.5"))).toBe("::ffff:203.0.113.5");
+  });
+
+  it("a plain IPv4 and an unknown stay as they are", () => {
+    expect(clientKey(header("203.0.113.5"))).toBe("203.0.113.5");
+    expect(clientKey(new Headers())).toBe("unknown");
+  });
+
+  it("a malformed selected entry is 'unknown', never a fresh key", () => {
+    for (const bad of [":54321", "203.0.113.5:", "203.0.113.5:abc", "203.0.113.5:70000", "203.0.113.5:0", "999.1.1.1", "[2001:db8::1", "[]:80", "not-an-ip", "unknown", "203.0.113.5:1:2"]) {
+      expect(clientKey(header(bad)), bad).toBe("unknown");
+      expect(clientKey(header(`1.1.1.1, ${bad}`)), `1.1.1.1, ${bad}`).toBe("unknown");
+    }
+  });
+
+  it("an empty entry, a header shorter than the hops and no trusted proxy are still 'unknown'", () => {
+    expect(clientKey(header(" "))).toBe("unknown");
+    expect(clientKey(header("1.1.1.1, "))).toBe("unknown");
+    expect(clientKey(header("203.0.113.5:54321"), 2)).toBe("unknown");
+    expect(clientKey(header("203.0.113.5:54321"), 0)).toBe("unknown");
+  });
+
+  it("a per-client limit holds for one client whose port changes on every request, and the cap+1 request is refused", () => {
+    const clock = { now: 1_000_000 };
+    const perClient = createRateLimiter({ perMinute: 20, now: () => clock.now });
+    const results = Array.from({ length: 21 }, (_unused, index) => perClient.take(clientKey(header(`203.0.113.5:${String(50_000 + index)}`))));
+    expect(results.slice(0, 20).every(Boolean)).toBe(true);
+    expect(results[20]).toBe(false);
+    // And rotating the forged left entry as well changes nothing.
+    const rotating = createRateLimiter({ perMinute: 20, now: () => clock.now });
+    const forged = Array.from({ length: 21 }, (_unused, index) => rotating.take(clientKey(header(`10.0.0.${String(index)}, 203.0.113.5:${String(50_000 + index)}`))));
+    expect(forged[20]).toBe(false);
+  });
+});
+
 describe("trustedProxyHops", () => {
   it("is 1 when unset or invalid, and the number otherwise (0 means none is trusted)", () => {
     expect(trustedProxyHops(undefined)).toBe(1);
