@@ -76,7 +76,8 @@ test("the alert card for a warning that is over says when it ended, with a way t
 
 test("the alert card sends a link that is not a warning to Today, in the same language", async ({ page }) => {
   await openAlert(page, { locale: "ur", path: "/ur/worker/alert?audience=site&target=x&level=purple&valid_from=soon" });
-  await expect(page).toHaveURL(/\/ur\/worker$/);
+  // Today for a phone with no site hands on to the join page, in the same language.
+  await expect(page).toHaveURL(/\/ur\/worker(\/join)?$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "ur");
 });
 

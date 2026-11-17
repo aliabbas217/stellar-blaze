@@ -182,8 +182,12 @@ test("in Urdu at 320 px the join page reads right to left and nothing overflows 
   await page.goto(`/ur/worker/join?s=${SITE_DEMO}`);
   const row = page.locator("main a[href*='c=crew-']").first();
   await expect(row).toBeVisible();
-  const mirrored = await row.locator("svg").evaluate((svg) => getComputedStyle(svg).transform);
-  expect(mirrored, "the chevron is flipped (a matrix with a negative x scale)").toMatch(/^matrix\(-1,/);
+  // Tailwind v4 writes the flip as the `scale` property, not as a transform: a negative x scale.
+  const mirrored = await row.locator("svg").evaluate((svg) => {
+    const style = getComputedStyle(svg);
+    return `${style.scale} | ${style.transform}`;
+  });
+  expect(mirrored, "the chevron is flipped (a negative x scale)").toMatch(/^-1 |matrix\(-1,/);
 });
 
 for (const theme of ["night", "sun"] as const) {
