@@ -19,7 +19,7 @@
  *   - The night values sit on `:root, [data-theme="night"]` so a nested night subtree still works on a page that
  *     is in sun mode. The sun block comes after it (equal specificity, later wins) and overrides every colour.
  *   - There is no system-preference switch: night is the default whatever prefers-color-scheme says; sun is chosen
- *     by src/components/shell/theme-script.ts (field routes only) and the one-tap override in SunToggle.
+ *     by src/components/shell/theme-script.ts (field routes only) and the one-tap override in the settings sheet (ScreenColors).
  *   - Names here must not equal a Tailwind theme key (--color-*, --text-*, --radius-*, --font-*, --spacing) or a
  *     next/font variable. A self-referencing `--x: var(--x)` is emitted by `@theme inline` and silently breaks it.
  *

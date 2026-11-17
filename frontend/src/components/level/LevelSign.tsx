@@ -10,7 +10,7 @@ export interface LevelSignProps {
   /** The level to show; null renders "Site rules" with no marker on the scale (no usable forecast). */
   readonly level: Level | null;
   readonly kind: LevelKind;
-  /** hero: the word at 76 px under a four-label scale (worker Today). mini: the word at 22 px, scale without labels. */
+  /** hero: the word at 32 px under a four-label scale (worker Today, the alert card). mini: the word at 22 px, scale without labels. */
   readonly size: "hero" | "mini";
   /**
    * How long the level holds, already worded for the locale ("until 17:00"). A node, so the caller can wrap the clock
@@ -34,9 +34,9 @@ const MARK: Record<Level, string> = {
   red: "bg-lv-red",
 };
 
-/** The 10 px mark that sits beside a level word. Decorative: the word and the scale carry the level. */
+/** The 14 px mark that sits beside a level word. Decorative: the word and the scale carry the level. */
 export function LevelMark({ level }: { readonly level: Level }) {
-  return <span data-level-mark="" aria-hidden="true" className={`size-2.5 shrink-0 self-center rounded-sign ${MARK[level]}`} />;
+  return <span data-level-mark="" aria-hidden="true" className={`size-3.5 shrink-0 self-center rounded-sign ${MARK[level]}`} />;
 }
 
 /*
@@ -50,7 +50,7 @@ const KICKER_LINE = "var(--t-16) * var(--sign-leading-text)";
 // The hero's kicker and its "until" share one row (F2 W1, I6), so the row is as tall as the taller of the two: the 18 px "until".
 const HEADER_LINE = "var(--t-18) * var(--sign-leading-text)";
 const WORD_LINE = {
-  // The word's size is a per-language property (globals.css): 76 px, 64 px for Arabic-script words, whose line height is 2.5.
+  // The word's size is a custom property (globals.css, 32 px in every language: the action sentence above it is the largest text of the screen).
   hero: "var(--sign-word-size) * var(--sign-leading-word)",
   // The mini row also holds the 16 px "until", so its floor is the taller of the two lines.
   mini: "max(var(--t-22) * var(--sign-leading-word), var(--t-16) * var(--sign-leading-text))",
@@ -58,7 +58,7 @@ const WORD_LINE = {
 
 /*
  * Arabic-script words are set at line height 2.5 (the marks clip below about 2), which leaves about a line of blank above and
- * below a 64 px word. The hero trims part of it from the layout (a negative block margin on the word row, `--sign-word-trim`:
+ * below the 32 px word. The hero trims part of it from the layout (a negative block margin on the word row, `--sign-word-trim`:
  * zero in every other language, 0.75 em in ur whose line height is 2.5 and 0.15 em in ar whose line height is 1.8): the line height itself is unchanged and nothing is clipped, the blank just
  * overlaps the gap around the row instead of pushing the lead and the spine down the fold. Measured on the Urdu face that ships (Noto
  * Nastaliq Urdu, in Chromium, canvas ink against the DOM baseline; F2 W2): the four level words reach 46 px above the baseline and 13
@@ -68,16 +68,16 @@ const WORD_LINE = {
 const WORD_TRIM = "var(--sign-word-trim)";
 
 export const LEVEL_SIGN_HEIGHT = {
-  // kicker-and-until row + gap + word row (less the blank trimmed from it) + gap + scale bar + gap + label
-  hero: `calc(${HEADER_LINE} + ${KICKER_LINE} + var(--s-3) * 2 + var(--s-2) * 2 + ${WORD_LINE.hero} - ${WORD_TRIM} * 2)`,
+  // kicker-and-until row + gap + word row (less the blank trimmed from it) + gap + scale bar (12 px, the raised segment) + gap + label
+  hero: `calc(${HEADER_LINE} + ${KICKER_LINE} + var(--s-3) * 3 + var(--s-2) + ${WORD_LINE.hero} - ${WORD_TRIM} * 2)`,
   // kicker + gap + word row + gap + scale bar (no labels)
-  mini: `calc(${KICKER_LINE} + var(--s-3) * 2 + var(--s-2) + ${WORD_LINE.mini})`,
+  mini: `calc(${KICKER_LINE} + var(--s-3) * 3 + ${WORD_LINE.mini})`,
 } as const;
 
 /**
  * The level as a sign: a kicker, the level word, how long it holds, and the four-step scale beneath.
  *
- * Level is never conveyed by color alone (DESIGN.md section 3): the word, the position on the scale and the 10 px mark
+ * Level is never conveyed by color alone (DESIGN.md section 3): the word, the position on the scale and the 14 px mark
  * are all present. There is no filled plate, no shadow and no hatch. A stale or fallback level shows a clock beside
  * the kicker, a dimmer word and a dashed marker, so it is never mistaken for a live one.
  */
@@ -114,7 +114,7 @@ export function LevelSign({ level, kind, size, until, kicker, stamp }: LevelSign
         {level === null ? null : <LevelMark level={level} />}
         <h2
           data-level-word=""
-          className={`font-display font-medium tracking-display leading-(--sign-leading-word) ${wordSize} ${live ? "text-ink" : "text-ink-2"}`}
+          className={`font-display font-semibold tracking-display leading-(--sign-leading-word) ${wordSize} ${live ? "text-ink" : "text-ink-2"}`}
         >
           {word}
         </h2>

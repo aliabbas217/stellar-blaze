@@ -1,5 +1,4 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { useState, type ReactNode } from "react";
 import enMessages from "../../../messages/en.json";
@@ -49,7 +48,7 @@ afterEach(() => {
 describe("FieldShell", () => {
   const props = { siteName: "Mussafah M-14 yard (synthetic)", crewLabel: "Crew B", clock: "11:10" } as const;
 
-  it("header: site and crew, the clock in a bdi, the sun toggle and six language chips", () => {
+  it("header: site and crew, the clock in a bdi, and ONE language pill (no chips, no Sun mode button)", () => {
     chrome();
     renderWithIntl(
       <FieldShell {...props} dock={<p>dock slot</p>}>
@@ -60,8 +59,32 @@ describe("FieldShell", () => {
     expect(within(header).getByText("Mussafah M-14 yard (synthetic)")).toBeInTheDocument();
     expect(within(header).getByText("Crew B")).toBeInTheDocument();
     expect(within(header).getByText("11:10").tagName).toBe("BDI");
-    expect(within(header).getByRole("button", { name: /Sun mode/ })).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Language" })).getAllByRole("link")).toHaveLength(6);
+    expect(within(header).getByRole("button", { name: "English, Settings" })).toBeInTheDocument();
+    expect(within(header).getAllByRole("button")).toHaveLength(1);
+    expect(screen.queryByRole("navigation", { name: "Language" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sun mode/ })).not.toBeInTheDocument();
+  });
+
+  it("a demo site is tagged Demo beside its name; the tag is the caller's word for what the API marked synthetic", () => {
+    chrome();
+    renderWithIntl(
+      <FieldShell {...props} siteName="Mussafah M-14 yard" demo>
+        <main>page</main>
+      </FieldShell>,
+    );
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("Mussafah M-14 yard")).toBeInTheDocument();
+    expect(header.querySelector("[data-demo-tag]")).toHaveTextContent("Demo");
+  });
+
+  it("no tag for a site that is not the demo", () => {
+    chrome();
+    renderWithIntl(
+      <FieldShell {...props} siteName="Mussafah M-14 yard">
+        <main>page</main>
+      </FieldShell>,
+    );
+    expect(screen.getByRole("banner").querySelector("[data-demo-tag]")).toBeNull();
   });
 
   it("reserveLabels holds the header's height for the names that arrive late: two lines for the site, one for the crew (no layout shift when they come)", () => {
@@ -122,7 +145,7 @@ describe("FieldShell", () => {
     expect(screen.getByRole("banner")).toHaveTextContent("No site chosen");
   });
 
-  it("test_field_shell_applies_sun_on_a_client_navigation_from_a_desk_route, and the toggle says so", async () => {
+  it("test_field_shell_applies_sun_on_a_client_navigation_from_a_desk_route", async () => {
     const meta = chrome();
     pathname = "/en/worker";
     renderWithIntl(
@@ -135,7 +158,6 @@ describe("FieldShell", () => {
       expect(document.documentElement.dataset["theme"]).toBe("sun");
     });
     expect(meta.content).toBe(THEME_COLORS.sun);
-    expect(screen.getByRole("button", { name: "Sun mode: on" })).toBeInTheDocument();
   });
 
   it("re-applies on every route change, keeping the visitor's override", async () => {
@@ -157,18 +179,16 @@ describe("FieldShell", () => {
       expect(document.documentElement.dataset["theme"]).toBe("sun");
     });
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Sun mode: on" }));
-    expect(document.documentElement.dataset["theme"]).toBeUndefined();
-    expect(JSON.parse(window.localStorage.getItem(THEME_STORAGE_KEY) ?? "null")).toMatchObject({ theme: "night" });
-
+    // The visitor's override, as the settings sheet writes it (Night until midnight): a route change must keep it.
+    window.localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ theme: "night", until: Date.now() + 3_600_000 }));
     pathname = "/en/worker/alerts";
     act(() => {
       navigate();
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Sun mode: off" })).toBeInTheDocument();
+      expect(document.documentElement.dataset["theme"]).toBeUndefined();
     });
-    expect(document.documentElement.dataset["theme"]).toBeUndefined();
+    expect(JSON.parse(window.localStorage.getItem(THEME_STORAGE_KEY) ?? "null")).toMatchObject({ theme: "night" });
   });
 
   it("test_field_shell_puts_night_back_when_it_unmounts (a client link out of a field route, to a page with no shell)", async () => {

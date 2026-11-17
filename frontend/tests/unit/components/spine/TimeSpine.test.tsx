@@ -63,6 +63,17 @@ function varPx(value: string | undefined): number {
 }
 const hourAt = (units: number): number => 6 + (units * 12) / 100;
 
+describe("TimeSpine: the slot's own label can be turned off (Today says the same in one plain line under the strip)", () => {
+  it("draws the label by default and not with slotLabel={false}; the slot itself stays drawn", () => {
+    const on = renderSpine({ orientation: "h" });
+    expect(on.root.querySelector("[data-slot-label]")).not.toBeNull();
+    on.unmount();
+    const off = renderSpine({ orientation: "h", slotLabel: false });
+    expect(off.root.querySelector("[data-slot-label]")).toBeNull();
+    expect(off.root.querySelector("[data-slot]")).not.toBeNull();
+  });
+});
+
 describe("TimeSpine: the qaylula slot", () => {
   // test_slot_edges_from_ban_window
   it("spans exactly 12:30 to 15:00 on a 6 to 18 vertical spine, from the window's instants", () => {

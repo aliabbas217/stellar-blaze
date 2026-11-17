@@ -44,7 +44,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
     // suppressHydrationWarning: the inline sun script sets data-theme on <html> before React hydrates.
     <html lang={locale} dir={dirFor(locale)} className={fontClassFor(locale)} suppressHydrationWarning>
       <head>
-        {/* Night is the default browser-chrome colour whatever the system prefers; the inline script, SunToggle and
+        {/* Night is the default browser-chrome colour whatever the system prefers; the inline script, ScreenColors and
             useRouteTheme move it to the sun colour on a field route in sun mode. It is a plain <meta> here and not
             `viewport.themeColor`: Next re-renders that one on every client navigation and puts the night colour back
             after the theme was applied (the sun colour was lost on a navigation from the landing page to /worker). Next

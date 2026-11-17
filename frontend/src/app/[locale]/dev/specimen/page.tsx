@@ -6,7 +6,7 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { LEVELS, levelIndex, type Level } from "@/components/level/level";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
-import { SunToggle } from "@/components/shell/SunToggle";
+import { ScreenColors } from "@/components/shell/ScreenColors";
 
 /*
  * Dev-only visual specimen for the "Qaylula" direction (DESIGN.md).
@@ -207,7 +207,7 @@ export default async function SpecimenPage(props: PageProps<"/[locale]/dev/speci
         <p className="text-lg text-ink-2">{t("lead")}</p>
         <div className="flex flex-wrap items-center gap-3">
           <LocaleSwitcher />
-          <SunToggle />
+          <ScreenColors />
         </div>
       </header>
 

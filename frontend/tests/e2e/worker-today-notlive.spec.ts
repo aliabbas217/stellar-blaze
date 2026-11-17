@@ -18,8 +18,8 @@ import { withScenario, type Scenario } from "./helpers/scenario.ts";
  * level vocabulary writes Orange; ADR 0058 decision 4, ADR 0046 decision 3), dashed; the spine stays on screen; the last known
  * level, when there is one, is secondary and dashed. The hero share of each state is printed (`hero share ...`) for the report.
  *
- * Also here: the Urdu hero shares the architect left open (partial) as RECORDED exceptions with their real numbers, and
- * the Urdu level words measured in the face that ships (Nastaliq): they never touch the rows around them (F2 W2).
+ * Also here: the Urdu level words measured in the face that ships (Nastaliq): they never touch the rows around them (F2 W2), and the
+ * Urdu personal and partial hero shares (formerly recorded exceptions, now above the 35 % floor).
  */
 
 const PHONE = { width: 390, height: 844 };
@@ -166,15 +166,12 @@ test("Today shows the emergency control and the protective lead together when of
   await context.setOffline(false);
 });
 
-// ---- The Urdu hero shares the architect left open: RECORDED exceptions, with the real numbers, never silent (F2 W2) ----------
+// ---- The Urdu personal and partial hero shares (formerly RECORDED exceptions, redesign S5: now above the floor) ------------------
 //
-// Live states have the spine as their hero (the level sign and the action lead stand above it). In Urdu every text row is 2.5 lines
-// tall, so a partial state (a banner above the sign) pushes the spine's top below the 35 % mark of the fold. It is held to the number
-// measured when it was recorded (a floor that can only go up), not to 35 %: a ruling of the architect is still open for it. The ideal
-// and personal states meet 35 % (the Urdu word trim measured in the Nastaliq face took personal from 31.8 % to above the floor), and
-// the fallback's hero is the protective lead now (asserted above).
-// F2 Task 22: with the real Urdu copy both the personal and the partial state are below 35 %, so both are recorded exceptions now, with
-// their measured numbers, kept in gate.ts beside the other recorded hero shares (RECORDED_HERO_EXCEPTIONS).
+// Live states have the level card and the shift strip as their hero (redesign S5). The Urdu personal and partial days were RECORDED
+// exceptions (26.4 % and 19.2 %, tests/e2e/gate.ts) while the hero was the vertical spine under a 64 px word; they now measure 82.1 %
+// and 69.9 % and hold the 35 % floor, so no exception is recorded. The fallback's hero is the protective lead (asserted above). The
+// number is printed (`hero share ...`); an entry in RECORDED_HERO_EXCEPTIONS would again make the test hold it to that number.
 const RECORDED_TOLERANCE = 0.01;
 
 const PROFILE = {
@@ -220,8 +217,9 @@ for (const [state, policyDown] of [
 
 // ---- The Urdu level words in the face that ships: ink never touches the rows around the word (F2 W2) --------------------------
 //
-// `--sign-word-trim` pulls the blank above and below the 64 px word out of the layout (negative block margin on the word row). It was
-// measured in the fallback Naskh; the face that ships is Noto Nastaliq Urdu, whose words reach differently. This measures the ink of
+// `--sign-word-trim` pulls the blank above and below the 32 px word (64 px before redesign S5) out of the layout (negative block margin on
+// the word row, in proportion to the size). It was measured in the fallback Naskh; the face that ships is Noto Nastaliq Urdu, whose words
+// reach differently. This measures the ink of
 // each of the four Urdu level words (canvas ink against the DOM baseline, in the real loaded font) and asks for 8 px between it and
 // the kicker row above and the scale below.
 test("Today's Urdu level words keep clear of the rows around them in the Nastaliq face (Today)", async ({ page }) => {

@@ -90,12 +90,10 @@ describe("messages: structure", () => {
         expect(flat.has(key as string), `${locale}: safety key ${String(key)} is not in the catalogue`).toBe(true);
       }
     }
-    // The families the review pack names: the four action codes, the Stop strings, the unwell sheet, the protective lead, the alert strings.
+    // The families the review pack names: the worker's action codes (the employer-duty lines left Today in S5), the Stop strings, the unwell sheet, the protective lead, the alert strings.
     for (const key of [
       "worker.today.also.selfPaced",
-      "worker.today.also.noUnacclimatised",
-      "worker.today.also.induction",
-      "worker.today.also.bottle",
+      "worker.today.draftWording",
       "supervisor.stop.recorded",
       "supervisor.stop.queued",
       "worker.unwell.steps.one",

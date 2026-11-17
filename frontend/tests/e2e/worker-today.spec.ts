@@ -27,6 +27,14 @@ interface Opening {
   readonly query?: string;
 }
 
+/** Opens the settings sheet from the header's language pill and returns it. */
+async function openSettings(page: Page) {
+  await page.getByRole("banner").getByRole("button", { name: /Settings|الإعدادات|ترتیبات/ }).click();
+  const sheet = page.getByRole("dialog").filter({ has: page.getByRole("heading", { level: 2 }) });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
 /** Opens Today as a phone: the scenario, the theme override (before paint) and the viewport set, the console watched. */
 async function openToday(page: Page, { locale = "en", theme = "sun", scenario, query = PIN }: Opening = {}): Promise<string[]> {
   const errors = watchConsole(page);
@@ -85,17 +93,20 @@ test("out of season Today has no slot (Today)", async ({ page }) => {
   await expect(page.getByText("Break in 1 h 20 min")).toBeVisible();
 });
 
-test("sun mode follows the replay clock and the toggle overrides until midnight (Today)", async ({ page }) => {
+test("sun mode follows the replay clock and Screen colors in the settings sheet overrides until midnight (Today)", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await page.goto(`/en/worker${PIN}`);
   // Replay is daytime by construction: sun, and the header clock is the replay moment, not the machine's.
   await expect(page.locator("html")).toHaveAttribute("data-theme", "sun");
   await expect(page.getByRole("banner").locator('bdi[dir="ltr"]')).toContainText("11:10");
 
-  const toggle = page.getByRole("banner").getByRole("button", { name: /Sun mode/ });
-  await expect(toggle).toHaveText("Sun mode: on");
-  await toggle.click();
+  // The header has ONE language pill, no "Sun mode" button and no row of chips; Screen colors live in the settings sheet.
+  await expect(page.getByRole("banner").getByRole("button", { name: /Sun mode/ })).toHaveCount(0);
+  const sheet = await openSettings(page);
+  await expect(sheet.getByRole("button", { name: en.shell.settings.colors.auto })).toHaveAttribute("aria-pressed", "true");
+  await sheet.getByRole("button", { name: en.shell.settings.colors.night }).click();
   await expect(page.locator("html")).not.toHaveAttribute("data-theme", "sun");
+  await expect(sheet.getByRole("button", { name: en.shell.settings.colors.night })).toHaveAttribute("aria-pressed", "true");
 
   // The choice is kept until the next local midnight: it survives a reload, and the stored time is that midnight.
   await page.reload();
@@ -107,22 +118,63 @@ test("sun mode follows the replay clock and the toggle overrides until midnight 
     return { theme: override?.theme, untilIsNextMidnight: override?.until === midnight.getTime() };
   });
   expect(stored).toEqual({ theme: "night", untilIsNextMidnight: true });
+  // ...and the sheet shows it, and Automatic hands the decision back to the replay clock (sun).
+  const again = await openSettings(page);
+  await expect(again.getByRole("button", { name: en.shell.settings.colors.night })).toHaveAttribute("aria-pressed", "true");
+  await again.getByRole("button", { name: en.shell.settings.colors.auto }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "sun");
+  expect(await page.evaluate(() => localStorage.getItem("sb-theme"))).toBeNull();
 
   // ?at= moves the replay clock (and nothing else about the theme).
   await page.goto(`/en/worker${PIN}&at=09:30`);
   await expect(page.getByRole("banner").locator('bdi[dir="ltr"]')).toContainText("09:30");
 });
 
-test("the Today level is the site's, live, with the action and the draft label (Today)", async ({ page }) => {
+test("the Today level is the site's, live, with the action and the one clinical note (Today)", async ({ page }) => {
   await openToday(page);
   await expect(page.getByRole("heading", { name: en.levels.name.orange, level: 2 })).toBeVisible();
   await expect(page.getByText("Work 20 min, rest 40 min in shade")).toBeVisible();
+  // D5: the clinical note appears ONCE per screen, in its honest words; the old "Draft wording" label is gone.
+  await expect(page.getByText(en.worker.today.draftWording)).toHaveCount(1);
   await expect(page.getByText(en.worker.today.draftWording)).toBeVisible();
+  await expect(page.getByText(/Draft wording/)).toHaveCount(0);
   await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(1);
-  // The one primary action while push is off, to Alerts, and the unwell dock is not counted as a second.
-  await expect(page.locator("[data-primary]")).toHaveCount(1);
+  // Warnings off is a quiet row, not a primary action (to Alerts); the unwell slab is the dock's, not counted.
+  await expect(page.locator("[data-primary]")).toHaveCount(0);
+  await expect(page.locator("[data-warnings-off]")).toContainText(en.worker.today.warningsOff);
   await expect(page.getByRole("link", { name: en.worker.today.turnOnWarnings })).toHaveAttribute("href", "/en/worker/alerts");
   await expect(page.locator("[data-emergency]")).toHaveCount(1);
+  // The employer's duties are not the worker's actions: none of the three is on the screen.
+  for (const duty of ["No unacclimatised person to work", "High Risk induction required", "Provide personal water bottle"]) {
+    await expect(page.getByText(duty)).toHaveCount(0);
+  }
+});
+
+test("the settings sheet opens from the one language pill, holds six languages, Screen colors and Change crew, and closes with Escape and focus returns (Today)", async ({ page }) => {
+  await openToday(page);
+  const pill = page.getByRole("banner").getByRole("button", { name: /Settings/ });
+  await expect(pill).toContainText("English");
+  // No row of six chips under the header any more.
+  await expect(page.getByRole("navigation", { name: en.shell.language })).toHaveCount(0);
+  const sheet = await openSettings(page);
+  await expect(sheet.getByRole("link")).toHaveCount(7);
+  await expect(sheet.getByRole("link", { name: en.shell.settings.changeCrew })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(pill).toBeFocused();
+  // The language persists as the chips did: a row is a link that loads the page in that language and keeps the pin.
+  const again = await openSettings(page);
+  await again.getByRole("link", { name: "العربية" }).click();
+  await expect(page).toHaveURL(/\/ar\/worker\?site=/);
+  await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+});
+
+test("Change crew lets go of the pin and opens the first-run chooser (Today)", async ({ page }) => {
+  await openToday(page);
+  const sheet = await openSettings(page);
+  await sheet.getByRole("link", { name: en.shell.settings.changeCrew }).click();
+  await expect(page).toHaveURL(/\/en\/worker$/);
+  await expect(page.getByRole("heading", { name: en.worker.today.entry.title })).toBeVisible();
 });
 
 test("Today shows a stale forecast as the protective plan, with the last known level secondary, never as live (Today)", async ({ page }) => {
@@ -186,11 +238,9 @@ for (const locale of ["en", "ur"] as const) {
     test(`Today passes the design gate at 390: the level and spine, ${locale}, ${theme}`, async ({ page }) => {
       const errors = await openToday(page, { locale, theme });
       await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(1);
-      // Urdu too (F2 W1, I6): the hero's share of the fold is asserted in every language. The word is 64 px in Arabic script at the
-      // Nastaliq line height of 2.5, the kicker and "until" share one row and the site name takes two lines at most; before that
-      // the Urdu day was 29.6 % of the fold, under the 35 % the gate asks, and the check was waived for it. Since the word is drawn by
-      // Nastaliq itself the trim is 0.5 em (at 0.75 the word's marks ran into the kicker text, seen in the picture): the Urdu day is a
-      // RECORDED exception (tests/e2e/gate.ts), held to its number.
+      // Urdu too (F2 W1, I6): the hero's share of the fold is asserted in every language. The hero is the level card and the shift
+      // strip; the Urdu day (a recorded exception of 33.2 % with the 64 px word and the vertical spine) now measures 75.4 % and meets
+      // the 35 % floor, so no exception is recorded for it any more (tests/e2e/gate.ts).
       const recorded = RECORDED_HERO_EXCEPTIONS[`today-live:${locale}`] ?? null;
       const report = await gate(page, errors, { hero: recorded === null, spine: true, locale }, `ideal-${locale}-${theme}`);
       if (recorded !== null) expect(report.heroShare ?? 0, `the Urdu day: a recorded exception, never below what was recorded`).toBeGreaterThanOrEqual(recorded - RECORDED_HERO_TOLERANCE);
@@ -220,7 +270,7 @@ for (const { name, scenario, hero, spine } of GATED) {
 // The not-live states (stale, offline, fallback) in all six locales, including their hero floor, are in worker-today-notlive.spec.ts
 // (F2 W3.2): the protective-plan lead is their hero. The Urdu exceptions that were recorded here are replaced there.
 
-test("Today puts the action lead directly under the sign, in the first fold, in English and Urdu (Today)", async ({ page }) => {
+test("Today puts the action sentence first, then the level, then the shift strip, in the first fold, in English and Urdu (Today)", async ({ page }) => {
   for (const locale of ["en", "ur"] as const) {
     await openToday(page, { locale });
     await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(1);
@@ -234,10 +284,11 @@ test("Today puts the action lead directly under the sign, in the first fold, in 
     expect(boxes.sign, `${locale}: sign`).not.toBeNull();
     expect(boxes.lead, `${locale}: lead`).not.toBeNull();
     expect(boxes.spine, `${locale}: spine`).not.toBeNull();
-    // Sign, then lead, then spine; the lead is inside the first fold (it was at 1010 px of 844 before).
-    expect(boxes.lead?.top ?? 0, `${locale}: lead below the sign`).toBeGreaterThanOrEqual(boxes.sign?.bottom ?? 0);
-    expect(boxes.spine?.top ?? 0, `${locale}: spine below the lead`).toBeGreaterThanOrEqual(boxes.lead?.bottom ?? 0);
+    // Lead, then sign, then the strip; the lead and the sign are inside the first fold (the answer to "what do I do" comes first).
+    expect(boxes.sign?.top ?? 0, `${locale}: sign below the lead`).toBeGreaterThanOrEqual(boxes.lead?.bottom ?? 0);
+    expect(boxes.spine?.top ?? 0, `${locale}: strip below the sign`).toBeGreaterThanOrEqual(boxes.sign?.bottom ?? 0);
     expect(boxes.lead?.bottom ?? 9999, `${locale}: lead inside the first fold`).toBeLessThanOrEqual(boxes.fold);
+    expect(boxes.sign?.bottom ?? 9999, `${locale}: sign inside the first fold`).toBeLessThanOrEqual(boxes.fold);
   }
 });
 

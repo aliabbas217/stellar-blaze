@@ -75,10 +75,7 @@
       "worker.alert.spine.starts",
       "worker.alert.title",
       "worker.nav.unwell",
-      "worker.today.also.bottle",
       "worker.today.also.buddy",
-      "worker.today.also.induction",
-      "worker.today.also.noUnacclimatised",
       "worker.today.also.selfPaced",
       "worker.today.also.water",
       "worker.today.draftWording",
@@ -223,6 +220,16 @@
     "skipToContent": "Skip to content",
     "close": "Close",
     "language": "Language",
+    "settings": {
+      "title": "Settings",
+      "changeCrew": "Change crew",
+      "colors": {
+        "label": "Screen colors",
+        "auto": "Automatic",
+        "bright": "Bright",
+        "night": "Night"
+      }
+    },
     "locales": {
       "en": "English",
       "ar": "العربية",
@@ -230,11 +237,6 @@
       "hi": "हिन्दी",
       "bn": "বাংলা",
       "ne": "नेपाली"
-    },
-    "sun": {
-      "current": "Sun mode: {state}",
-      "on": "on",
-      "off": "off"
     },
     "machineTranslation": "Machine translation, not yet reviewed by a native speaker",
     "roleChooser": {
@@ -278,7 +280,8 @@
     "field": {
       "noSite": "No site chosen",
       "clockLabel": "Time at the site",
-      "pendingClock": "--:--"
+      "pendingClock": "--:--",
+      "demo": "Demo"
     },
     "desk": {
       "menu": "Main",
@@ -321,15 +324,12 @@
         "siteRules": "Follow the site rules",
         "protective": "Site rules: rest in shade every hour, drink water"
       },
-      "draftWording": "Draft wording, awaiting clinical review",
+      "draftWording": "Not yet checked by a clinician.",
       "also": {
         "heading": "Also now",
         "water": "Drink water",
         "buddy": "Never work alone",
-        "selfPaced": "Self-paced work: workers must be allowed to adjust their work rate according to environmental conditions.",
-        "noUnacclimatised": "No unacclimatised person to work",
-        "induction": "High Risk induction required emphasising hydration and identifying signs of heat strain",
-        "bottle": "Provide personal water bottle (2 litre capacity) on-site at all times"
+        "selfPaced": "Self-paced work: workers must be allowed to adjust their work rate according to environmental conditions."
       },
       "why": {
         "level": "Why <bdi>{level}</bdi>?",
@@ -340,6 +340,8 @@
         "siteRules": "Site rules, because no level could be worked out"
       },
       "turnOnWarnings": "Turn on warnings",
+      "warningsOff": "Warnings are off on this phone",
+      "turnOn": "Turn on",
       "spine": {
         "now": "Now",
         "breakIn": "Break in {duration}",

@@ -40,7 +40,7 @@ export function decideTheme(input: ThemeInput): ThemeName | "solar" {
   return "solar";
 }
 
-/** The theme showing now: what `<html data-theme>` says, the one source of truth (SunToggle reads the same attribute). */
+/** The theme showing now: what `<html data-theme>` says, the one source of truth (the settings sheet's ScreenColors writes it). */
 export function currentTheme(): ThemeName {
   return document.documentElement.dataset["theme"] === "sun" ? "sun" : "night";
 }

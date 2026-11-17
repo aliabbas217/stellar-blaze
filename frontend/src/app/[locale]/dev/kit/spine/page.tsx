@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
-import { SunToggle } from "@/components/shell/SunToggle";
+import { ScreenColors } from "@/components/shell/ScreenColors";
 import { banStateFrom, type BanWindowInput } from "@/components/spine/ban-state";
 import { TimeSpine, type SpineCell, type SpineWaypoint } from "@/components/spine/TimeSpine";
 import { dirFor } from "@/i18n/direction";
@@ -71,7 +71,7 @@ export default async function SpineKitPage(props: PageProps<"/[locale]/dev/kit/s
         <p className="max-w-(--measure) text-lg text-ink-2">{t("lead")}</p>
         <div className="flex flex-wrap items-center gap-3">
           <LocaleSwitcher />
-          <SunToggle />
+          <ScreenColors />
           <Link href="/dev/kit" className="inline-flex min-h-(--target) items-center text-base text-ink-2 underline">
             {t("back")}
           </Link>

@@ -32,7 +32,7 @@ const DASH: Record<Level, string> = {
 };
 
 /**
- * The four-step scale beneath a level word: four thin segments, the current one raised and marked.
+ * The four-step scale beneath a level word: four segments 6 px tall, the current one raised to 12 px and marked.
  *
  * A live level is a solid marker. A stale or fallback level is a dashed outline of the same size: the marker says
  * "last known", not "now". It is dashed by border style, never by a gradient: DESIGN.md forbids a hatch anywhere.
@@ -56,15 +56,15 @@ export function LevelScale({ level, kind, labels = true }: LevelScaleProps) {
             className="flex flex-col gap-2"
           >
             {/* One fixed-height row, so the raised marker never moves the labels (no layout shift between levels). */}
-            <div className="flex h-2 items-center">
+            <div className="flex h-3 items-center">
               <span
                 data-bar=""
                 className={
                   current
                     ? dashed
-                      ? `h-2 w-full border-2 border-dashed ${DASH[segment]}`
-                      : `h-2 w-full ${FILL[segment]}`
-                    : "h-0.75 w-full bg-hair"
+                      ? `h-3 w-full border-2 border-dashed ${DASH[segment]}`
+                      : `h-3 w-full ${FILL[segment]}`
+                    : "h-1.5 w-full bg-hair"
                 }
               />
             </div>
