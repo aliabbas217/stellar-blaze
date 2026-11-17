@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
+import HsePage from "@/app/[locale]/(hse)/hse/page";
 import { HseView } from "@/app/[locale]/(hse)/hse/HseView";
 import { DemoProvider } from "@/features/demo/DemoProvider";
 import { apiClient } from "@/api/client";
@@ -31,6 +32,12 @@ vi.mock("@/i18n/navigation", () => ({
   ),
 }));
 
+vi.mock("next-intl/server", async () => {
+  const { createTranslator } = await import("next-intl");
+  const messages = (await import("../../../messages/en.json")).default;
+  return { getTranslations: (namespace: string) => Promise.resolve(createTranslator({ locale: "en", messages, namespace } as never)) };
+});
+
 const bff = {
   onRequest({ request }: { request: Request }) {
     request.headers.set("authorization", "Bearer demo-token");
@@ -47,17 +54,25 @@ afterEach(() => {
   apiClient.eject(bff);
 });
 
-function renderView() {
+function renderWith(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <NextIntlClientProvider locale="en" messages={en} timeZone="Asia/Dubai">
       <QueryClientProvider client={client}>
-        <DemoProvider>
-          <HseView />
-        </DemoProvider>
+        <DemoProvider>{ui}</DemoProvider>
       </QueryClientProvider>
     </NextIntlClientProvider>,
   );
+}
+
+/** The crews table and its states alone. */
+function renderView() {
+  return renderWith(<HseView />);
+}
+
+/** The whole page: its server markup (title, privacy, boundary, notices) and the two client parts. */
+async function renderPage() {
+  return renderWith(await HsePage());
 }
 
 const rows = () => [...document.querySelectorAll<HTMLElement>("[data-crew]")];
@@ -103,8 +118,9 @@ describe("HseView: data", () => {
   });
 
   it("says the privacy sentence and states the boundary, with a link to the refusal on the governance page", async () => {
-    renderView();
+    await renderPage();
     await screen.findByRole("table");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(en.hse.title);
 
     expect(document.querySelector("[data-privacy]")).toHaveTextContent("The service holds no individual worker health data.");
     const boundary = document.querySelector<HTMLElement>("[data-boundary]");
@@ -114,15 +130,18 @@ describe("HseView: data", () => {
   });
 
   it("holds the demo controls (Replay or Live, Reset) in a closed section, not in the primary chrome", async () => {
-    renderView();
+    await renderPage();
     await screen.findByRole("table");
 
     const controls = document.querySelector<HTMLDetailsElement>("details[data-demo-controls]");
     expect(controls).not.toBeNull();
     expect(controls?.open).toBe(false);
     expect(within(controls as HTMLElement).getByText(en.hse.demo.title)).toBeInTheDocument();
+    // Their code is not even loaded until the section is opened (the route budget): nothing of them is in the page before.
+    expect(screen.queryByRole("button", { name: en.shell.demo.reset.button })).toBeNull();
+    await userEvent.setup().click(within(controls as HTMLElement).getByText(en.hse.demo.title));
     // Both controls live inside the section; the page has no other.
-    expect(within(controls as HTMLElement).getByRole("button", { name: en.shell.demo.reset.button })).toBeInTheDocument();
+    expect(await within(controls as HTMLElement).findByRole("button", { name: en.shell.demo.reset.button })).toBeInTheDocument();
     expect(within(controls as HTMLElement).getByRole("button", { name: en.shell.demo.mode.replay })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: en.shell.demo.reset.button })).toHaveLength(1);
   });
@@ -138,8 +157,8 @@ describe("HseView: data", () => {
 });
 
 describe("HseView: loading, error, empty", () => {
-  it("loading: a skeleton at a fixed height, the privacy sentence and the boundary already there", () => {
-    const { container } = renderView();
+  it("loading: a skeleton at a fixed height, the privacy sentence and the boundary already there", async () => {
+    const { container } = await renderPage();
     expect(container.querySelector('[aria-busy="true"] [data-skeleton]')).not.toBeNull();
     expect(document.querySelector("[data-privacy]")).not.toBeNull();
     expect(document.querySelector("[data-boundary]")).not.toBeNull();
