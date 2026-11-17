@@ -193,7 +193,7 @@ describe("ScoreboardView", () => {
     // the heading is generated from the export at the slider's commute (default 45): see frontier.test.tsx for every commute
     expect(screen.getByRole("heading", { name: /^At a 45 minute commute the analysis finds no gain on top of the legal default\./ })).toBeInTheDocument();
     expect(document.getElementById("frontier")).not.toBeNull();
-    expect(screen.getByRole("link", { name: "Scoreboard" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("link", { name: "The evidence" })).toHaveAttribute("aria-current", "step");
   });
 
   it("uses no ADR, B2, B3 or HANDOFF jargon and no em or en dash in the English copy", () => {

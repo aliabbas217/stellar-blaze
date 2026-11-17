@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { StoryNav } from "@/components/shell/StoryNav";
 import { GovernanceGate } from "@/features/judge/governance/GovernanceGate";
 import { GovernanceStatic } from "@/features/judge/governance/GovernanceStatic";
 import { loadRecordedRun } from "@/features/judge/governance/load-recorded";
@@ -18,8 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function GovernancePage() {
   const recorded = await loadRecordedRun();
   return (
-    <GovernanceGate recorded={recorded}>
-      <GovernanceStatic recorded={recorded} />
-    </GovernanceGate>
+    <>
+      <GovernanceGate recorded={recorded}>
+        <GovernanceStatic recorded={recorded} />
+      </GovernanceGate>
+      {/* The last step of the story: Back to one day (the page itself is client-light, so the footer is a server sibling, not part of the island). */}
+      <div className="mx-auto w-full max-w-(--content-max) px-4 pb-8 sm:px-6">
+        <StoryNav current="boundary" />
+      </div>
+    </>
   );
 }

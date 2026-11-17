@@ -50,11 +50,11 @@ describe("claims blocks are English and left to right", () => {
     expect(CLAIMS_ENGLISH).toEqual({ lang: "en", dir: "ltr" });
   });
 
-  it("the replay layout wraps the judge pages in it, and the landing marks each claim fragment", () => {
+  it("the replay layout wraps the judge pages in it, and the landing marks its story chapters as one English block", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/[locale]/(judge)/replay/layout.tsx"), "utf8");
     expect(layout).toMatch(/<ClaimsEnglish>\{children\}<\/ClaimsEnglish>/);
-    const landing = readFileSync(join(process.cwd(), "src/features/judge/landing/LandingView.tsx"), "utf8");
-    expect(landing.match(/CLAIMS_ENGLISH/g)?.length, "caption, counts, evaluation line, table, trade-off, verdicts").toBeGreaterThanOrEqual(6);
+    const chapters = readFileSync(join(process.cwd(), "src/features/judge/landing/LandingChapters.tsx"), "utf8");
+    expect(chapters, "judge.landing.story.* is Tier 2: the chapters are lang=en dir=ltr").toMatch(/<div {...CLAIMS_ENGLISH} data-claims-english="" data-landing-chapters=""/);
   });
 
   it("the proof chip and the proof drawer (judge.proof, states.proof) are English blocks wherever they are mounted", () => {
@@ -71,7 +71,7 @@ describe("translated pieces inside a claims block restore the page's language an
   ] as const)("%s: story footer, banner, stamp, missing-proof note, demo notice and empty state", (locale, messages, dir) => {
     const { container } = renderWithIntl(
       <>
-        <StoryNav current="scoreboard" />
+        <StoryNav current="evidence" />
         <Banner>text</Banner>
         <Stamp kind="REPLAY" />
         <MissingProvenance what="x" />

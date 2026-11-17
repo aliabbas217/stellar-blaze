@@ -1,6 +1,5 @@
 import { useTranslations } from "next-intl";
 import { AuditDetails, AuditRows, RecountButton, StoryRows } from "@/components/provenance/ProofRows";
-import { StoryNav } from "@/components/shell/StoryNav";
 import { EmptyState } from "@/components/states/EmptyState";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { EvalSourceStamp } from "./EvalSourceStamp";
@@ -9,7 +8,7 @@ import type { EvalSource } from "./data";
 import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /**
- * The proof sheet (`/replay/proof/<claim>`): one number as large as it gets and "Where this number comes from" in plain words
+ * The proof sheet (`/replay/proof/<claim>`): one number as large as it gets (it is not a step of the story: it is reached from a number's "Where from" chip) and "Where this number comes from" in plain words
  * (the same story as the drawer). The technical record, the number's three-step timeline (scored numbers only) and the button
  * that recounts the file in this browser are under "For auditors", a closed `<details>` (`#audit`). The sheet exists for a number that has a complete record and
  * for nothing else: an unknown id and a number without a record both get the empty state ("not shown as a result") with a link to a number that does have one.
@@ -38,7 +37,6 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
           primary={{ label: t("back"), href: "/replay" }}
           secondary={{ label: t("emptyAction"), href: `/replay/proof/${FORECAST_CLAIMS.hours}` }}
         />
-        <StoryNav current="proof" />
       </main>
     );
   }
@@ -53,7 +51,6 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
           primary={{ label: t("emptyAction"), href: `/replay/proof/${FORECAST_CLAIMS.hours}` }}
           secondary={{ label: t("back"), href: "/replay" }}
         />
-        <StoryNav current="proof" />
       </main>
     );
   }
@@ -100,7 +97,6 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
           </FieldLink>
         </p>
       </div>
-      <StoryNav current="proof" />
     </main>
   );
 }
