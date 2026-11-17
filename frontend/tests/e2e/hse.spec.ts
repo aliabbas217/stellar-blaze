@@ -11,7 +11,9 @@ import { gateReport, watchConsole } from "./gate.ts";
 const PHONE = { width: 390, height: 844 };
 const DESK = { width: 1280, height: 800 };
 
-test.use({ viewport: PHONE });
+// The service worker is blocked: it takes over the page after the first load, and a retry of a read made through it would skip `page.route`,
+// so the error state could not be held in place long enough to be seen. (These specs do not test the worker; pwa.spec.ts does.)
+test.use({ viewport: PHONE, serviceWorkers: "block" });
 
 interface CrewRow {
   readonly id: string;
