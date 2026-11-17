@@ -135,6 +135,9 @@ loaded) there is no replay time: a route that reads the clock answers 503 `depen
 an alerts cycle fails and the loop tries again next cycle; a last good read is served for at most 30 seconds. With another
 forecast source both use the real clock.
 
+The web app follows this clock and has none of its own: `GET /sites/{id}/forecast/today` carries it as the optional member `now` (UTC), and
+the app keeps that reading plus the time elapsed since the response arrived. `?at=HH:MM` is the judge's time travel in the web app only.
+
 A crew-lead stop makes the crew's levels and plan Red from `started_at` to `cleared_at`, or, while it is active, to the end of
 the crew's shift for the day (never beyond). A stop cleared within `STOP_UNDO_WINDOW_S` (10 s, the F2 undo) is ignored entirely
 for levels, plans and alerts; the `crew.stop_started` and `crew.stop_cleared` audit rows and the stop row stay. One helper
@@ -168,7 +171,7 @@ version, which sign-off needs). `sb-jobs alerts run` must get the SAME `SB_REPLA
 (both read the epoch row, see above), and neither is restarted after a reset.
 
 The replay clock starts at the epoch row's `started_at`, which `sb-jobs site load` wrote when it created the site. So after a
-deploy run ONE reset with the employer token, which begins a fresh epoch at that moment (11:10 Dubai on the replay day, then
+deploy run ONE reset with the employer token, which begins a fresh epoch at that moment (the `SB_REPLAY_NOW` anchor, 10:10 Dubai on the replay day with the values above, then
 real speed), and reset again before each judged session; the window is about 7 h 20 min per epoch (until 17:30 Dubai replay
 time):
 

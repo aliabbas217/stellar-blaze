@@ -13,7 +13,7 @@ import { liveApiOrigin, liveEmployerToken, LIVE_SKIP_MESSAGE, NO_TOKEN_SKIP_MESS
  * replay snapshot. They cover what F2 has built: worker Today, the alert card, the governance refusal.
  *
  * They check the PAGE against the API: the level on screen equals the `site_level` of the forecast hour that contains the replay
- * clock (the API's date at 11:10 in the site's zone, which is the web app's own clock rule: src/features/demo). Where the page
+ * clock (the API's own clock, the `now` of its forecast: the web app has no replay moment of its own, src/features/demo). Where the page
  * and the API can legitimately differ (the app's three-hour freshness rule against a replay snapshot's old `generated_at`), the
  * spec records the observation as an annotation instead of failing on it: the run's report is the evidence.
  *
@@ -28,16 +28,37 @@ type Hour = Forecast["hours"][number];
 const ORIGIN = liveApiOrigin(process.env);
 const HAS_TOKEN = liveEmployerToken(process.env) !== null;
 const PHONE = { width: 390, height: 844 };
-/** The replay clock's local time, as the app reads it (src/features/demo useClock). */
-const REPLAY_LOCAL_HOUR = 11;
-
 test.skip(ORIGIN === null, LIVE_SKIP_MESSAGE);
 
 interface Replay {
   readonly site: Site;
   readonly forecast: Forecast;
-  /** The forecast hour that contains the replay clock: the one the screen reads. */
+  /** The forecast hour that contains the API's clock (`forecast.now`): the one the screen reads. */
   readonly hour: Hour | null;
+}
+
+/** Minutes after local midnight (the site's zone) of `instant`. */
+function minutesOfDay(instant: Date, zone: string): number {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(instant);
+  const part = (type: string): number => Number(parts.find((candidate) => candidate.type === type)?.value);
+  return part("hour") * 60 + part("minute");
+}
+
+/** The API's clock now, from its forecast response, in the site's zone (minutes after midnight). */
+async function apiClockMinutes(request: APIRequestContext, site: Site): Promise<number> {
+  const response = await request.get(`${ORIGIN ?? ""}/api/v1/sites/${site.id}/forecast/today`);
+  expect(response.status(), "GET forecast/today").toBe(200);
+  const { now } = (await response.json()) as Forecast;
+  expect(now, "the forecast carries the API's clock").toBeTruthy();
+  return minutesOfDay(new Date(now ?? ""), site.timezone);
+}
+
+/** What the page's header clock shows, as minutes after midnight. */
+async function headerClockMinutes(page: Page): Promise<number> {
+  const text = (await page.getByRole("banner").locator('bdi[dir="ltr"]').first().textContent()) ?? "";
+  const match = /(\d{2}):(\d{2})/.exec(text);
+  if (match === null) throw new Error(`the header clock reads "${text}", not a time`);
+  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 /** The first synthetic site (the app's demo site), its forecast for the API's default date, and the hour the clock is in. */
@@ -52,7 +73,9 @@ async function readReplay(request: APIRequestContext): Promise<Replay> {
   const forecast = (await forecastResponse.json()) as Forecast;
 
   const localHour = new Intl.DateTimeFormat("en-GB", { timeZone: site.timezone, hour: "2-digit", hourCycle: "h23" });
-  const hour = forecast.hours.find((candidate) => Number(localHour.format(new Date(candidate.starts_at))) === REPLAY_LOCAL_HOUR) ?? null;
+  // The hour the API's own clock is in (never a constant of this spec: the clock moves, and a deployment sets its own SB_REPLAY_NOW).
+  const apiHour = Number(localHour.format(new Date(forecast.now ?? "")));
+  const hour = forecast.hours.find((candidate) => Number(localHour.format(new Date(candidate.starts_at))) === apiHour) ?? null;
   return { site, forecast, hour };
 }
 
@@ -88,10 +111,11 @@ test.describe("F2 against the real B3 (replay)", () => {
 
   test("worker Today shows the level of the real forecast hour the replay clock is in", async ({ page, request }) => {
     const { site, forecast, hour } = await readReplay(request);
-    test.skip(hour === null, "the forecast has no hour at the replay clock's local hour (11:00)");
+    test.skip(hour === null, "the forecast has no hour at the API clock's local hour");
 
     const errors = watchConsole(page);
     await page.setViewportSize(PHONE);
+    const before = await apiClockMinutes(request, site);
     await page.goto(`/en/worker?site=${site.id}`);
     await expect(page.getByRole("heading", { level: 1, name: en.worker.today.title })).toBeAttached();
 
@@ -115,7 +139,13 @@ test.describe("F2 against the real B3 (replay)", () => {
     test.info().annotations.push({ type: "action_codes", description: JSON.stringify(hour?.action_codes ?? []) });
     // The header clock is the replay moment (the API's date at 11:10 at the site), not the machine's; and whether the app judged the
     // replay snapshot fresh is recorded, not assumed.
-    await expect(page.getByRole("banner").locator('bdi[dir="ltr"]')).toContainText("11:10");
+    // The header clock is the API's own clock (the regression guard of the 11:10 / 10:10 split): the page's HH:MM lies between the API's
+    // reading before the page was opened and its reading after the header drew, whatever SB_REPLAY_NOW is.
+    await expect(page.getByRole("banner").locator('bdi[dir="ltr"]').first()).toContainText(/\d{2}:\d{2}/);
+    const shown = await headerClockMinutes(page);
+    const after = await apiClockMinutes(request, site);
+    expect(shown, `header ${String(shown)} min, API clock ${String(before)} to ${String(after)} min`).toBeGreaterThanOrEqual(before);
+    expect(shown).toBeLessThanOrEqual(after);
     const kind = await page.locator("[data-level-sign]").first().getAttribute("data-kind");
     test.info().annotations.push({
       type: "freshness",
@@ -334,6 +364,35 @@ test.describe("F2 against the real B3: the supervisor's crews and Stop work", ()
     await expect(page.locator("[data-primary]")).toHaveCount(1);
     await expect(page.locator("[data-mode-stamp]")).toContainText(en.states.stamp.replay);
     await expect(page.getByText(en.shell.demo.banner)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  // The 11:10 / 10:10 split: the web app used to say 11:10 (every crew off shift) while the API's replay clock said 10:10 (every crew working).
+  // No `?at=` here: the first load must agree with the API's own clock, whatever SB_REPLAY_NOW is (run it with a shifted one to prove it).
+  test("the first load, with no ?at=, agrees with the API's clock: the header time and who is on shift", async ({ page, request }) => {
+    const site = await demoSite(request);
+    const crews = await readCrews(request, site.id);
+    const before = await apiClockMinutes(request, site);
+    const errors = watchConsole(page);
+    await page.setViewportSize(PHONE);
+    await page.goto("/en/supervisor");
+    await page.locator("[data-crew]").first().waitFor();
+    await expect(page.getByRole("banner").locator('bdi[dir="ltr"]').first()).toContainText(/\d{2}:\d{2}/);
+    const shown = await headerClockMinutes(page);
+    const after = await apiClockMinutes(request, site);
+    expect(shown, `header ${String(shown)} min, API clock ${String(before)} to ${String(after)} min`).toBeGreaterThanOrEqual(before);
+    expect(shown).toBeLessThanOrEqual(after);
+
+    // Who is on shift at the API's clock, from the API's own timelines (the shift is in UTC instants).
+    const onShift: boolean[] = [];
+    for (const crew of crews) {
+      const timeline = (await apiGet(request, `/api/v1/crews/${crew.id}/timeline`, false)).body as CrewTimeline;
+      onShift.push(timeline.shift.some((range) => minutesOfDay(new Date(range.starts_at), site.timezone) <= after && after < minutesOfDay(new Date(range.ends_at), site.timezone)));
+    }
+    const text = (await page.locator("main").textContent()) ?? "";
+    test.info().annotations.push({ type: "API clock", description: `${String(before)}-${String(after)} min; crews on shift: ${onShift.join(",")}` });
+    if (onShift.every(Boolean)) expect(text, "every crew is on shift at the API's clock").not.toMatch(/off shift now/);
+    if (onShift.every((value) => !value)) expect(text, "no crew is on shift at the API's clock").toMatch(/off shift now/);
     expect(errors).toEqual([]);
   });
 

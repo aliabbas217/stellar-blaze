@@ -2574,6 +2574,7 @@ export interface components {
          *       "lead_days": 1,
          *       "mode": "replay",
          *       "model_id": "corrector-20261112-0000000-000001",
+         *       "now": "2026-07-01T07:10:00Z",
          *       "policy_version": "ae-heat-2026.1",
          *       "site_id": "site-demo-mussafah"
          *     }
@@ -2625,6 +2626,12 @@ export interface components {
              * @description Id of the corrector model behind the numbers; null in fallback.
              */
             model_id: string | null;
+            /**
+             * Now
+             * Format: date-time
+             * @description The API's own clock when it answered, as a UTC instant: the replay clock in replay mode (the replay anchor plus the real time since the demo epoch started; a demo reset moves it back to the anchor), the real time otherwise. A client that must agree with the API about what time it is reads it once per response and adds the time elapsed since; in replay mode it never takes "now" from the device. Added after the v1 freeze as an optional member.
+             */
+            now?: string;
             /**
              * Policy Version
              * @description Id of the ruleset in force (`ae-heat-<year>.<n>`). Shown verbatim, never parsed.

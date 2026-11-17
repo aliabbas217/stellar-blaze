@@ -126,6 +126,13 @@ export function useAlertModel(params: AlertParams): AlertModel {
         : { status: "loading" };
     }
     if (window === null) return { status: "saved", cause: "not-covered", offline: today.offline, problem: null, retry: today.refetch };
+    // A crew's own alert has its hours from the crew's timeline, but what time it is comes from the forecast: until that has answered
+    // the card is loading (or "unavailable" when it cannot), and never reads a made-up hour.
+    if (clock === null) {
+      return today.status === "error"
+        ? { status: "saved", cause: "unavailable", offline: today.offline, problem: today.problem, retry: today.refetch }
+        : { status: "loading" };
+    }
     if (window.to !== null && clock.getTime() >= Date.parse(window.to)) return { status: "ended", endedAt: new Date(window.to) };
 
     const span = shiftSpan(timeline, zone);

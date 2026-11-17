@@ -303,10 +303,10 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
   // The target is always named: the crew's name, else its id, so the button and the confirmation never read as a bare "the crew".
   const label = crewName ?? work?.crewId ?? "";
   const at = work?.at === null || work?.at === undefined ? "" : time(new Date(work.at));
-  // The six-minute promise holds only for a recent stop. A start time we cannot read makes no promise; one in the future (the replay
-  // clock is fixed while a real replay server's runs on) counts as recent.
+  // The six-minute promise holds only for a recent stop. A start time we cannot read, or no known time to measure it against, makes
+  // no promise; one in the future counts as recent.
   const startedMs = work?.at === null || work?.at === undefined ? Number.NaN : Date.parse(work.at);
-  const withinNotifyWindow = !Number.isNaN(startedMs) && clock.getTime() - startedMs < NOTIFY_WINDOW_MS;
+  const withinNotifyWindow = clock !== null && !Number.isNaN(startedMs) && clock.getTime() - startedMs < NOTIFY_WINDOW_MS;
 
   if (work === null) {
     return (

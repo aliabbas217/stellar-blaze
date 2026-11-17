@@ -117,6 +117,7 @@ async def get_site_forecast_today(
             )
             for hour in day.hours
         ],
+        now=services.clock(),
     )
 
 

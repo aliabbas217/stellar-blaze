@@ -6,6 +6,7 @@ import { call } from "@/api/result";
 import { ROSTER_INVALID_TYPE, RosterInvalidProblem, rosterErrorsOf } from "@/api/roster-problem";
 import type { components } from "@/api/schema";
 import { trackSafetyFlight } from "@/lib/safety-flight";
+import { stampArrival } from "@/lib/time/server-clock";
 
 /*
  * Typed TanStack Query options for the F2 operations of the v1 contract (openapi/stellar-blaze.openapi.json), every
@@ -46,8 +47,11 @@ function dateQuery(date: string | undefined): { date?: string } {
 export function siteForecastQueryOptions(siteId: string) {
   return queryOptions<Schemas["SiteForecastToday"], ApiProblem>({
     queryKey: queryKeys.today(siteId),
-    queryFn: ({ signal }) =>
-      orThrow(apiClient.GET("/api/v1/sites/{site_id}/forecast/today", { params: { path: { site_id: siteId } }, signal })),
+    // Not structurally shared: the sharing builds a copy of a response that changed, and the copy would lose its arrival stamp.
+    structuralSharing: false,
+    // Stamped on arrival: the response's `now` is the API's clock, which the app follows from that moment (useClock).
+    queryFn: async ({ signal }) =>
+      stampArrival(await orThrow(apiClient.GET("/api/v1/sites/{site_id}/forecast/today", { params: { path: { site_id: siteId } }, signal }))),
   });
 }
 

@@ -5,8 +5,11 @@ import { Suspense, useSyncExternalStore } from "react";
 import { useClock } from "@/features/demo/useClock";
 
 function ClockText() {
+  const t = useTranslations("shell.field");
   const format = useFormatter();
   const now = useClock();
+  // No time is known until the API's clock has answered: the same "not yet" reading as before hydration, never a guessed time.
+  if (now === null) return t("pendingClock");
   // 24-hour, Western digits in every language, in the site's zone (the provider's `timeZone`): the same options as the
   // named "time" format of src/i18n/request.ts, written out so the client provider needs no `formats`.
   return <>{format.dateTime(now, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", numberingSystem: "latn" })}</>;
@@ -30,8 +33,8 @@ function useHydrated(): boolean {
  * A page rendered per request (the supervisor plan is `force-dynamic`) does render the clock on the server, and the server's
  * clock is never the browser's: a device a minute off, or a page that took a minute to hydrate, reads another HH:MM and React
  * reports #418 and re-renders the whole root. So the server and the first client render both draw the "not yet" reading, and the
- * time (the replay moment, or the device clock) fills in right after. Not `suppressHydrationWarning`: the mismatch is avoided,
- * not hidden, and the server's reading was never the right one in replay mode anyway (the replay moment comes from the forecast).
+ * time (the API's clock in replay mode, or the device clock) fills in right after, once a forecast has said which it is. Not `suppressHydrationWarning`: the mismatch is avoided,
+ * not hidden, and the server's reading was never the right one in replay mode anyway (the replay time comes from the API's own clock).
  */
 export function DemoClock() {
   const t = useTranslations("shell.field");

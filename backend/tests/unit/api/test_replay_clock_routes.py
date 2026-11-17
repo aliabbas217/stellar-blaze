@@ -192,3 +192,25 @@ def test_without_replay_the_clock_is_the_wall_clock_and_the_default_refresh_is_a
 
     assert world.services.clock is world.clock
     assert world.services.clock() == WALL
+
+
+FORECAST = f"/api/v1/sites/{SITE}/forecast/today"
+
+
+def test_the_forecast_carries_the_domain_clock_so_a_web_app_reads_one_now(settings: Settings) -> None:
+    """The web app takes "now" from this member in replay mode: it is the replay clock (the anchor plus the real time
+    since the epoch started), never the wall clock, and it moves with real time."""
+    world = replay_world(settings)
+    with client_for(world) as client:
+        first = client.get(FORECAST).json()
+        world.clock.advance(minutes=20)
+        later = client.get(FORECAST).json()
+
+    assert (first["mode"], first["now"]) == ("replay", "2026-07-01T07:10:00Z")  # the anchor, not WALL (2026-11-15)
+    assert later["now"] == "2026-07-01T07:30:00Z"  # real time passed; the replay clock follows at the same speed
+
+
+def test_the_forecast_clock_is_the_wall_clock_in_live_mode(settings: Settings) -> None:
+    with client_for(make_world(settings, clock=Clock(WALL))) as client:
+        body = client.get(FORECAST, params={"date": "2026-07-01"}).json()
+    assert (body["mode"], body["now"]) == ("live", "2026-11-15T09:00:00Z")

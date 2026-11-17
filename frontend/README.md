@@ -55,7 +55,8 @@ branch `feat/b3-warnings-planner`, `backend/`), runs the specs, and stops it:
 3. API environment: `SB_FORECAST_SOURCE=replay`, `SB_REPLAY_SNAPSHOT_ID=<id>`, `SB_REPLAY_DEFAULT_DATE=2026-06-14` (B3's committed snapshot `replay/demo-omaa-2026/`, README "Run recipe: the real OMAA day of 2026-06-14"; with `SB_REPLAY_SNAPSHOT_ID=demo-omaa-2026`),
    `SB_ACCESS_TOKENS` as JSON `{"<sha256 of the token>": {"actor": "...", "role": "employer", "employer_id": "emp-demo"}}`.
    The replay clock starts at `SB_REPLAY_NOW` when set, else the replay date at 11:10 Asia/Dubai, and runs at real speed. 11:10 is crew B's midday
-   break, so for a live stop set `SB_REPLAY_NOW` near 10:10 at the site (`2026-06-14T10:10:00+04:00`).
+   break, so for a live stop set `SB_REPLAY_NOW` near 10:10 at the site (`2026-06-14T10:10:00+04:00`). The web app has no replay moment of its own: it
+   shows the API's clock (the `now` of the forecast response, plus the time since it arrived), so whatever `SB_REPLAY_NOW` says is what every screen shows.
 4. Serve it: `uv run uvicorn stellar_blaze.api.app:create_app --factory --port 8000`, then wait until `GET /api/v1/risk-policy` reports
    `config_version` 1 or more: outside prod the API serves the file snapshot (version 0) until its first poll (up to 5 s) finds the
    database activation, and sign-off answers 503 meanwhile although `/health/ready` is already 200.

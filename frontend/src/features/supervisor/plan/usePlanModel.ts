@@ -8,7 +8,7 @@ import type { Problem } from "@/api/problem";
 import type { components } from "@/api/schema";
 import { banStateFrom, type BanState } from "@/components/spine/ban-state";
 import { useDemo } from "@/features/demo/DemoProvider";
-import { useClock } from "@/features/demo/useClock";
+import { useClockOrDevice } from "@/features/demo/useClock";
 import { buildCrewModels, type CrewStripModel } from "@/features/supervisor/crew-model";
 import { ackItemsOf, type PlanAckItem } from "@/features/supervisor/plan/derive-ack";
 import { heatCells, planAxis, planBlocks, planFailureOf, type PlanBlock, type PlanFailure } from "@/features/supervisor/plan/plan-model";
@@ -89,7 +89,7 @@ export interface PlanScreen {
 }
 
 export function usePlanModel(crewId: string): PlanScreen {
-  const { site } = useDemo();
+  const { site, siteStatus } = useDemo();
   const siteId = site?.id ?? null;
   const enabled = siteId !== null;
   const locale = useLocale();
@@ -100,7 +100,9 @@ export function usePlanModel(crewId: string): PlanScreen {
   const crewsQuery = useQuery({ ...crewsQueryOptions(siteId ?? ""), enabled, staleTime: STALE_MS });
   const timelineQuery = useQuery({ ...crewTimelineQueryOptions(crewId), staleTime: STALE_MS });
   const forecastQuery = useQuery({ ...siteForecastQueryOptions(siteId ?? ""), enabled, staleTime: STALE_MS });
-  const now = useClock();
+  // The API's clock arrives with the forecast: until it has (or the forecast cannot answer) the plan is drawn with no "now" (no current
+  // block, no strip) rather than at a guessed hour, and the strip's place is held.
+  const { now, pending: clockPending } = useClockOrDevice(enabled ? forecastQuery.isError : siteStatus !== "loading");
 
   const crews = crewsQuery.data;
   const crew = crews?.find((candidate) => candidate.id === crewId);
@@ -114,10 +116,10 @@ export function usePlanModel(crewId: string): PlanScreen {
   const forecast = forecastQuery.data;
 
   const strip = useMemo(
-    () => (crew === undefined || timeline === undefined ? null : (buildCrewModels([crew], { [crewId]: timeline }, plan === undefined ? undefined : { [crewId]: plan }, now, zone)[0] ?? null)),
-    [crew, timeline, plan, crewId, now, zone],
+    () => (clockPending || crew === undefined || timeline === undefined ? null : (buildCrewModels([crew], { [crewId]: timeline }, plan === undefined ? undefined : { [crewId]: plan }, now, zone)[0] ?? null)),
+    [clockPending, crew, timeline, plan, crewId, now, zone],
   );
-  const stripPending = strip === null && (crewsQuery.isPending || timelineQuery.isPending) && !(crewsQuery.isError || timelineQuery.isError);
+  const stripPending = strip === null && (clockPending || crewsQuery.isPending || timelineQuery.isPending) && !(crewsQuery.isError || timelineQuery.isError);
 
   const state = ((): PlanScreenState => {
     if (planQuery.isError && plan === undefined) {
@@ -143,7 +145,7 @@ export function usePlanModel(crewId: string): PlanScreen {
     // A forecast that is missing, stale or a fallback is not live: the crews see the protective plan, and no heat colour is drawn.
     const protective = plan.forecast_status !== "fresh" || plan.status === "fallback" || (!forecastFresh && !forecastPending);
     const ban = banStateFrom(plan.ban_window, zone, plan.date, locale);
-    const nowMin = localDate(now, zone) === plan.date ? Math.round(hourOfDay(now, zone) * 60) : null;
+    const nowMin = !clockPending && localDate(now, zone) === plan.date ? Math.round(hourOfDay(now, zone) * 60) : null;
     const currentIndex = nowMin === null ? -1 : blocks.findIndex((block) => block.fromMin <= nowMin && nowMin < block.toMin);
     return {
       status: "ready",

@@ -9,7 +9,7 @@ import type { components } from "@/api/schema";
 import { banStateFrom, type BanState } from "@/components/spine/ban-state";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { sitesQueryOptions } from "@/features/demo/sites";
-import { useClock } from "@/features/demo/useClock";
+import { useClockOrDevice } from "@/features/demo/useClock";
 import { buildCrewModels, type CrewStripModel } from "@/features/supervisor/crew-model";
 import { forecastFreshness } from "@/lib/forecast/freshness";
 import { useOffline } from "@/lib/net/use-offline";
@@ -96,8 +96,9 @@ export function useCrewsModel(): { readonly model: CrewsModel; readonly siteId: 
 
   const crewsQuery = useQuery({ ...crewsQueryOptions(siteId ?? ""), enabled, staleTime: STALE_MS });
   const forecastQuery = useQuery({ ...siteForecastQueryOptions(siteId ?? ""), enabled, staleTime: STALE_MS });
-  // The replay clock is read after the forecast is in the cache: it is the newest forecast's date at 11:10.
-  const now = useClock();
+  // The API's clock arrives with the forecast. Until it has (or the forecast cannot answer) the screen is loading: ranking the crews
+  // by the device's clock first and again by the API's would show one order and then another, and ask for two crews' plans.
+  const { now, pending: clockPending } = useClockOrDevice(enabled ? forecastQuery.isError : siteStatus !== "loading");
 
   const crewList = crewsQuery.data ?? NO_CREWS;
   const { byId: timelines, pending: timelinesPending } = useQueries({
@@ -108,7 +109,7 @@ export function useCrewsModel(): { readonly model: CrewsModel; readonly siteId: 
   // First pass without plans picks the focal crew; its day plan, once fetched, adds the cycle.
   const ranked = useMemo(() => buildCrewModels(crewList, timelines, undefined, now, zone), [crewList, timelines, now, zone]);
   const focalId = ranked[0]?.crew.id ?? null;
-  const planQuery = useQuery({ ...crewDayPlanQueryOptions(focalId ?? ""), enabled: focalId !== null, staleTime: STALE_MS, retry: false });
+  const planQuery = useQuery({ ...crewDayPlanQueryOptions(focalId ?? ""), enabled: focalId !== null && !clockPending, staleTime: STALE_MS, retry: false });
   const plans = useMemo(() => (focalId === null || planQuery.data === undefined ? undefined : { [focalId]: planQuery.data }), [focalId, planQuery.data]);
   const crews = useMemo(() => buildCrewModels(crewList, timelines, plans, now, zone), [crewList, timelines, plans, now, zone]);
 
@@ -130,7 +131,7 @@ export function useCrewsModel(): { readonly model: CrewsModel; readonly siteId: 
     return { model: { status: "error", problem: crewsQuery.error.problem, retry }, siteId, siteName };
   }
   // The crews' levels come from their timelines: until each has answered (or failed) the screen is loading, never a "no level" sentence.
-  if (crewsQuery.data === undefined || timelinesPending) return { model: { status: "loading" }, siteId, siteName };
+  if (crewsQuery.data === undefined || timelinesPending || clockPending) return { model: { status: "loading" }, siteId, siteName };
   const focal = crews[0];
   if (focal === undefined) return { model: { status: "empty" }, siteId, siteName };
 

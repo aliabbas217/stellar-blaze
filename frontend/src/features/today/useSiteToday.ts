@@ -11,6 +11,7 @@ import { useHasProfile } from "@/features/profile/site-pin";
 import { displayedLevel } from "@/features/risk/displayed-level";
 import type { PersonalLevel } from "@/features/risk/personal";
 import { currentHour, forecastFreshness, type Freshness } from "@/features/today/freshness";
+import { stampArrival } from "@/lib/time/server-clock";
 
 /*
  * The data behind the worker's Today screen, with no markup in it: the site's forecast and the risk policy through
@@ -57,8 +58,11 @@ export function siteTodayQueryOptions(siteId: string) {
   return queryOptions<SiteForecastToday, ApiProblem>({
     queryKey: todayKey(siteId),
     networkMode: "offlineFirst",
-    queryFn: ({ signal }) =>
-      orThrow(apiClient.GET("/api/v1/sites/{site_id}/forecast/today", { params: { path: { site_id: siteId } }, signal })),
+    // Not structurally shared: the sharing builds a copy of a response that changed, and the copy would lose its arrival stamp.
+    structuralSharing: false,
+    // Stamped on arrival: the response's `now` is the API's clock, which the app follows from that moment (useClock).
+    queryFn: async ({ signal }) =>
+      stampArrival(await orThrow(apiClient.GET("/api/v1/sites/{site_id}/forecast/today", { params: { path: { site_id: siteId } }, signal }))),
   });
 }
 
@@ -311,9 +315,10 @@ export type SiteToday =
  *
  * `options.now` is the instant the screen treats as now: the demo's replay clock (`useClock`) instead of the phone's. Which
  * hour is current, whether the forecast is fresh and whether a personal level may be shown all follow it; how long ago the
- * forecast was written (`deviceNow`) stays the phone's. `options.enabled: false` (no site chosen yet) makes no request.
+ * forecast was written (`deviceNow`) stays the phone's. `options.now: null` is "the clock is not known yet" (`useClock` before it
+ * has a time): the screen stays loading, never reads a made-up hour. `options.enabled: false` (no site chosen yet) makes no request.
  */
-export function useSiteToday(siteId: string, options: { readonly now?: Date; readonly enabled?: boolean } = {}): SiteToday {
+export function useSiteToday(siteId: string, options: { readonly now?: Date | null; readonly enabled?: boolean } = {}): SiteToday {
   const queryClient = useQueryClient();
   const enabled = options.enabled ?? true;
   const hasProfile = useHasProfile();
@@ -322,11 +327,11 @@ export function useSiteToday(siteId: string, options: { readonly now?: Date; rea
   const policyQuery = useQuery({ ...riskPolicyQueryOptions(), enabled: enabled && hasProfile });
   const personal = usePersonalSource(hasProfile, policyQuery.data);
   const deviceNow = useNow();
-  const now = options.now ?? deviceNow;
+  const now = options.now === undefined ? deviceNow : options.now;
   const offline = useOffline();
 
   const forecast = forecastQuery.data;
-  const view = useMemo(() => (forecast === undefined ? null : selectTodayViewModel({ forecast, now, personal })), [forecast, personal, now]);
+  const view = useMemo(() => (forecast === undefined || now === null ? null : selectTodayViewModel({ forecast, now, personal })), [forecast, personal, now]);
 
   const needsPolicyRefetch = view?.needsPolicyRefetch === true;
   const forecastConfigVersion = view?.versions.forecast.configVersion;

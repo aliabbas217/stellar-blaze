@@ -119,7 +119,7 @@ export function useTodayModel(): TodayModel {
   const offline = today.offline;
   const description = useMemo(
     () =>
-      view === null ? null : describeToday({ view, timeline: timelineData ?? null, offline, now: clock, deviceNow, zone, locale }),
+      view === null || clock === null ? null : describeToday({ view, timeline: timelineData ?? null, offline, now: clock, deviceNow, zone, locale }),
     [view, timelineData, offline, clock, deviceNow, zone, locale],
   );
 

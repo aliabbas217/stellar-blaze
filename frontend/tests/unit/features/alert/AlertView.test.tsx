@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw/http";
 import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
@@ -127,8 +127,22 @@ describe("AlertView", () => {
     act(() => {
       useProfile.getState().save({ ...profile, heatWorkStartDate: "2026-08-01" });
     });
-    renderAlert(orangeFromTen);
-    await screen.findByRole("heading", { name: "Orange" });
+    // The mock hour is hot enough that this worker's own level is Red (acclimatised or not), so "not higher" is a Red alert: the card then
+    // has nothing to add. The policy answer (which the personal level waits for) is awaited, so the absence is not a test that read the
+    // page a moment too soon.
+    let policyServed = false;
+    server.use(
+      http.get("*/api/v1/risk-policy", () => {
+        policyServed = true;
+        return undefined;
+      }),
+    );
+    renderAlert({ ...orangeFromTen, level: "red", validFrom: "2026-09-03T10:00:00Z" });
+    await screen.findByRole("heading", { name: "Red" });
+    await waitFor(() => {
+      expect(policyServed).toBe(true);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.queryByText(/Your level is higher/)).toBeNull();
   });
 
@@ -182,7 +196,7 @@ describe("AlertView", () => {
 
     it("a fallback forecast (no level for any hour)", async () => {
       forecastWith((forecast) => ({ ...forecast, forecast_status: "fallback", hours: forecast.hours.map((hour) => ({ ...hour, site_level: null })) }));
-      renderAlert({ ...orangeFromTen, level: "red" });
+      renderAlert({ ...orangeFromTen, level: "red", validFrom: "2026-09-03T10:00:00Z" });
       await expectProtectiveCard("Red");
     });
 
@@ -196,7 +210,7 @@ describe("AlertView", () => {
   it("with no forecast to read and the phone offline, the card still says the level the alert gave, saved on the phone", async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     server.use(http.get("*/api/v1/sites/:site_id/forecast/today", () => HttpResponse.error()));
-    renderAlert({ ...orangeFromTen, level: "red" });
+    renderAlert({ ...orangeFromTen, level: "red", validFrom: "2026-09-03T10:00:00Z" });
 
     expect(await screen.findByRole("heading", { name: "Red" })).toBeInTheDocument();
     expect(screen.getByText("You are offline")).toBeInTheDocument();

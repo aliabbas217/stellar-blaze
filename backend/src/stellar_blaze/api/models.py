@@ -242,7 +242,8 @@ class HourForecast(ApiResponse):
     ban_active: bool = Field(description="True when the midday work ban is in force for any part of this hour.")
 
 
-class SiteForecastToday(ApiResponse):
+class SiteForecastToday(OptionalMemberResponse):
+    wire_optional = frozenset({"now"})
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -258,6 +259,7 @@ class SiteForecastToday(ApiResponse):
                     "lead_days": 1,
                     "ban_window": BAN,
                     "hours": [_HOUR_EXAMPLE],
+                    "now": "2026-07-01T07:10:00Z",
                 }
             ]
         }
@@ -285,6 +287,14 @@ class SiteForecastToday(ApiResponse):
     lead_days: int = Field(description="Forecast lead in days the run was issued ahead of the date.")
     ban_window: BanWindow = Field(description=BAN_WINDOW_DESCRIPTION)
     hours: list[HourForecast] = Field(description="Working-day hours in time order (06:00-19:00 site-local).")
+    now: AwareDatetime | None = Field(
+        default=None,
+        description="The API's own clock when it answered, as a UTC instant: the replay clock in replay mode (the "
+        "replay anchor plus the real time since the demo epoch started; a demo reset moves it back to the anchor), the "
+        "real time otherwise. A client that must agree with the API about what time it is reads it once per response "
+        'and adds the time elapsed since; in replay mode it never takes "now" from the device. Added after the v1 '
+        "freeze as an optional member.",
+    )
 
 
 class RiskBand(ApiResponse):

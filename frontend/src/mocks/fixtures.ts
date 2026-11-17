@@ -65,8 +65,17 @@ function clock(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-/** The replay clock: the API date at 11:10 Asia/Dubai (the F2 plan's demo clock). */
-export const REPLAY_INSTANT = instantAt(REPLAY_DATE, minutesOf("11:10"));
+/**
+ * The MOCK API's clock: 11:10 Asia/Dubai on the date it serves, the moment the F2 stories are written for (crew shifts end at
+ * 11:00, so every crew is off shift). The mock sends it as the forecast's `now` and stamps stops and sign-offs with it (the real
+ * API's replay clock is SB_REPLAY_NOW, which the deployment sets; the web follows whichever the API says and has no moment of its own).
+ */
+export function mockClockAt(date: string): string {
+  return instantAt(date, minutesOf("11:10"));
+}
+
+/** The mock clock on the replay day. */
+export const REPLAY_INSTANT = mockClockAt(REPLAY_DATE);
 
 // --- The ban window --------------------------------------------------------------------------------------------------------
 
@@ -195,6 +204,7 @@ export function forecastToday(
     lead_days: 1,
     ban_window: banWindow(date),
     hours: HOURS.map((hour) => hourForecast(date, hour, forecastStatus === "fallback")),
+    now: mockClockAt(date),
   };
 }
 
@@ -923,6 +933,7 @@ export function legacyForecastToday(
     model_id: null,
     lead_days: 1,
     ban_window: banWindow(LEGACY_FORECAST_DATE),
+    now: mockClockAt(LEGACY_FORECAST_DATE),
     hours: LEGACY_DAY.map(({ hour, p50, level }) => ({
       starts_at: instantAt(LEGACY_FORECAST_DATE, hour * 60),
       wbgt_c: p50 === null ? { p05: null, p50: null, p95: null } : { p05: p50 - 2, p50, p95: p50 + 2 },

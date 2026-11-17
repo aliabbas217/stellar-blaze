@@ -14,10 +14,12 @@ export const DEMO_CREW_ID = "crew-b";
  */
 export const REPLAY_DATE = "2026-09-03";
 
-/** The replay moment on the replay day, in the site's own zone; `?at=HH:MM` overrides it. */
-export const REPLAY_HHMM = "11:10";
+/*
+ * There is no replay moment here on purpose: in replay mode "now" is the API's own clock (the `now` of its forecast response,
+ * src/features/demo/useClock.ts), so the web app and the API cannot disagree about the hour. `?at=HH:MM` moves it.
+ */
 
-/** The URL parameter of the mode switch, and of the replay time override. */
+/** The URL parameter of the mode switch, and of the replay time override (`?at=HH:MM`, the judge's time travel). */
 export const DEMO_PARAM = "demo";
 export const AT_PARAM = "at";
 
