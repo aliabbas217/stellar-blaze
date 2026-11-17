@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefCallback } from "react";
 import { Spinner } from "@/components/states/Spinner";
-import { ACTION_SECONDARY } from "@/components/states/actions";
+import { ACTION_SECONDARY, ACTION_SECONDARY_DENSE, ACTION_STOP } from "@/components/states/actions";
 import { useClock } from "@/features/demo/useClock";
 import { NOTIFY_WINDOW_MS, type ExpiredNotice, type StopNotices, type StopWorkOf } from "@/features/supervisor/useStopWork";
 import { useTimeFormat } from "@/lib/time/use-time-format";
@@ -25,9 +25,10 @@ import { useTimeFormat } from "@/lib/time/use-time-format";
  * first six minutes after the stop started (the stop's own `started_at` against the screen's clock, replay or real). Hours later the
  * bar reads "Work stopped HH:MM" and "Tell the crew now." only. (The architect's ruling fixes the wording while the promise holds.)
  *
- * Hierarchy: the bar is the permanent emergency control, so it is not another ink button. It carries its own framing (a heavy rule
- * across the top, an octagon mark, a double frame inside the ink block) so it is told apart from the screen's primary action by
- * shape and weight, not only by its words. No colour outside the system, no shadow.
+ * Hierarchy: the bar is the permanent emergency control, so it is not another primary. The press button is the Stop tier of the control
+ * system (ACTION_STOP, DESIGN.md 5.1): the only solid ink slab on the screen, 56 px, 12 px radius, with the octagon mark, so it is told
+ * apart from the screen's primary action (the signal fill) by fill, shape and glyph, not only by its words. No colour outside the
+ * system, no shadow.
  *
  * Resuming is the opposite risk (a crew back in the heat), so it sits behind a confirm dialog, with "Keep work stopped" as the
  * focused default.
@@ -74,17 +75,15 @@ function useBarHeightPublisher(): RefCallback<HTMLDivElement> {
 const NOTICES_MAX = "max-h-[40dvh]";
 const NOTICES_SCROLL = "min-h-0 shrink-[1000] overflow-y-auto overscroll-contain";
 const STATE = "min-h-0 overflow-y-auto";
-const INNER = "mx-auto flex max-h-dvh max-w-110 flex-col border-t-4 border-ink px-4 pt-3 pb-[calc(var(--s-3)+env(safe-area-inset-bottom))]";
-// The press target: an ink block with a second frame inside it (the stamp the screen's single primary action does not have).
-const PRESS = "block w-full shrink-0 touch-manipulation rounded-sign bg-ink p-1 font-body text-ground";
-const PRESS_FRAME =
-  "flex min-h-16 w-full items-center justify-center gap-3 rounded-sign border-2 border-ground px-4 text-xl font-bold leading-(--sign-leading-text)";
+const INNER = "mx-auto flex max-h-dvh max-w-110 flex-col border-t border-edge px-4 pt-3 pb-[calc(var(--s-3)+env(safe-area-inset-bottom))]";
+// The press target is the Stop tier. Its look in the stopped state (an ink bar) is a ring-only control in the ground colour.
+const PRESS = `${ACTION_STOP} shrink-0 font-body leading-(--sign-leading-text)`;
 const GHOST =
-  "flex min-h-14 w-full shrink-0 touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-lg font-semibold text-ground";
+  "flex min-h-(--target-stop) w-full shrink-0 touch-manipulation items-center justify-center rounded-ctl px-5 font-body text-lg font-semibold text-ground inset-ring-2 inset-ring-ground transition-transform duration-(--dur-press) active:translate-y-px active:scale-[0.985]";
 const bdi = (chunks: ReactNode): ReactNode => <bdi>{chunks}</bdi>;
 
 /** The emergency mark: an octagon (the stop sign's shape) round a solid square. Decorative: the words say it. Drawn here, not in the pictogram set. */
-function StopMark({ className = "size-7" }: { className?: string }) {
+function StopMark({ className = "size-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-stop-mark="" className={`shrink-0 ${className}`}>
       <path fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinejoin="miter" d="M8.2 2.6h7.6l5.6 5.6v7.6l-5.6 5.6H8.2l-5.6-5.6V8.2z" />
@@ -136,7 +135,7 @@ export function ResumeDialog({ crewName, at, onConfirm, onCancel }: { crewName: 
         ended.current = true;
         onCancel();
       }}
-      className="m-auto w-[min(92vw,26rem)] rounded-sign border border-edge bg-panel p-6 text-ink backdrop:bg-ground/80"
+      className="m-auto w-[min(92vw,26rem)] rounded-card border border-edge bg-panel p-6 text-ink backdrop:bg-ground/80"
     >
       <h2 id={titleId} className="font-display text-xl font-medium leading-(--sign-leading-text)">
         {t.rich("resumeTitle", { crew: crewName, bdi })}
@@ -149,7 +148,7 @@ export function ResumeDialog({ crewName, at, onConfirm, onCancel }: { crewName: 
           onClick={() => {
             close(onCancel);
           }}
-          className={`${ACTION_SECONDARY} min-h-14 w-full text-lg`}>
+          className={`${ACTION_SECONDARY} w-full`}>
           {t("resumeCancel")}
         </button>
         <button
@@ -157,7 +156,7 @@ export function ResumeDialog({ crewName, at, onConfirm, onCancel }: { crewName: 
           onClick={() => {
             close(onConfirm);
           }}
-          className={`${ACTION_SECONDARY} min-h-14 w-full text-lg`}
+          className={`${ACTION_SECONDARY} w-full`}
         >
           {t("resumeConfirm")}
         </button>
@@ -181,12 +180,12 @@ export interface StopWorkBarProps {
 }
 
 // `rule` is the hairline under the notices: without it the last notice runs into the state line below it ("Not sent. Tell the crew now."), which reads as part of that notice.
-const NOTICE_LIGHT = { text: "text-ink-2", rule: "border-hair", close: `${ACTION_SECONDARY} min-h-11 w-full px-4 text-base` } as const;
+const NOTICE_LIGHT = { text: "text-ink-2", rule: "border-hair", close: `${ACTION_SECONDARY_DENSE} w-full` } as const;
 const NOTICE_DARK = {
   text: "text-ground",
   rule: "border-ground",
   close:
-    "flex min-h-11 w-full touch-manipulation items-center justify-center rounded-sign border-2 border-ground px-4 font-body text-base font-semibold text-ground",
+    "flex min-h-(--target) w-full touch-manipulation items-center justify-center rounded-ctl px-4 font-body text-base font-semibold text-ground inset-ring-2 inset-ring-ground transition-transform duration-(--dur-press) active:translate-y-px active:scale-[0.985]",
 } as const;
 
 /** The focus target after the last notice closes: the bar's own action (Stop, Undo or Resume, or the no-crew line). */
@@ -408,10 +407,8 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
           </p>
         ) : null}
         <button ref={setPrimary} type="button" aria-busy={work.state === "sending" || work.busy} onKeyDown={ignoreRepeat} onClick={work.stop} className={PRESS}>
-          <span className={PRESS_FRAME}>
-            {work.state === "sending" ? <Spinner className="size-7" /> : <StopMark />}
-            <span>{t.rich("button", { crew: label, bdi })}</span>
-          </span>
+          {work.state === "sending" ? <Spinner className="size-6" /> : <StopMark />}
+          <span>{t.rich("button", { crew: label, bdi })}</span>
         </button>
       </div>
     </div>

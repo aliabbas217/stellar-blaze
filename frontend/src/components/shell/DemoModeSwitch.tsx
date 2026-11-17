@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { CHIP } from "@/components/states/actions";
 
 /*
  * The mode is declared here, not imported from the demo feature: shared code never imports a feature (eslint.config.mjs).
@@ -31,7 +32,7 @@ export function DemoModeSwitch({
 
   return (
     <div className="flex flex-col gap-1">
-      <div role="group" aria-label={t("label")} className="inline-flex gap-1">
+      <div role="group" aria-label={t("label")} className="inline-flex gap-2">
         {MODES.map((mode) => (
           <button
             key={mode}
@@ -45,7 +46,7 @@ export function DemoModeSwitch({
                     onChange(mode);
                   },
                 })}
-            className="inline-flex min-h-(--target) min-w-(--target) items-center justify-center rounded-sign border border-edge px-3 font-body text-sm text-ink-2 aria-pressed:border-ink aria-pressed:font-semibold aria-pressed:text-ink"
+            className={`${CHIP} min-w-(--target) px-3 font-body text-sm`}
           >
             {t(mode)}
           </button>
