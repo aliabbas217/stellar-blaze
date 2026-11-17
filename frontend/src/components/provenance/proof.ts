@@ -1,5 +1,5 @@
 import type { components } from "@/api/schema";
-import { buildStory, type ProofStory } from "./proof-story";
+import { levelStory, type ProofStory } from "./proof-story";
 
 type Provenance = components["schemas"]["Provenance"];
 type SiteForecastToday = components["schemas"]["SiteForecastToday"];
@@ -182,7 +182,7 @@ export function proofFromForecast(
     what,
     // The plain story says what the level is; the ruleset and configuration that drew it are technical record, shown only under
     // "For auditors" (they used to print as `policy=... config=...` in the worker's drawer). No script wrote a live forecast.
-    story: buildStory("level", {}),
+    story: levelStory(),
     protocol: `Ruleset ${forecast.policy_version}, configuration ${String(forecast.config_version)}`,
     protocolHref: null,
     script: null,

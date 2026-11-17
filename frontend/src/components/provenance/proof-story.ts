@@ -254,7 +254,12 @@ function ruleStory(p: RuleStoryParams): ProofStory {
   };
 }
 
-function forecastStory(p: ForecastStoryParams): ProofStory {
+/**
+ * The three families that client code builds are exported on their own (`forecastStory`, `frontierStory`, `levelStory`): the worker
+ * screens and the frontier panel run in the browser, and importing `buildStory` there would ship every family's builder to a page
+ * that needs one. Everything else goes through `buildStory`.
+ */
+export function forecastStory(p: ForecastStoryParams): ProofStory {
   const limit = String(p.limit);
   const howCounted =
     p.id === "hours_in_break"
@@ -273,7 +278,7 @@ function forecastStory(p: ForecastStoryParams): ProofStory {
   };
 }
 
-function frontierStory(p: FrontierStoryParams): ProofStory {
+export function frontierStory(p: FrontierStoryParams): ProofStory {
   const best = p.id === "best";
   return {
     family: "frontier",
@@ -288,7 +293,7 @@ function frontierStory(p: FrontierStoryParams): ProofStory {
   };
 }
 
-function levelStory(): ProofStory {
+export function levelStory(): ProofStory {
   return {
     family: "level",
     rows: [

@@ -1,5 +1,5 @@
 import { proofFromStaticFile, type Proof, type ProofLabel } from "@/components/provenance/proof";
-import { buildStory, type ForecastStoryParams } from "@/components/provenance/proof-story";
+import { forecastStory, frontierStory, type ForecastStoryParams } from "@/components/provenance/proof-story";
 import type { ScoreRow } from "@/components/provenance/ScoreboardTable";
 import type { JudgeFormat } from "./adapters";
 import type { DayCounter } from "./day-view";
@@ -126,7 +126,7 @@ export function forecastClaims(facts: SeasonFacts, source: ForecastSource, forma
   const lastDay = source.series.days[source.series.days.length - 1] ?? firstDay;
   const proof = (what: string, claim: string, id: ForecastStoryParams["id"]): Proof =>
     proofFromStaticFile(source.file, what, {
-      story: buildStory("forecast", {
+      story: forecastStory({
         id,
         station: source.series.station,
         firstDay,
@@ -175,7 +175,7 @@ export function frontierClaims(data: RosterFrontier, source: FrontierSource, for
   const script = `${data.generated_by} (${data.label})`;
   const proof = (what: string, claim: string, commuteMinutes: number | null): Proof =>
     proofFromStaticFile(source.file, what, {
-      story: buildStory("frontier", {
+      story: frontierStory({
         id: commuteMinutes === null ? "legalisation" : "best",
         commuteMinutes,
         sleepGateHours: data.assumptions.sleep_gate_h,
