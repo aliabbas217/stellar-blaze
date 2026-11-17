@@ -22,11 +22,27 @@ const bff: Middleware = {
   },
 };
 
+/** What `apiClient.GET` threw in the current test, with when: `call()` turns every exception into "Network error" and keeps none of it. */
+const thrownByGet: string[] = [];
+
+function recordWhatGetThrows(): void {
+  thrownByGet.length = 0;
+  const original = apiClient.GET.bind(apiClient) as unknown as (...args: unknown[]) => Promise<unknown>;
+  vi.spyOn(apiClient, "GET").mockImplementation(((...args: unknown[]) =>
+    original(...args).catch((error: unknown) => {
+      const at = `${String(Math.round(performance.now()))} ms`;
+      const what = error instanceof Error ? `${error.name}: ${error.message}; cause: ${String(error.cause)}\n${error.stack ?? ""}` : String(error);
+      thrownByGet.push(`${String(args[0])} threw at ${at}: ${what}`);
+      throw error;
+    })) as never);
+}
+
 export function installSupervisorTestEnvironment(): void {
   beforeEach(() => {
     resetDemoStateHard();
     window.localStorage.clear();
     apiClient.use(bff);
+    recordWhatGetThrows();
   });
   afterEach(() => {
     apiClient.eject(bff);
@@ -62,7 +78,7 @@ export function describeQueries(): string {
     fetchStatus: query.state.fetchStatus,
     error: query.state.error === null ? null : String(query.state.error),
   }));
-  return JSON.stringify(rows);
+  return `${JSON.stringify(rows)}\nwhat apiClient.GET threw in this test: ${thrownByGet.length === 0 ? "nothing" : thrownByGet.join("\n---\n")}`;
 }
 
 export function renderPlan(crewId: string): RenderResult {
