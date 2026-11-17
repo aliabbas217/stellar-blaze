@@ -40,7 +40,7 @@ export const LOCALES = [SOURCE_LOCALE, ...TARGET_LOCALES];
 export const STATUSES = ["untranslated", "machine-draft", "english-by-design", "reviewed"];
 
 /** The claims surfaces: English in every catalogue, verbatim. A test fails when one of these differs from en. */
-export const CLAIM_PREFIXES = ["judge.scoreboard.", "judge.frontier.", "judge.proof.", "judge.day.", "judge.try.", "judge.governance.", "states.proof."];
+export const CLAIM_PREFIXES = ["judge.scoreboard.", "judge.frontier.", "judge.proof.", "judge.day.", "judge.try.", "judge.governance.", "judge.landing.story.", "states.proof."];
 /** The dev pages (design kit, specimen): not product copy. */
 export const DEV_PREFIXES = ["common.kit.", "common.specimen.", "common.spineKit."];
 export const ENGLISH_BY_DESIGN_PREFIXES = [...CLAIM_PREFIXES, ...DEV_PREFIXES];
@@ -60,7 +60,7 @@ export const INVARIANT_KEYS = [
   "shell.locales.ne",
   "shell.field.pendingClock",
   "states.stamp.dev2025",
-  "judge.landing.field.degrees",
+  "judge.landing.phone.site",
 ];
 export const INVARIANT_NOTE = "same in every language (a name, a unit or a format)";
 

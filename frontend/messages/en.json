@@ -1541,10 +1541,10 @@
       "copyFailed": "Could not copy the link",
       "steps": {
         "problem": "The problem",
-        "scoreboard": "Scoreboard",
+        "product": "The product",
+        "evidence": "The evidence",
         "day": "One day",
-        "proof": "Proof",
-        "product": "The product"
+        "boundary": "The boundary"
       }
     },
     "proof": {
@@ -1674,29 +1674,39 @@
       }
     },
     "landing": {
-      "metaTitle": "Heat that stops work, forecast about 24 hours ahead",
+      "metaTitle": "Plan tomorrow's heat tonight",
       "skip": "Skip to the scoreboard",
-      "kicker": "Summer 2026, replayed against airport thermometers",
-      "title": "Heat that stops work, forecast about 24 hours ahead.",
-      "lede": "Hour-by-hour heat levels, legal shift plans and warnings in six languages, for the crews on a worksite, shift by shift.",
-      "primary": "See the scoreboard",
-      "secondary": "Walk me through it",
-      "apps": {
-        "heading": "Open the apps",
-        "note": "Both run on synthetic data in this demo."
+      "kicker": "Tested on last summer's real weather at Abu Dhabi airport",
+      "title": "Plan tomorrow's heat tonight.",
+      "lede": "Stellar Blaze turns a day-ahead forecast into a work-and-rest plan for each crew, and a plain warning on each worker's phone, in six languages.",
+      "door": {
+        "label": "Who is this for?",
+        "worker": {
+          "title": "I work on a site",
+          "line": "See today's heat and when to rest. No account."
+        },
+        "crew": {
+          "title": "I run a crew",
+          "line": "See tonight's plan for your crews. Stop work in one tap."
+        },
+        "safety": {
+          "title": "I look after safety",
+          "line": "See which crews planned, signed and stopped."
+        },
+        "review": {
+          "title": "I am reviewing this",
+          "line": "See how it was tested, then try anything."
+        },
+        "note": "This is a demo. The crews and people are made up. Workers never need an account."
+      },
+      "phone": {
+        "site": "Mussafah M-14 yard",
+        "demo": "Demo",
+        "caption": "A worker's phone on the demo site: one sign, in the worker's language. “I feel unwell” is always there."
       },
       "field": {
         "region": "The forecast heat field over the UAE, {day}",
-        "readout": "Field reading at the selected hour",
-        "hottest": "Hottest grid cell at {hour}",
-        "where": "{lat} N {lon} E",
-        "station": "Abu Dhabi airport (OMAA), its own forecast series",
-        "limit": "Heavy-work limit (NIOSH)",
-        "cells": "Grid cells above the limit",
-        "cellsOf": "{n} of {total}",
-        "degrees": "°C",
-        "sourcePeak": "WBGT in the sun from the ECMWF forecast issued the day before, as recorded, before any correction. {day} has the highest daily peak of the summer's raw forecast and is shown for illustration, not as the day we scored.",
-        "sourcePlain": "WBGT in the sun from the ECMWF forecast issued the day before, as recorded, before any correction. {day} is shown for illustration, not as the day we scored.",
+        "caption": "Forecast heat across the UAE for one hot day. An illustration, not the day we scored.",
         "proofWhat": "The forecast heat field, {day}, every hour",
         "stations": {
           "OMAA": "Abu Dhabi",
@@ -1718,40 +1728,67 @@
           "primary": "See the scoreboard"
         }
       },
-      "hook": {
-        "heading": "The season on the station's own record",
-        "label": "danger hours at Abu Dhabi airport, summer 2026",
-        "interval": "{lo} to {hi}, 95% interval",
-        "definition": "A danger hour is an hour in the ADOSH High or Red zone during working daytime, {hours}. Whether an hour was a danger hour is decided by observation-derived truth; the thermal margin of {margin} W/m² is an assumption."
-      },
-      "problem": {
-        "eyebrow": "The problem",
-        "heading": "The midday break covers only part of the hot hours",
-        "body1": "From {from} to {to} the law stops outdoor work from {start} to {end}. The recorded raw forecast puts working hours above the heavy-work limit outside that window too.",
-        "body2": "A crew needs to know which hours, not which months. That is the forecast we give them about 24 hours ahead.",
-        "ofHours": "of {total} working hours",
-        "calendarAria": "Every working hour, {start} to {end}, of {days} days from {from} to {to}, from the recorded raw forecast before correction. {over} of {n} hours are above the {limit} °C heavy-work limit; the midday break is cut in below the line for the days it is in force.",
-        "legendSlot": "Midday break, by law",
-        "legendHot": "Coloured: above {limit} °C, brighter is hotter",
-        "legendCool": "Grey: not above the limit",
-        "tableToggle": "Show the counts as a table",
-        "tableCaption": "Recorded raw forecast working hours above the limit, by month",
-        "columns": {
-          "period": "Days",
-          "hours": "Working hours",
-          "over": "Above the limit",
-          "inBreak": "Inside the midday break"
+      "story": {
+        "morning": {
+          "eyebrow": "A morning on site",
+          "heading": "One sign, one instruction, in the worker's own language.",
+          "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
+          "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
+          "link": "Open the worker screen"
         },
-        "period": "{from} to {to}",
-        "bridge": "These {over} hours and the {danger} danger hours at the top of this page count different things against different limits: here the recorded raw forecast against the {limit} °C heavy-work limit, there the station's observed heat against the ADOSH High or Red zone."
-      },
-      "season": {
-        "eyebrow": "The scoreboard",
-        "heading": "Four ways to warn a crew, judged on one summer",
-        "body": "Each way to warn gets only the forecast it would have had about 24 hours ahead. The station's thermometers then say what happened.",
-        "open": "Open the scoreboard"
-      },
-      "ledeProof": "Every figure about the season and the scores comes from a recorded file, and its proof chip says which."
+        "plan": {
+          "eyebrow": "Tonight's plan",
+          "heading": "The crew lead sees which crew heats up first.",
+          "body": "A plan that follows the published ADOSH heat rules. Stop work is one tap. So is Undo. It never waits for a sign-off.",
+          "demo": "Demo site: the crews and times are made up.",
+          "level": "Orange until 11:00",
+          "unsigned": "Plan unsigned",
+          "crewA": {
+            "name": "Crew A",
+            "task": "Rebar fixing"
+          },
+          "crewC": {
+            "name": "Crew C",
+            "task": "Formwork"
+          },
+          "crewD": {
+            "name": "Crew D",
+            "task": "Survey and inspection"
+          },
+          "stop": "Stop work, Crew A",
+          "link": "Open the crews screen",
+          "tag": "Demo"
+        },
+        "boundary": {
+          "eyebrow": "The boundary",
+          "heading": "An employer asks for one worker's health record. The answer is no.",
+          "body": "The service holds none. Every worker at the site can see that it was asked.",
+          "request": "Request from an employer account.",
+          "requestDetail": "Individual health data for one worker.",
+          "refused": "Refused.",
+          "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
+          "link": "See the refusal, recorded"
+        },
+        "evidence": {
+          "eyebrow": "Last summer, replayed",
+          "heading": "Danger hours nobody was warned about.",
+          "body": "Abu Dhabi airport, summer 2026, with only the forecast made a day ahead. Every setting was chosen using 2024 and 2025 data only. We wrote down how we would be judged before the scored run, and ran it once.",
+          "caption": "Danger hours not warned about, by way of warning. A shorter bar means fewer danger hours missed.",
+          "falseAlarms": "False-alarm hours: {n}",
+          "verdicts": "How the main checks came out",
+          "scoreboard": "See the full scoreboard",
+          "unavailable": "The scored results are not available in this build."
+        },
+        "limits": {
+          "eyebrow": "What this does not show yet",
+          "one": "One test summer and one airport station, not a worksite.",
+          "two": "No worker outcomes. This is not yet a health claim.",
+          "three": "Not yet checked by a clinician. Translations are machine-made.",
+          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "tested": "See how it was tested",
+          "auditors": "For auditors"
+        }
+      }
     }
   }
 }
