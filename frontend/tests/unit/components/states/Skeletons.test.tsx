@@ -1,7 +1,29 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { LevelSign, LEVEL_SIGN_HEIGHT } from "@/components/level/LevelSign";
+import { LEVEL_SIGN_HEIGHT as LEAF_HEIGHT } from "@/components/level/level-sign-height";
 import { LevelSignSkeleton, Skeleton, TableRowsSkeleton } from "@/components/states/Skeletons";
 import { renderWithIntl } from "../../../utils/intl";
+
+const source = (path: string): string => readFileSync(join(process.cwd(), "src", path), "utf8");
+
+/*
+ * The skeleton reads the sign's heights from a leaf module, not from the sign (ADR 0088): a bundler includes whole modules, so importing
+ * `LevelSign.tsx` for one constant put the pictogram glyphs and the scale in the first load of every route that shows a skeleton, and the
+ * safety view went over its 170 KB ceiling. `bundle:check` is the real guard; these two keep the mechanism visible in a unit run.
+ */
+describe("the skeleton's dependency on the level sign", () => {
+  it("reads LEVEL_SIGN_HEIGHT from the leaf module, and the sign re-exports that same object", () => {
+    expect(LEVEL_SIGN_HEIGHT).toBe(LEAF_HEIGHT);
+    expect(source("components/states/Skeletons.tsx")).toContain('from "@/components/level/level-sign-height"');
+    expect(source("components/states/Skeletons.tsx")).not.toMatch(/from "@\/components\/level\/LevelSign"/);
+  });
+
+  it("the leaf module imports nothing, so it can never pull the sign back in", () => {
+    expect(source("components/level/level-sign-height.ts")).not.toMatch(/^\s*import\s/m);
+  });
+});
 
 describe("Skeletons", () => {
   it("a block takes exactly the height it is given", () => {
