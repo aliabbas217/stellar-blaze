@@ -137,7 +137,8 @@ check_once() {
     # No replica, so no runningState or healthState to read: the three conditions above are all there is to check.
     scaled_to_zero=true
   else
-    [ "$running" = "Running" ] || problems+=("revision $latest runningState is '$running', expected Running")
+    # RunningAtMaxScale: a healthy replica count that has reached maxReplicas (web and alerts are pinned 1/1, so they always read it).
+    [ "$running" = "Running" ] || [ "$running" = "RunningAtMaxScale" ] || problems+=("revision $latest runningState is '$running', expected Running or RunningAtMaxScale")
     if [ "$no_ingress" = true ]; then
       if [ "$health" != "Healthy" ] && ! is_null_value "$health"; then
         problems+=("revision $latest healthState is '$health', expected Healthy (or None for a worker without probes)")

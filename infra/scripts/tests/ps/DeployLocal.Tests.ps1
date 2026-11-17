@@ -374,6 +374,19 @@ Describe 'Get-GateFailure (Review Focus 1)' {
         $zero = New-Snapshot -Replicas 0 -Running 'Stopped' -Health 'None'
         (@(Get-GateFailure -Snapshot $zero -ExpectedImage $script:ApiImage -Kind Worker) -join "`n") | Should -Match 'replicas'
     }
+    It 'accepts RunningAtMaxScale: web and the alerts worker are capped at one replica, so a healthy one always reads it (seen live 2026-11-17)' {
+        @(Get-GateFailure -Snapshot (New-Snapshot -Running 'RunningAtMaxScale') -ExpectedImage $script:ApiImage -Kind Ingress).Count | Should -Be 0
+        @(Get-GateFailure -Snapshot (New-Snapshot -Running 'RunningAtMaxScale' -Health 'None' -Traffic 0) -ExpectedImage $script:ApiImage -Kind Worker).Count | Should -Be 0
+    }
+    It 'RunningAtMaxScale excuses nothing else: health, image, replicas and traffic are still checked, and other running states still fail' {
+        (@(Get-GateFailure -Snapshot (New-Snapshot -Running 'RunningAtMaxScale' -Health 'Unhealthy') -ExpectedImage $script:ApiImage -Kind Ingress) -join "`n") | Should -Match 'healthState'
+        (@(Get-GateFailure -Snapshot (New-Snapshot -Running 'RunningAtMaxScale' -Image 'old:1') -ExpectedImage $script:ApiImage -Kind Ingress) -join "`n") | Should -Match 'expected'
+        (@(Get-GateFailure -Snapshot (New-Snapshot -Running 'RunningAtMaxScale' -Replicas 0) -ExpectedImage $script:ApiImage -Kind Ingress) -join "`n") | Should -Match 'replicas'
+        (@(Get-GateFailure -Snapshot (New-Snapshot -Running 'RunningAtMaxScale' -Traffic 50) -ExpectedImage $script:ApiImage -Kind Ingress) -join "`n") | Should -Match 'trafficWeight'
+        foreach ($state in 'Degraded', 'Failed', 'Processing', 'ActivationFailed', 'Stopped', 'ScaledToZero') {
+            (@(Get-GateFailure -Snapshot (New-Snapshot -Running $state) -ExpectedImage $script:ApiImage -Kind Ingress) -join "`n") | Should -Match 'runningState'
+        }
+    }
 }
 
 Describe 'Get-GateFailure for the api in cool mode (minReplicas 0, -AllowScaleToZero)' {

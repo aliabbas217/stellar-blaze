@@ -1407,6 +1407,19 @@ test_healthcheck_fails_when_not_running() {
   assert_out_has "runningState is 'Failed'"
 }
 
+# Container Apps reports RunningAtMaxScale for a healthy revision at its replica cap (web and alerts are pinned 1/1); seen live 2026-11-17.
+test_healthcheck_passes_at_max_scale() {
+  STUB_RUNNING="RunningAtMaxScale" run_health --timeout 0
+  assert_rc 0
+  assert_out_has "PASS healthcheck api"
+}
+
+test_healthcheck_max_scale_does_not_excuse_an_unhealthy_revision() {
+  STUB_RUNNING="RunningAtMaxScale" STUB_HEALTH="Unhealthy" run_health --timeout 0
+  assert_rc 1
+  assert_out_has "healthState is 'Unhealthy'"
+}
+
 test_healthcheck_fails_when_traffic_is_not_100() {
   STUB_TRAFFIC="0" run_health --timeout 0
   assert_rc 1
@@ -2660,6 +2673,8 @@ tests=(
   test_healthcheck_fails_when_unhealthy
   test_healthcheck_fails_while_provisioning
   test_healthcheck_fails_when_not_running
+  test_healthcheck_passes_at_max_scale
+  test_healthcheck_max_scale_does_not_excuse_an_unhealthy_revision
   test_healthcheck_fails_when_traffic_is_not_100
   test_healthcheck_fails_without_a_replica
   test_healthcheck_no_ingress_accepts_none_but_the_default_does_not
