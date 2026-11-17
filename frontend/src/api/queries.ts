@@ -2,7 +2,7 @@ import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
 import { ApiProblem, networkProblem } from "@/api/problem";
 import { queryKeys } from "@/api/query-keys";
-import { call } from "@/api/result";
+import { call, isAbortOrTimeout } from "@/api/result";
 import { ROSTER_INVALID_TYPE, RosterInvalidProblem, rosterErrorsOf } from "@/api/roster-problem";
 import type { components } from "@/api/schema";
 import { trackSafetyFlight } from "@/lib/safety-flight";
@@ -155,11 +155,6 @@ export const STOP_TIMEOUT_MS = 8_000;
 /** Undo and resume (`DELETE`) get a longer bound: ending a stop is the opposite risk and should be given time to land, but never forever. */
 export const CLEAR_STOP_TIMEOUT_MS = 15_000;
 
-/** Whether `error` is a request that was aborted or timed out (`AbortSignal.timeout` rejects with a `TimeoutError`). */
-function isAbort(error: unknown): boolean {
-  return error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError");
-}
-
 /**
  * `orThrow` for the safety writes: an abort or a timeout is the same as no answer at all (a status 0 `ApiProblem`, the offline path),
  * not the rethrown `AbortError` that `call()` keeps for cancelled queries. Nothing cancels these requests; only the clock does.
@@ -169,7 +164,7 @@ async function orThrowBounded<T>(request: Promise<{ data?: T; error?: unknown; r
     // Counted as in flight while it is on the wire: the service worker update check waits for it (features/pwa/safety-flight.ts).
     return await trackSafetyFlight(orThrow(request));
   } catch (error) {
-    if (isAbort(error)) throw new ApiProblem(networkProblem());
+    if (isAbortOrTimeout(error)) throw new ApiProblem(networkProblem());
     throw error;
   }
 }

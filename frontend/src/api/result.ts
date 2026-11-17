@@ -3,6 +3,25 @@ import { networkProblem, toProblem, type Problem } from "@/api/problem";
 /** The outcome of an API call. HTTP failures are values here, not exceptions: the request id survives. */
 export type Result<T> = { ok: true; data: T } | { ok: false; problem: Problem };
 
+function nameOf(error: unknown): string | undefined {
+  return typeof error === "object" && error !== null && "name" in error && typeof error.name === "string" ? error.name : undefined;
+}
+
+/**
+ * Whether `error` is a request that was cancelled (`AbortError`). Judged by the error's NAME and not by `instanceof DOMException`:
+ * that class belongs to a realm (a page, a worker, or a test environment such as jsdom), and `fetch` can throw the `DOMException`
+ * of another realm (in jsdom it does), for which `instanceof` is false although the error is an abort.
+ */
+export function isAbortError(error: unknown): boolean {
+  return nameOf(error) === "AbortError";
+}
+
+/** Whether `error` is an abort or a timeout (`AbortSignal.timeout` rejects with a `TimeoutError`); by name, for the reason above. */
+export function isAbortOrTimeout(error: unknown): boolean {
+  const name = nameOf(error);
+  return name === "AbortError" || name === "TimeoutError";
+}
+
 /**
  * Settles an openapi-fetch call into a Result.
  *
@@ -16,7 +35,7 @@ export async function call<T>(p: Promise<{ data?: T; error?: unknown; response: 
   try {
     settled = await p;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    if (isAbortError(error)) throw error;
     return { ok: false, problem: networkProblem() };
   }
 
