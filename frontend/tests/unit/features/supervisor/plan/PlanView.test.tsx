@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import type { Middleware } from "openapi-fetch";
 import { IDBFactory } from "fake-indexeddb";
 import { http, HttpResponse } from "msw/http";
-import { types } from "node:util";
 import type { ReactNode } from "react";
 import en from "../../../../../messages/en.json";
 import { apiClient } from "@/api/client";
@@ -617,11 +616,29 @@ describe("the plan screen: refused and empty states", () => {
   });
 
   it("while the plan loads, the skeleton is shown and Stop work is already live", async () => {
-    server.use(http.get(DAY_PLAN, () => new Promise<Response>(() => undefined)));
+    // The plan is HELD and then let go, not lost: a request that never answers is still in flight when the test ends, and its
+    // asynchronous teardown raced the first request of a later test on a busy CI runner (the site lookup of the heat test below
+    // went to the real network: "fetch failed", and no plan strip). Here the request finishes inside this test.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get(DAY_PLAN, async ({ params }) => {
+        await held;
+        const plan = crewDayPlan(String(params["crew_id"]), REPLAY_DATE);
+        if (plan === undefined) throw new Error("fixture");
+        return HttpResponse.json(plan);
+      }),
+    );
     renderPlan("crew-b");
 
     expect(document.querySelector('[aria-busy="true"] [data-skeleton]')).not.toBeNull();
     expect(await screen.findByRole("button", { name: /^Stop work/ })).toBeEnabled();
+    release();
+    await waitFor(() => {
+      expect(rows().length).toBeGreaterThan(0);
+    });
   });
 });
 
@@ -644,6 +661,8 @@ describe("the plan screen: forecast, k and restrictions", () => {
   });
 
   it("a fresh forecast draws the heat of each hour on the strip, from the API's own numbers", async () => {
+    // The strip waits for the site, the crews and the forecast. If it does not appear, the error says which of them did not arrive and
+    // why (what each query did, what apiClient.GET threw, what the mock server saw): a page dump alone shows only THAT it is missing.
     recordDiagnostics();
     renderPlan("crew-b");
     try {
@@ -651,20 +670,7 @@ describe("the plan screen: forecast, k and restrictions", () => {
         expect(document.querySelectorAll<HTMLElement>("[data-plan-heat] span[style*='--heat-night']").length).toBeGreaterThan(0);
       });
     } catch (error) {
-      // The strip waits for the site, the crews and the forecast; say which of them did not arrive and why. The site request is asked
-      // again outside the query (which turns every exception into "Network error") so that what it throws is on record.
-      let probe: string;
-      try {
-        const result = await apiClient.GET("/api/v1/sites");
-        probe = `GET /api/v1/sites answers now: HTTP ${String(result.response.status)}`;
-      } catch (thrown) {
-        probe =
-          thrown instanceof Error
-            ? `GET /api/v1/sites throws now: ${thrown.name}: ${thrown.message} (cause: ${String(thrown.cause)})\n${thrown.stack ?? ""}`
-            : `GET /api/v1/sites throws now: ${String(thrown)}`;
-      }
-      const globals = `Request is the setup proxy: ${String(types.isProxy(Request))}; location ${location.href}`;
-      throw new Error(`${String(error)}\nqueries: ${describeQueries()}\n${probe}\n${globals}`, { cause: error });
+      throw new Error(`${String(error)}\nqueries: ${describeQueries()}`, { cause: error });
     }
     expect(screen.getByText(en.supervisor.plan.strip.heatNote)).toBeInTheDocument();
   });
