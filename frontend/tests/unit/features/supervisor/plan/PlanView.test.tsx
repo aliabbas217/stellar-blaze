@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { Middleware } from "openapi-fetch";
 import { IDBFactory } from "fake-indexeddb";
 import { http, HttpResponse } from "msw/http";
+import { types } from "node:util";
 import type { ReactNode } from "react";
 import en from "../../../../../messages/en.json";
 import { apiClient } from "@/api/client";
@@ -649,8 +650,20 @@ describe("the plan screen: forecast, k and restrictions", () => {
         expect(document.querySelectorAll<HTMLElement>("[data-plan-heat] span[style*='--heat-night']").length).toBeGreaterThan(0);
       });
     } catch (error) {
-      // The strip waits for the site, the crews and the forecast; say which of them did not arrive and why.
-      throw new Error(`${String(error)}\nqueries: ${describeQueries()}`, { cause: error });
+      // The strip waits for the site, the crews and the forecast; say which of them did not arrive and why. The site request is asked
+      // again outside the query (which turns every exception into "Network error") so that what it throws is on record.
+      let probe: string;
+      try {
+        const result = await apiClient.GET("/api/v1/sites");
+        probe = `GET /api/v1/sites answers now: HTTP ${String(result.response.status)}`;
+      } catch (thrown) {
+        probe =
+          thrown instanceof Error
+            ? `GET /api/v1/sites throws now: ${thrown.name}: ${thrown.message} (cause: ${String(thrown.cause)})\n${thrown.stack ?? ""}`
+            : `GET /api/v1/sites throws now: ${String(thrown)}`;
+      }
+      const globals = `Request is the setup proxy: ${String(types.isProxy(Request))}; location ${location.href}`;
+      throw new Error(`${String(error)}\nqueries: ${describeQueries()}\n${probe}\n${globals}`, { cause: error });
     }
     expect(screen.getByText(en.supervisor.plan.strip.heatNote)).toBeInTheDocument();
   });
