@@ -263,8 +263,21 @@ serve_deploy_call() {
       # shellcheck disable=SC2086  # a space separated list, one output line per word
       if [ -n "${STUB_PRIVATE_ENDPOINTS:-}" ]; then printf '%s\n' $STUB_PRIVATE_ENDPOINTS; fi
       ;;
+    "group show "*)
+      # smoke.sh S6 without --expect-location: the region of the resource group (STUB_RG_MISSING=1: it cannot be read)
+      if [ "${STUB_RG_MISSING:-}" = "1" ]; then
+        echo "ERROR: (ResourceGroupNotFound) Resource group 'rg-test' could not be found." >&2
+        exit 3
+      fi
+      printf '%s\n' "${STUB_RG_LOCATION:-uaenorth}"
+      ;;
     "resource list "*)
-      printf 'api\tuaenorth\nweb\tuaenorth\npg-test\tUAE North\n'
+      # STUB_RESOURCES_REGION moves every resource to another region (a deployment in the fallback ladder)
+      if [ -n "${STUB_RESOURCES_REGION:-}" ]; then
+        printf 'api\t%s\nweb\t%s\npg-test\t%s\n' "$STUB_RESOURCES_REGION" "$STUB_RESOURCES_REGION" "$STUB_RESOURCES_REGION"
+      else
+        printf 'api\tuaenorth\nweb\tuaenorth\npg-test\tUAE North\n'
+      fi
       if [ "$scenario" = "other_region" ]; then printf 'stray-db\twesteurope\n'; fi
       if [ -n "${STUB_EXTRA_RESOURCE:-}" ]; then printf '%s\t%s\n' "${STUB_EXTRA_RESOURCE%%:*}" "${STUB_EXTRA_RESOURCE#*:}"; fi
       ;;

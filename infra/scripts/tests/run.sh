@@ -1667,6 +1667,26 @@ test_smoke_s6_follows_expect_location() {
   assert_out_has "FAIL S6 resources outside westeurope: api(uaenorth)"
 }
 
+test_smoke_s6_defaults_to_the_region_of_the_resource_group() {
+  # The first pipeline-driven deploy (France Central) failed S6 because the default was the constant uaenorth.
+  STUB_RG_LOCATION=francecentral STUB_RESOURCES_REGION=francecentral run_smoke rg-test --no-wait
+  assert_rc 0
+  assert_out_has "PASS S6 all 3 resources are in francecentral"
+}
+
+test_smoke_s6_still_catches_a_resource_outside_the_region_of_the_group() {
+  # the group is in France Central, the resources (the stub default) are in UAE North: that is a stray, not a pass
+  STUB_RG_LOCATION=francecentral run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S6 resources outside francecentral: api(uaenorth)"
+}
+
+test_smoke_s6_fails_when_the_region_of_the_group_cannot_be_read() {
+  STUB_RG_MISSING=1 run_smoke rg-test --no-wait
+  assert_rc 1
+  assert_out_has "FAIL S6 cannot read the region of resource group rg-test"
+}
+
 test_smoke_reports_fail_s7_when_plain_http_is_served() {
   STUB_CURL_RULES="" run_smoke rg-test --no-wait
   assert_rc 1
@@ -2712,6 +2732,9 @@ tests=(
   test_smoke_reports_fail_s2_when_max_replicas_is_3
   test_smoke_reports_fail_s6_on_a_resource_in_another_region
   test_smoke_s6_follows_expect_location
+  test_smoke_s6_defaults_to_the_region_of_the_resource_group
+  test_smoke_s6_still_catches_a_resource_outside_the_region_of_the_group
+  test_smoke_s6_fails_when_the_region_of_the_group_cannot_be_read
   test_smoke_reports_fail_s7_when_plain_http_is_served
   test_smoke_s7_accepts_a_refusal
   test_smoke_reports_fail_s5_when_the_worker_is_not_running
