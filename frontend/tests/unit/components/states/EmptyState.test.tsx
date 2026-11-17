@@ -137,7 +137,7 @@ describe("EmptyState", () => {
           title="Alone"
           reason="r"
           primary={{ label: "Parked", href: "/admin" }}
-          secondary={{ label: "Parked too", href: "/worker/join" }}
+          secondary={{ label: "Parked too", href: "/supervisor/qr" }}
         />,
       );
       expect(screen.getByRole("heading", { name: "Alone" })).toBeInTheDocument();

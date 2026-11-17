@@ -29,7 +29,7 @@ const SYNTAX = "no-restricted-syntax";
 const WORKER_ROUTE = "src/app/[locale]/(worker)/worker/page.tsx";
 const SUPERVISOR_ROUTE = "src/app/[locale]/(supervisor)/supervisor/page.tsx";
 const HSE_ROUTE = "src/app/[locale]/(hse)/hse/page.tsx";
-const WORKER_FEATURE_NAMES = ["today", "profile", "risk", "push", "alert", "unwell"];
+const WORKER_FEATURE_NAMES = ["today", "profile", "risk", "push", "alert", "unwell", "join"];
 const WORKER_FEATURES = WORKER_FEATURE_NAMES.map((name) => `src/features/${name}/x.ts`);
 const SUPERVISOR_FEATURE = "src/features/supervisor/x.ts";
 // The judge route group, the locale landing page and the judge feature (F2 Task 3): public, static, no personal data. They
