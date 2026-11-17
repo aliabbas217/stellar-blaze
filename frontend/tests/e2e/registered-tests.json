@@ -907,12 +907,13 @@
       "rtl: Urdu field screens > ur plan is rtl and unclipped, the Stop bar is there and 44 px, the clocks are isolated",
       "rtl: Urdu field screens > ur unwell sheet is rtl and unclipped, the calls are 44 px and the dock is still there",
       "rtl: Urdu field screens > ur worker today is rtl and unclipped",
-      "rtl: the header name keeps (synthetic) visible at 390 in ar on /supervisor",
-      "rtl: the header name keeps (synthetic) visible at 390 in ar on /supervisor/crews/crew-b",
-      "rtl: the header name keeps (synthetic) visible at 390 in ar on /worker?site=site-demo-mussafah&crew=crew-b",
-      "rtl: the header name keeps (synthetic) visible at 390 in ur on /supervisor",
-      "rtl: the header name keeps (synthetic) visible at 390 in ur on /supervisor/crews/crew-b",
-      "rtl: the header name keeps (synthetic) visible at 390 in ur on /worker?site=site-demo-mussafah&crew=crew-b"
+      "rtl: the Today shift strip mirrors in Arabic and Urdu and runs left to right in English, with the now line at its hour",
+      "rtl: the header name keeps its Demo tag visible at 390 in ar on /supervisor",
+      "rtl: the header name keeps its Demo tag visible at 390 in ar on /supervisor/crews/crew-b",
+      "rtl: the header name keeps its Demo tag visible at 390 in ar on /worker?site=site-demo-mussafah&crew=crew-b",
+      "rtl: the header name keeps its Demo tag visible at 390 in ur on /supervisor",
+      "rtl: the header name keeps its Demo tag visible at 390 in ur on /supervisor/crews/crew-b",
+      "rtl: the header name keeps its Demo tag visible at 390 in ur on /worker?site=site-demo-mussafah&crew=crew-b"
     ],
     "desktop-chromium": [
       "rtl: Arabic and the claims surfaces > ar landing mirrors: the copy and the story footer are Arabic right to left, the claim fragments English, the apps linked",
@@ -925,29 +926,30 @@
       "rtl: Urdu field screens > ur plan is rtl and unclipped, the Stop bar is there and 44 px, the clocks are isolated",
       "rtl: Urdu field screens > ur unwell sheet is rtl and unclipped, the calls are 44 px and the dock is still there",
       "rtl: Urdu field screens > ur worker today is rtl and unclipped",
-      "rtl: the header name keeps (synthetic) visible at 390 in ar on /supervisor",
-      "rtl: the header name keeps (synthetic) visible at 390 in ar on /supervisor/crews/crew-b",
-      "rtl: the header name keeps (synthetic) visible at 390 in ar on /worker?site=site-demo-mussafah&crew=crew-b",
-      "rtl: the header name keeps (synthetic) visible at 390 in ur on /supervisor",
-      "rtl: the header name keeps (synthetic) visible at 390 in ur on /supervisor/crews/crew-b",
-      "rtl: the header name keeps (synthetic) visible at 390 in ur on /worker?site=site-demo-mussafah&crew=crew-b"
+      "rtl: the Today shift strip mirrors in Arabic and Urdu and runs left to right in English, with the now line at its hour",
+      "rtl: the header name keeps its Demo tag visible at 390 in ar on /supervisor",
+      "rtl: the header name keeps its Demo tag visible at 390 in ar on /supervisor/crews/crew-b",
+      "rtl: the header name keeps its Demo tag visible at 390 in ar on /worker?site=site-demo-mussafah&crew=crew-b",
+      "rtl: the header name keeps its Demo tag visible at 390 in ur on /supervisor",
+      "rtl: the header name keeps its Demo tag visible at 390 in ur on /supervisor/crews/crew-b",
+      "rtl: the header name keeps its Demo tag visible at 390 in ur on /worker?site=site-demo-mussafah&crew=crew-b"
     ]
   },
   "shell.spec.ts": {
     "mobile-chromium": [
       "root redirects to /en without Accept-Language, and with one",
+      "the field shell on /en/worker > Screen colors in the settings sheet starts on Automatic (the theme the inline script set) and Night is one tap",
       "the field shell on /en/worker > a client navigation from the landing page applies sun mode, and the way back removes it",
-      "the field shell on /en/worker > shows the header, the six language chips, the unwell link and the tabs, in sun mode",
-      "the field shell on /en/worker > the chips switch language as a new document and keep the query string",
-      "the field shell on /en/worker > the sun toggle reads the theme the inline script set, and flips it with one tap",
+      "the field shell on /en/worker > shows the header with one language pill, the unwell link and the tabs, in sun mode",
+      "the field shell on /en/worker > the settings sheet switches language as a new document and keeps the query string",
       "the field shell on /en/worker > the unwell link is on every worker page"
     ],
     "desktop-chromium": [
       "root redirects to /en without Accept-Language, and with one",
+      "the field shell on /en/worker > Screen colors in the settings sheet starts on Automatic (the theme the inline script set) and Night is one tap",
       "the field shell on /en/worker > a client navigation from the landing page applies sun mode, and the way back removes it",
-      "the field shell on /en/worker > shows the header, the six language chips, the unwell link and the tabs, in sun mode",
-      "the field shell on /en/worker > the chips switch language as a new document and keep the query string",
-      "the field shell on /en/worker > the sun toggle reads the theme the inline script set, and flips it with one tap",
+      "the field shell on /en/worker > shows the header with one language pill, the unwell link and the tabs, in sun mode",
+      "the field shell on /en/worker > the settings sheet switches language as a new document and keeps the query string",
       "the field shell on /en/worker > the unwell link is on every worker page"
     ]
   },
@@ -1210,8 +1212,8 @@
       "Today says 'Last known level: Red' in the lead and the last-known sign can be reached above the dock: stale, ur",
       "Today shows the emergency control and the protective lead together when offline (Today)",
       "Today's Urdu level words keep clear of the rows around them in the Nastaliq face (Today)",
-      "Today, Urdu, partial: the hero share is a recorded exception (19.2%) and never lower (Today)",
-      "Today, Urdu, personal: the hero share is a recorded exception (26.4%) and never lower (Today)"
+      "Today, Urdu, partial: the hero holds the 35% floor (Today)",
+      "Today, Urdu, personal: the hero holds the 35% floor (Today)"
     ],
     "desktop-chromium": [
       "Today leads with the protective plan and holds the hero floor: fallback, ar, night",
@@ -1255,12 +1257,13 @@
       "Today says 'Last known level: Red' in the lead and the last-known sign can be reached above the dock: stale, ur",
       "Today shows the emergency control and the protective lead together when offline (Today)",
       "Today's Urdu level words keep clear of the rows around them in the Nastaliq face (Today)",
-      "Today, Urdu, partial: the hero share is a recorded exception (19.2%) and never lower (Today)",
-      "Today, Urdu, personal: the hero share is a recorded exception (26.4%) and never lower (Today)"
+      "Today, Urdu, partial: the hero holds the 35% floor (Today)",
+      "Today, Urdu, personal: the hero holds the 35% floor (Today)"
     ]
   },
   "worker-today.spec.ts": {
     "mobile-chromium": [
+      "Change crew lets go of the pin and opens the first-run chooser (Today)",
       "QR-less demo entry reaches a level in two taps (Today)",
       "Today asks for the risk policy only on a phone that holds a profile, and the site's level never waits for it (Today)",
       "Today draws a last known level as secondary: no heat in the spine, no line at now, the protective plan as the lead (Today)",
@@ -1274,18 +1277,20 @@
       "Today passes the design gate at 390: the level and spine, en, sun",
       "Today passes the design gate at 390: the level and spine, ur, night",
       "Today passes the design gate at 390: the level and spine, ur, sun",
-      "Today puts the action lead directly under the sign, in the first fold, in English and Urdu (Today)",
+      "Today puts the action sentence first, then the level, then the shift strip, in the first fold, in English and Urdu (Today)",
       "Today says what to do offline, from what the phone saved (Today)",
       "Today shows a stale forecast as the protective plan, with the last known level secondary, never as live (Today)",
       "Today shows the protective plan and the protective level for a fallback forecast, never a live level (Today)",
       "Today shows the site rules and the request id when the forecast cannot be had (Today)",
       "Today with no shift keeps the site level and says why there is no plan (Today)",
       "out of season Today has no slot (Today)",
-      "sun mode follows the replay clock and the toggle overrides until midnight (Today)",
-      "the Today level is the site's, live, with the action and the draft label (Today)",
+      "sun mode follows the replay clock and Screen colors in the settings sheet overrides until midnight (Today)",
+      "the Today level is the site's, live, with the action and the one clinical note (Today)",
+      "the settings sheet opens from the one language pill, holds six languages, Screen colors and Change crew, and closes with Escape and focus returns (Today)",
       "the why-drawer of Today says where the level comes from in plain words and prints no technical field outside For auditors (Today)"
     ],
     "desktop-chromium": [
+      "Change crew lets go of the pin and opens the first-run chooser (Today)",
       "QR-less demo entry reaches a level in two taps (Today)",
       "Today asks for the risk policy only on a phone that holds a profile, and the site's level never waits for it (Today)",
       "Today draws a last known level as secondary: no heat in the spine, no line at now, the protective plan as the lead (Today)",
@@ -1299,15 +1304,16 @@
       "Today passes the design gate at 390: the level and spine, en, sun",
       "Today passes the design gate at 390: the level and spine, ur, night",
       "Today passes the design gate at 390: the level and spine, ur, sun",
-      "Today puts the action lead directly under the sign, in the first fold, in English and Urdu (Today)",
+      "Today puts the action sentence first, then the level, then the shift strip, in the first fold, in English and Urdu (Today)",
       "Today says what to do offline, from what the phone saved (Today)",
       "Today shows a stale forecast as the protective plan, with the last known level secondary, never as live (Today)",
       "Today shows the protective plan and the protective level for a fallback forecast, never a live level (Today)",
       "Today shows the site rules and the request id when the forecast cannot be had (Today)",
       "Today with no shift keeps the site level and says why there is no plan (Today)",
       "out of season Today has no slot (Today)",
-      "sun mode follows the replay clock and the toggle overrides until midnight (Today)",
-      "the Today level is the site's, live, with the action and the draft label (Today)",
+      "sun mode follows the replay clock and Screen colors in the settings sheet overrides until midnight (Today)",
+      "the Today level is the site's, live, with the action and the one clinical note (Today)",
+      "the settings sheet opens from the one language pill, holds six languages, Screen colors and Change crew, and closes with Escape and focus returns (Today)",
       "the why-drawer of Today says where the level comes from in plain words and prints no technical field outside For auditors (Today)"
     ]
   },
