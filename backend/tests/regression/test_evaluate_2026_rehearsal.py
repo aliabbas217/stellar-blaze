@@ -72,8 +72,10 @@ def _peak_rss_windows() -> float:
 
     counters = Counters()
     counters.cb = ctypes.sizeof(Counters)
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    # ctypes.WinDLL exists only on Windows: mypy on Linux reports attr-defined, and on Windows the ignore is unused,
+    # hence both codes. This function runs only when os.name == "nt" (see _peak_rss_mib).
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined, unused-ignore]
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)  # type: ignore[attr-defined, unused-ignore]
     kernel32.GetCurrentProcess.restype = wintypes.HANDLE
     psapi.GetProcessMemoryInfo.argtypes = (wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD)
     if not psapi.GetProcessMemoryInfo(kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb):
