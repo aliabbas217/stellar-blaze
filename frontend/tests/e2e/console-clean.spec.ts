@@ -1,4 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import ar from "../../messages/ar.json";
+import en from "../../messages/en.json";
+import ur from "../../messages/ur.json";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 import { watchConsole } from "./gate.ts";
 
@@ -40,13 +43,25 @@ interface Route {
   /** The path after the locale prefix. */
   readonly path: string;
   /** What shows once the client has hydrated and the screen has settled. */
-  readonly settled: (page: Page) => Promise<void>;
+  readonly settled: (page: Page, locale: string) => Promise<void>;
 }
 
-/** The field frames show the demo clock as "--:--" until the client has taken the page over (static pages) and then as the time. */
+const MESSAGES = { en, ur, ar } as const;
+
+/**
+ * The field frames show the demo clock as "--:--" until a forecast has answered, and then as the time. That settles the screens that
+ * read a forecast; a screen that never asks for one (the alerts page) keeps "--:--" for good, which is right (the app never invents a
+ * time; ADR 0034, the clock amendment of 2026-11-17), so it waits for its own post-hydration content instead (ALERTS_HYDRATED).
+ */
 const FRAME_HYDRATED = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
   await expect(page.locator("header")).not.toContainText("--:--");
+};
+/** The alerts page: its Enable button is decided by the browser after hydration (as in a11y.spec.ts). */
+const ALERTS_HYDRATED = async (page: Page, locale: string): Promise<void> => {
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
+  const words = MESSAGES[locale as keyof typeof MESSAGES];
+  await expect(page.getByRole("button", { name: words.alerts.enable })).toBeVisible();
 };
 const SUPERVISOR_CREWS = async (page: Page): Promise<void> => {
   await FRAME_HYDRATED(page);
@@ -72,7 +87,7 @@ const LANDING_ROUTES: readonly Route[] = [
 ];
 const WORKER_ROUTES: readonly Route[] = [
   { name: "worker today", path: `/worker${PIN}`, settled: FRAME_HYDRATED },
-  { name: "worker alerts", path: "/worker/alerts", settled: FRAME_HYDRATED },
+  { name: "worker alerts", path: "/worker/alerts", settled: ALERTS_HYDRATED },
   { name: "worker alert", path: `/worker/alert?audience=site&target=${SITE_DEMO}&level=orange&valid_from=${VALID_FROM}`, settled: FRAME_HYDRATED },
 ];
 const SUPERVISOR_ROUTES: readonly Route[] = [
@@ -126,7 +141,7 @@ async function load(page: Page, locale: string, route: Route, prepare?: (page: P
   const search = route.path.startsWith("?") ? route.path : "";
   const path = route.path.startsWith("?") ? "" : route.path;
   await page.goto(`/${locale}${path}${search}`);
-  await route.settled(page);
+  await route.settled(page, locale);
   await expectClean(page, errors, `/${locale}${route.path}`);
 }
 
@@ -191,6 +206,6 @@ test("console clean: the minute ticks between the server render and hydration (s
     await request.continue();
   });
   await page.goto(`/en${route.path}`);
-  await route.settled(page);
+  await route.settled(page, "en");
   await expectClean(page, errors, "minute boundary");
 });
