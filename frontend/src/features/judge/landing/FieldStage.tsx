@@ -15,7 +15,7 @@ export function FieldStage({ children, picture = true, path }: { readonly childr
       data-field-stage=""
       {...(path === undefined ? {} : { "data-field-path": path })}
       {...(picture ? { "aria-hidden": true } : {})}
-      className="relative isolate h-72 overflow-hidden rounded-card bg-ground min-[900px]:h-80"
+      className="relative isolate h-72 overflow-hidden rounded-card bg-ground min-[900px]:h-80 min-[1100px]:h-[27rem]"
     >
       {children}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,var(--ground)_0%,transparent_14%,transparent_86%,var(--ground)_100%)]" />

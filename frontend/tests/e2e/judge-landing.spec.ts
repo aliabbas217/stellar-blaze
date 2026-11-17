@@ -139,10 +139,11 @@ test("landing hero field: ideal state at rest, the caption names what it is, the
   await expect(slider).toHaveAttribute("aria-valuetext", /^14:00: hottest grid cell \d\d\.\d degrees, Abu Dhabi airport \d\d\.\d$/);
   await expect(page.locator("[data-field-caption]")).toContainText("An illustration, not the day we scored.");
   await expect(page.getByRole("button", { name: /Play the day|Pause the day/ })).toHaveCount(0);
-  // the field sits beside the phone, in the same hero column
+  // wide: the phone is the right column of the hero beside the promise, and the field has the row under both (a third column made the map a thumbnail)
   const phone = await page.locator("[data-hero-phone]").boundingBox();
   const stage = await page.locator("[data-field-stage]").boundingBox();
-  expect((stage?.x ?? 0) - ((phone?.x ?? 0) + (phone?.width ?? 0)), "the field starts after the phone").toBeGreaterThanOrEqual(0);
+  expect(stage?.y ?? 0, "the field is under the phone").toBeGreaterThanOrEqual((phone?.y ?? 0) + (phone?.height ?? 0) - 1);
+  expect(stage?.width ?? 0, "the field has room: wider than the phone").toBeGreaterThan((phone?.width ?? 0) + 100);
   await shot(page, "ideal", WIDE);
   const report = await gateReport(page, { consoleErrors: errors, spine: true, hero: false });
   note("landing ideal 1440", report);

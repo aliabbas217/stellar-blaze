@@ -102,9 +102,16 @@ export function LandingView({ field, data, dir }: LandingViewProps) {
                 <span className="min-w-0 flex-1 basis-56">{t("door.note")}</span>
               </p>
             </div>
-            <div data-hero="" className="grid items-start gap-8 min-[640px]:grid-cols-[18rem_minmax(0,1fr)] min-[1100px]:gap-6">
-              <HeroPhone omaa={field.omaa} ban={ban} dir={dir} />
-              <div data-field-column="" className="grid min-w-0 content-start gap-3">
+            {/*
+              The phone and the field. Under 1100 px they are one block of their own (side by side from 640 px). From 1100 px the block is
+              `contents`: the phone becomes the right column of the hero beside the promise, and the field takes a row of its own under
+              both (it was a third column of about 300 px, where the map was a thumbnail and its station names collided).
+            */}
+            <div data-hero="" className="grid items-start gap-8 min-[640px]:grid-cols-[18rem_minmax(0,1fr)] min-[1100px]:contents">
+              <div className="grid min-w-0 justify-items-center min-[1100px]:justify-self-center">
+                <HeroPhone omaa={field.omaa} ban={ban} dir={dir} />
+              </div>
+              <div data-field-column="" className="grid min-w-0 content-start gap-3 min-[1100px]:col-span-2 min-[1100px]:mx-auto min-[1100px]:w-full min-[1100px]:max-w-2xl">
                 <FieldGate panel={panel}>
                   <FieldPoster panel={panel} grid={field.grid} reading={reading} />
                 </FieldGate>

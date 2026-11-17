@@ -37,6 +37,7 @@ export function HeroPhone({ omaa, ban, dir }: HeroPhoneProps) {
   const t = useTranslations("judge.landing.phone");
   const today = useTranslations("worker.today");
   const nav = useTranslations("worker.nav");
+  const spine = useTranslations("worker.today.spine");
   const lead = today("lead.cycle", { work: String(DEMO.cycle.work), rest: String(DEMO.cycle.rest) });
   const cells = omaa.map((wbgtC, hour) => ({ hour, wbgtC })).filter((cell) => cell.hour >= DEMO.from && cell.hour < DEMO.to);
 
@@ -66,7 +67,20 @@ export function HeroPhone({ omaa, ban, dir }: HeroPhoneProps) {
           <Pictogram name="shade" className="size-10" />
           <span>{lead}</span>
         </p>
-        <TimeSpine orientation="h" from={DEMO.from} to={DEMO.to} cells={cells} now={DEMO.now} ban={ban} surface="field" dir={dir} aria={t("caption")} />
+        {/* As on the worker's Today (S5): only "Now" is written on the strip; the slot's own long label is off (it wrapped to three lines in a 288 px phone and repeated the one under the field). */}
+        <TimeSpine
+          orientation="h"
+          from={DEMO.from}
+          to={DEMO.to}
+          cells={cells}
+          now={DEMO.now}
+          ban={ban}
+          surface="field"
+          dir={dir}
+          aria={t("caption")}
+          waypoints={[{ at: DEMO.now, title: spine("now") }]}
+          slotLabel={false}
+        />
         <div className={`${ACTION_STOP} pointer-events-none`}>
           <Pictogram name="cross" className="size-5" />
           <span>{nav("unwell")}</span>

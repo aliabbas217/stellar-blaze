@@ -134,7 +134,7 @@ describe("the landing page: the hero", () => {
     expect(phone.querySelector("figcaption")).toHaveTextContent("A worker's phone on the demo site: one sign, in the worker's language. \u201cI feel unwell\u201d is always there.");
   });
 
-  it("the field stays beside the phone, with its caption and one Where from chip, and no readout", () => {
+  it("the field stays in the hero block with the phone (a row of its own from 1100 px), with its caption and one Where from chip, and no readout", () => {
     const { container } = view();
     const column = container.querySelector("[data-field-column]") as HTMLElement;
     expect(column.closest("[data-hero]")?.querySelector("[data-hero-phone]")).not.toBeNull();
