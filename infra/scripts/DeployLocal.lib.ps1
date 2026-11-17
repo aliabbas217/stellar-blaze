@@ -64,7 +64,7 @@ $script:ParamEnvNames = @(
     'SB_RULESET_ID', 'SB_MODEL_ID', 'TRUSTED_PROXY_HOPS'
 )
 # Every variable infra/bicep/bootstrap.bicepparam reads.
-$script:BootstrapEnvNames = @('LOCATION', 'BUDGET_CONTACT_EMAIL', 'GITHUB_OWNER', 'OPERATOR_PRINCIPAL_ID', 'BUDGET_MONTH')
+$script:BootstrapEnvNames = @('LOCATION', 'BUDGET_CONTACT_EMAIL', 'GITHUB_OWNER', 'GITHUB_OWNER_ID', 'GITHUB_REPO_ID', 'OPERATOR_PRINCIPAL_ID', 'BUDGET_MONTH')
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Output and secret masking
@@ -406,6 +406,8 @@ function New-DeployConfig {
         [string]$VapidSubject = '',
         [string]$PostgresVersion = '',
         [string]$GitHubOwner = '',
+        [string]$GitHubOwnerId = '',
+        [string]$GitHubRepoId = '',
         [string]$BudgetMonth = '',
         [switch]$Placeholder,
         [switch]$SkipBuild,
@@ -418,6 +420,14 @@ function New-DeployConfig {
         [switch]$Cool,
         [string]$RepoRoot = ''
     )
+    foreach ($pair in @(@('GitHubOwnerId', $GitHubOwnerId), @('GitHubRepoId', $GitHubRepoId))) {
+        if ($pair[1] -and $pair[1] -notmatch '^\d+$') {
+            throw "-$($pair[0]) must be the numeric GitHub id (gh api repos/OWNER/REPO --jq '.owner.id, .id'). Got '$($pair[1])'."
+        }
+    }
+    if ([bool]$GitHubOwnerId -ne [bool]$GitHubRepoId) {
+        throw '-GitHubOwnerId and -GitHubRepoId go together: the immutable OIDC subject needs both ids (give both, or neither for the classic subject).'
+    }
     if ($Warm -and $Cool) {
         throw '-Warm and -Cool cannot be used together: -Warm deploys the api with one replica always running, -Cool lets it scale to zero. Pass one of them, or neither (a re-deploy then keeps the recorded mode).'
     }
@@ -432,6 +442,8 @@ function New-DeployConfig {
         VapidSubject    = $VapidSubject
         PostgresVersion = $PostgresVersion
         GitHubOwner     = $GitHubOwner
+        GitHubOwnerId   = $GitHubOwnerId
+        GitHubRepoId    = $GitHubRepoId
         BudgetMonth     = $BudgetMonth
         Placeholder     = [bool]$Placeholder
         SkipBuild       = [bool]$SkipBuild
@@ -943,7 +955,10 @@ function Invoke-Bootstrap {
     Write-CostReminder
     Write-Say "Budget month: $month ($($budget.Source)). A re-run in a later month reuses it."
     if ($newLife) { Write-Say "Note: $reason." }
-    if ($Config.GitHubOwner) { Write-Say "GitHub owner: $($Config.GitHubOwner) (a federated credential for repo:$($Config.GitHubOwner)/stellar-blaze:environment:demo is created)." }
+    if ($Config.GitHubOwner -and $Config.GitHubOwnerId -and $Config.GitHubRepoId) {
+        Write-Say "GitHub owner: $($Config.GitHubOwner) (a federated credential for the IMMUTABLE subject repo:$($Config.GitHubOwner)@$($Config.GitHubOwnerId)/stellar-blaze@$($Config.GitHubRepoId):environment:demo is created)."
+    }
+    elseif ($Config.GitHubOwner) { Write-Say "GitHub owner: $($Config.GitHubOwner) (a federated credential for repo:$($Config.GitHubOwner)/stellar-blaze:environment:demo is created; a repository created after 15 July 2026 needs -GitHubOwnerId and -GitHubRepoId, see infra/README.md section 13)." }
     else { Write-Say 'No -GitHubOwner: no federated credential is created (add it later by re-running with -GitHubOwner).' }
 
     $operator = ConvertFrom-AzTsv -Text (Invoke-Native -FilePath 'az' -Arguments @('ad', 'signed-in-user', 'show', '--query', 'id', '-o', 'tsv'))
@@ -953,6 +968,8 @@ function Invoke-Bootstrap {
         LOCATION              = $Config.Location
         BUDGET_CONTACT_EMAIL  = $Config.ContactEmail
         GITHUB_OWNER          = $Config.GitHubOwner
+        GITHUB_OWNER_ID       = $Config.GitHubOwnerId
+        GITHUB_REPO_ID        = $Config.GitHubRepoId
         OPERATOR_PRINCIPAL_ID = $operator
         BUDGET_MONTH          = $month
     }

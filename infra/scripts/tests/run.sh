@@ -566,6 +566,16 @@ test_check_template_b2_fails_when_a_credential_exists_without_an_owner() {
   expect_c_fail b2-owner B2 modules/bootstrap-rg.bicep 's/= if (!empty(githubOwner)) {/= {/' "although githubOwner is empty"
 }
 
+test_check_template_b2_fails_when_the_immutable_ids_are_ignored() {
+  bicep_ready || return 0
+  expect_c_fail b2-immutable B2 modules/bootstrap-rg.bicep 's/^var immutableSubject = .*/var immutableSubject = false/' "boot-immutable: subject is"
+}
+
+test_check_template_b2_fails_when_one_id_is_enough_for_the_immutable_subject() {
+  bicep_ready || return 0
+  expect_c_fail b2-half B2 modules/bootstrap-rg.bicep 's/^var immutableSubject = .*/var immutableSubject = !empty(githubOwnerId) || !empty(githubRepoId)/' "boot-half-id: subject is"
+}
+
 test_check_template_b3_fails_when_the_operator_gets_a_role_unasked() {
   bicep_ready || return 0
   expect_c_fail b3-operator B3 modules/bootstrap-rg.bicep 's/= if (!empty(operatorPrincipalId)) {/= {/' "boot-bare: unexpected role assignment"
@@ -2586,6 +2596,8 @@ tests=(
   test_check_template_b1_fails_when_budget_month_is_ignored
   test_check_template_b2_fails_when_the_subject_loses_its_case
   test_check_template_b2_fails_when_a_credential_exists_without_an_owner
+  test_check_template_b2_fails_when_the_immutable_ids_are_ignored
+  test_check_template_b2_fails_when_one_id_is_enough_for_the_immutable_subject
   test_check_template_b3_fails_when_the_operator_gets_a_role_unasked
   test_check_template_b3_fails_when_the_apps_identity_cannot_pull
   test_check_template_b4_fails_when_the_admin_user_is_enabled
