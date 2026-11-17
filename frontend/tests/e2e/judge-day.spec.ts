@@ -44,7 +44,7 @@ function note(label: string, report: Awaited<ReturnType<typeof gateReport>>): vo
 test("day page keyboard: chart table toggle and day rule drawer", async ({ page }) => {
   await open(page);
   await expect(page.locator("[data-day-shown=scored]")).toContainText("Sun 14 Jun");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One day, hour by hour, chosen by a rule before we looked");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One day, hour by hour: 14 June 2026");
   // the rule button is the page's one primary action and opens the proof drawer
   const rule = page.getByRole("button", { name: "Read the day rule" });
   await expect(rule).toBeVisible();
@@ -105,11 +105,11 @@ for (const [name, viewport] of [
   test(`day page counters carry both thetas and the not-in-force outline is named in words, ${name} wide`, async ({ page }) => {
     await open(page, viewport);
     const counters = page.locator("[data-day-counters]");
-    // whole hours, out of the 7 the station recorded; the label names the policy (P1 called all 7, the ADOSH zones 5)
+    // whole hours, out of the 7 the station recorded; the label names the way to warn (the fixed 32 °C rule warned about all 7, the regulator's zones 5)
     await expect(counters.locator("[data-counter-id=high]")).toContainText("7");
     await expect(counters.locator("[data-counter-id=p1]")).toContainText("7 of 7");
     await expect(counters.locator("[data-counter-id=raw]")).toContainText("5 of 7");
-    await expect(counters.locator("[data-counter-id=raw]")).toContainText("ADOSH zones on the raw forecast");
+    await expect(counters.locator("[data-counter-id=raw]")).toContainText("Warned about by the regulator's zones, raw forecast");
     await expect(counters.locator("[data-counter-id=ours]")).toContainText("6 of 7");
     await expect(counters.locator("[data-counter-id=balanced]")).toContainText("5 of 7");
     await expect(counters).not.toContainText(/\d\.0(?!\d)/);

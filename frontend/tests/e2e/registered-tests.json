@@ -672,7 +672,7 @@
       "scoreboard frontier commute lives in the URL and survives a reload",
       "scoreboard renders with the API stopped: the page makes no API request at all",
       "scoreboard scored state: three scored tables, no pending cell, no DEV stamp, every number with its proof",
-      "scoreboard shows every verdict sentence exactly as the runner wrote it, including the one that did not hold",
+      "scoreboard shows every verdict in plain words with the file's flag, including the one that was not met, and keeps the runner's sentence under For auditors",
       "scoreboard story footer links only to routes that exist and Next goes to the day page",
       "scoreboard where-from chip opens a plain story with no path or fingerprint, For auditors opens the record, and Escape returns focus to the chip"
     ],
@@ -694,7 +694,7 @@
       "scoreboard frontier commute lives in the URL and survives a reload",
       "scoreboard renders with the API stopped: the page makes no API request at all",
       "scoreboard scored state: three scored tables, no pending cell, no DEV stamp, every number with its proof",
-      "scoreboard shows every verdict sentence exactly as the runner wrote it, including the one that did not hold",
+      "scoreboard shows every verdict in plain words with the file's flag, including the one that was not met, and keeps the runner's sentence under For auditors",
       "scoreboard story footer links only to routes that exist and Next goes to the day page",
       "scoreboard where-from chip opens a plain story with no path or fingerprint, For auditors opens the record, and Escape returns focus to the chip"
     ]
