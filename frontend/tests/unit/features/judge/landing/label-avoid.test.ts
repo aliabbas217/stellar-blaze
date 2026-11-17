@@ -79,9 +79,9 @@ describe("a frame of the WebGL scene reads no layout", () => {
 
   /** A stage with a hero, a readout card (stubbed rect) and two names; returns the names' container. */
   function page(): { container: HTMLElement; names: HTMLElement[]; visibilityWrites: () => number } {
-    document.body.innerHTML = `<section data-landing-hero><div data-hero><div data-names></div></div><div data-field-readout></div></section>`;
-    const stage = document.querySelector("[data-hero]") as HTMLElement;
-    const card = document.querySelector("[data-field-readout]") as HTMLElement;
+    document.body.innerHTML = `<section data-landing-hero><div data-field-stage><div data-names></div></div><div data-avoid></div></section>`;
+    const stage = document.querySelector("[data-field-stage]") as HTMLElement;
+    const card = document.querySelector("[data-avoid]") as HTMLElement;
     stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 600, right: 1000, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
     card.getBoundingClientRect = () => ({ left: 700, top: 200, width: 300, height: 300, right: 1000, bottom: 500, x: 700, y: 200, toJSON: () => ({}) });
     const container = document.querySelector("[data-names]") as HTMLElement;
@@ -186,8 +186,8 @@ describe("collectObstacles", () => {
   });
 
   function stage(html: string): HTMLElement {
-    document.body.innerHTML = `<section data-landing-hero><div data-hero data-rect="0,0,1000,600"></div>${html}</section>`;
-    return document.querySelector("[data-hero]") as HTMLElement;
+    document.body.innerHTML = `<section data-landing-hero><div data-field-stage data-rect="0,0,1000,600"></div>${html}</section>`;
+    return document.querySelector("[data-field-stage]") as HTMLElement;
   }
 
   it("test_ctas_and_proof_chip_are_obstacles: a control marked data-avoid is kept clear of, like the card and the copy", () => {

@@ -347,12 +347,13 @@ test.describe("rtl: Arabic and the claims surfaces", () => {
     await expectClocksIsolated(page, "main", "ar Today");
   });
 
-  test("ar landing mirrors: the copy and the story footer are Arabic right to left, the claim fragments English, the apps linked", async ({ page }) => {
+  test("ar landing mirrors: the copy and the story footer are Arabic right to left, the story chapters English, the role door linked", async ({ page }) => {
     await open(page, "/ar", { size: DESK });
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(ar.judge.landing.title);
     expect(await page.locator("[data-claims-english]").count() + (await page.locator('[lang="en"][dir="ltr"]').count())).toBeGreaterThan(0);
     await expect(page.locator("[data-machine-translation]")).toHaveCount(1);
+    await expect(page.locator("[data-role-door] a")).toHaveText([new RegExp(`^${ar.judge.landing.door.worker.title}`), new RegExp(`^${ar.judge.landing.door.crew.title}`), new RegExp(`^${ar.judge.landing.door.safety.title}`), new RegExp(`^${ar.judge.landing.door.review.title}`)]);
     expect(await page.locator("body").innerText()).not.toMatch(NON_WESTERN_DIGIT);
   });
 });

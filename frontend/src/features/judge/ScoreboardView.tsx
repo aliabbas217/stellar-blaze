@@ -330,7 +330,7 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
         <li>{t("limits.twl")}</li>
       </ul>
 
-      <StoryNav current="scoreboard" />
+      <StoryNav current="evidence" />
     </main>
   );
 }

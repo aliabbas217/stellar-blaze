@@ -1420,10 +1420,10 @@
       "copyFailed": "लिंक कपी गर्न सकिएन",
       "steps": {
         "problem": "समस्या",
-        "scoreboard": "स्कोरबोर्ड",
+        "product": "उत्पादन",
+        "evidence": "प्रमाण",
         "day": "एक दिन",
-        "proof": "प्रमाण",
-        "product": "उत्पादन"
+        "boundary": "सीमा"
       }
     },
     "proof": {
@@ -1553,29 +1553,39 @@
       }
     },
     "landing": {
-      "metaTitle": "काम रोक्ने गर्मी, करिब 24 घण्टा अगाडिको पूर्वानुमान",
+      "metaTitle": "भोलिको गर्मीको योजना आज राति नै बनाउनुहोस्",
       "skip": "स्कोरबोर्डमा जानुहोस्",
-      "kicker": "गर्मी 2026, विमानस्थलका थर्मोमिटरहरूको तुलनामा फेरि चलाइएको",
-      "title": "काम रोक्ने गर्मी, करिब 24 घण्टा अगाडिको पूर्वानुमान।",
-      "lede": "घण्टै पिच्छे गर्मीको स्तर, कानुनी सिफ्ट योजना र छ भाषामा चेतावनी, कार्यस्थलका समूहहरूका लागि, सिफ्ट पिच्छे।",
-      "primary": "स्कोरबोर्ड हेर्नुहोस्",
-      "secondary": "मलाई घुमाएर देखाउनुहोस्",
-      "apps": {
-        "heading": "एपहरू खोल्नुहोस्",
-        "note": "यस डेमोमा दुवै कृत्रिम डेटामा चल्छन्।"
+      "kicker": "गत गर्मीको वास्तविक मौसममा, अबु धाबी विमानस्थलमा परीक्षण गरिएको",
+      "title": "भोलिको गर्मीको योजना आज राति नै बनाउनुहोस्।",
+      "lede": "Stellar Blaze ले भोलिको पूर्वानुमानलाई हरेक समूहका लागि काम र आराम योजनामा, र हरेक कामदारको फोनमा सरल चेतावनीमा बदल्छ, छ भाषामा।",
+      "door": {
+        "label": "यो कसका लागि हो?",
+        "worker": {
+          "title": "म साइटमा काम गर्छु",
+          "line": "आजको गर्मी र आराम गर्ने समय हेर्नुहोस्। कुनै खाता छैन।"
+        },
+        "crew": {
+          "title": "म एउटा समूह चलाउँछु",
+          "line": "तपाईंका समूहहरूको आज रातिको योजना हेर्नुहोस्। एउटै ट्यापमा काम रोक्नुहोस्।"
+        },
+        "safety": {
+          "title": "म सुरक्षा हेर्छु",
+          "line": "कुन समूहको योजना बन्यो, हस्ताक्षर भयो र काम रोकियो भनेर हेर्नुहोस्।"
+        },
+        "review": {
+          "title": "म यसको समीक्षा गर्दैछु",
+          "line": "यसको परीक्षण कसरी भयो हेर्नुहोस्, त्यसपछि जे चाहनुहुन्छ प्रयास गर्नुहोस्।"
+        },
+        "note": "यो एउटा डेमो हो। समूह र मानिसहरू काल्पनिक हुन्। कामदारलाई कहिल्यै खाता चाहिँदैन।"
+      },
+      "phone": {
+        "site": "Mussafah M-14 yard",
+        "demo": "डेमो",
+        "caption": "डेमो साइटमा एक कामदारको फोन: एउटा साइन, कामदारको आफ्नै भाषामा। “मलाई अस्वस्थ लागिरहेको छ” सधैं छ।"
       },
       "field": {
         "region": "संयुक्त अरब इमिरेट्समाथि अनुमानित गर्मीको क्षेत्र, {day}",
-        "readout": "चुनिएको घण्टामा क्षेत्रको रिडिङ",
-        "hottest": "{hour} मा सबैभन्दा तातो ग्रिड सेल",
-        "where": "{lat} उत्तर {lon} पूर्व",
-        "station": "अबु धाबी विमानस्थल (OMAA), यसको आफ्नै पूर्वानुमान शृङ्खला",
-        "limit": "भारी कामको सीमा (NIOSH)",
-        "cells": "सीमाभन्दा माथिका ग्रिड सेल",
-        "cellsOf": "{total} मध्ये {n}",
-        "degrees": "°C",
-        "sourcePeak": "घाममा WBGT, ECMWF को अघिल्लो दिन जारी पूर्वानुमानबाट, जसरी रेकर्ड भयो, कुनै सुधारअघि। {day} मा गर्मीको काँचो पूर्वानुमानको दैनिक सबैभन्दा उच्च चुचुरो छ र यो उदाहरणका लागि देखाइएको हो, हामीले मूल्यांकन गरेको दिनका रूपमा होइन।",
-        "sourcePlain": "घाममा WBGT, ECMWF को अघिल्लो दिन जारी पूर्वानुमानबाट, जसरी रेकर्ड भयो, कुनै सुधारअघि। {day} उदाहरणका लागि देखाइएको हो, हामीले मूल्यांकन गरेको दिनका रूपमा होइन।",
+        "caption": "एक तातो दिनका लागि सम्पूर्ण UAE मा पूर्वानुमानित गर्मी। एउटा उदाहरण, हामीले मूल्यांकन गरेको दिन होइन।",
         "proofWhat": "अनुमानित गर्मीको क्षेत्र, {day}, हरेक घण्टा",
         "stations": {
           "OMAA": "अबु धाबी",
@@ -1597,40 +1607,67 @@
           "primary": "स्कोरबोर्ड हेर्नुहोस्"
         }
       },
-      "hook": {
-        "heading": "स्टेशनको आफ्नै रेकर्डमा यो मौसम",
-        "label": "अबु धाबी विमानस्थलमा खतराका घण्टा, गर्मी 2026",
-        "interval": "{lo} देखि {hi}, 95% अन्तराल",
-        "definition": "खतराको घण्टा भनेको कामको दिनको समय, {hours}, भित्र ADOSH को उच्च वा रातो क्षेत्रमा परेको घण्टा हो। कुनै घण्टा खतराको घण्टा थियो कि थिएन भन्ने कुरा अवलोकनबाट निस्केको सत्यले तय गर्छ; {margin} W/m² को तापीय मार्जिन एउटा अनुमान हो।"
-      },
-      "problem": {
-        "eyebrow": "समस्या",
-        "heading": "दिउँसोको विश्रामले तातो घण्टाहरूको केही भाग मात्र ढाक्छ",
-        "body1": "{from} देखि {to} सम्म कानुनले {start} देखि {end} सम्म खुला ठाउँमा काम रोक्छ। रेकर्ड गरिएको काँचो पूर्वानुमानअनुसार त्यो अवधिबाहिर पनि कामका केही घण्टा भारी कामको सीमाभन्दा माथि छन्।",
-        "body2": "समूहलाई कुन घण्टा भन्ने जान्नुपर्छ, कुन महिना होइन। करिब 24 घण्टा अगाडि हामी उनीहरूलाई यही पूर्वानुमान दिन्छौं।",
-        "ofHours": "जम्मा {total} कामका घण्टामध्ये",
-        "calendarAria": "कामको हरेक घण्टा, {start} देखि {end} सम्म, {from} देखि {to} सम्मका {days} दिनको, सुधारअघि रेकर्ड गरिएको काँचो पूर्वानुमानबाट। {n} मध्ये {over} घण्टा {limit} °C को भारी कामको सीमाभन्दा माथि छन्; दिउँसोको विश्राम लागू हुने दिनमा त्यो रेखामुनि काटेर देखाइएको छ।",
-        "legendSlot": "दिउँसोको विश्राम, कानुनअनुसार",
-        "legendHot": "रङ्गीन: {limit} °C भन्दा माथि, जति चम्किलो उति तातो",
-        "legendCool": "खैरो: सीमाभन्दा माथि छैन",
-        "tableToggle": "गणनालाई तालिकामा देखाउनुहोस्",
-        "tableCaption": "सीमाभन्दा माथिका कामका घण्टा, रेकर्ड गरिएको काँचो पूर्वानुमान, महिना अनुसार",
-        "columns": {
-          "period": "दिन",
-          "hours": "कामका घण्टा",
-          "over": "सीमाभन्दा माथि",
-          "inBreak": "दिउँसोको विश्रामभित्र"
+      "story": {
+        "morning": {
+          "eyebrow": "A morning on site",
+          "heading": "One sign, one instruction, in the worker's own language.",
+          "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
+          "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
+          "link": "Open the worker screen"
         },
-        "period": "{from} देखि {to} सम्म",
-        "bridge": "यी {over} घण्टा र यो पेजको माथिका {danger} खतराका घण्टाले फरक सीमाको तुलनामा फरक कुरा गन्छन्: यहाँ रेकर्ड गरिएको काँचो पूर्वानुमान {limit} °C को भारी कामको सीमाको तुलनामा छ, त्यहाँ स्टेशनले देखेको गर्मी ADOSH को उच्च वा रातो क्षेत्रको तुलनामा छ।"
-      },
-      "season": {
-        "eyebrow": "स्कोरबोर्ड",
-        "heading": "समूहलाई सचेत गराउने चार तरिका, एउटै गर्मीमा परीक्षण गरिएको",
-        "body": "सचेत गराउने हरेक तरिकाले करिब 24 घण्टा अगाडि पाउने पूर्वानुमान मात्र पाउँछ। त्यसपछि स्टेशनका थर्मोमिटरले के भयो भनेर बताउँछन्।",
-        "open": "स्कोरबोर्ड खोल्नुहोस्"
-      },
-      "ledeProof": "मौसम र स्कोरबारे हरेक संख्या रेकर्ड गरिएको फाइलबाट आउँछ, र त्यसको प्रमाण चिह्नले कुन हो भनेर बताउँछ।"
+        "plan": {
+          "eyebrow": "Tonight's plan",
+          "heading": "The crew lead sees which crew heats up first.",
+          "body": "A plan that follows the published ADOSH heat rules. Stop work is one tap. So is Undo. It never waits for a sign-off.",
+          "demo": "Demo site: the crews and times are made up.",
+          "level": "Orange until 11:00",
+          "unsigned": "Plan unsigned",
+          "crewA": {
+            "name": "Crew A",
+            "task": "Rebar fixing"
+          },
+          "crewC": {
+            "name": "Crew C",
+            "task": "Formwork"
+          },
+          "crewD": {
+            "name": "Crew D",
+            "task": "Survey and inspection"
+          },
+          "stop": "Stop work, Crew A",
+          "link": "Open the crews screen",
+          "tag": "Demo"
+        },
+        "boundary": {
+          "eyebrow": "The boundary",
+          "heading": "An employer asks for one worker's health record. The answer is no.",
+          "body": "The service holds none. Every worker at the site can see that it was asked.",
+          "request": "Request from an employer account.",
+          "requestDetail": "Individual health data for one worker.",
+          "refused": "Refused.",
+          "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
+          "link": "See the refusal, recorded"
+        },
+        "evidence": {
+          "eyebrow": "Last summer, replayed",
+          "heading": "Danger hours nobody was warned about.",
+          "body": "Abu Dhabi airport, summer 2026, with only the forecast made a day ahead. Every setting was chosen using 2024 and 2025 data only. We wrote down how we would be judged before the scored run, and ran it once.",
+          "caption": "Danger hours not warned about, by way of warning. A shorter bar means fewer danger hours missed.",
+          "falseAlarms": "False-alarm hours: {n}",
+          "verdicts": "How the main checks came out",
+          "scoreboard": "See the full scoreboard",
+          "unavailable": "The scored results are not available in this build."
+        },
+        "limits": {
+          "eyebrow": "What this does not show yet",
+          "one": "One test summer and one airport station, not a worksite.",
+          "two": "No worker outcomes. This is not yet a health claim.",
+          "three": "Not yet checked by a clinician. Translations are machine-made.",
+          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "tested": "See how it was tested",
+          "auditors": "For auditors"
+        }
+      }
     }
   }
 }

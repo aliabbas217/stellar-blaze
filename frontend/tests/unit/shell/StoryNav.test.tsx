@@ -31,7 +31,7 @@ function pagePatterns(dir = APP, prefix = ""): RegExp[] {
 
 describe("StoryNav prefetch", () => {
   it("no link prefetches: a prefetched route's script would count against this page's JS budget", () => {
-    const { container } = renderWithIntl(<StoryNav current="proof" />);
+    const { container } = renderWithIntl(<StoryNav current="evidence" />);
     const links = [...container.querySelectorAll("a")];
     expect(links.length).toBeGreaterThan(2);
     for (const link of links) expect(link.getAttribute("data-prefetch")).toBe("false");
@@ -52,8 +52,19 @@ describe("StoryNav steps", () => {
     for (const step of STORY_STEPS) expect(isDeferredRoute(step.href), step.href).toBe(false);
   });
 
-  it("keeps the five steps in the story order", () => {
-    expect(STORY_STEPS.map((s) => s.id)).toEqual(["problem", "scoreboard", "day", "proof", "product"]);
+  it("keeps the five steps in the story order (A2): the problem, the product, the evidence, one day, the boundary, and no proof step", () => {
+    expect(STORY_STEPS.map((s) => s.id)).toEqual(["problem", "product", "evidence", "day", "boundary"]);
+  });
+
+  it("sends the product step to the worker screen until the tour exists, and only that step is an app step", () => {
+    expect(STORY_STEPS.find((s) => s.id === "product")).toMatchObject({ href: "/worker", frame: "app" });
+    expect(STORY_STEPS.filter((s) => s.frame === "app").map((s) => s.id)).toEqual(["product"]);
+  });
+
+  it("every judge step is a page that renders the story footer (the footer names its own step)", () => {
+    // The boundary is the last step and has a footer (Back, no Next): the old story ended on a worker screen with no way on.
+    const judge = STORY_STEPS.filter((s) => s.frame === "judge").map((s) => s.id);
+    expect(judge).toEqual(["problem", "evidence", "day", "boundary"]);
   });
 });
 
@@ -73,49 +84,58 @@ function withUnbuilt(id: StoryStep["id"], body: () => void): void {
 
 describe("StoryNav", () => {
   it("marks the current step and links the built ones", () => {
-    renderWithIntl(<StoryNav current="scoreboard" />);
+    renderWithIntl(<StoryNav current="evidence" />);
     const nav = screen.getByRole("navigation", { name: "Story" });
-    expect(within(nav).getByText("Step 2 of 5: Scoreboard")).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "Scoreboard" })).toHaveAttribute("aria-current", "step");
+    expect(within(nav).getByText("Step 3 of 5: The evidence")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "The evidence" })).toHaveAttribute("aria-current", "step");
+    expect(within(nav).getByRole("link", { name: "The product" })).toHaveAttribute("href", "/worker");
+    expect(within(nav).getByRole("link", { name: "The boundary" })).toHaveAttribute("href", "/replay/governance");
+    expect(within(nav).queryByRole("link", { name: "Proof" })).toBeNull();
     expect(within(nav).getByRole("link", { name: "The problem" })).toHaveAttribute("href", "/");
     expect(within(nav).getByRole("link", { name: "One day" })).toHaveAttribute("href", "/replay/day");
   });
 
   it("an unbuilt step is text, not a link, and Back and Next skip it", () => {
     withUnbuilt("day", () => {
-      renderWithIntl(<StoryNav current="scoreboard" />);
+      renderWithIntl(<StoryNav current="evidence" />);
       const nav = screen.getByRole("navigation", { name: "Story" });
       expect(within(nav).queryByRole("link", { name: "One day" })).toBeNull();
       expect(within(nav).getByText("One day")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Back: The problem" })).toHaveAttribute("href", "/");
-      expect(screen.getByRole("link", { name: "Next: Proof" })).toHaveAttribute("href", "/replay/proof/forecast.hours_over_limit");
+      expect(screen.getByRole("link", { name: "Next: The boundary" })).toHaveAttribute("href", "/replay/governance");
     });
   });
 
-  it("goes back to the previous step and forward to the next one", () => {
-    renderWithIntl(<StoryNav current="scoreboard" />);
+  it("goes back to the previous step and forward to the next one, passing over the worker app (it has no story footer, so Back and Next never send a reader there)", () => {
+    renderWithIntl(<StoryNav current="evidence" />);
     expect(screen.getByRole("link", { name: "Back: The problem" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Next: One day" })).toHaveAttribute("href", "/replay/day");
   });
 
-  it("has no Next on the last step and no Back on the first", () => {
-    const { unmount } = renderWithIntl(<StoryNav current="product" />);
+  it("the first step goes on to the evidence, not into the worker app", () => {
+    renderWithIntl(<StoryNav current="problem" />);
+    expect(screen.getByRole("link", { name: "Next: The evidence" })).toHaveAttribute("href", "/replay");
+    expect(screen.queryByRole("link", { name: "Next: The product" })).toBeNull();
+  });
+
+  it("the last step, the boundary, has Back to the day and no Next; the first has no Back", () => {
+    const { unmount } = renderWithIntl(<StoryNav current="boundary" />);
     expect(screen.queryByRole("link", { name: /^Next:/ })).toBeNull();
-    expect(screen.getByRole("link", { name: "Back: Proof" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back: One day" })).toHaveAttribute("href", "/replay/day");
     unmount();
     renderWithIntl(<StoryNav current="problem" />);
     expect(screen.queryByRole("link", { name: /^Back:/ })).toBeNull();
   });
 
   it("has 44 px or larger targets on every link and button (min-h-(--target) or min-h-(--target-field))", () => {
-    const { container } = renderWithIntl(<StoryNav current="scoreboard" />);
+    const { container } = renderWithIntl(<StoryNav current="evidence" />);
     for (const target of container.querySelectorAll("a, button")) expect(target.className, target.textContent).toMatch(/min-h-\(--target(-field)?\)/);
   });
 
   it("copies the link of the page without its query and says so", async () => {
     const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    renderWithIntl(<StoryNav current="scoreboard" />);
+    renderWithIntl(<StoryNav current="evidence" />);
     fireEvent.click(screen.getByRole("button", { name: "Copy link to this step" }));
     await waitFor(() => {
       expect(screen.getByText("Link copied")).toBeInTheDocument();
@@ -125,7 +145,7 @@ describe("StoryNav", () => {
 
   it("says when the link could not be copied", async () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.reject(new Error("denied")) } });
-    renderWithIntl(<StoryNav current="scoreboard" />);
+    renderWithIntl(<StoryNav current="evidence" />);
     fireEvent.click(screen.getByRole("button", { name: "Copy link to this step" }));
     await waitFor(() => {
       expect(screen.getByText("Could not copy the link")).toBeInTheDocument();

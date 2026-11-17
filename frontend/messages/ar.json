@@ -1420,10 +1420,10 @@
       "copyFailed": "تعذّر نسخ الرابط",
       "steps": {
         "problem": "المشكلة",
-        "scoreboard": "لوحة النتائج",
+        "product": "المنتج",
+        "evidence": "الأدلة",
         "day": "يوم واحد",
-        "proof": "الدليل",
-        "product": "المنتج"
+        "boundary": "الحدود"
       }
     },
     "proof": {
@@ -1553,29 +1553,39 @@
       }
     },
     "landing": {
-      "metaTitle": "حرارة توقف العمل، متوقعة قبل نحو 24 ساعة",
+      "metaTitle": "خطّط لحرارة الغد الليلة",
       "skip": "انتقل إلى لوحة النتائج",
-      "kicker": "صيف 2026، معاد تشغيله مقابل مقاييس حرارة المطار",
-      "title": "حرارة توقف العمل، متوقعة قبل نحو 24 ساعة.",
-      "lede": "مستويات حرارة ساعة بساعة، وخطط ورديات قانونية وتحذيرات بست لغات، لفرق العمل في موقع العمل، وردية بوردية.",
-      "primary": "شاهد لوحة النتائج",
-      "secondary": "خذني في جولة",
-      "apps": {
-        "heading": "افتح التطبيقين",
-        "note": "كلاهما يعمل ببيانات اصطناعية في هذه النسخة التجريبية."
+      "kicker": "اختُبر على طقس الصيف الماضي الحقيقي في مطار أبوظبي",
+      "title": "خطّط لحرارة الغد الليلة.",
+      "lede": "يحوّل Stellar Blaze توقعات اليوم التالي إلى خطة عمل وراحة لكل فريق، وتحذيرًا واضحًا على هاتف كل عامل، بست لغات.",
+      "door": {
+        "label": "لمن هذا؟",
+        "worker": {
+          "title": "أعمل في موقع",
+          "line": "اطّلع على حرارة اليوم ووقت الراحة. بلا حساب."
+        },
+        "crew": {
+          "title": "أدير فريقًا",
+          "line": "اطّلع على خطة الليلة لفرقك. أوقف العمل بلمسة واحدة."
+        },
+        "safety": {
+          "title": "أتولى السلامة",
+          "line": "اطّلع على الفرق التي وُضعت خطتها ووُقّعت وتوقف عملها."
+        },
+        "review": {
+          "title": "أراجع هذا العمل",
+          "line": "اطّلع على كيفية اختباره، ثم جرّب ما تشاء."
+        },
+        "note": "هذا عرض تجريبي. الفرق والأشخاص مختلَقون. لا يحتاج العمال إلى حساب أبدًا."
+      },
+      "phone": {
+        "site": "Mussafah M-14 yard",
+        "demo": "تجريبي",
+        "caption": "هاتف عامل في الموقع التجريبي: لوحة واحدة بلغة العامل. زر «أشعر بتوعك» موجود دائمًا."
       },
       "field": {
         "region": "حقل الحرارة المتوقعة فوق الإمارات، {day}",
-        "readout": "قراءة الحقل في الساعة المحددة",
-        "hottest": "أسخن خلية في الشبكة عند {hour}",
-        "where": "{lat} شمالًا {lon} شرقًا",
-        "station": "مطار أبوظبي (OMAA)، سلسلة توقعاته الخاصة",
-        "limit": "حد العمل الشاق (NIOSH)",
-        "cells": "خلايا الشبكة فوق الحد",
-        "cellsOf": "{n} من {total}",
-        "degrees": "°C",
-        "sourcePeak": "WBGT في الشمس من توقعات ECMWF الصادرة في اليوم السابق، كما سُجّلت، قبل أي تصحيح. {day} فيه أعلى ذروة يومية في التوقعات الخام للصيف، ويُعرض للتوضيح، لا بوصفه اليوم الذي قيّمناه.",
-        "sourcePlain": "WBGT في الشمس من توقعات ECMWF الصادرة في اليوم السابق، كما سُجّلت، قبل أي تصحيح. يُعرض {day} للتوضيح، لا بوصفه اليوم الذي قيّمناه.",
+        "caption": "الحرارة المتوقعة في أنحاء الإمارات ليوم حار واحد. توضيح فقط، وليس اليوم الذي قيّمناه.",
         "proofWhat": "حقل الحرارة المتوقعة، {day}، كل ساعة",
         "stations": {
           "OMAA": "أبوظبي",
@@ -1597,40 +1607,67 @@
           "primary": "شاهد لوحة النتائج"
         }
       },
-      "hook": {
-        "heading": "الموسم في سجل المحطة نفسها",
-        "label": "ساعات خطر في مطار أبوظبي، صيف 2026",
-        "interval": "من {lo} إلى {hi}، فاصل ثقة 95%",
-        "definition": "ساعة الخطر هي ساعة تقع في منطقة ADOSH المرتفعة أو الحمراء خلال النهار الفعلي للعمل، {hours}. يُحسم ما إذا كانت الساعة ساعة خطر بالحقيقة المشتقة من الرصد؛ وهامش الحرارة البالغ {margin} واط/م² افتراض."
-      },
-      "problem": {
-        "eyebrow": "المشكلة",
-        "heading": "استراحة الظهيرة لا تغطي إلا جزءًا من الساعات الحارة",
-        "body1": "من {from} إلى {to} يمنع القانون العمل في الخارج من {start} إلى {end}. وتضع التوقعات الخام المسجَّلة ساعات عمل فوق حد العمل الشاق خارج تلك النافذة أيضًا.",
-        "body2": "يحتاج الفريق إلى معرفة أي الساعات، لا أي الأشهر. وهذه هي التوقعات التي نقدمها له قبل نحو 24 ساعة.",
-        "ofHours": "من أصل {total} ساعة عمل",
-        "calendarAria": "كل ساعة عمل، من {start} إلى {end}، على مدى {days} يومًا من {from} إلى {to}، من التوقعات الخام المسجَّلة قبل التصحيح. {over} من {n} ساعة فوق حد العمل الشاق البالغ {limit} °C؛ وتظهر استراحة الظهيرة أسفل الخط في الأيام التي تسري فيها.",
-        "legendSlot": "استراحة الظهيرة، بحكم القانون",
-        "legendHot": "ملوّن: فوق {limit} °C، والأفتح أسخن",
-        "legendCool": "رمادي: ليس فوق الحد",
-        "tableToggle": "اعرض الأعداد في جدول",
-        "tableCaption": "ساعات العمل في التوقعات الخام المسجَّلة فوق الحد، حسب الشهر",
-        "columns": {
-          "period": "الأيام",
-          "hours": "ساعات العمل",
-          "over": "فوق الحد",
-          "inBreak": "داخل استراحة الظهيرة"
+      "story": {
+        "morning": {
+          "eyebrow": "A morning on site",
+          "heading": "One sign, one instruction, in the worker's own language.",
+          "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
+          "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
+          "link": "Open the worker screen"
         },
-        "period": "من {from} إلى {to}",
-        "bridge": "هذه الساعات البالغ عددها {over} وساعات الخطر البالغ عددها {danger} في أعلى هذه الصفحة تعدّ أشياء مختلفة مقابل حدود مختلفة: هنا التوقعات الخام المسجَّلة مقابل حد العمل الشاق البالغ {limit} °C، وهناك الحرارة التي رصدتها المحطة مقابل منطقة ADOSH المرتفعة أو الحمراء."
-      },
-      "season": {
-        "eyebrow": "لوحة النتائج",
-        "heading": "أربع طرق لتحذير فريق، مقيَّمة على صيف واحد",
-        "body": "تحصل كل طريقة تحذير على التوقعات التي كانت ستتوفر لها قبل نحو 24 ساعة فقط. ثم تقول مقاييس حرارة المحطة ما حدث.",
-        "open": "افتح لوحة النتائج"
-      },
-      "ledeProof": "كل رقم عن الموسم والنتائج يأتي من ملف مسجَّل، وتذكر شارة الدليل أي ملف."
+        "plan": {
+          "eyebrow": "Tonight's plan",
+          "heading": "The crew lead sees which crew heats up first.",
+          "body": "A plan that follows the published ADOSH heat rules. Stop work is one tap. So is Undo. It never waits for a sign-off.",
+          "demo": "Demo site: the crews and times are made up.",
+          "level": "Orange until 11:00",
+          "unsigned": "Plan unsigned",
+          "crewA": {
+            "name": "Crew A",
+            "task": "Rebar fixing"
+          },
+          "crewC": {
+            "name": "Crew C",
+            "task": "Formwork"
+          },
+          "crewD": {
+            "name": "Crew D",
+            "task": "Survey and inspection"
+          },
+          "stop": "Stop work, Crew A",
+          "link": "Open the crews screen",
+          "tag": "Demo"
+        },
+        "boundary": {
+          "eyebrow": "The boundary",
+          "heading": "An employer asks for one worker's health record. The answer is no.",
+          "body": "The service holds none. Every worker at the site can see that it was asked.",
+          "request": "Request from an employer account.",
+          "requestDetail": "Individual health data for one worker.",
+          "refused": "Refused.",
+          "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
+          "link": "See the refusal, recorded"
+        },
+        "evidence": {
+          "eyebrow": "Last summer, replayed",
+          "heading": "Danger hours nobody was warned about.",
+          "body": "Abu Dhabi airport, summer 2026, with only the forecast made a day ahead. Every setting was chosen using 2024 and 2025 data only. We wrote down how we would be judged before the scored run, and ran it once.",
+          "caption": "Danger hours not warned about, by way of warning. A shorter bar means fewer danger hours missed.",
+          "falseAlarms": "False-alarm hours: {n}",
+          "verdicts": "How the main checks came out",
+          "scoreboard": "See the full scoreboard",
+          "unavailable": "The scored results are not available in this build."
+        },
+        "limits": {
+          "eyebrow": "What this does not show yet",
+          "one": "One test summer and one airport station, not a worksite.",
+          "two": "No worker outcomes. This is not yet a health claim.",
+          "three": "Not yet checked by a clinician. Translations are machine-made.",
+          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "tested": "See how it was tested",
+          "auditors": "For auditors"
+        }
+      }
     }
   }
 }

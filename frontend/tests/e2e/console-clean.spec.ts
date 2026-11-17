@@ -78,7 +78,7 @@ const SIGNED_PLAN = async (page: Page): Promise<void> => {
 };
 const LANDING = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
-  await expect(page.locator("[data-hero][data-field-path]")).toBeAttached({ timeout: 15_000 });
+  await expect(page.locator("[data-field-stage][data-field-path]")).toBeAttached({ timeout: 15_000 });
 };
 
 const LANDING_ROUTES: readonly Route[] = [

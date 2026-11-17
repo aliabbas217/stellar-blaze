@@ -60,10 +60,15 @@ describe("the sign's language-aware leading", () => {
     expect(token("--leading-ar")).toBe(1.8);
   });
 
-  it("the landing's h1 and both h2 read it, and no other file moved to it", () => {
-    const landing = readFileSync(path.resolve(import.meta.dirname, "../../../src/features/judge/landing/LandingView.tsx"), "utf8");
-    expect(landing.match(/leading-\(--sign-leading-display\)/g)?.length).toBe(3);
-    expect(landing).not.toContain("leading-(--sign-leading-word)");
+  it("the landing's h1 and the chapter headings read it (the hero's own h1, and one shared heading class for the chapters), and no other file moved to it", () => {
+    const dir = path.resolve(import.meta.dirname, "../../../src/features/judge/landing");
+    const landing = readFileSync(path.join(dir, "LandingView.tsx"), "utf8");
+    const chapters = readFileSync(path.join(dir, "LandingChapters.tsx"), "utf8");
+    expect(landing.match(/leading-\(--sign-leading-display\)/g)?.length).toBe(1);
+    expect(chapters.match(/leading-\(--sign-leading-display\)/g)?.length).toBe(1);
+    // every chapter heading takes that one class, not a leading of its own
+    expect(chapters.match(/className=\{HEADING\}/g)?.length).toBe(4);
+    expect(landing + chapters).not.toContain("leading-(--sign-leading-word)");
   });
 
   it("matches the line height the page itself uses for the language", () => {
