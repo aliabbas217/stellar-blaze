@@ -1109,7 +1109,7 @@ test_run_migrate_identifies_the_new_execution_by_the_list_when_start_prints_noth
   list_before="${lines%% *}"
   list_after="$(printf '%s' "$lines" | awk '{print $2}')"
   start_line="$(az_line "containerapp job start" | awk '{print $1}')"
-  [ "$list_before" -lt "$start_line" ] && [ "$list_after" -gt "$start_line" ] || fail "the executions were not listed before and after the start (list $lines, start $start_line)"
+  if ! [ "$list_before" -lt "$start_line" ] || ! [ "$list_after" -gt "$start_line" ]; then fail "the executions were not listed before and after the start (list $lines, start $start_line)"; fi
 }
 
 test_run_migrate_fails_when_start_prints_nothing_and_only_an_old_execution_is_listed() {
@@ -1988,7 +1988,7 @@ assert_issued_back_to_back() {
   # and nothing waits before the last one is issued: the first revision show comes after it
   local first_wait
   first_wait="$(az_line "revision show" | awk '{print $1}')"
-  [ -n "$first_wait" ] && [ "$first_wait" -gt "$last" ] || fail "a wait started before every restart was issued"
+  if [ -z "$first_wait" ] || ! [ "$first_wait" -gt "$last" ]; then fail "a wait started before every restart was issued"; fi
 }
 
 test_restart_apps_restarts_api_alerts_and_web_back_to_back_before_any_wait() {

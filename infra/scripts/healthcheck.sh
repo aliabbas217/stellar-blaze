@@ -75,7 +75,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-[ -n "$app" ] && [ -n "$rg" ] && [ -n "$image" ] || usage
+if [ -z "$app" ] || [ -z "$rg" ] || [ -z "$image" ]; then usage; fi
 [[ "$timeout_s" =~ ^[0-9]+$ ]] || die "--timeout must be a whole number of seconds, got '$timeout_s'"
 [[ "$poll_s" =~ ^[0-9]+$ ]] || die "HEALTH_POLL_S must be a whole number, got '$poll_s'"
 if [ -n "$url" ]; then
@@ -86,7 +86,7 @@ if [ -n "$url" ]; then
 fi
 if [ -n "$json_key$json_value" ]; then
   [ -n "$url" ] || die "--expect-json-key/--expect-json-value need --url"
-  [ -n "$json_key" ] && [ -n "$json_value" ] || die "--expect-json-key and --expect-json-value go together"
+  if [ -z "$json_key" ] || [ -z "$json_value" ]; then die "--expect-json-key and --expect-json-value go together"; fi
   [[ "$json_key" =~ ^[A-Za-z0-9_.-]+$ ]] || die "--expect-json-key: letters, digits, _ . - only"
   [[ "$json_value" =~ ^[A-Za-z0-9_.:/-]+$ ]] || die "--expect-json-value: letters, digits, _ . : / - only"
 fi

@@ -49,7 +49,7 @@ for arg in "$@"; do
     *) positional+=("$arg") ;;
   esac
 done
-[ "${#positional[@]}" -ge 1 ] && [ "${#positional[@]}" -le 2 ] || usage
+if [ "${#positional[@]}" -lt 1 ] || [ "${#positional[@]}" -gt 2 ]; then usage; fi
 rg="${positional[0]}"
 path="${positional[1]:-/api/v1/health/ready}"
 
