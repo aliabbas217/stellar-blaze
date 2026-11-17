@@ -76,7 +76,7 @@ describe("where the machine-translation line is mounted", () => {
   it("is mounted on exactly the placed surfaces: Alerts (worker privacy area), the two supervisor screens' foot, the landing foot, and (S7) the safety view, the role entries, the front door and the tour", () => {
     const mounts = sources.filter(({ path, text }) => !path.endsWith("MachineTranslationNotice.tsx") && /<MachineTranslationNotice\b/.test(text)).map(({ path }) => path).sort();
     expect(mounts).toEqual([
-      "app/[locale]/(hse)/hse/HseView.tsx",
+      "app/[locale]/(hse)/hse/page.tsx",
       "app/[locale]/(worker)/worker/(app)/alerts/page.tsx",
       "app/[locale]/start/page.tsx",
       "app/[locale]/tour/page.tsx",
