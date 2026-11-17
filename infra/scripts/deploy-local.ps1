@@ -61,6 +61,10 @@ param(
     [ValidateSet('17', '18')]
     [string]$PostgresVersion,
     [string]$GitHubOwner,
+    [ValidatePattern('^\d+$')]
+    [string]$GitHubOwnerId,
+    [ValidatePattern('^\d+$')]
+    [string]$GitHubRepoId,
     [switch]$Placeholder,
     [switch]$SkipBuild,
     [switch]$AllowDirty,
@@ -93,7 +97,7 @@ try {
         Warm              = [bool]$Warm
         Cool              = [bool]$Cool
     }
-    foreach ($name in 'Location', 'ResourceGroup', 'ContactEmail', 'VapidSubject', 'PostgresVersion', 'GitHubOwner', 'BudgetMonth') {
+    foreach ($name in 'Location', 'ResourceGroup', 'ContactEmail', 'VapidSubject', 'PostgresVersion', 'GitHubOwner', 'GitHubOwnerId', 'GitHubRepoId', 'BudgetMonth') {
         if ($PSBoundParameters.ContainsKey($name)) { $options[$name] = [string]$PSBoundParameters[$name] }
     }
     $config = Resolve-DeployConfig -Config (New-DeployConfig @options)

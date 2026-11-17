@@ -2017,7 +2017,7 @@ Describe 'Bootstrap' {
         $script:Responses = @(
             @{ Pattern = '^az ad signed-in-user'; Value = '11111111-1111-1111-1111-111111111111' },
             @{ Pattern = '^az deployment sub what-if'; Value = {
-                    $script:BootstrapEnvSeen.Add(@{ Step = 'whatif'; Email = $env:BUDGET_CONTACT_EMAIL; Operator = $env:OPERATOR_PRINCIPAL_ID; Month = $env:BUDGET_MONTH; Owner = $env:GITHUB_OWNER; Location = $env:LOCATION })
+                    $script:BootstrapEnvSeen.Add(@{ Step = 'whatif'; Email = $env:BUDGET_CONTACT_EMAIL; Operator = $env:OPERATOR_PRINCIPAL_ID; Month = $env:BUDGET_MONTH; Owner = $env:GITHUB_OWNER; OwnerId = $env:GITHUB_OWNER_ID; RepoId = $env:GITHUB_REPO_ID; Location = $env:LOCATION })
                     return ''
                 }
             },
@@ -2074,6 +2074,26 @@ Describe 'Bootstrap' {
         Get-InfoText { Invoke-Bootstrap -Config $config } | Out-Null
         $script:BootstrapEnvSeen[0].Month | Should -BeExactly '2026-10'
         $script:BootstrapEnvSeen[0].Owner | Should -BeExactly 'AliOrg'
+    }
+    It 'passes the numeric GitHub ids for the immutable OIDC subject (a repository created after 15 July 2026) and says so' {
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -GitHubOwner 'AliOrg' -GitHubOwnerId '119006262' -GitHubRepoId '1460260014' -Yes -RepoRoot $script:FakeRepo
+        $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+        $script:BootstrapEnvSeen[0].OwnerId | Should -BeExactly '119006262'
+        $script:BootstrapEnvSeen[0].RepoId | Should -BeExactly '1460260014'
+        $output | Should -Match ([regex]::Escape('repo:AliOrg@119006262/stellar-blaze@1460260014:environment:demo'))
+        foreach ($name in $script:BootstrapEnvNames) { Test-Path "Env:\$name" | Should -BeFalse }
+    }
+    It 'passes no ids for the classic subject, and tells the operator how to add them' {
+        $config = New-DeployConfig -ContactEmail 'ali@acme-demo.dev' -GitHubOwner 'AliOrg' -Yes -RepoRoot $script:FakeRepo
+        $output = Get-InfoText { Invoke-Bootstrap -Config $config }
+        $script:BootstrapEnvSeen[0].OwnerId | Should -BeNullOrEmpty
+        $script:BootstrapEnvSeen[0].RepoId | Should -BeNullOrEmpty
+        $output | Should -Match 'GitHubOwnerId'
+    }
+    It 'refuses one id without the other, and an id that is not a number' {
+        { New-DeployConfig -GitHubOwnerId '119006262' -RepoRoot $script:FakeRepo } | Should -Throw '*go together*'
+        { New-DeployConfig -GitHubRepoId '1460260014' -RepoRoot $script:FakeRepo } | Should -Throw '*go together*'
+        { New-DeployConfig -GitHubOwnerId 'abc' -GitHubRepoId '1' -RepoRoot $script:FakeRepo } | Should -Throw '*numeric GitHub id*'
     }
     It 'needs -ContactEmail and creates nothing without it' {
         $config = New-DeployConfig -Yes -RepoRoot $script:FakeRepo

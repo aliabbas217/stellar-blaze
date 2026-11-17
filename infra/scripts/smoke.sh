@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post-deploy smoke test of the Azure deployment. Prints `PASS|FAIL|SKIP S<n> <subject>`, exits 1 on any FAIL.
 #
-#   smoke.sh <resource-group> [--placeholder] [--expect-location uaenorth] [--no-wait] [--api-min 0|1]
+#   smoke.sh <resource-group> [--placeholder] [--expect-location <region>] [--no-wait] [--api-min 0|1]
 #
 # The api has INTERNAL ingress (architect ruling 2026-11-15), so nothing here calls it over HTTP: it is gated on its own
 # revision state (healthcheck.sh) and exercised through the web BFF, which is also the path a visitor takes. In cheap mode the
@@ -14,7 +14,10 @@
 #       lines of smoke-http.sh). With --placeholder: https://<web fqdn>/ is 200.
 #   S4  the api is NOT public: ingress.external is false for api and true for web, and alerts has no ingress
 #   S5  the alerts worker: running, image matches its template, at least one replica (healthcheck.sh --no-ingress)
-#   S6  every resource in the group is in the expected region (a display name such as "UAE North" matches uaenorth)
+#   S6  every resource in the group is in the expected region (a display name such as "UAE North" matches uaenorth). The
+#       expected region is --expect-location when given, else the region of the resource group itself (bootstrap creates the
+#       group in the region the operator chose, so this holds for the whole fallback ladder, not only for UAE North; the first
+#       pipeline-driven deploy, in France Central, failed here when the default was the constant uaenorth).
 #   S7  plain http://<web fqdn>/ does not answer 200 (a redirect or a refusal passes)
 #   S8  check-db-tls.sh --deployed passes (ADR 0042)
 #   S9  the rest of smoke-http.sh (H3 stop and undo, H4 demo-window check of the epoch replay clock (its failure says to run
@@ -32,13 +35,13 @@ scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$scripts_dir/lib.sh"
 
 usage() {
-  printf 'usage: smoke.sh <resource-group> [--placeholder] [--expect-location uaenorth] [--no-wait] [--api-min 0|1]\n' >&2
+  printf 'usage: smoke.sh <resource-group> [--placeholder] [--expect-location <region>] [--no-wait] [--api-min 0|1]\n' >&2
   exit 1
 }
 
 rg=""
 placeholder=false
-expect_location="uaenorth"
+expect_location="" # empty: the region of the resource group itself (S6)
 wait_flag="--wait"
 api_min="0"
 while [ "$#" -gt 0 ]; do
@@ -211,10 +214,15 @@ else
 fi
 
 # ---- S6 -----------------------------------------------------------------------------------------------------------------
+if [ -z "$expect_location" ]; then
+  expect_location="$(az_tsv group show --name "$rg" --query location || true)"
+fi
 want_norm="${expect_location// /}"
 want_norm="${want_norm,,}"
 resources="$(az_tsv resource list -g "$rg" --query '[].[name, location]' || true)"
-if [ -z "$resources" ]; then
+if [ -z "$expect_location" ]; then
+  result FAIL S6 "cannot read the region of resource group $rg: pass --expect-location <region>"
+elif [ -z "$resources" ]; then
   result FAIL S6 "no resource listed in $rg: cannot confirm the region"
 else
   total=0

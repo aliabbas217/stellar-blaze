@@ -995,8 +995,23 @@ asks for this). Add the federated credential by re-running Bootstrap with the ow
 .\infra\scripts\deploy-local.ps1 -Action Bootstrap -ContactEmail $Email -GitHubOwner $Owner
 ```
 
-Expect a what-if with one `+ Create` for the federated credential and nothing else changing, then the prompt. Its subject
-must read exactly `repo:<owner>/stellar-blaze:environment:demo`.
+**A repository created after 15 July 2026 signs in with an IMMUTABLE subject** that carries the numeric ids:
+`repo:<owner>@<owner id>/stellar-blaze@<repo id>:environment:demo` ([GitHub changelog, 23 April 2026](https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens/)).
+The classic subject above then fails with `AADSTS700213` (this happened on the first deploy of this repository, 2026-11-17).
+Look at what GitHub issues for your repository, and pass the ids:
+
+```powershell
+gh api "repos/$Repo/actions/oidc/customization/sub"      # "use_immutable_subject": true, and the exact prefix
+$r = gh api "repos/$Repo" | ConvertFrom-Json
+.\infra\scripts\deploy-local.ps1 -Action Bootstrap -ContactEmail $Email -GitHubOwner $Owner -GitHubOwnerId $r.owner.id -GitHubRepoId $r.id
+```
+
+Pass both ids, or neither (the classic subject, for an older repository that has not opted in). The immutable form is the safer one:
+a repository that is deleted and created again under the same name cannot inherit the credential.
+
+Expect a what-if with one `+ Create` for the federated credential (or one `~ Modify` of its subject when it exists), then the
+prompt; the other `~ Modify` lines are Azure what-if noise (defaults and `reference()` expressions). Its subject must read
+exactly what "Federated token details" shows in the `azure/login` step of a run.
 
 **Variables** that `.github/workflows/deploy.yml` reads (identifiers, not secrets; they come from the bootstrap outputs,
 `state.json` and `secrets.json`):
@@ -1056,8 +1071,8 @@ It builds both images in parallel on GitHub, then `deploy` runs the template che
 `check-template.sh`), the same two Bicep phases with the migration between, the database TLS check on what was deployed, a
 gate per app, a restart of the apps (`restart-apps.sh`), a wait for the cold api through the web (`wait-ready.sh`), a demo
 reset, the smoke test and a final reset. On the first run, open the `azure/login` step and check that "Federated token
-details" shows the subject `repo:<owner>/stellar-blaze:environment:demo`. An `AADSTS700213` error means the subject does not
-match (section 13). The workflow ends with a reset, so the demo day starts then: run `-Action ResetDemo` before a judged
+details" shows the subject (`repo:<owner>/stellar-blaze:environment:demo`, or the immutable form with the numeric ids, see
+above) and that it equals the credential's. An `AADSTS700213` error means the subject does not match (section 13). The workflow ends with a reset, so the demo day starts then: run `-Action ResetDemo` before a judged
 session all the same, because one epoch lasts about 7 h 20 min.
 
 ## 11. Run the offline checks yourself
@@ -1161,7 +1176,7 @@ The ladder is ADR 0001. Take a step only when the step above it is blocked.
 | Symptom | Cause | What to do |
 |---|---|---|
 | The first request after idle fails or is slow: a `502` with `Upstream unavailable` on `/api/v1/*`, or a page with no data | Scale to zero. The api is not running and the web gives up after 10 s (`UPSTREAM_TIMEOUT_MS`); the cold start took about 29 s locally, plus the image pull on Azure | Ask again in a few seconds. For a judged session or a recording: `.\infra\scripts\deploy-local.ps1 -Action Warm`. Section 1.2 |
-| `AADSTS700213` in the `azure/login` step | The OIDC subject does not match: owner or repository casing, or the environment name | Compare the subject in the step log with the credential. Re-run Bootstrap with the owner exactly as GitHub shows it. If Azure rejects an in-place change, delete it and re-run: `az identity federated-credential delete --name github-demo --identity-name id-sb-deployer --resource-group rg-stellarblaze-demo-uaenorth --yes` |
+| `AADSTS700213` in the `azure/login` step | The OIDC subject does not match: owner or repository casing, the environment name, or (repositories created after 15 July 2026) the IMMUTABLE subject `repo:<owner>@<owner id>/<repo>@<repo id>:environment:demo` that GitHub issues instead of the name-only one | Compare the subject in the step log ("Federated token details") with the credential. Re-run Bootstrap with the owner exactly as GitHub shows it, and with `-GitHubOwnerId` and `-GitHubRepoId` when the log shows the `@id` form. If Azure rejects an in-place change, delete it and re-run: `az identity federated-credential delete --name github-demo --identity-name id-sb-deployer --resource-group rg-stellarblaze-demo-uaenorth --yes` |
 | First image pull fails; migration `Failed`, or a revision will not provision, right after Bootstrap | AcrPull propagation (up to about 10 minutes) | Wait 10 minutes and re-run `Deploy`. It already retries the migration once after 90 seconds. Change nothing |
 | `QuotaExceeded` or `LocationNotAvailableForResourceType` | The region or quota is not available to this subscription | Ladder step 1: another region with `-Location` (section 12). For Postgres, a region-access request (portal, Help + support, Region access) |
 | Doctor `FAIL PostgreSQL Standard_B1ms is not offered` | Same, for Postgres | Same as above |

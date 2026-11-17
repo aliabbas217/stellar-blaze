@@ -17,6 +17,12 @@ param githubRepo string = 'stellar-blaze'
 @description('GitHub environment whose jobs may sign in as the deployer identity.')
 param githubEnvironment string = 'demo'
 
+@description('Numeric GitHub id of the owner account (gh api repos/OWNER/REPO --jq .owner.id). Together with githubRepoId it selects the IMMUTABLE subject format that GitHub issues for repositories created after 15 July 2026 (repo:OWNER@OWNERID/REPO@REPOID:environment:ENV; a deleted and re-created repository of the same name cannot inherit the credential). Empty: the classic name-only subject.')
+param githubOwnerId string = ''
+
+@description('Numeric GitHub id of the repository (gh api repos/OWNER/REPO --jq .id). See githubOwnerId: both are given, or neither.')
+param githubRepoId string = ''
+
 @description('Object id of the signed-in operator (a user). When non-empty that user gets AcrPush on the registry, so local image pushes do not depend on Owner or Contributor implying it.')
 param operatorPrincipalId string = ''
 
@@ -28,6 +34,12 @@ var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec'
 var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 var acrName = 'acrsb${take(uniqueString(resourceGroup().id), 13)}'
+
+// The subject GitHub puts in the token must match this string exactly (case-sensitive), or Azure answers AADSTS700213. With only one
+// of the two ids the classic subject is used, never a half-formed one.
+var immutableSubject = !empty(githubOwnerId) && !empty(githubRepoId)
+var classicGithubSubject = 'repo:${githubOwner}/${githubRepo}:environment:${githubEnvironment}'
+var immutableGithubSubject = 'repo:${githubOwner}@${githubOwnerId}/${githubRepo}@${githubRepoId}:environment:${githubEnvironment}'
 
 // Pulls images for the container apps and jobs.
 resource appsIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
@@ -49,7 +61,7 @@ resource githubCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/fede
   name: 'github-${githubEnvironment}'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubOwner}/${githubRepo}:environment:${githubEnvironment}'
+    subject: immutableSubject ? immutableGithubSubject : classicGithubSubject
     audiences: [
       'api://AzureADTokenExchange'
     ]

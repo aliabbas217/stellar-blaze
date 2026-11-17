@@ -16,6 +16,12 @@ param githubRepo string = 'stellar-blaze'
 
 param githubEnvironment string = 'demo'
 
+@description('Numeric GitHub id of the owner account, with githubRepoId: the immutable OIDC subject format of repositories created after 15 July 2026 (see modules/bootstrap-rg.bicep). Empty: the classic subject.')
+param githubOwnerId string = ''
+
+@description('Numeric GitHub id of the repository (both ids, or neither).')
+param githubRepoId string = ''
+
 @description('Object id of the signed-in operator. When non-empty that user gets AcrPush on the registry. Get it with: az ad signed-in-user show --query id -o tsv')
 param operatorPrincipalId string = ''
 
@@ -57,6 +63,8 @@ module resources 'modules/bootstrap-rg.bicep' = {
     githubOwner: githubOwner
     githubRepo: githubRepo
     githubEnvironment: githubEnvironment
+    githubOwnerId: githubOwnerId
+    githubRepoId: githubRepoId
     operatorPrincipalId: operatorPrincipalId
     tags: tags
   }
