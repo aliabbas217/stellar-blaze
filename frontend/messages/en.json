@@ -950,7 +950,7 @@
           "about": "{station}, {period}. {nDays} days, one simulated crew of {headcount} doing heavy work.",
           "howCounted": {
             "violation_minutes_per_season": "A rule checker that shares no code with the planner replays the plan against what the station recorded. We add up the minutes a worker would have worked against the rules, per worker over the season.",
-            "high_cycled_share": "Of the heavy work done in hours the station put in the High zone, the share the plan broke into work and rest.",
+            "high_cycled_share": "Of the heavy work done in hours the station put in the High or Red zone, the share the plan broke into work and rest.",
             "missed_protection_ticks": "Minutes in which the plan used a milder heat zone than the one the station recorded.",
             "rest_minutes_added_vs_naive": "Extra rest minutes per worker over the season, compared with working every minute outside the midday break."
           },
