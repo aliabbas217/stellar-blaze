@@ -6,16 +6,17 @@ import { FieldCanvas2D, type FieldCanvasHandle } from "./FieldCanvas2D";
 import type { FieldCanvasGLProps } from "./FieldCanvasGL";
 import { readingAt } from "./field-data";
 import type { LoadedField } from "./field-load";
-import { FieldReadout, readoutText } from "./FieldReadout";
+import { FieldCaption } from "./FieldCaption";
 import type { FieldPanelProps } from "./FieldPoster";
 import { FieldStage } from "./FieldStage";
 import { HourScrubber, type NowHandle } from "./HourScrubber";
+import { readoutText } from "./readout-text";
 import { useFieldClock } from "./useFieldClock";
 import { useReducedMotion } from "./useReducedMotion";
 import { canUpgrade, detectEnv, orbitFromSearch, whenIdle } from "./webgl-support";
 
 /*
- * The live hero: the field drawn from the recorded grid, the readout and the hour scrubber, driven by one clock. Loaded after
+ * The live field of the hero: the field drawn from the recorded grid and the hour scrubber under it, driven by one clock (the caption says what it is). Loaded after
  * first paint (FieldGate) and never rendered on the server. The day plays once from the hottest hour, round the clock and back,
  * unless the reader prefers reduced motion; then it rests on the hottest hour and the scrubber is the control.
  *
@@ -37,7 +38,6 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
   const calm = useReducedMotion();
   const nowLine = useRef<NowHandle>(null);
   const [mode, setMode] = useState<Mode>("2d");
-  const [sliderFocused, setSliderFocused] = useState(false);
   const modeRef = useRef<Mode>("2d");
   const hourRef = useRef(panel.peakHour);
   const [scene, setScene] = useState<{ readonly Scene: ComponentType<FieldCanvasGLProps>; readonly hour: number; readonly azimuth: number } | null>(null);
@@ -98,13 +98,6 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
         </div>
         {scene === null ? null : <scene.Scene grid={data.grid} coast={data.coast} initialHour={scene.hour} initialAzimuth={scene.azimuth} rtl={panel.dir === "rtl"} handleRef={gl} onReady={ready} onFail={gaveUp} />}
       </FieldStage>
-      <FieldReadout
-        reading={reading}
-        live={!clock.playing && !sliderFocused}
-        announce={t("scrubber.valueText", { hour: text.hour, hottest: text.hottest, station: text.station })}
-        proof={panel.proof}
-        source={t(panel.highestOfSeason ? "sourcePeak" : "sourcePlain", { day: panel.dayLabel })}
-      />
       <HourScrubber
         values={panel.omaa}
         ban={panel.ban}
@@ -119,8 +112,8 @@ export function FieldIsland({ panel, data }: { readonly panel: FieldPanelProps; 
         calm={calm}
         onSeek={clock.seek}
         onToggle={clock.playing ? clock.pause : clock.play}
-        onFocusChange={setSliderFocused}
       />
+      <FieldCaption proof={panel.proof} />
     </>
   );
 }

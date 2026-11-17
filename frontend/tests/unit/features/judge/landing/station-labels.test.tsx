@@ -43,11 +43,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("StationLabels watches the readout card", () => {
-  it("test_card_growing_refreshes_avoidance: the card is observed, and when it grows over a name the name is hidden", () => {
-    document.body.innerHTML = `<section data-landing-hero><div data-hero></div><div data-field-readout></div></section>`;
-    const stage = document.querySelector("[data-hero]") as HTMLElement;
-    const card = document.querySelector("[data-field-readout]") as HTMLElement;
+describe("StationLabels watches the stage and the hero", () => {
+  it("test_control_growing_refreshes_avoidance: the stage and the hero are observed, and when a control marked data-avoid grows over a name the name is hidden", () => {
+    document.body.innerHTML = `<section data-landing-hero><div data-field-stage></div><div data-avoid></div></section>`;
+    const stage = document.querySelector("[data-field-stage]") as HTMLElement;
+    const card = document.querySelector("[data-avoid]") as HTMLElement;
     let cardBox = rect(700, 500, 300, 100); // a card of two lines: at the foot of the stage, clear of the name
     stage.getBoundingClientRect = () => rect(0, 0, 1000, 600);
     card.getBoundingClientRect = () => cardBox;
@@ -61,7 +61,8 @@ describe("StationLabels watches the readout card", () => {
     );
     const name = stage.querySelector("[data-station-label]") as HTMLElement;
     expect(name.style.visibility).toBe("");
-    expect(observers.flatMap((o) => o.targets)).toContain(card);
+    expect(observers.flatMap((o) => o.targets)).toContain(stage);
+    expect(observers.flatMap((o) => o.targets)).toContain(document.querySelector("[data-landing-hero]"));
     cardBox = rect(700, 380, 300, 220); // the card wrapped to more lines and grew upward over the name
     act(() => {
       for (const o of observers) o.fire();

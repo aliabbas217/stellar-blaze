@@ -55,16 +55,14 @@ export function inkAllowance(text: string, fontSizePx: number): number {
 }
 
 /**
- * The obstacles of a hero as they are laid out now: the readout card, every control marked `data-avoid` (the two buttons and the
- * hook's Proof chip) and every line of the copy's text (text rectangles, not the blocks: a heading's line height is leading, not
- * ink; Arabic-script lines are inflated by the ink allowance). `stage` is the box the names are positioned in.
+ * The obstacles of a hero as they are laid out now: every control marked `data-avoid` and every line of the hero's text (text rectangles, not the
+ * blocks: a heading's line height is leading, not ink; Arabic-script lines are inflated by the ink allowance). Since the redesign the field is a box
+ * beside the copy, so none is usually over it, but the rule holds if a layout ever puts one there. `stage` is the box the names are positioned in.
  */
 export function collectObstacles(stage: HTMLElement): Rect[] {
   const hero = stage.closest("[data-landing-hero]");
   if (hero === null) return [];
   const pages: PageRect[] = [];
-  const card = hero.querySelector("[data-field-readout]");
-  if (card !== null) pages.push(card.getBoundingClientRect());
   for (const el of hero.querySelectorAll("[data-avoid]")) pages.push(el.getBoundingClientRect());
   for (const el of hero.querySelectorAll("[data-contrast]:not([data-station-label])")) {
     const range = document.createRange();
@@ -105,7 +103,7 @@ function apply(container: HTMLElement, state: Known, measure: boolean): void {
 
 /** Reads the obstacles of the stage `container` lies in and the names' sizes, keeps them for `reapplyAvoidance`, and applies them. Call when the layout may have changed. */
 export function refreshAvoidance(container: HTMLElement): void {
-  const stage = container.closest("[data-hero]");
+  const stage = container.closest("[data-field-stage]");
   const state: Known = { obstacles: stage instanceof HTMLElement ? collectObstacles(stage) : [], sizes: new WeakMap() };
   known.set(container, state);
   apply(container, state, true);
