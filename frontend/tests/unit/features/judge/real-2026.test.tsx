@@ -9,7 +9,7 @@ import { DayView } from "@/features/judge/DayView";
 import { parseHourlySeries } from "@/features/judge/facts";
 import { DATA_MANIFEST } from "@/features/judge/manifest.generated";
 import { ScoreboardView } from "@/features/judge/ScoreboardView";
-import { ProofRows } from "@/components/provenance/ProofRows";
+import { AuditRows } from "@/components/provenance/ProofRows";
 import { planTableText, policyTableText } from "@/features/judge/table-text";
 import { renderWithIntl } from "../../../utils/intl";
 
@@ -178,7 +178,7 @@ describe("ScoreboardView on the real 2026 data", () => {
       expect(proof?.file).toMatch(/^eval\/2026\//);
     }
     if (policyProof === undefined) throw new Error("no proof");
-    renderWithIntl(<ProofRows proof={policyProof} />);
+    renderWithIntl(<AuditRows proof={policyProof} />);
     expect(screen.getByText("Pre-registration")).toBeInTheDocument();
     expect(screen.getByText(record.lock_sha256)).toBeInTheDocument();
     expect(screen.getByText(record.protocol_commit)).toBeInTheDocument();

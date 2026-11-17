@@ -17,6 +17,7 @@ import arMessages from "../../../messages/ar.json";
 import enMessages from "../../../messages/en.json";
 import urMessages from "../../../messages/ur.json";
 import { renderWithIntl } from "../../utils/intl";
+import { SAMPLE_STORY } from "../../utils/story";
 
 /*
  * F2 Task 22, ruling 1: the claims surfaces (scoreboard, day, try, governance, proof) stay English in every catalogue. In a right-to-left
@@ -134,6 +135,7 @@ describe("the island status line (judge.island) is mounted inside the replay cla
 describe("the proof chip: English for its own words, the page's language for a caller's label", () => {
   const proof: Proof = {
     what: "Alerts per shift, P3 protect",
+    story: SAMPLE_STORY,
     protocol: "docs/protocol/preregistration.md#72-warnings-row",
     protocolHref: null,
     script: "backend.eval.policy_scoreboard:build_policy_scoreboard @ 661b373a1b2c",
@@ -145,7 +147,7 @@ describe("the proof chip: English for its own words, the page's language for a c
     generatedAt: "2026-11-12T09:14:00Z",
   };
 
-  it("the default chip (\"Proof\", judge.proof) is an English block", () => {
+  it("the default chip (\"Where from\", states.proof) is an English block", () => {
     renderWithIntl(<ProofChip proof={proof} />, { locale: "ur", messages: urMessages });
     expect(screen.getByRole("button")).toHaveAttribute("lang", "en");
     expect(screen.getByRole("button")).toHaveAttribute("dir", "ltr");

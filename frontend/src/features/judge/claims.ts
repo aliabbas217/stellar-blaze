@@ -1,8 +1,10 @@
 import { proofFromStaticFile, type Proof, type ProofLabel } from "@/components/provenance/proof";
+import { buildStory, type ForecastStoryParams } from "@/components/provenance/proof-story";
 import type { ScoreRow } from "@/components/provenance/ScoreboardTable";
 import type { JudgeFormat } from "./adapters";
 import type { DayCounter } from "./day-view";
-import type { SeasonFacts } from "./facts";
+import type { HourlySeries, SeasonFacts } from "./facts";
+import { SEASON_BAN } from "./ban";
 import type { RosterFrontier } from "./roster-frontier";
 
 /*
@@ -104,6 +106,10 @@ export interface ForecastSource {
   readonly file: { readonly path: string; readonly sha256: string };
   /** What the file is (the manifest's source line). */
   readonly protocol: string;
+  /** The recorded series the counts come from (its station and its days): the story names the place and the period. */
+  readonly series: Pick<HourlySeries, "station" | "days">;
+  /** The heavy-work limit the counts are against, degrees C WBGT. */
+  readonly limit: number;
 }
 
 const unit = (value: string | undefined): { readonly unit?: string } => (value === undefined ? {} : { unit: value });
@@ -116,17 +122,29 @@ export const FORECAST_CLAIMS = {
 
 /** The season counts, from the recorded hourly forecast file (RECORDED: a forecast, never a scored result). */
 export function forecastClaims(facts: SeasonFacts, source: ForecastSource, format: JudgeFormat, text: ForecastClaimText): Claim[] {
-  const proof = (what: string, claim: string): Proof =>
+  const firstDay = source.series.days[0] ?? "";
+  const lastDay = source.series.days[source.series.days.length - 1] ?? firstDay;
+  const proof = (what: string, claim: string, id: ForecastStoryParams["id"]): Proof =>
     proofFromStaticFile(source.file, what, {
+      story: buildStory("forecast", {
+        id,
+        station: source.series.station,
+        firstDay,
+        lastDay,
+        nDays: source.series.days.length,
+        limit: source.limit,
+        breakStart: SEASON_BAN.start,
+        breakEnd: SEASON_BAN.end,
+      }),
       protocol: source.protocol,
       script: "src/features/judge/facts.ts:seasonFacts",
       label: "RECORDED",
       claim,
     });
   return [
-    { id: FORECAST_CLAIMS.days, what: text.daysOverLimit, value: format.whole(facts.daysOver), ...unit(text.units?.days), kind: "forecast", proof: proof(text.daysOverLimit, FORECAST_CLAIMS.days) },
-    { id: FORECAST_CLAIMS.hours, what: text.hoursOverLimit, value: format.whole(facts.over), ...unit(text.units?.hours), kind: "forecast", proof: proof(text.hoursOverLimit, FORECAST_CLAIMS.hours) },
-    { id: FORECAST_CLAIMS.inBan, what: text.hoursInBreak, value: format.whole(facts.inBan), ...unit(text.units?.inBreak), kind: "forecast", proof: proof(text.hoursInBreak, FORECAST_CLAIMS.inBan) },
+    { id: FORECAST_CLAIMS.days, what: text.daysOverLimit, value: format.whole(facts.daysOver), ...unit(text.units?.days), kind: "forecast", proof: proof(text.daysOverLimit, FORECAST_CLAIMS.days, "days_over_limit") },
+    { id: FORECAST_CLAIMS.hours, what: text.hoursOverLimit, value: format.whole(facts.over), ...unit(text.units?.hours), kind: "forecast", proof: proof(text.hoursOverLimit, FORECAST_CLAIMS.hours, "hours_over_limit") },
+    { id: FORECAST_CLAIMS.inBan, what: text.hoursInBreak, value: format.whole(facts.inBan), ...unit(text.units?.inBreak), kind: "forecast", proof: proof(text.hoursInBreak, FORECAST_CLAIMS.inBan, "hours_in_break") },
   ];
 }
 
@@ -155,8 +173,18 @@ export const FRONTIER_LEGAL_ID = "frontier.legalisation.ge30";
  */
 export function frontierClaims(data: RosterFrontier, source: FrontierSource, format: JudgeFormat, text: FrontierClaimText): Claim[] {
   const script = `${data.generated_by} (${data.label})`;
-  const proof = (what: string, claim: string): Proof =>
-    proofFromStaticFile(source.file, what, { protocol: source.protocol, script, label: source.label, claim });
+  const proof = (what: string, claim: string, commuteMinutes: number | null): Proof =>
+    proofFromStaticFile(source.file, what, {
+      story: buildStory("frontier", {
+        id: commuteMinutes === null ? "legalisation" : "best",
+        commuteMinutes,
+        sleepGateHours: data.assumptions.sleep_gate_h,
+      }),
+      protocol: source.protocol,
+      script,
+      label: source.label,
+      claim,
+    });
   return [
     ...data.frontier_absolute_gate
       .filter((gate) => gate.avoided_vs_legal_default_ge30 > 0)
@@ -167,7 +195,7 @@ export function frontierClaims(data: RosterFrontier, source: FrontierSource, for
         value: format.percentOne(gate.avoided_vs_legal_default_ge30),
         ...unit(text.units?.best),
         kind: "analysis",
-        proof: proof(text.best(gate.commute_min), frontierBestId(gate.commute_min)),
+        proof: proof(text.best(gate.commute_min), frontierBestId(gate.commute_min), gate.commute_min),
       }),
     ),
     {
@@ -176,7 +204,7 @@ export function frontierClaims(data: RosterFrontier, source: FrontierSource, for
       value: format.percentOne(data.legalisation_B0_to_B1_mean.ge30),
       ...unit(text.units?.legal),
       kind: "analysis",
-      proof: proof(text.legal, FRONTIER_LEGAL_ID),
+      proof: proof(text.legal, FRONTIER_LEGAL_ID, null),
     },
   ];
 }

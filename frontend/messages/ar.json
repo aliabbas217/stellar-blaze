@@ -61,8 +61,8 @@
           "note": "Where a screen shows replayed, recorded, simulated, designed or development data, a stamp says so."
         },
         "proof": {
-          "title": "Proof chip and drawer",
-          "note": "Every scored number carries a chip that opens where it comes from. No provenance block means no number. Press a chip to open the drawer, then Recount to hash the file in this browser."
+          "title": "Where-from chip and drawer",
+          "note": "Every number carries a chip that opens where it comes from, in plain words. No complete record means no number. Press a chip to open the drawer, open For auditors, then Recount to hash the file in this browser."
         },
         "evidence": {
           "title": "Evidence components",
@@ -720,19 +720,18 @@
       "notClinicallyReviewed": "لم يُراجَع سريريًا"
     },
     "proof": {
-      "chip": "Proof",
+      "chip": "Where from",
       "lock": {
         "note": "Held-out 2026 run: the protocol was committed and locked before the models were scored.",
         "hash": "SHA-256 of the lock the run started under",
         "protocolCommit": "Commit of the pre-registered protocol",
         "amendmentsNote": "Changes to the protocol and the freeze addendum, each committed before 2026 was scored. They are listed with their commit and fingerprint; read them with the protocol, they are not summarized here."
       },
-      "chipAria": "Proof for {what}",
+      "chipAria": "Where from: {what}",
       "loadFailed": "The proof could not be opened. Try again.",
       "title": "Where this number comes from",
       "close": "Close",
       "rows": {
-        "number": "Number",
         "protocol": "Protocol line",
         "script": "Script",
         "file": "Result file",
@@ -747,7 +746,6 @@
         "file": "Of the file this page drew",
         "source": "Of the data the exporter read"
       },
-      "notRecorded": "Not recorded",
       "labels": {
         "real": "REAL",
         "realAssumedCrew": "REAL weather + assumed crew",
@@ -763,7 +761,179 @@
         "unpublished": "This file is not published here, so it cannot be recounted.",
         "failed": "The file could not be read, so nothing was recounted."
       },
-      "syntheticShape": "synthetic shape"
+      "syntheticShape": "synthetic shape",
+      "story": {
+        "rows": {
+          "madeBy": "Made by",
+          "about": "About",
+          "howCounted": "How we counted",
+          "shows": "It shows",
+          "doesNotShow": "It does not show"
+        },
+        "stamp": {
+          "real": "Real weather.",
+          "realAssumedCrew": "Real weather, assumed crew.",
+          "simulated": "Demo site: the crews and people are made up.",
+          "dev2025": "A development run on 2025 data. This is not the result.",
+          "recorded": "From a recorded forecast."
+        },
+        "tested": {
+          "stamp": "Tested on summer 2026.",
+          "note": "Every setting was chosen using 2024 and 2025 data only. The test plan was written down and locked before the scored run."
+        },
+        "incomplete": "Some technical details for this number were not recorded. The figures above are unaffected.",
+        "note": {
+          "recordedCount": "This is a count made from a recorded forecast file. It is not a scored result.",
+          "analysis": "This is an analysis of recorded data. It is not a scored result.",
+          "map": "This is a recorded forecast drawn as a map. It is not a scored result."
+        },
+        "seasonAbout": "{station}, {period}, working hours. {nDays} days.",
+        "range": {
+          "hours": "Likely range {lo} to {hi} hours.",
+          "minutes": "Likely range {lo} to {hi} minutes.",
+          "share": "Likely range {lo} to {hi}."
+        },
+        "policy": {
+          "madeBy": {
+            "P0": "The legal midday break and nothing else. It never warns about a working hour.",
+            "P1": "A fixed rule: warn whenever the raw forecast from the European weather centre (ECMWF) reaches the fixed heat-stress limit. No correction is applied.",
+            "P2": "The regulator's own heat zones (ADOSH, Abu Dhabi's workplace-safety authority) applied to the raw forecast from the European weather centre (ECMWF). No correction is applied.",
+            "P3_protect": "Our correction of the European weather centre's (ECMWF) forecast, warning at the protective setting: the cautious end of the trade-off between missed danger hours and false alarms.",
+            "P3_balanced": "Our correction of the European weather centre's (ECMWF) forecast, warning at the balanced setting, which is less cautious than the protective one."
+          },
+          "lead": {
+            "1": "The forecast used was made about 24 hours ahead.",
+            "2": "The forecast used was issued by 18:00 Gulf time the evening before."
+          },
+          "howCounted": {
+            "missed_danger_hours": "An hour is dangerous when the station's own instruments put it in the regulator's High or Red zone during working hours, outside the midday break. We count the dangerous hours this way of warning did not warn about.",
+            "false_alarm_hours": "We count the hours this way of warning warned about when the station's instruments did not put them in the regulator's High or Red zone, during working hours outside the midday break.",
+            "pod": "Of the dangerous hours (the station's instruments put them in the regulator's High or Red zone), the share this way of warning warned about.",
+            "far": "Of all the hours this way of warning warned about, the share that were not dangerous on the station's instruments."
+          },
+          "shows": {
+            "missed_danger_hours": "How many dangerous hours this way of warning missed in one summer at one airport.",
+            "false_alarm_hours": "How many warned hours were not dangerous on the station's record, in one summer at one airport.",
+            "pod": "How much of the danger this way of warning caught, in one summer at one airport.",
+            "far": "How often a warning turned out not to be needed, in one summer at one airport."
+          },
+          "doesNotShow": "How workers fared, or how this performs at a worksite or at a new site.",
+          "doesNotShowMargin": "How workers fared, or how this performs at a worksite or at a new site. The count of dangerous hours rests on a heat margin we chose ({margin} W/m²), not on a measurement at a worksite."
+        },
+        "plan": {
+          "madeBy": {
+            "baseline": "The legal minimum: working every shift minute outside the midday break.",
+            "rule_raw": "A work-and-rest plan built from the raw forecast with the ADOSH heat rules.",
+            "rule_corrected": "A work-and-rest plan built from our corrected forecast with the same ADOSH heat rules."
+          },
+          "about": "{station}, {period}. {nDays} days, one simulated crew of {headcount} doing heavy work.",
+          "howCounted": {
+            "violation_minutes_per_season": "A rule checker that shares no code with the planner replays the plan against what the station recorded. We add up the minutes a worker would have worked against the rules, per worker over the season.",
+            "high_cycled_share": "Of the heavy work done in hours the station put in the High zone, the share the plan broke into work and rest.",
+            "missed_protection_ticks": "Minutes in which the plan used a milder heat zone than the one the station recorded.",
+            "rest_minutes_added_vs_naive": "Extra rest minutes per worker over the season, compared with working every minute outside the midday break."
+          },
+          "shows": {
+            "violation_minutes_per_season": "How well a plan keeps a simulated crew within the rules.",
+            "high_cycled_share": "How much of the high-heat heavy work the plan paced with rest.",
+            "missed_protection_ticks": "How often the plan was less protective than the station's record called for.",
+            "rest_minutes_added_vs_naive": "What the protection costs in rest time."
+          },
+          "doesNotShow": "Health outcomes. The crew is simulated and the rest time is a simulated cost; no real worker is involved."
+        },
+        "day": {
+          "madeBy": {
+            "high": "The station's own instruments, not a forecast.",
+            "outside": "The station's own instruments, not a forecast.",
+            "p1": "The fixed heat-stress rule applied to the raw forecast issued the day before.",
+            "raw": "The regulator's own heat zones (ADOSH) applied to the raw forecast issued the day before.",
+            "ours": "Our correction of the day-before forecast, at the protective setting.",
+            "balanced": "Our correction of the day-before forecast, at the balanced setting."
+          },
+          "about": "{station}, {date}: one day chosen by a fixed rule from the station's records alone, before we looked at our own results. {candidates} days were considered.",
+          "aboutOne": "{station}, {date}: one day chosen by a fixed rule from the station's records alone.",
+          "howCounted": {
+            "high": "Working hours in which the station's instruments put the heat in the regulator's High or Red zone.",
+            "outside": "The same hours, outside the midday break ({start} to {end}).",
+            "warned": "Of the {total} working hours the station recorded in the High or Red zone that day, the hours this way of warning had warned about in advance."
+          },
+          "shows": {
+            "high": "How much of that day was dangerous on the station's record.",
+            "warned": "How many of that day's dangerous hours this way of warning caught: {n} of {total}."
+          },
+          "doesNotShow": "Skill. One day is an illustration, not proof."
+        },
+        "rule": {
+          "madeBy": "A fixed rule, written down before we looked at our own results.",
+          "about": "{station}, {date}. {candidates} days were considered.",
+          "aboutPending": "{station}. The scored day is not chosen yet; this page shows the hottest day of the recorded forecast.",
+          "howCounted": "Among the days with every working hour observed, the day with the most High or Red zone working hours outside the midday break is picked. Ties go to the earliest date. The rule looks at the station's records only.",
+          "shows": "Which day is shown, and why it is that one.",
+          "doesNotShow": "That our forecast did well on that day. One day is an illustration, not proof of skill."
+        },
+        "forecast": {
+          "madeBy": "The European weather centre's (ECMWF) forecast, issued the day before and kept in a recorded file. We counted it; we did not score it.",
+          "howCounted": {
+            "days_over_limit": "Days on which the recorded forecast put the heat-stress index (WBGT) above {limit} °C, the heavy-work limit, at some hour.",
+            "hours_over_limit": "Working hours in which the recorded forecast put the heat-stress index (WBGT) above {limit} °C, the heavy-work limit.",
+            "hours_in_break": "Of the working hours above {limit} °C, the ones inside the midday break ({start} to {end}), when work is already stopped."
+          },
+          "shows": "How hot the forecast said the summer would be.",
+          "doesNotShow": "What the weather actually was, or any danger. A forecast is not a measurement, and the heavy-work limit is a guideline for heavy work."
+        },
+        "frontier": {
+          "madeBy": "A planning analysis of the station's recorded heat in past summers, with commute, evening time and bedtime assumed. It is not a forecast.",
+          "about": "A one-way commute of {minutes} minutes, daily rosters, an assumed crew.",
+          "aboutLegal": "Daily rosters, an assumed crew, averaged over the analysis.",
+          "howCounted": {
+            "best": "The share of summer working hours at a heat-stress index (WBGT) of 30 or more that a better roster avoids, compared with the legal default roster, keeping sleep at {gate} hours or more.",
+            "legal": "The average share of those hours avoided by moving from common practice, which breaks the rules, to the legal default roster. This gain belongs to the law, not to Stellar Blaze."
+          },
+          "shows": {
+            "best": "How much heat exposure a smarter roster could remove on top of the law, at this commute.",
+            "legal": "How much heat exposure the legal rules already remove."
+          },
+          "doesNotShow": "A measured benefit for real workers. Commute, evening time and bedtime are assumptions we made."
+        },
+        "level": {
+          "madeBy": "The day-ahead forecast, adjusted by Stellar Blaze, turned into a level (green, yellow, orange or red) using the published ADOSH heat zones.",
+          "about": "The whole site, not you. Your own limit can be higher or lower.",
+          "doesNotShow": "A medical judgment. The wording has not yet been checked by a clinician."
+        },
+        "truth": {
+          "madeBy": "The station's own instruments at {station}, not a forecast.",
+          "howCounted": "An hour is dangerous when the station's instruments put it in the regulator's High or Red zone during working hours.",
+          "howCountedMargin": "An hour is dangerous when the station's instruments put it in the regulator's High or Red zone during working hours, with a heat margin of {margin} W/m² that we chose.",
+          "shows": "How many working hours in that period were dangerous on the station's record.",
+          "doesNotShow": "Danger at a worksite. This is one airport station; a worksite can be hotter or cooler."
+        },
+        "evaluation": {
+          "madeBy": "Our own test, run once on summer 2026 with every setting fixed in advance.",
+          "howCounted": "We wrote down how we would be judged and locked the plan before the scored run. Every setting was chosen using 2024 and 2025 data only.",
+          "amendments": "Later changes to the plan, {amendments} in all, are logged for auditors.",
+          "shows": "How the ways of warning a crew and the shift plans did on one summer of real weather.",
+          "doesNotShow": "How workers fared, or how this performs at a worksite or at a new site."
+        },
+        "verdict": {
+          "madeBy": "Our own scoring run. Each check was written down before the run, and the result is reported the same way whether we won or lost.",
+          "howCounted": "Each check names two things to compare, how to measure them and what counts as met. The run reports each one as met or not met.",
+          "shows": "Whether each check we set in advance was met or not met.",
+          "doesNotShow": "That a met check means a better outcome for workers. The exact sentences are in the full record, under For auditors."
+        },
+        "field": {
+          "madeBy": "The European weather centre's (ECMWF) forecast for one hot day, issued the day before and drawn as a map of the heat-stress index (WBGT).",
+          "about": "The UAE on {date}: the day with the highest forecast heat of the summer, shown for illustration. It is not the day we scored.",
+          "shows": "Where the forecast said the heat would be worst.",
+          "doesNotShow": "A measurement, or how well our warnings did that day."
+        }
+      },
+      "audit": {
+        "heading": "For auditors: the full record",
+        "intro": "The technical record behind this number, for anyone who wants to check it. Fields with no value are not shown.",
+        "link": "For auditors",
+        "policy": "Policy code and threshold",
+        "verdicts": "Verdict sentences, exactly as the scoring run wrote them"
+      }
     }
   },
   "levels": {
@@ -1199,32 +1369,23 @@
       }
     },
     "proof": {
-      "title": "Proof sheet",
+      "title": "Where this number comes from",
       "back": "Back to the scoreboard",
       "openSheet": "Open the proof sheet",
-      "rowsHeading": "Where it comes from",
       "timelineHeading": "The number's timeline",
       "timeline": {
-        "forecast": "Forecast made",
-        "protocol": "Protocol committed",
-        "run": "Scoring run",
-        "shown": "Shown here"
+        "plan": "Plan written down and locked",
+        "run": "Scored once on summer 2026",
+        "shown": "Shown here as scored"
       },
       "notes": {
-        "forecastAhead": "About 24 hours ahead of each day, by the ECMWF model.",
-        "notAForecast": "Not a forecast: recorded station observations and a roster model.",
-        "protocolCommitted": "The pre-registration, commit {commit}, before 2026 was scored.",
-        "noProtocolForecast": "No scoring protocol: this count is made from the recorded forecast file.",
-        "noProtocolAnalysis": "No scoring protocol: this is a recorded analysis, not a scored result.",
+        "planLocked": "The test plan, commit {commit}, was locked before 2026 was scored.",
         "runScored": "The single scoring run wrote this file.",
-        "runDev": "The 2025 development run wrote this file. It is not the result.",
-        "runNotScoring": "Not a scoring run: nothing here is scored.",
         "shown": "This page reads the file whose fingerprint is above.",
-        "runSynthetic": "Not a scoring run: a script wrote this file with made-up numbers, only to check the layout.",
-        "protocolDev": "The pre-registration. This is a development run: it is not the held-out result."
+        "synthetic": "These numbers are made up, only to check the layout. No scoring run wrote them."
       },
-      "emptyTitle": "No provenance recorded for this number",
-      "emptyReason": "No provenance recorded for this number. It is not shown as a result.",
+      "emptyTitle": "This number is not shown",
+      "emptyReason": "This number is not shown because its record is incomplete.",
       "emptyAction": "Open a number that has proof",
       "unreadableTitle": "The file behind this number could not be read",
       "unreadableReason": "The number exists but its result file could not be read, so it is not shown. Nothing here is guessed."

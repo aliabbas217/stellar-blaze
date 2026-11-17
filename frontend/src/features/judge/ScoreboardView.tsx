@@ -4,11 +4,12 @@ import { ScoreboardTable, type ScoreRow } from "@/components/provenance/Scoreboa
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { Verdict } from "@/components/provenance/Verdict";
 import { proofFromProvenance } from "@/components/provenance/proof";
+import { buildStory } from "@/components/provenance/proof-story";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
 import { PendingBanner } from "@/components/states/PendingBanner";
-import { makeFormat, pendingPlanRows, pendingPolicyRows, toPlanRows, toPolicyRows } from "./adapters";
+import { makeFormat, pendingPlanRows, pendingPolicyRows, storySeason, toPlanRows, toPolicyRows } from "./adapters";
 import { EvalSourceStamp } from "./EvalSourceStamp";
 import { FrontierSection } from "./FrontierSection";
 import { FORECAST_CLAIMS } from "./claims";
@@ -77,13 +78,26 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
   const primary = policy?.verdicts.find((verdict) => verdict.primary) ?? null;
   const verdictProof =
     primary !== null && policy !== null && files?.policy != null
-      ? proofFromProvenance(policy.provenance, "", t("verdict.heading"), files.policy)
+      ? proofFromProvenance(policy.provenance, "", t("verdict.heading"), files.policy, {
+          story: buildStory("verdict", storySeason(policy)),
+          audit: { verdicts: [primary.text] },
+        })
       : null;
 
   const policyProof =
-    policy !== null && files?.policy != null ? proofFromProvenance(policy.provenance, "", t("verdict.other"), files.policy) : null;
+    policy !== null && files?.policy != null
+      ? proofFromProvenance(policy.provenance, "", t("verdict.other"), files.policy, {
+          story: buildStory("verdict", storySeason(policy)),
+          audit: { verdicts: policy.verdicts.filter((verdict) => !verdict.primary).map((verdict) => verdict.text) },
+        })
+      : null;
   const plansProof =
-    plans !== null && files?.plans != null ? proofFromProvenance(plans.provenance, "", t("verdict.plansHeading"), files.plans) : null;
+    plans !== null && files?.plans != null
+      ? proofFromProvenance(plans.provenance, "", t("verdict.plansHeading"), files.plans, {
+          story: buildStory("verdict", storySeason(plans)),
+          audit: { verdicts: plans.verdicts.map((verdict) => verdict.text) },
+        })
+      : null;
   const lead1Verdicts = (policy?.verdicts ?? []).filter((verdict) => !verdict.primary && verdict.id !== "H4-lead2");
   const lead2Verdicts = (policy?.verdicts ?? []).filter((verdict) => verdict.id === "H4-lead2");
   const planVerdicts = plans?.verdicts ?? [];
@@ -114,7 +128,11 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
 
   // The held-out run's own label and lock, through the proof chip (the drawer shows the lock hash and the protocol commit).
   const evaluationProof =
-    data?.source === "2026" && data.record !== null && policy !== null && files?.policy != null ? proofFromProvenance(policy.provenance, "", t("evaluation.what"), files.policy) : null;
+    data?.source === "2026" && data.record !== null && policy !== null && files?.policy != null
+      ? proofFromProvenance(policy.provenance, "", t("evaluation.what"), files.policy, {
+          story: buildStory("evaluation", { ...storySeason(policy), amendments: data.record.amendments.length }),
+        })
+      : null;
 
   // The truth-based figure: the station's own danger hours (value and interval read from the Warnings file), with its definition.
   const truthMetric = policy?.leads.find((lead) => lead.lead_days === 1)?.truth_danger_hours ?? null;
@@ -129,7 +147,15 @@ export function ScoreboardView({ data, failed = false, hourly, frontierSource }:
         })
       : null;
   const truthProof =
-    policy !== null && truthMetric !== null && files?.policy != null ? proofFromProvenance(policy.provenance, truthMetric.anchor, t("warnings.truthWhat"), files.policy) : null;
+    policy !== null && truthMetric !== null && files?.policy != null
+      ? proofFromProvenance(policy.provenance, truthMetric.anchor, t("warnings.truthWhat"), files.policy, {
+          story: buildStory("truth", {
+            ...storySeason(policy),
+            marginWm2: policy.margin_w_m2,
+            range: truthMetric.ci === null ? null : { lo: format.one(truthMetric.ci.lo), hi: format.one(truthMetric.ci.hi), unit: "hours" },
+          }),
+        })
+      : null;
 
   // The trade-off paragraph: every number and every "fewer" or "more" from the Warnings rows (policy-tradeoff.ts).
   const warningsTradeoff = policy === null ? null : policyTradeoff(policy, 1, format, t);

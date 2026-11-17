@@ -5,7 +5,7 @@ import { useEffect, useId, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
-import { ProofRows, RecountButton } from "./ProofRows";
+import { AuditDetails, AuditRows, RecountButton, StoryRows } from "./ProofRows";
 import type { Proof } from "./proof";
 
 export interface ProofDrawerProps {
@@ -16,7 +16,9 @@ export interface ProofDrawerProps {
 }
 
 /**
- * Where a number comes from: protocol line, script, result file, fingerprints, label. A native modal <dialog>: the
+ * Where a number comes from, in plain words (`StoryRows`). The technical record (protocol, script, result file, fingerprints) is
+ * "For auditors": a link to the proof sheet's auditor section when the number has a sheet, and otherwise the same record behind a
+ * closed <details> here (a number with no sheet has nowhere else to show it). A native modal <dialog>: the
  * browser gives it the top layer, the inert page behind it, Escape and focus containment. It is a drawer at the inline end from
  * 48 rem up and a bottom sheet below. The code is a dynamic import (ProofChip loads it on the first click), so a page
  * with fifty chips ships none of it until someone asks.
@@ -59,22 +61,35 @@ export function ProofDrawer({ proof, open, onClose }: ProofDrawerProps) {
               {t("close")}
             </Button>
           </header>
-          <ProofRows proof={proof} />
-          <RecountButton proof={proof} />
-          <SheetLink claim={proof.claim} />
+          <p className="px-4 pt-4 text-base font-medium text-ink">{proof.what}</p>
+          <StoryRows proof={proof} />
+          {proof.claim === undefined ? (
+            <div className="px-4 pb-4">
+              <AuditDetails>
+                <AuditRows proof={proof} />
+                <RecountButton proof={proof} />
+              </AuditDetails>
+            </div>
+          ) : (
+            <SheetLinks claim={proof.claim} />
+          )}
         </div>
       ) : null}
     </dialog>
   );
 }
 
-function SheetLink({ claim }: { readonly claim: string | undefined }) {
+function SheetLinks({ claim }: { readonly claim: string }) {
   const t = useTranslations("judge.proof");
-  if (claim === undefined) return null;
+  const ts = useTranslations("states.proof");
+  const className = "inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4";
   return (
-    <p className="px-4 pb-4">
-      <FieldLink href={`/replay/proof/${claim}`} className="text-base text-ink underline underline-offset-4">
+    <p className="flex flex-wrap gap-x-6 px-4 pb-4">
+      <FieldLink href={`/replay/proof/${claim}`} className={className}>
         {t("openSheet")}
+      </FieldLink>
+      <FieldLink href={`/replay/proof/${claim}#audit`} className={className}>
+        {ts("audit.link")}
       </FieldLink>
     </p>
   );

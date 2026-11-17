@@ -1,4 +1,5 @@
 import type { components } from "@/api/schema";
+import { buildStory, type ProofStory } from "./proof-story";
 
 type Provenance = components["schemas"]["Provenance"];
 type SiteForecastToday = components["schemas"]["SiteForecastToday"];
@@ -33,15 +34,31 @@ export interface EvaluationInfo {
   readonly freeze: { readonly path: string; readonly commit: string; readonly sha256: string };
 }
 
+/**
+ * What only an auditor needs and the story never says: the policy's code and threshold (a policy cell), and the verdict sentences
+ * exactly as the scoring run wrote them (a verdict proof). Shown only in "For auditors"; a field with no value is not shown.
+ */
+export interface ProofAudit {
+  readonly policy?: { readonly code: string; readonly threshold?: string };
+  readonly verdicts?: readonly string[];
+}
+
 export interface Proof {
   /** The number in words, already localized by the caller ("Alerts per shift, P3 protect"). */
   readonly what: string;
-  /** The pre-registration line the metric is defined in: `<repo path>#<anchor>`, or the policy and configuration ids. */
+  /**
+   * The plain "Where this number comes from" story: built from the record's structured fields by `buildStory`, never from the
+   * technical strings below. Every proof has one: a number shown outside "For auditors" is explained there first.
+   */
+  readonly story: ProofStory;
+  /** The pre-registration line the metric is defined in: `<repo path>#<anchor>`, or the ruleset and configuration. Auditor layer only. */
   readonly protocol: string;
   /** Where that line can be read, when a public URL for the protocol exists. */
   readonly protocolHref: string | null;
-  /** The script and function that produced it, `module:function @ commit`. */
-  readonly script: string;
+  /** The script and function that produced it, `module:function @ commit`; null when no script wrote it (a live forecast). Auditor layer only. */
+  readonly script: string | null;
+  /** Policy code, threshold and the verdict sentences verbatim, when the proof has them. Auditor layer only. */
+  readonly audit?: ProofAudit;
   /** The result file this page drew, relative to `data/` (`eval/2026/policy_scoreboard.json`), or an API response id. */
   readonly file: string;
   /** SHA-256 of the bytes of that file as this page drew them. */
@@ -97,7 +114,7 @@ export function proofFromProvenance(
   anchor: string,
   what: string,
   file: { readonly path: string; readonly sha256: string | null; readonly evaluation?: EvaluationInfo },
-  options: { readonly label?: ProofLabel; readonly claim?: string } = {},
+  options: { readonly story: ProofStory; readonly label?: ProofLabel; readonly claim?: string; readonly audit?: ProofAudit },
 ): Proof | null {
   if (provenance === null || provenance === undefined) return null;
   const { protocol_path, protocol_anchor, script, function: fn, git_sha, data_sha256, label, generated_at } = provenance;
@@ -108,6 +125,7 @@ export function proofFromProvenance(
   const fragment = slug.startsWith("#") ? slug : `#${slug}`;
   return {
     what,
+    story: options.story,
     protocol: `${protocol_path}${fragment}`,
     protocolHref: PROTOCOL_BASE_URL === null ? null : `${PROTOCOL_BASE_URL}/${protocol_path}${fragment}`,
     script: `${script}:${fn} @ ${git_sha.slice(0, 12)}`,
@@ -118,6 +136,7 @@ export function proofFromProvenance(
     modelId: provenance.model_id ?? null,
     generatedAt: generated_at,
     ...(options.claim === undefined ? {} : { claim: options.claim }),
+    ...(options.audit === undefined ? {} : { audit: options.audit }),
     // A development or synthetic file is not the held-out run: it never shows a lock.
     ...(file.evaluation === undefined || isDevPath(file.path) ? {} : { evaluation: file.evaluation }),
   };
@@ -131,10 +150,11 @@ export function proofFromProvenance(
 export function proofFromStaticFile(
   file: { readonly path: string; readonly sha256: string },
   what: string,
-  source: { readonly protocol: string; readonly script: string; readonly label: ProofLabel; readonly claim?: string },
+  source: { readonly story: ProofStory; readonly protocol: string; readonly script: string; readonly label: ProofLabel; readonly claim?: string },
 ): Proof {
   return {
     what,
+    story: source.story,
     protocol: source.protocol,
     protocolHref: null,
     script: source.script,
@@ -160,9 +180,12 @@ export function proofFromForecast(
 ): Proof {
   return {
     what,
-    protocol: `policy=${forecast.policy_version} config=${String(forecast.config_version)}`,
+    // The plain story says what the level is; the ruleset and configuration that drew it are technical record, shown only under
+    // "For auditors" (they used to print as `policy=... config=...` in the worker's drawer). No script wrote a live forecast.
+    story: buildStory("level", {}),
+    protocol: `Ruleset ${forecast.policy_version}, configuration ${String(forecast.config_version)}`,
     protocolHref: null,
-    script: "get_site_forecast_today",
+    script: null,
     file: `${forecast.site_id}/forecast/today/${forecast.date}`,
     fileSha256: null,
     sourceSha256: null,
@@ -170,6 +193,15 @@ export function proofFromForecast(
     modelId: forecast.model_id,
     generatedAt: forecast.generated_at,
   };
+}
+
+/**
+ * Whether the record is missing details an exporter-backed number should have (a fingerprint of the file the page drew). A
+ * recorded file or a live forecast has no exporter block, so its empty fields are expected and not "incomplete". The sheet says
+ * so once, in one sentence, and prints no placeholder for the empty fields.
+ */
+export function isIncomplete(proof: Proof): boolean {
+  return proof.sourceSha256 !== null && proof.fileSha256 === null;
 }
 
 // Files the browser may fetch back and hash: the committed static data and the held-out 2026 exports (both are copied
