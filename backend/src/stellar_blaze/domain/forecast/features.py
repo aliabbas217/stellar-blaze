@@ -221,6 +221,21 @@ class FoldStats:
     station_climatology: pl.DataFrame
 
 
+def _group_sum(column: str) -> pl.Expr:
+    """The sum of ``column`` within a ``group_by`` group, computed over the group's rows in their frame order.
+
+    A bare ``pl.col(c).sum()`` is a simple aggregation that Polars may run as a partitioned group-by: the rows are
+    split into partitions, each is summed on its own and the partial sums are merged. Whether it does so is a run-time
+    choice, and the way the partial sums associate changes from run to run, so the same rows in the same order give
+    float sums that differ in the last digits. Measured: ``POLARS_MAX_THREADS=1`` still varies, and so does the thread
+    count; ``POLARS_NO_PARTITION=1`` never varies and ``POLARS_FORCE_PARTITION=1`` makes it frequent.
+    ``maintain_order=True`` fixes the order of the groups, not this sum. ``drop_nulls`` changes no value (a sum skips
+    nulls) but makes the aggregation no longer a plain column aggregate, so it takes the path that sums each group over
+    its own rows; the regression test pins that with the partitioned path forced.
+    """
+    return pl.col(column).drop_nulls().sum()
+
+
 def _windowed_means(rows: pl.DataFrame, keys: list[str], columns: Mapping[str, str]) -> pl.DataFrame:
     """Mean of each source column over ``doy`` +- 7 days, per ``keys`` and hour; the window is not circular.
 
@@ -228,7 +243,7 @@ def _windowed_means(rows: pl.DataFrame, keys: list[str], columns: Mapping[str, s
     days, never wrapped days. A target day is kept only if some column has a value in its window.
     """
     daily = rows.group_by([*keys, "hour_utc", "doy"], maintain_order=True).agg(
-        [pl.col(source).sum().alias(f"{name}__sum") for name, source in columns.items()]
+        [_group_sum(source).alias(f"{name}__sum") for name, source in columns.items()]
         + [pl.col(source).count().alias(f"{name}__n") for name, source in columns.items()]
     )
     offsets = pl.DataFrame({"offset": list(range(-_WINDOW_DAYS, _WINDOW_DAYS + 1))}, schema={"offset": pl.Int32()})
@@ -238,7 +253,8 @@ def _windowed_means(rows: pl.DataFrame, keys: list[str], columns: Mapping[str, s
         .filter(pl.col("target_doy").is_between(1, _MAX_DOY))
     )
     pooled = expanded.group_by([*keys, "hour_utc", "target_doy"], maintain_order=True).agg(
-        [pl.col(f"{name}__sum").sum() for name in columns] + [pl.col(f"{name}__n").sum() for name in columns]
+        [_group_sum(f"{name}__sum").alias(f"{name}__sum") for name in columns]
+        + [pl.col(f"{name}__n").sum() for name in columns]  # integer counts: exact in any order
     )
     means = pooled.select(
         *keys,

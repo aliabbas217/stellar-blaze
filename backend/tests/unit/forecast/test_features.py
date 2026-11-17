@@ -1,7 +1,12 @@
 """The feature builder, the fold statistics and the history features (pre-registration 3.2), on synthetic pairs."""
 
+import hashlib
+import os
+import subprocess
+import sys
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from statistics import fmean
 from typing import Any
 
@@ -405,6 +410,54 @@ def test_fold_stats_ignore_wbgt_truth_that_is_rejected(pairs: pl.DataFrame, stat
     )
     assert (pairs["wbgt_obs_reject"] != 0).sum() > 0
     assert fit_fold_stats(poisoned).pooled_climatology.equals(stats.pooled_climatology)
+
+
+_STATS_DIGEST_SCRIPT = """
+import hashlib, sys
+import polars as pl
+from stellar_blaze.domain.forecast.features import fit_fold_stats
+pairs = pl.read_parquet(sys.argv[1])
+digests = set()
+for _ in range(int(sys.argv[2])):
+    stats = fit_fold_stats(pairs)
+    rows = (stats.pooled_climatology.rows(), stats.station_climatology.rows())
+    digests.add(hashlib.sha256(repr(rows).encode()).hexdigest())
+print(*sorted(digests))
+"""
+
+
+def _stats_digest(stats: FoldStats) -> str:
+    return hashlib.sha256(
+        repr((stats.pooled_climatology.rows(), stats.station_climatology.rows())).encode()
+    ).hexdigest()
+
+
+@pytest.mark.parametrize("threads", ["1", "2", "16"])
+def test_fold_stats_are_bit_identical_whatever_the_partitioning_and_thread_count_of_polars(
+    tmp_path: Path, threads: str
+) -> None:
+    """A float group sum must not depend on how Polars splits the rows (a flaky bit-exact failure on 2-vCPU CI).
+
+    Polars' partitioned group-by sums each partition and merges the partial sums, so the last digits of a float sum
+    change from run to run and with the thread count. Setting ``POLARS_FORCE_PARTITION`` inside a running interpreter
+    has no effect (checked), so the check runs in a fresh one with it set. Every digest, repeated in the child at each
+    thread count, must be the one of this process, which sums every group over its own rows.
+    """
+    rows = make_pairs(
+        seed=11, summers=(2023, 2024), station_bias_c={}, leads=(0, 1), hours_utc=MODELLED_HOURS_UTC
+    ).filter(pl.col("lead_days") == 1)
+    path = tmp_path / "pairs.parquet"
+    rows.write_parquet(path)
+    env = {**os.environ, "POLARS_FORCE_PARTITION": "1", "POLARS_MAX_THREADS": threads}
+    done = subprocess.run(  # noqa: S603  (our own interpreter and script)
+        [sys.executable, "-I", "-c", _STATS_DIGEST_SCRIPT, str(path), "8"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=300,
+    )
+    assert done.stdout.split() == [_stats_digest(fit_fold_stats(rows))]
 
 
 def test_a_cold_feature_row_carries_the_pooled_climatology(pairs: pl.DataFrame, stats: FoldStats) -> None:
