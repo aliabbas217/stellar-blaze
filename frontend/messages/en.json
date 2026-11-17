@@ -1017,7 +1017,7 @@
           "doesNotShow": "A measured benefit for real workers. Commute, evening time and bedtime are assumptions we made."
         },
         "level": {
-          "madeBy": "The day-ahead forecast, adjusted by Stellar Blaze, turned into a level (green, yellow, orange or red) using the published ADOSH heat zones.",
+          "madeBy": "The day-ahead forecast, adjusted by Stellar Blaze, turned into a level (green, amber, orange or red) using the published ADOSH heat zones.",
           "about": "The whole site, not you. Your own limit can be higher or lower.",
           "doesNotShow": "A medical judgment. The wording has not yet been checked by a clinician."
         },
