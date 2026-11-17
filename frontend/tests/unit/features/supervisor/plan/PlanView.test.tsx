@@ -8,7 +8,7 @@ import en from "../../../../../messages/en.json";
 import { apiClient } from "@/api/client";
 import { crewDayPlan, crewStops, crewTimeline, forecastToday, listCrews, REPLAY_DATE, SITE_DEMO } from "@/mocks/fixtures";
 import { server } from "@/mocks/node";
-import { installSupervisorTestEnvironment, renderPlan, stopBar, textOf } from "../support";
+import { describeQueries, installSupervisorTestEnvironment, renderPlan, stopBar, textOf } from "../support";
 
 /*
  * The supervisor's plan screen with sign-off (F2 Task 20), through the real hooks and MSW. Crew B is the demo crew (unsigned, heavy
@@ -644,9 +644,14 @@ describe("the plan screen: forecast, k and restrictions", () => {
 
   it("a fresh forecast draws the heat of each hour on the strip, from the API's own numbers", async () => {
     renderPlan("crew-b");
-    await waitFor(() => {
-      expect(document.querySelectorAll<HTMLElement>("[data-plan-heat] span[style*='--heat-night']").length).toBeGreaterThan(0);
-    });
+    try {
+      await waitFor(() => {
+        expect(document.querySelectorAll<HTMLElement>("[data-plan-heat] span[style*='--heat-night']").length).toBeGreaterThan(0);
+      });
+    } catch (error) {
+      // The strip waits for the site, the crews and the forecast; say which of them did not arrive and why.
+      throw new Error(`${String(error)}\nqueries: ${describeQueries()}`, { cause: error });
+    }
     expect(screen.getByText(en.supervisor.plan.strip.heatNote)).toBeInTheDocument();
   });
 

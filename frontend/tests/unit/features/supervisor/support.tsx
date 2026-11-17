@@ -46,8 +46,28 @@ export function renderCrews(): RenderResult {
   return renderWithIntl(view);
 }
 
+/** The client of the latest renderPlan, kept only so that a failing wait can say what its queries were doing. */
+let lastPlanClient: QueryClient | null = null;
+
+/**
+ * What every query of the latest renderPlan is doing: its key, status, fetch status and error. A `waitFor` that times out prints
+ * the page, which shows THAT something is missing but not WHY (a request that never answered, one that failed, or one that was
+ * never enabled look the same); this shows which.
+ */
+export function describeQueries(): string {
+  if (lastPlanClient === null) return "no plan has been rendered";
+  const rows = lastPlanClient.getQueryCache().getAll().map((query) => ({
+    key: query.queryKey,
+    status: query.state.status,
+    fetchStatus: query.state.fetchStatus,
+    error: query.state.error === null ? null : String(query.state.error),
+  }));
+  return JSON.stringify(rows);
+}
+
 export function renderPlan(crewId: string): RenderResult {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  lastPlanClient = client;
   const view: ReactNode = (
     <QueryClientProvider client={client}>
       <DemoProvider>
