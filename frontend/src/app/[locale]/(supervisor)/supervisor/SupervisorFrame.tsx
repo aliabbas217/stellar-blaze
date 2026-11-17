@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FieldShell } from "@/components/shell/FieldShell";
+import { splitDemoName } from "@/components/shell/site-name";
 import { DemoClock } from "@/features/demo/DemoClock";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { DemoSwitch } from "@/features/demo/DemoSwitch";
@@ -16,9 +17,10 @@ export function SupervisorFrame({ children }: { children: ReactNode }) {
   const { site } = useDemo();
   // A crew's plan always has a site name and a crew name: the header keeps their height from the first paint (no shift when they arrive).
   const crewScreen = usePathname().includes("/supervisor/crews/");
+  const { name, demo } = site === null ? { name: null, demo: false } : splitDemoName(site.name, site.synthetic);
 
   return (
-    <FieldShell siteName={site?.name ?? null} reserveLabels={crewScreen} clock={<DemoClock />}>
+    <FieldShell siteName={name} demo={demo} reserveLabels={crewScreen} clock={<DemoClock />}>
       <div className="border-b border-hair px-4 py-2">
         <DemoSwitch />
       </div>

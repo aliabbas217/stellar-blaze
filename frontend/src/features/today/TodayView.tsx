@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { LEVEL_SIGN_HEIGHT } from "@/components/level/LevelSign";
 import { Pictogram } from "@/components/level/Pictogram";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { proofFromForecast } from "@/components/provenance/proof";
@@ -8,38 +9,46 @@ import { FieldLink } from "@/components/shell/FieldLink";
 import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
 import { ErrorState } from "@/components/states/ErrorState";
-import { LevelSignSkeleton, Skeleton } from "@/components/states/Skeletons";
+import { Skeleton } from "@/components/states/Skeletons";
 import { WakingLine } from "@/components/states/WakingLine";
-import { ACTION_PRIMARY } from "@/components/states/actions";
+import { ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 import { ActionLead } from "@/features/today/ActionLead";
-import { ALSO_NEEDS_DRAFT_MARKER, alsoPictogram } from "@/features/today/action-codes";
+import { alsoPictogram } from "@/features/today/action-codes";
 import { LevelHeader } from "@/features/today/LevelHeader";
 import { ProtectiveLead } from "@/features/today/ProtectiveLead";
-import { ShiftSpine, spineHeight } from "@/features/today/ShiftSpine";
+import { SHIFT_STRIP_HEIGHT, ShiftSpine } from "@/features/today/ShiftSpine";
 import { SiteEntry } from "@/features/today/SiteEntry";
 import { useTodayModel, type TodayModel } from "@/features/today/useTodayModel";
 
 /*
- * The worker's Today screen (F2 Task 16): the site level now, what to do about it, and the shift on the Qaylula spine.
- * One column, the phone's width. The states (loading, empty, error, stale, offline, fallback, out of season, no shift,
- * personal, partial) are decided in describe.ts and useTodayModel.ts; this file only words and lays them out.
+ * The worker's Today screen (F2 Task 16, restructured in redesign S5): what to do now, the site level, and the shift as one strip.
+ * One column, the phone's width. It is read in three seconds: the action sentence and the level in one card, the strip under it,
+ * then at most three "Also now" lines, the one clinical note of the screen beside "Why <level>?", and a quiet row when warnings are
+ * off. The "I feel unwell" slab and the tabs are the dock (WorkerDock.tsx). The states (loading, empty, error, stale, offline,
+ * fallback, out of season, no shift, personal, partial) are decided in describe.ts and useTodayModel.ts; this file only words and
+ * lays them out.
  *
  * It reads `?at=`, `?site=` and `?crew=` (the replay clock and the pin), so the page puts it in its own <Suspense> boundary:
  * the rest of the page stays server rendered and this fills in after hydration, behind TodaySkeleton.
  */
 
-/** The shift the skeleton reserves room for: the usual day of the spine (06:00 to 18:00). */
-const SKELETON_HOURS = 12;
+/** The level card: the same box on the screen and in its skeleton. */
+const CARD = "mx-4 flex flex-col gap-4 rounded-card bg-panel p-5";
+
+/**
+ * The height of the level card before its data arrives (CLS): the padding, the two-line action sentence, the gap, the rule and the
+ * level sign at its published height. A sentence of three lines (some languages) grows the card past this floor.
+ */
+const CARD_HEIGHT = `calc(var(--s-5) * 2 + max(2.75rem, var(--t-28) * var(--sign-leading-display) * 2) + var(--s-4) * 2 + 1.5px + ${LEVEL_SIGN_HEIGHT.hero})`;
 
 /** The placeholder of the whole screen, at the final element heights (CLS), shown until the forecast arrives. */
 export function TodaySkeleton() {
   const t = useTranslations("states");
   return (
     <>
-      <div role="status" aria-busy="true" className="flex flex-col gap-4 px-4 pt-3">
-        <LevelSignSkeleton size="hero" />
-        <Skeleton height="calc(max(2.5rem, var(--t-22) * var(--sign-leading-text)) + var(--s-2) + var(--t-16) * var(--sign-leading-text))" />
-        <Skeleton height={spineHeight(SKELETON_HOURS)} />
+      <div role="status" aria-busy="true" data-today-skeleton="" className="flex flex-col gap-4 px-4 pt-3">
+        <Skeleton height={CARD_HEIGHT} />
+        <Skeleton height={SHIFT_STRIP_HEIGHT} />
         <span className="sr-only">{t("loading")}</span>
       </div>
       {/* Outside the busy region (a change inside it is not announced). The forecast read can be waiting for a scaled-to-zero API. */}
@@ -65,7 +74,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
       : proofFromForecast(forecast, levelName === null ? t("proofWhat.siteRules") : t("proofWhat.level", { level: levelName }), { synthetic });
 
   return (
-    <div className="flex flex-col gap-3 pb-6">
+    <div className={`flex flex-col gap-4 pb-6 ${d.notLive ? "" : "pt-3"}`}>
       {d.notLive ? (
         <ProtectiveLead
           description={d}
@@ -90,61 +99,81 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
         </div>
       ) : null}
 
-      {d.notLive ? null : <LevelHeader description={d} mode={forecast.mode} />}
-
       {d.noShift ? (
-        <div className="px-4">
-          <EmptyState
-            title={t("noShift.title", { crew: d.crewName ?? "" })}
-            reason={t("noShift.reason")}
-            primary={{ label: t("noShift.primary"), href: "/worker/alerts" }}
-            {...(d.level === null ? {} : { level: d.level })}
-          />
-        </div>
-      ) : (
         <>
-          {d.notLive ? null : <ActionLead lead={d.plan.lead} protective={d.protective} />}
-          <ShiftSpine description={d} />
+          {d.notLive ? null : (
+            <div className={CARD}>
+              <LevelHeader description={d} mode={forecast.mode} className="" />
+            </div>
+          )}
+          <div className="px-4">
+            <EmptyState
+              title={t("noShift.title", { crew: d.crewName ?? "" })}
+              reason={t("noShift.reason")}
+              primary={{ label: t("noShift.primary"), href: "/worker/alerts" }}
+              {...(d.level === null ? {} : { level: d.level })}
+            />
+          </div>
         </>
+      ) : d.notLive ? (
+        <ShiftSpine description={d} />
+      ) : (
+        // The hero while the forecast is live: the level card (the action first, then the level) and the shift strip under it.
+        <div data-hero="" className="flex flex-col gap-4">
+          <div className={CARD}>
+            <ActionLead lead={d.plan.lead} protective={d.protective} className="" />
+            <div className="border-t-[1.5px] border-hair pt-4">
+              <LevelHeader description={d} mode={forecast.mode} className="" />
+            </div>
+          </div>
+          <ShiftSpine description={d} />
+        </div>
       )}
 
       {d.plan.also.length === 0 || d.noShift ? null : (
-        <section aria-labelledby="also-now" className="flex flex-col gap-2 px-4">
-          <h2 id="also-now" className="text-base font-medium text-ink-3">
+        <section aria-labelledby="also-now" className="flex flex-col gap-1 px-4">
+          <h2 id="also-now" className="text-sm leading-(--sign-leading-text) font-medium text-ink-3">
             {t("also.heading")}
           </h2>
           <ol className="m-0 flex list-none flex-col p-0">
             {d.plan.also.map((item) => (
               <li
                 key={item}
-                className="grid grid-cols-[2.5rem_1fr] items-center gap-3 border-b border-hair py-3 text-xl leading-(--sign-leading-text) font-medium text-ink"
+                className="grid min-h-14 grid-cols-[2rem_1fr] items-center gap-3.5 border-t-[1.5px] border-hair py-2 text-20 leading-(--sign-leading-text) font-medium text-ink"
               >
-                <Pictogram name={alsoPictogram(item)} className="size-10" />
+                <Pictogram name={alsoPictogram(item)} className="size-8 text-ink-2" />
                 <span>{t(`also.${item}`)}</span>
               </li>
             ))}
           </ol>
-          {d.plan.also.some((item) => ALSO_NEEDS_DRAFT_MARKER.has(item)) ? (
-            <p data-draft-wording="" className="text-base leading-(--sign-leading-text) text-ink-2">
-              {t("draftWording")}
-            </p>
-          ) : null}
         </section>
       )}
 
-      <div className="flex flex-col items-start gap-3 px-4">
-        <ProofChip
-          proof={proof}
-          field
-          label={levelName === null ? t("why.siteRules") : plainWhy(levelName)}
-          labelContent={levelName === null ? undefined : t.rich("why.level", { level: levelName, bdi: (chunks) => <bdi>{chunks}</bdi> })}
-        />
-        {pushOff && !d.noShift ? (
-          <FieldLink href="/worker/alerts" data-primary="" className={`${ACTION_PRIMARY} w-full`}>
-            {t("turnOnWarnings")}
-          </FieldLink>
-        ) : null}
+      {/* The ONE clinical note of the screen (decision D5), covering the lead and the list. The label is the honest one and stays. */}
+      <div className="flex items-center justify-between gap-3 px-4">
+        {d.noShift ? null : (
+          <p data-clinical-note="" className="text-sm leading-(--sign-leading-text) text-ink-2">
+            {t("draftWording")}
+          </p>
+        )}
+        <div className="ms-auto">
+          <ProofChip
+            proof={proof}
+            variant="quiet"
+            label={levelName === null ? t("why.siteRules") : plainWhy(levelName)}
+            labelContent={levelName === null ? undefined : t.rich("why.level", { level: levelName, bdi: (chunks) => <bdi>{chunks}</bdi> })}
+          />
+        </div>
       </div>
+
+      {pushOff && !d.noShift ? (
+        <div data-warnings-off="" className="mx-4 flex items-center justify-between gap-3 rounded-card bg-panel py-3 ps-4 pe-3">
+          <p className="min-w-0 text-base leading-(--sign-leading-text) font-medium text-ink">{t("warningsOff")}</p>
+          <FieldLink href="/worker/alerts" aria-label={t("turnOnWarnings")} className={`${ACTION_SECONDARY_DENSE} flex-none whitespace-nowrap`}>
+            {t("turnOn")}
+          </FieldLink>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -195,7 +195,7 @@ describe("Today: no site yet", () => {
 });
 
 describe("Today: a pinned phone", () => {
-  it("shows the level now, until when, the action from the hour's codes, and the draft label", async () => {
+  it("shows the action first, then the level now and until when, from the hour's codes, with the one clinical note", async () => {
     pin();
     renderToday();
 
@@ -204,7 +204,14 @@ describe("Today: a pinned phone", () => {
     // 11:00, 12:00 and 13:00 are Orange, 14:00 is Red (the mock's placeholder levels): until 14:00.
     expect(screen.getByText(/until/).textContent).toContain("14:00");
     expect(screen.getByText("Work 20 min, rest 40 min in shade")).toBeInTheDocument();
-    expect(screen.getByText("Draft wording, awaiting clinical review")).toBeInTheDocument();
+    // D5: ONE clinical note per screen, covering the action and the list, and the old label is gone.
+    expect(screen.getAllByText("Not yet checked by a clinician.")).toHaveLength(1);
+    expect(screen.queryByText(/Draft wording/)).toBeNull();
+    // The action is the first thing of the level card; the level row follows it.
+    const lead = document.querySelector("[data-action-lead]") as HTMLElement;
+    const sign = document.querySelector("[data-level-sign]") as HTMLElement;
+    expect(lead.compareDocumentPosition(sign) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sign.querySelector("[data-level-word]")).toHaveTextContent("Orange");
     const also = screen.getByRole("heading", { name: "Also now" }).closest("section") as HTMLElement;
     expect(within(also).getByText("Drink water")).toBeInTheDocument();
     expect(within(also).getByText("Never work alone")).toBeInTheDocument();
@@ -212,12 +219,12 @@ describe("Today: a pinned phone", () => {
     expect(document.body.textContent).not.toMatch(/litre|1\.2/i);
   });
 
-  it("test_four_ruleset_codes_are_shown_in_the_rulesets_own_words_under_the_draft_marker: the Orange hour of the real ruleset", async () => {
+  it("test_employer_duties_are_not_on_the_workers_screen: the Orange hour of the real ruleset lists only what the worker does, each with its own glyph", async () => {
     server.use(
       http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => {
         const forecast = forecastToday(String(params["site_id"]));
         if (forecast === undefined) return new HttpResponse(null, { status: 404 });
-        const orangeCodes = ["cycle.high.heavy.20-40", "no-lone-work", "no-unacclimatised", "fluids.over-1.2l", "high-risk-induction", "personal-water-bottle-2l"];
+        const orangeCodes = ["cycle.high.heavy.20-40", "no-lone-work", "no-unacclimatised", "fluids.over-1.2l", "high-risk-induction", "personal-water-bottle-2l", "self-paced-work"];
         return HttpResponse.json({ ...forecast, hours: forecast.hours.map((hour) => ({ ...hour, action_codes: orangeCodes })) });
       }),
     );
@@ -226,26 +233,34 @@ describe("Today: a pinned phone", () => {
 
     expect(await orange()).toBeInTheDocument();
     const also = screen.getByRole("heading", { name: "Also now" }).closest("section") as HTMLElement;
-    // Verbatim ADOSH Table 1 text, as the ruleset's clause cites it; nothing added.
-    expect(within(also).getByText("No unacclimatised person to work")).toBeInTheDocument();
-    expect(within(also).getByText("High Risk induction required emphasising hydration and identifying signs of heat strain")).toBeInTheDocument();
-    expect(within(also).getByText("Provide personal water bottle (2 litre capacity) on-site at all times")).toBeInTheDocument();
-    // The unreviewed marker follows the list as well as the lead.
-    expect(within(also).getByText("Draft wording, awaiting clinical review")).toBeInTheDocument();
-    // "Drink water" is still only that: the bottle's capacity is the duty's own words, never a quantity to drink.
-    expect(within(also).getByText("Drink water")).toBeInTheDocument();
+    // The three employer duties (ADOSH text written for duty holders) are nowhere on the screen: not as a line, not as text.
+    for (const duty of ["No unacclimatised person to work", "High Risk induction required", "Provide personal water bottle"]) {
+      expect(screen.queryByText(new RegExp(duty))).toBeNull();
+    }
+    // What is left is what the worker does: at most three lines, one glyph per rule, no two the same.
+    const rows = within(also).getAllByRole("listitem");
+    expect(rows.length).toBeLessThanOrEqual(3);
+    expect(rows.map((row) => row.textContent)).toEqual(["Never work alone", "Drink water", expect.stringMatching(/^Self-paced work/)]);
+    const glyphs = rows.map((row) => row.querySelector("[data-pictogram]")?.getAttribute("data-pictogram"));
+    expect(glyphs).toEqual(["buddy", "water", "clock"]);
+    expect(new Set(glyphs).size).toBe(glyphs.length);
+    // One note for the whole screen, not one under the list as well.
+    expect(screen.getAllByText("Not yet checked by a clinician.")).toHaveLength(1);
   });
 
-  it("test_primary_action_is_turn_on_warnings_when_push_off: one primary action, to Alerts; none once push is on", async () => {
+  it("test_warnings_off_is_a_quiet_row_when_push_off: Turn on is a link to Alerts, not a primary action; none once push is on", async () => {
     pin();
     renderToday();
     await orange();
 
-    const primary = document.querySelectorAll("[data-primary]");
-    expect(primary).toHaveLength(1);
-    expect(primary[0]).toHaveTextContent("Turn on warnings");
-    expect(primary[0]).toHaveAttribute("href", "/en/worker/alerts");
-    expect(primary[0]).toHaveAttribute("data-prefetch", "false");
+    const row = document.querySelector("[data-warnings-off]") as HTMLElement;
+    expect(row).toHaveTextContent("Warnings are off on this phone");
+    const turnOn = within(row).getByRole("link", { name: "Turn on warnings" });
+    expect(turnOn).toHaveTextContent("Turn on");
+    expect(turnOn).toHaveAttribute("href", "/en/worker/alerts");
+    expect(turnOn).toHaveAttribute("data-prefetch", "false");
+    // The screen has no primary action of its own: the unwell slab is the dock's, and one-time setup is quiet.
+    expect(document.querySelectorAll("[data-primary]")).toHaveLength(0);
   });
 
   it("has no primary action once warnings are on (a push registration exists on this phone)", async () => {
@@ -257,6 +272,7 @@ describe("Today: a pinned phone", () => {
     await orange();
 
     expect(document.querySelectorAll("[data-primary]")).toHaveLength(0);
+    expect(document.querySelector("[data-warnings-off]")).toBeNull();
     expect(screen.queryByRole("link", { name: "Turn on warnings" })).toBeNull();
   });
 
@@ -427,6 +443,50 @@ describe("Today: states", () => {
     expect(document.querySelector('[data-level-sign][data-kind="live"]')).not.toBeNull();
   });
 
+  it("the shift is ONE horizontal strip: only Now is on it, the rest of the day is one plain line under it, and the card and the strip are the hero", async () => {
+    pin();
+    renderToday();
+    await orange();
+    const hero = document.querySelector("[data-hero]") as HTMLElement;
+    const strip = hero.querySelector('[data-spine][data-orientation="h"][data-surface="field"]') as HTMLElement;
+    expect(strip, "a horizontal field spine inside the hero").not.toBeNull();
+    // Only "Now" is stacked over the band; the slot's own label is off (the line says it) and the slot is still drawn.
+    expect([...strip.querySelectorAll("[data-waypoint]")].map((item) => item.textContent)).toEqual(["Now"]);
+    expect(strip.querySelector("[data-slot-label]")).toBeNull();
+    expect(strip.querySelector("[data-slot]")).not.toBeNull();
+    // The one plain line: the break, back to work and the shift's end, as separate phrases.
+    // The crew's timeline (the shift's end) arrives after the forecast.
+    await waitFor(() => {
+      expect(hero.querySelector("[data-shift-line]")?.textContent).toContain("Shift ends");
+    });
+    const line = hero.querySelector("[data-shift-line]") as HTMLElement;
+    expect([...line.querySelectorAll("span")].map((span) => span.textContent.replace(/[⁦⁩]/g, ""))).toEqual([
+      "Break in 1 h 20 min",
+      "Back to work 15:00",
+      "Shift ends 18:00",
+    ]);
+    // The card (action, then level) and the strip stand together; the card is a panel.
+    expect(hero.querySelector("[data-action-lead]")).not.toBeNull();
+    expect(hero.querySelector("[data-level-sign]")).not.toBeNull();
+  });
+
+  it("out of season the line says why there is no break, once, and the strip draws no slot", async () => {
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) => {
+        const forecast = forecastToday(String(params["site_id"]));
+        if (forecast === undefined) return new HttpResponse(null, { status: 404 });
+        return HttpResponse.json({ ...forecast, ban_window: { ...forecast.ban_window, active_on_date: false, starts_at: null, ends_at: null, season_end: "08-01" } });
+      }),
+    );
+    pin();
+    renderToday();
+    await orange();
+    const line = document.querySelector("[data-shift-line]") as HTMLElement;
+    expect(line.textContent).toMatch(/No midday break by law after 1 Aug/);
+    expect(line.textContent).not.toMatch(/Break in/);
+    expect(document.querySelector("[data-spine] [data-slot]")).toBeNull();
+  });
+
   it("an error shows the site rules, a retry and the request id: never a dead end", async () => {
     server.use(
       http.get("*/api/v1/sites/:site_id/forecast/today", () =>
@@ -530,18 +590,18 @@ describe("Today: states", () => {
     const { container } = renderToday();
     // Synchronously after the first render: the forecast has not arrived, so the screen is the skeleton, and a pinned phone must
     // never flash the entry for a phone that has no site.
-    expect(container.querySelector('[role="status"][aria-busy="true"] [data-skeleton="level-sign"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-today-skeleton] [data-skeleton]')).toHaveLength(2);
     expect(screen.queryByRole("heading", { name: "Scan your crew's code" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Orange" })).toBeNull();
     // ...and the skeleton goes when the level comes.
     await orange();
-    expect(container.querySelector('[data-skeleton="level-sign"]')).toBeNull();
+    expect(container.querySelector("[data-today-skeleton]")).toBeNull();
   });
 
   it("an unpinned phone shows the entry at once, not a skeleton that never ends", async () => {
     const { container } = renderToday();
     expect(await screen.findByRole("heading", { name: "Scan your crew's code" })).toBeInTheDocument();
-    expect(container.querySelector('[data-skeleton="level-sign"]')).toBeNull();
+    expect(container.querySelector("[data-today-skeleton]")).toBeNull();
   });
 });
 

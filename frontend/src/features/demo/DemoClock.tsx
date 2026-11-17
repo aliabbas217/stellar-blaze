@@ -17,7 +17,7 @@ function ClockText() {
 
 const noSubscription = (): (() => void) => () => undefined;
 
-/** False on the server and during hydration, true once the browser has taken the page over (the same snapshot discipline as SunToggle). */
+/** False on the server and during hydration, true once the browser has taken the page over (the same snapshot discipline the old sun toggle had). */
 function useHydrated(): boolean {
   return useSyncExternalStore(
     noSubscription,

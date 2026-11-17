@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ACTION_PRIMARY_DENSE } from "@/components/states/actions";
+import { ACTION_PRIMARY_DENSE, ACTION_QUIET } from "@/components/states/actions";
 import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
 import type { ProofDrawerProps } from "./ProofDrawer";
@@ -21,7 +21,8 @@ import type { Proof } from "./proof";
  * `label` replaces the words "Where from" on the button ("Why Orange?"); the accessible name of the default chip is "Where this number comes from: <what>". `field` is
  * the phone size: 44 px target and 16 px text, for the worker screens (a desk chip is 28 px). `variant="primary"` is the desk
  * primary action (a screen whose one action is "read how this is proved"): the same drawer, the primary button of the state
- * components, and `data-primary` for the design gate.
+ * components, and `data-primary` for the design gate. `variant="quiet"` is the text action of a field screen ("Why Orange?" beside the clinical
+ * note of Today): the quiet tier of the control system, no ring and no fill.
  */
 export function ProofChip({
   proof,
@@ -31,7 +32,7 @@ export function ProofChip({
   variant = "chip",
 }: {
   readonly proof: Proof | null;
-  readonly variant?: "chip" | "primary";
+  readonly variant?: "chip" | "primary" | "quiet";
   readonly label?: string;
   /** The same words as `label`, as nodes (a level name wrapped in <bdi>, so an Urdu name inside an English phrase keeps its place). The accessible name stays `label`. */
   readonly labelContent?: ReactNode;
@@ -48,7 +49,7 @@ function Chip({
   field,
   variant,
 }: {
-  readonly variant: "chip" | "primary";
+  readonly variant: "chip" | "primary" | "quiet";
   readonly proof: Proof;
   readonly label: string | undefined;
   readonly labelContent: ReactNode;
@@ -99,12 +100,14 @@ function Chip({
         className={
           variant === "primary"
             ? `${ACTION_PRIMARY_DENSE} gap-2`
-            : `inline-flex items-center gap-1 rounded-pill bg-panel text-ink-2 inset-ring-[1.5px] inset-ring-hair hover:text-ink hover:inset-ring-ink-3 ${
+            : variant === "quiet"
+              ? ACTION_QUIET
+              : `inline-flex items-center gap-1 rounded-pill bg-panel text-ink-2 inset-ring-[1.5px] inset-ring-hair hover:text-ink hover:inset-ring-ink-3 ${
                 field ? "min-h-(--target) min-w-(--target) touch-manipulation px-3 text-base" : "min-h-7 min-w-7 px-2 text-xs"
               }`
         }
       >
-        {variant === "primary" ? null : <span aria-hidden className="size-1.5 rotate-45 border border-current" />}
+        {variant === "chip" ? <span aria-hidden className="size-1.5 rotate-45 border border-current" /> : null}
         {/* One element: the button is a flex row, and a fragment of text, <bdi> and text would be three items with a gap between them. */}
         <span>{labelContent ?? label ?? t("chip")}</span>
       </button>

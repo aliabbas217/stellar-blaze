@@ -278,12 +278,12 @@ Contrast (8-bit sRGB, computed from tokens.css by `frontend/scripts/contrast.mjs
 - **IBM Plex Mono only for codes**: station codes, coordinates, SHA-256, commands. Target ≤ 10 % of the text nodes on a
   screen (C was 74 %).
 - Scale: 12 · 14 · 16 · 18 · 20 · 22 · 24 · 28 · 32 · 36 · 44 · 48 · 56 · 64 · 76 px (the prototype's 13 px step is dropped:
-  critique fix 10; 20, 24, 32, 44 and 56 were added by the redesign, S4. 64 and 76 stay in the tokens only for the phone
-  level word until the Today restructure (S5) retires it; nothing new may use them).
+  critique fix 10; 20, 24, 32, 44 and 56 were added by the redesign, S4. 64 and 76 are no longer used by the phone level word
+  (32 px since the Today restructure, S5); they stay for the desk's display figures and nothing new on a phone may use them).
   **12 px floor**, 14 px for labels and code (C had 114 elements under 12 px). Worker and supervisor phone screens: every
-  time label and level label is 16 px or larger. Worker: body 18, actions 22 weight 500, level word 76.
-- The redesign (S4) changed the scale only. Heading weights (400 to 600 or 650) and the 76 px phone level word change with the
-  screens that draw them (S5 and the landing), not with the tokens.
+  time label and level label is 16 px or larger. Worker: body 18, the action sentence 28 weight 600, level word 32 weight 600.
+- The redesign (S4) changed the scale only. Heading weights (400 to 600 or 650) change with the screens that draw them (S5 did
+  the phone level word: 76 px at weight 500 became 32 px at 600; the landing follows), not with the tokens.
 - Scripts: Noto Sans Arabic (ar), Noto Nastaliq Urdu with Naskh fallback, line height 2.5 for ur (friction §7:
   Nastaliq content area 2.5 em; no fixed height on Arabic-script text), Noto Sans Devanagari (hi, ne), Noto Sans
   Bengali (bn). Tracking is zero in every language except English: spaced Arabic-script text breaks its joins.
@@ -340,7 +340,8 @@ check mark and weight 600, so selection never relies on colour. The tab bar is a
   at the site** (solar elevation from the site coordinates and the device clock, computed on the device; no sensor,
   no permission; `Site` carries no coordinates, so the UAE centroid 24.4 N, 54.4 E is used), and whenever
   `prefers-contrast: more`. In replay mode (the default) the replayed moment is daytime by construction, so the field
-  routes start in sun mode. One tap on the sun/night control overrides until the next local midnight. HSE, judge and
+  routes start in sun mode. The settings sheet's "Screen colors" (Automatic, Bright, Night; redesign S5, it replaced the "Sun mode" button) overrides with
+  Bright or Night until the next local midnight; Automatic hands the decision back to the sun. HSE, judge and
   admin are night only. Sun mode keeps every structure (spine, slot, scale); only the tokens change, so the product
   still reads as one.
 - **Sun overrides.** Every colour token is re-declared under `[data-theme="sun"]`, so none can keep its night value

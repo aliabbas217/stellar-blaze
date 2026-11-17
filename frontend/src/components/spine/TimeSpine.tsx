@@ -43,6 +43,11 @@ export interface TimeSpineProps {
    * between screens: a name may be used once per page.
    */
   readonly transitionName?: string | null;
+  /**
+   * Draw the slot's own label ("Midday break, 12:30 to 15:00, by law") above the band (default). A screen that says the same in a line of
+   * its own (Today's one plain line under the strip) turns it off, and the slot stays drawn.
+   */
+  readonly slotLabel?: boolean;
 }
 
 /** The name the hero spine carries from screen to screen (src/styles/view-transitions.css). */
@@ -102,6 +107,7 @@ export function TimeSpine({
   dir,
   aria,
   transitionName = SPINE_TRANSITION_NAME,
+  slotLabel = true,
 }: TimeSpineProps) {
   const s = SURFACE[surface];
   const vertical = orientation === "v";
@@ -152,7 +158,7 @@ export function TimeSpine({
     </>
   );
 
-  const labels = <SlotLabel ban={ban} surface={surface} {...axis} />;
+  const labels = slotLabel ? <SlotLabel ban={ban} surface={surface} {...axis} /> : null;
   const waypointList = waypoints.length > 0 ? <SpineWaypoints waypoints={waypoints} {...axis} /> : null;
   const rootClass = "relative font-body text-ink text-(length:--spine-text) leading-(--spine-leading)";
 
