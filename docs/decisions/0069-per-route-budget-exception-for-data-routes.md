@@ -42,3 +42,5 @@ After the submission (build option 2); the idle-host re-measure shows an exempt 
 
 ## Links
 [ADR 0003](0003-frontend-single-nextjs-app-pwa.md) · [0045](0045-f2-scope-core-demo-path.md) · [0059](0059-frontend-governance-invariants-sw-allow-list-and-revocation.md)
+
+> **Amendment pointer, 2026-11-18:** [ADR 0088](0088-settings-sheet-body-loads-on-first-open.md) records the verified amendments owed to this ADR (the idle-host re-measure is still owed) and the structural fixes that kept `/hse` inside the 174,080 B class.

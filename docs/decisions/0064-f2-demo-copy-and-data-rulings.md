@@ -43,3 +43,5 @@ Per item, under each heading. In general: an accepted ADR changes one of the fou
 
 ## Links
 [ADR 0034](0034-demo-strategy.md) · [0045](0045-f2-scope-core-demo-path.md) · [0050](0050-crew-timeline-and-k-suppression-semantics.md) · [0054](0054-governance-refusal-and-hash-chained-audit.md) · [0057](0057-plans-row-baselines-and-crew-fixture.md) · [F2 plan](../superpowers/plans/2026-11-14-f2-core-demo-screens.md)
+
+> **Amendment pointer, 2026-11-18:** section 5 (the five-step stepper) is superseded by [ADR 0076](0076-story-order-and-plain-landing-and-verdicts.md).

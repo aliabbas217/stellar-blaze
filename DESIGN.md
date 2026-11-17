@@ -305,6 +305,8 @@ join flow (`--target-stop`). Heights are always `min-height`, never fixed, so Na
 
 ### 5.1 Shape and control tiers (redesign S4, 2026-11-18)
 
+Decision record: [ADR 0077](docs/decisions/0077-control-system-two-radii-and-four-tiers.md).
+
 **Shape: what you read is cut, what you press is rounded.** `--r` (2 px) is kept for DATA marks only: the spine cells, the
 qaylula slot, level marks, the scale segments, table rules and stamps. `--r-ctl` (12 px) is every control a hand presses,
 `--r-card` (16 px) is panels, sheets, dialogs and drawers, `--r-pill` (999 px) is selection chips and the tab pill. This
