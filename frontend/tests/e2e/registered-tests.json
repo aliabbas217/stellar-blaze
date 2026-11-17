@@ -445,7 +445,7 @@
     "mobile-chromium": [
       "hse: Replay or Live and Reset are in a closed Demo controls section, and the address can open it",
       "hse: empty state is actionable and leads to the front door",
-      "hse: error state says what failed and its retry loads the crews",
+      "hse: error state > hse: error state says what failed and its retry loads the crews",
       "hse: lists each crew of the demo site with its plan and whether work is stopped, as the API returns it",
       "hse: reads well at desk width and has no horizontal scroll",
       "hse: the boundary panel says employer requests are refused and logged, and its link opens the refusal",
@@ -456,7 +456,7 @@
     "desktop-chromium": [
       "hse: Replay or Live and Reset are in a closed Demo controls section, and the address can open it",
       "hse: empty state is actionable and leads to the front door",
-      "hse: error state says what failed and its retry loads the crews",
+      "hse: error state > hse: error state says what failed and its retry loads the crews",
       "hse: lists each crew of the demo site with its plan and whether work is stopped, as the API returns it",
       "hse: reads well at desk width and has no horizontal scroll",
       "hse: the boundary panel says employer requests are refused and logged, and its link opens the refusal",

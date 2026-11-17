@@ -11,9 +11,7 @@ import { gateReport, watchConsole } from "./gate.ts";
 const PHONE = { width: 390, height: 844 };
 const DESK = { width: 1280, height: 800 };
 
-// The service worker is blocked: it takes over the page after the first load, and a retry of a read made through it would skip `page.route`,
-// so the error state could not be held in place long enough to be seen. (These specs do not test the worker; pwa.spec.ts does.)
-test.use({ viewport: PHONE, serviceWorkers: "block" });
+test.use({ viewport: PHONE });
 
 interface CrewRow {
   readonly id: string;
@@ -67,6 +65,11 @@ test("hse: Replay or Live and Reset are in a closed Demo controls section, and t
   await expect(page.getByRole("button", { name: en.shell.demo.reset.button })).toBeVisible();
 });
 
+test.describe("hse: error state", () => {
+  // The service worker is blocked here: it takes over the page after the first load, and a retry of a read made through it would skip
+  // `page.route`, so the error could not be held in place long enough to be seen. (No gate runs in this case; pwa.spec.ts tests the worker.)
+  test.use({ serviceWorkers: "block" });
+
 test("hse: error state says what failed and its retry loads the crews", async ({ page }) => {
   let fail = true;
   await page.route("**/api/v1/sites/*/crews", async (route) => {
@@ -83,6 +86,7 @@ test("hse: error state says what failed and its retry loads the crews", async ({
   fail = false;
   await page.getByRole("button", { name: en.states.retry }).click();
   await expect(page.getByRole("table")).toBeVisible();
+});
 });
 
 test("hse: empty state is actionable and leads to the front door", async ({ page }) => {
