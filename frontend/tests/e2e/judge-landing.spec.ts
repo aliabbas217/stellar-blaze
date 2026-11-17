@@ -111,7 +111,7 @@ for (const [name, viewport] of [
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Plan tomorrow's heat tonight.");
     const door = page.getByRole("navigation", { name: "Who is this for?" }).getByRole("link");
     await expect(door).toHaveText([/^I work on a site/, /^I run a crew/, /^I look after safety/, /^I am reviewing this/]);
-    await expect(door).toHaveAttribute("href", /\/en\/(worker|supervisor|hse|replay)$/);
+    for (const href of await door.evaluateAll((els) => els.map((el) => el.getAttribute("href")))) expect(href).toMatch(/\/en\/(worker|supervisor|hse|replay|tour)(\/enter)?$/);
     // the first tile is in the first fold on both screens, and every tile is at least 44 px tall
     const first = await door.first().boundingBox();
     expect((first?.y ?? 0) + (first?.height ?? 0), "the first door tile is inside the first fold").toBeLessThanOrEqual(viewport.height);
@@ -435,15 +435,23 @@ async function airportAt(page: Page, width: number): Promise<number> {
   return (box.x + box.width / 2) / width;
 }
 
-test("landing in Urdu: the hero is right to left, the phone and the field sit on the end side (the left), and the copy is on the right", async ({ page }) => {
+/** Where the middle of an element sits across the page, as a fraction of the page width. */
+async function centreOf(page: Page, selector: string, width: number): Promise<number> {
+  const box = await page.locator(selector).first().boundingBox();
+  if (box === null) throw new Error(`${selector} is not on the page`);
+  return (box.x + box.width / 2) / width;
+}
+
+test("landing in Urdu: the hero is right to left, the phone sits on the end side (the left), and the copy is on the right", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors = await open(page, WIDE, "/ur");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   const ran = await settledPath(page);
   if (REQUIRE_WEBGL) expect(ran, "SB_E2E_REQUIRE_WEBGL=1: the Urdu page must run the WebGL scene").toBe("webgl");
   await page.waitForTimeout(500);
-  // the copy is on the right in right-to-left; the field (and the airport on it) is on the left half
-  expect(await airportAt(page, WIDE.width), `path ${ran}`).toBeLessThan(0.5);
+  // the copy is on the right in right-to-left and the phone (the end column of the hero) on the left half; the field has a row of its own
+  // under both and is not mirrored (a map has no direction), so the airport on it is no signal of mirroring from 1100 px
+  expect(await centreOf(page, "[data-hero-phone]", WIDE.width), `path ${ran}`).toBeLessThan(0.5);
   const h1 = await page.getByRole("heading", { level: 1 }).boundingBox();
   expect((h1?.x ?? 0) + (h1?.width ?? 0) / 2).toBeGreaterThan(WIDE.width / 2);
   await shotAs(page, `ur-${ran}-1440-night.png`);
@@ -454,7 +462,7 @@ test("landing in Urdu: the hero is right to left, the phone and the field sit on
   await page.goto("/en");
   await drawn(page);
   await page.waitForTimeout(500);
-  expect(await airportAt(page, WIDE.width)).toBeGreaterThan(0.5);
+  expect(await centreOf(page, "[data-hero-phone]", WIDE.width)).toBeGreaterThan(0.5);
 });
 
 test("landing in Urdu on the 2D path (?static) and at tablet width", async ({ page }) => {
@@ -462,7 +470,7 @@ test("landing in Urdu on the 2D path (?static) and at tablet width", async ({ pa
   await open(page, WIDE, "/ur?static");
   await drawn(page);
   await expect(page.locator("[data-field-stage][data-field-path]")).toHaveAttribute("data-field-path", "2d");
-  expect(await airportAt(page, WIDE.width)).toBeLessThan(0.5);
+  expect(await centreOf(page, "[data-hero-phone]", WIDE.width)).toBeLessThan(0.5);
   await shotAs(page, "ur-2d-1440-night.png");
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.waitForTimeout(500);
