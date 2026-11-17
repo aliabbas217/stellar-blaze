@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -47,7 +48,7 @@ export function CopyStepLink() {
       <button
         type="button"
         onClick={copy}
-        className="inline-flex min-h-12 items-center justify-center rounded-sign border border-edge bg-ground px-4 text-base text-ink hover:bg-panel"
+        className={ACTION_SECONDARY_DENSE}
       >
         {t("copy")}
       </button>

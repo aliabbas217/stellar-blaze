@@ -39,7 +39,7 @@ export function LocaleSwitcher() {
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a full load is intended, see the comment above
           window.location.assign(`${getPathname({ href: pathname, locale: next })}${search}${hash}`);
         }}
-        className="min-h-(--target) rounded-sign border border-edge bg-ground px-3 font-body text-base text-ink"
+        className="min-h-(--target) rounded-ctl border-[1.5px] border-edge bg-raised px-3 font-body text-base text-ink"
       >
         {routing.locales.map((code) => (
           <option key={code} value={code} lang={code}>

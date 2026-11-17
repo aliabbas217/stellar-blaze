@@ -117,7 +117,7 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
           </div>
         )}
         <div className="px-4">
-          <FieldLink href="/worker" data-primary="" className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation text-lg`}>
+          <FieldLink href="/worker" data-primary="" className={`${ACTION_PRIMARY} w-full`}>
             {t("gotIt")}
           </FieldLink>
         </div>
@@ -227,7 +227,7 @@ export function AlertView({ params }: { readonly params: AlertParams }) {
           label={today.markup("why.level", { level: levelName, bdi: (chunks) => chunks })}
           labelContent={today.rich("why.level", { level: levelName, bdi })}
         />
-        <FieldLink href="/worker" data-primary="" className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation text-lg`}>
+        <FieldLink href="/worker" data-primary="" className={`${ACTION_PRIMARY} w-full`}>
           {t("gotIt")}
         </FieldLink>
       </div>

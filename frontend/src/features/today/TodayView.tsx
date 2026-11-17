@@ -140,7 +140,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
           labelContent={levelName === null ? undefined : t.rich("why.level", { level: levelName, bdi: (chunks) => <bdi>{chunks}</bdi> })}
         />
         {pushOff && !d.noShift ? (
-          <FieldLink href="/worker/alerts" data-primary="" className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation text-lg`}>
+          <FieldLink href="/worker/alerts" data-primary="" className={`${ACTION_PRIMARY} w-full`}>
             {t("turnOnWarnings")}
           </FieldLink>
         ) : null}

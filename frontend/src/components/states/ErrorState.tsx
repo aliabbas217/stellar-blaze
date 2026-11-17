@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import { useLocaleAttrs } from "@/i18n/use-locale-attrs";
-import { ACTION_PRIMARY, ACTION_SECONDARY } from "./actions";
+import { ACTION_PRIMARY, ACTION_SECONDARY_DENSE } from "./actions";
 
 export interface ErrorStateProps {
   readonly title: string;
@@ -34,7 +34,7 @@ export function ErrorState({ title, detail, onRetry, requestId, children }: Erro
   }
 
   return (
-    <section {...attrs} role="alert" className="flex flex-col items-start gap-3 rounded-sign border border-edge px-6 py-8">
+    <section {...attrs} role="alert" className="flex flex-col items-start gap-3 rounded-card border border-edge px-6 py-8">
       <h2 className="font-display text-lg font-medium">{title}</h2>
       <p className="max-w-(--measure) text-base text-ink-2">{detail}</p>
       {children}
@@ -48,7 +48,7 @@ export function ErrorState({ title, detail, onRetry, requestId, children }: Erro
           <p>
             <span>{t("requestIdLabel")}</span> <code dir="ltr" translate="no" className="font-mono text-sm text-ink-2">{requestId}</code>
           </p>
-          <button type="button" onClick={() => void copy(requestId)} className={ACTION_SECONDARY}>
+          <button type="button" onClick={() => void copy(requestId)} className={ACTION_SECONDARY_DENSE}>
             {t("error.copy")}
           </button>
           {/* Always mounted, so a screen reader hears the change when the text arrives. */}
