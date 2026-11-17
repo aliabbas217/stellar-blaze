@@ -290,6 +290,12 @@
         "governance": "Governance",
         "crews": "For crews"
       }
+    },
+    "role": {
+      "crew": "Demo: crew lead",
+      "officer": "Demo: safety officer",
+      "switch": "Switch role",
+      "choose": "Choose a role"
     }
   },
   "worker": {
@@ -796,11 +802,39 @@
     }
   },
   "hse": {
-    "title": "HSE overview",
+    "title": "Safety view",
     "empty": {
-      "title": "HSE overview",
-      "reason": "The site-wide HSE view is coming in the next release. Meanwhile, you can preview the supervisor view.",
-      "primary": "Preview the supervisor view"
+      "title": "No crews to show",
+      "reason": "The service returned no crews for this site.",
+      "primary": "Back to the start"
+    },
+    "lead": "Each crew's plan, and whether its work is stopped.",
+    "table": {
+      "caption": "Crews on the demo site",
+      "crew": "Crew",
+      "plan": "Plan",
+      "work": "Work"
+    },
+    "plan": {
+      "signed": "Signed",
+      "unsigned": "Not signed",
+      "changed": "Changed since signed"
+    },
+    "work": {
+      "stopped": "Stopped",
+      "running": "Not stopped"
+    },
+    "privacy": "The service holds no individual worker health data.",
+    "boundary": {
+      "title": "What you cannot see here",
+      "body": "If an employer asks for one worker's record, the request is refused and logged.",
+      "link": "See the refusal"
+    },
+    "error": {
+      "title": "We could not load the crews"
+    },
+    "demo": {
+      "title": "Demo controls"
     }
   },
   "states": {
@@ -1695,7 +1729,7 @@
         },
         "review": {
           "title": "I am reviewing this",
-          "line": "See how it was tested, then try anything."
+          "line": "A 3-minute tour, then try anything."
         },
         "note": "This is a demo. The crews and people are made up. Workers never need an account."
       },
@@ -1787,6 +1821,53 @@
           "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
+        }
+      }
+    },
+    "roleEntry": {
+      "demoAccess": "Demo access. Anyone can enter.",
+      "production": "In a real deployment this screen is a sign-in: an invitation link from your employer, then your company's own sign-in.",
+      "change": "Choose another role",
+      "crew": {
+        "title": "Crew lead, demo",
+        "sees": "You will see tonight's plan for each crew and which plans are signed. You can stop work for a crew, and undo it.",
+        "button": "Open the crews screen"
+      },
+      "officer": {
+        "title": "Safety officer, demo",
+        "sees": "You will see which crews have a plan, which plans are signed and which crews have stopped work. You will also see what this service cannot show you about any one worker.",
+        "button": "Open the safety view"
+      }
+    },
+    "start": {
+      "lead": "Pick the one that fits you."
+    },
+    "tour": {
+      "title": "A 3-minute tour",
+      "lead": "Five stops, in this order. Each one opens the real screen.",
+      "open": "Open this screen",
+      "controls": "To switch between Replay and Live, or to reset the demo site, use Demo controls on the safety view.",
+      "controlsLink": "Open Demo controls",
+      "steps": {
+        "story": {
+          "title": "The story",
+          "text": "Why plan the night before, and how the warnings were checked on a summer held out of every choice."
+        },
+        "worker": {
+          "title": "The worker's phone",
+          "text": "What a worker sees: today's heat level and when to rest. There is no account to make."
+        },
+        "crew": {
+          "title": "The crew lead's screen",
+          "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "boundary": {
+          "title": "The refusal",
+          "text": "Ask, as an employer, for one worker's health record. The service refuses and logs the request."
+        },
+        "scoreboard": {
+          "title": "The scoreboard",
+          "text": "Every way of warning side by side, including where Stellar Blaze does worse."
         }
       }
     }
