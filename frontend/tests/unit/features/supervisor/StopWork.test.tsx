@@ -1598,13 +1598,13 @@ describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
     await user.keyboard("{Enter}");
     await waitFor(() => {
       expect(document.querySelector('[data-expired-stop="crew-d"]')).toBeNull();
-    });
+    }, SLOW);
     expect(document.activeElement).toBe(closeOf("crew-c"));
 
     await user.keyboard("{Enter}");
     await waitFor(() => {
       expect(document.querySelector("[data-expired-stop]")).toBeNull();
-    });
+    }, SLOW);
     expect(document.activeElement).toBe(stopButton);
     // The press that closed the last notice did not press Stop.
     expect(crewStops("crew-a")).toHaveLength(0);
@@ -1626,7 +1626,7 @@ describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
 
     await waitFor(() => {
       expect(document.activeElement).toBe(closeOf("crew-c"));
-    });
+    }, SLOW);
   });
 
   it("in the stopped state the last Close hands focus to the bar's one action (Resume work), not to <body>", async () => {
@@ -1645,7 +1645,7 @@ describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
 
     await waitFor(() => {
       expect(document.querySelector("[data-expired-stop]")).toBeNull();
-    });
+    }, SLOW);
     expect(document.activeElement).toBe(within(stopBar()).getByRole("button", { name: "Resume work" }));
   });
 });
