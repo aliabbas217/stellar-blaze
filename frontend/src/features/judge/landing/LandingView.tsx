@@ -97,9 +97,10 @@ export function LandingView({ field, data, dir }: LandingViewProps) {
               </h1>
               <p data-contrast="body" data-contrast-name="lede" className="max-w-[44ch] text-lg text-ink-2">{t("lede")}</p>
               <RoleDoor className="mt-1" />
-              <p data-contrast="body" data-contrast-name="door-note" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
-                <span className="rounded-ctl px-1.5 py-0.5 text-xs font-semibold tracking-wide text-ink-2 uppercase inset-ring-[1.5px] inset-ring-edge">{t("phone.demo")}</span>
-                <span className="min-w-0 flex-1 basis-56">{t("door.note")}</span>
+              {/* The contrast check reads the pixels of every marked element's boxes: a box that holds the tag's ring reads the ring (a border, not text), so the tag and the sentence are marked separately, the tag as a label (only its glyph pixels count). */}
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
+                <span data-contrast="label" data-contrast-name="demo-tag" className="rounded-ctl px-1.5 py-0.5 text-xs font-semibold tracking-wide text-ink-2 uppercase inset-ring-[1.5px] inset-ring-edge">{t("phone.demo")}</span>
+                <span data-contrast="body" data-contrast-name="door-note" className="min-w-0 flex-1 basis-56">{t("door.note")}</span>
               </p>
             </div>
             {/*
