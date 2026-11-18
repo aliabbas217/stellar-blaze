@@ -24,15 +24,15 @@ export function StationLabels({ labels, containerRef }: { readonly labels: reado
   const own = useRef<HTMLDivElement>(null);
   // the WebGL scene moves the names itself, frame by frame, and needs the element
   useImperativeHandle(containerRef, () => own.current as HTMLDivElement, []);
-  // A name is never drawn under the readout card or a line of the copy (label-avoid.ts): decided when the names are placed ...
+  // A name is never drawn under a control or a line of text laid over the stage (label-avoid.ts): decided when the names are placed ...
   useLayoutEffect(() => {
     if (own.current !== null) refreshAvoidance(own.current);
   }, [labels]);
-  // ... and again when the layout moves under them (a resize, the fonts arriving, the readout card growing: the stage, the hero and the card are observed).
+  // ... and again when the layout moves under them (a resize, the fonts arriving: the stage and the hero are observed).
   useEffect(() => {
     const el = own.current;
     if (el === null) return;
-    const stage = el.closest("[data-hero]");
+    const stage = el.closest("[data-field-stage]");
     if (!(stage instanceof HTMLElement)) return;
     const again = (): void => {
       refreshAvoidance(el);
@@ -41,9 +41,6 @@ export function StationLabels({ labels, containerRef }: { readonly labels: reado
     observer.observe(stage);
     const hero = stage.closest("[data-landing-hero]");
     if (hero !== null) observer.observe(hero);
-    // the readout card is what grows (a longer sentence wraps to another line and the card rises over the east names)
-    const card = hero?.querySelector("[data-field-readout]");
-    if (card !== null && card !== undefined) observer.observe(card);
     // (jsdom has no font loading API: the type says there always is one)
     const fonts = Reflect.get(document, "fonts") as FontFaceSet | undefined;
     if (fonts !== undefined) void fonts.ready.then(again);

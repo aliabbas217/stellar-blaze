@@ -7,6 +7,7 @@ import { ProofChip } from "@/components/provenance/ProofChip";
 import type { Proof } from "@/components/provenance/proof";
 import { server } from "@/mocks/node";
 import { renderWithIntl } from "../../../utils/intl";
+import { SAMPLE_STORY } from "../../../utils/story";
 
 // The locale-aware Link needs the Next.js app router; only the href it is given matters here (the drawer links to the proof sheet).
 vi.mock("@/i18n/navigation", () => ({
@@ -19,6 +20,11 @@ vi.mock("@/i18n/navigation", () => ({
 
 const BODY = "stellar blaze";
 
+/** The technical record is behind "For auditors" (a closed <details>): a reader opens it on purpose. */
+async function openAudit(dialog: HTMLElement): Promise<void> {
+  await userEvent.click(within(dialog).getByText("For auditors: the full record"));
+}
+
 async function sha256(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -27,6 +33,7 @@ async function sha256(text: string): Promise<string> {
 function proofOf(overrides: Partial<Proof> = {}): Proof {
   return {
     what: "Alerts per shift, P3 protect",
+    story: SAMPLE_STORY,
     protocol: "docs/protocol/preregistration.md#72-warnings-row",
     protocolHref: null,
     script: "backend.eval.policy_scoreboard:build_policy_scoreboard @ 661b373a1b2c",
@@ -81,7 +88,7 @@ describe("ProofChip", () => {
   it("is a plain button named for the number it proves, with an id and no JSON in its attributes", () => {
     const { container } = renderWithIntl(<ProofChip proof={proofOf()} />);
     const chip = screen.getByRole("button", { name: /Alerts per shift, P3 protect/ });
-    expect(chip).toHaveTextContent("Proof");
+    expect(chip).toHaveTextContent("Where from");
     expect(chip).toHaveAttribute("type", "button");
     expect(chip.getAttribute("data-proof-id")).toBeTruthy();
     expect(container.innerHTML).not.toContain("{");
@@ -89,24 +96,46 @@ describe("ProofChip", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("opens the drawer with every row on the first click", async () => {
+  it("names itself for the number it explains, in a name that contains its visible words (WCAG 2.5.3)", () => {
+    renderWithIntl(<ProofChip proof={proofOf()} />);
+    const chip = screen.getByRole("button", { name: "Where from: Alerts per shift, P3 protect" });
+    expect(chip.getAttribute("aria-label")).toContain(chip.textContent);
+  });
+
+  it("opens the plain story first on the first click, and keeps the technical record behind For auditors", async () => {
     renderWithIntl(<ProofChip proof={proofOf()} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
     const dialog = await screen.findByRole("dialog", { name: "Where this number comes from" });
-    for (const row of ["Number", "Protocol line", "Script", "Result file", "SHA-256", "Label", "Model", "Generated"]) {
+    for (const row of ["Made by", "About", "How we counted", "It shows", "It does not show"]) {
       expect(within(dialog).getByText(row)).toBeInTheDocument();
     }
     expect(within(dialog).getByText("Alerts per shift, P3 protect")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Real weather\./)).toBeInTheDocument();
+    expect(within(dialog).getByText("For auditors: the full record").closest("details")).not.toHaveAttribute("open");
+    await openAudit(dialog);
+    for (const row of ["Protocol line", "Script", "Result file", "SHA-256", "Label", "Model", "Generated"]) {
+      expect(within(dialog).getByText(row)).toBeInTheDocument();
+    }
     expect(within(dialog).getByText("docs/protocol/preregistration.md#72-warnings-row")).toBeInTheDocument();
     expect(within(dialog).getByText("f".repeat(64))).toBeInTheDocument();
     expect(within(dialog).getByText("a".repeat(64))).toBeInTheDocument();
     expect(within(dialog).getByText("REAL")).toBeInTheDocument();
   });
 
+  it("the story part of the drawer never prints a file path, a hash, a function name or a placeholder", async () => {
+    renderWithIntl(<ProofChip proof={proofOf({ fileSha256: null, sourceSha256: null, modelId: null, generatedAt: null })} />);
+    await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
+    const dialog = await screen.findByRole("dialog");
+    const story = dialog.querySelector("[data-story]");
+    expect(story).not.toBeNull();
+    expect(story?.textContent).not.toMatch(/[A-Za-z0-9_-]+\.(json|md|ts|py)\b|[0-9a-f]{40,}|src\/|Not recorded|policy=|config=/);
+  });
+
   it("links the protocol line only when a protocol URL exists", async () => {
     renderWithIntl(<ProofChip proof={proofOf({ protocolHref: "https://example.test/protocol#72" })} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
     const dialog = await screen.findByRole("dialog");
+    await openAudit(dialog);
     expect(within(dialog).getByRole("link", { name: /preregistration\.md#72-warnings-row/ })).toHaveAttribute(
       "href",
       "https://example.test/protocol#72",
@@ -137,7 +166,7 @@ describe("ProofChip", () => {
     renderWithIntl(<ProofChip proof={proofOf()} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByText("Number"));
+    await userEvent.click(within(dialog).getByText("Made by"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     await userEvent.click(dialog);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -147,12 +176,14 @@ describe("ProofChip", () => {
     server.use(http.get("/data/static/recount-sample.json", () => new HttpResponse(BODY)));
     const { unmount } = renderWithIntl(<ProofChip proof={proofOf({ fileSha256: await sha256(BODY) })} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
+    await openAudit(await screen.findByRole("dialog"));
     await userEvent.click(await screen.findByRole("button", { name: "Recount in this browser" }));
     expect(await screen.findByText("Matches")).toBeInTheDocument();
     unmount();
 
     renderWithIntl(<ProofChip proof={proofOf({ fileSha256: "0".repeat(64) })} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
+    await openAudit(await screen.findByRole("dialog"));
     await userEvent.click(await screen.findByRole("button", { name: "Recount in this browser" }));
     expect(await screen.findByText("Does not match: report this")).toBeInTheDocument();
     expect(screen.queryByText("Matches")).not.toBeInTheDocument();
@@ -162,6 +193,7 @@ describe("ProofChip", () => {
     server.use(http.get("/data/static/recount-sample.json", () => new HttpResponse(null, { status: 500 })));
     renderWithIntl(<ProofChip proof={proofOf()} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
+    await openAudit(await screen.findByRole("dialog"));
     await userEvent.click(await screen.findByRole("button", { name: "Recount in this browser" }));
     expect(await screen.findByText(/could not be read/)).toBeInTheDocument();
     expect(screen.queryByText("Matches")).not.toBeInTheDocument();
@@ -171,26 +203,32 @@ describe("ProofChip", () => {
     renderWithIntl(<ProofChip proof={proofOf({ file: "eval/dev/demo_day.2025.json" })} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
     const dialog = await screen.findByRole("dialog");
+    await openAudit(dialog);
     expect(within(dialog).queryByRole("button", { name: "Recount in this browser" })).not.toBeInTheDocument();
     expect(within(dialog).getByText(/not published here/)).toBeInTheDocument();
   });
 
-  it("links to the proof sheet only for a number that has one", async () => {
+  it("links to the proof sheet, and to its For auditors section, only for a number that has one", async () => {
     const { unmount } = renderWithIntl(<ProofChip proof={proofOf({ claim: "policy.p3.missed_danger_hours" })} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift, P3 protect/ }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("link", { name: "Open the proof sheet" })).toHaveAttribute("href", "/replay/proof/policy.p3.missed_danger_hours");
+    expect(within(dialog).getByRole("link", { name: "For auditors" })).toHaveAttribute("href", "/replay/proof/policy.p3.missed_danger_hours#audit");
+    expect(within(dialog).queryByText("For auditors: the full record")).toBeNull();
     unmount();
     renderWithIntl(<ProofChip proof={proofOf()} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift, P3 protect/ }));
     expect(within(await screen.findByRole("dialog")).queryByRole("link", { name: "Open the proof sheet" })).toBeNull();
   });
 
-  it("writes Not recorded for a missing fingerprint or model, never a blank", async () => {
+  it("skips a missing fingerprint, model or time: no Not recorded, no empty row", async () => {
     renderWithIntl(<ProofChip proof={proofOf({ fileSha256: null, sourceSha256: null, modelId: null, generatedAt: null })} />);
     await userEvent.click(screen.getByRole("button", { name: /Alerts per shift/ }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getAllByText("Not recorded").length).toBeGreaterThanOrEqual(4);
+    await openAudit(dialog);
+    expect(within(dialog).queryByText("Not recorded")).toBeNull();
+    for (const row of ["SHA-256", "Model", "Generated"]) expect(within(dialog).queryByText(row)).toBeNull();
+    expect(within(dialog).getByText("Protocol line")).toBeInTheDocument();
   });
 });
 
@@ -218,12 +256,12 @@ describe("Proved", () => {
 
   it("has a field size: a 44 px target and 16 px text, where the desk chip is 28 px", () => {
     const first = renderWithIntl(<ProofChip proof={proofOf()} />);
-    const desk = screen.getByRole("button", { name: /Proof for/ });
+    const desk = screen.getByRole("button", { name: /Where from/ });
     expect(desk.className).toContain("min-h-7");
     expect(desk.className).not.toContain("min-h-(--target)");
     first.unmount();
     renderWithIntl(<ProofChip proof={proofOf()} field />);
-    const field = screen.getByRole("button", { name: /Proof for/ });
+    const field = screen.getByRole("button", { name: /Where from/ });
     expect(field.className).toContain("min-h-(--target)");
     expect(field.className).toContain("min-w-(--target)");
     expect(field.className).toContain("text-base");

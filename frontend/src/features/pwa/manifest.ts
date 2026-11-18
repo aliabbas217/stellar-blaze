@@ -15,7 +15,7 @@ import type { Locale } from "@/i18n/routing";
 /**
  * Colours of the manifest and of the browser chrome (<meta name="theme-color">), as sRGB hex: a manifest cannot
  * hold oklch(). They are the `--ground` token of each theme (night and sun in src/styles/tokens.css), kept in
- * src/lib/sun/theme-colors.ts so the theme script and the sun toggle can use them too;
+ * src/lib/sun/theme-colors.ts so the theme script and the screen-colors control can use them too;
  * tests/unit/app/manifest.test.ts recomputes them from tokens.css and fails if either drifts. The installed app is
  * night: the manifest has one theme_color and night is the default.
  */

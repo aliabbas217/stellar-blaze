@@ -19,7 +19,7 @@
  *   - The night values sit on `:root, [data-theme="night"]` so a nested night subtree still works on a page that
  *     is in sun mode. The sun block comes after it (equal specificity, later wins) and overrides every colour.
  *   - There is no system-preference switch: night is the default whatever prefers-color-scheme says; sun is chosen
- *     by src/components/shell/theme-script.ts (field routes only) and the one-tap override in SunToggle.
+ *     by src/components/shell/theme-script.ts (field routes only) and the one-tap override in the settings sheet (ScreenColors).
  *   - Names here must not equal a Tailwind theme key (--color-*, --text-*, --radius-*, --font-*, --spacing) or a
  *     next/font variable. A self-referencing `--x: var(--x)` is emitted by `@theme inline` and silently breaks it.
  *
@@ -134,17 +134,24 @@
 
 /* ---------- Tier 2: semantic, non-colour (theme independent) ---------- */
 :root {
-  /* type scale: the prototype's 13 px step is dropped (12 px is the floor, 14 the smallest comfortable label) */
+  /* type scale: the prototype's 13 px step is dropped (12 px is the floor, 14 the smallest comfortable label). 20, 24, 32, 44 and 56
+     were added with the control system (redesign S4): 20 is the Stop label and the landing body, 32 the phone level word and
+     the hero action, 44 and 56 the landing section heading and h1. */
   --t-12: 0.75rem;
   --t-14: 0.875rem;
   --t-16: 1rem;
   --t-18: 1.125rem;
+  --t-20: 1.25rem;
   --t-22: 1.375rem;
+  --t-24: 1.5rem;
   --t-28: 1.75rem;
+  --t-32: 2rem;
   --t-36: 2.25rem;
+  --t-44: 2.75rem;
   --t-48: 3rem;
+  --t-56: 3.5rem;
   --t-64: 4rem;
-  --t-76: 4.75rem;
+  --t-76: 4.75rem; /* the phone level word until S5 steps it down to 32 px; no new use of 64 or 76 */
 
   /* space: the 4 px atom */
   --s-1: 4px;
@@ -159,12 +166,30 @@
   --s-16: 64px;
   --s-24: 96px;
 
-  /* shape: one corner radius everywhere, no shadows */
+  /* shape, two rules: what you READ is cut (--r, 2 px: data marks only, that is the spine cells, the slot, level marks, scale
+     segments, table rules, stamps) and what you PRESS is rounded (--r-ctl for every control, --r-card for panels, sheets and
+     drawers, --r-pill for selection chips and the tab pill). No shadows: the one ring is the 1.5 px --edge of a secondary
+     control, which is a boundary. */
   --r: 2px;
+  --r-ctl: 12px;
+  --r-card: 16px;
+  --r-pill: 999px;
 
-  /* targets: 44 px on every control, 52 px for the primary action on field surfaces */
+  /* targets: 44 px on every control, 52 px for the primary action on field surfaces, 56 px for Stop work, "I feel unwell"
+     and the language rows of the join flow */
   --target: 44px;
   --target-field: 52px;
+  --target-stop: 56px;
+
+  /* control states: how much --ink (or, on the Stop slab, --ground) is mixed into a control's fill. A mixed fill must still meet
+     contrast: scripts/contrast.mjs prints every pair and tests/unit/styles/tokens.test.ts fails below 4.5:1 in both themes. */
+  --mix-primary-hover: 12%;
+  --mix-primary-press: 22%;
+  --mix-secondary-hover: 8%;
+  --mix-secondary-press: 16%;
+  --mix-quiet-hover: 7%;
+  --mix-stop-hover: 12%;
+  --mix-stop-press: 22%;
 
   --content-max: 88rem;
   --measure: 66ch;
@@ -191,9 +216,11 @@
   --font-body-fallback: system-ui, sans-serif;
   --font-mono-fallback: ui-monospace, monospace;
 
-  /* motion: 150 to 240 ms, opacity and transform only, switched off for reduced motion */
+  /* motion: 150 to 240 ms, opacity and transform only, switched off for reduced motion. The press of a control is 120 ms
+     (translate 1 px and scale 0.985, never a shadow). */
   --dur-1: 150ms;
   --dur-2: 240ms;
+  --dur-press: 120ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -216,5 +243,6 @@
   :root {
     --dur-1: 0ms;
     --dur-2: 0ms;
+    --dur-press: 0ms;
   }
 }

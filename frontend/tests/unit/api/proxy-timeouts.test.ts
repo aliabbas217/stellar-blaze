@@ -160,6 +160,11 @@ function fetchSignals(): AbortSignal[] {
   return signals;
 }
 
+/** Everything console.error received, printed to unlimited depth as a developer would see it. */
+function loggedErrors(): string {
+  return inspect(vi.mocked(console.error).mock.calls, { depth: null });
+}
+
 /** A request whose client goes away `ms` after it is made (the browser tab closed, the connection dropped). */
 function disconnectingAfter(ms: number, path: string, init: RequestInit = {}): Request {
   const client = new AbortController();
@@ -209,23 +214,24 @@ describe("a client that goes away", () => {
     const signals = fetchSignals();
     const upstream = answersAfter(80, method, path, status);
     const handler = method === "delete" ? DELETE : POST;
+    const started = performance.now();
 
     const res = await handler(
       disconnectingAfter(20, path, { method: method.toUpperCase(), ...(method === "post" ? { headers: { "content-type": "application/json" }, body: "{}" } : {}) }),
     );
+    const waited = Math.round(performance.now() - started);
 
     expect(upstream).toHaveBeenCalledTimes(1);
-    expect(res.status).toBe(status);
+    // The one failure seen so far (a 502 on the DELETE case in 1 of about 14 CI runs) could not be told apart from the
+    // route's own 300 ms limit expiring on a starved runner or from a failed connection: say which it was, and how long it took.
+    expect(res.status, `answered ${String(res.status)} after ${String(waited)} ms (limit ${String(READ_MS)} ms, upstream 80 ms); the route logged: ${loggedErrors()}`).toBe(status);
     expect(signals).toHaveLength(1);
     expect(signals[0]?.aborted).toBe(false);
   });
 });
 
 describe("what a failed upstream call writes to the log", () => {
-  /** Everything console.error received, printed to unlimited depth as a developer would see it. */
-  function logged(): string {
-    return inspect(vi.mocked(console.error).mock.calls, { depth: null });
-  }
+  const logged = loggedErrors;
 
   it("a timeout logs the cause's name and message and the request id, not the whole DOMException", async () => {
     answersAfter(READ_MS * 3, "get", "/api/v1/sites");

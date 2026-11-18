@@ -4,9 +4,11 @@ import { ScoreboardTable, type ScoreRow } from "@/components/provenance/Scoreboa
 import { Verdict } from "@/components/provenance/Verdict";
 import type { Proof } from "@/components/provenance/proof";
 import { renderWithIntl } from "../../../utils/intl";
+import { SAMPLE_STORY } from "../../../utils/story";
 
 const proof: Proof = {
   what: "Danger hours nobody was warned about, Stellar Blaze",
+  story: SAMPLE_STORY,
   protocol: "docs/research/preregistration.md#72-warnings-row",
   protocolHref: null,
   script: "backend.eval.policy_scoreboard:build @ 661b373a1b2c",
@@ -109,9 +111,9 @@ describe("Counter", () => {
 });
 
 describe("Verdict", () => {
-  it("says the outcome is chosen after the scoring run when there is no sentence", () => {
+  it("says the outcome is not available until the scored run when there is no sentence", () => {
     renderWithIntl(<Verdict sentence={null} proof={null} />);
-    expect(screen.getByText("Chosen from the pre-registered outcome table after the single scoring run.")).toBeInTheDocument();
+    expect(screen.getByText("Not available until the scored run has produced its results.")).toBeInTheDocument();
   });
 
   it("shows the sentence exactly as written, with its proof", () => {

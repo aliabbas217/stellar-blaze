@@ -1,7 +1,6 @@
-import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { ACTION_PRIMARY } from "@/components/states/actions";
+import { ACTION_PRIMARY_DENSE } from "@/components/states/actions";
 
 /** Every visible label comes from messages: the contract's class names are data keys, never copy. */
 const DATA_CLASS_KEY = { health: "dataClassHealth", personal: "dataClassPersonal", exposure: "dataClassExposure" } as const;
@@ -46,8 +45,7 @@ export function RequestCard({ path, workerRef, dataClass, sentBefore, pending, o
         </dd>
       </dl>
       <p className="text-sm text-ink-3">{t("refNote")}</p>
-      <button type="button" data-primary="" data-island-action="send" aria-busy={pending} {...(onSend === undefined ? {} : { onClick: onSend })} className={`${ACTION_PRIMARY} w-full gap-2`}>
-        {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
+      <button type="button" data-primary="" data-island-action="send" aria-busy={pending} {...(onSend === undefined ? {} : { onClick: onSend })} className={`${ACTION_PRIMARY_DENSE} w-full`}>
         {sentBefore ? t("sendAgain") : t("send")}
       </button>
       {notice}

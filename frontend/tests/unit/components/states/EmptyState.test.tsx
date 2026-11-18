@@ -40,8 +40,9 @@ function pageRoutes(): string[] {
     });
 }
 
-// F1 placeholder pages that stand where a parked view will be. The page exists; the view the guard protects does not.
-const PLACEHOLDER_PAGES: readonly string[] = ["/hse"];
+// F1 placeholder pages that stand where a parked view will be. The page exists; the view the guard protects does not. None now: `/hse` left the
+// deferred list when the minimal safety view was built (redesign S7).
+const PLACEHOLDER_PAGES: readonly string[] = [];
 
 describe("EmptyState", () => {
   it("is never blank: a title, a reason and a primary action that is a link", () => {
@@ -110,7 +111,7 @@ describe("EmptyState", () => {
           title="Still here"
           reason="r"
           primary={{ label: "One", href: "/worker" }}
-          secondary={{ label: "Parked", href: "/hse" }}
+          secondary={{ label: "Parked", href: "/admin" }}
         />,
       );
       expect(screen.getByRole("heading", { name: "Still here" })).toBeInTheDocument();
@@ -128,7 +129,8 @@ describe("EmptyState", () => {
         />,
       );
       expect(screen.queryByRole("link", { name: "Parked" })).not.toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Built" }).className).toContain("bg-ink");
+      // the promoted action is the primary tier: the signal fill
+      expect(screen.getByRole("link", { name: "Built" }).className).toContain("bg-signal");
       promoted.unmount();
 
       renderWithIntl(
@@ -136,7 +138,7 @@ describe("EmptyState", () => {
           title="Alone"
           reason="r"
           primary={{ label: "Parked", href: "/admin" }}
-          secondary={{ label: "Parked too", href: "/worker/join" }}
+          secondary={{ label: "Parked too", href: "/supervisor/qr" }}
         />,
       );
       expect(screen.getByRole("heading", { name: "Alone" })).toBeInTheDocument();

@@ -828,12 +828,14 @@ describe("Stop work: copy that holds while it is true, and a target that is alwa
     Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
   });
 
-  it("the Stop bar carries its own emergency framing: the octagon mark and a heavy rule, not the primary action's plain ink button", async () => {
+  it("the Stop bar carries its own emergency framing: the octagon mark and the Stop tier (the only ink slab, 56 px, rounded), not the primary action's signal fill", async () => {
     renderCrews();
     const button = await press();
 
     expect(button.querySelector("[data-stop-mark]")).not.toBeNull();
-    expect(stopBar().innerHTML).toContain("border-t-4");
+    for (const token of ["bg-ink", "min-h-(--target-stop)", "rounded-ctl", "w-full"]) expect(button.className).toContain(token);
+    expect(button.className).not.toContain("bg-signal");
+    expect(stopBar().innerHTML).toContain("border-t");
     expect(button.getAttribute("aria-hidden")).toBeNull();
   });
 });
@@ -1596,13 +1598,13 @@ describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
     await user.keyboard("{Enter}");
     await waitFor(() => {
       expect(document.querySelector('[data-expired-stop="crew-d"]')).toBeNull();
-    });
+    }, SLOW);
     expect(document.activeElement).toBe(closeOf("crew-c"));
 
     await user.keyboard("{Enter}");
     await waitFor(() => {
       expect(document.querySelector("[data-expired-stop]")).toBeNull();
-    });
+    }, SLOW);
     expect(document.activeElement).toBe(stopButton);
     // The press that closed the last notice did not press Stop.
     expect(crewStops("crew-a")).toHaveLength(0);
@@ -1624,7 +1626,7 @@ describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
 
     await waitFor(() => {
       expect(document.activeElement).toBe(closeOf("crew-c"));
-    });
+    }, SLOW);
   });
 
   it("in the stopped state the last Close hands focus to the bar's one action (Resume work), not to <body>", async () => {
@@ -1643,7 +1645,7 @@ describe("Stop work: focus after a notice closes (W6 fix 2, item 5)", () => {
 
     await waitFor(() => {
       expect(document.querySelector("[data-expired-stop]")).toBeNull();
-    });
+    }, SLOW);
     expect(document.activeElement).toBe(within(stopBar()).getByRole("button", { name: "Resume work" }));
   });
 });

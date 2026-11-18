@@ -1,4 +1,3 @@
-import { LoaderCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode, SyntheticEvent } from "react";
 import type { RosterError } from "@/api/roster-problem";
@@ -8,7 +7,7 @@ import type { BanState } from "@/components/spine/ban-state";
 import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { Skeleton } from "@/components/states/Skeletons";
 import { WakingLine } from "@/components/states/WakingLine";
-import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
+import { ACTION_PRIMARY_DENSE, ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 import { PlanStrip } from "./PlanStrip";
 import { RunsForm, type RunsFormHandlers } from "./RunsForm";
 import { ViolationList } from "./ViolationList";
@@ -103,8 +102,7 @@ export function TryPlanLayout(props: TryLayoutProps) {
             <PlanStrip runs={runs} validator={phase === "answer" || phase === "none" ? (answer?.validator ?? null) : null} heat={heat} ban={ban} dateLabel={dateLabel} />
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-3">
-                <button type="submit" data-primary="" data-island-action="check" aria-busy={loading} className={`${ACTION_PRIMARY} gap-2`}>
-                  {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
+                <button type="submit" data-primary="" data-island-action="check" aria-busy={loading} className={ACTION_PRIMARY_DENSE}>
                   {t("check")}
                 </button>
                 {loading ? (
@@ -190,7 +188,7 @@ function Result(props: TryLayoutProps) {
             )}
           </div>
           <div className="flex flex-wrap gap-3">
-            <button type="button" data-island-action="check" {...(handlers === undefined ? {} : { onClick: handlers.onCheck })} className={ACTION_PRIMARY}>
+            <button type="button" data-island-action="check" {...(handlers === undefined ? {} : { onClick: handlers.onCheck })} className={ACTION_PRIMARY_DENSE}>
               {t("error.retry")}
             </button>
             {recorded === null ? null : (
@@ -199,7 +197,7 @@ function Result(props: TryLayoutProps) {
                 data-island-action="show-recorded"
                 aria-pressed={showRecorded}
                 {...(handlers === undefined ? {} : { onClick: handlers.onShowRecorded })}
-                className={ACTION_SECONDARY}
+                className={ACTION_SECONDARY_DENSE}
               >
                 {showRecorded ? t("recorded.hide") : t("recorded.button")}
               </button>
@@ -218,7 +216,7 @@ function Result(props: TryLayoutProps) {
                 data-island-action="show-recorded"
                 aria-pressed={showRecorded}
                 {...(handlers === undefined ? {} : { onClick: handlers.onShowRecorded })}
-                className={ACTION_SECONDARY}
+                className={ACTION_SECONDARY_DENSE}
               >
                 {showRecorded ? t("recorded.hide") : t("recorded.button")}
               </button>

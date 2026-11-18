@@ -1,14 +1,12 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTimeZone } from "next-intl";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { crewTimelineQueryOptions } from "@/api/queries";
-import { queryKeys } from "@/api/query-keys";
 import type { Problem } from "@/api/problem";
 import type { components } from "@/api/schema";
 import { useFieldCrewLabel } from "@/components/shell/FieldHeading";
-import { DEMO_CREW_ID } from "@/features/demo/constants";
 import { useDemo } from "@/features/demo/DemoProvider";
 import { useClock } from "@/features/demo/useClock";
 import { chooseDeviceSite } from "@/features/profile/choose-site";
@@ -24,7 +22,7 @@ import { useUrlParam } from "@/lib/url-state";
  * the view words each case and draws nothing it was not given.
  *
  * Which site: the one this phone is pinned to; `?site=` and `?crew=` pin it too (an e2e and a shared link use them), and the
- * demo yard is one tap (`demoYard`) for a visitor with no poster to scan. The crew's name goes to the header through the
+ * join page (`/worker/join`, features/join) is where a phone with neither gets its site. The crew's name goes to the header through the
  * shell's slot (`useFieldCrewLabel`), because the layout runs no query of its own.
  */
 
@@ -45,14 +43,8 @@ function subscribeNever(): () => void {
 export type TodayModel =
   /** Before the phone's own storage can be read (server render, hydration): a skeleton, never the "no site" screen. */
   | { readonly status: "starting" }
-  | {
-      readonly status: "no-site";
-      /** `failed`: the choice could not be saved on this phone (the store chunk did not load): a calm retry, never a button that does nothing. */
-      readonly entry: "ready" | "loading" | "unavailable" | "failed";
-      /** Pins the phone to the demo site and its scored crew. */
-      readonly demoYard: () => void;
-      readonly retrySites: () => void;
-    }
+  /** No site on this phone and none in the link: the view hands over to the join page (features/join), where a worker finds the site and crew. */
+  | { readonly status: "no-site" }
   | { readonly status: "loading" }
   | { readonly status: "error"; readonly problem: Problem; readonly retry: () => void }
   | {
@@ -76,10 +68,9 @@ export function useTodayModel(): TodayModel {
   const [siteParam] = useUrlParam(SITE_PARAM, parseId, null);
   const [crewParam] = useUrlParam(CREW_PARAM, parseId, null);
   const pin = useSitePin();
-  const { site: demoSite, sites, siteStatus } = useDemo();
+  const { sites } = useDemo();
   // The pinned site's call numbers go onto the phone, for the unwell sheet to use offline (features/profile/useSiteContactsSync.ts).
   useSiteContactsSync(sites);
-  const queryClient = useQueryClient();
   const pushOff = !useHasPush();
 
   const pinnedSite = pin?.siteId ?? null;
@@ -123,18 +114,8 @@ export function useTodayModel(): TodayModel {
     [view, timelineData, offline, clock, deviceNow, zone, locale],
   );
 
-  const demoYard = useCallback(() => {
-    if (demoSite !== null) choose(demoSite.id, DEMO_CREW_ID);
-  }, [demoSite, choose]);
-  const retrySites = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.sites() });
-  }, [queryClient]);
-
   if (!hydrated) return { status: "starting" };
-  if (siteId === null) {
-    const entry = chooseFailed ? "failed" : demoSite !== null ? "ready" : siteStatus === "loading" ? "loading" : "unavailable";
-    return { status: "no-site", entry, demoYard, retrySites };
-  }
+  if (siteId === null) return { status: "no-site" };
   if (today.status === "error") return { status: "error", problem: today.problem, retry: today.refetch };
   if (description === null || view === null) return { status: "loading" };
   return {

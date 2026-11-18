@@ -100,7 +100,7 @@ export function buildSeasonView({ series, file, source, locale, t }: SeasonViewI
 
   const claims = forecastClaims(
     facts,
-    { file, protocol: source },
+    { file, protocol: source, series, limit },
     format,
     {
       daysOverLimit: t("tally.whatDays"),

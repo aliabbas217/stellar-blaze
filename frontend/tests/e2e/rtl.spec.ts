@@ -347,48 +347,42 @@ test.describe("rtl: Arabic and the claims surfaces", () => {
     await expectClocksIsolated(page, "main", "ar Today");
   });
 
-  test("ar landing mirrors: the copy and the story footer are Arabic right to left, the claim fragments English, the apps linked", async ({ page }) => {
+  test("ar landing mirrors: the copy and the story footer are Arabic right to left, the story chapters English, the role door linked", async ({ page }) => {
     await open(page, "/ar", { size: DESK });
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(ar.judge.landing.title);
     expect(await page.locator("[data-claims-english]").count() + (await page.locator('[lang="en"][dir="ltr"]').count())).toBeGreaterThan(0);
     await expect(page.locator("[data-machine-translation]")).toHaveCount(1);
+    await expect(page.locator("[data-role-door] a")).toHaveText([new RegExp(`^${ar.judge.landing.door.worker.title}`), new RegExp(`^${ar.judge.landing.door.crew.title}`), new RegExp(`^${ar.judge.landing.door.safety.title}`), new RegExp(`^${ar.judge.landing.door.review.title}`)]);
     expect(await page.locator("body").innerText()).not.toMatch(NON_WESTERN_DIGIT);
   });
 });
 
 /*
- * The header names the site, and the demo site's name ends in "(synthetic)": that marker is never cut off. At 390 px the Arabic sun-mode
- * button is long and used to leave the name about 135 px: the two-line clamp then put the ellipsis where "(synthetic)" was (fix round 1,
- * ar-plan-390-night.png: "Mussafah M-14 / ...yard"). The name wraps instead; this asserts the marker's own text rectangle lies inside the
- * name's box, and that no text of the name is hidden by a clamp or an overflow.
+ * The header names the site and tags the synthetic demo site "Demo" (redesign S5; the name used to end in "(synthetic)", which a two-line
+ * clamp once cut off: fix round 1, ar-plan-390-night.png). The name wraps and is never cut, and the Demo tag, which is how the screen says
+ * the site is made up, sits inside the header's name box and the viewport. The name takes at most two lines beside the clock and the
+ * language pill, in Arabic and Urdu too; no text of it is hidden by a clamp or an overflow.
  */
 for (const locale of ["ar", "ur"] as const) {
   for (const route of [`/${locale}/supervisor/crews/crew-b`, `/${locale}/worker${PIN}`, `/${locale}/supervisor`]) {
-    test(`rtl: the header name keeps (synthetic) visible at 390 in ${locale} on ${route.replace(`/${locale}`, "")}`, async ({ page }) => {
+    test(`rtl: the header name keeps its Demo tag visible at 390 in ${locale} on ${route.replace(`/${locale}`, "")}`, async ({ page }) => {
       await open(page, route);
       const name = page.locator("header p[title]").first();
       await expect(name, "the header names the site").toBeVisible();
-      await expect(name).toContainText("(synthetic)");
+      await expect(name).not.toContainText("(synthetic)");
+      const tag = name.locator("[data-demo-tag]");
+      await expect(tag, "the demo site is tagged").toBeVisible();
       const measured = await name.evaluate((el) => {
-        const text = el.textContent;
         const box = el.getBoundingClientRect();
+        const tagBox = (el.querySelector("[data-demo-tag]") as HTMLElement).getBoundingClientRect();
         const style = getComputedStyle(el);
-        // The text node that holds the marker, and the rectangle of just those characters.
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-        let rect: DOMRect | null = null;
-        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-          const at = (node.textContent ?? "").indexOf("(synthetic)");
-          if (at < 0) continue;
-          const range = document.createRange();
-          range.setStart(node, at);
-          range.setEnd(node, at + "(synthetic)".length);
-          rect = range.getBoundingClientRect();
-        }
+        const label = el.querySelector("bdi") as HTMLElement;
         return {
-          text,
+          text: el.textContent,
           box: { top: box.top, bottom: box.bottom, left: box.left, right: box.right },
-          marker: rect === null ? null : { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+          tag: { top: tagBox.top, bottom: tagBox.bottom, left: tagBox.left, right: tagBox.right },
+          nameLines: Math.round(label.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(label).lineHeight)),
           clamp: style.webkitLineClamp,
           overflowY: style.overflowY,
           lineHeight: Number.parseFloat(style.lineHeight),
@@ -396,25 +390,57 @@ for (const locale of ["ar", "ur"] as const) {
           viewport: window.innerWidth,
         };
       });
-      expect(measured.marker, "the marker's text was laid out").not.toBeNull();
-      const marker = measured.marker as { top: number; bottom: number; left: number; right: number };
-      // A text range's rectangle is the font's content area, which overshoots the line box by a pixel or two: half a line is the
-      // tolerance, and a marker clamped onto a hidden line sits a whole line or more below the box.
       const halfLine = measured.lineHeight / 2;
-      expect(marker.bottom, `${measured.text}: the marker is inside the name's box (not clamped away below it)`).toBeLessThanOrEqual(measured.box.bottom + halfLine);
-      expect(marker.top).toBeGreaterThanOrEqual(measured.box.top - halfLine);
-      // The Arabic night button is the longest: the name must still fit two lines (a third line costs the hero 3 points of the fold).
-      expect(measured.box.bottom - measured.box.top, "the name takes at most two lines").toBeLessThanOrEqual(measured.lineHeight * 2 + 2);
-      expect(marker.left, "inside the viewport").toBeGreaterThanOrEqual(0);
-      expect(marker.right, "inside the viewport").toBeLessThanOrEqual(measured.viewport + 0.5);
+      expect(measured.tag.bottom, `${measured.text}: the tag is inside the name's box`).toBeLessThanOrEqual(measured.box.bottom + halfLine);
+      expect(measured.tag.top).toBeGreaterThanOrEqual(measured.box.top - halfLine);
+      expect(measured.tag.left, "inside the viewport").toBeGreaterThanOrEqual(0);
+      expect(measured.tag.right, "inside the viewport").toBeLessThanOrEqual(measured.viewport + 0.5);
+      expect(measured.nameLines, "the name itself takes at most two lines").toBeLessThanOrEqual(2);
       expect(measured.clamp, "no line clamp on the site name").toMatch(/none|normal|^$/);
-      // Nothing hides overflow on the name (a clamp, overflow hidden or clip); the content area's own overshoot of the line box (a pixel or
-      // two) is not hidden text, so the scroll height is only held to half a line.
       expect(measured.overflowY, "the name does not hide overflow").toBe("visible");
       expect(measured.hiddenHeight, "no text of the name is hidden").toBeLessThanOrEqual(halfLine);
     });
   }
 }
+
+// The Today shift strip is horizontal now (redesign S5) and time flows in the reading direction: the first hour of the shift is at the
+// physical right in Arabic and Urdu and at the physical left in English, the line at "now" follows its hour, and the 06:00 tick sits over
+// the first cell. Compared against English on the same phone, so the mirror is measured, not assumed.
+test("rtl: the Today shift strip mirrors in Arabic and Urdu and runs left to right in English, with the now line at its hour", async ({ page }) => {
+  const centres: Record<string, { first: number; firstEdge: number; last: number; now: number | null; tick06: number | null; width: number }> = {};
+  for (const locale of ["en", "ar", "ur"] as const) {
+    await open(page, `/${locale}/worker${PIN}`);
+    await expect(page.locator('[data-spine][data-orientation="h"]')).toBeVisible();
+    centres[locale] = await page.evaluate(() => {
+      const mid = (el: Element | null) => (el === null ? null : el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2);
+      const spine = document.querySelector("[data-spine]") as HTMLElement;
+      const firstCell = (spine.querySelector('[data-cell="6"]') as Element).getBoundingClientRect();
+      return {
+        // the outer edge of the first cell: the hour the strip starts at (the left edge in ltr, the right edge in rtl)
+        firstEdge: document.documentElement.dir === "rtl" ? firstCell.right : firstCell.left,
+        first: mid(spine.querySelector('[data-cell="6"]')) ?? 0,
+        last: mid(spine.querySelector('[data-cell="17"]')) ?? 0,
+        now: mid(spine.querySelector("[data-now]")),
+        tick06: mid(spine.querySelector('[data-tick="6"]')),
+        width: window.innerWidth,
+      };
+    });
+  }
+  const en = centres["en"];
+  expect(en, "english measured").toBeDefined();
+  if (en === undefined) return;
+  expect(en.first, "english: 06:00 at the left").toBeLessThan(en.last);
+  for (const locale of ["ar", "ur"]) {
+    const c = centres[locale];
+    expect(c, `${locale} measured`).toBeDefined();
+    if (c === undefined) continue;
+    expect(c.first, `${locale}: 06:00 at the right`).toBeGreaterThan(c.last);
+    expect(c.first, `${locale}: the first cell is mirrored about the middle of the phone`).toBeCloseTo(c.width - en.first, 0);
+    expect(c.now, `${locale}: the now line is mirrored too`).toBeCloseTo(c.width - (en.now ?? 0), 0);
+    // The 06:00 tick sits at the outer edge of the first cell, whichever way the hours run.
+    expect(Math.abs((c.tick06 ?? 0) - c.firstEdge), `${locale}: the 06:00 tick sits at the start of the first cell`).toBeLessThan(2);
+  }
+});
 
 test("rtl: Hindi, Bengali and Nepali stay left to right with their own leading, and the English block keeps the English face", async ({ page }) => {
   for (const locale of ["hi", "bn", "ne"]) {

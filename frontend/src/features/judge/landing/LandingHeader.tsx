@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { NAV_TAB } from "@/components/states/actions";
 
 /*
  * The landing's header: the wordmark and the judge menu, the same links as the desk header of the scoreboard pages (shell.desk.nav).
@@ -31,7 +32,7 @@ export function LandingHeader() {
               <FieldLink
                 href={item.href}
                 aria-current={"current" in item ? "page" : undefined}
-                className="inline-flex min-h-(--target) items-center rounded-sign border border-transparent px-3 font-body text-sm text-ink-2 no-underline aria-[current=page]:border-ink aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+                className={`${NAV_TAB} font-body text-sm`}
               >
                 {item.label}
               </FieldLink>

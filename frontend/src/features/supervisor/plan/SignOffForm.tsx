@@ -7,7 +7,6 @@ import { signOffMutation } from "@/api/queries";
 import { queryKeys } from "@/api/query-keys";
 import { ApiProblem, type Problem } from "@/api/problem";
 import type { components } from "@/api/schema";
-import { Spinner } from "@/components/states/Spinner";
 import { ACTION_PRIMARY } from "@/components/states/actions";
 import { formatClock } from "@/components/spine/geometry";
 import { cycleOfCode, type PlanAckItem } from "@/features/supervisor/plan/derive-ack";
@@ -253,8 +252,7 @@ export default function SignOffForm({ crewId, date, items, zone }: SignOffFormPr
           </p>
         ) : null}
         {outcome.kind === "not-legal" ? <ShiftNotLegalResult violations={outcome.problem.violations ?? []} /> : null}
-        <button type="submit" data-primary="" aria-busy={mutation.isPending} className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation gap-3 text-lg`}>
-          {mutation.isPending ? <Spinner className="size-6" /> : null}
+        <button type="submit" data-primary="" aria-busy={mutation.isPending} className={`${ACTION_PRIMARY} w-full`}>
           <span>{t("signOff.submit")}</span>
         </button>
       </form>

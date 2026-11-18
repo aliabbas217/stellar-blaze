@@ -1,4 +1,5 @@
-import { LEVEL_SIGN_HEIGHT } from "@/components/level/LevelSign";
+// From the leaf module, never from LevelSign.tsx: importing the sign for a constant pulls its glyphs and scale into the first load of every route that shows a skeleton (ADR 0088).
+import { LEVEL_SIGN_HEIGHT } from "@/components/level/level-sign-height";
 
 /*
  * Loading placeholders. Each reserves the height of the element that replaces it, so the page does not move when the

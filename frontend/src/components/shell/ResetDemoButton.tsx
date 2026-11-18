@@ -1,5 +1,5 @@
 import { useTranslations } from "next-intl";
-import { Spinner } from "@/components/states/Spinner";
+import { ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 
 /**
  * The "Reset demo site" button, presentational: the same markup is the live control's button (`ResetDemoControl`) and the
@@ -14,9 +14,8 @@ export function ResetDemoButton({ busy = false, onClick }: { busy?: boolean; onC
       aria-busy={busy}
       data-island-action="reset"
       {...(onClick === undefined ? {} : { onClick })}
-      className="inline-flex min-h-(--target) w-fit items-center justify-center gap-2 rounded-sign border border-edge px-4 font-body text-base text-ink"
+      className={`${ACTION_SECONDARY_DENSE} w-fit font-body`}
     >
-      {busy ? <Spinner className="size-4" /> : null}
       {t("demo.reset.button")}
     </button>
   );

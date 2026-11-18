@@ -64,9 +64,9 @@ describe("ScoreboardView", () => {
     expect(container.querySelectorAll("table[data-scoreboard=pending] [aria-label='not scored yet']")).toHaveLength(16 + 12);
     expect(container.querySelectorAll("table [data-proof-id]")).toHaveLength(0);
     // the actionable empty state, linking to a number that does have a proof
-    expect(screen.getByRole("link", { name: "See how a number is proved" })).toHaveAttribute("href", "/replay/proof/forecast.hours_over_limit");
-    // the outcome sentence waits for the scoring run
-    expect(screen.getByText("Chosen from the pre-registered outcome table after the single scoring run.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See where a number comes from" })).toHaveAttribute("href", "/replay/proof/forecast.hours_over_limit");
+    // the outcome sentence waits for the scored run
+    expect(screen.getByText("Not available until the scored run has produced its results.")).toBeInTheDocument();
   });
 
   it("test_warnings_rows_in_order_ours_last", () => {
@@ -74,8 +74,8 @@ describe("ScoreboardView", () => {
     const rows = [...container.querySelectorAll("#warnings > table tbody tr")];
     expect(rows.map((r) => r.getAttribute("data-row"))).toEqual(["P0", "P1", "P2", "P3_protect", "P3_balanced"]);
     expect(rows.map((r) => r.getAttribute("aria-current"))).toEqual([null, null, null, "true", "true"]);
-    expect(within(rows[0] as HTMLElement).getByText("Baseline: ban only")).toBeInTheDocument();
-    expect(within(rows[3] as HTMLElement).getByText("Stellar Blaze")).toBeInTheDocument();
+    expect(within(rows[0] as HTMLElement).getByText("Midday break only")).toBeInTheDocument();
+    expect(within(rows[3] as HTMLElement).getByText("Stellar Blaze, protective setting")).toBeInTheDocument();
     // every number has a proof chip: 4 per row
     expect(container.querySelectorAll("#warnings > table tbody [data-proof-id]")).toHaveLength(5 * 4);
   });
@@ -84,7 +84,7 @@ describe("ScoreboardView", () => {
     const { container } = view(ideal);
     const text = container.textContent;
     expect(text).toContain("about 24 hours ahead");
-    expect(text).toContain("Held-out 2026, every choice fixed on 2024-2025 data");
+    expect(text).toContain("Held-out 2026: every choice was fixed on 2024 and 2025 data");
     // the lead-2 stamp ("issued by 18:00 the evening before") may be carried for lead 2 only: never in the headline, the lede or the facts line
     const header = container.querySelector("header")?.textContent ?? "";
     expect(header).not.toMatch(/evening before/i);
@@ -95,16 +95,20 @@ describe("ScoreboardView", () => {
     const { container } = view(ideal);
     const rows = [...container.querySelectorAll("#plans tbody tr")];
     expect(rows.map((r) => r.getAttribute("data-row"))).toEqual(["merged", "rule_raw", "rule_corrected"]);
-    expect(screen.getByText("Baseline: ban only (= working every shift minute outside the midday break, on the legal roster)")).toBeInTheDocument();
+    expect(screen.getByText("Midday break only (working every minute of the shift outside the break, on the legal roster)")).toBeInTheDocument();
     expect(rows[2]?.getAttribute("aria-current")).toBe("true");
     expect(container.querySelectorAll("#plans tbody [data-proof-id]")).toHaveLength(3 * 4);
   });
 
-  it("shows the outcome sentence exactly as the file wrote it, with its proof", () => {
+  it("shows a plain outcome sentence with its proof, never the runner's sentence, and says plainly when a check has no template", () => {
     const { container } = view(ideal);
     const primary = policy.verdicts.find((v) => v.primary);
-    expect(screen.getByText(primary?.text ?? "x")).toBeInTheDocument();
-    expect(container.querySelector("[data-verdict=written] [data-proof-id]")).not.toBeNull();
+    // the shape fixture's comparisons are not the ones a template reads (H4 against the fixed rule only), so the story layer carries the
+    // neutral line and no number; the runner's own sentence is in the proof's auditor layer, not on the page
+    const verdict = container.querySelector("[data-verdict=written]");
+    expect(verdict?.textContent).toContain("The details of this check are under For auditors.");
+    expect(container.textContent).not.toContain(primary?.text ?? "x");
+    expect(verdict?.querySelector("[data-proof-id]")).not.toBeNull();
   });
 
   it("shows a notice instead of the Plans table when only the Plans file is missing", () => {
@@ -136,7 +140,7 @@ describe("ScoreboardView", () => {
   });
 
   it("states the held-out claim only for the 2026 run (or before any run), never beside a dev or shape stamp", () => {
-    const held = /Held-out 2026, every choice fixed on 2024-2025 data/;
+    const held = /Held-out 2026: every choice was fixed on 2024 and 2025 data/;
     for (const source of ["dev-2025", "synthetic-shape"] as const) {
       const { container, unmount } = view({ ...ideal, source });
       expect(container.textContent).not.toMatch(held);
@@ -189,7 +193,7 @@ describe("ScoreboardView", () => {
     // the heading is generated from the export at the slider's commute (default 45): see frontier.test.tsx for every commute
     expect(screen.getByRole("heading", { name: /^At a 45 minute commute the analysis finds no gain on top of the legal default\./ })).toBeInTheDocument();
     expect(document.getElementById("frontier")).not.toBeNull();
-    expect(screen.getByRole("link", { name: "Scoreboard" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("link", { name: "The evidence" })).toHaveAttribute("aria-current", "step");
   });
 
   it("uses no ADR, B2, B3 or HANDOFF jargon and no em or en dash in the English copy", () => {

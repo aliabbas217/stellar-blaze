@@ -3,6 +3,7 @@ import type { components } from "@/api/schema";
 import { dayFormat } from "@/components/charts/day-format";
 import type { DayChartLabels, DayQuantiles } from "@/components/charts/DayChart";
 import { proofFromProvenance, proofFromStaticFile, type Proof } from "@/components/provenance/proof";
+import { buildStory } from "@/components/provenance/proof-story";
 import { banStateFor, SEASON_BAN, SITE_TZ } from "./ban";
 import { REPLAY_DATE } from "@/features/demo/constants";
 import { makeFormat } from "./adapters";
@@ -181,7 +182,8 @@ export function buildDay({ day, dayFile, hourly, locale, t }: DayInput): DayMode
   const ruleWhat = t("rule.what");
   const ruleProof =
     day !== null && dayFile !== null
-      ? (proofFromProvenance(day.provenance, "", ruleWhat, dayFile) ?? recordedProof(hourly, ruleWhat))
+      ? (proofFromProvenance(day.provenance, "", ruleWhat, dayFile, { story: buildStory("rule", { station: day.station, date: day.date, candidates: day.candidates }) }) ??
+        recordedProof(hourly, ruleWhat))
       : recordedProof(hourly, ruleWhat);
 
   let counters: DayCounter[] | null = null;
@@ -193,7 +195,19 @@ export function buildDay({ day, dayFile, hourly, locale, t }: DayInput): DayMode
       label,
       value: of === undefined ? count(value) : t("counters.of", { n: count(value), total: count(of) }),
       unit: label,
-      proof: proofFromProvenance(day.provenance, "", label, dayFile, { claim: `day.${id}` }),
+      proof: proofFromProvenance(day.provenance, "", label, dayFile, {
+        claim: `day.${id}`,
+        story: buildStory("day", {
+          id,
+          station: day.station,
+          date: day.date,
+          n: value,
+          total: of ?? null,
+          candidates: day.candidates,
+          breakStart: SEASON_BAN.start,
+          breakEnd: SEASON_BAN.end,
+        }),
+      }),
     });
     counters = [
       entry("high", t("counters.high"), day.high_hours),
@@ -235,5 +249,7 @@ export function hitsBy(day: DemoDay, policy: DemoDay["hours"][number]["warned_by
 
 /** While there is no scored day, "the day rule" is proved by what the page does draw: the recorded forecast file. */
 function recordedProof(hourly: DayInput["hourly"], what: string): Proof {
-  return proofFromStaticFile(hourly.file, what, { protocol: hourly.source, script: "backend/eval/demo_day.py (writes demo_day.json after the scoring run)", label: "RECORDED" });
+  return proofFromStaticFile(hourly.file, what, {
+    story: buildStory("rule", { station: hourly.series.station, date: null, candidates: null }),
+    protocol: hourly.source, script: "backend/eval/demo_day.py (writes demo_day.json after the scoring run)", label: "RECORDED" });
 }

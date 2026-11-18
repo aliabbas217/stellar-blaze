@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useImperativeHandle, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import { percentAt, pct, screenPercent } from "@/components/spine/geometry";
+import { LOOK_SECONDARY } from "@/components/states/actions";
 import { TimeSpine, type BanState } from "@/components/spine/TimeSpine";
 import { hourLabel } from "./field-data";
 
@@ -41,11 +42,9 @@ export interface HourScrubberProps {
   readonly calm: boolean;
   readonly onSeek?: (hour: number) => void;
   readonly onToggle?: () => void;
-  /** The slider took or lost keyboard focus (the readout's live sentence is silent while it has it: the slider says the same words itself). */
-  readonly onFocusChange?: (focused: boolean) => void;
 }
 
-export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabel, valueText, interactive, playing, calm, onSeek, onToggle, onFocusChange }: HourScrubberProps) {
+export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabel, valueText, interactive, playing, calm, onSeek, onToggle }: HourScrubberProps) {
   const t = useTranslations("judge.landing.field.scrubber");
   const track = useRef<HTMLDivElement>(null);
   const rtl = dir === "rtl";
@@ -111,7 +110,7 @@ export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabe
   return (
     <div
       data-scrub=""
-      className="relative z-10 grid grid-cols-[var(--target)_minmax(0,1fr)] items-center gap-x-4 gap-y-1 px-4 min-[1100px]:absolute min-[1100px]:inset-x-10 min-[1100px]:bottom-3 min-[900px]:max-[1099px]:col-start-1 min-[900px]:max-[1099px]:row-start-2 min-[900px]:max-[1099px]:mx-10 min-[900px]:max-[1099px]:mb-3 min-[900px]:grid-cols-[var(--target)_minmax(0,1fr)_12.5rem] min-[900px]:px-0 max-[899px]:order-3"
+      className="relative z-10 grid grid-cols-[var(--target)_minmax(0,1fr)] items-center gap-x-3 gap-y-1"
     >
       {showPlay ? (
         interactive ? (
@@ -120,7 +119,7 @@ export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabe
             type="button"
             onClick={onToggle}
             aria-label={playing ? t("pause") : t("play")}
-            className="grid size-(--target) touch-manipulation place-items-center rounded-sign border border-edge bg-ground text-ink hover:bg-panel"
+            className={`${LOOK_SECONDARY} grid size-(--target) touch-manipulation place-items-center rounded-ctl`}
           >
             {playing ? (
               <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
@@ -139,8 +138,8 @@ export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabe
       ) : (
         <span aria-hidden="true" className="size-(--target)" />
       )}
-      {/* On a phone the track is about 250 px: the 3-hourly tick labels would run into each other, so every other one is dropped (00, 06, 12, 18, 00). */}
-      <div ref={spine} className="relative min-w-0 max-[899px]:[&_[data-tick]:nth-child(even)]:hidden" data-spine-track="">
+      {/* The track is a column beside the phone (about 250 to 330 px) at every width: the 3-hourly tick labels would run into each other, so every other one is dropped (00, 06, 12, 18, 00). */}
+      <div ref={spine} className="relative min-w-0 [&_[data-tick]:nth-child(even)]:hidden" data-spine-track="">
         <TimeSpine
           orientation="h"
           from={0}
@@ -168,13 +167,11 @@ export function HourScrubber({ values, ban, position, nowRef, hour, dir, dayLabe
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onKeyDown={onKeyDown}
-            onFocus={() => onFocusChange?.(true)}
-            onBlur={() => onFocusChange?.(false)}
             className="absolute inset-y-0 inset-x-6 cursor-pointer touch-pan-y rounded-sign"
           />
         ) : null}
       </div>
-      <p className="text-sm text-ink-2 max-[899px]:col-span-full min-[900px]:text-end">
+      <p className="col-span-full text-sm text-ink-2">
         <b className="block text-base font-medium text-ink tabular-nums" data-when-hour="">
           {hourLabel(hour)}
         </b>

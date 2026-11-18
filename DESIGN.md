@@ -75,6 +75,9 @@ typography:
     fontWeight: 400
 rounded:
   r: 2px
+  r-ctl: 12px
+  r-card: 16px
+  r-pill: 999px
 spacing:
   "1": 4px
   "2": 8px
@@ -98,11 +101,11 @@ components:
   panel:
     backgroundColor: "{colors.panel}"
     textColor: "{colors.ink}"
-    rounded: "{rounded.r}"
+    rounded: "{rounded.r-card}"
   panel-raised:
     backgroundColor: "{colors.raised}"
     textColor: "{colors.ink}"
-    rounded: "{rounded.r}"
+    rounded: "{rounded.r-card}"
   slot:
     backgroundColor: "{colors.slot}"
     textColor: "{colors.ink-3}"
@@ -112,7 +115,7 @@ components:
   edge-control:
     backgroundColor: "{colors.edge}"
     height: 44px
-    rounded: "{rounded.r}"
+    rounded: "{rounded.r-ctl}"
   text-secondary:
     backgroundColor: "{colors.ground}"
     textColor: "{colors.ink-2}"
@@ -122,17 +125,41 @@ components:
     textColor: "{colors.ink-3}"
     typography: "{typography.label}"
   button-primary:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.ground}"
-    typography: "{typography.title}"
-    rounded: "{rounded.r}"
-    height: 44px
-  button-field:
     backgroundColor: "{colors.signal}"
     textColor: "{colors.on-signal}"
     typography: "{typography.title}"
-    rounded: "{rounded.r}"
+    rounded: "{rounded.r-ctl}"
     height: 52px
+  button-secondary:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.ink}"
+    typography: "{typography.title}"
+    rounded: "{rounded.r-ctl}"
+    height: 52px
+  button-quiet:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink-2}"
+    typography: "{typography.label}"
+    rounded: "{rounded.r-ctl}"
+    height: 44px
+  button-stop:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.ground}"
+    typography: "{typography.title}"
+    rounded: "{rounded.r-ctl}"
+    height: 56px
+  chip-selected:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.ground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.r-pill}"
+    height: 44px
+  chip:
+    backgroundColor: "{colors.panel}"
+    textColor: "{colors.ink-2}"
+    typography: "{typography.label}"
+    rounded: "{rounded.r-pill}"
+    height: 44px
   level-mark-green:
     backgroundColor: "{colors.lv-green}"
     rounded: "{rounded.r}"
@@ -157,12 +184,18 @@ components:
     backgroundColor: "{colors.sun-ground}"
     textColor: "{colors.sun-ink}"
     typography: "{typography.body}"
-  sun-button-field:
+  sun-button-primary:
     backgroundColor: "{colors.sun-signal}"
     textColor: "{colors.sun-ground}"
     typography: "{typography.title}"
-    rounded: "{rounded.r}"
+    rounded: "{rounded.r-ctl}"
     height: 52px
+  sun-button-stop:
+    backgroundColor: "{colors.sun-ink}"
+    textColor: "{colors.sun-ground}"
+    typography: "{typography.title}"
+    rounded: "{rounded.r-ctl}"
+    height: 56px
 ---
 
 # Qaylula: v2-final design direction
@@ -214,8 +247,9 @@ thin contour lines at each 1 °C, the convention of weather charts, so heat read
 - Night ground hue 245, chroma 0.014 (tinted, never pure grey). Panels are one tonal step up, the slot one step down.
   Separation by 1 px hairlines and tonal steps; no shadows, no glass, no glow.
 - **One UI colour, `--signal`** (pale cyan, hue 200): live, selected, "needs you", focus. It sits outside the heat
-  ramp's hues, so it never reads as heat. The desk primary button is `ink` on `ground`; the field primary button is
-  `signal` on `on-signal`.
+  ramp's hues, so it never reads as heat. Since the redesign (S4, 2026-11-18) the primary button is `signal` with
+  `on-signal` text on every surface, desk included; it used to be `ink` on `ground` at the desk. `ink` is now the fill of
+  exactly one control, the Stop slab (section 5.1).
 - **Heat** = `RAMP_DARK` on night, `RAMP_LIGHT` in sun (prototype/assets/heat.js): OKLCH, lightness monotonic, hue
   unwrapped (no green/cyan sweep), safe in greyscale and for colour-vision deficiency by lightness. Data only.
 - **Level marks** (green, amber, orange, red) appear only as the thin scale segment and a 10 px mark beside the word.
@@ -243,9 +277,13 @@ Contrast (8-bit sRGB, computed from tokens.css by `frontend/scripts/contrast.mjs
   (as the A landing); UI 500; never condensed widths for text.
 - **IBM Plex Mono only for codes**: station codes, coordinates, SHA-256, commands. Target ≤ 10 % of the text nodes on a
   screen (C was 74 %).
-- Scale: 12 · 14 · 16 · 18 · 22 · 28 · 36 · 48 · 64 · 76 px (the prototype's 13 px step is dropped: critique fix 10).
+- Scale: 12 · 14 · 16 · 18 · 20 · 22 · 24 · 28 · 32 · 36 · 44 · 48 · 56 · 64 · 76 px (the prototype's 13 px step is dropped:
+  critique fix 10; 20, 24, 32, 44 and 56 were added by the redesign, S4. 64 and 76 are no longer used by the phone level word
+  (32 px since the Today restructure, S5); they stay for the desk's display figures and nothing new on a phone may use them).
   **12 px floor**, 14 px for labels and code (C had 114 elements under 12 px). Worker and supervisor phone screens: every
-  time label and level label is 16 px or larger. Worker: body 18, actions 22 weight 500, level word 76.
+  time label and level label is 16 px or larger. Worker: body 18, the action sentence 28 weight 600, level word 32 weight 600.
+- The redesign (S4) changed the scale only. Heading weights (400 to 600 or 650) change with the screens that draw them (S5 did
+  the phone level word: 76 px at weight 500 became 32 px at 600; the landing follows), not with the tokens.
 - Scripts: Noto Sans Arabic (ar), Noto Nastaliq Urdu with Naskh fallback, line height 2.5 for ur (friction §7:
   Nastaliq content area 2.5 em; no fixed height on Arabic-script text), Noto Sans Devanagari (hi, ne), Noto Sans
   Bengali (bn). Tracking is zero in every language except English: spaced Arabic-script text breaks its joins.
@@ -262,7 +300,37 @@ Contrast (8-bit sRGB, computed from tokens.css by `frontend/scripts/contrast.mjs
 
 Inner-screen rules (from `critique/inner-screens-gap.md`): one hero object from real data owning ≥ 35 % of the fold;
 one primary action; a time spine; a linking transition. Targets are 44 px on every control (`--target`), 52 px for the
-primary action on field surfaces (`--target-field`).
+primary action on field surfaces (`--target-field`), 56 px for Stop work, "I feel unwell" and the language rows of the
+join flow (`--target-stop`). Heights are always `min-height`, never fixed, so Nastaliq text grows the control.
+
+### 5.1 Shape and control tiers (redesign S4, 2026-11-18)
+
+Decision record: [ADR 0077](docs/decisions/0077-control-system-two-radii-and-four-tiers.md).
+
+**Shape: what you read is cut, what you press is rounded.** `--r` (2 px) is kept for DATA marks only: the spine cells, the
+qaylula slot, level marks, the scale segments, table rules and stamps. `--r-ctl` (12 px) is every control a hand presses,
+`--r-card` (16 px) is panels, sheets, dialogs and drawers, `--r-pill` (999 px) is selection chips and the tab pill. This
+replaces "2 px everywhere" (section 11): the rule that survives is that the cut corner marks data and nothing else.
+Panels outside the restyled states, dialogs and the proof drawer move to `--r-card` as their screens are rebuilt.
+
+**Four control tiers** replace "an ink slab or a hairline box". One primary per screen; Stop is never counted as the primary.
+
+| Tier | Use | Look | Size |
+|---|---|---|---|
+| Primary | The one next step | `signal` fill, `on-signal` text | 52 px (44 px in dense desk views), 12 px radius, 18 px text weight 600 |
+| Secondary | A real alternative | `raised` fill, `ink` text, a 1.5 px `edge` ring: a boundary, never a hairline box | Same |
+| Quiet | A text action ("Skip") | `ink-2` text, no fill; `ink` and a 7 % wash on hover | 44 px hit area |
+| Stop | The emergency action only ("Stop work", "I feel unwell") | `ink` fill with `ground` text: the ONLY solid ink slab on a screen; always with a glyph | 56 px, full width, 12 px radius, 20 px text weight 600 |
+
+**States** (every control, both themes): default; hover mixes `ink` into the fill (primary 12 %, secondary 8 %, quiet a 7 %
+wash, Stop mixes `ground` 12 %); pressed mixes more (22 %, 16 %, 22 %) and moves 1 px down and to 0.985 scale in 120 ms
+(`--dur-press`), no shadow; focus is the 3 px `focus` ring at a 2 px offset; busy keeps the label, adds a 1 em ring spinner
+after it and drops to 85 % opacity, and is never `disabled`; disabled is 50 % opacity and `not-allowed`. The mix
+percentages are tokens (`--mix-*`) and a unit test fails if a mixed fill drops below 4.5:1 against its text in either theme.
+
+**Selection** is a filled pill, not a hairline box: a chip (44 px) is a pill; the selected one is `ink` with `ground` text, a
+check mark and weight 600, so selection never relies on colour. The tab bar is a segmented pill: the selected tab has a
+`raised` fill and the 1.5 px `edge` ring.
 
 ## 6. Sun mode (decision)
 
@@ -274,7 +342,8 @@ primary action on field surfaces (`--target-field`).
   at the site** (solar elevation from the site coordinates and the device clock, computed on the device; no sensor,
   no permission; `Site` carries no coordinates, so the UAE centroid 24.4 N, 54.4 E is used), and whenever
   `prefers-contrast: more`. In replay mode (the default) the replayed moment is daytime by construction, so the field
-  routes start in sun mode. One tap on the sun/night control overrides until the next local midnight. HSE, judge and
+  routes start in sun mode. The settings sheet's "Screen colors" (Automatic, Bright, Night; redesign S5, it replaced the "Sun mode" button) overrides with
+  Bright or Night until the next local midnight; Automatic hands the decision back to the sun. HSE, judge and
   admin are night only. Sun mode keeps every structure (spine, slot, scale); only the tokens change, so the product
   still reads as one.
 - **Sun overrides.** Every colour token is re-declared under `[data-theme="sun"]`, so none can keep its night value
@@ -306,6 +375,8 @@ Custom glyphs are labelled untested until a comprehension test reaches ≥ 85 % 
 - Do draw time; don't write "until 17:00" without drawing it.
 - Don't use a level hue in chrome or a heat hue in UI. Don't fill a level. Don't hatch.
 - Don't use mono for prose or for numbers. Don't go below 12 px.
+- Don't put a second solid `ink` slab on a screen: Stop is the only one. Don't draw a control as a 2 px rectangle or a
+  hairline box; don't round a data mark.
 - Don't write a fake-looking real number: pending results say "scored 12 Nov" or show the pending state.
 - Copy tells: verb + number ("Rest 40 min in shade every hour"); explanations go behind "Why?" or into the proof drawer.
 
@@ -315,7 +386,7 @@ Custom glyphs are labelled untested until a comprehension test reaches ≥ 85 % 
 |---|---|
 | Accent not indigo / purple gradient | PASS: pale cyan signal, outside the heat hues |
 | Base font not Inter by default | PASS: Archivo, chosen for tabular figures and the width axis on the wordmark |
-| Radius has a point of view | PASS: 2 px everywhere |
+| Radius has a point of view | PASS: two radii by function: 2 px cut for what you read (data marks), 12 / 16 px and pill for what you press (amended 2026-11-18; was "2 px everywhere") |
 | Depth fork chosen | PASS: borders + tonal steps + one recessed slot; no shadows |
 | ≥ 3 tokens match Linear / Stripe / Vercel / Geist | PASS: 0 (ground is blue-tinted night, not #08090a; no Geist; no gradient) |
 | Signature present | PASS: the qaylula slot on every time spine + isotherm contours |
@@ -330,3 +401,6 @@ Custom glyphs are labelled untested until a comprehension test reaches ≥ 85 % 
 | Every colour token is declared in the sun block, including `focus` and the `viz-*` set; `focus` and `viz-*` reference primitives, not other tokens | a `var()` to another semantic token resolves where it is declared, so inside a nested sun subtree it kept the night value |
 | `--leading-ur` is 2.5 (F1 had 2.1) | Nastaliq content area, friction §7 |
 | `primary` and component entries for every colour were added to this file | the design.md linter fails the F1 gate on orphaned tokens and on a missing `primary` (14 warnings on the v2 file) |
+| `--r-ctl` 12 px, `--r-card` 16 px, `--r-pill` 999 px added; `--r` 2 px kept for data marks only (redesign S4) | Owner review: every primary was a hard slab and every secondary a hairline rectangle, and selection, navigation and action all shared one shape. Gloved hands press rounded shapes; the cut corner now means "data" (amends "2 px everywhere") |
+| `--target-stop` 56 px, type steps 20, 24, 32, 44, 56, `--mix-*` state mixes and `--dur-press` 120 ms added | Stop and "I feel unwell" are 56 px; the new steps are the headline and action sizes of the redesign; hover and pressed are measured mixes |
+| The primary button is `signal` (it was `ink` at the desk), the secondary is a tonal fill with a 1.5 px `edge` ring, a quiet tier and the Stop slab are added; chips and tabs are pills with a check-marked selection | Section 5.1. `button-field` and `sun-button-field` are renamed `button-primary` and `sun-button-primary` (the field primary is now the only primary) |

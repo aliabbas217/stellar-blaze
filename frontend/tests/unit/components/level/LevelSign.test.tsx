@@ -75,9 +75,10 @@ describe("LevelSign", () => {
     expect(container.querySelector("[data-pictogram]")).toBeNull();
   });
 
-  it("sets the hero word from the per-language size (76 px, 64 px in Arabic script) and the mini word at 22 px", () => {
+  it("sets the hero word from the one size property (32 px) and the mini word at 22 px; the mark beside it is 14 px", () => {
     const hero = renderWithIntl(<LevelSign level="amber" kind="live" size="hero" kicker="k" />);
     expect(hero.container.querySelector("h2")?.className).toContain("text-(length:--sign-word-size)");
+    expect(hero.container.querySelector("[data-level-mark]")).toHaveClass("size-3.5");
     hero.unmount();
     const mini = renderWithIntl(<LevelSign level="amber" kind="live" size="mini" kicker="k" />);
     expect(mini.container.querySelector("h2")?.className).toContain("text-xl");
@@ -88,16 +89,13 @@ describe("LevelSign", () => {
     expect(LEVEL_SIGN_HEIGHT.mini).toMatch(/^calc\(/);
   });
 
-  it("steps the hero word down to 64 px in Arabic script only, from one property both the sign and its skeleton read (F2 W1, I6)", () => {
+  it("sets the hero word at 32 px in every language, from one property both the sign and its skeleton read (redesign S5: it was 76 px, 64 px in Arabic script)", () => {
     const css = readFileSync(resolve(process.cwd(), "src/styles/globals.css"), "utf8");
     const sizeOf = (selector: string): string | undefined =>
       new RegExp(String.raw`:lang\(${selector}\)[^{]*\{[^}]*--sign-word-size:\s*([^;]+);`).exec(css)?.[1];
-    expect(sizeOf("ar")).toBe("var(--t-64)");
-    expect(sizeOf("ur")).toBe("var(--t-64)");
-    expect(sizeOf("en")).toBe("var(--t-76)");
-    expect(sizeOf("ne")).toBe("var(--t-76)");
+    for (const code of ["en", "ar", "ur", "hi", "bn", "ne"]) expect(sizeOf(code), code).toBe("var(--t-32)");
     expect(LEVEL_SIGN_HEIGHT.hero).toContain("var(--sign-word-size)");
-    expect(LEVEL_SIGN_HEIGHT.hero).not.toContain("--t-76");
+    expect(LEVEL_SIGN_HEIGHT.hero).not.toMatch(/--t-(64|76)/);
   });
 
   it("puts the kicker and the 'until' on one row above the word, never below it (hero)", () => {

@@ -8,6 +8,7 @@
  * The code vocabulary is the ruleset's and still moves (B3 builds it); the shapes below are the ones its plan names
  * (`cycle.<zone>.<workload>.<work>-<rest>`, `no-lone-work`, `fluids.*`, `stop-work`) plus the two the contract's example uses
  * (`rest_in_shade`, `water_every_15_min`). Water is only ever "Drink water": no litres, no interval (clinical review pending).
+ * A code that is an employer's duty (`EMPLOYER_DUTY_CODES`) is known and deliberately dropped, like an unknown one.
  */
 
 import type { PictogramName } from "@/components/level/Pictogram";
@@ -20,30 +21,32 @@ export type Lead =
   | { readonly kind: "siteRules" };
 
 /**
- * The list under "Also now": only what a known code asks for. The last four are the ruleset's codes that had no wording until the
- * architect's ruling of 2026-11-15: each is the ADOSH Technical Guideline Table 1 text the ruleset's own clause cites, verbatim where
- * possible (messages `worker.today.also.*`; the (code, wording, clause) log is in the F2 Task 20 report for the clinical review pack).
- * They stay under the draft marker ("Draft wording, awaiting clinical review"): nothing here is reviewed.
+ * The list under "Also now": only what a known code asks of THE WORKER, at most three lines (water, never alone, self-paced work).
+ * One glyph, one meaning (redesign 04, section 3): each line has its own glyph, and a rule that has no honest glyph of its own
+ * must be given none rather than another rule's (the buddy glyph used to stand for three different rules).
  */
-export type AlsoNow = "water" | "buddy" | "selfPaced" | "noUnacclimatised" | "induction" | "bottle";
+export type AlsoNow = "water" | "buddy" | "selfPaced";
 
-/** The pictogram drawn beside an "Also now" line (decorative: the words carry the meaning). */
+/**
+ * The ruleset's codes that are the EMPLOYER's duty, not an action of the worker who reads Today (the text is the ADOSH Technical
+ * Guideline's, written for duty holders: a worker cannot hold an induction or provide a bottle). They are NOT shown on the worker's
+ * screens (Today, the alert card) and have no wording in the catalogues any more; the codes stay in the data and are parked until the
+ * crew lead's plan has a "Site duties today" place for them (redesign 04 section 3.2; the controller's ADR lists the verbatim wording).
+ */
+export const EMPLOYER_DUTY_CODES: ReadonlySet<string> = new Set(["no-unacclimatised", "high-risk-induction", "personal-water-bottle-2l"]);
+
+/** The pictogram drawn beside an "Also now" line (decorative: the words carry the meaning). One per rule, never shared. */
 export function alsoPictogram(item: AlsoNow): PictogramName {
   switch (item) {
     case "water":
-    case "bottle":
       return "water";
     case "selfPaced":
       return "clock";
     case "buddy":
-    case "noUnacclimatised":
-    case "induction":
+      // The two-figure glyph means "never work alone" and nothing else.
       return "buddy";
   }
 }
-
-/** The lines that carry clinical wording of their own (everything but the two older, simpler prompts): the draft marker follows them. */
-export const ALSO_NEEDS_DRAFT_MARKER: ReadonlySet<AlsoNow> = new Set<AlsoNow>(["selfPaced", "noUnacclimatised", "induction", "bottle"]);
 
 export interface ActionPlan {
   readonly lead: Lead;
@@ -63,11 +66,10 @@ function cycle(code: string): Lead | null {
 }
 
 function alsoOf(code: string): AlsoNow | null {
+  // Parked, not mapped: an employer's duty is never a line of the worker's screen (and "personal-water-bottle-2l" must not read as water).
+  if (EMPLOYER_DUTY_CODES.has(code)) return null;
   if (code === "no-lone-work") return "buddy";
   if (code === "self-paced-work") return "selfPaced";
-  if (code === "no-unacclimatised") return "noUnacclimatised";
-  if (code === "high-risk-induction") return "induction";
-  if (code === "personal-water-bottle-2l") return "bottle";
   if (code.startsWith("fluids.") || code.startsWith("water")) return "water";
   return null;
 }

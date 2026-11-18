@@ -95,7 +95,7 @@ function Ready({ model }: { readonly model: Extract<CrewsModel, { status: "ready
       </div>
       <Footnote names={model.suppressedNames} k={model.k} />
       <div className="px-4 pt-4">
-        <FieldLink href={`/supervisor/crews/${focal.crew.id}`} data-primary="" className={`${ACTION_PRIMARY} w-full min-h-14 touch-manipulation text-lg`}>
+        <FieldLink href={`/supervisor/crews/${focal.crew.id}`} data-primary="" className={`${ACTION_PRIMARY} w-full`}>
           <span>{t.rich("primary", { crew: focal.crew.name, bdi })}</span>
         </FieldLink>
       </div>

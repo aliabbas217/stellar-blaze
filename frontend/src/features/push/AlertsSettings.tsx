@@ -3,12 +3,16 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
+import { FieldLink } from "@/components/shell/FieldLink";
+import { ACTION_PRIMARY, ACTION_SECONDARY } from "@/components/states/actions";
+import { joinHref } from "@/features/join/link";
 import {
   readRevokeActive,
   readRevokeIncomplete,
   subscribeRevokeActive,
   subscribeRevokeIncomplete,
 } from "@/features/profile/revoke-marker";
+import { useSitePin } from "@/features/profile/site-pin";
 import { isRevokeComplete, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { pushCapability, readPushEnv, type PushCapability } from "@/features/push/capability";
 import { InstallCard } from "@/features/push/InstallCard";
@@ -26,14 +30,13 @@ import { usePush } from "@/features/push/usePush";
 const noopSubscribe = () => () => undefined;
 
 /*
- * A plain <button>, 48 px tall (min-h-12: a gloved hand needs 44), from tokens only. Not the shadcn Button: its class
- * merging (the `cn` package) alone adds about 10 KB gzip to the route, which this screen cannot afford inside the 170 KB
- * worker budget. The design phase decides which button the composed screen uses and what that costs.
+ * A plain <button> of the control tiers (components/states/actions.ts: 52 px, the signal fill for the one next step, the tonal fill
+ * and edge ring for an alternative), from tokens only. Not the shadcn Button: its class merging (the `cn` package) alone adds about
+ * 10 KB gzip to the route, which this screen cannot afford inside the 170 KB worker budget.
  */
-const BUTTON_BASE = "min-h-12 rounded-sign px-4 font-body text-base disabled:opacity-50";
 const BUTTON_VARIANTS = {
-  primary: "bg-ink text-ground",
-  secondary: "border border-edge bg-ground text-ink",
+  primary: ACTION_PRIMARY,
+  secondary: ACTION_SECONDARY,
 } as const;
 
 function ActionButton({
@@ -50,7 +53,7 @@ function ActionButton({
   children: ReactNode;
 }) {
   return (
-    <button ref={ref} type="button" disabled={disabled} onClick={onClick} className={`${BUTTON_BASE} ${BUTTON_VARIANTS[variant]}`}>
+    <button ref={ref} type="button" disabled={disabled} onClick={onClick} className={`${BUTTON_VARIANTS[variant]} font-body`}>
       {children}
     </button>
   );
@@ -73,8 +76,15 @@ export interface AlertsSettingsProps {
   readonly debug: boolean;
 }
 
-export function AlertsSettings(props: AlertsSettingsProps) {
+export function AlertsSettings({ siteId: siteFromLink, ...rest }: AlertsSettingsProps) {
   const t = useTranslations("alerts.removeData");
+  // The site to subscribe for: the one named in the address (`?site=`, the spike), else the one this phone is pinned to (what the join page
+  // wrote). Without the pin a worker who had just joined was told to "choose your site first" on the one screen that turns warnings on.
+  // The crew comes from the pin only when the site is the pinned one: a crew of another site is never sent with it.
+  const pin = useSitePin();
+  const siteId = siteFromLink ?? pin?.siteId ?? null;
+  const crewId = pin !== null && siteId === pin.siteId ? pin.crewId : null;
+  const props = { ...rest, siteId, crewId };
   // What the last removal of the worker's data reported, and a counter that starts the alerts section again after it:
   // the alerts state machine holds the browser's subscription in React state, which a removal made behind its back
   // would leave saying "on". Both live here, above the key, so that they survive that restart.
@@ -151,14 +161,15 @@ export function AlertsSettings(props: AlertsSettingsProps) {
 function AlertsPanel({
   vapidPublicKey,
   siteId,
+  crewId,
   debug,
   afterRemoval,
   onRemoving,
   onRemoved,
-}: AlertsSettingsProps & { afterRemoval: boolean; onRemoving: () => void; onRemoved: (outcome: RevokeOutcome) => void }) {
+}: AlertsSettingsProps & { crewId: string | null; afterRemoval: boolean; onRemoving: () => void; onRemoved: (outcome: RevokeOutcome) => void }) {
   const t = useTranslations("alerts");
   const capability = useSyncExternalStore(noopSubscribe, readCapability, () => null);
-  const push = usePush({ vapidPublicKey, siteId });
+  const push = usePush({ vapidPublicKey, siteId, crewId });
 
   return (
     <div className="flex flex-col gap-6">
@@ -297,6 +308,7 @@ function Explanation({ title, body }: { title: string; body: string }) {
 function Controls({ push, siteId }: { push: ReturnType<typeof usePush>; siteId: string | null }) {
   const t = useTranslations("alerts");
   const tStates = useTranslations("states");
+  const tJoin = useTranslations("worker.join");
 
   const canDisable = push.state === "subscribed" || (push.state === "error" && push.failure === "disable");
 
@@ -339,9 +351,13 @@ function Controls({ push, siteId }: { push: ReturnType<typeof usePush>; siteId: 
         >
           {t("disable")}
         </ActionButton>
+      ) : siteId === null ? (
+        // No site to subscribe for: the way to one, not a greyed button (redesign S6a). The join page finds the site and the crew.
+        <FieldLink href={joinHref()} data-primary="" className={`${ACTION_PRIMARY} font-body`}>
+          {tJoin("pageTitle")}
+        </FieldLink>
       ) : (
         <ActionButton
-          disabled={siteId === null}
           onClick={() => {
             void push.enable();
           }}

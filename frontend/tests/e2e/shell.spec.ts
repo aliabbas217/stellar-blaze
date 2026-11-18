@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import en from "../../messages/en.json";
 import { THEME_COLORS } from "../../src/lib/sun/theme-colors.ts";
+import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 
 /*
  * The shells and the locale root (F2 Task 3), against a production build (see playwright.config.ts).
@@ -30,13 +31,17 @@ test("root redirects to /en without Accept-Language, and with one", async ({ req
   }
 });
 
+/** A pinned phone (the way a link or an e2e chooses): Today, with its dock. An unpinned /worker hands over to the join page, which has none. */
+const PIN = `?site=${SITE_DEMO}&crew=crew-b`;
+
 test.describe("the field shell on /en/worker", () => {
-  test("shows the header, the six language chips, the unwell link and the tabs, in sun mode", async ({ page }) => {
-    await page.goto("/en/worker");
+  test("shows the header with one language pill, the unwell link and the tabs, in sun mode", async ({ page }) => {
+    await page.goto(`/en/worker${PIN}`);
 
     const header = page.getByRole("banner");
-    await expect(header.getByRole("button", { name: /Sun mode/ })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: en.shell.language }).getByRole("link")).toHaveCount(6);
+    await expect(header.getByRole("button", { name: /Settings/ })).toContainText("English");
+    await expect(header.getByRole("button", { name: /Sun mode/ })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: en.shell.language })).toHaveCount(0);
     await expect(page.getByRole("link", { name: new RegExp(en.worker.nav.unwell) })).toHaveAttribute("href", "/en/worker/unwell");
     await expect(page.locator("[data-emergency]")).toHaveCount(1);
     await expect(page.getByRole("navigation", { name: en.worker.nav.label }).getByRole("link", { name: en.worker.nav.today })).toHaveAttribute(
@@ -49,19 +54,19 @@ test.describe("the field shell on /en/worker", () => {
     await expectThemeColor(page, THEME_COLORS.sun);
   });
 
-  test("the sun toggle reads the theme the inline script set, and flips it with one tap", async ({ page }) => {
-    await page.goto("/en/worker");
-    const toggle = page.getByRole("banner").getByRole("button", { name: /Sun mode/ });
-    // Hydrated, not just server-rendered: the server's "off" must have been replaced by what <html data-theme> says.
-    await expect(toggle).toHaveText("Sun mode: on");
-    await toggle.click();
-    await expect(toggle).toHaveText("Sun mode: off");
+  test("Screen colors in the settings sheet starts on Automatic (the theme the inline script set) and Night is one tap", async ({ page }) => {
+    await page.goto(`/en/worker${PIN}`);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sun");
+    await page.getByRole("banner").getByRole("button", { name: /Settings/ }).click();
+    const sheet = page.getByRole("dialog", { name: en.shell.settings.title });
+    await expect(sheet.getByRole("button", { name: en.shell.settings.colors.auto })).toHaveAttribute("aria-pressed", "true");
+    await sheet.getByRole("button", { name: en.shell.settings.colors.night }).click();
     await expect(page.locator("html")).not.toHaveAttribute("data-theme", "sun");
     await expectThemeColor(page, THEME_COLORS.night);
   });
 
   test("the unwell link is on every worker page", async ({ page }) => {
-    for (const path of ["/en/worker", "/en/worker/alerts"]) {
+    for (const path of [`/en/worker${PIN}`, "/en/worker/alerts"]) {
       await page.goto(path);
       await expect(page.locator("[data-emergency]")).toBeVisible();
     }
@@ -72,7 +77,8 @@ test.describe("the field shell on /en/worker", () => {
     await expect(page.locator("html")).not.toHaveAttribute("data-theme", "sun");
 
     await page.getByRole("link", { name: en.shell.roleChooser.worker.title }).click();
-    await expect(page).toHaveURL(/\/en\/worker$/);
+    // An unpinned phone is handed on to the join page: the same field shell, the same theme.
+    await expect(page).toHaveURL(/\/en\/worker(\/join)?$/);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sun");
     await expectThemeColor(page, THEME_COLORS.sun);
 
@@ -82,10 +88,11 @@ test.describe("the field shell on /en/worker", () => {
     await expectThemeColor(page, THEME_COLORS.night);
   });
 
-  test("the chips switch language as a new document and keep the query string", async ({ page }) => {
-    await page.goto("/en/worker?demo=replay");
-    await page.getByRole("link", { name: "العربية" }).click();
-    await expect(page).toHaveURL(/\/ar\/worker\?demo=replay$/);
+  test("the settings sheet switches language as a new document and keeps the query string", async ({ page }) => {
+    await page.goto(`/en/worker?demo=replay&site=${SITE_DEMO}&crew=crew-b`);
+    await page.getByRole("banner").getByRole("button", { name: /Settings/ }).click();
+    await page.getByRole("dialog", { name: en.shell.settings.title }).getByRole("link", { name: "العربية" }).click();
+    await expect(page).toHaveURL(/\/ar\/worker\?demo=replay&site=/);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   });
 });

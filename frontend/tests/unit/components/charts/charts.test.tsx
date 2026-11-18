@@ -5,6 +5,7 @@ import { SeasonPlayer, PLAY_MS } from "@/components/charts/SeasonPlayer";
 import { SeasonRibbon, type RibbonLabels, type SeasonRibbonProps } from "@/components/charts/SeasonRibbon";
 import type { Proof } from "@/components/provenance/proof";
 import { renderWithIntl } from "../../../utils/intl";
+import { SAMPLE_STORY } from "../../../utils/story";
 
 const N = 12;
 const days = Array.from({ length: N }, (_, i) => `2026-06-${String(10 + i).padStart(2, "0")}`);
@@ -41,6 +42,7 @@ const tally = days.map((_, i) => ({ days: i + 1, hours: (i + 1) * 5, inBan: Math
 
 const proof: Proof = {
   what: "x",
+  story: SAMPLE_STORY,
   protocol: "recorded forecast",
   protocolHref: null,
   script: "facts.ts:seasonFacts",

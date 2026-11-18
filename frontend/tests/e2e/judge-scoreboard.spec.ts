@@ -19,6 +19,7 @@ const SEASON_DAYS = 139;
 interface Verdict {
   readonly id: string;
   readonly text: string;
+  readonly outcome: "supported" | "negative";
 }
 const eval2026 = (name: string): { verdicts: readonly Verdict[] } & Record<string, unknown> =>
   JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", `${name}.json`), "utf8")) as { verdicts: readonly Verdict[] } & Record<string, unknown>;
@@ -118,31 +119,53 @@ test("scoreboard scored state: three scored tables, no pending cell, no DEV stam
   await expect(page.locator("#warnings > table [data-row=P0] [data-not-computed]")).toHaveText("not computed");
   // the plan cut and its rest cost are one sentence, over the scored days of the plans file
   const tradeoff = page.locator("[data-plans-tradeoff]");
-  for (const part of ["33,875", "2,140", "31,680", "13,560", "138 scored days", "simulated crew"]) await expect(tradeoff).toContainText(part);
+  for (const part of ["33,875", "2,140", "31,680", "13,560", "138 scored days", "assumed crew"]) await expect(tradeoff).toContainText(part);
 });
 
-test("scoreboard shows every verdict sentence exactly as the runner wrote it, including the one that did not hold", async ({ page }) => {
+test("scoreboard shows every verdict in plain words with the file's flag, including the one that was not met, and keeps the runner's sentence under For auditors", async ({ page }) => {
   await open(page, "/en/replay");
   const main = page.locator("main");
   const sentences = [...eval2026("policy_scoreboard").verdicts, ...eval2026("plan_scoreboard").verdicts];
   expect(sentences.map((v) => v.id)).toEqual(["H4", "H5", "H4-lead2", "H6", "H7"]);
-  for (const verdict of sentences) await expect(main).toContainText(verdict.text, { useInnerText: false });
-  await expect(main).toContainText("H5 not supported at lead 1 (secondary)");
-  // the stamp "issued by 18:00 the evening before" belongs to lead 2 only
+  // the main layer never prints the runner's own sentence or its codes
+  for (const verdict of sentences) await expect(main).not.toContainText(verdict.text, { useInnerText: false });
+  await expect(main).not.toContainText(/H[0-9]|P[0-3]|lead [0-9]/);
+  // each check is a plain sentence whose "met" or "not met" is the file's own flag
+  const verdictOf = (id: string) => (id === "H4" ? page.locator("[data-verdict=written]") : page.locator(`[data-verdict-id="${id}"]`));
+  for (const verdict of sentences) await expect(verdictOf(verdict.id)).toHaveAttribute("data-verdict-outcome", verdict.outcome === "supported" ? "met" : "notMet");
+  await expect(verdictOf("H4")).toContainText("This was the main check and it was met.");
+  await expect(verdictOf("H5")).toContainText("This check was not met.");
+  await expect(verdictOf("H5")).toContainText("We do not claim to beat the regulator's zones.");
+  // the stricter forecast ("issued by 18:00 the evening before") belongs to lead 2 only
   await expect(page.locator("main > header")).not.toContainText(/evening before/i);
-  await expect(page.locator("[data-lead='2']")).toContainText("issued by 18:00 GST the evening before");
-  // H4 is not a stable result: the page names the prior run and never says robust
-  await expect(page.locator("[data-verdict-caption]")).toHaveText("Supported on 2026 (pre-registered). On the 2025 development run, the prior run, this check was not supported.");
+  await expect(page.locator("[data-lead='2']")).toContainText("issued by 18:00 the evening before");
+  await expect(page.locator("[data-lead='2'] [data-verdict-id='H4-lead2']")).toContainText("On the stricter forecast");
+  // the runner's sentence, exactly as written, is one deliberate step away: the chip, then For auditors
+  await page.locator('[data-verdict-id="H5"] [data-proof-id]').click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer).toBeVisible();
+  await drawer.getByText("For auditors: the full record").click();
+  const h5 = sentences.find((v) => v.id === "H5");
+  await expect(drawer.getByText(h5?.text ?? "x", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  // H4 is not a stable result: the page names the development run and never says robust
+  await expect(page.locator("[data-verdict-caption]")).toHaveText("Met on summer 2026. On the 2025 development run, made while we were building, this check was not met.");
   await expect(main).not.toContainText(/robust|consistently|calibrated|beats every|beats ADOSH|catches 90|best overall|highest CSI|untouched/i);
 });
 
 test("scoreboard evaluation chip shows the held-out label and the pre-registration lock in the drawer", async ({ page }) => {
   await open(page, "/en/replay");
-  const record = JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", "evaluation_record.json"), "utf8")) as { lock_sha256: string; protocol_commit: string };
-  await expect(page.locator("[data-evaluation]")).toContainText("Scored once on summer 2026, under a protocol locked before the run.");
+  const record = JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", "evaluation_record.json"), "utf8")) as { lock_sha256: string; protocol_commit: string; amendments: readonly unknown[] };
+  await expect(page.locator("[data-evaluation]")).toContainText("Tested on summer 2026. Every setting was chosen using 2024 and 2025 data only. The test plan was written down and locked before the scored run.");
+  // the count of later changes is the evaluation record's own
+  await expect(page.locator("[data-evaluation]")).toContainText(`${String(record.amendments.length)} later changes to the plan are logged for auditors.`);
   await page.locator("[data-evaluation] [data-proof-id]").click();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toBeVisible();
+  // the number has no sheet of its own, so its record sits in the drawer behind For auditors (closed until the reader opens it)
+  await expect(drawer.locator("dt", { hasText: "Pre-registration" })).toBeHidden();
+  await drawer.getByText("For auditors: the full record").click();
   await expect(drawer.locator("dt", { hasText: "Pre-registration" })).toBeVisible();
   await expect(drawer.getByText(record.lock_sha256)).toBeVisible();
   await expect(drawer.getByText(record.protocol_commit)).toBeVisible();
@@ -151,18 +174,26 @@ test("scoreboard evaluation chip shows the held-out label and the pre-registrati
   await expect(drawer).toBeHidden();
 });
 
-test("scoreboard proof chip opens the drawer with the file's sha, and Escape returns focus to the chip", async ({ page }) => {
+test("scoreboard where-from chip opens a plain story with no path or fingerprint, For auditors opens the record, and Escape returns focus to the chip", async ({ page }) => {
   await open(page, "/en/replay");
   const chip = page.locator("[data-tally] [data-proof-id]").first();
   await chip.click();
-  const drawer = page.getByRole("dialog");
+  const drawer = page.getByRole("dialog", { name: "Where this number comes from" });
   await expect(drawer).toBeVisible();
-  const sha = drawer.locator("dt", { hasText: "SHA-256" }).locator("xpath=following-sibling::dd[1]");
-  await expect(sha.locator("code").first()).toHaveText(/^[0-9a-f]{64}$/);
-  await expect(drawer.getByText("static/omaa_2026_ifs_d1_wbgt_hourly.json")).toBeVisible();
+  for (const row of ["Made by", "About", "How we counted", "It shows", "It does not show"]) await expect(drawer.getByText(row, { exact: true })).toBeVisible();
+  // the main layer never prints a file name, a fingerprint or a source path (docs/design/redesign-2026-11-17/02b section 6, test 4)
+  expect(await drawer.innerText()).not.toMatch(/[A-Za-z0-9_-]+\.json|[0-9a-f]{40,}|src\//);
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
   await expect(chip).toBeFocused();
+  // one deliberate step: For auditors, on the sheet, opened by the #audit link
+  await chip.click();
+  await page.getByRole("dialog").getByRole("link", { name: "For auditors" }).click();
+  await expect(page).toHaveURL(/\/en\/replay\/proof\/forecast\.days_over_limit#audit$/);
+  const audit = page.locator("details#audit");
+  await expect(audit).toHaveJSProperty("open", true);
+  await expect(audit.locator("dt", { hasText: "SHA-256" }).locator("xpath=following-sibling::dd[1]").locator("code").first()).toHaveText(/^[0-9a-f]{64}$/);
+  await expect(audit.getByText("static/omaa_2026_ifs_d1_wbgt_hourly.json")).toBeVisible();
 });
 
 test("scoreboard drawer links to the proof sheet and back", async ({ page }) => {
@@ -173,7 +204,7 @@ test("scoreboard drawer links to the proof sheet and back", async ({ page }) => 
   await expect(page.locator("[data-sheet-number]")).toContainText("139");
   await page.getByRole("link", { name: "Back to the scoreboard" }).first().click();
   await expect(page).toHaveURL(/\/en\/replay$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Summer 2026, replayed honestly");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("How four ways of warning a crew would have done last summer");
 });
 
 test("scoreboard frontier commute lives in the URL and survives a reload", async ({ page }) => {
@@ -194,7 +225,8 @@ test("scoreboard frontier commute lives in the URL and survives a reload", async
 test("scoreboard story footer links only to routes that exist and Next goes to the day page", async ({ page }) => {
   await open(page, "/en/replay");
   const nav = page.getByRole("navigation", { name: "Story" });
-  await expect(nav.getByText("Step 2 of 5: Scoreboard")).toBeVisible();
+  // The story is problem, product, evidence, day, boundary (ADR 0076): the scoreboard is the evidence, the third step.
+  await expect(nav.getByText("Step 3 of 5: The evidence")).toBeVisible();
   for (const href of await nav.locator("a").evaluateAll((links) => links.map((a) => a.getAttribute("href") ?? ""))) {
     const response = await page.request.get(href);
     expect(response.status(), href).toBeLessThan(400);
@@ -225,7 +257,11 @@ for (const [name, viewport] of [
 test("proof sheet recounts the file in this browser and reports a match", async ({ page }) => {
   await open(page, "/en/replay/proof/forecast.hours_over_limit");
   await expect(page.locator("[data-sheet-number]")).toContainText("1,624");
-  await expect(page.locator("[data-timeline] li")).toHaveCount(4);
+  // a count made from a recorded forecast is not a scored result: one honest line, no timeline
+  await expect(page.getByText("This is a count made from a recorded forecast file. It is not a scored result.")).toBeVisible();
+  await expect(page.locator("[data-timeline]")).toHaveCount(0);
+  await expect(page.locator("details#audit")).toHaveJSProperty("open", false);
+  await page.getByText("For auditors: the full record").click();
   await page.getByRole("button", { name: "Recount in this browser" }).click();
   await expect(page.getByText("Matches", { exact: true })).toBeVisible();
 });
@@ -233,17 +269,20 @@ test("proof sheet recounts the file in this browser and reports a match", async 
 test("proof sheet serves the lead 2 and day counter claims, with the lock", async ({ page }) => {
   await open(page, "/en/replay/proof/policy.lead2.p3.pod");
   await expect(page.locator("[data-sheet-number]")).toBeVisible();
+  // a scored number: the lock is in the auditor record, and its timeline has three steps
+  await page.getByText("For auditors: the full record").click();
   await expect(page.locator("dt", { hasText: "Pre-registration" })).toBeVisible();
+  await expect(page.locator("[data-timeline] li")).toHaveCount(3);
   await open(page, "/en/replay/proof/day.balanced");
   await expect(page.locator("[data-sheet-number]")).toContainText("5 of 7");
-  await open(page, "/en/replay/proof/policy.p3.pod");
+  await open(page, "/en/replay/proof/policy.p3.pod#audit");
   const record = JSON.parse(readFileSync(path.join(process.cwd(), "data", "eval", "2026", "evaluation_record.json"), "utf8")) as { lock_sha256: string };
   await expect(page.getByText(record.lock_sha256)).toBeVisible();
 });
 
 test("proof sheet for an unknown number is the empty state, with a way to a number that has proof", async ({ page }) => {
   await open(page, "/en/replay/proof/policy.p9.nothing");
-  await expect(page.getByRole("heading", { name: "No provenance recorded for this number" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This number is not shown" })).toBeVisible();
   await expect(page.locator("[data-sheet-number]")).toHaveCount(0);
   await page.getByRole("link", { name: "Open a number that has proof" }).click();
   await expect(page).toHaveURL(/\/en\/replay\/proof\/forecast\.hours_over_limit$/);
@@ -253,7 +292,7 @@ test("proof sheet for an unknown number is the empty state, with a way to a numb
 test("proof sheet has a sheet for the frontier readouts the page offers", async ({ page }) => {
   await open(page, "/en/replay/proof/frontier.legalisation.ge30");
   await expect(page.locator("[data-sheet-number]")).toContainText("%");
-  await expect(page.getByText("Not a forecast: recorded station observations and a roster model.")).toBeVisible();
+  await expect(page.getByText("This is an analysis of recorded data. It is not a scored result.")).toBeVisible();
 });
 
 for (const [name, viewport] of [

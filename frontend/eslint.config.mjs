@@ -29,7 +29,7 @@ import tseslint from "typescript-eslint";
 // block (field shell, dock, state components), which repeats the shared-code rule of the block before it and adds the ban on
 // the raw links, because the later block wins whole.
 // tests/unit/lint/route-group-isolation.test.ts resolves the real config per path and fails if one did.
-const WORKER_FEATURES = ["today", "profile", "risk", "push", "alert", "unwell"];
+const WORKER_FEATURES = ["today", "profile", "risk", "push", "alert", "unwell", "join"];
 const SHARED_DIRS = ["components", "api", "lib", "i18n"];
 
 // One forbidden target, written for both mechanisms: `globs` (gitignore syntax) for no-restricted-imports and

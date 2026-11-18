@@ -15,8 +15,8 @@ import { routing } from "@/i18n/routing";
  * `/<locale>`: the landing page, the first frame of the story. Static: it reads the recorded forecast files and the scored
  * files at build time and makes no API call, so it renders the same with the API stopped. The only client code at first load is
  * the proof chip and the gate that brings the field in after first paint (features/judge/landing/FieldGate.tsx); the field, its
- * data and (later) the WebGL scene load after that, on this route only. The role chooser of the first phase is gone: the apps
- * are linked from the foot of the page.
+ * data and (later) the WebGL scene load after that, on this route only. The role door (four tiles) is part of the hero, and the story chapters are
+ * server markup: the client reads only the field's own strings, the story footer's copy button and the proof chip's.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,7 +34,7 @@ export default async function LocaleHomePage({ params }: PageProps<"/[locale]">)
   try {
     data = await loadEval();
   } catch (error) {
-    // A scored file that cannot be read drops the scored parts of the landing (the hook and the table); a release build must not ship that.
+    // A scored file that cannot be read drops the scored parts of the landing (the evidence chapter); a release build must not ship that.
     if (!(error instanceof EvalDataError) || process.env.SB_REQUIRE_SCORED === "1") throw error;
     console.error(`landing: ${error.message}`);
   }
@@ -43,8 +43,8 @@ export default async function LocaleHomePage({ params }: PageProps<"/[locale]">)
 
   return (
     // The client reads: the proof chip and its drawer, the spine's slot label, the field island's own strings.
-    <ClientMessages paths={["judge.landing", "judge.story", "states.proof", "judge.proof", "common.spine"]}>
-      <LandingView field={field} hourly={hourly} data={data} dir={dirFor(locale)} />
+    <ClientMessages paths={["judge.landing.field", "judge.story", "states.proof", "judge.proof", "common.spine"]}>
+      <LandingView field={field} data={data} dir={dirFor(locale)} />
     </ClientMessages>
   );
 }

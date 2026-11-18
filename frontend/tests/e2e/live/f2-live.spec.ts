@@ -284,7 +284,7 @@ test.describe("F2 against the real B3: the worker's unwell sheet", () => {
     await page.setViewportSize(PHONE);
     // The way a visitor really gets a site: no pin, one tap on the demo yard (which reads the site list), then Today.
     await page.goto("/en/worker");
-    await page.getByRole("button", { name: en.worker.today.entry.demo }).click();
+    await page.getByRole("button", { name: en.worker.join.demo }).click();
     await expect(page.getByRole("heading", { level: 1, name: en.worker.today.title })).toBeAttached();
     await expect(page.locator("[data-level-sign]").first()).toBeVisible();
 

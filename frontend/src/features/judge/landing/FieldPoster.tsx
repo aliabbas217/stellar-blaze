@@ -4,13 +4,14 @@ import type { Proof } from "@/components/provenance/proof";
 import type { BanState } from "@/components/spine/TimeSpine";
 import { heatColor } from "@/lib/heat/ramp";
 import { boxOf, type FieldGrid, type FieldReading } from "./field-data";
-import { FieldReadout, readoutText } from "./FieldReadout";
+import { FieldCaption } from "./FieldCaption";
 import { FieldStage } from "./FieldStage";
 import { HourScrubber } from "./HourScrubber";
+import { readoutText } from "./readout-text";
 
 /*
- * What the server paints before the island is in: the stage (empty, at its final size), the readout at the peak hour (real
- * numbers, read from the recorded files on the server) and the spine of the day with no slider yet. It is the loading state:
+ * What the server paints before the island is in: the stage (a blurred picture of the recorded grid at the peak hour, at its final size), the
+ * spine of the day with no slider yet, and the caption with its "Where from" chip. It is the loading state:
  * the island replaces it box for box, so nothing moves. `FieldIsland` draws the same three parts.
  */
 
@@ -21,8 +22,6 @@ export interface FieldPanelProps {
   readonly peakHour: number;
   readonly ban: BanState;
   readonly proof: Proof;
-  /** Whether the day is the summer's highest daily peak of the raw forecast (the source line says so only then). */
-  readonly highestOfSeason: boolean;
   readonly dir: "ltr" | "rtl";
 }
 
@@ -51,7 +50,7 @@ function PosterMap({ grid, hour }: { readonly grid: FieldGrid; readonly hour: nu
         viewBox={`0 0 ${String(cols)} ${String(rows)}`}
         preserveAspectRatio="none"
         style={{ "--ar": String(aspect) } as CSSProperties}
-        className="absolute top-1/2 aspect-(--ar) w-[min(92cqw,calc(86cqh*var(--ar)))] -translate-y-1/2 blur-[10px] max-[899px]:inset-s-1/2 max-[899px]:-translate-x-1/2 max-[899px]:rtl:translate-x-1/2 min-[900px]:inset-s-[62cqw] min-[900px]:top-[44cqh] min-[900px]:w-[min(50cqw,calc(62cqh*var(--ar)))] min-[900px]:-translate-x-1/2 min-[900px]:rtl:translate-x-1/2"
+        className="absolute inset-s-1/2 top-1/2 aspect-(--ar) w-[min(92cqw,calc(86cqh*var(--ar)))] -translate-x-1/2 -translate-y-1/2 blur-[10px] rtl:translate-x-1/2"
       >
         {cells}
       </svg>
@@ -70,13 +69,6 @@ export function FieldPoster({ panel, grid, reading }: { readonly panel: FieldPan
       <p role="status" className="sr-only">
         {t("loading")}
       </p>
-      <FieldReadout
-        reading={reading}
-        live={false}
-        announce={t("scrubber.valueText", { hour: text.hour, hottest: text.hottest, station: text.station })}
-        proof={panel.proof}
-        source={t(panel.highestOfSeason ? "sourcePeak" : "sourcePlain", { day: panel.dayLabel })}
-      />
       <HourScrubber
         values={panel.omaa}
         ban={panel.ban}
@@ -89,6 +81,7 @@ export function FieldPoster({ panel, grid, reading }: { readonly panel: FieldPan
         playing={false}
         calm={false}
       />
+      <FieldCaption proof={panel.proof} />
     </>
   );
 }

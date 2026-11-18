@@ -4,15 +4,14 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState, ViewTransition, type ReactNode } from "react";
 import { FieldHeadingContext, type FieldHeadingSlot } from "@/components/shell/FieldHeading";
 import { FieldLink } from "@/components/shell/FieldLink";
-import { LanguageChips } from "@/components/shell/LanguageChips";
-import { SunToggle } from "@/components/shell/SunToggle";
+import { SettingsSheet, type ChangeCrew } from "@/components/shell/SettingsSheet";
 import { useRouteTheme } from "@/components/shell/useRouteTheme";
 import { setTheme } from "@/lib/sun/route-theme";
 import "@/styles/view-transitions.css";
 
 /**
- * The shell of the phone surfaces (worker and supervisor): a header with the site and crew, the clock and the sun toggle,
- * the six language chips, the page, and an optional dock. It is a presentational composition, so it imports no feature:
+ * The shell of the phone surfaces (worker and supervisor): a header with the site and crew, the clock and ONE language pill that
+ * opens the settings sheet (language, screen colors, change crew: SettingsSheet.tsx), the page, and an optional dock. It is a presentational composition, so it imports no feature:
  * the layout that mounts it passes what to show (the pinned site, the demo clock, the worker dock), and a page can name the
  * crew through `useFieldCrewLabel` (FieldHeading.tsx).
  *
@@ -25,6 +24,8 @@ import "@/styles/view-transitions.css";
 export function FieldShell({
   siteName,
   crewLabel,
+  demo = false,
+  changeCrew,
   reserveLabels = false,
   clock,
   dock,
@@ -36,6 +37,10 @@ export function FieldShell({
    */
   siteName?: string | null;
   crewLabel?: string | null;
+  /** The site is the synthetic demo site: it is tagged "Demo" beside its name (the caller has already taken "(synthetic)" out of the name). */
+  demo?: boolean;
+  /** "Change crew" in the settings sheet: omitted on surfaces that have no crew to change (the supervisor). */
+  changeCrew?: ChangeCrew;
   /**
    * Hold the header's final height from the first paint: two lines for the site's name and one for the crew's. The names arrive after
    * the page does (the demo site, then the crew's timeline), and on a phone each one grew the header and pushed the whole screen down
@@ -84,6 +89,14 @@ export function FieldShell({
             // page, so an inline child would otherwise keep it and make each line of the name 40 px tall.
             <p {...(site === null ? {} : { title: site })} className={`font-body text-base leading-tight font-semibold break-words text-ink${reserveLabels ? " max-sm:min-h-10" : ""}`}>
               {site === null ? t("shell.field.noSite") : <bdi className="leading-[inherit]">{site}</bdi>}
+              {demo && site !== null ? (
+                <span
+                  data-demo-tag=""
+                  className="mt-1 flex min-h-6 w-fit items-center rounded-sign px-2 font-body text-xs leading-none font-semibold tracking-wide text-ink-2 uppercase inset-ring-[1.5px] inset-ring-edge"
+                >
+                  {t("shell.field.demo")}
+                </span>
+              ) : null}
             </p>
           )}
           {crew === null ? (
@@ -100,9 +113,8 @@ export function FieldShell({
             <bdi dir="ltr">{clock}</bdi>
           </p>
         )}
-        <SunToggle />
+        <SettingsSheet {...(changeCrew === undefined ? {} : { changeCrew })} />
       </header>
-      <LanguageChips />
       <FieldHeadingContext.Provider value={slot}>
         <div className={dock === undefined ? "flex flex-1 flex-col" : "flex flex-1 flex-col pb-44"}>{children}</div>
       </FieldHeadingContext.Provider>

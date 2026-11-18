@@ -46,7 +46,7 @@ export function EmptyState({ title, reason, primary, secondary, level }: EmptySt
   const other = usable(secondary);
 
   return (
-    <section {...attrs} className="flex flex-col items-start gap-3 rounded-sign border border-dashed border-edge px-6 py-8">
+    <section {...attrs} className="flex flex-col items-start gap-3 rounded-card border border-dashed border-edge px-6 py-8">
       {level === undefined ? null : (
         <p className="flex items-center gap-2 text-base text-ink-2">
           <LevelMark level={level} />

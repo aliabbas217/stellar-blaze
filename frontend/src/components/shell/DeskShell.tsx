@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { ViewTransition, type ReactNode } from "react";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { NAV_TAB } from "@/components/states/actions";
 import { useRouteTheme } from "@/components/shell/useRouteTheme";
 import "@/styles/view-transitions.css";
 
@@ -74,7 +75,7 @@ export function DeskShell({
                   <FieldLink
                     href={item.href}
                     aria-current={item.href === current ? "page" : undefined}
-                    className="inline-flex min-h-(--target) items-center rounded-sign border border-transparent px-3 font-body text-sm text-ink-2 no-underline aria-[current=page]:border-ink aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+                    className={`${NAV_TAB} font-body text-sm`}
                   >
                     {item.label}
                   </FieldLink>

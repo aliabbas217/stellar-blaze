@@ -10,18 +10,22 @@ import { useTimeFormat } from "@/features/today/labels";
 import "@/styles/view-transitions.css";
 
 /**
- * The level sign of Today: the word at 76 px, how long it holds, and the four-step scale. A stale, offline or fallback sign is
- * drawn as such by LevelSign (clock, dimmer word, dashed marker), never as a live one. The shared view-transition name
- * `level` pairs it with the alert card's sign. A worker whose own level is higher is told so under it: the sign leads with
+ * The level row of Today: the word at 32 px with its 14 px mark, how long it holds, and the four-step scale. A stale, offline or
+ * fallback sign is drawn as such by LevelSign (clock, dimmer word, dashed marker), never as a live one. The shared view-transition
+ * name `level` pairs it with the alert card's sign. A worker whose own level is higher is told so under it: the sign leads with
  * the more severe of the two, and says whose it is in the kicker.
+ *
+ * `className` is the section's gutter: `px-4` on the page, none inside the level card (which pads itself).
  */
 export function LevelHeader({
   description,
   mode,
+  className = "px-4",
 }: {
   readonly description: TodayDescription;
   /** The API's own mode for this forecast: a replayed day carries the Replay stamp on the sign's kicker line (review focus 6). */
   readonly mode: components["schemas"]["SiteForecastToday"]["mode"];
+  readonly className?: string;
 }) {
   const t = useTranslations("worker.today");
   const time = useTimeFormat();
@@ -29,7 +33,7 @@ export function LevelHeader({
 
   return (
     <ViewTransition name="level" share="morph" default="none">
-      <section aria-label={t(`kicker.${kicker}`)} className="flex flex-col gap-3 px-4">
+      <section aria-label={t(`kicker.${kicker}`)} className={`flex flex-col gap-3 ${className}`}>
         <LevelSign
           level={level}
           kind={levelKind}

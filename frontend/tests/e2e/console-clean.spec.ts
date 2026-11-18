@@ -78,16 +78,22 @@ const SIGNED_PLAN = async (page: Page): Promise<void> => {
 };
 const LANDING = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
-  await expect(page.locator("[data-hero][data-field-path]")).toBeAttached({ timeout: 15_000 });
+  await expect(page.locator("[data-field-stage][data-field-path]")).toBeAttached({ timeout: 15_000 });
 };
 
 const LANDING_ROUTES: readonly Route[] = [
   { name: "landing (WebGL path)", path: "", settled: LANDING },
   { name: "landing (?static)", path: "?static", settled: LANDING },
 ];
+/** The join page's confirm card: its "Yes" button exists once the site and the crew have been read. */
+const JOIN_CONFIRM = async (page: Page, locale: string): Promise<void> => {
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
+  await expect(page.getByRole("button", { name: MESSAGES[locale as keyof typeof MESSAGES].worker.join.confirm })).toBeVisible();
+};
 const WORKER_ROUTES: readonly Route[] = [
   { name: "worker today", path: `/worker${PIN}`, settled: FRAME_HYDRATED },
-  { name: "worker alerts", path: "/worker/alerts", settled: ALERTS_HYDRATED },
+  { name: "worker join", path: `/worker/join?s=${SITE_DEMO}&c=crew-b`, settled: JOIN_CONFIRM },
+  { name: "worker alerts", path: `/worker/alerts?site=${SITE_DEMO}`, settled: ALERTS_HYDRATED },
   { name: "worker alert", path: `/worker/alert?audience=site&target=${SITE_DEMO}&level=orange&valid_from=${VALID_FROM}`, settled: FRAME_HYDRATED },
 ];
 const SUPERVISOR_ROUTES: readonly Route[] = [

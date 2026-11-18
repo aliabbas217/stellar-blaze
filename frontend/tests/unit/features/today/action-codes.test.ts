@@ -1,4 +1,4 @@
-import { ALSO_NEEDS_DRAFT_MARKER, actionPlan, alsoPictogram } from "@/features/today/action-codes";
+import { actionPlan, alsoPictogram, EMPLOYER_DUTY_CODES } from "@/features/today/action-codes";
 
 /*
  * What an hour's action codes become on the Today screen (F2 Task 16). The words are messages; here only the meaning: which
@@ -53,21 +53,22 @@ describe("actionPlan", () => {
     expect(actionPlan(["rest_in_shade", light, heavy]).lead).toEqual({ kind: "cycle", workMinutes: 20, restMinutes: 40 });
   });
 
-  // The four codes B3's real ruleset sends that had no wording (found in the first live run, F2 Task 24b item 9). Each is now the
-  // ADOSH Table 1 text the ruleset's clause cites, verbatim; the lines are under the draft marker and add no advice of their own.
-  it.each([
-    ["self-paced-work", "selfPaced"],
-    ["no-unacclimatised", "noUnacclimatised"],
-    ["high-risk-induction", "induction"],
-    ["personal-water-bottle-2l", "bottle"],
-  ] as const)("test_four_ruleset_codes_have_a_line: %s is the '%s' line, leads nothing, and wears the draft marker", (code, item) => {
-    expect(actionPlan([code])).toEqual({ lead: { kind: "siteRules" }, also: [item] });
-    expect(ALSO_NEEDS_DRAFT_MARKER.has(item)).toBe(true);
-    // never mistaken for the water prompt (the bottle code contains the word "water"; the line is the bottle duty, not a quantity to drink)
-    if (code === "personal-water-bottle-2l") expect(actionPlan([code]).also).not.toContain("water");
+  // The ruleset codes that had no wording (found in the first live run, F2 Task 24b item 9). The worker's own one is the self-paced
+  // line; the other three are the EMPLOYER's duties (ADOSH Table 1 text written for duty holders) and are no longer a line of the
+  // worker's screen (redesign S5): known, parked, never mapped to a message.
+  it("test_self_paced_code_has_a_line: self-paced-work is the 'selfPaced' line and leads nothing", () => {
+    expect(actionPlan(["self-paced-work"])).toEqual({ lead: { kind: "siteRules" }, also: ["selfPaced"] });
   });
 
-  it("an Orange hour of the real ruleset lists every code once, in the ruleset's order", () => {
+  it.each([...EMPLOYER_DUTY_CODES])("test_employer_duty_is_not_a_worker_line: %s gives no line and no lead", (code) => {
+    expect(actionPlan([code])).toEqual({ lead: { kind: "siteRules" }, also: [] });
+  });
+
+  it("the parked employer duties are exactly the three codes the redesign named", () => {
+    expect([...EMPLOYER_DUTY_CODES].sort()).toEqual(["high-risk-induction", "no-unacclimatised", "personal-water-bottle-2l"]);
+  });
+
+  it("an Orange hour of the real ruleset lists only what the worker does, once each, in the ruleset's order", () => {
     const orange = [
       "cycle.high.light.45-15",
       "cycle.high.heavy.20-40",
@@ -79,15 +80,17 @@ describe("actionPlan", () => {
     ];
     expect(actionPlan(orange)).toEqual({
       lead: { kind: "cycle", workMinutes: 20, restMinutes: 40 },
-      also: ["buddy", "noUnacclimatised", "water", "induction", "bottle"],
+      also: ["buddy", "water"],
     });
     expect(actionPlan(["self-paced-work", "fluids.light.600ml-1l"]).also).toEqual(["selfPaced", "water"]);
+    // at most three lines, whatever the hour carries
+    expect(actionPlan([...orange, "self-paced-work"]).also.length).toBeLessThanOrEqual(3);
   });
 
-  it("every line has a pictogram, and the older two keep theirs", () => {
-    expect(alsoPictogram("water")).toBe("water");
-    expect(alsoPictogram("buddy")).toBe("buddy");
-    expect(alsoPictogram("bottle")).toBe("water");
+  it("every line has its own pictogram: no two rules share a glyph", () => {
+    const glyphs = (["water", "buddy", "selfPaced"] as const).map((item) => alsoPictogram(item));
+    expect(glyphs).toEqual(["water", "buddy", "clock"]);
+    expect(new Set(glyphs).size).toBe(glyphs.length);
   });
 
   it("an unknown code beside known ones is ignored, and the list has each item once", () => {

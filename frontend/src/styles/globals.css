@@ -60,7 +60,8 @@
   --color-viz-ours: var(--viz-ours);
   --color-viz-grid: var(--viz-grid);
 
-  /* The type scale of tokens.css (12, 14, 16, 18, 22, 28, 36, 48, 64, 76 px) under Tailwind's step names. */
+  /* The type scale of tokens.css (12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 44, 48, 56, 64, 76 px). The original steps keep
+     Tailwind's names; the steps added with the control system are named by their size (text-20, text-24, text-32, text-44, text-56). */
   --text-xs: var(--t-12);
   --text-sm: var(--t-14);
   --text-base: var(--t-16);
@@ -71,16 +72,29 @@
   --text-4xl: var(--t-48);
   --text-5xl: var(--t-64);
   --text-6xl: var(--t-76);
+  --text-20: var(--t-20);
+  --text-24: var(--t-24);
+  --text-32: var(--t-32);
+  --text-44: var(--t-44);
+  --text-56: var(--t-56);
 
-  /* One corner radius everywhere; components built for other radii (shadcn) still land on it. */
+  /*
+   * Two radii, by what the shape is for (DESIGN.md, Shape). What you read is cut at --r (2 px: the data marks, via rounded-sign
+   * and the xs to md steps below); what you press is rounded. The shadcn steps follow the same rule: lg, xl and 2xl, which the
+   * generated controls use (buttons, selects, switches), land on --r-ctl; 3xl and 4xl, which they use for cards and sheets,
+   * on --r-card. Utilities for the system's own names: rounded-ctl, rounded-card, rounded-pill.
+   */
   --radius-xs: var(--r);
   --radius-sm: var(--r);
   --radius-md: var(--r);
-  --radius-lg: var(--r);
-  --radius-xl: var(--r);
-  --radius-2xl: var(--r);
-  --radius-3xl: var(--r);
-  --radius-4xl: var(--r);
+  --radius-lg: var(--r-ctl);
+  --radius-xl: var(--r-ctl);
+  --radius-2xl: var(--r-ctl);
+  --radius-3xl: var(--r-card);
+  --radius-4xl: var(--r-card);
+  --radius-ctl: var(--r-ctl);
+  --radius-card: var(--r-card);
+  --radius-pill: var(--r-pill);
 }
 
 /*
@@ -268,37 +282,38 @@
    * loading skeleton both compute their height from these two properties, so the skeleton is as tall as the sign in
    * every language (CLS): never write a language's leading into either component. Mutually exclusive, like the
    * tracking rules in tokens.css. text: kicker, scale labels, "until". word: the level word, which is set solid
-   * (line-height 1) only where the script has no ascenders or marks to clip, i.e. English. size: the hero word's font size.
+   * (line-height 1) only where the script has no ascenders or marks to clip, i.e. English. size: the hero word's font size, 32 px in
+   * every language since the redesign (S5): the action sentence above it (28 px) is the largest text of the screen, the word a label of it.
    */
   :lang(en) {
     --sign-leading-text: var(--leading-body);
     --sign-leading-word: var(--leading-solid);
     --sign-leading-display: var(--leading-solid);
-    --sign-word-size: var(--t-76);
+    --sign-word-size: var(--t-32);
     --sign-word-trim: 0px;
   }
 
-  /* The hero word steps down one size (64 px) in Arabic script: at line height 2.5 (Nastaliq clips below about 2) a 76 px word
-     would take 190 px of a phone's first fold for one line (F2 W1, I6). Ar and ur both write the hero in this script. */
+  /* Arabic script: at line height 2.5 (Nastaliq clips below about 2) even a 32 px word takes 80 px of row, so the blank above and below
+     it is trimmed from the layout (--sign-word-trim, below), in proportion to the word's size. */
   :lang(ar) {
     --sign-leading-text: var(--leading-ar);
     --sign-leading-word: var(--leading-ar);
     --sign-leading-display: var(--leading-ar-display);
-    --sign-word-size: var(--t-64);
-    --sign-word-trim: calc(var(--t-64) * 0.15);
+    --sign-word-size: var(--t-32);
+    --sign-word-trim: calc(var(--t-32) * 0.15);
   }
 
   :lang(ur) {
     --sign-leading-text: var(--leading-ur);
     --sign-leading-word: var(--leading-ur);
     --sign-leading-display: var(--leading-ur-display);
-    --sign-word-size: var(--t-64);
+    --sign-word-size: var(--t-32);
     /* 0.5 em. The level word is drawn by Noto Nastaliq Urdu itself since the display headings left the operating system's Arial for the
        locale face. Measured on the four words (tests/e2e/worker-today-notlive.spec.ts prints them): at the earlier 0.75 em the ink of
        "orange" ran 20 px into the box of the kicker row above and "green" 5 px into the scale below; at 0.5 em the most is 4.4 px (the rows'
        own blank is about a line high, so their ink is not touched); at 0.25 em every word keeps 8 px but the first screen loses 7.6 points.
        0.5 em costs 3.8 points of the hero share against 0.75 em: the Urdu exceptions in tests/e2e/gate.ts say so. */
-    --sign-word-trim: calc(var(--t-64) * 0.5);
+    --sign-word-trim: calc(var(--t-32) * 0.5);
   }
 
   :lang(hi),
@@ -307,7 +322,7 @@
     --sign-leading-text: var(--leading-body);
     --sign-leading-word: var(--leading-body);
     --sign-leading-display: var(--leading-body);
-    --sign-word-size: var(--t-76);
+    --sign-word-size: var(--t-32);
     --sign-word-trim: 0px;
   }
 

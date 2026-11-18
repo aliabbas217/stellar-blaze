@@ -1,10 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
 import { ENDPOINT_HOST_NOT_ALLOWED_TYPE } from "@/api/problem";
 import { CONSENT_VERSION } from "@/features/profile/profile-shape";
+import { resetSitePinForTests } from "@/features/profile/site-pin";
 import { PROFILE_STORAGE_KEY, useProfile, type RevokeOutcome } from "@/features/profile/store";
 import { AlertsSettings, type AlertsSettingsProps } from "@/features/push/AlertsSettings";
 import type { PushEnv } from "@/features/push/capability";
@@ -24,6 +25,8 @@ const hoisted = vi.hoisted(() => ({
   push: undefined as unknown as { value: UsePush },
   /** How many times the alerts state machine was mounted: removing the data starts it again from the browser's state. */
   mounts: 0,
+  /** What the screen asked usePush for (the site and crew it subscribes for). */
+  config: null as unknown as { siteId: string | null; crewId?: string | null },
   /**
    * When set, the real store's clearing of Cache Storage (its slowest, most visible step) waits for this instead. It lets a
    * test hold a REAL removal in flight, with the real marker written, and look at the screen meanwhile.
@@ -40,8 +43,16 @@ vi.mock("@/features/pwa/api-cache", async (importOriginal) => {
   };
 });
 
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ href, children, prefetch, ...props }: { href: string; children: ReactNode; prefetch?: boolean; className?: string }) => (
+    <a href={`/en${href}`} data-prefetch={String(prefetch)} {...props}>
+      {children}
+    </a>
+  ),
+}));
 vi.mock("@/features/push/usePush", () => ({
-  usePush: () => {
+  usePush: (config: { siteId: string | null; crewId?: string | null }) => {
+    hoisted.config = config;
     useEffect(() => {
       hoisted.mounts += 1;
     }, []);
@@ -95,6 +106,9 @@ const alertButtons = () => screen.queryAllByRole("button").filter((button) => bu
 beforeEach(() => {
   hoisted.mounts = 0;
   clearRevokeIncomplete();
+  window.localStorage.removeItem(PROFILE_STORAGE_KEY);
+  resetSitePinForTests();
+  useProfile.setState({ site: null });
 });
 
 describe("AlertsSettings: what the phone can do", () => {
@@ -129,10 +143,29 @@ describe("AlertsSettings: supported", () => {
     expect(push.enable).toHaveBeenCalledTimes(1);
   });
 
-  it("idle without a site: Enable is disabled and the screen says a site is needed", () => {
+  it("idle without a site: no greyed Enable; the screen says a site is needed and links to the join page", () => {
     setup({}, {}, { siteId: null });
-    expect(enable()).toBeDisabled();
+    expect(enable()).not.toBeInTheDocument();
     expect(screen.getByText(en.alerts.noSite)).toBeInTheDocument();
+    const join = screen.getByRole("link", { name: en.worker.join.pageTitle });
+    expect(join).toHaveAttribute("href", "/en/worker/join");
+    expect(join).toHaveAttribute("data-prefetch", "false");
+    expect(join.className).toContain("bg-signal");
+  });
+
+  it("a phone pinned by the join page subscribes for its pinned site and crew, with no ?site= in the address", () => {
+    useProfile.getState().chooseSite({ siteId: "site-demo-mussafah", crewId: "crew-c" });
+    setup({}, {}, { siteId: null });
+    expect(screen.queryByText(en.alerts.noSite)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: en.worker.join.pageTitle })).not.toBeInTheDocument();
+    expect(enable()).toBeEnabled();
+    expect(hoisted.config).toMatchObject({ siteId: "site-demo-mussafah", crewId: "crew-c" });
+  });
+
+  it("the site in the address wins over the pin, and the pinned crew is not sent with another site", () => {
+    useProfile.getState().chooseSite({ siteId: "site-demo-mussafah", crewId: "crew-c" });
+    setup({}, {}, { siteId: "site-demo-empty" });
+    expect(hoisted.config).toMatchObject({ siteId: "site-demo-empty", crewId: null });
   });
 
   it("subscribed: says alerts are on and offers Turn off, which calls disable", async () => {
@@ -204,9 +237,9 @@ describe("AlertsSettings: supported", () => {
     expect(region).toBeDefined();
   });
 
-  it("gives every button a 48 px target (min-h-12), above the 44 px a gloved hand needs", () => {
+  it("gives every button a 52 px target (min-h-(--target-field)), above the 44 px a gloved hand needs", () => {
     setup({});
-    for (const button of screen.getAllByRole("button")) expect(button.className).toContain("min-h-12");
+    for (const button of screen.getAllByRole("button")) expect(button.className).toContain("min-h-(--target-field)");
   });
 });
 
@@ -677,13 +710,13 @@ describe("AlertsSettings: removing the worker's data", () => {
     });
   });
 
-  it("gives the question's buttons the same 48 px target (min-h-12) as every other button", async () => {
+  it("gives the question's buttons the same 52 px target (min-h-(--target-field)) as every other button", async () => {
     stubRevoke();
     setup({});
-    expect(removeData()?.className).toContain("min-h-12");
+    expect(removeData()?.className).toContain("min-h-(--target-field)");
 
     await userEvent.click(removeData() as HTMLElement);
-    for (const button of within(screen.getByRole("group")).getAllByRole("button")) expect(button.className).toContain("min-h-12");
+    for (const button of within(screen.getByRole("group")).getAllByRole("button")) expect(button.className).toContain("min-h-(--target-field)");
   });
 
   it("is shown in Arabic from the Arabic messages", async () => {

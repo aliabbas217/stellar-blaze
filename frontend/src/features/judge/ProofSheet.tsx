@@ -1,6 +1,5 @@
 import { useTranslations } from "next-intl";
-import { ProofRows, RecountButton } from "@/components/provenance/ProofRows";
-import { StoryNav } from "@/components/shell/StoryNav";
+import { AuditDetails, AuditRows, RecountButton, StoryRows } from "@/components/provenance/ProofRows";
 import { EmptyState } from "@/components/states/EmptyState";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { EvalSourceStamp } from "./EvalSourceStamp";
@@ -9,10 +8,10 @@ import type { EvalSource } from "./data";
 import { CLAIMS_LOCALE } from "@/i18n/claims-english";
 
 /**
- * The proof sheet (`/replay/proof/<claim>`): one number as large as it gets, where it comes from (the same rows as the
- * drawer), the number's timeline (forecast made, protocol committed, scoring run, shown) and a button that recounts the file
- * in this browser. The sheet exists for a number that has provenance and for nothing else: an unknown id and a number
- * without a proof both get the empty state ("not shown as a result") with a link to a number that does have one.
+ * The proof sheet (`/replay/proof/<claim>`): one number as large as it gets (it is not a step of the story: it is reached from a number's "Where from" chip) and "Where this number comes from" in plain words
+ * (the same story as the drawer). The technical record, the number's three-step timeline (scored numbers only) and the button
+ * that recounts the file in this browser are under "For auditors", a closed `<details>` (`#audit`). The sheet exists for a number that has a complete record and
+ * for nothing else: an unknown id and a number without a record both get the empty state ("not shown as a result") with a link to a number that does have one.
  */
 
 export interface ProofSheetProps {
@@ -38,7 +37,6 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
           primary={{ label: t("back"), href: "/replay" }}
           secondary={{ label: t("emptyAction"), href: `/replay/proof/${FORECAST_CLAIMS.hours}` }}
         />
-        <StoryNav current="proof" />
       </main>
     );
   }
@@ -53,7 +51,6 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
           primary={{ label: t("emptyAction"), href: `/replay/proof/${FORECAST_CLAIMS.hours}` }}
           secondary={{ label: t("back"), href: "/replay" }}
         />
-        <StoryNav current="proof" />
       </main>
     );
   }
@@ -66,84 +63,75 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
         <EvalSourceStamp source={claim.kind === "scored" ? source : "none"} />
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-12">
-        <div className="flex flex-col gap-10">
-          <section aria-label={claim.what} className="flex flex-col gap-2" data-sheet-number="">
-            <strong className="font-display text-5xl leading-solid font-normal tracking-display tabular-nums text-ink sm:text-6xl">
-              {claim.value}
-            </strong>
-            {claim.unit === undefined || claim.unit === "" ? null : (
-              <p className="max-w-(--measure) text-lg text-ink-2 sm:text-xl" data-sheet-unit="">
-                {claim.unit}
-              </p>
-            )}
-            {claim.interval === undefined ? null : <p className="text-base whitespace-nowrap text-ink-2 tabular-nums">{claim.interval}</p>}
-          </section>
-          <Timeline claim={claim} source={source} />
-        </div>
+      <div className="flex w-full max-w-3xl flex-col gap-8">
+        <section aria-label={claim.what} className="flex flex-col gap-2" data-sheet-number="">
+          <strong className="font-display text-5xl leading-solid font-normal tracking-display tabular-nums text-ink sm:text-6xl">
+            {claim.value}
+          </strong>
+          {claim.unit === undefined || claim.unit === "" ? null : (
+            <p className="max-w-(--measure) text-lg text-ink-2 sm:text-xl" data-sheet-unit="">
+              {claim.unit}
+            </p>
+          )}
+          {claim.interval === undefined ? null : <p className="text-base whitespace-nowrap text-ink-2 tabular-nums">{claim.interval}</p>}
+        </section>
 
-        <div className="flex flex-col gap-6 lg:pt-2">
-          <section aria-labelledby="proof-rows-heading" className="flex flex-col rounded-sign border border-hair bg-panel">
-            <h2 id="proof-rows-heading" className="border-b border-hair px-4 py-3 font-display text-lg font-medium">
-              {t("rowsHeading")}
-            </h2>
-            <ProofRows proof={claim.proof} />
-            <RecountButton proof={claim.proof} />
-          </section>
-          <p>
-            <FieldLink href="/replay" className="inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4">
-              {t("back")}
-            </FieldLink>
-          </p>
-        </div>
+        <section aria-label={t("title")} data-sheet-story="">
+          <StoryRows proof={claim.proof} flush />
+          {claim.kind === "scored" && source === "synthetic-shape" ? (
+            <p className="max-w-(--measure) text-sm text-ink-2" data-sheet-note="">
+              {t("notes.synthetic")}
+            </p>
+          ) : null}
+        </section>
+
+        <AuditDetails>
+          <AuditRows proof={claim.proof} />
+          <Timeline claim={claim} />
+          <RecountButton proof={claim.proof} />
+        </AuditDetails>
+
+        <p>
+          <FieldLink href="/replay" className="inline-flex min-h-(--target) items-center text-base text-ink underline underline-offset-4">
+            {t("back")}
+          </FieldLink>
+        </p>
       </div>
-      <StoryNav current="proof" />
     </main>
   );
 }
 
-function Timeline({ claim, source }: { readonly claim: Claim; readonly source: EvalSource }) {
+/**
+ * The number's timeline, for a SCORED claim only (one with the held-out run's record): three steps that cannot contradict each
+ * other. A recorded count or an analysis has no scoring run, so it has no timeline (its story says what it is, in one line).
+ */
+function Timeline({ claim }: { readonly claim: Claim }) {
   const t = useTranslations("judge.proof");
-  const locale = CLAIMS_LOCALE;
-  const kind = claim.kind;
+  const evaluation = claim.proof.evaluation;
+  if (claim.kind !== "scored" || evaluation === undefined) return null;
   const generated = claim.proof.generatedAt;
   const at =
     generated === null
       ? null
-      : new Intl.DateTimeFormat(`${locale}-GB-u-nu-latn`, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(generated));
-
+      : new Intl.DateTimeFormat(`${CLAIMS_LOCALE}-GB-u-nu-latn`, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(generated));
   const steps = [
-    { id: "forecast", note: kind === "analysis" ? t("notes.notAForecast") : t("notes.forecastAhead") },
-    {
-      id: "protocol",
-      note: kind === "scored" ? (claim.proof.evaluation === undefined ? t("notes.protocolDev") : t("notes.protocolCommitted", { commit: claim.proof.evaluation.protocolCommit.slice(0, 7) })) : kind === "forecast" ? t("notes.noProtocolForecast") : t("notes.noProtocolAnalysis"),
-    },
-    {
-      id: "run",
-      note:
-        kind !== "scored"
-          ? t("notes.runNotScoring")
-          : source === "2026"
-            ? t("notes.runScored")
-            : source === "synthetic-shape"
-              ? t("notes.runSynthetic")
-              : t("notes.runDev"),
-    },
+    { id: "plan", note: t("notes.planLocked", { commit: evaluation.protocolCommit.slice(0, 7) }) },
+    { id: "run", note: t("notes.runScored") },
     { id: "shown", note: t("notes.shown") },
   ] as const;
 
   return (
-    <section aria-labelledby="timeline-heading" className="flex flex-col gap-3">
+    <section aria-labelledby="timeline-heading" className="flex flex-col gap-3 px-4 pb-4" data-timeline-section="">
       <h2 id="timeline-heading" className="font-display text-lg font-medium">
         {t("timelineHeading")}
       </h2>
-      <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-2" data-timeline="">
+      <ol className="grid gap-x-8 gap-y-5 sm:grid-cols-3" data-timeline="">
         {steps.map((step, index) => (
           <li key={step.id} data-step={step.id} className="flex flex-col gap-1 border-t border-edge pt-3">
             <span className="text-sm text-ink-3 tabular-nums">{index + 1}</span>
             <span className="text-base font-medium text-ink">{t(`timeline.${step.id}`)}</span>
             <span className="max-w-(--measure) text-sm text-ink-2">{step.note}</span>
-            {step.id === "run" && kind === "scored" && at !== null ? (
+            {step.id === "run" && at !== null ? (
               <time dateTime={generated ?? undefined} className="text-sm text-ink tabular-nums">
                 {at}
               </time>

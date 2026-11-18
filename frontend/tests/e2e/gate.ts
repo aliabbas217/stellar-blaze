@@ -41,18 +41,13 @@ export type HeroKey = {
   readonly state: "today-live" | "today-personal" | "today-partial" | "today-not-live" | "alert" | "unwell" | "crews" | "plan";
 };
 export const RECORDED_HERO_EXCEPTIONS: Readonly<Record<string, number>> = {
-  // Today with a profile on the phone, Urdu, 390 x 844 (worker-today-notlive.spec.ts). With the real Urdu copy (F2 Task 22) the "your own
-  // level is higher" line (18 px at the Urdu leading of 2.5, 45 px) and, in the partial state, the three-line "not available" banner stand
-  // above the spine. Measured 2026-11-16: personal 30.2 % (was 35.5 % with English text in the Urdu catalogue), partial 23.0 % (was 28.3 %).
-  // Level-word trim 0.75 em -> 0.5 em (the Nastaliq face now draws the word: "orange" ran 20 px into the kicker row at 0.75): 3.8 points less on
-  // the first screen. Measured 2026-11-16: live 33.2 %, personal 26.4 %, partial 19.2 %.
-  "today-live:ur": 0.332,
-  "today-personal:ur": 0.264,
-  "today-partial:ur": 0.192,
-  // Arabic, Today with a profile and the risk policy down (the three-line "not available" banner above the spine), measured in fix round 1
-  // (the first time hero-share.spec.ts measured personal and partial outside Urdu). The reviewer's estimate was 32 %. Hindi, Bengali and
-  // Nepali measure 35.1 % (above the floor by 0.1 point, so they are not exceptions, but one more line of copy there makes them one).
-  "today-partial:ar": 0.328,
+  // EMPTY since the Today restructure (redesign S5, 2026-11-18). The four exceptions that stood here (Urdu Today live 33.2 %, personal
+  // 26.4 %, partial 19.2 %, and Arabic partial 32.8 %) were recorded because the 76 px (64 px in Arabic script) level word and the
+  // vertical spine left too little of the first fold to the hero in the languages with the tallest line heights. Today's hero is now the
+  // level card (the 28 px action sentence, the 32 px level word and its scale) together with the full-width shift strip: measured at
+  // 390 x 844 on 2026-11-18, every Today state in every locale is at least 58.2 % (today-live: en 59.1, ar 67.9, ur 75.4, hi 64.3, bn 69.3,
+  // ne 69.3; today-personal: 66.9 to 82.1; today-partial: en 59.1, ar 67.9, ur 69.9; today-not-live, whose hero is the protective-plan
+  // lead: en 58.2, ar 62.7, ur 70.4, hi 64.5, bn 78.0, ne 69.4). An entry is added again only with a measured number and a reason.
 };
 export const RECORDED_HERO_TOLERANCE = 0.01;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { applyRouteTheme, setTheme } from "@/lib/sun/route-theme";
 
 /**
@@ -15,23 +15,14 @@ import { applyRouteTheme, setTheme } from "@/lib/sun/route-theme";
  *
  * A page with neither shell (landing, offline) is covered by the field shell's unmount, which puts night back (FieldShell.tsx).
  *
- * The attribute on `<html>` is the one source of truth, and SunToggle reads it during render. After each application the
- * shell is rendered again so the toggle (a child) reads the current value.
+ * The attribute on `<html>` is the one source of truth for what is showing; nothing renders from it (the settings sheet's
+ * "Screen colors" reads the stored choice when it opens), so applying the theme needs no render.
  */
 export function useRouteTheme(kind: "route" | "desk"): void {
   const pathname = usePathname();
-  const [, rerender] = useState(0);
 
   useEffect(() => {
-    let current = true;
-    const settled = kind === "desk" ? Promise.resolve(setTheme("night")) : applyRouteTheme(pathname);
-    void settled.then(() => {
-      // Always, not only when the attribute changed: on a full load the inline script set it before React hydrated, and a
-      // child that rendered the server's "night" (SunToggle) must read the real value, which only a render does.
-      if (current) rerender((count) => count + 1);
-    });
-    return () => {
-      current = false;
-    };
+    if (kind === "desk") setTheme("night");
+    else void applyRouteTheme(pathname);
   }, [kind, pathname]);
 }

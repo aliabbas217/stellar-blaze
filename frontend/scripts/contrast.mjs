@@ -7,7 +7,7 @@
 // disagreement instead of two copies of the same error.
 //
 // Usage: node scripts/contrast.mjs          the markdown table (commit the output to docs/design/f2/gate/tokens/contrast.txt)
-//        node scripts/contrast.mjs --json   { night|sun: { token: { ground|panel: ratio } } }
+//        node scripts/contrast.mjs --json   { night|sun: { token: { ground|panel: ratio } }, states: { night|sun: { state: ratio } } }
 // Exit code 1 if a pair is below its floor (4.5 text, 3 graphics).
 import { readFileSync } from "node:fs";
 
@@ -70,6 +70,64 @@ const GROUNDS = ["ground", "panel"];
 const TEXT = ["ink", "ink-2", "ink-3", "signal"];
 const GRAPHIC = ["edge", "focus", "lv-green", "lv-amber", "lv-orange", "lv-red"];
 
+// ---------- control states: the fills of hover, pressed and busy ----------
+// `color-mix(in oklch, A, B p%)`: a linear mix of the oklch components, hue along the shorter arc (CSS Color 4). Both fills of every
+// control state must still meet 4.5:1 against the control's text, so the mixes are computed here from the --mix-* tokens.
+const oklchOf = (value) => {
+  const m = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(value);
+  if (!m) throw new Error(`not an oklch() value: ${value}`);
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+};
+const primitiveOf = (theme, name) => {
+  const ref = /^var\(--([\w-]+)\)$/.exec(theme[name] ?? "")?.[1];
+  const value = ref === undefined ? undefined : primitives[ref];
+  if (value === undefined) throw new Error(`--${name} does not resolve to a primitive`);
+  return value;
+};
+function mixRgb(theme, base, other, percentToken) {
+  const p = Number(/^([\d.]+)%$/.exec(primitives[percentToken] ?? "")?.[1]) / 100;
+  if (Number.isNaN(p)) throw new Error(`--${percentToken} is not a percentage`);
+  const [L1, C1, h1] = oklchOf(primitiveOf(theme, base));
+  const [L2, C2, h2] = oklchOf(primitiveOf(theme, other));
+  let dh = h2 - h1;
+  if (dh > 180) dh -= 360;
+  if (dh < -180) dh += 360;
+  const h = (h1 + dh * p + 360) % 360;
+  return oklchToRgb(`oklch(${L1 + (L2 - L1) * p} ${C1 + (C2 - C1) * p} ${h})`);
+}
+const composite = (fg, bg, alpha) => fg.map((v, i) => Math.round(v * alpha + bg[i] * (1 - alpha)));
+// [label, text token, fill: [base, mixed-in, percentage token] | token]
+const STATES = [
+  ["primary hover", "on-signal", ["signal", "ink", "mix-primary-hover"]],
+  ["primary pressed", "on-signal", ["signal", "ink", "mix-primary-press"]],
+  ["secondary hover", "ink", ["raised", "ink", "mix-secondary-hover"]],
+  ["secondary pressed", "ink", ["raised", "ink", "mix-secondary-press"]],
+  ["quiet hover", "ink", ["ground", "ink", "mix-quiet-hover"]],
+  ["stop hover", "ground", ["ink", "ground", "mix-stop-hover"]],
+  ["stop pressed", "ground", ["ink", "ground", "mix-stop-press"]],
+];
+const stateRatios = {};
+for (const [themeName, theme] of Object.entries(themes)) {
+  stateRatios[themeName] = {};
+  for (const [label, text, [base, other, token]] of STATES) {
+    stateRatios[themeName][label] = ratio(luminance(rgbOf(theme, text)), luminance(mixRgb(theme, base, other, token)));
+  }
+  // busy: the whole control drops to 85 % opacity over the ground, text and fill alike
+  const ground = rgbOf(theme, "ground");
+  stateRatios[themeName]["primary busy (85 % opacity)"] = ratio(
+    luminance(composite(rgbOf(theme, "on-signal"), ground, 0.85)),
+    luminance(composite(rgbOf(theme, "signal"), ground, 0.85)),
+  );
+  stateRatios[themeName]["secondary busy (85 % opacity)"] = ratio(
+    luminance(composite(rgbOf(theme, "ink"), ground, 0.85)),
+    luminance(composite(rgbOf(theme, "raised"), ground, 0.85)),
+  );
+  stateRatios[themeName]["stop busy (85 % opacity)"] = ratio(
+    luminance(composite(rgbOf(theme, "ground"), ground, 0.85)),
+    luminance(composite(rgbOf(theme, "ink"), ground, 0.85)),
+  );
+}
+
 const ratios = {};
 for (const [themeName, theme] of Object.entries(themes)) {
   ratios[themeName] = {};
@@ -84,7 +142,7 @@ for (const [themeName, theme] of Object.entries(themes)) {
 }
 
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify(ratios, null, 2));
+  console.log(JSON.stringify({ ...ratios, states: stateRatios }, null, 2));
   process.exit(0);
 }
 
@@ -108,7 +166,22 @@ console.log("");
 console.log(`on-signal on signal: night ${f2(ratios.night["on-signal"].ground)}, sun ${f2(ratios.sun["on-signal"].ground)} (floor 4.5)`);
 console.log(`focus ring on ground / panel: night ${pair("night", "focus")}, sun ${pair("sun", "focus")} (floor 3.0)`);
 
+console.log("");
+console.log("| Control state (text on fill) | Night | Sun | Floor |");
+console.log("|---|---|---|---|");
+for (const label of Object.keys(stateRatios.night)) {
+  console.log(`| ${label} | ${f2(stateRatios.night[label])} | ${f2(stateRatios.sun[label])} | 4.5 |`);
+}
+
 let failed = 0;
+for (const [themeName, perState] of Object.entries(stateRatios)) {
+  for (const [label, value] of Object.entries(perState)) {
+    if (value < 4.5) {
+      failed++;
+      console.error(`BELOW FLOOR: ${themeName} ${label} is ${f2(value)} (floor 4.5)`);
+    }
+  }
+}
 for (const [themeName, perToken] of Object.entries(ratios)) {
   for (const [token, perGround] of Object.entries(perToken)) {
     const floor = GRAPHIC.includes(token) ? 3 : 4.5;

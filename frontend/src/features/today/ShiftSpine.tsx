@@ -9,19 +9,32 @@ import { formatMonthDay } from "@/features/today/schedule";
 import { dirFor } from "@/i18n/direction";
 
 /*
- * The hero of Today: the shift as a vertical time spine (the heat level in each hour's cell, the recessed slot only where the
- * midday break is in force, the line at now), with the waypoints worded. The spine is the biggest thing on the screen on
- * purpose (`data-hero`: at least 35 % of the first fold, the design gate) while the forecast is live. In a not-live state the
- * protective-plan lead above it is the hero (ProtectiveLead.tsx) and the spine keeps its place without the attribute.
+ * The shift of Today as one horizontal strip across the full width of the phone (redesign S5, 04 section 3.2): the heat level in
+ * each hour's cell, the recessed slot only where the midday break is in force, the line at now with its label above it, the hour
+ * ticks below. In Arabic and Urdu the strip mirrors (time flows in the reading direction, as TimeSpine does).
+ *
+ * Only "Now" is drawn on the strip; the rest of the day's waypoints (the break, back to work, the shift's end, or why there is no
+ * break) are ONE plain line under it, so the strip stays as short as the horizontal spine is and the line reads in one glance.
+ * The spoken description (the image's accessible name) still carries every waypoint. The slot's own label is off: the line says when the
+ * break starts and ends, and the recessed slot is still drawn where the break is in force.
+ *
+ * The strip is the second half of the hero while the forecast is live (TodayView puts `data-hero` around the level card and this
+ * strip together). In a not-live state the protective-plan lead above is the hero (ProtectiveLead.tsx) and the strip keeps its place.
  */
 
-/** One text row of the spine, as TimeSpine sets it (the 16 px field label at the locale's line height). */
-const SPINE_ROW = "calc(var(--t-16) * var(--sign-leading-text, var(--leading-body)))";
+/** One text row of the strip (the 16 px field label at the locale's line height). */
+const ROW = "calc(var(--t-16) * var(--sign-leading-text, var(--leading-body)))";
 
-/** The height of a spine of `hours` hours: two rows per hour plus the one the last waypoint hangs into, and its top padding. */
-export function spineHeight(hours: number): string {
-  return `calc(${SPINE_ROW} * ${String(hours * 2 + 1)} + var(--s-3))`;
-}
+/** A 14 px line (the strip's heading and its plain line) at the locale's line height. */
+const SMALL_ROW = "var(--t-14) * var(--sign-leading-text, var(--leading-body))";
+
+/**
+ * The height the strip reserves while the forecast loads: the heading line, the spine (its padding, the "Now" row, the band with its
+ * overhang, the tick row) and the one plain line, with the gaps between them. A line
+ * that wraps still grows it past this floor, as in every sign of the screen.
+ */
+export const SHIFT_STRIP_HEIGHT =
+  `calc(${SMALL_ROW} * 2 + ${ROW} + var(--s-12) + var(--s-3) * 4 + var(--t-16) * 1.5 + var(--s-2) * 2 + var(--s-1))` as const;
 
 export function ShiftSpine({ description }: { readonly description: TodayDescription }) {
   const t = useTranslations("worker.today.spine");
@@ -41,31 +54,41 @@ export function ShiftSpine({ description }: { readonly description: TodayDescrip
           ? undefined
           : t("noBreakUntil", { date: banNote.resumes });
 
-  const waypoints = description.waypoints.map((spec): SpineWaypoint => {
+  const all = description.waypoints.map((spec): SpineWaypoint & { readonly kind: (typeof description.waypoints)[number]["kind"] } => {
     switch (spec.kind) {
       case "now":
-        return { at: spec.at, title: t("now") };
+        return { kind: spec.kind, at: spec.at, title: t("now") };
       case "breakIn":
-        return { at: spec.at, title: t("breakIn", { duration: ageLabel(spec.minutes * 60_000) }) };
+        return { kind: spec.kind, at: spec.at, title: t("breakIn", { duration: ageLabel(spec.minutes * 60_000) }) };
       case "backToWork":
-        return { at: spec.at, title: t("backToWork", { time: isolateTime(formatClock(spec.at)) }) };
+        return { kind: spec.kind, at: spec.at, title: t("backToWork", { time: isolateTime(formatClock(spec.at)) }) };
       case "shiftEnds":
-        return { at: spec.at, title: t("shiftEnds", { time: isolateTime(formatClock(spec.at)) }) };
+        return { kind: spec.kind, at: spec.at, title: t("shiftEnds", { time: isolateTime(formatClock(spec.at)) }) };
       case "noBreak":
-        return noBreak === undefined ? { at: spec.at } : { at: spec.at, detail: noBreak };
+        return noBreak === undefined ? { kind: spec.kind, at: spec.at } : { kind: spec.kind, at: spec.at, detail: noBreak };
     }
   });
 
-  const spoken = waypoints
+  const spoken = all
     .map((waypoint) => [waypoint.title, waypoint.detail].filter((part) => part !== undefined).join(", "))
     .filter((part) => part !== "")
     .join(". ");
   const aria = t("aria", { from: formatClock(from), to: formatClock(to), waypoints: spoken });
 
+  // The strip carries "Now" alone; everything else is the line under it, as separate phrases (no punctuation to localise).
+  const onStrip = all.filter((waypoint) => waypoint.kind === "now").map(({ at, title }): SpineWaypoint => (title === undefined ? { at } : { at, title }));
+  const line = all
+    .filter((waypoint) => waypoint.kind !== "now")
+    .map((waypoint) => waypoint.title ?? waypoint.detail)
+    .filter((phrase): phrase is string => phrase !== undefined);
+
   return (
-    <section {...(description.notLive ? {} : { "data-hero": "" })} aria-label={heading} className="px-2">
+    <section aria-labelledby="shift-strip" className="flex flex-col">
+      <h2 id="shift-strip" className="px-4 text-sm leading-(--sign-leading-text) font-medium text-ink-3">
+        {heading}
+      </h2>
       <TimeSpine
-        orientation="v"
+        orientation="h"
         surface="field"
         dir={dirFor(locale)}
         from={from}
@@ -73,9 +96,17 @@ export function ShiftSpine({ description }: { readonly description: TodayDescrip
         cells={description.cells}
         now={description.nowHour}
         ban={ban}
-        waypoints={waypoints}
+        waypoints={onStrip}
         aria={aria}
+        slotLabel={false}
       />
+      {line.length === 0 ? null : (
+        <p data-shift-line="" className="mt-1 flex flex-wrap gap-x-3 px-4 text-sm leading-(--sign-leading-text) text-ink-2">
+          {line.map((phrase) => (
+            <span key={phrase}>{phrase}</span>
+          ))}
+        </p>
+      )}
     </section>
   );
 }
