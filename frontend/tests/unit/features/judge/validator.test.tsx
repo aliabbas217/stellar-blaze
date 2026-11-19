@@ -20,6 +20,8 @@ import { renderWithIntl } from "../../../utils/intl";
  * roster the validator cannot read is told per line, and the page never sends by itself.
  */
 
+// every test here waits for the lazy island once, so the file's own ceiling sits above that wait
+vi.setConfig({ testTimeout: 20_000 });
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -57,7 +59,8 @@ function renderTry(run: typeof recorded | null = recorded) {
  */
 async function warmed(user: ReturnType<typeof userEvent.setup>, label: string): Promise<HTMLElement> {
   await user.click(screen.getByRole("button", { name: /^Common roster/ }));
-  await screen.findByText("Mussafah M-14 yard (synthetic)");
+  // the island is a lazy chunk: on a loaded CPU (a parallel full suite) its import can take longer than the 1 s default
+  await screen.findByText("Mussafah M-14 yard (synthetic)", undefined, { timeout: 10_000 });
   const field = screen.getByLabelText(label);
   await user.click(field);
   return field;
