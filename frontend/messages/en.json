@@ -1892,7 +1892,8 @@
         "allAbove": "From {from} to {to} every cell is above it.",
         "hottest": "Hottest grid cell at {hour}.",
         "where": "{lat} N, {lon} E.",
-        "station": "{station} airport forecast at {hour}."
+        "station": "{station} airport forecast at {hour}.",
+        "summary": "The forecast on the map, in three steps"
       },
       "hero": {
         "primary": "See how it works",
