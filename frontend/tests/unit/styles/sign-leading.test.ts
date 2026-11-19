@@ -60,15 +60,11 @@ describe("the sign's language-aware leading", () => {
     expect(token("--leading-ar")).toBe(1.8);
   });
 
-  it("the landing's h1 and the chapter headings read it (the hero's own h1, and one shared heading class for the chapters), and no other file moved to it", () => {
-    const dir = path.resolve(import.meta.dirname, "../../../src/features/judge/landing");
-    const landing = readFileSync(path.join(dir, "LandingView.tsx"), "utf8");
-    const chapters = readFileSync(path.join(dir, "LandingChapters.tsx"), "utf8");
-    expect(landing.match(/leading-\(--sign-leading-display\)/g)?.length).toBe(1);
-    expect(chapters.match(/leading-\(--sign-leading-display\)/g)?.length).toBe(1);
-    // every chapter heading takes that one class, not a leading of its own
-    expect(chapters.match(/className=\{HEADING\}/g)?.length).toBe(4);
-    expect(landing + chapters).not.toContain("leading-(--sign-leading-word)");
+  it("the landing's display type (the h1, the h2s, the level words and the door titles) reads it from landing.css, and no display rule keeps a fixed line height", () => {
+    const css = readFileSync(path.resolve(import.meta.dirname, "../../../src/styles/landing.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    // 1.04 only as the fallback of the token: h1, h2, h3-less display rules (.lv, .door b) all go through var(--sign-leading-display, 1.04)
+    expect(css.match(/line-height: var\(--sign-leading-display, 1\.04\)/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(css).not.toMatch(/line-height: 1\.04/);
   });
 
   it("matches the line height the page itself uses for the language", () => {

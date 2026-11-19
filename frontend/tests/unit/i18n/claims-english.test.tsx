@@ -53,8 +53,9 @@ describe("claims blocks are English and left to right", () => {
   it("the replay layout wraps the judge pages in it, and the landing marks its story chapters as one English block", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/[locale]/(judge)/replay/layout.tsx"), "utf8");
     expect(layout).toMatch(/<ClaimsEnglish>\{children\}<\/ClaimsEnglish>/);
-    const chapters = readFileSync(join(process.cwd(), "src/features/judge/landing/LandingChapters.tsx"), "utf8");
-    expect(chapters, "judge.landing.story.* is Tier 2: the chapters are lang=en dir=ltr").toMatch(/<div {...CLAIMS_ENGLISH} data-claims-english="" data-landing-chapters=""/);
+    const chapters = readFileSync(join(process.cwd(), "src/features/judge/landing/LandingSlides.tsx"), "utf8");
+    expect(chapters, "judge.landing.story.* is Tier 2: the story slides are lang=en dir=ltr").toMatch(/const CLAIMS = \{ \.\.\.CLAIMS_ENGLISH, "data-claims-english": "" \} as const;/);
+    expect(chapters.match(/\{\.\.\.CLAIMS\}/g)?.length, "six slides carry it, 'Ways in' does not").toBe(6);
   });
 
   it("the proof chip and the proof drawer (judge.proof, states.proof) are English blocks wherever they are mounted", () => {

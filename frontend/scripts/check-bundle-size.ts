@@ -16,7 +16,7 @@
 //  - `/worker/alert` (the static alert-card shell) is covered too (architect, 2026-11-15, afternoon). The covered routes are exactly
 //    /worker, /worker/alerts, /worker/alert, /supervisor and /supervisor/crews/[crewId]; there is no "pending" class any more: every
 //    route either meets its ceiling or fails the build. `/worker/unwell` and every other route stay at 174,080 B.
-//  - the landing's lazy 3D scene (Part L1 I3, the landing review): the scene chunk and the terrain worker's chunks load after first
+//  - the landing's lazy 3D scene (Part L1 I3, the landing review): the scene chunk and the chunks it imports load after first
 //    paint and are not in any route's first-load list, so the first-load check cannot see them. They are gated here on their own:
 //    22 KB gzip, 22,528 B (`SCENE_CEILING`; ADR 0037's scene budget), found in the build output by the worker URL the scene chunk
 //    carries, never by a hashed file name, and failing when they cannot be found (a Turbopack change must not drop the gate silently).
@@ -90,8 +90,11 @@ export function vacuity(stats: readonly RouteStats[], rows: readonly RouteVerdic
   return problems;
 }
 
-/** What Turbopack writes in the page-side scene chunk for `new Worker(new URL("./terrain.worker.ts", ...))`. */
-const SCENE_MARKER = "terrain.worker.";
+/**
+ * A string only the landing's WebGL scene module (landing-scene.ts) contains: the name of the extension it asks the context for. The scene is one lazy
+ * chunk (plus whatever it imports); it has no worker any more, so a worker bootstrap, when a build names one, is counted and none is not an error.
+ */
+const SCENE_MARKER = "OES_standard_derivatives";
 const WORKER_ENTRY = /\.f\("(static\/chunks\/turbopack-worker-[^"]+\.js)",\[([^\]]*)\]\)/;
 
 export interface SceneFound {
@@ -116,14 +119,11 @@ export function lazyScene(
 ): SceneFound {
   const problems: string[] = [];
   const scene = files.filter((file) => read(file)?.includes(SCENE_MARKER) === true);
-  if (scene.length === 0) return { chunks: [], size: 0, problems: [`no chunk references the terrain worker (\`${SCENE_MARKER}\`): the scene was renamed, or the build no longer emits it`] };
+  if (scene.length === 0) return { chunks: [], size: 0, problems: [`no chunk references the WebGL scene (\`${SCENE_MARKER}\`): the scene was renamed, or the build no longer emits it`] };
   const named = new Set<string>(scene);
   for (const file of scene) {
     const entry = WORKER_ENTRY.exec(read(file) ?? "");
-    if (entry === null) {
-      problems.push(`${file} names no worker bootstrap (turbopack-worker-*.js): the worker output shape changed`);
-      continue;
-    }
+    if (entry === null) continue; // the scene is one chunk with no worker
     named.add(entry[1] ?? "");
     for (const dep of (entry[2] ?? "").matchAll(/"([^"]+)"/g)) named.add(dep[1] ?? "");
   }

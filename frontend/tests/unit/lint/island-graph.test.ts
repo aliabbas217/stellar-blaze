@@ -107,50 +107,35 @@ describe("the first-load graph of the judge pages that call the API", () => {
   });
 });
 
-// The landing page (`/[locale]`) is static and public: no TanStack Query and no provider at first load, and the live field is
-// a separate chunk the page brings in after first paint (features/judge/landing/FieldGate.tsx), never part of the first load.
+// The landing page (`/[locale]`) is static and public: no TanStack Query and no provider at first load, and the WebGL scene is
+// a separate chunk the stage brings in after first paint (features/judge/landing/ForecastStage.tsx), never part of the first load.
 const LANDING = join(SRC, "app/[locale]/page.tsx");
 const LANDING_DIR = join(SRC, "features/judge/landing");
 
 describe("the first-load graph of the landing page", () => {
-  it("is not vacuous: the page and the gate exist", () => {
+  it("is not vacuous: the page, the stage and the scene exist", () => {
     expect(existsSync(LANDING)).toBe(true);
-    expect(existsSync(join(LANDING_DIR, "FieldGate.tsx"))).toBe(true);
+    expect(existsSync(join(LANDING_DIR, "ForecastStage.tsx"))).toBe(true);
+    expect(existsSync(join(LANDING_DIR, "landing-scene.ts"))).toBe(true);
   });
 
   it("reaches no @tanstack/*, query provider or demo context from the locale layout and the page", () => {
     expect(firstLoadViolation([join(SRC, "app/[locale]/layout.tsx"), LANDING])).toBeNull();
   });
 
-  it("reaches the live field (canvas, scrubber, island) only through a dynamic import", () => {
-    const gate = readFileSync(join(LANDING_DIR, "FieldGate.tsx"), "utf8");
-    expect(valueImports(gate)).toContain("./FieldIsland");
-    expect(staticImports(gate)).not.toContain("./FieldIsland");
-    // nothing else on the page imports the island or the canvas statically
+  it("reaches the WebGL scene only through a dynamic import, from the stage and nowhere else", () => {
+    const stage = readFileSync(join(LANDING_DIR, "ForecastStage.tsx"), "utf8");
+    expect(valueImports(stage)).toContain("./landing-scene");
+    expect(staticImports(stage)).not.toContain("./landing-scene");
     const view = readFileSync(join(LANDING_DIR, "LandingView.tsx"), "utf8");
-    for (const heavy of ["./FieldIsland", "./FieldCanvas2D", "./FieldCanvasGL", "./terrain.worker"]) expect(staticImports(view)).not.toContain(heavy);
-    expect(staticImports(readFileSync(LANDING, "utf8"))).not.toContain("@/features/judge/landing/FieldIsland");
-  });
-
-  it("keeps the WebGL scene and its worker on the landing route: nothing outside the landing feature imports them, and inside it only FieldIsland does, dynamically", () => {
-    // An IMPORT (or a worker started by URL) of the scene, the worker or the terrain maths: a comment that names them (the
-    // service worker's worker-scripts.ts explains the terrain worker) is not a dependency on them.
-    const SCENE = /FieldCanvasGL|terrain\.worker|terrain-math/;
+    expect(staticImports(view)).not.toContain("./landing-scene");
+    expect(staticImports(readFileSync(LANDING, "utf8"))).not.toContain("@/features/judge/landing/landing-scene");
+    // nothing outside the landing feature imports the scene, and inside it only the stage does
     const importers = [...ALL].filter((file) => {
-      if (file.startsWith(LANDING_DIR) || file.includes("tests")) return false;
-      const source = readFileSync(file, "utf8");
-      const byUrl = [...source.matchAll(/new URL\(\s*["']([^"']+)["']/g)].map((m) => m[1] ?? "");
-      return [...valueImports(source), ...byUrl].some((spec) => SCENE.test(spec));
+      if (file.includes("tests")) return false;
+      return valueImports(readFileSync(file, "utf8")).some((spec) => /landing-scene/.test(spec));
     });
-    expect(importers.map(rel)).toEqual([]);
-    const gl = [...ALL].filter((file) => file.startsWith(LANDING_DIR) && /import\(\s*["']\.\/FieldCanvasGL["']\s*\)|from\s*["']\.\/FieldCanvasGL["']/.test(readFileSync(file, "utf8")));
-    // FieldIsland imports it (dynamically) and FieldCanvas2D-free files only type-import it
-    expect(gl.map(rel)).toContain("features/judge/landing/FieldIsland.tsx");
-    const island = readFileSync(join(LANDING_DIR, "FieldIsland.tsx"), "utf8");
-    expect(staticImports(island)).not.toContain("./FieldCanvasGL");
-    expect(valueImports(island)).toContain("./FieldCanvasGL");
-    // the worker is started by URL, not imported
-    expect(valueImports(readFileSync(join(LANDING_DIR, "FieldCanvasGL.tsx"), "utf8"))).not.toContain("./terrain.worker");
+    expect(importers.map(rel)).toEqual(["features/judge/landing/ForecastStage.tsx"]);
   });
 
   it("fails on the leak it guards: a provider imported by the landing page", () => {
