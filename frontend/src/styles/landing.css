@@ -17,7 +17,7 @@
 .lp { background: var(--ground); color: var(--ink); font: 400 16px/1.5 var(--font); font-variant-numeric: tabular-nums; padding-inline-start: var(--rail); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; flex: 1 0 auto; }
 .lp ul, .lp ol { list-style: none; padding: 0; }
 .lp button { font: inherit; color: inherit; }
-.lp a { color: inherit; text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
+.lp a { color: inherit; text-decoration-line: underline; text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
 .lp a:focus-visible, .lp .scrub:focus-within { outline: 2px solid var(--signal); outline-offset: 2px; }
 .lp .scrub:focus-within { outline-offset: -2px; }
 .lp h1, .lp h2, .lp h3 { font-weight: 500; }
@@ -61,10 +61,11 @@
 .lp .clock { text-align: end; }
 .lp .clock span { display: block; font: 500 24px/1 var(--mono); letter-spacing: -0.02em; }
 .lp .clock small { display: block; margin-top: 6px; font: 12px/1 var(--mono); color: var(--ink-3); }
-.lp .mapwrap { position: relative; min-height: 0; overflow: hidden; }
+.lp .body { position: relative; min-height: 0; }
+.lp .mapwrap { position: absolute; inset: 0; overflow: hidden; }
 .lp .mapwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .lp .labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.lp .txt { position: absolute; inset-block: 0; inset-inline-start: 0; width: 37.5%; padding-block: 0; padding-inline: var(--pad) 24px; background: var(--ground-deep); border-inline-end: 1px solid var(--hair); }
+.lp .txt { position: absolute; z-index: 1; inset-block: 0; inset-inline-start: 0; width: 37.5%; padding-block: 0; padding-inline: var(--pad) 24px; background: var(--ground-deep); border-inline-end: 1px solid var(--hair); }
 .lp .s { position: absolute; inset-block: 0; inset-inline: var(--pad) 24px; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transform: translateY(12px); transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), visibility 0s 0.35s; }
 .lp .s0 { justify-content: center; }
 .lp .s1, .lp .s2, .lp .s3 { justify-content: flex-end; padding-bottom: 32px; }
@@ -260,12 +261,13 @@
   .lp .inst { height: auto; }
   .lp .ih, .lp .ik { grid-template-columns: minmax(0, 1fr); }
   .lp .ihr { padding-inline-start: 0; margin-top: 12px; }
+  .lp .body { display: flex; flex-direction: column; }
   .lp .txt { position: static; width: auto; padding: 32px var(--pad); }
   .lp .s { position: static; opacity: 1; visibility: visible; transform: none; display: none; }
   .lp .s0 { display: flex; }
   .lp .ikr, .lp .ik .attr { padding-inline-start: 0; grid-column: auto; }
   .lp .dayrule { display: none; }
-      .lp .mapwrap { aspect-ratio: 4 / 3; }
+  .lp .mapwrap { position: relative; inset: auto; aspect-ratio: 4 / 3; }
   .lp .g > .c-a, .lp .g > .c-b, .lp .g.two > .c-a, .lp .g.two > .c-b { grid-column: 1 / -1; }
   .lp .g > .c-b { margin-top: 24px; }
   .lp .states { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -348,19 +350,16 @@
 .lp .vid-icon { margin-inline-end: 10px; flex: none; }
 .lp button.btn { border: 0; cursor: pointer; }
 .lp a.btn, .lp .door a { text-decoration-line: none; }
-/* the stage when the scene is not running (reduced motion, save-data, no WebGL): a plain column with the still image, like a narrow screen */
+/* the stage when the scene is not running (reduced motion, save-data, no WebGL): not pinned, the still image where the canvas would be.
+   Under 1100 px it is the plain column of a narrow screen (rules above); from 1100 px it keeps the hero's two columns, one screen high,
+   with the image on the map side and no hour rule (nothing scrolls the hour). */
 .lp .ch1[data-scene="poster"] { height: auto; }
-.lp .ch1[data-scene="poster"] .stage { position: static; height: auto; }
-.lp .ch1[data-scene="poster"] .inst { height: auto; }
-.lp .ch1[data-scene="poster"] .ih, .lp .ch1[data-scene="poster"] .ik { grid-template-columns: minmax(0, 1fr); }
-.lp .ch1[data-scene="poster"] .ihr { padding-inline-start: 0; margin-top: 12px; }
-.lp .ch1[data-scene="poster"] .txt { position: static; width: auto; padding: 32px var(--pad); border-inline-end: 0; }
-.lp .ch1[data-scene="poster"] .s { position: static; opacity: 1; visibility: visible; transform: none; display: none; }
-.lp .ch1[data-scene="poster"] .s0 { display: flex; }
-.lp .ch1[data-scene="poster"] .ikr, .lp .ch1[data-scene="poster"] .ik .attr { padding-inline-start: 0; grid-column: auto; }
-.lp .ch1[data-scene="poster"] .dayrule { display: none; }
-.lp .ch1[data-scene="poster"] .mapwrap { aspect-ratio: 4 / 3; }
-.lp .ch1[data-scene="poster"] canvas { display: none; }
+.lp .ch1[data-scene="poster"] canvas, .lp .ch1[data-scene="poster"] .dayrule { display: none; }
+@media (min-width: 1100px) {
+  .lp .ch1[data-scene="poster"] .stage { position: static; height: 100svh; }
+  .lp .ch1[data-scene="poster"] .poster { inset-inline-start: 37.5%; width: 62.5%; }
+  .lp .ch1[data-scene="poster"] .ikr { grid-column: 2; }
+}
 /* "Ways in": the four rows share the screen's height, so the nav that holds them is the flex child (the rows sit one level down from the prototype's) */
 @media (min-width: 1100px) and (min-height: 600px) {
   .lp .sl [data-role-door] { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }

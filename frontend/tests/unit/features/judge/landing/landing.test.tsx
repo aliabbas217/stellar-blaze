@@ -7,6 +7,7 @@ import { makeFormat } from "@/features/judge/adapters";
 import { parseHourlySeries } from "@/features/judge/facts";
 import { DATA_MANIFEST } from "@/features/judge/manifest.generated";
 import { buildEvidence } from "@/features/judge/landing/evidence";
+import { HEAT_NUMBER } from "@/features/judge/landing/landing-colour";
 import { LandingView } from "@/features/judge/landing/LandingView";
 import { ROLE_DOOR_DESTINATIONS } from "@/features/judge/landing/role-door-destinations";
 import urMessages from "../../../../../messages/ur.json";
@@ -88,6 +89,21 @@ describe("the landing page: the hero and the rail", () => {
     expect(stage?.querySelectorAll(".chips i")).toHaveLength(5);
     // the limit and the class steps in the legend are the field's own constants, never typed in the markup
     expect([...(stage?.querySelectorAll(".chl span") ?? [])].map((s) => s.textContent)).toEqual(["none", "26.6", "30", "33", "36"]);
+  });
+
+  it("the hero's words are a sibling of the map box, never inside it (a text block inside the positioned map was painted over by the canvas and the still image on narrow screens)", () => {
+    const { container } = view();
+    const body = container.querySelector("#forecast .body");
+    expect(body?.querySelector(":scope > .txt h1")).not.toBeNull();
+    expect(body?.querySelector(":scope > .mapwrap")).not.toBeNull();
+    expect(container.querySelector(".mapwrap .txt")).toBeNull();
+    expect(container.querySelector(".mapwrap h1")).toBeNull();
+  });
+
+  it("the giant caption numbers take the heat colour of the ramp, set once on the page's root from the one constant the scene's shader also reads", () => {
+    const { container } = view();
+    expect(container.querySelector<HTMLElement>(".lp")?.style.getPropertyValue("--heat")).toBe(HEAT_NUMBER);
+    expect(HEAT_NUMBER).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
   });
 
   it("has the seven chapters in order, each slide one screen (`section.sl`) with its own h2, and the rail's seven links point at them", () => {
@@ -328,6 +344,12 @@ describe("the stylesheet (src/styles/landing.css)", () => {
     for (const group of selectors) for (const sel of group.split(",")) expect(sel.trim().startsWith(".lp") || sel.trim().startsWith("html:has(.lp)"), sel.trim()).toBe(true);
     expect(css.match(/scroll-snap-type/g)).toHaveLength(1);
     expect(css).toMatch(/html:has\(\.lp\) \{ scroll-snap-type: y mandatory; \}/);
+  });
+
+  it("links look like links: the app's reset takes the underline off every anchor, so the page's base rule puts it back (the buttons, the door rows and the rail opt out)", () => {
+    expect(css).toMatch(/\.lp a \{[^}]*text-decoration-line: underline/);
+    expect(css).toMatch(/\.lp a\.btn, \.lp \.door a \{ text-decoration-line: none; \}/);
+    expect(css).toMatch(/\.lp \.idx a \{[^}]*text-decoration: none/);
   });
 
   it("snaps only where a hand drives the wheel and motion is not reduced, on a wide and tall screen", () => {

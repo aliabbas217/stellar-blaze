@@ -203,14 +203,9 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
               </p>
             </div>
           </figcaption>
-          <div className="mapwrap">
-            <canvas ref={canvas} aria-hidden="true" />
-            <div ref={labels} className="labels" aria-hidden="true" />
-            {/* eslint-disable-next-line @next/next/no-img-element -- a decorative still of a fixed size from /public, shown only where the scene does not run; the optimizer adds nothing */}
-            {mode === "poster" ? <img className="poster" src={POSTER_SRC} alt="" width={1000} height={751} /> : null}
-            <p role="status" className="sr-only">
-              {mode === "loading" ? t("field.loading") : ""}
-            </p>
+          <div className="body">
+            {/* The text and the map are siblings, not parent and child: on a narrow screen the map is a box in a column under the text, and a
+                text block inside the positioned map box would be painted over by the canvas or the still image (the hero went missing there). */}
             <div className="txt">
               <div className="s s0">{hero}</div>
               <div className="s s1">
@@ -239,6 +234,15 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
                 <p className="sen">{reading === null ? "" : t("scene.station", { station: t("field.stations.OMAA"), hour: hourLabel(hour) })}</p>
                 <p className="sen2" />
               </div>
+            </div>
+            <div className="mapwrap">
+              <canvas ref={canvas} aria-hidden="true" />
+              <div ref={labels} className="labels" aria-hidden="true" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- a decorative still of a fixed size from /public, shown only where the scene does not run; the optimizer adds nothing */}
+              {mode === "poster" ? <img className="poster" src={POSTER_SRC} alt="" width={1000} height={751} /> : null}
+              <p role="status" className="sr-only">
+                {mode === "loading" ? t("field.loading") : ""}
+              </p>
             </div>
           </div>
           <div className="ik">

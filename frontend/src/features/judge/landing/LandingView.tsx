@@ -1,4 +1,5 @@
 import { useLocale, useTranslations } from "next-intl";
+import type { CSSProperties } from "react";
 import { dayFormat } from "@/components/charts/day-format";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
@@ -9,7 +10,7 @@ import { LIMIT_C } from "./field-data";
 import type { FieldHeroData } from "./field-server";
 import { buildEvidence } from "./evidence";
 import { ForecastStage } from "./ForecastStage";
-import { CLASS_STEPS, LEGEND_SWATCHES } from "./landing-colour";
+import { CLASS_STEPS, HEAT_NUMBER, LEGEND_SWATCHES } from "./landing-colour";
 import { LandingEffects } from "./LandingEffects";
 import { LandingRail } from "./LandingRail";
 import { Boundary, EvidenceSlides, Limits, Morning, Plan, WaysIn } from "./LandingSlides";
@@ -84,7 +85,7 @@ export function LandingView({ field, data, dir }: LandingViewProps) {
   );
 
   return (
-    <div className="lp" data-theme="night" data-landing="">
+    <div className="lp" data-theme="night" data-landing="" style={{ "--heat": HEAT_NUMBER } as CSSProperties}>
       <FieldLink
         href="/replay"
         className="sr-only rounded-sign bg-ink px-4 py-3 text-base font-medium text-ground focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50"
