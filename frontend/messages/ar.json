@@ -1606,24 +1606,24 @@
       "skip": "انتقل إلى لوحة النتائج",
       "kicker": "اختُبر على طقس الصيف الماضي الحقيقي في مطار أبوظبي",
       "title": "خطّط لحرارة الغد الليلة.",
-      "lede": "يحوّل Stellar Blaze توقعات اليوم التالي إلى خطة عمل وراحة لكل فريق، وتحذيرًا واضحًا على هاتف كل عامل، بست لغات.",
+      "lede": "خطر الحرارة لا ينتظر استراحة الظهيرة. نتوقعه قبل يوم ونعطي كل فريق خطة وكل عامل تحذيرًا.",
       "door": {
         "label": "لمن هذا؟",
         "worker": {
           "title": "أعمل في موقع",
-          "line": "اطّلع على حرارة اليوم ووقت الراحة. بلا حساب."
+          "line": "أوقات الحرارة والراحة اليوم. بلا حساب."
         },
         "crew": {
           "title": "أدير فريقًا",
-          "line": "اطّلع على خطة الليلة لفرقك. أوقف العمل بلمسة واحدة."
+          "line": "خطة الليلة. أوقف العمل بنقرة واحدة."
         },
         "safety": {
           "title": "أتولى السلامة",
-          "line": "اطّلع على الفرق التي وُضعت خطتها ووُقّعت وتوقف عملها."
+          "line": "أي الفرق خطّطت ووقّعت وأوقفت العمل."
         },
         "review": {
           "title": "أراجع هذا العمل",
-          "line": "جولة من 3 دقائق، ثم جرّب ما تشاء."
+          "line": "جولة مدتها 3 دقائق، ثم جرّب أي شيء."
         },
         "note": "هذا عرض تجريبي. الفرق والأشخاص مختلَقون. لا يحتاج العمال إلى حساب أبدًا."
       },
@@ -1634,7 +1634,7 @@
       },
       "field": {
         "region": "حقل الحرارة المتوقعة فوق الإمارات، {day}",
-        "caption": "الحرارة المتوقعة في أنحاء الإمارات ليوم حار واحد. توضيح فقط، وليس اليوم الذي قيّمناه.",
+        "caption": "رسم توضيحي ليوم حار واحد، وليس اليوم الذي سجّلنا نتيجته.",
         "proofWhat": "حقل الحرارة المتوقعة، {day}، كل ساعة",
         "stations": {
           "OMAA": "أبوظبي",
@@ -1662,7 +1662,12 @@
           "heading": "One sign, one instruction, in the worker's own language.",
           "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
           "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
-          "link": "Open the worker screen"
+          "link": "Open the worker screen",
+          "spine": {
+            "level": "Heat level",
+            "airport": "Abu Dhabi airport forecast",
+            "break": "Midday break"
+          }
         },
         "plan": {
           "eyebrow": "Tonight's plan",
@@ -1685,7 +1690,8 @@
           },
           "stop": "Stop work, Crew A",
           "link": "Open the crews screen",
-          "tag": "Demo"
+          "tag": "Demo",
+          "copy": "Follows the ADOSH heat rules. Stop work in one tap."
         },
         "boundary": {
           "eyebrow": "The boundary",
@@ -1695,7 +1701,17 @@
           "requestDetail": "Individual health data for one worker.",
           "refused": "Refused.",
           "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
-          "link": "See the refusal, recorded"
+          "link": "See the refusal, recorded",
+          "panel": {
+            "asked": "Asked",
+            "refused": "Refused",
+            "seen": "Seen",
+            "refusedLine": "The service holds none.",
+            "seenLine": "Every worker at the site can see it was asked.",
+            "chain": "Each log entry builds on the one before, so a change shows.",
+            "earlier": "earlier",
+            "entry": "entry"
+          }
         },
         "evidence": {
           "eyebrow": "Last summer, replayed",
@@ -1705,17 +1721,73 @@
           "falseAlarms": "False-alarm hours: {n}",
           "verdicts": "How the main checks came out",
           "scoreboard": "See the full scoreboard",
-          "unavailable": "The scored results are not available in this build."
+          "unavailable": "The scored results are not available in this build.",
+          "short": {
+            "body": "Abu Dhabi airport, summer 2026. Forecast made a day ahead.",
+            "caption": "Danger hours not warned about. Shorter is better.",
+            "trade": "Every setting trades missed danger hours against false alarms. You choose where to sit."
+          },
+          "met": "Met",
+          "notMet": "Not met",
+          "noClaim": "We do not claim to beat them.",
+          "headline": {
+            "H4": {
+              "fewer": "fewer danger hours missed than the midday break alone",
+              "more": "more danger hours missed than the midday break alone"
+            },
+            "H5": {
+              "more": "more false-alarm hours than the regulator's own zones.",
+              "fewer": "fewer false-alarm hours than the regulator's own zones."
+            }
+          }
         },
         "limits": {
           "eyebrow": "What this does not show yet",
-          "one": "One test summer and one airport station, not a worksite.",
-          "two": "No worker outcomes. This is not yet a health claim.",
-          "three": "Not yet checked by a clinician. Translations are machine-made.",
-          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "one": "One summer, one airport station.",
+          "two": "No worker outcomes yet.",
+          "three": "No clinician review yet. Translations are machine-made.",
+          "four": "Made-up demo data, hosted in France. Built for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
         }
+      },
+      "hero": {
+        "primary": "اطّلع على طريقة عمله",
+        "skip": "انتقل إلى العرض التجريبي"
+      },
+      "ways": {
+        "heading": "اختر طريقة الدخول"
+      },
+      "video": {
+        "title": "فيديو مدته 3 دقائق",
+        "play": "شغّل الفيديو",
+        "soon": "سيصل فيديونا الذي مدته 3 دقائق إلى هنا في 19 نوفمبر.",
+        "notLoaded": "لا يُحمَّل أي شيء من YouTube حتى تضغط على «شغّل الفيديو»."
+      },
+      "rail": {
+        "label": "الفصول",
+        "forecast": "التوقعات",
+        "morning": "الصباح",
+        "plan": "الخطة",
+        "boundary": "الحدود",
+        "evidence": "الدليل",
+        "ways": "طرق الدخول",
+        "limits": "القيود",
+        "note": "عرض تجريبي. الفرق والأشخاص مختلَقون."
+      },
+      "scene": {
+        "measure": "WBGT, °C",
+        "source": "ECMWF IFS، توقعات قبل يوم، {date}",
+        "limit": "حد العمل الشاق (NIOSH REL) {limit} °C WBGT",
+        "legendNone": "لا شيء",
+        "how": "التضاريس ×{exag}. الخلايا فوق البحر غير ملوّنة.",
+        "howPoster": "الخلايا فوق البحر غير ملوّنة.",
+        "eyebrow": "{hour} / {date}",
+        "cells": "من {total} خلية توقعات فوق حد العمل الشاق البالغ {limit} °C.",
+        "allAbove": "من {from} إلى {to} جميع الخلايا فوق الحد.",
+        "hottest": "أسخن خلية في الشبكة عند {hour}.",
+        "where": "{lat} شمالًا، {lon} شرقًا.",
+        "station": "توقعات مطار {station} عند {hour}."
       }
     },
     "roleEntry": {

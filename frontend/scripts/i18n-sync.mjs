@@ -61,6 +61,8 @@ export const INVARIANT_KEYS = [
   "shell.field.pendingClock",
   "states.stamp.dev2025",
   "judge.landing.phone.site",
+  "judge.landing.scene.measure",
+  "judge.landing.scene.eyebrow",
 ];
 export const INVARIANT_NOTE = "same in every language (a name, a unit or a format)";
 

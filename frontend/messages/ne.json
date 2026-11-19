@@ -1606,24 +1606,24 @@
       "skip": "स्कोरबोर्डमा जानुहोस्",
       "kicker": "गत गर्मीको वास्तविक मौसममा, अबु धाबी विमानस्थलमा परीक्षण गरिएको",
       "title": "भोलिको गर्मीको योजना आज राति नै बनाउनुहोस्।",
-      "lede": "Stellar Blaze ले भोलिको पूर्वानुमानलाई हरेक समूहका लागि काम र आराम योजनामा, र हरेक कामदारको फोनमा सरल चेतावनीमा बदल्छ, छ भाषामा।",
+      "lede": "गर्मीको खतरा दिउँसोको विश्रामको प्रतीक्षा गर्दैन। हामी यसको पूर्वानुमान एक दिन अघि नै गर्छौं र हरेक समूहलाई योजना र हरेक कामदारलाई चेतावनी दिन्छौं।",
       "door": {
         "label": "यो कसका लागि हो?",
         "worker": {
           "title": "म साइटमा काम गर्छु",
-          "line": "आजको गर्मी र आराम गर्ने समय हेर्नुहोस्। कुनै खाता छैन।"
+          "line": "आजको गर्मी र आरामको समय। खाता छैन।"
         },
         "crew": {
           "title": "म एउटा समूह चलाउँछु",
-          "line": "तपाईंका समूहहरूको आज रातिको योजना हेर्नुहोस्। एउटै ट्यापमा काम रोक्नुहोस्।"
+          "line": "आज रातको योजना। एउटै ट्यापमा काम रोक्नुहोस्।"
         },
         "safety": {
           "title": "म सुरक्षा हेर्छु",
-          "line": "कुन समूहको योजना बन्यो, हस्ताक्षर भयो र काम रोकियो भनेर हेर्नुहोस्।"
+          "line": "कुन समूहहरूले योजना बनाए, हस्ताक्षर गरे र काम रोके।"
         },
         "review": {
           "title": "म यसको समीक्षा गर्दैछु",
-          "line": "3 मिनेटको भ्रमण, त्यसपछि जे चाहनुहुन्छ प्रयास गर्नुहोस्।"
+          "line": "3 मिनेटको टुर, त्यसपछि जे पनि प्रयास गर्नुहोस्।"
         },
         "note": "यो एउटा डेमो हो। समूह र मानिसहरू काल्पनिक हुन्। कामदारलाई कहिल्यै खाता चाहिँदैन।"
       },
@@ -1634,7 +1634,7 @@
       },
       "field": {
         "region": "संयुक्त अरब इमिरेट्समाथि अनुमानित गर्मीको क्षेत्र, {day}",
-        "caption": "एक तातो दिनका लागि सम्पूर्ण UAE मा पूर्वानुमानित गर्मी। एउटा उदाहरण, हामीले मूल्यांकन गरेको दिन होइन।",
+        "caption": "एउटा तातो दिनको उदाहरण चित्र, हामीले स्कोर निकालेको दिन होइन।",
         "proofWhat": "अनुमानित गर्मीको क्षेत्र, {day}, हरेक घण्टा",
         "stations": {
           "OMAA": "अबु धाबी",
@@ -1662,7 +1662,12 @@
           "heading": "One sign, one instruction, in the worker's own language.",
           "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
           "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
-          "link": "Open the worker screen"
+          "link": "Open the worker screen",
+          "spine": {
+            "level": "Heat level",
+            "airport": "Abu Dhabi airport forecast",
+            "break": "Midday break"
+          }
         },
         "plan": {
           "eyebrow": "Tonight's plan",
@@ -1685,7 +1690,8 @@
           },
           "stop": "Stop work, Crew A",
           "link": "Open the crews screen",
-          "tag": "Demo"
+          "tag": "Demo",
+          "copy": "Follows the ADOSH heat rules. Stop work in one tap."
         },
         "boundary": {
           "eyebrow": "The boundary",
@@ -1695,7 +1701,17 @@
           "requestDetail": "Individual health data for one worker.",
           "refused": "Refused.",
           "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
-          "link": "See the refusal, recorded"
+          "link": "See the refusal, recorded",
+          "panel": {
+            "asked": "Asked",
+            "refused": "Refused",
+            "seen": "Seen",
+            "refusedLine": "The service holds none.",
+            "seenLine": "Every worker at the site can see it was asked.",
+            "chain": "Each log entry builds on the one before, so a change shows.",
+            "earlier": "earlier",
+            "entry": "entry"
+          }
         },
         "evidence": {
           "eyebrow": "Last summer, replayed",
@@ -1705,17 +1721,73 @@
           "falseAlarms": "False-alarm hours: {n}",
           "verdicts": "How the main checks came out",
           "scoreboard": "See the full scoreboard",
-          "unavailable": "The scored results are not available in this build."
+          "unavailable": "The scored results are not available in this build.",
+          "short": {
+            "body": "Abu Dhabi airport, summer 2026. Forecast made a day ahead.",
+            "caption": "Danger hours not warned about. Shorter is better.",
+            "trade": "Every setting trades missed danger hours against false alarms. You choose where to sit."
+          },
+          "met": "Met",
+          "notMet": "Not met",
+          "noClaim": "We do not claim to beat them.",
+          "headline": {
+            "H4": {
+              "fewer": "fewer danger hours missed than the midday break alone",
+              "more": "more danger hours missed than the midday break alone"
+            },
+            "H5": {
+              "more": "more false-alarm hours than the regulator's own zones.",
+              "fewer": "fewer false-alarm hours than the regulator's own zones."
+            }
+          }
         },
         "limits": {
           "eyebrow": "What this does not show yet",
-          "one": "One test summer and one airport station, not a worksite.",
-          "two": "No worker outcomes. This is not yet a health claim.",
-          "three": "Not yet checked by a clinician. Translations are machine-made.",
-          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "one": "One summer, one airport station.",
+          "two": "No worker outcomes yet.",
+          "three": "No clinician review yet. Translations are machine-made.",
+          "four": "Made-up demo data, hosted in France. Built for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
         }
+      },
+      "hero": {
+        "primary": "यो कसरी काम गर्छ हेर्नुहोस्",
+        "skip": "डेमोमा जानुहोस्"
+      },
+      "ways": {
+        "heading": "आफ्नो बाटो छान्नुहोस्"
+      },
+      "video": {
+        "title": "3 मिनेटको भिडियो",
+        "play": "भिडियो चलाउनुहोस्",
+        "soon": "हाम्रो 3 मिनेटको भिडियो 19 नोभेम्बरमा यहाँ आउँछ।",
+        "notLoaded": "“भिडियो चलाउनुहोस्” थिच्नुअघि YouTube बाट केही पनि लोड हुँदैन।"
+      },
+      "rail": {
+        "label": "अध्याय",
+        "forecast": "पूर्वानुमान",
+        "morning": "बिहान",
+        "plan": "योजना",
+        "boundary": "सीमाना",
+        "evidence": "प्रमाण",
+        "ways": "बाटाहरू",
+        "limits": "सीमाहरू",
+        "note": "डेमो। समूह र मानिसहरू काल्पनिक हुन्।"
+      },
+      "scene": {
+        "measure": "WBGT, °C",
+        "source": "ECMWF IFS, एक दिन अघिको पूर्वानुमान, {date}",
+        "limit": "भारी कामको सीमा {limit} °C WBGT (NIOSH REL)",
+        "legendNone": "कुनै छैन",
+        "how": "उभार ×{exag}। समुद्रमाथिका सेलमा रङ लगाइएको छैन।",
+        "howPoster": "समुद्रमाथिका सेलमा रङ लगाइएको छैन।",
+        "eyebrow": "{hour} / {date}",
+        "cells": "{total} पूर्वानुमान सेलमध्ये भारी कामको {limit} °C सीमाभन्दा माथि छन्।",
+        "allAbove": "{from} देखि {to} सम्म हरेक सेल यसभन्दा माथि छ।",
+        "hottest": "{hour} मा सबैभन्दा तातो ग्रिड सेल।",
+        "where": "{lat} उत्तर, {lon} पूर्व।",
+        "station": "{hour} मा {station} विमानस्थलको पूर्वानुमान।"
       }
     },
     "roleEntry": {
