@@ -1,4 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import ar from "../../messages/ar.json";
+import bn from "../../messages/bn.json";
+import en from "../../messages/en.json";
+import hi from "../../messages/hi.json";
+import ne from "../../messages/ne.json";
 import ur from "../../messages/ur.json";
 import { axeViolations } from "./axe.ts";
 import { watchConsole } from "./gate.ts";
@@ -35,6 +40,16 @@ const scrollTo = async (page: Page, y: number): Promise<void> => {
 };
 const topOf = (page: Page, id: string): Promise<number> => page.evaluate((s) => (document.getElementById(s)?.getBoundingClientRect().top ?? 0) + window.scrollY, id);
 const pinnedRange = (page: Page): Promise<number> => page.evaluate(() => (document.querySelector("#forecast")?.getBoundingClientRect().height ?? 0) - window.innerHeight);
+
+const onTop = (page: Page, selector: string): Promise<boolean> =>
+  page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (el === null) return false;
+    el.scrollIntoView({ block: "center" });
+    const box = el.getBoundingClientRect();
+    const at = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return at !== null && el.contains(at);
+  }, selector);
 
 test.describe("wide screens", () => {
   test.beforeEach(({}, testInfo) => {
@@ -81,6 +96,22 @@ test.describe("wide screens", () => {
     expect(await clock.textContent()).toBe("14:00");
     await expect(stage).toHaveAttribute("data-step", "3");
     expect(await page.locator("#forecast .s3 .n").textContent()).toMatch(/^\d\d\.\d$/);
+  });
+
+  test("landing scene summary: the three captions are always there as text for a screen reader, drawn nowhere and taking no room", async ({ page }) => {
+    await open(page);
+    const summary = page.locator("#forecast [data-scene-summary]");
+    await expect(summary.locator("li")).toHaveCount(3);
+    const box = await summary.boundingBox();
+    expect(box?.width ?? 99).toBeLessThanOrEqual(2);
+    expect(box?.height ?? 99).toBeLessThanOrEqual(2);
+    expect(await summary.evaluate((el) => getComputedStyle(el).position)).toBe("absolute");
+    // the stage is exactly one screen high at the top and the pinned stretch is three more: the summary adds nothing to either
+    expect(await pinnedRange(page)).toBe(3 * WIDE.height);
+    const text = (await summary.textContent()) ?? "";
+    expect(text).toContain("09:00 / ");
+    expect(text).toContain("14:00 / ");
+    expect(text).toMatch(/Abu Dhabi airport forecast at 14:00/);
   });
 
   test("landing every slide is exactly one screen, nothing runs sideways, and the rail marks the chapter in view", async ({ page }) => {
@@ -133,6 +164,8 @@ test.describe("wide screens", () => {
     await expect(page.locator("#forecast")).toHaveAttribute("data-scene", "poster", { timeout: 30_000 });
     expect(await page.locator("#forecast .stage").evaluate((el) => getComputedStyle(el).position)).toBe("static");
     await expect(page.locator("#forecast img.poster")).toBeVisible();
+    expect(await onTop(page, "#h1"), "the hero's title is on top, not under the still image").toBe(true);
+    expect(await onTop(page, "#forecast a.btn"), "the hero's button can be clicked").toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 
@@ -142,6 +175,8 @@ test.describe("wide screens", () => {
     await expect(page.locator("#forecast")).toHaveAttribute("data-scene", "poster", { timeout: 30_000 });
     expect(await page.locator("#forecast .stage").evaluate((el) => getComputedStyle(el).position)).toBe("static");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType)).toBe("none");
+    await expect(page.locator("#forecast img.poster")).toBeVisible();
+    expect(await onTop(page, "#h1"), "the hero's title is on top, not under the still image").toBe(true);
   });
 });
 
@@ -157,5 +192,21 @@ for (const [width, height] of [
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType)).toBe("none");
     for (const id of SLIDES) await expect(page.locator(`section#${id}`)).toBeAttached();
     expect(await page.locator(".idx a").count()).toBe(7);
+    // the hero's words sit above the map box in the column, not under the canvas
+    expect(await onTop(page, "#h1"), "the hero's title is on top, not under the map").toBe(true);
+    expect(await onTop(page, "#forecast a.btn"), "the hero's button can be clicked").toBe(true);
   });
+}
+
+/** The landing in every language, phone and desktop width: no WCAG 2.2 AA violation (the scene is a canvas, so axe judges the page around it). */
+const TITLES = { en: en.judge.landing.title, ar: ar.judge.landing.title, ur: ur.judge.landing.title, hi: hi.judge.landing.title, bn: bn.judge.landing.title, ne: ne.judge.landing.title } as const;
+for (const [locale, title] of Object.entries(TITLES)) {
+  for (const width of [390, 1440] as const) {
+    test(`landing axe: no violations in ${locale} at ${String(width)} px`, async ({ page }) => {
+      await open(page, { width, height: width === 390 ? 844 : 900 }, `/${locale}`);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+      await expect(page.locator("#forecast")).not.toHaveAttribute("data-scene", "loading", { timeout: 30_000 });
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  }
 }

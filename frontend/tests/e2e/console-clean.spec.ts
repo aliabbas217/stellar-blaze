@@ -44,6 +44,8 @@ interface Route {
   readonly path: string;
   /** What shows once the client has hydrated and the screen has settled. */
   readonly settled: (page: Page, locale: string) => Promise<void>;
+  /** What this route needs set on the page before it loads (the landing's still-image state needs reduced motion). */
+  readonly prepare?: (page: Page) => Promise<void>;
 }
 
 const MESSAGES = { en, ur, ar } as const;
@@ -76,14 +78,21 @@ const SIGNED_PLAN = async (page: Page): Promise<void> => {
   await FRAME_HYDRATED(page);
   await page.locator("[data-signed]").waitFor();
 };
+/** The landing's forecast scene has gone live (S10: the lazy WebGL scene and its three data files have loaded and drawn). */
 const LANDING = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
-  await expect(page.locator("[data-field-stage][data-field-path]")).toBeAttached({ timeout: 15_000 });
+  await expect(page.locator("#forecast")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
+};
+/** The landing where the scene does not run (reduced motion): the still image is in. */
+const LANDING_STILL = async (page: Page): Promise<void> => {
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeAttached();
+  await expect(page.locator("#forecast")).toHaveAttribute("data-scene", "poster", { timeout: 30_000 });
+  await expect(page.locator("#forecast img.poster")).toBeVisible();
 };
 
 const LANDING_ROUTES: readonly Route[] = [
-  { name: "landing (WebGL path)", path: "", settled: LANDING },
-  { name: "landing (?static)", path: "?static", settled: LANDING },
+  { name: "landing (WebGL scene)", path: "", settled: LANDING },
+  { name: "landing (still image)", path: "", settled: LANDING_STILL, prepare: (page) => page.emulateMedia({ reducedMotion: "reduce" }) },
 ];
 /** The join page's confirm card: its "Yes" button exists once the site and the crew have been read. */
 const JOIN_CONFIRM = async (page: Page, locale: string): Promise<void> => {
@@ -144,6 +153,7 @@ async function load(page: Page, locale: string, route: Route, prepare?: (page: P
   await page.setViewportSize(PHONE);
   await watchPlanBudget(page, route);
   await prepare?.(page);
+  await route.prepare?.(page);
   const search = route.path.startsWith("?") ? route.path : "";
   const path = route.path.startsWith("?") ? "" : route.path;
   await page.goto(`/${locale}${path}${search}`);

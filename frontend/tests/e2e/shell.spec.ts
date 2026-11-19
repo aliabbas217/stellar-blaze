@@ -76,7 +76,7 @@ test.describe("the field shell on /en/worker", () => {
     await page.goto("/en");
     await expect(page.locator("html")).not.toHaveAttribute("data-theme", "sun");
 
-    await page.getByRole("link", { name: en.shell.roleChooser.worker.title }).click();
+    await page.locator('[data-role-door] a[data-role="worker"]').click(); // the landing's "Ways in" door for a worker
     // An unpinned phone is handed on to the join page: the same field shell, the same theme.
     await expect(page).toHaveURL(/\/en\/worker(\/join)?$/);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sun");

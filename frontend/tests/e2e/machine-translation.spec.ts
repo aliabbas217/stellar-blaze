@@ -11,7 +11,8 @@ import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
  * The draft-translation notice (F2 Task 22, architect ruling 2026-11-15): no banner and no badge on the main screens. Every non-English
  * locale shows ONE quiet line, "Machine translation, not yet reviewed by a native speaker", in the language of the page, on three
  * surfaces: the worker's Alerts page (the privacy area: it holds "Remove my data"), the foot of the supervisor screens, and the foot of
- * the landing page. English shows it nowhere. The main screens (Today, the alert card, the unwell sheet) never show it.
+ * the landing page (since redesign S10 the landing's line sits in the chapter rail, the landing's own navigation, not at its foot: the rail is one fixed
+ * column on a wide screen and a strip at the top of a phone). English shows it nowhere. The main screens (Today, the alert card, the unwell sheet) never show it.
  * Every title contains "machine translation", so `pnpm e2e -g "machine translation"` selects them.
  */
 
@@ -23,11 +24,11 @@ const PLACED = [
   { surface: "/worker/alerts", lastInMain: true },
   { surface: "/supervisor", lastInMain: false },
   { surface: "/supervisor/crews/crew-b", lastInMain: false },
-  { surface: "", lastInMain: false },
+  { surface: "", lastInMain: false, inRail: true },
 ] as const;
 const MAIN_SCREENS = [`/worker?site=${SITE_DEMO}&crew=crew-b`, `/worker/alert?audience=site&target=${SITE_DEMO}&level=orange&valid_from=${encodeURIComponent("2026-09-03T06:00:00Z")}`, "/worker/unwell", "/replay", "/replay/day"] as const;
 
-async function lines(page: Page, path: string): Promise<{ count: number; text: string | null; lang: string | null; dir: string | null; belowFold: boolean | null; lastInMain: boolean | null }> {
+async function lines(page: Page, path: string): Promise<{ count: number; text: string | null; lang: string | null; dir: string | null; belowFold: boolean | null; lastInMain: boolean | null; inRail: boolean | null }> {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(path);
   await page.evaluate(() => document.fonts.ready);
@@ -43,6 +44,7 @@ async function lines(page: Page, path: string): Promise<{ count: number; text: s
       dir: first?.getAttribute("dir") ?? null,
       belowFold: rect === undefined ? null : rect.top + window.scrollY > window.innerHeight,
       lastInMain: first === undefined ? null : first.closest("main")?.lastElementChild === first,
+      inRail: first === undefined ? null : first.closest("nav.rail") !== null,
     };
   });
 }
@@ -50,13 +52,15 @@ async function lines(page: Page, path: string): Promise<{ count: number; text: s
 test.describe("machine translation line", () => {
   for (const locale of LOCALES) {
     test(`machine translation: ${locale} shows the line once on each placed surface, below the fold, in its own language`, async ({ page }) => {
-      for (const { surface, lastInMain } of PLACED) {
+      for (const placed of PLACED) {
+        const { surface, lastInMain } = placed;
         const found = await lines(page, `/${locale}${surface}`);
         expect(found.count, `${locale}${surface}`).toBe(1);
         expect(found.text, `${locale}${surface}`).toBe(CATALOGUE[locale].shell.machineTranslation);
         expect(found.lang, `${locale}${surface}`).toBe(locale);
         expect(found.dir, `${locale}${surface}`).toBe(locale === "ar" || locale === "ur" ? "rtl" : "ltr");
-        if (lastInMain) expect(found.lastInMain, `${locale}${surface}: the last thing in the page content`).toBe(true);
+        if ("inRail" in placed) expect(found.inRail, `${locale}${surface}: in the landing's chapter rail`).toBe(true);
+        else if (lastInMain) expect(found.lastInMain, `${locale}${surface}: the last thing in the page content`).toBe(true);
         else expect(found.belowFold, `${locale}${surface}: never above the fold`).toBe(true);
       }
     });

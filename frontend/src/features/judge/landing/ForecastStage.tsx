@@ -2,11 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { hourLabel, LIMIT_C, readingAt, type FieldGrid } from "./field-data";
+import { readingAt, type FieldGrid } from "./field-data";
 import { loadFieldGrid } from "./field-load";
+import { allAboveRange, captionsAt } from "./landing-captions";
 import { cameraAt, FIRST_HOUR, hourOf, LAST_HOUR, PANEL_SHARE, progressOf, RELIEF, stepOf, type Step } from "./landing-camera";
 import { isPinnedLayout, media, NARROW_QUERY, REDUCED_QUERY, subscribeScroll } from "./landing-scroll";
 import type { Scene } from "./landing-scene";
+import { SceneCaptions } from "./SceneCaptions";
 
 /*
  * Chapter 01, "Forecast": the hero and the one pinned scene share ONE stage. The server markup is complete and readable on its own (the promise,
@@ -31,6 +33,8 @@ export interface ForecastStageProps {
   readonly hero: ReactNode;
   readonly legend: ReactNode;
   readonly attribution: ReactNode;
+  /** The three captions as visually hidden text (SceneSummary), written by the server so it is in the first HTML with or without WebGL. */
+  readonly summary: ReactNode;
   readonly stations: readonly { readonly code: string; readonly name: string; readonly lat: number; readonly lon: number; readonly leader: number; readonly end?: boolean }[];
 }
 
@@ -72,7 +76,7 @@ async function loadAssets(): Promise<{ geo: unknown; dem: Int16Array; image: HTM
   return { geo, dem: new Int16Array(dem), image };
 }
 
-export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, hero, legend, attribution, stations }: ForecastStageProps) {
+export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, hero, legend, attribution, summary, stations }: ForecastStageProps) {
   const t = useTranslations("judge.landing");
   const [mode, setMode] = useState<Mode>("loading");
   const [step, setStep] = useState<Step>(0);
@@ -181,10 +185,8 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
   }, [mode, rtl]);
 
   const reading = grid === null || step === 0 ? null : readingAt(grid, omaa, hour);
-  const num = new Intl.NumberFormat("en-US", { useGrouping: false });
-  const eyebrow = t("scene.eyebrow", { hour: hourLabel(hour), date: dateLabel });
-  const above = reading === null ? "" : num.format(reading.cellsAbove);
   const allAbove = useMemo(() => (grid === null ? null : allAboveRange(grid)), [grid]);
+  const captions = captionsAt({ reading, hour, dateLabel, allAbove, say: t });
 
   return (
     <section ref={section} id="forecast" className="ch ch1" data-ch="1" data-scene={mode} aria-labelledby="h1">
@@ -208,32 +210,7 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
                 text block inside the positioned map box would be painted over by the canvas or the still image (the hero went missing there). */}
             <div className="txt">
               <div className="s s0">{hero}</div>
-              <div className="s s1">
-                <p className="eb">{eyebrow}</p>
-                <p className="big">
-                  <b className="n">{above}</b>
-                </p>
-                <p className="sen">{reading === null ? "" : t("scene.cells", { total: num.format(reading.cells), limit: LIMIT_C.toFixed(1) })}</p>
-                <p className="sen2">{reading !== null && allAbove !== null && reading.cellsAbove === reading.cells ? t("scene.allAbove", { from: hourLabel(allAbove[0]), to: hourLabel(allAbove[1]) }) : ""}</p>
-              </div>
-              <div className="s s2">
-                <p className="eb">{eyebrow}</p>
-                <p className="big">
-                  <b className="n">{reading === null ? "" : reading.hottest.value.toFixed(1)}</b>
-                  <span className="un">°C</span>
-                </p>
-                <p className="sen">{reading === null ? "" : t("scene.hottest", { hour: hourLabel(hour) })}</p>
-                <p className="sen2">{reading === null ? "" : t("scene.where", { lat: reading.hottest.lat.toFixed(2), lon: reading.hottest.lon.toFixed(2) })}</p>
-              </div>
-              <div className="s s3">
-                <p className="eb">{eyebrow}</p>
-                <p className="big">
-                  <b className="n">{reading === null ? "" : reading.station.toFixed(1)}</b>
-                  <span className="un">°C</span>
-                </p>
-                <p className="sen">{reading === null ? "" : t("scene.station", { station: t("field.stations.OMAA"), hour: hourLabel(hour) })}</p>
-                <p className="sen2" />
-              </div>
+              <SceneCaptions captions={captions} />
             </div>
             <div className="mapwrap">
               <canvas ref={canvas} aria-hidden="true" />
@@ -245,6 +222,7 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
               </p>
             </div>
           </div>
+          {summary}
           <div className="ik">
             <div className="dayrule" aria-hidden="true">
               <div className="rl">
@@ -269,14 +247,4 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
       </div>
     </section>
   );
-}
-
-/** The first and last hour of the day at which every cell is above the limit (null when there is none). */
-function allAboveRange(grid: FieldGrid): readonly [number, number] | null {
-  const cells = grid.lat.length * grid.lon.length;
-  const hours: number[] = [];
-  for (let h = 0; h < 24; h++) if (readingAt(grid, [], h).cellsAbove === cells) hours.push(h);
-  const first = hours[0];
-  const lastHour = hours[hours.length - 1];
-  return first === undefined || lastHour === undefined ? null : [first, lastHour];
 }

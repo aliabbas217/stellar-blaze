@@ -10,10 +10,12 @@ import { LIMIT_C } from "./field-data";
 import type { FieldHeroData } from "./field-server";
 import { buildEvidence } from "./evidence";
 import { ForecastStage } from "./ForecastStage";
+import { restCaptions } from "./landing-captions";
 import { CLASS_STEPS, HEAT_NUMBER, LEGEND_SWATCHES } from "./landing-colour";
 import { LandingEffects } from "./LandingEffects";
 import { LandingRail } from "./LandingRail";
 import { Boundary, EvidenceSlides, Limits, Morning, Plan, WaysIn } from "./LandingSlides";
+import { SceneSummary } from "./SceneCaptions";
 import { STATIONS } from "./landing-stations";
 import "@/styles/landing.css";
 
@@ -109,6 +111,7 @@ export function LandingView({ field, data, dir }: LandingViewProps) {
           hero={hero}
           legend={legend}
           attribution={field.attribution}
+          summary={<SceneSummary label={t("scene.summary")} captions={restCaptions(field.grid, field.omaa, dateLabel, t)} />}
           stations={stations}
         />
         <Morning omaa={field.omaa} />
