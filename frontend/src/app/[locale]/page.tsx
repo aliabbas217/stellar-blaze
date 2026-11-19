@@ -14,9 +14,8 @@ import { routing } from "@/i18n/routing";
 /*
  * `/<locale>`: the landing page, the first frame of the story. Static: it reads the recorded forecast files and the scored
  * files at build time and makes no API call, so it renders the same with the API stopped. The only client code at first load is
- * the proof chip and the gate that brings the field in after first paint (features/judge/landing/FieldGate.tsx); the field, its
- * data and (later) the WebGL scene load after that, on this route only. The role door (four tiles) is part of the hero, and the story chapters are
- * server markup: the client reads only the field's own strings, the story footer's copy button and the proof chip's.
+ * the stage (hour, captions and the scroll listener), the rail and the reveals; the WebGL scene, its three data files and the forecast grid load
+ * after that, when the page is idle, on this route only (features/judge/landing/ForecastStage.tsx). The chapters are server markup.
  */
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -42,8 +41,8 @@ export default async function LocaleHomePage({ params }: PageProps<"/[locale]">)
   const field = await loadFieldHero(hourly);
 
   return (
-    // The client reads: the proof chip and its drawer, the spine's slot label, the field island's own strings.
-    <ClientMessages paths={["judge.landing.field", "judge.story", "states.proof", "judge.proof", "common.spine"]}>
+    // The client reads: the stage's own strings (captions, legend words, the scene), the rail's, and the language picker's.
+    <ClientMessages paths={["judge.landing.field", "judge.landing.scene", "judge.landing.rail", "common.appName", "shell.language", "shell.locales"]}>
       <LandingView field={field} data={data} dir={dirFor(locale)} />
     </ClientMessages>
   );

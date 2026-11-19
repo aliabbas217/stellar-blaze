@@ -274,7 +274,7 @@ export function isothermSegments(values: Float32Array, nx: number, nz: number, s
 type Rgb = readonly [number, number, number];
 
 /** OKLCH to sRGB 0..1 (Bjorn Ottosson's matrices): the prototype's `oklchToRgb`, which `lib/heat/ramp.ts` also ports. */
-function oklchToRgb(l: number, c: number, h: number): [number, number, number] {
+export function oklchToRgb(l: number, c: number, h: number): [number, number, number] {
   const a = c * Math.cos((h * Math.PI) / 180);
   const b = c * Math.sin((h * Math.PI) / 180);
   const l1 = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
