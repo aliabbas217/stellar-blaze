@@ -137,6 +137,10 @@ describe.each(LOCALES)("the scene summary, %s", (locale) => {
     expect(summary).toHaveAttribute("aria-label", CATALOGUES[locale].judge.landing.scene.summary);
     expect(summary).toHaveClass("sr-only");
     expect(summary?.querySelectorAll("li")).toHaveLength(3);
+    // the unit of the drawn captions is its own left-to-right run, so an Arabic-script page cannot draw it as "C°"
+    const units = [...container.querySelectorAll("#forecast .big .un")];
+    expect(units).toHaveLength(2);
+    for (const unit of units) expect(unit).toHaveAttribute("dir", "ltr");
     // nothing of the summary is drawn: the stage's visible layout (the figure's header, body and footer) does not hold it
     expect(summary?.closest("figure.inst")?.querySelector(".body")?.contains(summary)).toBe(false);
     expect(summary?.closest("figure.inst")?.querySelector(".ik")?.contains(summary)).toBe(false);

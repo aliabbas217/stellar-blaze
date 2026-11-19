@@ -12,7 +12,11 @@ function Lines({ caption }: { readonly caption: Caption }) {
       <p className="eb">{caption.eyebrow}</p>
       <p className="big">
         <b className="n">{caption.value}</b>
-        {caption.unit === "" ? null : <span className="un">{caption.unit}</span>}
+        {caption.unit === "" ? null : (
+          <span className="un" dir="ltr">
+            {caption.unit}
+          </span>
+        )}
       </p>
       <p className="sen">{caption.sentence}</p>
       <p className="sen2">{caption.detail}</p>
