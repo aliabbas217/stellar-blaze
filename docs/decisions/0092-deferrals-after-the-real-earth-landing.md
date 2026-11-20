@@ -71,3 +71,4 @@ The real-earth landing merged on 2026-11-20 (PR #5, `b72a81a`) while the demo is
 
 ## Links
 [ADR 0090](0090-landing-is-seven-whole-screen-slides-over-real-imagery-and-terrain.md) · [0082](0082-deferrals-after-the-redesign.md) · [0083](0083-tier-2-english-only-story-copy.md) · [0066](0066-demo-reset-is-a-new-epoch-audit-stays-append-only.md) · [0076](0076-story-order-and-plain-landing-and-verdicts.md)
+- **2026-11-20 (S13).** Item 5 is built for Arabic only (the other four languages are still English; the item stays open for them). Item 10 is built: the tour has a "One day" stop. See [ADR 0093](0093-judge-path-polish-s13.md).
