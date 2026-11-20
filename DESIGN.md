@@ -358,10 +358,14 @@ Transitions (`@view-transition { navigation: auto }`) with shared names `wordmar
 plays the day (the only autoplay); the scoreboard ticks once on arrival; everything else moves only on input.
 `prefers-reduced-motion`: no animation, final frames, same layout.
 
+*State described, 2026-11-20 (`main` at `b72a81a`):* the landing no longer plays a day on its own. Its forecast scene follows the scroll, and on wide screens the slides come to rest with CSS scroll-snap; ADR 0090 has the gate and the departures. The paragraph above is the 2026-11-14 text and is kept.
+
 ## 8. 3D (ADR 0037)
 
 The landing's IFS WBGT terrain from A (unlit, contours, sea dimmed), with C's console panels below the hero instead of
 voxel columns. Budget and fallback per ADR 0037. No WebGL on worker, supervisor, HSE or admin routes.
+
+*State described, 2026-11-20 (`main` at `b72a81a`):* the landing's 3D is now real satellite imagery and terrain under the forecast drawn as four flat classes, in one lazy plain-WebGL scene with a still-image fallback; the unlit-contour terrain from A and the console panels above are the 2026-11-14 text and are kept. ADR 0090 supersedes ADR 0037 decision 4 in part, and ADR 0091 records the data licences.
 
 ## 9. Iconography
 
