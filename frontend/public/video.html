@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Stellar Blaze, Challenge 07: 3-minute walkthrough</title>
+<meta name="description" content="A 3-minute walkthrough of Stellar Blaze, the UAE heat-stress shift planner, with the full transcript.">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html { background: #0B1015; }
+  body { margin: 0; background: #0B1015; color: #EEF1F3; font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; font-size: 1.0625rem; line-height: 1.6; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem); line-height: 1.2; font-weight: 600; margin: 0 0 20px; }
+  h2 { font-size: 1.5rem; line-height: 1.25; font-weight: 600; margin: 40px 0 8px; }
+  h3 { font-size: 1.125rem; line-height: 1.3; font-weight: 600; margin: 28px 0 6px; color: #EEF1F3; }
+  video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 16px 0 0; }
+  a { color: #7FE0E6; text-underline-offset: 4px; display: inline-flex; align-items: center; min-height: 44px; }
+  a:focus-visible { outline: 3px solid #7FE0E6; outline-offset: 3px; }
+  .lede { color: #B7C0C9; margin: 0 0 24px; max-width: 70ch; }
+  .vo { margin: 0; max-width: 70ch; }
+  .print { margin: 8px 0 0; max-width: 90ch; font-size: .9375rem; line-height: 1.5; color: #B7C0C9; }
+  .print span { color: #8E99A5; }
+  section { border-top: 1px solid #25303B; }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Stellar Blaze, Challenge 07: 3-minute walkthrough</h1>
+  <p class="lede">The UAE heat-stress shift planner, on a demo site with made-up crews and people. The video has narration and burned-in captions; the transcript is below.</p>
+  <video controls preload="metadata" poster="/media/stellar-blaze-video-poster.jpg" width="1920" height="1080"><source src="/media/stellar-blaze-video-web.mp4" type="video/mp4">
+    <p>Your browser cannot play this video. <a href="/media/stellar-blaze-video-web.mp4">Download the MP4</a>.</p>
+  </video>
+  <nav aria-label="Next">
+    <a href="/en">Open the demo</a>
+    <a href="/technical-report.pdf">Technical report</a>
+  </nav>
+  <h2>Transcript</h2>
+  <div id="transcript">
+    <section id="beat-cold">
+      <h3>Cold open</h3>
+      <p class="vo">Last summer, at Abu Dhabi airport, about 250 working hours were in the High-risk zone. A midday ban does not cover them.</p>
+      <p class="print"><span>Small print on screen:</span> Hours that station observations (a derived heat-stress truth) put in the ADOSH High zone, summer 2026, working daytime; 95% interval 192 to 316; airport station, not a worksite; zone margin 7 W/m2 assumed.</p>
+    </section>
+    <section id="beat-product">
+      <h3>The product</h3>
+      <p class="vo">This is Stellar Blaze. It turns tomorrow&#39;s forecast into a work-and-rest plan for each crew, and a plain warning on each worker&#39;s phone. The crew lead sees which crew heats up first. Stop work is one tap, and so is Undo. The worker sees one sign, in their own language, right to left in Urdu. And &quot;I feel unwell&quot; takes three taps, and sends nothing to anyone.</p>
+      <p class="print"><span>Small print on screen:</span> Demo site, made-up crews and people; workers never need an account; machine translation, not yet reviewed by a native speaker.</p>
+    </section>
+    <section id="beat-evidence">
+      <h3>The evidence</h3>
+      <p class="vo">We replayed summer 2026 against the airport&#39;s own observations, using only a forecast made a day ahead, after writing down how we would be judged. The ban alone warns on none of those hours. A fixed threshold catches 92% of them, and raises about 280 hours of false alarms doing it. The regulator&#39;s own zones raise fewer false alarms than ours, about 75 hours against 180, and miss more danger hours, 81 against 46. So we are no better than the regulator&#39;s zones: a different trade, not a better one. The trade belongs to the employer.</p>
+      <p class="print"><span>Small print on screen:</span> Hour-weighted, REAL weather, assumed crew of 20; the fixed rule is WBGT at or above 32 C on the raw forecast; the regulator&#39;s zones are the ADOSH zones on the raw forecast; ours is shown at the protective setting, theta 0.3; at the balanced setting, theta 0.45, ours misses 96.5 hours and raises 73.5 against the regulator&#39;s zones&#39; 80.5 and 74.5, with overlapping likely ranges; the counters show exact hours and the receipt shows their 95% intervals.</p>
+    </section>
+    <section id="beat-price">
+      <h3>The price of protection</h3>
+      <p class="vo">Protection has a price, and the supervisor sees it. Plan on the raw forecast and the crew still breaks the rules for about 15,000 minutes, with about 20% rest. Plan on the corrected forecast and that falls to about 2,100 minutes, at about 48% rest. Simulated crew, real weather.</p>
+      <p class="print"><span>Small print on screen:</span> REAL weather + assumed crew: SIMULATED crew: 20 experienced adults, heavy work, 480-minute shifts, 138 scored days; rule-violation minutes 15,225 against 2,140; rest as a share of scheduled minutes 20.5% against 47.8%; the zone engine and the validator do the protecting, the forecast sets how much rest is scheduled.</p>
+    </section>
+    <section id="beat-day">
+      <h3>The day</h3>
+      <p class="vo">Fourteenth of June, chosen in advance by one rule: the forecast, our range, and what the station recorded. A supervisor tries a run that is too long, and the law checker cites the article.</p>
+      <p class="print"><span>Small print on screen:</span> One day is an illustration, not evidence of skill; the crew is simulated (SIMULATED crew: 20 experienced adults, heavy work).</p>
+    </section>
+    <section id="beat-boundary">
+      <h3>The boundary</h3>
+      <p class="vo">An employer asks for one worker&#39;s health record. The answer is no. The attempt is logged, and the worker sees it.</p>
+    </section>
+    <section id="beat-promise">
+      <h3>The promise</h3>
+      <p class="vo">The measured next step: using the morning&#39;s observations, a same-day refresh at about 10:00 local, cuts false-alarm hours by about 10% to 11% at seven of eight airports. That is development evidence, not in the product. A pilot summer, with sensors on site, is how this becomes a health claim.</p>
+      <p class="print"><span>Small print on screen:</span> Development evidence, leave-one-summer-out, not pre-registered, 23 candidates tried; the seven-airport figure was requested after the verdict (post hoc); a same-day refresh, not day-ahead; not tested at a new airport; not in the product; not yet clinically reviewed; one test summer; derived heat-stress truth; no site sensors and no heat-illness outcomes; the demo is hosted in France Central and designed for UAE North.</p>
+    </section>
+    <section id="beat-close">
+      <h3>Close</h3>
+      <p class="vo">Stellar Blaze. Every number has its receipt.</p>
+    </section>
+  </div>
+</main>
+</body>
+</html>

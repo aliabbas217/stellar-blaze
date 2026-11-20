@@ -59,6 +59,12 @@ The real-earth landing merged on 2026-11-20 (PR #5, `b72a81a`) while the demo is
 - **Why parked:** the 2026-11-20 amendment of [ADR 0076](0076-story-order-and-plain-landing-and-verdicts.md) added "Try a plan" only; no reason for leaving out the day page is recorded.
 - **Revisit:** the tour is revised; a judge test shows the day page is missed; the 0076 trigger that the story is too long or too short.
 
+## 11. The submission walkthrough video is served by the demo, not by YouTube (2026-11-20)
+- **What:** the 3-minute walkthrough is a static page, `/video.html`, with the MP4 (about 12 MB, H.264, faststart) and its poster in `frontend/public/media/`, plus the full transcript as text. The landing's YouTube facade (`youtubeId`) stays unset.
+- **Why:** the owner's YouTube account was not reachable when the video was finished, and a plain page on the demo's own origin is viewable by anyone and needs no new CSP rule (`default-src 'self'` covers media).
+- **Cost:** the file lives in the git history and the web image (about 12 MB); the pre-commit large-file hook (500 kB) excludes `frontend/public/media/` and nothing else.
+- **Revisit:** the owner publishes the video on YouTube (set `youtubeId`, then remove the file and the hook exclusion), or the demo is torn down after GITEX.
+
 ## Consequences
 - **Cost of being wrong:** none of these blocks the judge path; items 8 and 9 are the two a judge could notice (two different days, a screen that resets under them), and both are visible in the page text or the audit.
 - Items 3 and 4 depend on the owner's video being published. The landing's real-device check has no record yet ([ADR 0090](0090-landing-is-seven-whole-screen-slides-over-real-imagery-and-terrain.md) weak spots).
