@@ -94,12 +94,14 @@ export function LandingView({ field, data, dir }: LandingViewProps) {
       >
         {t("skip")}
       </FieldLink>
-      <LandingRail>
-        <div className="lang">
-          <LocaleSwitcher />
-        </div>
-        <MachineTranslationNotice className="mt" />
-      </LandingRail>
+      <LandingRail
+        language={
+          <div className="lang">
+            <LocaleSwitcher />
+          </div>
+        }
+        notice={<MachineTranslationNotice className="mt" />}
+      />
       <main id="main-content">
         <ForecastStage
           region={t("field.region", { day: dayLabel })}

@@ -153,9 +153,9 @@ const Arrow = () => (
   </span>
 );
 
-function Panel({ n, tag, lead, line, vis, no = false }: { readonly n: string; readonly tag: string; readonly lead: string; readonly line: string; readonly vis: ReactNode; readonly no?: boolean }) {
+function Panel({ n, tag, lead, line, vis, no = false, seen = false }: { readonly n: string; readonly tag: string; readonly lead: string; readonly line: string; readonly vis: ReactNode; readonly no?: boolean; readonly seen?: boolean }) {
   return (
-    <article className={no ? "pn no" : "pn"}>
+    <article className={no ? "pn no" : seen ? "pn sn" : "pn"}>
       <p className="pl">
         <span>{n}</span>
         {tag}
@@ -176,7 +176,7 @@ export function BoundaryFigure({ label, asked, refused, seen, earlier, entry }: 
       <Arrow />
       <Panel n="2" {...refused} vis={<Page strike />} no />
       <Arrow />
-      <Panel n="3" {...seen} vis={<Chain earlier={earlier} entry={entry} />} />
+      <Panel n="3" {...seen} seen vis={<Chain earlier={earlier} entry={entry} />} />
     </div>
   );
 }

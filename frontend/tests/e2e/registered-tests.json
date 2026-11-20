@@ -789,6 +789,42 @@
       "landing display lines: the ur headings at 390 do not touch from one line to the next"
     ]
   },
+  "landing-mobile.spec.ts": {
+    "mobile-chromium": [
+      "landing phone ar 360x740: no sideways overflow at any chapter",
+      "landing phone ar 390x844: no sideways overflow at any chapter",
+      "landing phone axe: the bar, the open menu and the first screen have no violations in English and Arabic",
+      "landing phone en 360x740: no sideways overflow at any chapter",
+      "landing phone en 390x844: no sideways overflow at any chapter",
+      "landing phone first screen ar 360x740: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone first screen ar 390x844: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone first screen en 360x740: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone first screen en 390x844: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone header ar 360x740: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone header ar 390x844: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone header en 360x740: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone header en 390x844: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone menu in Arabic is mirrored: the brand on the right, the language picker on the left, the chevrons of the doors point left",
+      "landing phone menu: a button names the chapter in view, opens the seven chapters, works from the keyboard and lands a chapter below the bar"
+    ],
+    "desktop-chromium": [
+      "landing phone ar 360x740: no sideways overflow at any chapter",
+      "landing phone ar 390x844: no sideways overflow at any chapter",
+      "landing phone axe: the bar, the open menu and the first screen have no violations in English and Arabic",
+      "landing phone en 360x740: no sideways overflow at any chapter",
+      "landing phone en 390x844: no sideways overflow at any chapter",
+      "landing phone first screen ar 360x740: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone first screen ar 390x844: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone first screen en 360x740: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone first screen en 390x844: the headline, the promise and both actions are inside the first viewport, the map peeks in, nothing runs sideways",
+      "landing phone header ar 360x740: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone header ar 390x844: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone header en 360x740: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone header en 390x844: one bar of at most 56 px that stays at the top, with the language picker named and 44 px high",
+      "landing phone menu in Arabic is mirrored: the brand on the right, the language picker on the left, the chevrons of the doors point left",
+      "landing phone menu: a button names the chapter in view, opens the seven chapters, works from the keyboard and lands a chapter below the bar"
+    ]
+  },
   "machine-translation.spec.ts": {
     "mobile-chromium": [
       "machine translation line > machine translation: English shows nothing anywhere",
