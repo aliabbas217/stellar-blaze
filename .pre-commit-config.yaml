@@ -16,6 +16,9 @@ repos:
         exclude: *research
       - id: check-added-large-files
         args: [--maxkb=500]
+        # One deliberate exception: the submission walkthrough video (about 12 MB) is served by the demo from
+        # frontend/public/media/. Every other path keeps the 500 kB limit. Recorded in ADR 0092.
+        exclude: ^frontend/public/media/
       - id: check-yaml
         exclude: &pnpmlock ^frontend/pnpm-lock\.yaml$
       # pnpm 11+ writes pnpm-lock.yaml as two YAML documents (the env lockfile, then the package lockfile), so the

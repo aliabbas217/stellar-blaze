@@ -1,0 +1,79 @@
+# ADR 0090: The landing is seven whole-screen slides over real satellite imagery and terrain
+
+- **Status:** Accepted (owner decision, relayed in the controller's brief of 2026-11-20: he rejected the tilt (S8), the pinned deck (S9) and prototypes A to C, chose direction D "Real Earth", and asked three times for whole-screen slides). Built as slice S10 (`8562946` to `e00cd54`) and merged to `main` in PR #5 (`b72a81a`, 2026-11-20).
+- **Date:** 2026-11-20
+- **Deciders:** Ali (owner); the architect (Claude)
+- **Supersedes / superseded by:** supersedes [ADR 0076](0076-story-order-and-plain-landing-and-verdicts.md) decision 2 (the landing's composition) in full; 0076 decisions 1, 3 and 4 stand. Supersedes [ADR 0037](0037-reverse-0014-cinematic-3d-landing.md) decision 4 (the 2D canvas fallback, the performance monitor and the keyboard hour scrubber) and the treatment of its 2026-11-12 amendment (plain WebGL2 in a worker on an OffscreenCanvas); 0037 decisions 1, 2, 3 and 5 stand (see "Departures from 0037 decision 3" below). Supersedes the landing parts of the **draft** ADR 0089 (see "Draft ADR 0089" below). Applies the rules of [ADR 0083](0083-tier-2-english-only-story-copy.md) (amended today for the new page) and carries the licence record to [ADR 0091](0091-imagery-terrain-and-map-data-licences-for-the-landing.md).
+- **Evidence:** commits `8562946` (hero, forecast stage, scene), `bed4c4a` (slides 02 to 07, video facade), `e0f7c13`, `5b696d9` (copy in six languages), `2271dcc`, `3fc8969` (tests), `dfb622a`, `79e21fb`, `e00cd54` (fixes found after the port); `frontend/src/features/judge/landing/*` (header comments of `LandingView.tsx`, `ForecastStage.tsx`, `landing-scene.ts`, `landing-scroll.ts`, `LandingSlides.tsx`, `LandingFigures.tsx`, `VideoEmbed.tsx`, `video-config.ts`), `frontend/src/styles/landing.css` (header and the media queries at lines 204 to 251), `frontend/csp.ts`; `frontend/public/data/LICENCES.md` and `uae-geo.json`; the CI log of run 44690629991 (the PR #5 head `d870910`, job `frontend`, step `pnpm bundle:check`); the draft ADR 0089 (`git show feat/s8-landing-tilt:docs/decisions/0089-landing-native-scroll-tilt-ways-in-and-video.md`).
+
+## Context
+ADR 0076 decision 2 put the role door, a phone sign and a small 3D field in the hero, with five chapters under it. After the redesign merged (`ca004c0`) two more landings were built on top of it and shown to the owner:
+
+- **S8, native-scroll tilt** (`feat/s8-landing-tilt`, never merged): a CSS entry tilt of the pictures, no snapping, no pinning; recorded only as the draft ADR 0089. The owner rejected it.
+- **S9, pinned deck** (`feat/s9-landing-pinned-scenes`, never merged; `26c91ee` "make the landing a deck of seven same-size slides with snapping rests"): the owner rejected it. Prototypes A, B and C were rejected as cartoonish. The owner chose direction D, "Real Earth" (the prototype that `landing-scene.ts` and `LICENCES.md` name as the approved source), and asked three times for whole-screen slides.
+
+The owner's chat is not in the repo. The rejections and the choice above are the controller's relay, not a quoted source. The repo shows only the outcome: the two branches, the draft, and the S10 code.
+
+## Options considered
+| Option | Evidence | Verdict |
+|---|---|---|
+| Keep 0076 decision 2 (role door and phone in the hero, small field) | The field island, the 2D and worker canvases, the scrubber and the phone had no user once S10 replaced them (`8562946` removes them) | Rejected by the owner's choice of D |
+| S8: native-scroll CSS tilt, no snap, no pinning (draft 0089) | Rejected by the owner | Rejected |
+| S9: deck of seven same-size slides with snapping rests | Rejected by the owner | Rejected |
+| Prototypes A to C | Rejected by the owner as cartoonish; not in the repo | Rejected |
+| A three.js or R3F scene | The draft 0089's research of 2026-11-18 measured three.js 0.187.0 at 133 KB gzip for a minimal scene and R3F with three at 255 KB, against the 22 KB scene ceiling (`SCENE_CEILING`) and the 170 KB route budget; carried here by citation, not re-measured | Rejected |
+| **Direction D: seven whole-screen slides, real imagery and terrain in one lazy plain-WebGL scene (chosen)** | Measured below | Accepted |
+
+## Decision
+1. **Seven chapters** (`CHAPTERS` in `LandingRail.tsx`): 01 Forecast, 02 Morning, 03 Plan, 04 Boundary, 05 Evidence, 06 Ways in, 07 Limits. From chapter 02 on, each is one whole screen that comes to rest; Evidence has a second screen for the two verdict numbers. Chapter 01 is the hero and one pinned scene on one stage, a tall snap area inside which the scroll is free. The limits stay last (the claim rule of ADR 0076).
+2. **Native scroll with CSS scroll-snap, gated.** `html:has(.lp) { scroll-snap-type: y mandatory }`, slides `scroll-snap-align: start` and `scroll-snap-stop: always`, only inside `@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)`. The whole-screen slide sizing (`height: 100svh`) is gated by the width and height part only (`landing.css` line 204), so a touch tablet or a desktop with reduced motion at that size gets whole-screen slides that do not snap, and with reduced motion the hero stage is a still, not pinned. Under 1100 px wide the rail becomes a strip at the top and the chapters are a plain column; under 600 px high the slides are not sized to the screen. There is no wheel handler, no scroll hijack and no smooth-scroll library: one passive scroll listener (`landing-scroll.ts`) feeds the scene's hour and camera and the rail's current chapter, at most once per animation frame. The one-line fallback if snapping feels wrong on a real device is `y mandatory` to `y proximity` (the comment in `landing.css`).
+3. **One lazy plain-WebGL scene** (`landing-scene.ts`, WebGL1, no library; mesh 80 x 60 terrain vertices plus a 552-vertex skirt plus 18 tick vertices, 5,370 per frame; relief x5): real NASA GIBS imagery draped on real AWS terrain, with the recorded ECMWF IFS day-1 forecast on top as four flat classes on a 22 x 17 grid. It is imported after first paint when the page is idle. The hour runs 06:00 to 14:00 with the scroll and holds at 06:00, 09:00 and 14:00 so a caption's number is on screen with its own hour. Three captions are message templates; the same three are also a visually hidden text list in the first HTML (`SceneSummary`) and a unit test asserts they equal the drawn ones in six languages. Where the scene cannot or should not run (no WebGL, a failed load, reduced motion, the browser's save-data flag) the stage shows the still `uae-poster.webp` (27,592 B). The map is captioned "An illustration of one hot day, not the day we scored."
+4. **Thin-line figures.** Two inline SVG isometric figures with 1 px strokes and mono labels (`LandingFigures.tsx`): the plan (three made-up crews and Stop as the one solid slab) and the boundary (Asked, Refused, Seen). They are pictures of the product, labelled Demo, never readings.
+5. **The role door is in slide 06 "Ways in"**, next to the video, with the same four tiles and destinations as before (`role-door-destinations.ts`: `/worker`, `/supervisor/enter`, `/hse/enter`, `/tour`). The hero has two links: "See how it works" (to `#morning`) and "Skip to the demo" (to `#ways`).
+6. **The language picker sits in the rail** with the demo note and the machine-translation line, under the chapter index.
+7. **The landing is night-only.** The page root carries `data-theme="night"` whatever theme the visitor has.
+8. **The video is a click-to-load facade with a config id.** `landing-video.json` holds `youtubeId` (now `null`). With no id the block is a panel with one sentence ("A 3-minute video walkthrough accompanies this submission.") and nothing from a third party. With an id, nothing is requested from YouTube, not even a thumbnail, until Play is pressed; the press creates the privacy-enhanced `youtube-nocookie.com` iframe with captions on; `csp.ts` adds `frame-src https://www.youtube-nocookie.com` only while a valid id is set, so with none the policy is byte for byte the one `headers.spec.ts` pins. This block, its config and its CSP builder were carried over from S8 (`298c3a9`).
+9. **Numbers are read, never typed** (0076 decision 3 stands): the four bars, the axis and the two big verdict numbers come from the scored Warnings file through `evidence.ts`; the second Evidence screen says the regulator's zones raise fewer false alarms. There is no win claim.
+
+## Draft ADR 0089
+A draft ADR 0089 ("The landing moves with a native-scroll tilt...", Proposed, 2026-11-18) exists only on the unmerged branches `feat/s8-landing-tilt` (`03b1601`) and `feat/s9-landing-pinned-scenes`; it is not on `main`, so it cannot carry a pointer. Its fate, decision by decision:
+
+| Draft 0089 | This ADR |
+|---|---|
+| 1 native scroll, no snapping, no pinning | **Superseded.** S10 snaps (decision 2) and pins the scene (decision 3). "No scroll listeners": superseded by the one passive listener. "No new dependency": still true. |
+| 2 the CSS entry tilt | **Superseded** (rejected by the owner; not built on `main`) |
+| 3 order, role door below the story, hero with one primary action and one quiet link | **Carried over** (decision 5; the draft's order differs: its ways in came after the evidence and before the limits, which S10 keeps) |
+| 4 ways in with the video and the unchanged role door | **Carried over** (decisions 5 and 8) |
+| 5 click-to-load video, config id, `frame-src` only with an id | **Carried over** (decision 8); the draft's placeholder text ("arrives on 19 November") was replaced by `6b800b3` |
+| Parked: scroll-linked day on the hero terrain | **Built**: the scene's hour and camera follow the scroll (decision 3); no parking row is needed. What stays parked is in [ADR 0092](0092-deferrals-after-the-real-earth-landing.md) |
+
+The number 0089 is not reused: the index lists it as a draft that is not on `main` and is superseded in part by this ADR.
+
+## Departures from 0037 decision 3
+0037's hard budget stands as written; S10 departs from it in these measured or read places, none of which was tested against Lighthouse (no S10 Lighthouse run is recorded in the repo, and the matrix runs only by hand, [ADR 0084](0084-full-browser-e2e-leaves-the-per-push-ci.md)):
+
+- **Vertices:** the mesh is 5,370 on every device; 0037 says at most 6,000 on desktop and at most 1,500 on a phone. The scene has no phone variant.
+- **Pixel ratio:** capped at 2 (`landing-scene.ts`); 0037 says 1.5 on phones.
+- **Fallback:** the 2D canvas map and the "below 30 fps for 2 s" monitor are gone; the fallback is the still poster, chosen at load (the list in decision 3), and there is no runtime monitor.
+- **Hour control:** the keyboard slider (`HourScrubber`) and the Play and Pause control are gone, so the hour is moved only by scroll. The three captions are text for screen readers (decision 3). There is no autoplay (so `DESIGN.md` section 7's "the landing plays the day" no longer holds).
+- **Scene data:** 108,714 B (`uae-sat-gray.webp`) + 25,856 B (`uae-dem.bin`) + 3,782 B (`uae-geo.json`) + 92,147 B (the forecast grid) = 230,499 B raw, under 0037's 250 kB; all four load after first paint.
+
+## Consequences
+- **Bundle numbers** (CI `pnpm bundle:check`, PR #5 head `d870910`): `/[locale]` first-load script **156,014 B of 174,080 B**; the landing's lazy 3D scene **4,766 B of 22,528 B, one chunk** (no worker). The baseline in the draft 0089's measurement at `ca004c0` was 159,650 B and 8,382 B (a local run by the draft's author, a different tree: it is a comparison, not an A/B). Every route in that run is under its ceiling (the tightest is `/[locale]/supervisor/enter` at 172,841 B of 174,080 B, then `/[locale]/hse` at 172,407 B).
+- **Cost of being wrong:** the owner's ask is the whole case for snapping, and the draft 0089's research (read, not repeated here) found no evidence that scroll storytelling improves comprehension and documented zoom and keyboard problems with snapping; a reviewer who is disoriented by `mandatory` snap on a real wheel or trackpad costs the first impression. It is contained by the gate (touch, narrow, short and reduced-motion get a plain column) and by a one-word fallback (`proximity`).
+- **Known weak spots** (from the S10 commit messages and the code; none is hidden by a test):
+  1. The port was first checked by rendering the production build only after `3fc8969`; that check found the hero painted over by the map and flat amber numbers (`dfb622a`, fixed). Rendering, not unit tests, found it.
+  2. The unit of the big caption number drew as "C°" in Arabic and Urdu until `79e21fb`.
+  3. The captions were on the map only until `3fc8969` added the text list.
+  4. The 28 Tier 1 strings the page added or changed are machine-translated into ar, ur, hi, bn and ne with no native review (`e0f7c13`, `5b696d9`); the chapters' own words are English by design (0083).
+  5. Snapping on real hardware (wheel, trackpad, keyboard, zoom) has no recorded check in the repo; the e2e suite does not run in CI ([ADR 0084](0084-full-browser-e2e-leaves-the-per-push-ci.md)).
+  6. The video id is `null`: no video is published, and its captions and transcript are open ([ADR 0092](0092-deferrals-after-the-real-earth-landing.md)).
+  7. `lighthouserc.json` still lists `/en?static`, the switch of the removed field island; the page ignores the query string, so that row measures the landing again.
+  8. `LICENCES.md` names a build script `fetch.py` that is not in the repo, so the imagery and terrain cannot be rebuilt from the repo alone ([ADR 0091](0091-imagery-terrain-and-map-data-licences-for-the-landing.md)).
+  9. The validator tests needed a longer wait for the lazy island under load (`e00cd54`); no code under test changed.
+
+## Revisit trigger
+A reviewer reports disorientation, a stuck keyboard or a zoom problem on the landing (change `mandatory` to `proximity`, or drop the snap block); a Lighthouse run on `/en` fails 0037's gates (then add the phone variant, the 1.5 pixel ratio or the poster as the default on phones); the video is published (set the id, then the captions row of ADR 0092 comes due); the owner asks for the hour control back.
+
+## Links
+[ADR 0076](0076-story-order-and-plain-landing-and-verdicts.md) · [0037](0037-reverse-0014-cinematic-3d-landing.md) · [0083](0083-tier-2-english-only-story-copy.md) · [0084](0084-full-browser-e2e-leaves-the-per-push-ci.md) · [0091](0091-imagery-terrain-and-map-data-licences-for-the-landing.md) · [0092](0092-deferrals-after-the-real-earth-landing.md) · [`DESIGN.md`](../../DESIGN.md) sections 7 and 8
