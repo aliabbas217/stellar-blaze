@@ -39,7 +39,7 @@ function currentHref(route: string, items: readonly DeskNavItem[]): string | nul
 }
 
 /**
- * Whether the menu has more to scroll to. `Math.abs`: in a right-to-left page `scrollLeft` runs from 0 down to a negative number, and the far
+ * Whether the menu has more to scroll to. `Math.abs`: in a page that reads from right to left `scrollLeft` runs from 0 down to a negative number, and the far
  * end is the same distance either way. One pixel of slack for sub-pixel scroll positions. Measured on scroll and on resize, never polled.
  */
 function useMoreToScroll(): { readonly ref: RefObject<HTMLElement | null>; readonly more: boolean } {
