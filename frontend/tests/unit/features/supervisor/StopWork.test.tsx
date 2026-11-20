@@ -118,6 +118,14 @@ describe("Stop work: structure", () => {
     expect(document.querySelector("dialog")).toBeNull();
   });
 
+  it("names an off-shift crew in the bar (S13, defect G) and keeps Stop work enabled: the replay moment is after the mock crews' first block", async () => {
+    renderCrews();
+    const button = await press();
+    await barSays("is off shift now. You can still stop work.");
+    expect(button).toBeEnabled();
+    expect(button).toHaveTextContent(/^Stop work/);
+  });
+
   it("test_stop_never_disabled: sending (the press is in flight), and a second press is ignored without disabling anything", async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {

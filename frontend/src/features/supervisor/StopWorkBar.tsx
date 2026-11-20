@@ -177,6 +177,8 @@ export interface StopWorkBarProps {
   readonly notices: StopNotices;
   /** What to say when there is no crew to stop. */
   readonly noCrew: "unavailable" | "none";
+  /** The crew is off shift now (and not stopped): the bar says so above the button. The button stays: a crew can be stopped off shift too. */
+  readonly offShift?: boolean;
 }
 
 // `rule` is the hairline under the notices: without it the last notice runs into the state line below it ("Not sent. Tell the crew now."), which reads as part of that notice.
@@ -285,7 +287,7 @@ function ExpiredNotices({
   );
 }
 
-export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProps) {
+export function StopWorkBar({ crewName, work, notices, noCrew, offShift = false }: StopWorkBarProps) {
   const t = useTranslations("supervisor.stop");
   const time = useTimeFormat();
   const [confirming, setConfirming] = useState(false);
@@ -404,6 +406,11 @@ export function StopWorkBar({ crewName, work, notices, noCrew }: StopWorkBarProp
         {work.noActiveStop ? (
           <p role="status" data-no-active-stop="" className="pb-3 text-base leading-(--sign-leading-text) text-ink-2">
             {t("noActiveStop")}
+          </p>
+        ) : null}
+        {offShift && work.state === "idle" ? (
+          <p data-off-shift="" className="pb-1.5 text-sm leading-(--sign-leading-text) text-ink-2">
+            {t.rich("offShiftNote", { crew: label, bdi })}
           </p>
         ) : null}
         <button ref={setPrimary} type="button" aria-busy={work.state === "sending" || work.busy} onKeyDown={ignoreRepeat} onClick={work.stop} className={PRESS}>

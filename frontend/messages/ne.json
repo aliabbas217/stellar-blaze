@@ -156,7 +156,8 @@
         "label": "डेटाको स्रोत",
         "live": "प्रत्यक्ष",
         "replay": "रिप्ले",
-        "liveUnavailable": "यस डिप्लोयमेन्टमा प्रत्यक्ष मोड चलिरहेको छैन"
+        "liveUnavailable": "यस डिप्लोयमेन्टमा प्रत्यक्ष मोड चलिरहेको छैन",
+        "liveOff": "प्रत्यक्ष: जडान छैन"
       }
     },
     "field": {
@@ -211,6 +212,10 @@
         "stop": "काम रोक्नुहोस्",
         "siteRules": "साइटका नियम पालना गर्नुहोस्",
         "protective": "साइटका नियम: हरेक घण्टा छायाँमा आराम गर्नुहोस्, पानी पिउनुहोस्"
+      },
+      "offShift": {
+        "back": "तपाईंको समूह अहिले सिफ्टबाहिर छ, {time} मा फर्कन्छ। माथिको पङ्क्ति त्यसअघि काम गर्नेहरूका लागि साइटको नियम हो।",
+        "over": "आज तपाईंको समूहको सिफ्ट सकियो। माथिको पङ्क्ति अझै काम गर्नेहरूका लागि साइटको नियम हो।"
       },
       "draftWording": "अहिलेसम्म कुनै चिकित्सकले जाँच गरेका छैनन्।",
       "also": {
@@ -715,7 +720,8 @@
       "expiredClock": "<bdi>{crew}</bdi> को आदेश पठाइएन। थिच्दा यो फोनको समय गलत देखिएको थियो, त्यसैले यसलाई राखिएन। समूहलाई अहिले भन्नुहोस्, आवाजले वा रेडियोले, र अनलाइन हुँदा «काम रोक्नुहोस्» फेरि थिच्नुहोस्।",
       "expired": "<bdi>{crew}</bdi> को आदेश पठाइएन। यसले जडानबिना 60 मिनेट पर्खियो र म्याद सकियो। समूहलाई अहिले भन्नुहोस्, आवाजले वा रेडियोले, र अनलाइन हुँदा «काम रोक्नुहोस्» फेरि थिच्नुहोस्।",
       "noCrew": "समूहको सूची लोड भएन। समूहलाई अहिले काम रोक्न भन्नुहोस्।",
-      "noCrews": "यस साइटमा रोक्नका लागि कुनै समूह छैन।"
+      "noCrews": "यस साइटमा रोक्नका लागि कुनै समूह छैन।",
+      "offShiftNote": "<bdi>{crew}</bdi> अहिले सिफ्टबाहिर छ। तपाईं अझै काम रोक्न सक्नुहुन्छ।"
     }
   },
   "hse": {
@@ -1465,7 +1471,7 @@
       },
       "recorded": {
         "button": "Show a recorded result",
-        "noteMock": "Recorded against the demo mock on {date}, not the live rule checker. It is what the rule checker said for the common roster, not a check of your times.",
+        "noteMock": "A recorded example from {date}, not a live check. It is what the rule checker said for the common roster, not a check of your times.",
         "note": "Recorded on {date}. It is what the rule checker said for the common roster, not a check of your times.",
         "hide": "Hide the recorded result"
       },
@@ -1566,6 +1572,7 @@
       },
       "answer": {
         "who": "API",
+        "exampleValue": "Recorded example",
         "title": "The service answers",
         "waiting": "Waiting for the API",
         "none": "Nothing sent yet.",
@@ -1589,6 +1596,7 @@
         "outcomeValue": "Refused",
         "why": "Why",
         "whyValue": "A worker's health data is never released to an employer, whatever the reason given.",
+        "exampleValue": "Recorded example",
         "rules": "Rules in force",
         "model": "Model",
         "noModel": "none loaded",
@@ -1645,7 +1653,7 @@
         },
         "notReady": "The demo site is still loading. Try again in a moment.",
         "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
-        "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
+        "recordedMock": "A recorded example, not a live call. Press the button to make a real call to the demo API."
       }
     },
     "landing": {

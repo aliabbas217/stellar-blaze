@@ -81,6 +81,9 @@ export function GovernanceLayout({ run, recorded, siteName, siteId, pending, log
   const locale = claimsLocale(useLocale());
   const { answer, auditRow, logRows, shownRows, runLive } = run;
 
+  // Before any call the page draws the recorded run; when that recording came from the demo mock its ids ("mock-req-1", "mock-0") are
+  // placeholders, so they are not printed and the cards say "Recorded example". A call this page just made is live and prints its own.
+  const example = !runLive && recorded?.source === "msw-mock";
   const path = `/api/v1/sites/${siteId ?? recorded?.siteId ?? "{site_id}"}/data-requests`;
   const clock = (iso: string | null): string => (iso === null ? BLANK_CLOCK : clockTime(iso, locale));
 
@@ -113,10 +116,10 @@ export function GovernanceLayout({ run, recorded, siteName, siteId, pending, log
               />
             </Step>
             <Step time={pending ? BLANK_CLOCK : clock(answer?.answeredAt ?? null)} who={t("answer.who")} tone={answer === null ? "wait" : "refuse"}>
-              <AnswerCard answer={answer} pending={pending} />
+              <AnswerCard answer={answer} pending={pending} example={example} />
             </Step>
             <Step time={pending ? BLANK_CLOCK : clock(auditRow?.at ?? null)} who={t("audit.who")} tone={auditRow === null ? "wait" : "done"}>
-              <AuditCard row={auditRow} clock={auditRow === null ? null : clock(auditRow.at)} pending={pending} />
+              <AuditCard row={auditRow} clock={auditRow === null ? null : clock(auditRow.at)} pending={pending} example={example} />
             </Step>
             <Step time={pending ? BLANK_CLOCK : clock(logRows[0]?.at ?? null)} who={t("phone.who")} tone={logRows.length === 0 ? "wait" : "done"}>
               <h3 className="text-base font-semibold text-ink">{t("phone.title")}</h3>

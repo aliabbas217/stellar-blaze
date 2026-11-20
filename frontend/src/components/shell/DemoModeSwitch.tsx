@@ -34,7 +34,7 @@ export function DemoModeSwitch({
   const noteId = useId();
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col">
       <div role="group" aria-label={t("label")} className="inline-flex gap-2">
         {MODES.map((mode) => {
           const unavailable = mode === "live" && liveUnavailable;
@@ -56,12 +56,12 @@ export function DemoModeSwitch({
                 })}
             className={`${CHIP} min-w-(--target) px-3 font-body text-sm disabled:cursor-not-allowed disabled:bg-transparent disabled:text-ink-3`}
           >
-            {t(mode)}
+            {unavailable ? t("liveOff") : t(mode)}
           </button>
           );
         })}
       </div>
-      <p id={noteId} role="status" className="font-body text-sm text-ink-2">
+      <p id={noteId} role="status" className={`font-body text-sm leading-(--sign-leading-text) text-ink-2${liveUnavailable ? " sr-only sm:not-sr-only sm:mt-1" : ""}`}>
         {liveUnavailable ? t("liveUnavailable") : null}
       </p>
     </div>

@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 import ar from "../../messages/ar.json";
-import en from "../../messages/en.json";
 import ur from "../../messages/ur.json";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
 import { watchConsole } from "./gate.ts";
@@ -267,7 +266,7 @@ test.describe("rtl: Urdu field screens", () => {
 });
 
 test.describe("rtl: Arabic and the claims surfaces", () => {
-  test("ar replay scoreboard mirrors and keeps Western digits", async ({ page }) => {
+  test("ar replay scoreboard is Arabic, mirrors and keeps Western digits", async ({ page }) => {
     await open(page, "/ar/replay", { size: DESK });
     await expect(page.locator("[data-claims-english]")).toHaveCount(1);
     // The chrome mirrors: the document and the desk header are right to left, and the wordmark (the first item) is at the right edge.
@@ -284,34 +283,19 @@ test.describe("rtl: Arabic and the claims surfaces", () => {
     // The menu is the active locale's words.
     await expect(page.getByRole("navigation", { name: ar.shell.desk.menu })).toBeVisible();
     await expect(page.getByRole("navigation", { name: ar.shell.desk.menu }).getByRole("link", { name: ar.shell.desk.nav.scoreboard })).toBeVisible();
-    // The claims block is English and left to right; its headings are the English source, byte for byte.
+    // Arabic claims are translated (ADR 0093): the block follows the page, right to left, and its headings are the Arabic catalogue's, byte for byte.
     const block = page.locator("[data-claims-english]");
-    await expect(block).toHaveAttribute("lang", "en");
-    await expect(block).toHaveAttribute("dir", "ltr");
-    await expect(block.getByRole("heading", { level: 1 })).toHaveText(en.judge.scoreboard.title);
-    expect(await block.locator("main").evaluate((el) => getComputedStyle(el).direction)).toBe("ltr");
-    // English paragraphs in the block are set with the English leading, not Arabic's 1.8.
-    const leading = await block.locator("p").first().evaluate((el) => Number.parseFloat(getComputedStyle(el).lineHeight) / Number.parseFloat(getComputedStyle(el).fontSize));
-    expect(leading).toBeCloseTo(1.5, 1);
-    // The translated story footer inside the block restores Arabic and right to left.
+    await expect(block).toHaveAttribute("lang", "ar");
+    await expect(block).toHaveAttribute("dir", "rtl");
+    await expect(block.getByRole("heading", { level: 1 })).toHaveText(ar.judge.scoreboard.title);
+    expect(await block.locator("main").evaluate((el) => getComputedStyle(el).direction)).toBe("rtl");
+    // The story footer keeps Arabic and right to left too.
     const nav = page.locator("[data-story-nav]");
     await expect(nav).toHaveAttribute("lang", "ar");
     await expect(nav).toHaveAttribute("dir", "rtl");
-    // The claims copy is English all the way down, dates and lists included: no Arabic-script letter in it, but for the translated
-    // pieces that restore the page language (the story footer, a banner, a stamp). "15 May to 30 Sep", never "15 مايو to 30 سبتمبر".
-    const arabicInClaims = await block.evaluate((root, script) => {
-      const arabic = new RegExp(script);
-      const found: string[] = [];
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-        const owner = node.parentElement;
-        const text = node.textContent ?? "";
-        if (owner === null || !arabic.test(text) || owner.closest("[data-story-nav], [role='status'], [role='note'], script, style, svg") !== null) continue;
-        found.push(text.trim().slice(0, 60));
-      }
-      return found;
-    }, ARABIC_SCRIPT.source);
-    expect(arabicInClaims, "no Arabic-script text inside the English claims block").toEqual([]);
+    // The lede is Arabic script, not the English source, and no horizontal scroll.
+    expect(await block.locator("main p").first().innerText()).toMatch(ARABIC_SCRIPT);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     // Digits stay Western everywhere on the page.
     expect(await page.locator("body").innerText()).not.toMatch(NON_WESTERN_DIGIT);
     expect(await page.locator("body").innerText()).toMatch(/\d/);

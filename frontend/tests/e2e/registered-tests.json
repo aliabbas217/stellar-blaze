@@ -485,7 +485,7 @@
       "hse: lists each crew of the demo site with its plan and whether work is stopped, as the API returns it",
       "hse: reads well at desk width and has no horizontal scroll",
       "hse: the boundary panel says employer requests are refused and logged, and its link opens the refusal",
-      "tour: five numbered stops in order, each Open link and the Where from go to a page that answers",
+      "tour: seven numbered stops in order, each Open link and the Where from go to a page that answers",
       "tour: the first stop opens the story, and the Demo controls link opens the safety view's controls",
       "tour: the review tile on the landing page leads here"
     ],
@@ -496,7 +496,7 @@
       "hse: lists each crew of the demo site with its plan and whether work is stopped, as the API returns it",
       "hse: reads well at desk width and has no horizontal scroll",
       "hse: the boundary panel says employer requests are refused and logged, and its link opens the refusal",
-      "tour: five numbered stops in order, each Open link and the Where from go to a page that answers",
+      "tour: seven numbered stops in order, each Open link and the Where from go to a page that answers",
       "tour: the first stop opens the story, and the Demo controls link opens the safety view's controls",
       "tour: the review tile on the landing page leads here"
     ]
@@ -911,7 +911,7 @@
     "mobile-chromium": [
       "rtl: Arabic and the claims surfaces > ar landing mirrors: the copy and the story footer are Arabic right to left, the story chapters English, the role door linked",
       "rtl: Arabic and the claims surfaces > ar plan sign-off keeps every clock isolated, and the worker and supervisor pages never read C° before a number",
-      "rtl: Arabic and the claims surfaces > ar replay scoreboard mirrors and keeps Western digits",
+      "rtl: Arabic and the claims surfaces > ar replay scoreboard is Arabic, mirrors and keeps Western digits",
       "rtl: Arabic and the claims surfaces > ur replay day, try and governance keep the English block and the translated chrome",
       "rtl: Hindi, Bengali and Nepali stay left to right with their own leading, and the English block keeps the English face",
       "rtl: Urdu field screens > ur alert card is rtl and unclipped, the clock is isolated and the dock stays",
@@ -930,7 +930,7 @@
     "desktop-chromium": [
       "rtl: Arabic and the claims surfaces > ar landing mirrors: the copy and the story footer are Arabic right to left, the story chapters English, the role door linked",
       "rtl: Arabic and the claims surfaces > ar plan sign-off keeps every clock isolated, and the worker and supervisor pages never read C° before a number",
-      "rtl: Arabic and the claims surfaces > ar replay scoreboard mirrors and keeps Western digits",
+      "rtl: Arabic and the claims surfaces > ar replay scoreboard is Arabic, mirrors and keeps Western digits",
       "rtl: Arabic and the claims surfaces > ur replay day, try and governance keep the English block and the translated chrome",
       "rtl: Hindi, Bengali and Nepali stay left to right with their own leading, and the English block keeps the English face",
       "rtl: Urdu field screens > ur alert card is rtl and unclipped, the clock is isolated and the dock stays",

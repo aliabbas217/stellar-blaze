@@ -20,7 +20,8 @@ describe("DemoModeSwitch", () => {
   it("when Live is unavailable it is disabled, not pressed, and a plain line says why", async () => {
     const onChange = vi.fn();
     renderWithIntl(<DemoModeSwitch value="live" onChange={onChange} liveUnavailable />);
-    const live = screen.getByRole("button", { name: "Live" });
+    // The chip says it in two words, so the switch costs no extra row on a phone; the full sentence is the status line (visible from sm up, always read aloud).
+    const live = screen.getByRole("button", { name: "Live: not connected" });
     expect(live).toBeDisabled();
     expect(live).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("status")).toHaveTextContent("Live feeds are not connected in this demo");

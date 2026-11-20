@@ -100,6 +100,12 @@ export interface TodayDescription {
   readonly waypoints: readonly WaypointSpec[];
   /** The crew's timeline is loaded for this day and its shift is empty. */
   readonly noShift: boolean;
+  /**
+   * The crew has shift blocks today and none covers now (the midday break, or after the last block): the crew pages say "off shift
+   * now", so this screen says so too. `backAtHour` is the next block's start as an hour of the site's day, null when none is left.
+   * Null when the crew is on shift, has no shift at all (that is `noShift`), or no time or timeline is known.
+   */
+  readonly offShift: { readonly backAtHour: number | null } | null;
   readonly crewName: string | null;
 }
 
@@ -121,6 +127,16 @@ function shiftSpan(timeline: Timeline | null, zone: string): { from: number; to:
   const to = Math.ceil(endHour);
   // A shift that crosses midnight, or a malformed one, would draw a backwards spine: the usual day instead.
   return to > from ? { from, to, endHour } : { from: DEFAULT_FROM, to: DEFAULT_TO, endHour: null };
+}
+
+/** The crew's shift blocks are the API's own; "off shift" is no block covering `now`, the rule the crew pages use (supervisor/crew-model.ts). */
+function offShiftNow(timeline: Timeline | null, now: Date, nowHour: number | null, zone: string): TodayDescription["offShift"] {
+  const blocks = (timeline?.shift ?? []).map((range) => ({ from: Date.parse(range.starts_at), to: Date.parse(range.ends_at), startsAt: range.starts_at }));
+  if (nowHour === null || blocks.length === 0 || blocks.some((block) => Number.isNaN(block.from) || Number.isNaN(block.to))) return null;
+  const nowMs = now.getTime();
+  if (blocks.some((block) => block.from <= nowMs && nowMs < block.to)) return null;
+  const next = blocks.filter((block) => block.from > nowMs).sort((a, b) => a.from - b.from)[0];
+  return { backAtHour: next === undefined ? null : hourOfDay(new Date(next.startsAt), zone) };
 }
 
 function banNoteOf(forecast: Forecast, ban: BanState): BanNote | null {
@@ -202,6 +218,7 @@ export function describeToday(input: DescribeInput): TodayDescription {
     banNote: banNoteOf(forecast, ban),
     waypoints,
     noShift: timeline !== null && timeline.shift.length === 0,
+    offShift: offShiftNow(timeline, now, nowHour, zone),
     crewName: timeline?.crew_name ?? null,
   };
 }
