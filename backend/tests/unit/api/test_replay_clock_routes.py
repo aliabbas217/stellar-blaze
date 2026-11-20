@@ -210,6 +210,85 @@ def test_the_forecast_carries_the_domain_clock_so_a_web_app_reads_one_now(settin
     assert later["now"] == "2026-07-01T07:30:00Z"  # real time passed; the replay clock follows at the same speed
 
 
+# --- the window repeats (ADR 0034 amendment of 2026-11-20) ---------------------------------------------------------
+
+
+DEMO_ANCHOR = datetime(2026, 7, 1, 6, 10, tzinfo=UTC)  # 10:10 in Asia/Dubai: the deployed SB_REPLAY_NOW
+DEMO_END = datetime(2026, 7, 1, 13, 30, tzinfo=UTC)  # 17:30 Asia/Dubai
+
+
+def demo_world(settings: Settings) -> World:
+    replay = settings.model_copy(
+        update={"forecast_source": "replay", "replay_snapshot_id": "snap", "replay_default_date": REPLAY_DAY}
+    )
+    return make_world(replay, clock=Clock(WALL), replay_anchor=DEMO_ANCHOR)
+
+
+def test_regression_a_50_hour_old_epoch_serves_a_now_inside_the_working_day(settings: Settings) -> None:
+    """Live 2026-11-20: 50 hours after the last reset the supervisor screen said "off shift, No level"."""
+    world = demo_world(settings)
+    with client_for(world) as client:
+        world.clock.advance(hours=50)
+        body = client.get(FORECAST).json()
+
+    assert body["mode"] == "replay"
+    assert (
+        body["now"] == "2026-07-01T12:10:00Z"
+    )  # 16:10 Dubai on the replay day (50 h = 6 windows + 6 h), not 2 days on
+
+
+def test_the_forecast_now_wraps_from_17_29_to_10_10_at_the_exact_instant(settings: Settings) -> None:
+    world = demo_world(settings)
+    with client_for(world) as client:
+        world.clock.advance(hours=7, minutes=19, seconds=59)
+        before = client.get(FORECAST).json()["now"]
+        world.clock.advance(seconds=1)
+        after = client.get(FORECAST).json()["now"]
+
+    assert before == "2026-07-01T13:29:59Z"
+    assert after == "2026-07-01T06:10:00Z"
+
+
+def test_a_stop_of_an_earlier_cycle_comes_back_at_the_same_domain_time_and_nothing_crashes(settings: Settings) -> None:
+    """Rows of the replay day are scoped by epoch and carry domain timestamps: in the next cycle the same epoch's stop
+    is in the domain future until the clock reaches its time again. The behaviour is kept (nothing is deleted)."""
+    world = demo_world(settings)
+    with client_for(world) as client:
+        world.clock.advance(hours=6)  # 16:10 Dubai, inside crew B's afternoon block (15-18)
+        stop = client.post(STOPS, json=HEAT, headers=bearer())
+        in_cycle_one = levels(client.get(TIMELINE).json())
+        world.clock.advance(hours=1, minutes=40)  # 7 h 40 min since the epoch: cycle two, domain time 10:30
+        in_cycle_two = levels(client.get(TIMELINE).json())
+        plan_two = client.get(PLAN, headers=bearer())
+        later = client.post(CREW_A_STOPS, json=HEAT, headers=bearer())  # crew A, in cycle two, at 10:30
+        resumed = client.delete(f"{STOPS}/{stop.json()['id']}", headers=bearer())  # a resume of the cycle-one stop
+        after_resume = levels(client.get(TIMELINE).json())
+
+    assert stop.status_code == 201
+    assert stop.json()["started_at"] == "2026-07-01T12:10:00Z"
+    assert in_cycle_one["2026-07-01T12:00:00Z"] == "red"  # the 16:10 stop covers the rest of the shift ...
+    assert in_cycle_two["2026-07-01T12:00:00Z"] == "red"  # ... and is still there in cycle two, at the same domain time
+    assert plan_two.status_code == 200
+    assert later.status_code == 201
+    assert later.json()["started_at"] == "2026-07-01T06:30:00Z"  # 7 h 40 min mod 7 h 20 min = 20 min: 10:30 Dubai
+    assert resumed.status_code == 204  # clearing a stop that is in the domain future ends it at its own start: no crash
+    assert after_resume["2026-07-01T12:00:00Z"] != "red"  # an undo-sized stop covers nothing
+    record = asyncio.run(world.stops.get(stop.json()["id"]))
+    assert record is not None
+    assert record.epoch_id == 1  # still the row of epoch 1: nothing was moved or deleted
+
+
+def test_a_demo_reset_in_a_later_cycle_re_anchors_to_10_10(settings: Settings) -> None:
+    world = demo_world(settings)
+    with client_for(world) as client:
+        world.clock.advance(hours=50)
+        client.get(FORECAST)
+        client.post(RESET, headers=bearer())
+        body = client.get(FORECAST).json()
+
+    assert body["now"] == "2026-07-01T06:10:00Z"
+
+
 def test_the_forecast_clock_is_the_wall_clock_in_live_mode(settings: Settings) -> None:
     with client_for(make_world(settings, clock=Clock(WALL))) as client:
         body = client.get(FORECAST, params={"date": "2026-07-01"}).json()

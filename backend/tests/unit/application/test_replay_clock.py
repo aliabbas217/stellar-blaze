@@ -10,15 +10,19 @@ import structlog
 from stellar_blaze.application import replay_clock
 from stellar_blaze.application.replay_clock import (
     REPLAY_LOCAL_TIME,
+    REPLAY_WINDOW,
     EpochReplayClock,
     ReplayClockUnavailableError,
     domain_clock,
+    replay_reading,
 )
 
 pytestmark = pytest.mark.unit
 
 ANCHOR = datetime(2025, 7, 10, 7, 10, tzinfo=UTC)  # 11:10 in Asia/Dubai on the replay day
 EPOCH_START = datetime(2026, 11, 15, 9, 0, tzinfo=UTC)  # when the demo epoch began (the site_epoch row), months later
+DEMO_ANCHOR = datetime(2026, 6, 14, 6, 10, tzinfo=UTC)  # the deployed SB_REPLAY_NOW: 10:10 Asia/Dubai on the replay day
+DEMO_END = datetime(2026, 6, 14, 13, 30, tzinfo=UTC)  # 17:30 Asia/Dubai: the end of the demo window (excluded)
 
 
 @pytest.fixture
@@ -424,3 +428,127 @@ def test_a_live_source_ignores_both_settings_and_the_epoch() -> None:
 def test_a_replay_anchor_without_an_epoch_source_is_refused_not_started_at_process_start() -> None:
     with pytest.raises(ValueError, match="epoch source"):
         domain_clock(source="replay", replay_now=ANCHOR, replay_default_date=None, wall=Wall())
+
+
+# --- the window repeats (ADR 0034 amendment of 2026-11-20) --------------------------------------------------------
+
+
+def test_the_window_is_the_7_h_20_min_from_10_10_to_17_30_dubai() -> None:
+    assert timedelta(hours=7, minutes=20) == REPLAY_WINDOW
+    assert DEMO_ANCHOR + REPLAY_WINDOW == DEMO_END
+
+
+@pytest.mark.parametrize(
+    ("elapsed", "reads"),
+    [
+        (timedelta(0), DEMO_ANCHOR),  # the epoch start
+        (timedelta(minutes=1), DEMO_ANCHOR + timedelta(minutes=1)),
+        (timedelta(hours=7, minutes=19, seconds=59), DEMO_END - timedelta(seconds=1)),  # the last second of the window
+        (timedelta(hours=7, minutes=20), DEMO_ANCHOR),  # the wrap instant: back at the anchor, never 17:30
+        (timedelta(hours=7, minutes=20, seconds=1), DEMO_ANCHOR + timedelta(seconds=1)),
+        (timedelta(hours=50), DEMO_ANCHOR + timedelta(hours=6)),  # 6 windows (44 h) + 6 h: 16:10 Dubai
+        (timedelta(days=10), DEMO_ANCHOR + timedelta(hours=5, minutes=20)),  # 32 windows (234 h 40 min) + 5 h 20 min
+        (timedelta(minutes=-10), DEMO_ANCHOR),  # a writer's clock ahead of this reader's: the anchor
+    ],
+    ids=["start", "plus-1-min", "last-second", "wrap-instant", "wrap-plus-1-s", "50-hours", "10-days", "before-start"],
+)
+def test_the_reading_is_the_anchor_plus_the_elapsed_time_modulo_the_window(elapsed: timedelta, reads: datetime) -> None:
+    assert replay_reading(DEMO_ANCHOR, EPOCH_START + elapsed, EPOCH_START) == reads
+
+
+def test_the_reading_is_always_inside_the_window_whatever_the_age_of_the_epoch() -> None:
+    for minutes in range(0, 60 * 24 * 40, 37):  # forty days in 37 minute steps: no phase lines up with the window
+        reading = replay_reading(DEMO_ANCHOR, EPOCH_START + timedelta(minutes=minutes), EPOCH_START)
+        assert DEMO_ANCHOR <= reading < DEMO_END
+
+
+def test_the_reading_refuses_naive_instants() -> None:
+    naive = datetime(2026, 11, 15, 9, 0)  # noqa: DTZ001
+    with pytest.raises(ValueError, match="aware"):
+        replay_reading(DEMO_ANCHOR, naive, EPOCH_START)
+    with pytest.raises(ValueError, match="aware"):
+        replay_reading(DEMO_ANCHOR, EPOCH_START, naive)
+    with pytest.raises(ValueError, match="aware"):
+        replay_reading(naive, EPOCH_START, EPOCH_START)
+
+
+def demo_clock(wall: Wall, source: Source) -> EpochReplayClock:
+    return EpochReplayClock(DEMO_ANCHOR, wall, source)
+
+
+@pytest.mark.asyncio
+async def test_regression_a_50_hour_old_epoch_reads_inside_the_working_day() -> None:
+    """Live 2026-11-20: the clock ran on for two days and the supervisor screen said "off shift, no level"."""
+    wall, source = Wall(EPOCH_START + timedelta(hours=50)), Source()
+    clock = demo_clock(wall, source)
+
+    await clock.refresh()
+
+    reading = clock.now()
+    assert DEMO_ANCHOR <= reading < DEMO_END
+    assert reading == datetime(2026, 6, 14, 12, 10, tzinfo=UTC)  # 16:10 Dubai, the same day as the anchor
+
+
+@pytest.mark.asyncio
+async def test_the_reading_goes_from_17_29_59_to_10_10_at_the_wrap_instant() -> None:
+    wall, source = Wall(EPOCH_START + timedelta(hours=7, minutes=19, seconds=59)), Source()
+    clock = demo_clock(wall, source)
+    await clock.refresh()
+    assert clock.now() == DEMO_END - timedelta(seconds=1)
+
+    wall.advance(seconds=1)  # exactly 7 h 20 min after the epoch start
+
+    assert clock.now() == DEMO_ANCHOR  # a new cycle: allowed to go back, and 17:30 is never read
+    wall.advance(seconds=1)
+    assert clock.now() == DEMO_ANCHOR + timedelta(seconds=1)  # and it runs on at real speed
+
+
+@pytest.mark.asyncio
+async def test_a_wall_clock_that_steps_back_across_the_wrap_holds_the_reading_it_gave() -> None:
+    wall, source = Wall(EPOCH_START + timedelta(hours=7, minutes=20, seconds=30)), Source()
+    clock = demo_clock(wall, source)
+    await clock.refresh()
+    assert clock.now() == DEMO_ANCHOR + timedelta(seconds=30)  # the second cycle
+
+    wall.advance(seconds=-40)  # an NTP correction back over the wrap: the previous cycle's 17:29:50
+
+    assert clock.now() == DEMO_ANCHOR + timedelta(seconds=30)  # held, not 17:29:50 and then back again
+    wall.advance(seconds=40)
+    assert clock.now() == DEMO_ANCHOR + timedelta(seconds=30)
+    wall.advance(seconds=1)
+    assert clock.now() == DEMO_ANCHOR + timedelta(seconds=31)
+
+
+@pytest.mark.asyncio
+async def test_two_processes_read_the_same_instant_before_at_and_long_after_the_wrap() -> None:
+    wall, source = Wall(EPOCH_START + timedelta(hours=3)), Source()
+    api = demo_clock(wall, source)
+    for elapsed in (timedelta(hours=7, minutes=19, seconds=59), timedelta(hours=7, minutes=20), timedelta(hours=50)):
+        wall.now = EPOCH_START + elapsed
+        worker = demo_clock(wall, source)  # a worker restarted this second: no cache, no history
+        await api.refresh(force=True)
+        await worker.refresh()
+        assert api.now() == worker.now()  # the same wall second gives the same domain time in both processes
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_replay_now_anchors_the_window_wherever_it_is() -> None:
+    late = datetime(2026, 6, 14, 14, 0, tzinfo=UTC)  # 18:00 Dubai: the window is 18:00 to 01:20, past midnight
+    wall, source = Wall(EPOCH_START + timedelta(hours=7, minutes=20, seconds=5)), Source()
+    clock = EpochReplayClock(late, wall, source)
+    await clock.refresh()
+
+    assert clock.now() == late + timedelta(seconds=5)  # the window is anchor + 7 h 20 min, not a fixed 17:30
+
+
+@pytest.mark.asyncio
+async def test_a_reset_in_a_later_cycle_re_anchors_to_the_anchor() -> None:
+    wall, source = Wall(EPOCH_START + timedelta(hours=50)), Source()
+    clock = demo_clock(wall, source)
+    await clock.refresh()
+    assert clock.now() == datetime(2026, 6, 14, 12, 10, tzinfo=UTC)
+
+    source.start = wall.now  # a demo reset
+    await clock.refresh(force=True)
+
+    assert clock.now() == DEMO_ANCHOR

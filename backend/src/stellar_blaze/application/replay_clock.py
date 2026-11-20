@@ -3,14 +3,20 @@
 Replay mode serves a fixed past day, but a crew stop and a sign-off are stamped with "now". Stamped with the real clock
 they would never fall on the replay day, and "Stop work" would visibly do nothing. ``EpochReplayClock`` reads
 
-    replay anchor + (wall now - start of the current demo epoch)
+    replay anchor + ((wall now - start of the current demo epoch) mod REPLAY_WINDOW)
 
 where the epoch start is the ``started_at`` of the latest ``site_epoch`` row of the synthetic sites, read from Postgres
 (``ports.replay_epoch.ReplayEpochSource``). The API and ``sb-jobs alerts run`` are separate processes; because both read
 the same row they agree on replay time, and a restart of either changes nothing (it used to return that process to the
 anchor). A demo reset (ADR 0066) starts a new epoch, so it re-anchors both: the API at once (the reset route forces a
-refresh), the worker at its next cycle, within the cache interval. The replay time passes 17:30 Dubai about 7 h 20 min
-after the epoch starts; after that a reset is needed (the README run recipe says when).
+refresh), the worker at its next cycle, within the cache interval.
+
+The replay time stays inside ONE working-day window of 7 h 20 min from the anchor (10:10 to 17:30 Dubai at the deployed
+anchor) and repeats: at the end of the window it goes back to the anchor and runs on at real speed (ADR 0034
+amendment of 2026-11-20), so the demo shows an active shift at any hour of any day and needs no reset to stay inside it.
+The window is half-open, ``[anchor, anchor + 7 h 20 min)``, and is counted from the anchor whatever time of day that
+is. The reading is a pure function of the wall time and the epoch row, so the api and the worker agree through every
+wrap.
 
 The clock is read synchronously (``Services.clock()``, in stores and use cases) but the epoch start lives in a database,
 so it is read by an explicit ``await clock.refresh()`` at the ENTRY of a request or a job cycle and cached for a few
@@ -37,9 +43,11 @@ from stellar_blaze.ports.replay_epoch import ReplayEpochSource
 __all__ = [
     "REPLAY_LOCAL_TIME",
     "REPLAY_LOCAL_ZONE",
+    "REPLAY_WINDOW",
     "EpochReplayClock",
     "ReplayClockUnavailableError",
     "domain_clock",
+    "replay_reading",
 ]
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -47,6 +55,9 @@ logger = structlog.stdlib.get_logger(__name__)
 # The F2 prototype's replay time: 11:10 on the replay date, Asia/Dubai local (the demo site's zone, UTC+4, no DST).
 REPLAY_LOCAL_TIME: Final = time(11, 10)
 REPLAY_LOCAL_ZONE: Final = "Asia/Dubai"
+# The demo day the replay clock repeats: 10:10 to 17:30 Dubai at the deployed anchor (SB_REPLAY_NOW), the window
+# ADR 0034 has always named. The window starts at the anchor and ends WINDOW later, wherever the anchor is.
+REPLAY_WINDOW: Final = timedelta(hours=7, minutes=20)
 
 
 class ReplayClockUnavailableError(Exception):
@@ -61,12 +72,29 @@ def _aware(value: datetime, what: str) -> datetime:
     return value
 
 
-class EpochReplayClock:
-    """``now()`` is ``anchor + max(0, wall now - epoch start)``; the epoch start is cached from ``source``.
+def replay_reading(anchor: datetime, wall_now: datetime, epoch_start: datetime) -> datetime:
+    """The replay time at ``wall_now``: ``anchor + (max(0, wall_now - epoch_start) mod REPLAY_WINDOW)``.
 
-    Aware UTC only. Within one epoch the reading never moves backwards (a wall clock that steps back, an NTP correction,
-    leaves it where it was until the wall catches up); a CHANGED epoch start (a demo reset) moves it back to the anchor.
-    A reading just before the epoch start (a replica whose clock runs behind the writer's) is the anchor.
+    Real speed inside the window ``[anchor, anchor + REPLAY_WINDOW)``; at the end of the window (an elapsed time of
+    exactly one window) it is the anchor again, and so on every window. A ``wall_now`` before ``epoch_start`` (a replica
+    whose clock runs behind the writer's) is the anchor. Pure: the same three instants give the same reading in every
+    process. All three are aware (any offsets); the result has the anchor's offset.
+
+    Raises:
+        ValueError: An argument is naive.
+    """
+    elapsed = _aware(wall_now, "the wall clock reading") - _aware(epoch_start, "the epoch start")
+    return _aware(anchor, "the replay anchor") + max(timedelta(0), elapsed) % REPLAY_WINDOW
+
+
+class EpochReplayClock:
+    """``now()`` is ``replay_reading``: ``anchor + (max(0, wall now - epoch start) mod REPLAY_WINDOW)``; the epoch
+    start is cached from ``source``.
+
+    Aware UTC only. Within one cycle of the window the reading never moves backwards (a wall clock that steps back, an
+    NTP correction, leaves it where it was until the wall catches up). It moves back at only two moments: the end of the
+    window (the next cycle starts at the anchor) and a CHANGED epoch start (a demo reset, which also starts at the
+    anchor). A reading just before the epoch start (a replica whose clock runs behind the writer's) is the anchor.
 
     ``refresh`` is awaited by whoever is about to read: it reads the source when the last try is older than ``ttl_s``
     (measured on ``wall``) or when ``force`` is set (the demo-reset route), one read at a time however many callers
@@ -106,7 +134,7 @@ class EpochReplayClock:
         self._epoch_start: datetime | None = None  # None with ``_loaded_at`` set: the database has no synthetic epoch
         self._loaded_at: datetime | None = None  # wall time of the last successful read; None: never read
         self._attempted_at: datetime | None = None  # wall time of the last try, good or bad
-        self._last: datetime | None = None  # the last reading of this epoch (monotone)
+        self._last: tuple[int, datetime] | None = None  # (cycle of the window, reading): monotone within an epoch
         # An asyncio.Lock belongs to the loop that first waits on it; the clock outlives a test's loops, so it is made
         # again for a new loop (a process has one loop and never does).
         self._lock = asyncio.Lock()
@@ -159,11 +187,15 @@ class EpochReplayClock:
             raise ReplayClockUnavailableError(
                 f"the replay epoch start could not be refreshed for more than {self._max_stale.total_seconds():g} s"
             )
-        current = self._anchor + max(timedelta(0), wall_now - self._epoch_start)
+        cycle = max(timedelta(0), wall_now - self._epoch_start) // REPLAY_WINDOW
+        reading = replay_reading(self._anchor, wall_now, self._epoch_start)
+        # (cycle, reading) only grows: inside a cycle a stepped-back wall holds the reading, across the wrap the cycle
+        # number makes the move back to the anchor a move forward, and a wall stepped back OVER the wrap holds too.
         if self._last is not None:
-            current = max(current, self._last)
-        self._last = current
-        return current
+            self._last = max(self._last, (cycle, reading))
+        else:
+            self._last = (cycle, reading)
+        return self._last[1]
 
     def __call__(self) -> datetime:
         """The ``Services.clock`` shape: a callable that returns the instant."""

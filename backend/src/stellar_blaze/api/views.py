@@ -191,7 +191,9 @@ async def load_site_day(
     mode = serving_mode(runtime.settings)
     key = (site.id, local_date, snapshot.sha256, snapshot.version_id, model, mode)
     hit = services.day_cache.get(key)
-    if hit is not None and now - hit[0] < DAY_CACHE_TTL:
+    # A negative age is not fresh: the domain clock goes back at the end of the replay window and at a demo reset, and
+    # an entry stamped in its "future" must not be served until the clock catches up with it.
+    if hit is not None and timedelta(0) <= now - hit[0] < DAY_CACHE_TTL:
         cached: SiteDay = hit[1]
         return cached
     day = await site_day(
