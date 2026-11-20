@@ -7,6 +7,8 @@ export interface AuditCardProps {
   readonly row: AuditRow | null;
   readonly clock: string | null;
   readonly pending: boolean;
+  /** The row is from a recorded example (not a live call): the version ids and model are placeholders of the recording and are not printed. */
+  readonly example?: boolean;
 }
 
 export const AUDIT_SKELETON_HEIGHT = "13rem";
@@ -16,7 +18,7 @@ export const AUDIT_SKELETON_HEIGHT = "13rem";
  * the page's own sentence. The version ids are identifiers (mono). The log is append-only and tamper-evident: an edited
  * row is detected, not prevented, which is why the wording is "tamper-evident".
  */
-export function AuditCard({ row, clock, pending }: AuditCardProps) {
+export function AuditCard({ row, clock, pending, example = false }: AuditCardProps) {
   const t = useTranslations("judge.governance.audit");
   return (
     <div className="grid content-start gap-3" aria-busy={pending}>
@@ -43,11 +45,11 @@ export function AuditCard({ row, clock, pending }: AuditCardProps) {
           <dd className="text-ink">{t("whyValue")}</dd>
           <dt className="text-ink-3">{t("rules")}</dt>
           <dd className="font-mono text-xs break-all text-ink" dir="ltr" translate="no">
-            {row.policyVersion} · {row.configVersion}
+            {example ? t("exampleValue") : `${row.policyVersion} · ${String(row.configVersion)}`}
           </dd>
           <dt className="text-ink-3">{t("model")}</dt>
           <dd className="font-mono text-xs break-all text-ink" dir="ltr" translate="no">
-            {row.modelId ?? t("noModel")}
+            {example ? t("exampleValue") : (row.modelId ?? t("noModel"))}
           </dd>
         </dl>
       )}

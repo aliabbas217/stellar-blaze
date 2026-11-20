@@ -1,9 +1,9 @@
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { RuleLabel } from "@/components/provenance/RuleLabel";
 import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 import { clockOf } from "./runs";
 import type { ViolationView } from "./view";
-import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { claimsLocale } from "@/i18n/claims-english";
 import { useRuleName } from "./rule-name";
 
 /**
@@ -14,7 +14,7 @@ import { useRuleName } from "./rule-name";
 export function ViolationList({ violations }: { readonly violations: readonly ViolationView[] }) {
   const t = useTranslations("judge.try");
   const nameOf = useRuleName();
-  const locale = CLAIMS_LOCALE;
+  const locale = claimsLocale(useLocale());
   const list = new Intl.ListFormat(locale, { type: "conjunction" });
   return (
     <ol className="grid gap-3" data-violations="">

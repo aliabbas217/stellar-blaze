@@ -8,6 +8,8 @@ export interface AnswerCardProps {
   /** The answer to show: the live one, or the recorded one before any call. Null when there is none. */
   readonly answer: RefusalAnswer | null;
   readonly pending: boolean;
+  /** The answer is a recorded example (not a live call): its request id is a placeholder of the recording and is not printed as an id. */
+  readonly example?: boolean;
 }
 
 /** The skeleton's height: the answer card's content (status line, content type, four fields). */
@@ -30,7 +32,7 @@ export function AnswerCard(props: AnswerCardProps) {
   );
 }
 
-function AnswerBody({ answer, pending }: AnswerCardProps) {
+function AnswerBody({ answer, pending, example = false }: AnswerCardProps) {
   const t = useTranslations("judge.governance.answer");
   return (
     <div className="grid content-start gap-3" aria-busy={pending}>
@@ -74,7 +76,7 @@ function AnswerBody({ answer, pending }: AnswerCardProps) {
               <>
                 <dt className="text-ink-3">{t("requestId")}</dt>
                 <dd className="font-mono text-xs break-all text-ink" dir="ltr" translate="no">
-                  {answer.requestId}
+                  {example ? t("exampleValue") : answer.requestId}
                 </dd>
               </>
             )}

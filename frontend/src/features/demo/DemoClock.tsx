@@ -4,12 +4,17 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Suspense, useSyncExternalStore } from "react";
 import { useClock } from "@/features/demo/useClock";
 
-function ClockText() {
+/** The "not yet" reading: kept for its width, never seen. FieldShell hides the whole clock label while this is in it (`data-clock-pending`). */
+function Pending() {
   const t = useTranslations("shell.field");
+  return <span data-clock-pending="">{t("pendingClock")}</span>;
+}
+
+function ClockText() {
   const format = useFormatter();
   const now = useClock();
   // No time is known until the API's clock has answered: the same "not yet" reading as before hydration, never a guessed time.
-  if (now === null) return t("pendingClock");
+  if (now === null) return <Pending />;
   // 24-hour, Western digits in every language, in the site's zone (the provider's `timeZone`): the same options as the
   // named "time" format of src/i18n/request.ts, written out so the client provider needs no `formats`.
   return <>{format.dateTime(now, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", numberingSystem: "latn" })}</>;
@@ -37,11 +42,10 @@ function useHydrated(): boolean {
  * not hidden, and the server's reading was never the right one in replay mode anyway (the replay time comes from the API's own clock).
  */
 export function DemoClock() {
-  const t = useTranslations("shell.field");
   const hydrated = useHydrated();
-  if (!hydrated) return t("pendingClock");
+  if (!hydrated) return <Pending />;
   return (
-    <Suspense fallback={t("pendingClock")}>
+    <Suspense fallback={<Pending />}>
       <ClockText />
     </Suspense>
   );

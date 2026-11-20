@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Banner } from "@/components/states/Banner";
 import { EmptyState } from "@/components/states/EmptyState";
@@ -12,7 +12,8 @@ import { Stamp } from "@/components/provenance/Stamp";
 import { StoryNav } from "@/components/shell/StoryNav";
 import { SyntheticDemoBanner } from "@/components/shell/SyntheticDemoBanner";
 import { IslandStatus } from "@/features/judge/live/IslandStatus";
-import { CLAIMS_ENGLISH, CLAIMS_LOCALE, ClaimsEnglish } from "@/i18n/claims-english";
+import { CLAIMS_ENGLISH, CLAIMS_TRANSLATED_LOCALES, claimsAttrs, claimsLocale, ClaimsEnglish } from "@/i18n/claims-english";
+import { CLAIMS_TRANSLATED_LOCALES as SYNC_TRANSLATED_LOCALES } from "../../../scripts/i18n-sync.mjs";
 import arMessages from "../../../messages/ar.json";
 import enMessages from "../../../messages/en.json";
 import urMessages from "../../../messages/ur.json";
@@ -37,7 +38,7 @@ vi.mock("@/i18n/navigation", () => ({
 
 describe("claims blocks are English and left to right", () => {
   it("ClaimsEnglish marks its content lang=en dir=ltr without adding a box (display: contents)", () => {
-    const { container } = render(
+    const { container } = renderWithIntl(
       <ClaimsEnglish>
         <p>Warnings</p>
       </ClaimsEnglish>,
@@ -54,13 +55,13 @@ describe("claims blocks are English and left to right", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/[locale]/(judge)/replay/layout.tsx"), "utf8");
     expect(layout).toMatch(/<ClaimsEnglish>\{children\}<\/ClaimsEnglish>/);
     const chapters = readFileSync(join(process.cwd(), "src/features/judge/landing/LandingSlides.tsx"), "utf8");
-    expect(chapters, "judge.landing.story.* is Tier 2: the story slides are lang=en dir=ltr").toMatch(/const CLAIMS = \{ \.\.\.CLAIMS_ENGLISH, "data-claims-english": "" \} as const;/);
-    expect(chapters.match(/\{\.\.\.CLAIMS\}/g)?.length, "six slides carry it, 'Ways in' does not").toBe(6);
+    expect(chapters, "judge.landing.story.* is Tier 2: the story slides are lang=en dir=ltr (the page's own in a translated locale)").toMatch(/\.\.\.useClaimsAttrs\(\), "data-claims-english": ""/);
+    expect(chapters.match(/\{\.\.\.claims\}/g)?.length, "six slides carry it, 'Ways in' does not").toBe(6);
   });
 
-  it("the proof chip and the proof drawer (judge.proof, states.proof) are English blocks wherever they are mounted", () => {
+  it("the proof chip and the proof drawer (judge.proof, states.proof) are claims blocks wherever they are mounted (English, or the page's own in Arabic)", () => {
     for (const file of ["ProofChip.tsx", "ProofDrawer.tsx"]) {
-      expect(readFileSync(join(process.cwd(), "src/components/provenance", file), "utf8"), file).toMatch(/CLAIMS_ENGLISH/);
+      expect(readFileSync(join(process.cwd(), "src/components/provenance", file), "utf8"), file).toMatch(/useClaimsAttrs/);
     }
   });
 });
@@ -154,6 +155,12 @@ describe("the proof chip: English for its own words, the page's language for a c
     expect(screen.getByRole("button")).toHaveAttribute("dir", "ltr");
   });
 
+  it("in Arabic, whose claims are translated, the default chip is in the page's language and direction", () => {
+    renderWithIntl(<ProofChip proof={proof} />, { locale: "ar", messages: arMessages });
+    expect(screen.getByRole("button")).toHaveAttribute("lang", "ar");
+    expect(screen.getByRole("button")).toHaveAttribute("dir", "rtl");
+  });
+
   it("a chip with its own label (Today's \"Why Orange?\") keeps the page's language and direction", () => {
     renderWithIntl(<ProofChip proof={proof} label="نارنجی کیوں؟" />, { locale: "ur", messages: urMessages });
     expect(screen.getByRole("button")).toHaveAttribute("lang", "ur");
@@ -161,20 +168,31 @@ describe("the proof chip: English for its own words, the page's language for a c
   });
 });
 
-describe("claims surfaces format in English, whatever the page language", () => {
+describe("claims surfaces format in English, except in a locale whose claims are translated (Arabic)", () => {
   const dir = join(process.cwd(), "src/features/judge");
   const walk = (path: string): string[] =>
     readdirSync(path, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(join(path, entry.name)) : /\.tsx?$/.test(entry.name) ? [join(path, entry.name)] : []));
   // The landing page is translated copy (Tier 1) and formats in the page language; every other judge file is a claims surface.
   const claimsFiles = [...walk(dir).filter((file) => !file.split(String.fromCharCode(92)).join("/").includes("/landing/")), join(process.cwd(), "src/components/charts/SeasonPlayer.tsx")];
 
-  it("no claims view reads the page locale: dates, numbers and lists are English (\"15 May to 30 Sep\", never \"15 مايو to 30 سبتمبر\")", () => {
+  it("a claims view reads the page locale only through claimsLocale(): a locale that is not translated gets English dates, numbers and lists", () => {
     expect(claimsFiles.length).toBeGreaterThan(20);
-    const following = claimsFiles.filter((file) => /\buseLocale\s*\(|\bgetLocale\s*\(/.test(readFileSync(file, "utf8"))).map((file) => file.slice(process.cwd().length + 1));
-    expect(following).toEqual([]);
+    const readsLocale = claimsFiles.filter((file) => /useLocale\s*\(|getLocale\s*\(/.test(readFileSync(file, "utf8")));
+    const raw = readsLocale.filter((file) => !/claimsLocale\(\s*(useLocale|getLocale)\(\)/.test(readFileSync(file, "utf8")) && !/claimsLocale/.test(readFileSync(file, "utf8"))).map((file) => file.slice(process.cwd().length + 1));
+    expect(raw).toEqual([]);
   });
 
-  it("the locale they use is English", () => {
-    expect(CLAIMS_LOCALE).toBe("en");
+  it("claimsLocale and claimsAttrs: Arabic follows the page, the other languages stay English and left to right", () => {
+    expect(claimsLocale("en")).toBe("en");
+    expect(claimsLocale("ar")).toBe("ar");
+    for (const locale of ["ur", "hi", "bn", "ne"]) {
+      expect(claimsLocale(locale), locale).toBe("en");
+      expect(claimsAttrs(locale), locale).toEqual(CLAIMS_ENGLISH);
+    }
+    expect(claimsAttrs("ar")).toEqual({ lang: "ar", dir: "rtl" });
+  });
+
+  it("the list of translated locales is the same in the page code and in i18n-sync (the catalogue rule)", () => {
+    expect([...CLAIMS_TRANSLATED_LOCALES]).toEqual([...SYNC_TRANSLATED_LOCALES]);
   });
 });

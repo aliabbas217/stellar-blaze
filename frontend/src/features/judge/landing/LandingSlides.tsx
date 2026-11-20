@@ -2,7 +2,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { CSSProperties, ReactNode } from "react";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { policyClaim } from "@/features/judge/adapters";
-import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
+import { useClaimsAttrs } from "@/i18n/claims-english";
 import { dirFor } from "@/i18n/direction";
 import { stripFill } from "./landing-colour";
 import { DAY_STEPS, DAY_STRIP, MIDDAY_BREAK, clockText, hoursOf, type DayLevel } from "./landing-day";
@@ -21,7 +21,10 @@ import { ROLE_DOOR_DESTINATIONS, ROLE_DOOR_ORDER } from "./role-door-destination
  * Tier 1 and restore the page's language on their own block. "Ways in" is Tier 1 all through.
  */
 
-const CLAIMS = { ...CLAIMS_ENGLISH, "data-claims-english": "" } as const;
+/** The story chapters' language attributes: English and left to right, or the page's own where the story is translated (Arabic). */
+function useClaims() {
+  return { ...useClaimsAttrs(), "data-claims-english": "" } as const;
+}
 export const AUDITORS_HREF = `/replay/proof/${policyClaim("P3_protect", "missed_danger_hours")}#audit`;
 type Custom = CSSProperties & Record<`--${string}`, string | number>;
 
@@ -83,6 +86,7 @@ function Spine({ omaa }: { readonly omaa: readonly number[] }) {
 }
 
 export function Morning({ omaa }: { readonly omaa: readonly number[] }) {
+  const claims = useClaims();
   const t = useTranslations("judge.landing");
   const today = useTranslations("worker.today");
   const lv = useTranslations("levels");
@@ -90,7 +94,7 @@ export function Morning({ omaa }: { readonly omaa: readonly number[] }) {
   const locale = useLocale();
   const lead = (s: (typeof DAY_STEPS)[number]): string => (s.lead.kind === "cycle" ? today("lead.cycle", { work: String(s.lead.work), rest: String(s.lead.rest) }) : today(s.lead.kind === "stop" ? "lead.stop" : "lead.siteRules"));
   return (
-    <section id="morning" className="ch sl" data-ch="2" aria-labelledby="h-morning" {...CLAIMS}>
+    <section id="morning" className="ch sl" data-ch="2" aria-labelledby="h-morning" {...claims}>
       <Mark n="02" label={rail("morning")} />
       <div className="fill">
         <div className="g head rv">
@@ -125,12 +129,13 @@ export function Morning({ omaa }: { readonly omaa: readonly number[] }) {
 }
 
 export function Plan() {
+  const claims = useClaims();
   const t = useTranslations("judge.landing.story.plan");
   const rail = useTranslations("judge.landing.rail");
   const locale = useLocale();
   const crews = (["A", "C", "D"] as const).map((letter) => ({ letter, name: t(`crew${letter}.name`), task: t(`crew${letter}.task`) }));
   return (
-    <section id="plan" className="ch sl" data-ch="3" aria-labelledby="h-plan" {...CLAIMS}>
+    <section id="plan" className="ch sl" data-ch="3" aria-labelledby="h-plan" {...claims}>
       <Mark n="03" label={rail("plan")} />
       <div className="fill">
         <div className="g two">
@@ -155,10 +160,11 @@ export function Plan() {
 }
 
 export function Boundary() {
+  const claims = useClaims();
   const t = useTranslations("judge.landing.story.boundary");
   const rail = useTranslations("judge.landing.rail");
   return (
-    <section id="boundary" className="ch sl" data-ch="4" aria-labelledby="h-boundary" {...CLAIMS}>
+    <section id="boundary" className="ch sl" data-ch="4" aria-labelledby="h-boundary" {...claims}>
       <Mark n="04" label={rail("boundary")} />
       <div className="fill">
         <div className="g head rv">
@@ -208,6 +214,7 @@ function Verdict({ headline, plain, met, notMet, line, noClaim }: { readonly hea
 }
 
 export function EvidenceSlides({ evidence }: { readonly evidence: Evidence | null }) {
+  const claims = useClaims();
   const t = useTranslations("judge.landing.story.evidence");
   const rail = useTranslations("judge.landing.rail");
   const falseAlarms = (n: string): string => t("falseAlarms", { n });
@@ -217,7 +224,7 @@ export function EvidenceSlides({ evidence }: { readonly evidence: Evidence | nul
   const longest = evidence?.bars[0]?.missed ?? "";
   return (
     <>
-      <section id="evidence" className="ch sl" data-ch="5" aria-labelledby="h-evidence" {...CLAIMS}>
+      <section id="evidence" className="ch sl" data-ch="5" aria-labelledby="h-evidence" {...claims}>
         <Mark n="05" label={rail("evidence")} />
         <div className="fill">
           <div className="g head rv">
@@ -250,7 +257,7 @@ export function EvidenceSlides({ evidence }: { readonly evidence: Evidence | nul
           )}
         </div>
       </section>
-      <section id="checks" className="ch sl" data-ch="5" aria-labelledby="h-checks" {...CLAIMS}>
+      <section id="checks" className="ch sl" data-ch="5" aria-labelledby="h-checks" {...claims}>
         <Mark n="05" label={rail("evidence")} />
         <div className="fill">
           <div className="g head rv">
@@ -300,13 +307,14 @@ export function WaysIn() {
 }
 
 export function Limits() {
+  const claims = useClaims();
   const t = useTranslations("judge.landing.story.limits");
   const v = useTranslations("judge.landing.video");
   const rail = useTranslations("judge.landing.rail");
   const locale = useLocale();
   const items: readonly ReactNode[] = (["one", "two", "three", "four"] as const).map((k) => t(k));
   return (
-    <section id="limits" className="ch sl" data-ch="7" aria-labelledby="h-limits" {...CLAIMS}>
+    <section id="limits" className="ch sl" data-ch="7" aria-labelledby="h-limits" {...claims}>
       <Mark n="07" label={rail("limits")} />
       <div className="fill">
         <h2 id="h-limits" className="rv">{t("eyebrow")}</h2>

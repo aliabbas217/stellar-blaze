@@ -299,6 +299,34 @@ describe("describeToday", () => {
     expect(describeWith({ timeline: null }).waypoints.some((w) => w.kind === "shiftEnds")).toBe(false);
   });
 
+  it("off shift (S13, defect F): the replay moment 13:57 is inside the midday break, so a crew with two blocks is off shift, back at 15:00; the lead stays the site's rule", () => {
+    const blocks: Timeline["shift"] = [
+      { starts_at: "2026-09-03T02:00:00Z", ends_at: "2026-09-03T07:00:00Z" }, // 06:00 to 11:00
+      { starts_at: "2026-09-03T11:00:00Z", ends_at: "2026-09-03T14:00:00Z" }, // 15:00 to 18:00
+    ];
+    const at = new Date("2026-09-03T09:57:00Z"); // 13:57 at the site
+    const shown = describeWith({ timeline: timeline(blocks), now: at, deviceNow: at });
+    expect(shown.offShift).toEqual({ backAtHour: 15 });
+    // The two screens now agree on the crew's state; the heat rule is the site's, unchanged (ADR 0046): no policy is read from the shift.
+    expect(shown.level).not.toBeNull();
+    // After the last block: off shift, nothing to come back to.
+    const late = new Date("2026-09-03T14:30:00Z"); // 18:30
+    expect(describeWith({ timeline: timeline(blocks), now: late, deviceNow: late }).offShift).toEqual({ backAtHour: null });
+  });
+
+  it("on shift, with no shift at all, with no timeline, or with another day's timeline there is no off-shift line", () => {
+    const blocks: Timeline["shift"] = [
+      { starts_at: "2026-09-03T02:00:00Z", ends_at: "2026-09-03T07:00:00Z" },
+      { starts_at: "2026-09-03T11:00:00Z", ends_at: "2026-09-03T14:00:00Z" },
+    ];
+    const working = new Date("2026-09-03T06:30:00Z"); // 10:30, inside the first block
+    expect(describeWith({ timeline: timeline(blocks), now: working, deviceNow: working }).offShift).toBeNull();
+    expect(describeWith({ timeline: timeline([]) }).offShift).toBeNull(); // that is noShift
+    expect(describeWith({ timeline: null }).offShift).toBeNull();
+    const at = new Date("2026-09-03T09:57:00Z");
+    expect(describeWith({ timeline: timeline(blocks, { date: "2026-09-02" }), now: at, deviceNow: at }).offShift).toBeNull();
+  });
+
   it("a timeline of another day than the forecast is not used (no shift is drawn from yesterday)", () => {
     const shown = describeWith({ timeline: timeline(SHIFT, { date: "2026-09-02" }) });
     expect(shown.noShift).toBe(false);

@@ -174,6 +174,7 @@ export function CrewsView() {
         work={work.crewId === null ? null : work}
         notices={work}
         noCrew={model.status === "empty" ? "none" : "unavailable"}
+        offShift={entry !== undefined && !entry.working && !entry.stopped}
       />
     </div>
   );

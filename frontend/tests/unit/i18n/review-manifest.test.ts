@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   CLAIM_PREFIXES,
+  CLAIMS_TRANSLATED_LOCALES,
   ENGLISH_BY_DESIGN_PREFIXES,
   LOCALES,
   STATUSES,
@@ -10,6 +11,7 @@ import {
   flatten,
   isClaimKey,
   isEnglishByDesign,
+  numberTokens,
   manifestEntries,
   releaseProblems,
   type Catalogues,
@@ -87,16 +89,33 @@ describe("review manifest: Tier 1 is translated, Tier 2 is English by design", (
     expect(untranslated.map((entry) => `${entry.locale}.${entry.key}`)).toEqual([]);
   });
 
-  it("every claims-surface key is english-by-design and its text is en's, byte for byte, in every locale", () => {
+  it("every claims-surface key is english-by-design and its text is en's, byte for byte, in every locale whose claims are not translated", () => {
     const claims = [...enFlat.keys()].filter(isClaimKey);
     expect(claims.length, "the claims surfaces are found").toBeGreaterThan(300);
-    for (const locale of TARGET_LOCALES) {
+    for (const locale of TARGET_LOCALES.filter((candidate) => !CLAIMS_TRANSLATED_LOCALES.includes(candidate))) {
       const flat = flatten(catalogues[locale]);
       for (const key of claims) {
         expect(flat.get(key), `${locale}.${key}`).toBe(enFlat.get(key));
         const entry = entries.find((candidate) => candidate.locale === locale && candidate.key === key);
         expect(entry?.status, `${locale}.${key}`).toBe("english-by-design");
       }
+    }
+  });
+
+  it("in a locale whose claims are translated (Arabic, ADR 0083 amendment) a claims key is a machine draft that keeps every number of en's sentence", () => {
+    const claims = [...enFlat.keys()].filter(isClaimKey);
+    expect(CLAIMS_TRANSLATED_LOCALES).toEqual(["ar"]);
+    for (const locale of CLAIMS_TRANSLATED_LOCALES) {
+      const flat = flatten(catalogues[locale]);
+      let translated = 0;
+      for (const key of claims) {
+        const entry = entries.find((candidate) => candidate.locale === locale && candidate.key === key);
+        expect(entry?.status, `${locale}.${key}`).toBe("machine-draft");
+        expect(numberTokens(flat.get(key) ?? "").join(), `${locale}.${key}`).toBe(numberTokens(enFlat.get(key) ?? "").join());
+        if (flat.get(key) !== enFlat.get(key)) translated += 1;
+      }
+      // Not vacuous: nearly every claims sentence is in the locale's own words (the rest are names, units and formats that read the same).
+      expect(translated, `${locale}: translated claims keys`).toBeGreaterThan(claims.length * 0.95);
     }
   });
 
@@ -154,7 +173,8 @@ describe("review manifest: the release flag (SB_REQUIRE_TRANSLATED=1)", () => {
   });
 
   it("passes a Tier 2 english-by-design key and a Tier 1 machine draft", () => {
-    const claim = deriveManifest(tiny({ judge: { scoreboard: { x: "Hello" } } }, { judge: { scoreboard: { x: "Hello" } } }), null);
+    // Urdu: its claims surfaces stay English. In Arabic the same key would be an untranslated leftover.
+    const claim = deriveManifest({ en: { judge: { scoreboard: { x: "Hello" } } }, ur: { judge: { scoreboard: { x: "Hello" } } } }, null);
     expect(manifestEntries(claim).map((row) => row.status)).toEqual(["english-by-design"]);
     expect(releaseProblems(claim)).toEqual([]);
     const drafted = deriveManifest(tiny({ a: { b: "Hello" } }, { a: { b: "Salam" } }), null);

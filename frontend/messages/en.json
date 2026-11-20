@@ -36,6 +36,7 @@
       "supervisor.stop.failed",
       "supervisor.stop.failedDetail",
       "supervisor.stop.noActiveStop",
+      "supervisor.stop.offShiftNote",
       "supervisor.stop.noCrew",
       "supervisor.stop.noCrews",
       "supervisor.stop.queued",
@@ -274,7 +275,8 @@
         "label": "Data source",
         "live": "Live",
         "replay": "Replay",
-        "liveUnavailable": "Live is not running on this deployment"
+        "liveUnavailable": "Live feeds are not connected in this demo",
+        "liveOff": "Live: not connected"
       }
     },
     "field": {
@@ -329,6 +331,10 @@
         "stop": "Stop work",
         "siteRules": "Follow the site rules",
         "protective": "Site rules: rest in shade every hour, drink water"
+      },
+      "offShift": {
+        "back": "Your crew is off shift now, back at {time}. The line above is the site rule for anyone who works before then.",
+        "over": "Your crew's shift is over for today. The line above is the site rule for anyone still working."
       },
       "draftWording": "Not yet checked by a clinician.",
       "also": {
@@ -812,6 +818,7 @@
     "stop": {
       "region": "Stop work",
       "button": "Stop work, <bdi>{crew}</bdi>",
+      "offShiftNote": "<bdi>{crew}</bdi> is off shift now. You can still stop work.",
       "sending": "Sending the stop",
       "recorded": "<bdi>{crew}</bdi> stopped <bdi>{time}</bdi>. Stop recorded. Crews are notified within about six minutes. Tell the crew now.",
       "undo": "Undo ({seconds} s)",
@@ -1583,7 +1590,7 @@
       },
       "recorded": {
         "button": "Show a recorded result",
-        "noteMock": "Recorded against the demo mock on {date}, not the live rule checker. It is what the rule checker said for the common roster, not a check of your times.",
+        "noteMock": "A recorded example from {date}, not a live check. It is what the rule checker said for the common roster, not a check of your times.",
         "note": "Recorded on {date}. It is what the rule checker said for the common roster, not a check of your times.",
         "hide": "Hide the recorded result"
       },
@@ -1684,6 +1691,7 @@
       },
       "answer": {
         "who": "API",
+        "exampleValue": "Recorded example",
         "title": "The service answers",
         "waiting": "Waiting for the API",
         "none": "Nothing sent yet.",
@@ -1707,6 +1715,7 @@
         "outcomeValue": "Refused",
         "why": "Why",
         "whyValue": "A worker's health data is never released to an employer, whatever the reason given.",
+        "exampleValue": "Recorded example",
         "rules": "Rules in force",
         "model": "Model",
         "noModel": "none loaded",
@@ -1763,7 +1772,7 @@
         },
         "notReady": "The demo site is still loading. Try again in a moment.",
         "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
-        "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
+        "recordedMock": "A recorded example, not a live call. Press the button to make a real call to the demo API."
       }
     },
     "landing": {
@@ -1978,7 +1987,7 @@
       "title": "A 3-minute tour",
       "lead": "The stops, in this order. Each one opens the real screen.",
       "open": "Open this screen",
-      "controls": "To switch between Replay and Live, or to reset the demo site, use Demo controls on the safety view.",
+      "controls": "To reset the demo site, use Demo controls on the safety view. Live feeds are not connected in this demo, so every screen shows the recorded replay.",
       "controlsLink": "Open Demo controls",
       "steps": {
         "story": {
@@ -1992,6 +2001,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "day": {
+          "title": "One day, hour by hour",
+          "text": "One hot day, hour by hour: the forecast, what the station recorded, and what we would have said."
         },
         "try": {
           "title": "Try a plan",

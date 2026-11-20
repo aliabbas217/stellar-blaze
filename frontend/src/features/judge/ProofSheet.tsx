@@ -1,11 +1,11 @@
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AuditDetails, AuditRows, RecountButton, StoryRows } from "@/components/provenance/ProofRows";
 import { EmptyState } from "@/components/states/EmptyState";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { EvalSourceStamp } from "./EvalSourceStamp";
 import { FORECAST_CLAIMS, type Claim } from "./claims";
 import type { EvalSource } from "./data";
-import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { claimsLocale } from "@/i18n/claims-english";
 
 /**
  * The proof sheet (`/replay/proof/<claim>`): one number as large as it gets (it is not a step of the story: it is reached from a number's "Where from" chip) and "Where this number comes from" in plain words
@@ -107,13 +107,14 @@ export function ProofSheet({ claim, source, unreadable = false }: ProofSheetProp
  */
 function Timeline({ claim }: { readonly claim: Claim }) {
   const t = useTranslations("judge.proof");
+  const locale = claimsLocale(useLocale());
   const evaluation = claim.proof.evaluation;
   if (claim.kind !== "scored" || evaluation === undefined) return null;
   const generated = claim.proof.generatedAt;
   const at =
     generated === null
       ? null
-      : new Intl.DateTimeFormat(`${CLAIMS_LOCALE}-GB-u-nu-latn`, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(generated));
+      : new Intl.DateTimeFormat(`${locale === "en" ? "en-GB" : locale}-u-nu-latn`, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(generated));
   const steps = [
     { id: "plan", note: t("notes.planLocked", { commit: evaluation.protocolCommit.slice(0, 7) }) },
     { id: "run", note: t("notes.runScored") },

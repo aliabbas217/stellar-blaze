@@ -7,6 +7,8 @@ import { http, HttpResponse, delay } from "msw";
 import type { ReactNode } from "react";
 import { AccessLog } from "@/components/governance/AccessLog";
 import { DemoProvider } from "@/features/demo/DemoProvider";
+import { AnswerCard } from "@/features/judge/governance/AnswerCard";
+import { AuditCard } from "@/features/judge/governance/AuditCard";
 import { outcomeOf, REFUSED_TYPE, REQUEST_DATA_CLASS, SYNTHETIC_WORKER_REF } from "@/features/judge/governance/answer";
 import { GovernanceView } from "@/features/judge/governance/GovernanceView";
 import { parseRecordedRun, toRecordedView } from "@/features/judge/governance/recorded";
@@ -88,22 +90,26 @@ describe("GovernanceView: first paint", () => {
     const { container, root: view } = renderView();
     expect(view().getAttribute("data-governance")).toBe("recorded");
     expect(container.querySelectorAll("[data-hero]")).toHaveLength(1);
-    // the stamp, and a source-specific line: the recording was made against the mock API, never the live service
+    // the stamp, and a source-specific line: the recording is a recorded example, never worded as a live call
     expect(screen.getByText("Recorded")).toBeInTheDocument();
     expect(screen.queryByText("Simulated")).toBeNull();
     expect(container.querySelector("[data-notice=recorded]")?.textContent).toContain(
-      "Recorded against the demo mock, not the live service. Press the button to run it against the demo API.",
+      "A recorded example, not a live call. Press the button to make a real call to the demo API.",
     );
+    expect(container.textContent).not.toMatch(/demo mock|mock-req|mock-0/);
     expect(container.querySelector("[data-notice=recorded]")?.textContent).not.toMatch(/same audit row|same request/);
     // the answer: 403 and the problem fields
     expect(within(container.querySelector("[data-answer=shown]") as HTMLElement).getByText("403")).toBeInTheDocument();
     expect(screen.getByText(REFUSED_TYPE)).toBeInTheDocument();
     expect(screen.getByText("Individual data refused")).toBeInTheDocument();
-    expect(screen.getByText(recorded.answer.requestId as string)).toBeInTheDocument();
+    // a recording made against the mock prints no placeholder id ("mock-req-1", "mock-0"): the cards say "Recorded example"
+    expect(recorded.source).toBe("msw-mock");
+    expect(screen.queryByText(recorded.answer.requestId as string)).toBeNull();
     expect(screen.getByText("content-type: application/problem+json")).toBeInTheDocument();
     // the audit row and the worker's list, from the recorded log
     const audit = container.querySelector("[data-audit=shown]") as HTMLElement;
-    expect(within(audit).getByText(/mock-0/)).toBeInTheDocument();
+    expect(within(audit).queryByText(/mock-0/)).toBeNull();
+    expect(within(audit).getAllByText("Recorded example").length).toBe(2);
     expect(rows(container)).toHaveLength(recorded.entries.length);
     expect(screen.getByText(SENTENCE)).toBeInTheDocument();
   });
@@ -478,5 +484,32 @@ describe("the recorded run file", () => {
   it("the recording script and the page agree on the made-up reference", () => {
     const script = readFileSync(path.join(root, "scripts/record-governance-run.mjs"), "utf8");
     expect(script).toContain(`const WORKER_REF = "${SYNTHETIC_WORKER_REF}";`);
+  });
+});
+
+describe("recorded example versus a live call (S13, defect D)", () => {
+  const answer = { status: 403, contentType: "application/problem+json", answeredAt: "2026-11-14T23:30:15.439Z", type: REFUSED_TYPE, title: "Individual data refused", requestId: "req-live-1" };
+  const row = { at: "2026-11-14T23:30:15.439Z", policyVersion: "ae-heat-2026.1", configVersion: 3, modelId: "corrector-1" };
+
+  it("prints the ids of a live call, and 'Recorded example' in place of the ids of a recording", () => {
+    const live = renderWithIntl(
+      <>
+        <AnswerCard answer={answer} pending={false} />
+        <AuditCard row={row} clock="23:30:15" pending={false} />
+      </>,
+    );
+    expect(live.container.textContent).toContain("req-live-1");
+    expect(live.container.textContent).toContain("ae-heat-2026.1 · 3");
+    expect(live.container.textContent).toContain("corrector-1");
+    expect(live.container.textContent).not.toContain("Recorded example");
+    live.unmount();
+    const example = renderWithIntl(
+      <>
+        <AnswerCard answer={answer} pending={false} example />
+        <AuditCard row={row} clock="23:30:15" pending={false} example />
+      </>,
+    );
+    expect(example.container.textContent).not.toMatch(/req-live-1|ae-heat-2026|corrector-1/);
+    expect(example.container.textContent.match(/Recorded example/g)).toHaveLength(3);
   });
 });

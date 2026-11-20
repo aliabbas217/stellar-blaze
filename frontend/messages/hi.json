@@ -156,7 +156,8 @@
         "label": "डेटा का स्रोत",
         "live": "लाइव",
         "replay": "रीप्ले",
-        "liveUnavailable": "इस डिप्लॉयमेंट पर लाइव नहीं चल रहा"
+        "liveUnavailable": "इस डिप्लॉयमेंट पर लाइव नहीं चल रहा",
+        "liveOff": "लाइव: जुड़ा नहीं"
       }
     },
     "field": {
@@ -211,6 +212,10 @@
         "stop": "काम रोकें",
         "siteRules": "साइट के नियम मानें",
         "protective": "साइट के नियम: हर घंटे छाया में आराम करें, पानी पिएँ"
+      },
+      "offShift": {
+        "back": "आपकी टीम अभी शिफ़्ट से बाहर है, {time} पर वापसी। ऊपर की पंक्ति उनके लिए साइट का नियम है जो इससे पहले काम करते हैं।",
+        "over": "आज आपकी टीम की शिफ़्ट समाप्त हो गई है। ऊपर की पंक्ति उनके लिए साइट का नियम है जो अब भी काम कर रहे हैं।"
       },
       "draftWording": "अभी किसी चिकित्सक ने जाँचा नहीं है।",
       "also": {
@@ -715,7 +720,8 @@
       "expiredClock": "<bdi>{crew}</bdi> का आदेश नहीं भेजा गया। दबाते समय इस फ़ोन का समय गलत लग रहा था, इसलिए उसे रखा नहीं गया। टीम को अभी बताएँ, आवाज़ से या रेडियो से, और ऑनलाइन होने पर «काम रोकें» फिर दबाएँ।",
       "expired": "<bdi>{crew}</bdi> का आदेश नहीं भेजा गया। वह 60 मिनट बिना कनेक्शन के इंतज़ार में रहा और उसकी अवधि समाप्त हो गई। टीम को अभी बताएँ, आवाज़ से या रेडियो से, और ऑनलाइन होने पर «काम रोकें» फिर दबाएँ।",
       "noCrew": "टीमों की सूची लोड नहीं हुई। टीम से अभी काम रोकने को कहें।",
-      "noCrews": "इस साइट पर रोकने के लिए कोई टीम नहीं है।"
+      "noCrews": "इस साइट पर रोकने के लिए कोई टीम नहीं है।",
+      "offShiftNote": "<bdi>{crew}</bdi> अभी शिफ़्ट से बाहर है। आप फिर भी काम रोक सकते हैं।"
     }
   },
   "hse": {
@@ -1465,7 +1471,7 @@
       },
       "recorded": {
         "button": "Show a recorded result",
-        "noteMock": "Recorded against the demo mock on {date}, not the live rule checker. It is what the rule checker said for the common roster, not a check of your times.",
+        "noteMock": "A recorded example from {date}, not a live check. It is what the rule checker said for the common roster, not a check of your times.",
         "note": "Recorded on {date}. It is what the rule checker said for the common roster, not a check of your times.",
         "hide": "Hide the recorded result"
       },
@@ -1566,6 +1572,7 @@
       },
       "answer": {
         "who": "API",
+        "exampleValue": "Recorded example",
         "title": "The service answers",
         "waiting": "Waiting for the API",
         "none": "Nothing sent yet.",
@@ -1589,6 +1596,7 @@
         "outcomeValue": "Refused",
         "why": "Why",
         "whyValue": "A worker's health data is never released to an employer, whatever the reason given.",
+        "exampleValue": "Recorded example",
         "rules": "Rules in force",
         "model": "Model",
         "noModel": "none loaded",
@@ -1645,7 +1653,7 @@
         },
         "notReady": "The demo site is still loading. Try again in a moment.",
         "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
-        "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
+        "recordedMock": "A recorded example, not a live call. Press the button to make a real call to the demo API."
       }
     },
     "landing": {
@@ -1874,6 +1882,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "day": {
+          "title": "One day, hour by hour",
+          "text": "One hot day, hour by hour: the forecast, what the station recorded, and what we would have said."
         },
         "try": {
           "title": "Try a plan",

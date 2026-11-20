@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { formatClock } from "@/components/spine/geometry";
 import { LEVEL_SIGN_HEIGHT } from "@/components/level/LevelSign";
 import { Pictogram } from "@/components/level/Pictogram";
 import { ProofChip } from "@/components/provenance/ProofChip";
@@ -14,6 +15,7 @@ import { WakingLine } from "@/components/states/WakingLine";
 import { ACTION_SECONDARY_DENSE } from "@/components/states/actions";
 import { ActionLead } from "@/features/today/ActionLead";
 import { alsoPictogram } from "@/features/today/action-codes";
+import { isolateTime } from "@/features/today/labels";
 import { LevelHeader } from "@/features/today/LevelHeader";
 import { ProtectiveLead } from "@/features/today/ProtectiveLead";
 import { SHIFT_STRIP_HEIGHT, ShiftSpine } from "@/features/today/ShiftSpine";
@@ -122,6 +124,13 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
         <div data-hero="" className="flex flex-col gap-4">
           <div className={CARD}>
             <ActionLead lead={d.plan.lead} protective={d.protective} className="" />
+            {d.offShift === null ? null : (
+              // The lead above is the SITE's rule for the hour (ADR 0046): it is what to do for anyone working. The crew pages say this crew is off
+              // shift now; so does this line, or the two screens read as a contradiction.
+              <p data-off-shift="" className="text-base leading-(--sign-leading-text) text-ink-2">
+                {d.offShift.backAtHour === null ? t("offShift.over") : t("offShift.back", { time: isolateTime(formatClock(d.offShift.backAtHour)) })}
+              </p>
+            )}
             <div className="border-t-[1.5px] border-hair pt-4">
               <LevelHeader description={d} mode={forecast.mode} className="" />
             </div>

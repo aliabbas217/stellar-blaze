@@ -1,4 +1,4 @@
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { SeasonPlayer } from "@/components/charts/SeasonPlayer";
 import { ScoreboardTable, type ScoreRow } from "@/components/provenance/ScoreboardTable";
 import { ProofChip } from "@/components/provenance/ProofChip";
@@ -20,7 +20,7 @@ import { buildSeasonView } from "./season-view";
 import { policyTradeoff } from "./policy-tradeoff";
 import { planTableText, policyTableText } from "./table-text";
 import { plainPlanVerdicts, plainPolicyVerdicts, type PlainVerdict } from "./verdict-plain";
-import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { claimsLocale } from "@/i18n/claims-english";
 
 /**
  * The season scoreboard (`/replay`): the hero ribbon with its player and tally, the outcome sentence, Warnings, Plans and
@@ -44,7 +44,7 @@ export interface ScoreboardViewProps {
 
 export function ScoreboardView({ data, failed = false, hourly, frontierSource }: ScoreboardViewProps) {
   const t = useTranslations("judge.scoreboard");
-  const locale = CLAIMS_LOCALE;
+  const locale = claimsLocale(useLocale());
   const format = makeFormat(locale);
   const season = buildSeasonView({ ...hourly, locale, t });
   const policy = data?.policy ?? null;

@@ -188,7 +188,7 @@ test("governance live rows the API already has sit in their own block and never 
   // step 4 is still the recorded run's own row, and the sequence is still labelled recorded
   await expect(page.locator("[data-log-source=recorded] [data-access-row]")).toHaveCount(1);
   await expect(state(page)).toHaveAttribute("data-governance", "recorded");
-  await expect(page.locator("[data-notice=recorded]")).toContainText("Recorded against the demo mock, not the live service.");
+  await expect(page.locator("[data-notice=recorded]")).toContainText("A recorded example, not a live call.");
 });
 
 test("governance 429 is 'Not sent. Try again in a minute.' and the page never retries", async ({ page }) => {

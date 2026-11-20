@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { siteForecastQueryOptions, validatePlanMutation } from "@/api/queries";
 import { RosterInvalidProblem, type RosterError } from "@/api/roster-problem";
@@ -16,7 +16,7 @@ import { TryPlanLayout, type TryPhase } from "./TryPlanLayout";
 import { buildRequest, DEFAULT_ACCLIMATISED, DEFAULT_DAYS_PER_WEEK, parseDays } from "./request";
 import { filledEntries, MAX_RUNS, normalizeTime, padRuns, rowOfLine, runProblem, templateOf, templateRuns, type Run, type RunProblem, type TemplateId } from "./runs";
 import { toAnswerView, type AnswerView, type RecordedPlanView } from "./view";
-import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { claimsLocale } from "@/i18n/claims-english";
 
 /*
  * The interactive try-a-plan screen: the island that `TryGate` loads on the first interaction with a control (so TanStack
@@ -74,7 +74,7 @@ function lastTemplateTap(actions: readonly string[]): TemplateId | undefined {
 
 export function TryPlanView({ date, heat, ban, dateLabel, recorded, initialActions = NO_ACTIONS, restoreFocus = null, fields = NO_FIELDS }: TryViewProps) {
   const t = useTranslations("judge.try");
-  const locale = CLAIMS_LOCALE;
+  const locale = claimsLocale(useLocale());
   const demo = useDemo();
   const site = demo.site;
   const siteId = site?.id;

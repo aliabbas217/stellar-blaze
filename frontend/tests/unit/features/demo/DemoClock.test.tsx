@@ -134,6 +134,8 @@ describe("DemoClock hydration", () => {
         root = hydrateRoot(container, tree(client));
       });
       expect(container.textContent).toBe(enMessages.shell.field.pendingClock);
+      // The reading carries the marker that makes FieldShell hide the whole clock label: "--:--" is never seen.
+      expect(container.querySelector("[data-clock-pending]")).not.toBeNull();
       act(() => root?.unmount());
       container.remove();
     }

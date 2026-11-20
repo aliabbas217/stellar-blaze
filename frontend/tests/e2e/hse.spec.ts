@@ -106,13 +106,13 @@ test("hse: reads well at desk width and has no horizontal scroll", async ({ page
   expect(report.failures).toEqual([]);
 });
 
-test("tour: five numbered stops in order, each Open link and the Where from go to a page that answers", async ({ page }) => {
+test("tour: seven numbered stops in order, each Open link and the Where from go to a page that answers", async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto("/en/tour");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(en.judge.tour.title);
   const steps = page.locator("[data-tour-step]");
-  await expect(steps).toHaveCount(5);
-  expect(await steps.evaluateAll((items) => items.map((item) => (item as HTMLElement).dataset["tourStep"]))).toEqual(["story", "worker", "crew", "boundary", "scoreboard"]);
+  await expect(steps).toHaveCount(7);
+  expect(await steps.evaluateAll((items) => items.map((item) => (item as HTMLElement).dataset["tourStep"]))).toEqual(["story", "worker", "crew", "day", "try", "boundary", "scoreboard"]);
   const hrefs = await page.locator("[data-tour-step] a, main a[href*='demo-controls']").evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).getAttribute("href") ?? ""));
   expect(hrefs.length).toBeGreaterThanOrEqual(7);
   for (const href of hrefs) {

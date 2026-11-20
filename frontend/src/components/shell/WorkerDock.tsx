@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { ViewTransition } from "react";
+import { useDockHeightPublisher } from "@/components/shell/dock-height";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { ACTION_SECONDARY, ACTION_STOP, SEGMENT, SEGMENTS } from "@/components/states/actions";
 import "@/styles/view-transitions.css";
@@ -34,6 +35,7 @@ export function WorkerDock({ myDataEnabled = MY_DATA_TAB_ENABLED }: { myDataEnab
   const t = useTranslations("worker.nav");
   const route = withoutLocale(usePathname());
   const onUnwellSheet = route === "/worker/unwell";
+  const publishHeight = useDockHeightPublisher();
 
   const tabs = [
     { href: "/worker", label: t("today"), current: route === "/worker" },
@@ -42,7 +44,7 @@ export function WorkerDock({ myDataEnabled = MY_DATA_TAB_ENABLED }: { myDataEnab
   ];
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-10">
+    <div ref={publishHeight} className="fixed inset-x-0 bottom-0 z-10">
       <div className="mx-auto max-w-110 border-t border-edge bg-ground px-4 pt-2.5 pb-[calc(var(--s-2)+env(safe-area-inset-bottom))]">
         {onUnwellSheet ? (
           // On the sheet itself the emergency link would point at the page the worker is on; the way out is back to Today.
