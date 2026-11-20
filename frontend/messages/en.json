@@ -1542,7 +1542,7 @@
         "start": "Start",
         "end": "End",
         "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
-        "none": "Add at least one run of work to check a plan.",
+        "none": "Add at least one run of work, or pick a roster, then check.",
         "placeholder": "hh:mm",
         "problem": {
           "format": "Write the time as hh:mm, for example 06:00.",

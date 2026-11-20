@@ -207,6 +207,38 @@ describe("TryPlanView: editable runs", () => {
   });
 });
 
+describe("TryPlanView: an empty roster (audit m7)", () => {
+  it("test_empty_roster_says_what_to_do: every row cleared and Check pressed shows one polite inline message, sends nothing, and shows no result", async () => {
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    const { container } = renderTry();
+    const user = userEvent.setup();
+    await warmed(user, "Run 1: Start");
+    for (const label of ["Run 1: Start", "Run 1: End", "Run 2: Start", "Run 2: End"]) await user.clear(screen.getByLabelText(label));
+    for (const input of container.querySelectorAll<HTMLInputElement>("[data-run] input")) expect(input).toHaveValue("");
+
+    await user.click(screen.getByRole("button", { name: CHECK }));
+
+    const text = await screen.findByText(/^Add at least one run of work/);
+    const notice = text.closest("[data-notice]") as HTMLElement;
+    expect(text).toHaveTextContent("Add at least one run of work, or pick a roster, then check.");
+    expect(notice).toHaveAttribute("data-notice", "none");
+    expect(notice).toHaveAttribute("role", "status");
+    // the same plain style as the neighbouring inline notices, and it is not a result
+    expect(notice.className).toContain("text-sm");
+    expect(container.querySelector("[data-try-result]")).toBeNull();
+    expect(calls.bodies).toHaveLength(0);
+
+    // picking a roster is the way on the message names: it works, and the message goes with the next press
+    await user.click(screen.getByRole("button", { name: /^Legal default/ }));
+    await user.click(screen.getByRole("button", { name: CHECK }));
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+    expect(screen.queryByText(/Add at least one run of work/)).toBeNull();
+  });
+});
+
 describe("TryGate: the lazy island", () => {
   it("first paint is the common roster on the day's heat with plain controls, and calls no API", async () => {
     const calls = { bodies: [] as unknown[] };
