@@ -20,6 +20,8 @@ import { renderWithIntl } from "../../../utils/intl";
  * roster the validator cannot read is told per line, and the page never sends by itself.
  */
 
+// every test here waits for the lazy island once, so the file's own ceiling sits above that wait
+vi.setConfig({ testTimeout: 20_000 });
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -57,7 +59,8 @@ function renderTry(run: typeof recorded | null = recorded) {
  */
 async function warmed(user: ReturnType<typeof userEvent.setup>, label: string): Promise<HTMLElement> {
   await user.click(screen.getByRole("button", { name: /^Common roster/ }));
-  await screen.findByText("Mussafah M-14 yard (synthetic)");
+  // the island is a lazy chunk: on a loaded CPU (a parallel full suite) its import can take longer than the 1 s default
+  await screen.findByText("Mussafah M-14 yard (synthetic)", undefined, { timeout: 10_000 });
   const field = screen.getByLabelText(label);
   await user.click(field);
   return field;
@@ -204,6 +207,38 @@ describe("TryPlanView: editable runs", () => {
   });
 });
 
+describe("TryPlanView: an empty roster (audit m7)", () => {
+  it("test_empty_roster_says_what_to_do: every row cleared and Check pressed shows one polite inline message, sends nothing, and shows no result", async () => {
+    const calls = { bodies: [] as unknown[] };
+    counting(calls);
+    const { container } = renderTry();
+    const user = userEvent.setup();
+    await warmed(user, "Run 1: Start");
+    for (const label of ["Run 1: Start", "Run 1: End", "Run 2: Start", "Run 2: End"]) await user.clear(screen.getByLabelText(label));
+    for (const input of container.querySelectorAll<HTMLInputElement>("[data-run] input")) expect(input).toHaveValue("");
+
+    await user.click(screen.getByRole("button", { name: CHECK }));
+
+    const text = await screen.findByText(/^Add at least one run of work/);
+    const notice = text.closest("[data-notice]") as HTMLElement;
+    expect(text).toHaveTextContent("Add at least one run of work, or pick a roster, then check.");
+    expect(notice).toHaveAttribute("data-notice", "none");
+    expect(notice).toHaveAttribute("role", "status");
+    // the same plain style as the neighbouring inline notices, and it is not a result
+    expect(notice.className).toContain("text-sm");
+    expect(container.querySelector("[data-try-result]")).toBeNull();
+    expect(calls.bodies).toHaveLength(0);
+
+    // picking a roster is the way on the message names: it works, and the message goes with the next press
+    await user.click(screen.getByRole("button", { name: /^Legal default/ }));
+    await user.click(screen.getByRole("button", { name: CHECK }));
+    await waitFor(() => {
+      expect(calls.bodies).toHaveLength(1);
+    });
+    expect(screen.queryByText(/Add at least one run of work/)).toBeNull();
+  });
+});
+
 describe("TryGate: the lazy island", () => {
   it("first paint is the common roster on the day's heat with plain controls, and calls no API", async () => {
     const calls = { bodies: [] as unknown[] };
@@ -262,6 +297,15 @@ describe("TryGate: the lazy island", () => {
     expect([...container.querySelectorAll("[data-violation-mark]")].map((el) => el.getAttribute("data-violation-mark"))).toEqual(["1", "2", "2"]);
     // what was checked comes from the API's own list
     expect(container.querySelector("[data-checked]")?.textContent).toContain("P-H7.cap60");
+    // audit M2: every chip of "What was checked" and every breach heading carries a plain-language name before the id
+    const chips = [...container.querySelectorAll("[data-checked] li")];
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.querySelector("[data-rule-name]")?.textContent ?? "", chip.textContent).not.toBe("");
+      expect(chip.querySelector("[data-rule-id]")).not.toBeNull();
+    }
+    expect(within(rule("P-H3")).getByText("Break after five hours of work")).toBeInTheDocument();
+    expect(within(rule("P-H2.daily")).getByText("Daily working hours")).toBeInTheDocument();
   });
 
   it("the legal default answers '0 rules broken' with what was checked (the empty state)", async () => {

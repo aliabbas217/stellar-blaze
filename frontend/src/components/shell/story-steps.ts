@@ -1,6 +1,7 @@
 /*
- * The five steps of the judge story, in reading order (redesign 2026-11, A2): the problem, the product, the evidence, one day, the
- * boundary. The evidence is the payoff, so it comes after a person has met the product (it used to come first and the product last).
+ * The six steps of the judge story, in reading order (redesign 2026-11, A2; audit M4 added the validator): the problem, the product, the
+ * evidence, one day, try a plan, the boundary. Try a plan is the interactive step: the reader writes a roster and the independent
+ * checker answers, between watching one day and meeting the refusal. The evidence is the payoff, so it comes after a person has met the product (it used to come first and the product last).
  * There is no "proof" step: the proof sheet is reached from any number's "Where from" chip, never from the story's own path.
  * `href` is a route without the locale prefix. `built` says whether the route exists yet: a step whose view is not built
  * is shown as plain text and skipped by Back and Next, so the story never links to a page that is not there (the same rule as
@@ -13,7 +14,7 @@
  * reader following the path is never sent to a page with no way on (the dead end the redesign audit found: step 5 was the worker app).
  * When the tour exists it is a judge page: flip its `frame` to "judge" in the same change.
  */
-export type StoryStepId = "problem" | "product" | "evidence" | "day" | "boundary";
+export type StoryStepId = "problem" | "product" | "evidence" | "day" | "try" | "boundary";
 
 export interface StoryStep {
   readonly id: StoryStepId;
@@ -29,5 +30,6 @@ export const STORY_STEPS: readonly StoryStep[] = [
   { id: "product", href: "/worker", frame: "app", built: true },
   { id: "evidence", href: "/replay", frame: "judge", built: true },
   { id: "day", href: "/replay/day", frame: "judge", built: true },
+  { id: "try", href: "/replay/try", frame: "judge", built: true },
   { id: "boundary", href: "/replay/governance", frame: "judge", built: true },
 ];

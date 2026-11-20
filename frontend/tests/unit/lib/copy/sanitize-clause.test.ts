@@ -181,4 +181,13 @@ describe("sanitizeClause: a rule id never swallows the sentence's own full stop 
     expect(sanitizeClause("P-H2.daily Rest is counted per shift. Next sentence.")).toBe("Rest is counted per shift. Next sentence.");
     expect(sanitizeClause("P-H10. No added minutes. A plan never extends the shift.")).toBe("No added minutes. A plan never extends the shift.");
   });
+
+  it("takes a parenthesised runtime-config key out (audit M2: STOP.red showed \"(red_twl_w_m2)\" to a judge) and leaves the policy words", () => {
+    const stopRed = "Decisions 2 and 8: below the Red edge (red_twl_w_m2) every crew is stopped. POLICY, beyond the ADOSH table: stop work";
+
+    expect(sanitizeClause(stopRed)).toBe("Decisions 2 and 8: below the Red edge every crew is stopped. POLICY, beyond the ADOSH table: stop work");
+    expect(sanitizeClause(stopRed)).not.toMatch(/red_twl_w_m2|_/);
+    // a plain parenthesis and the law's own numbers in parentheses stay
+    expect(sanitizeClause("Art. 18: \"more than (5) five consecutive hours\" (see Table 1)")).toBe("Art. 18: \"more than (5) five consecutive hours\" (see Table 1)");
+  });
 });

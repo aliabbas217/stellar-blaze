@@ -23,7 +23,7 @@ const tier2 = newKeys.filter((key) => key.startsWith(TIER_2_PREFIX));
 describe("the S7 strings", () => {
   it("exist: the badge, both entries, the safety view and the tour", () => {
     expect(tier1).toHaveLength(39);
-    expect(tier2).toHaveLength(10);
+    expect(tier2).toHaveLength(12); // six tour stops, a title and a sentence each (Try a plan added, audit M4)
     for (const key of ["shell.role.crew", "shell.role.officer", "shell.role.switch", "judge.roleEntry.demoAccess", "hse.privacy", "hse.boundary.body", "judge.tour.open"]) {
       expect(en.has(key), key).toBe(true);
     }

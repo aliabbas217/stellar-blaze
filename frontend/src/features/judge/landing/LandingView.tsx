@@ -1,38 +1,35 @@
 import { useLocale, useTranslations } from "next-intl";
+import type { CSSProperties } from "react";
 import { dayFormat } from "@/components/charts/day-format";
-import { proofFromStaticFile } from "@/components/provenance/proof";
-import { buildStory } from "@/components/provenance/proof-story";
 import { FieldLink } from "@/components/shell/FieldLink";
+import { LocaleSwitcher } from "@/components/shell/LocaleSwitcher";
 import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
-import { StoryNav } from "@/components/shell/StoryNav";
 import { makeFormat } from "@/features/judge/adapters";
-import { banStateFor, SEASON_BAN } from "@/features/judge/ban";
 import type { EvalData } from "@/features/judge/data";
-import { readingAt } from "./field-data";
+import { LIMIT_C } from "./field-data";
 import type { FieldHeroData } from "./field-server";
-import { FieldGate } from "./FieldGate";
-import { FieldPoster, type FieldPanelProps } from "./FieldPoster";
 import { buildEvidence } from "./evidence";
-import { HeroPhone } from "./HeroPhone";
-import { Chapters } from "./LandingChapters";
-import { LandingHeader } from "./LandingHeader";
-import { RoleDoor } from "./RoleDoor";
+import { ForecastStage } from "./ForecastStage";
+import { restCaptions } from "./landing-captions";
+import { CLASS_STEPS, HEAT_NUMBER, LEGEND_SWATCHES } from "./landing-colour";
+import { LandingEffects } from "./LandingEffects";
+import { LandingRail } from "./LandingRail";
+import { Boundary, EvidenceSlides, Limits, Morning, Plan, WaysIn } from "./LandingSlides";
+import { SceneSummary } from "./SceneCaptions";
+import { STATIONS } from "./landing-stations";
+import "@/styles/landing.css";
 
 /*
- * The landing page: a story in the order of the build plan (redesign S2, A2), promise, person, product, then the evidence as the payoff.
- *
- *   1. the hero: the promise (the h1 and its lede), the ROLE DOOR (four tiles, the way in for each kind of visitor), a phone sign built from
- *      the app's own components with demo props, and the 3D heat field beside it with its caption (D7). The field is a box of its own, not
- *      the backdrop of the page: it is drawn from the recorded forecast grid after first paint (FieldGate), the poster is the server's
- *      loading state, and the old six-line readout and the statistic that led the page are gone.
- *   2. the chapters (LandingChapters.tsx): a morning on site, tonight's plan, the boundary, last summer replayed, what this does not show yet.
- *   3. the foot: the story footer (Back and Next) and the machine-translation notice.
- *
- * A server component over build-time files: nothing here fetches, and every number on it is read from a committed file by the code that is
- * imported here (never typed): the four bars and their sentences from the scored Warnings file (evidence.ts), the phone's day strip and the field
- * from the recorded forecast. Claim rules this page keeps: no win claim (the regulator's zones raise fewer false alarms, and the sentence under
- * the bars says so), no probability, "tested on summer 2026, every setting chosen on 2024 and 2025 data", and the limits stated last.
- * The unledgered season counts of the old chapter 1 are not on this page (they live behind a number's "Where from" chip only).
+ * The landing page, "Real Earth" (redesign S10, ported from the approved prototype): a chapter rail on the start edge and seven chapters.
+ *   01 Forecast   the hero and ONE pinned scene share one stage: a real satellite-and-terrain slab of the UAE with the recorded ECMWF IFS day-1
+ *                 forecast on it as flat amber classes; scrolling moves the hour 06:00 to 14:00, the camera and three captions (ForecastStage.tsx)
+ *   02 Morning    03 Plan    04 Boundary    05 Evidence (two screens)    06 Ways in    07 Limits: one whole screen each, coming to rest on wide
+ *                 screens (landing.css); a plain column everywhere else.
+ * A server component over build-time files: nothing here fetches and every number on it is read from a committed file by the code imported here,
+ * never typed: the bars, the axis and the two big verdict numbers from the scored Warnings file (evidence.ts), the captions and the legend from the
+ * recorded forecast and the field's limit (field-data.ts). Claim rules this page keeps: no win claim (the regulator's zones raise fewer false
+ * alarms, and the second evidence screen says so), the map is an illustration of one hot day and not the day that was scored, and the limits last.
+ * The page is drawn with the night tokens whatever theme the visitor has: it is an instrument page, and tokens.css sets sun mode on field routes only.
  */
 
 export interface LandingViewProps {
@@ -46,90 +43,85 @@ export function LandingView({ field, data, dir }: LandingViewProps) {
   const t = useTranslations("judge.landing");
   const ts = useTranslations("judge.scoreboard");
   const locale = useLocale();
-  const format = makeFormat(locale);
   const f = dayFormat(locale);
-
-  // ---- the field of the hero ----
   const day = field.grid.day;
-  const dayLabel = `${f.withWeekday(day)} ${day.slice(0, 4)}`;
-  const ban = banStateFor(SEASON_BAN, day, locale);
-  const panel: FieldPanelProps = {
-    day,
-    dayLabel,
-    omaa: field.omaa,
-    peakHour: field.peakHour,
-    ban,
-    // The file's own words are the proof's protocol and script (it says plainly that this day is an illustration, not the scored day).
-    proof: proofFromStaticFile(field.file, t("field.proofWhat", { day: dayLabel }), {
-      story: buildStory("field", { day }),
-      protocol: field.grid.why,
-      script: field.grid.physics,
-      label: "RECORDED",
-    }),
-    dir,
-  };
-  const reading = readingAt(field.grid, field.omaa, field.peakHour);
-  const evidence = buildEvidence(data, format, ts);
+  const year = day.slice(0, 4);
+  const dayLabel = `${f.withWeekday(day)} ${year}`;
+  const dateLabel = `${f.dayMonth(day)} ${year}`;
+  const evidence = buildEvidence(data, makeFormat(locale), ts);
+  const stations = STATIONS.map((s) => ({ ...s, name: t(`field.stations.${s.code}`) }));
+  const limit = LIMIT_C.toFixed(1);
+
+  const hero = (
+    <>
+      <h1 id="h1" data-contrast="large" data-contrast-name="h1">
+        {t("title")}
+      </h1>
+      <p className="lede" data-contrast="body" data-contrast-name="lede">
+        {t("lede")}
+      </p>
+      <p className="act">
+        <a className="btn" href="#morning">
+          {t("hero.primary")}
+        </a>
+        <a className="quiet" href="#ways">
+          {t("hero.skip")}
+        </a>
+      </p>
+    </>
+  );
+  const legend = (
+    <div className="legend">
+      <p className="k">{t("scene.limit", { limit })}</p>
+      <div className="chips" aria-hidden="true">
+        {LEGEND_SWATCHES.map((background, i) => (
+          <i key={i} style={{ background }} />
+        ))}
+      </div>
+      <div className="chl" aria-hidden="true">
+        {[t("scene.legendNone"), ...CLASS_STEPS.map((v, i) => (i === 0 ? limit : String(v)))].map((label, i) => (
+          <span key={i}>{label}</span>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <>
+    <div className="lp" data-theme="night" data-landing="" style={{ "--heat": HEAT_NUMBER } as CSSProperties}>
       <FieldLink
         href="/replay"
         className="sr-only rounded-sign bg-ink px-4 py-3 text-base font-medium text-ground focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50"
       >
         {t("skip")}
       </FieldLink>
-
-      <LandingHeader />
-
-      <main id="main-content" className="flex flex-col">
-        <section aria-labelledby="landing-title" data-landing-hero="" className="border-b border-hair">
-          <div className="mx-auto grid w-full max-w-(--content-max) gap-10 px-4 py-8 sm:px-6 min-[1100px]:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] min-[1100px]:items-center min-[1100px]:gap-12 min-[1100px]:px-10 min-[1100px]:py-14">
-            <div className="grid content-start gap-5">
-              <p data-contrast="body" data-contrast-name="kicker" className="text-sm text-ink-3">{t("kicker")}</p>
-              <h1
-                id="landing-title"
-                data-contrast="large"
-                data-contrast-name="h1"
-                className="font-display text-4xl leading-(--sign-leading-display) font-normal tracking-display min-[1100px]:text-5xl min-[1100px]:rtl:text-4xl"
-              >
-                {t("title")}
-              </h1>
-              <p data-contrast="body" data-contrast-name="lede" className="max-w-[44ch] text-lg text-ink-2">{t("lede")}</p>
-              <RoleDoor className="mt-1" />
-              {/* The contrast check reads the pixels of every marked element's boxes: a box that holds the tag's ring reads the ring (a border, not text), so the tag and the sentence are marked separately, the tag as a label (only its glyph pixels count). */}
-              <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
-                <span data-contrast="label" data-contrast-name="demo-tag" className="rounded-ctl px-1.5 py-0.5 text-xs font-semibold tracking-wide text-ink-2 uppercase inset-ring-[1.5px] inset-ring-edge">{t("phone.demo")}</span>
-                <span data-contrast="body" data-contrast-name="door-note" className="min-w-0 flex-1 basis-56">{t("door.note")}</span>
-              </p>
-            </div>
-            {/*
-              The phone and the field. Under 1100 px they are one block of their own (side by side from 640 px). From 1100 px the block is
-              `contents`: the phone becomes the right column of the hero beside the promise, and the field takes a row of its own under
-              both (it was a third column of about 300 px, where the map was a thumbnail and its station names collided).
-            */}
-            <div data-hero="" className="grid items-start gap-8 min-[640px]:grid-cols-[18rem_minmax(0,1fr)] min-[1100px]:contents">
-              <div className="grid min-w-0 justify-items-center min-[1100px]:justify-self-center">
-                <HeroPhone omaa={field.omaa} ban={ban} dir={dir} />
-              </div>
-              <div data-field-column="" className="grid min-w-0 content-start gap-3 min-[1100px]:col-span-2 min-[1100px]:mx-auto min-[1100px]:w-full min-[1100px]:max-w-2xl">
-                <FieldGate panel={panel}>
-                  <FieldPoster panel={panel} grid={field.grid} reading={reading} />
-                </FieldGate>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="mx-auto flex w-full max-w-(--content-max) flex-col gap-24 px-4 pt-16 pb-12 sm:px-6 min-[900px]:px-10">
-          <Chapters evidence={evidence} />
-
-          <StoryNav current="problem" />
-
-          {/* The foot of the page, below everything: the one quiet line of a machine-translated catalogue (architect ruling 2026-11-15). */}
-          <MachineTranslationNotice />
+      <LandingRail>
+        <div className="lang">
+          <LocaleSwitcher />
         </div>
+        <MachineTranslationNotice className="mt" />
+      </LandingRail>
+      <main id="main-content">
+        <ForecastStage
+          region={t("field.region", { day: dayLabel })}
+          when={t("field.scrubber.when", { day: dayLabel })}
+          dateLabel={dateLabel}
+          omaa={field.omaa}
+          rtl={dir === "rtl"}
+          sourceLine={t("scene.source", { date: dateLabel })}
+          hero={hero}
+          legend={legend}
+          attribution={field.attribution}
+          summary={<SceneSummary label={t("scene.summary")} captions={restCaptions(field.grid, field.omaa, dateLabel, t)} />}
+          stations={stations}
+        />
+        <Morning omaa={field.omaa} />
+        <Plan />
+        <Boundary />
+        <EvidenceSlides evidence={evidence} />
+        <WaysIn />
+        <Limits />
       </main>
-    </>
+      <LandingEffects />
+    </div>
   );
 }

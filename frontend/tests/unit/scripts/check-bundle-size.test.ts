@@ -116,7 +116,7 @@ describe("check-bundle-size gates the lazy 3D scene (Part L1 I3)", () => {
   // imports; the bootstrap lists them in `.f("static/chunks/turbopack-worker-<hash>.js",[ ...chunks ])`.
   const SCENE = "static/chunks/scene.js";
   const WORKER = "static/chunks/turbopack-worker-x.js";
-  const SCENE_TEXT = `e.q("/_next/static/media/terrain.worker.abc.ts")},11343,e=>{e.v(e.r(10914).f("${WORKER}",["static/chunks/w1.js","static/chunks/turbopack-runtime.js"]))}`;
+  const SCENE_TEXT = `e.q("/_next/static/media/OES_standard_derivatives.abc")},11343,e=>{e.v(e.r(10914).f("${WORKER}",["static/chunks/w1.js","static/chunks/turbopack-runtime.js"]))}`;
   const FILES: Record<string, string> = {
     [SCENE]: SCENE_TEXT,
     [WORKER]: "worker bootstrap",
@@ -132,7 +132,7 @@ describe("check-bundle-size gates the lazy 3D scene (Part L1 I3)", () => {
     expect(SCENE_CEILING).toBe(22_528);
   });
 
-  it("finds the scene chunk by the worker URL it carries, the worker bootstrap and every chunk it imports, and sums them once", () => {
+  it("finds the scene chunk by the extension name it carries, the worker bootstrap and every chunk it imports, and sums them once", () => {
     const bytes = { [SCENE]: 2_300, [WORKER]: 400, "static/chunks/w1.js": 5_300, "static/chunks/turbopack-runtime.js": 4_000 };
     const found = lazyScene(list(FILES), read(FILES), gz(bytes), []);
     expect(found.chunks.sort()).toEqual([SCENE, "static/chunks/turbopack-runtime.js", "static/chunks/w1.js", WORKER].sort());
@@ -156,14 +156,16 @@ describe("check-bundle-size gates the lazy 3D scene (Part L1 I3)", () => {
     expect(sceneVerdict(over)).toBe("FAIL");
   });
 
-  it("cannot pass vacuously: no chunk carries the worker URL, no worker bootstrap is named, or a named chunk is missing or empty", () => {
+  it("cannot pass vacuously: no chunk carries the scene marker, or a named chunk is missing or empty", () => {
     const none = lazyScene(list({ "static/chunks/other.js": "x" }), read({ "static/chunks/other.js": "x" }), gz({ "static/chunks/other.js": 10 }), []);
-    expect(none.problems.join("\n")).toContain("no chunk references the terrain worker");
+    expect(none.problems.join("\n")).toContain("no chunk references the WebGL scene");
     expect(none.size).toBe(0);
 
-    const noBootstrap = { ...FILES, [SCENE]: 'e.q("/_next/static/media/terrain.worker.abc.ts")' };
+    // the scene has no worker: a chunk that carries the marker and names no bootstrap is the whole scene, counted alone
+    const noBootstrap = { ...FILES, [SCENE]: 'e.q("OES_standard_derivatives")' };
     const a = lazyScene(list(noBootstrap), read(noBootstrap), gz({ [SCENE]: 100 }), []);
-    expect(a.problems.join("\n")).toContain("names no worker bootstrap");
+    expect(a.problems).toEqual([]);
+    expect(a.size).toBe(100);
 
     const bytes = { [SCENE]: 2_300, [WORKER]: 400, "static/chunks/w1.js": 0, "static/chunks/turbopack-runtime.js": 4_000 };
     const b = lazyScene(list(FILES), read(FILES), gz(bytes), []);

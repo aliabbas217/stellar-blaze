@@ -1,0 +1,81 @@
+{
+  "bbox": {
+    "west": 51.125,
+    "south": 22.125,
+    "east": 57.125,
+    "north": 26.875
+  },
+  "projection": "equirectangular (plate carree, EPSG:4326); texture and DEM cover the bbox edge to edge",
+  "texture": {
+    "file": "uae-sat-gray.jpg",
+    "alt_file": "uae-sat-gray.webp",
+    "w": 1536,
+    "h": 1216,
+    "bytes_jpg": 181933,
+    "bytes_webp": 108714,
+    "note": "grayscale luminance; u=0 is the bbox west edge, v=0 the north edge (image top = north)",
+    "ground_resolution_m_east_west_at_24.5N": 396,
+    "native_source_resolution_m": 375
+  },
+  "dem": {
+    "file": "uae-dem.bin",
+    "w": 128,
+    "h": 101,
+    "min": 0,
+    "max": 2316,
+    "units": "m",
+    "order": "row-major, north row first, Int16 LE",
+    "registration": "node (i,j) is at lon = west + i*(east-west)/(w-1), lat = north - j*(north-south)/(h-1); so node 0 sits on the west/north bbox edge and node w-1 / h-1 on the east/south edge",
+    "node_spacing_deg": {
+      "lon": 0.04724,
+      "lat": 0.0475
+    },
+    "note": "each node is the mean of the source (zoom-9, ~280 m) pixels inside its cell, sea and negative values clamped to 0 before averaging; coastal land below ~1 m is also 0. Averaging smooths peaks: the raw 280 m maximum in the bbox is 2980 m."
+  },
+  "cells": {
+    "west": 51.375,
+    "east": 56.875,
+    "south": 22.375,
+    "north": 26.625,
+    "cols": 22,
+    "rows": 17
+  },
+  "sources": [
+    {
+      "name": "NASA GIBS WMTS, VIIRS Suomi/NOAA-21 corrected reflectance true colour",
+      "url": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/VIIRS_NOAA21_CorrectedReflectance_TrueColor/default/{date}/250m/{z}/{row}/{col}.jpg",
+      "licence": "NASA EOSDIS data use policy: freely accessible; unless a restriction is marked, NASA-led mission data are CC0; acknowledgement of NASA GIBS requested",
+      "licence_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-policy",
+      "fetched": "2026-11-18",
+      "layer_or_dataset": "VIIRS_NOAA21_CorrectedReflectance_TrueColor, tile matrix set 250m, zoom 8, 15 daily scenes 2026-10-18 to 2026-11-15 every 2 days",
+      "note": "per-pixel 40th-percentile luminance across the dates (removes cloud, dust, sun glint, swath gaps), cropped to the bbox, downsampled to 1536 px, tone-curved, grayscale. The WELD Landsat 30 m layer named in the brief was NOT used: its imagery ends in 2000, before Palm Jumeirah, The World, Saadiyat or most of the current coast existed."
+    },
+    {
+      "name": "AWS Open Data: Terrain Tiles (Mapzen / Tilezen joerd), terrarium encoding",
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+      "licence": "Mixed public-domain and open sources. In this bbox: SRTM (public domain, USGS credit requested) on land and ETOPO1 (NOAA, public domain) for sea, GMTED2010 (USGS, no restrictions) at low zooms. No key, no account.",
+      "licence_url": "https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+      "fetched": "2026-11-18",
+      "layer_or_dataset": "elevation-tiles-prod/terrarium zoom 9 (tiles x {x}, y {y})",
+      "note": "height = R*256 + G + B/256 - 32768 m; area-averaged to a 128x101 lon/lat grid, sea clamped to 0. AWS registry: https://registry.opendata.aws/terrain-tiles/"
+    }
+  ],
+  "attribution": "Imagery: NASA Global Imagery Browse Services (GIBS), VIIRS NOAA-21. Terrain: SRTM and GMTED2010 courtesy of the U.S. Geological Survey, ETOPO1 NOAA, via AWS Terrain Tiles.",
+  "imagery_dates": [
+    "2026-10-18",
+    "2026-10-20",
+    "2026-10-22",
+    "2026-10-24",
+    "2026-10-26",
+    "2026-10-28",
+    "2026-10-30",
+    "2026-11-01",
+    "2026-11-03",
+    "2026-11-05",
+    "2026-11-07",
+    "2026-11-09",
+    "2026-11-11",
+    "2026-11-13",
+    "2026-11-15"
+  ]
+}

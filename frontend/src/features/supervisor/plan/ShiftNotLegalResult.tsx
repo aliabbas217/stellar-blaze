@@ -2,7 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import type { ShiftViolation } from "@/api/problem";
+import { RuleLabel } from "@/components/provenance/RuleLabel";
 import { sanitizeClause } from "@/lib/copy/sanitize-clause";
+import { useRuleName } from "./rule-name";
 
 /*
  * The 422 `shift-not-legal` of the day plan and the sign-off (F2 Task 20): the crew's published shift breaks a rule by itself, so
@@ -14,6 +16,7 @@ import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 
 export function ShiftNotLegalResult({ violations }: { readonly violations: readonly ShiftViolation[] }) {
   const t = useTranslations("supervisor.plan.notLegal");
+  const nameOf = useRuleName();
   return (
     <section data-shift-not-legal="" role="status" className="flex flex-col gap-3 rounded-sign border border-edge border-s-3 border-s-ink-2 bg-panel px-4 py-4">
       <h2 className="font-display text-lg font-medium leading-(--sign-leading-text) text-ink">{t("title")}</h2>
@@ -24,9 +27,9 @@ export function ShiftNotLegalResult({ violations }: { readonly violations: reado
           <ul className="m-0 flex list-none flex-col p-0">
             {violations.map((violation, index) => (
               <li key={`${violation.rule_id}-${String(index)}`} data-violation={violation.rule_id} className="flex flex-col gap-1 border-t border-hair py-2 first:border-t-0">
-                <code dir="ltr" translate="no" className="font-mono text-sm text-ink">
-                  {violation.rule_id}
-                </code>
+                <span className="flex flex-wrap items-baseline gap-x-2 text-base">
+                  <RuleLabel id={violation.rule_id} name={nameOf(violation.rule_id)} />
+                </span>
                 {violation.clause === "" ? null : <p className="text-base leading-(--sign-leading-text) text-ink-2">{sanitizeClause(violation.clause, { sourceId: violation.source_id })}</p>}
               </li>
             ))}

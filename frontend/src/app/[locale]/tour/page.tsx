@@ -7,7 +7,7 @@ import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { DEMO_CONTROLS_HREF, TOUR_STEPS } from "@/features/judge/tour-steps";
 
 /*
- * `/tour`: the 3-minute tour for a reviewer (03 section 6). Five numbered stops, each one plain sentence and a link to the real screen, in
+ * `/tour`: the 3-minute tour for a reviewer (03 section 6). Numbered stops, each one plain sentence and a link to the real screen, in
  * the order that tells the story. Static, server markup, no script. The page chrome and the buttons are in the visitor's language; the
  * stops' own sentences are English by design (Tier 2, `judge.tour.steps.`: story copy, like the landing's chapters), so each sits in a
  * `lang="en"` block. No number is written here, and the one "Where from" link points at a proof sheet that already exists.

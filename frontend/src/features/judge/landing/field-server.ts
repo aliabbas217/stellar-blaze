@@ -26,6 +26,14 @@ export interface FieldHeroData {
   readonly peakHour: number;
   /** Whether the field's day is the season's highest daily peak in the hourly file (the copy says so only when it is). */
   readonly highestOfSeason: boolean;
+  /** The imagery and terrain credit the page prints under the map (public/data/uae-geo.json; the licences are public/data/LICENCES.md). */
+  readonly attribution: string;
+}
+
+export async function loadAttribution(root: string = path.join(process.cwd(), "public", "data")): Promise<string> {
+  const geo = JSON.parse(await readFile(path.join(root, "uae-geo.json"), "utf8")) as { attribution?: unknown };
+  if (typeof geo.attribution !== "string" || geo.attribution.trim() === "") throw new RangeError("public/data/uae-geo.json has no attribution text");
+  return geo.attribution;
 }
 
 export async function loadFieldHero(hourly: HourlyData, dataRoot: string = path.join(process.cwd(), "data")): Promise<FieldHeroData> {
@@ -47,5 +55,6 @@ export async function loadFieldHero(hourly: HourlyData, dataRoot: string = path.
     omaa,
     peakHour: peakHourOf(omaa),
     highestOfSeason: seasonPeakDay === grid.day,
+    attribution: await loadAttribution(),
   };
 }

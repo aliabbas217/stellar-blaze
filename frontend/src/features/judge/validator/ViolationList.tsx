@@ -1,16 +1,19 @@
 import { useTranslations } from "next-intl";
+import { RuleLabel } from "@/components/provenance/RuleLabel";
 import { sanitizeClause } from "@/lib/copy/sanitize-clause";
 import { clockOf } from "./runs";
 import type { ViolationView } from "./view";
 import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { useRuleName } from "./rule-name";
 
 /**
- * The rules a plan breaks, as the API answered, numbered like the marks on the plan strip: the rule id in mono (an
+ * The rules a plan breaks, as the API answered, numbered like the marks on the plan strip: the rule's plain name with its id beside it in mono (an
  * identifier, never translated), the clause text only when the API sent some (a rule whose clause the contract does not
  * carry shows its id alone, never invented wording), when, and the API's own sentence about what the plan does.
  */
 export function ViolationList({ violations }: { readonly violations: readonly ViolationView[] }) {
   const t = useTranslations("judge.try");
+  const nameOf = useRuleName();
   const locale = CLAIMS_LOCALE;
   const list = new Intl.ListFormat(locale, { type: "conjunction" });
   return (
@@ -25,9 +28,9 @@ export function ViolationList({ violations }: { readonly violations: readonly Vi
             >
               {i + 1}
             </span>
-            <code className="font-mono text-base text-ink" dir="ltr" translate="no">
-              {violation.ruleId}
-            </code>
+            <span className="flex flex-wrap items-baseline gap-x-2 text-base">
+              <RuleLabel id={violation.ruleId} name={nameOf(violation.ruleId)} />
+            </span>
           </p>
           {violation.clause === "" ? null : <p className="max-w-(--measure) text-sm text-ink-2" data-clause="">{sanitizeClause(violation.clause, { sourceId: violation.sourceId })}</p>}
           <p className="text-sm text-ink-2 tabular-nums">

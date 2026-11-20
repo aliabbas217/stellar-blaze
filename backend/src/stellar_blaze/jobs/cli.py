@@ -810,8 +810,9 @@ def alerts_run_command(site: SiteOption = None) -> None:
     the current run; a failing cycle is logged and the loop goes on. Each site of each cycle is a ``job_run`` row, like
     ``alerts dispatch``, under its own per-site lock. In replay mode the API and this loop agree on replay time through
     the ``site_epoch`` row in Postgres (replay anchor + real time since the current epoch started): a restart of either
-    changes nothing, and a demo reset re-anchors both (the API at once, this loop at its next cycle). The window is
-    about 7 h 20 min per epoch (replay time passes 17:30 Dubai), after which a reset is needed. With that row
+    changes nothing, and a demo reset re-anchors both (the API at once, this loop at its next cycle). The replay time
+    stays inside a window of 7 h 20 min from the anchor (10:10 to 17:30 Dubai) and repeats: at its end it goes back to
+    the anchor, so no reset is needed to stay inside the working day. With that row
     unreadable the cycle fails and the loop tries again."""
     settings = _settings()
     runtime = _runtime(settings)

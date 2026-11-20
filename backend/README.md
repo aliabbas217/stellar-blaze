@@ -124,12 +124,12 @@ It only **extends** the built-in list; it can never remove an entry, and it neve
 `sb-jobs alerts dispatch` runs one cycle and `sb-jobs alerts run` loops (`--help` has the SLA and the lanes); the API serves the
 reads and records stops but never sends a push (ADR 0058 decision 5). They are SEPARATE processes that agree on time through
 Postgres: in replay mode (`SB_FORECAST_SOURCE=replay`, anchored by `SB_REPLAY_NOW` or `SB_REPLAY_DEFAULT_DATE`) the domain
-"now" is `replay anchor + (real time now - start of the current epoch)`, where the epoch start is the `started_at` of the
+"now" is `replay anchor + ((real time now - start of the current epoch) mod 7 h 20 min)`, where the epoch start is the `started_at` of the
 latest `site_epoch` row of the synthetic sites (ADR 0034 amendment of 2026-11-15). Both processes read that row (cached for
 5 seconds, refreshed at the entry of every API request and every alerts cycle), so a restart of either changes nothing, and
 they need the same `SB_REPLAY_*` values but need not start together. A demo reset (ADR 0066) starts a new epoch and so
 re-anchors the clock to `SB_REPLAY_NOW`: the API at once (the reset route refreshes), the worker at its next cycle. The window
-is about 7 h 20 min per epoch (replay time passes 17:30 Dubai), after which a reset is needed. The real clock still drives the
+is 7 h 20 min (10:10 to 17:30 Dubai at the deployed anchor) and REPEATS: at its end the replay time goes back to the anchor and runs on at real speed, so the demo shows an active shift at any hour without a reset (ADR 0034 amendment of 2026-11-20). The real clock still drives the
 rate limiter, `reset_at` and the audit `at`. If the epoch row cannot be read (the database is down, or no synthetic site was
 loaded) there is no replay time: a route that reads the clock answers 503 `dependency-unavailable` (`dependency: database`),
 an alerts cycle fails and the loop tries again next cycle; a last good read is served for at most 30 seconds. With another
@@ -172,8 +172,8 @@ version, which sign-off needs). `sb-jobs alerts run` must get the SAME `SB_REPLA
 
 The replay clock starts at the epoch row's `started_at`, which `sb-jobs site load` wrote when it created the site. So after a
 deploy run ONE reset with the employer token, which begins a fresh epoch at that moment (the `SB_REPLAY_NOW` anchor, 10:10 Dubai on the replay day with the values above, then
-real speed), and reset again before each judged session; the window is about 7 h 20 min per epoch (until 17:30 Dubai replay
-time):
+real speed), and reset again before a judged session when you want it to start at the anchor; the 7 h 20 min window (until 17:30 Dubai replay
+time) repeats, so a reset is not needed to stay inside the working day:
 
 ```bash
 curl -X POST -H "Authorization: Bearer $DEMO_TOKEN" http://127.0.0.1:8123/api/v1/sites/site-demo-mussafah/demo-reset

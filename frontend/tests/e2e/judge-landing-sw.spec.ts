@@ -1,32 +1,27 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { gateReport, watchConsole } from "./gate.ts";
+import { watchConsole } from "./gate.ts";
 import { INSTALL_TIMEOUT_MS } from "./helpers/service-worker.ts";
 
 /*
- * The landing's WebGL scene when a SERVICE WORKER is in the picture. Every title contains "landing" and "service worker".
+ * The landing's forecast scene when a SERVICE WORKER is in the picture. Every title contains "landing" and "service worker".
  *
- * Why it exists: "Missing worker bootstrap config" was logged once in a production gate run (a first load), and was then
- * reproduced on EVERY load a service worker controlled (a returning visit: 9 of 9). Turbopack hands the terrain worker its
- * config in the `#params=` fragment of the worker script's URL and the worker reads it back from its own `self.location`; the
- * location of a worker is the URL of the response that delivered its script, and a response the service worker serves from
- * Cache Storage (the precache holds every `_next/static` chunk) has the URL it was stored under, without the fragment. The
- * worker threw, and the page fell back to the 2D field with a console error. The fix is in src/features/pwa/worker-scripts.ts
- * (the service worker does not answer worker scripts); the unit test there runs Serwist's real listeners.
+ * Why it exists: the landing's scene (landing-scene.ts, plain WebGL on the page's own thread) starts after first paint and fetches three files
+ * of its own from /data/ (the terrain, the outline and the satellite image) and the forecast grid from /data/static/. A returning visitor has a
+ * service worker that controls the page and may answer those requests; a first visitor's worker takes the page over while the scene starts. The
+ * scene must go live in all of these, or leave the still image, and in no case log an error or break the page. (The earlier landing started a
+ * terrain Web Worker whose bootstrap config the service worker's cache once stripped; that worker no longer exists, and this spec now guards the
+ * scene's own requests instead of the worker's script.)
  *
  * The other landing specs never see it: each of their tests is a brand-new browser context, whose first load is not controlled.
- * These tests make the service worker take part, in the three situations a visitor can be in:
+ * These tests make the service worker take part, in the situations a visitor can be in:
  *   - returning visit:  the worker is active and controls the page when the landing opens (loadControlled), 20 loads;
- *   - first visit race: a brand-new context; the scene is held back (idle callbacks wait) until the worker has claimed the page,
- *                       which is what a slow page on a fast install does. The page records, when the scene's worker is created,
- *                       whether the service worker already controlled it: the test fails if the race did not happen (not vacuous);
- *   - offline:          a returning visitor with no network gets the scene (its worker script comes from the browser's own HTTP
- *                       cache, which the service worker no longer shadows) or the 2D field, never a broken page;
- *   - blocked script:   a worker script that cannot be fetched leaves the 2D field (the designed fallback) and no uncaught error.
- * Each load must: report no console error, no uncaught error and no failed request; start the scene's worker with its
- * `#params=` config intact in `self.location` (read from the worker itself); and, where the browser has WebGL, draw the scene on
- * the WebGL path, not the 2D fallback (SB_E2E_REQUIRE_WEBGL=1 makes a host without WebGL a failure, as in judge-landing.spec.ts).
- * To prove the tests are not vacuous, revert src/app/sw.ts to `serwist.addEventListeners()`, rebuild, and run them: the returning
- * visit and first visit tests fail on every load.
+ *   - first visit race: a brand-new context; the scene is held back (idle callbacks wait) until the worker has claimed the page, which is what
+ *                       a slow page on a fast install does. The page records, when the scene asks for its first file, whether the service
+ *                       worker already controlled it: the test fails if the race did not happen (not vacuous);
+ *   - offline:          a returning visitor with no network gets the scene or the still image, never a broken page;
+ *   - blocked file:     a scene file that cannot be fetched leaves the still image (the designed fallback) and no uncaught error.
+ * Each load must report no console error, no uncaught error and no failed request, and, where the browser has WebGL, draw the live scene, not
+ * the still image (SB_E2E_REQUIRE_WEBGL=1 makes a host without WebGL a failure, as in judge-landing.spec.ts).
  */
 
 const LOADS = 20;
@@ -34,26 +29,32 @@ const REQUIRE_WEBGL = process.env.SB_E2E_REQUIRE_WEBGL === "1";
 const WIDE = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
 
-interface Load {
-  readonly path: string;
-  readonly errors: readonly string[];
-  /** `self.location.href` of every worker the page started, read from the workers themselves. */
-  readonly workerLocations: readonly string[];
-  /** For each `new Worker(...)`: was the page controlled by the service worker at that moment? */
-  readonly controlledAtWorkerStart: readonly boolean[];
+type SceneMode = "live" | "poster";
+
+/** The page is whole: the chapter rail with its seven links, the map box, and nothing running sideways (the landing has no header or spine for the app's design gate). */
+async function expectIntact(page: Page): Promise<void> {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), "nothing runs sideways").toBeLessThanOrEqual(0);
+  await expect(page.locator("nav.rail a[href^='#']")).toHaveCount(7);
+  await expect(page.locator("#forecast .mapwrap")).toBeVisible();
 }
 
-/** Records, for every worker the page creates, whether the service worker controlled the page then. Runs before any page script. */
-async function recordWorkerStarts(page: Page): Promise<void> {
+interface Load {
+  readonly mode: SceneMode;
+  readonly errors: readonly string[];
+  /** For each request the page made for the scene's first file: was the page controlled by the service worker at that moment? */
+  readonly controlledAtSceneStart: readonly boolean[];
+}
+
+/** Records, for the request of the scene's first data file, whether the service worker controlled the page then. Runs before any page script. */
+async function recordSceneStarts(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const w = window as unknown as { __workerStarts: boolean[]; Worker: typeof Worker };
-    w.__workerStarts = [];
-    const Real = w.Worker;
-    w.Worker = class extends Real {
-      constructor(url: string | URL, options?: WorkerOptions) {
-        super(url, options);
-        w.__workerStarts.push(navigator.serviceWorker.controller !== null);
-      }
+    const w = window as unknown as { __sceneStarts: boolean[] };
+    w.__sceneStarts = [];
+    const real = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/data/uae-geo.json")) w.__sceneStarts.push(navigator.serviceWorker.controller !== null);
+      return real(input, init);
     };
   });
 }
@@ -86,29 +87,20 @@ async function holdIdleUntilClaimed(page: Page): Promise<void> {
   });
 }
 
-async function settle(page: Page): Promise<string> {
-  const stage = page.locator("[data-field-stage][data-field-path]");
-  await expect(stage).toBeAttached({ timeout: 20_000 });
-  try {
-    await expect(stage).toHaveAttribute("data-field-path", "webgl", { timeout: 9_000 });
-  } catch {
-    // the scene did not take over: the 2D field is the page
-  }
-  return (await stage.getAttribute("data-field-path")) ?? "";
+async function settle(page: Page): Promise<SceneMode> {
+  const stage = page.locator("#forecast");
+  await expect(stage).toHaveAttribute("data-scene", /^(live|poster)$/, { timeout: 30_000 });
+  return (await stage.getAttribute("data-scene")) === "live" ? "live" : "poster";
 }
 
 /** Opens the landing in `page` and reads what happened. `errors` is collected by the caller's `watchConsole`. */
 async function measure(page: Page, errors: string[], url: string): Promise<Load> {
-  const locations: string[] = [];
-  page.on("worker", (worker) => {
-    void worker.evaluate(() => self.location.href).then((href) => locations.push(href), () => undefined);
-  });
   await page.goto(url);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const path = await settle(page);
-  await page.waitForTimeout(700); // a worker's bootstrap error or a late warning shows up here
-  const controlledAtWorkerStart = await page.evaluate(() => (window as unknown as { __workerStarts?: boolean[] }).__workerStarts ?? []);
-  return { path, errors: [...errors], workerLocations: locations, controlledAtWorkerStart };
+  const mode = await settle(page);
+  await page.waitForTimeout(700); // a late warning shows up here
+  const controlledAtSceneStart = await page.evaluate(() => (window as unknown as { __sceneStarts?: boolean[] }).__sceneStarts ?? []);
+  return { mode, errors: [...errors], controlledAtSceneStart };
 }
 
 /** The project's base URL (a context made with `browser.newContext` does not inherit it). */
@@ -117,16 +109,9 @@ function requireBase(baseURL: string | undefined): string {
   return baseURL;
 }
 
-function expectGood(load: Load, label: string, origin: string): void {
+function expectGood(load: Load, label: string): void {
   expect(load.errors, `${label}: the browser reported`).toEqual([]);
-  if (REQUIRE_WEBGL) expect(load.path, `${label}: SB_E2E_REQUIRE_WEBGL=1, the WebGL scene must run, not fall back to 2D`).toBe("webgl");
-  if (load.path === "webgl") {
-    expect(load.workerLocations.length, `${label}: the scene started a worker`).toBeGreaterThan(0);
-    for (const href of load.workerLocations) {
-      expect(href, `${label}: the worker kept its bootstrap config in its own location`).toContain("#params=");
-      expect(href.startsWith(`${origin}/_next/static/`), `${label}: a same-origin chunk`).toBe(true);
-    }
-  }
+  if (REQUIRE_WEBGL) expect(load.mode, `${label}: SB_E2E_REQUIRE_WEBGL=1, the live scene must run, not the still image`).toBe("live");
 }
 
 /** Waits until the app's worker is active (the page that did it is then closed by the caller). */
@@ -145,16 +130,16 @@ async function installServiceWorker(context: BrowserContext): Promise<void> {
 test.describe("landing and the service worker", () => {
   test.setTimeout(8 * 60_000);
 
-  test("landing service worker returning visit: the scene starts with its config on every controlled load (20 loads)", async ({ browser, baseURL }) => {
+  test("landing service worker returning visit: the scene starts on every controlled load (20 loads)", async ({ browser, baseURL }) => {
     const context = await browser.newContext({ baseURL: requireBase(baseURL), viewport: WIDE });
     await installServiceWorker(context);
     for (let i = 0; i < LOADS; i++) {
       const page = await context.newPage();
-      await recordWorkerStarts(page);
+      await recordSceneStarts(page);
       const errors = watchConsole(page);
       const load = await measure(page, errors, "/en");
       expect(await page.evaluate(() => navigator.serviceWorker.controller !== null), `load ${String(i)}: the service worker controls the page`).toBe(true);
-      expectGood(load, `returning visit, load ${String(i)}`, requireBase(baseURL));
+      expectGood(load, `returning visit, load ${String(i)}`);
       await page.close();
     }
     await context.close();
@@ -164,19 +149,19 @@ test.describe("landing and the service worker", () => {
     for (let i = 0; i < LOADS; i++) {
       const context = await browser.newContext({ baseURL: requireBase(baseURL), viewport: i % 2 === 0 ? WIDE : PHONE });
       const page = await context.newPage();
-      await recordWorkerStarts(page);
+      await recordSceneStarts(page);
       await holdIdleUntilClaimed(page);
       const errors = watchConsole(page);
       const load = await measure(page, errors, i % 4 < 2 ? "/en" : "/ar");
-      if (load.path === "webgl") {
-        expect(load.controlledAtWorkerStart, `load ${String(i)}: the race happened (the scene's worker was created under the service worker's control)`).toEqual([true]);
+      if (load.mode === "live") {
+        expect(load.controlledAtSceneStart, `load ${String(i)}: the race happened (the scene asked for its files under the service worker's control)`).toEqual([true]);
       }
-      expectGood(load, `first visit, load ${String(i)}`, requireBase(baseURL));
+      expectGood(load, `first visit, load ${String(i)}`);
       await context.close();
     }
   });
 
-  test("landing service worker offline: a returning visitor gets the scene from the browser's own cache or the 2D field, never a broken page", async ({ browser, baseURL }) => {
+  test("landing service worker offline: a returning visitor gets the scene or the still image, never a broken page", async ({ browser, baseURL }) => {
     const context: BrowserContext = await browser.newContext({ baseURL: requireBase(baseURL), viewport: WIDE });
     await installServiceWorker(context);
     const warm = await context.newPage(); // one controlled visit stores the page itself, as any returning visitor has
@@ -186,41 +171,43 @@ test.describe("landing and the service worker", () => {
     await context.setOffline(true);
     const page = await context.newPage();
     const uncaught: string[] = [];
-    const locations: string[] = [];
     page.on("pageerror", (error) => uncaught.push(error.message));
-    page.on("worker", (worker) => {
-      void worker.evaluate(() => self.location.href).then((href) => locations.push(href), () => undefined);
-    });
     await page.goto("/en");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    const path = await settle(page);
+    const mode = await settle(page);
     await page.waitForTimeout(700);
-    // The service worker leaves the worker script alone, so offline it comes from the browser's HTTP cache (the chunk is immutable and
-    // the warm visit loaded it): the scene runs with its config. Where that cache is empty the script fails and the 2D field is the page.
-    expect(["webgl", "2d"]).toContain(path);
-    if (path === "webgl") for (const href of locations) expect(href).toContain("#params=");
+    // Offline, the page comes from the precache; the scene's files come from the browser's caches where it has them. Where any is missing the scene
+    // gives up and the still image is the page: both are right, a blank map or an uncaught error is not.
+    expect(["live", "poster"]).toContain(mode);
+    if (mode === "poster") await expect(page.locator("#forecast img.poster")).toBeVisible();
     expect(uncaught, "an uncaught error on the page").toEqual([]);
-    const report = await gateReport(page, { consoleErrors: [], spine: true, hero: false });
-    expect(report.failures).toEqual([]);
+    await expectIntact(page);
     await context.setOffline(false);
     await context.close();
   });
 
-  test("landing service worker: a worker script that cannot be fetched leaves the 2D field and no uncaught error", async ({ browser, baseURL }) => {
+  test("landing service worker: a scene file that cannot be fetched leaves the still image and no uncaught error", async ({ browser, baseURL }) => {
     const context: BrowserContext = await browser.newContext({ baseURL: requireBase(baseURL), viewport: WIDE });
     await installServiceWorker(context);
-    const page = await context.newPage(); // controlled: the service worker passes the script request on, so the route below sees it
-    await page.route(/\/turbopack-worker-[^/]*\.js/, (route) => route.abort("failed"));
+    const page = await context.newPage();
+    // The page's own fetch of the terrain file fails (a request made on a controlled page goes to the service worker, which a page.route cannot see, so it fails here, before it leaves the page).
+    await page.addInitScript(() => {
+      const real = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        return url.includes("/data/uae-dem.bin") ? Promise.reject(new TypeError("Failed to fetch")) : real(input, init);
+      };
+    });
     const uncaught: string[] = [];
     page.on("pageerror", (error) => uncaught.push(error.message));
     await page.goto("/en");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    const path = await settle(page);
+    const mode = await settle(page);
     await page.waitForTimeout(700);
-    expect(path, "the scene's worker cannot start: the 2D field of the same data is the page").toBe("2d");
+    expect(mode, "the scene's terrain file cannot load: the still image of the same map is the page").toBe("poster");
+    await expect(page.locator("#forecast img.poster")).toBeVisible();
     expect(uncaught, "an uncaught error on the page").toEqual([]);
-    const report = await gateReport(page, { consoleErrors: [], spine: true, hero: false });
-    expect(report.failures).toEqual([]);
+    await expectIntact(page);
     await context.close();
   });
 

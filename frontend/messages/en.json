@@ -784,6 +784,29 @@
         "title": "This crew was not found",
         "reason": "No crew with this link is at this site.",
         "primary": "All crews"
+      },
+      "rules": {
+        "pH1": "Work during the midday break",
+        "pH1a": "Exemption from the midday break",
+        "pH2Daily": "Daily working hours",
+        "pH2Weekly": "Weekly working hours",
+        "pH3": "Break after five hours of work",
+        "pH4": "Weekly rest day",
+        "pH5Hours": "Young worker: daily hours",
+        "pH5Run": "Young worker: run of work",
+        "pH5Window": "Young worker: hours of the day",
+        "pH5BanSeason": "Young worker: heat season",
+        "pH7Cap60": "Too many work minutes in an hour",
+        "pH7Run": "Work run too long, or rest too short",
+        "pH7Lone": "Working alone in the heat",
+        "pH7Unacclimatised": "Unacclimatised crew working in the heat",
+        "pH7Cycle": "Work-rest cycle",
+        "pH8Ramp": "Acclimatisation ramp-up",
+        "pH8Heavy7": "Heavy work before 7 days of acclimatisation",
+        "pH10": "No added minutes",
+        "stopRed": "Stop work in the red zone",
+        "stopNoAcclimatised": "No acclimatised worker available",
+        "fallbackHigh": "No usable forecast: treated as High"
       }
     },
     "stop": {
@@ -1519,7 +1542,7 @@
         "start": "Start",
         "end": "End",
         "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
-        "none": "Add at least one run of work to check a plan.",
+        "none": "Add at least one run of work, or pick a roster, then check.",
         "placeholder": "hh:mm",
         "problem": {
           "format": "Write the time as hh:mm, for example 06:00.",
@@ -1575,7 +1598,30 @@
         "reason": "The rule checker could not read these lines. Nothing was checked.",
         "line": "Run {line}"
       },
-      "loading": "Loading the checker"
+      "loading": "Loading the checker",
+      "rules": {
+        "pH1": "Work during the midday ban",
+        "pH1a": "Exemption from the midday ban",
+        "pH2Daily": "Daily working hours",
+        "pH2Weekly": "Weekly working hours",
+        "pH3": "Break after five hours of work",
+        "pH4": "Weekly rest day",
+        "pH5Hours": "Young worker: daily hours",
+        "pH5Run": "Young worker: run of work",
+        "pH5Window": "Young worker: hours of the day",
+        "pH5BanSeason": "Young worker: heat season",
+        "pH7Cap60": "Too many work minutes in an hour",
+        "pH7Run": "Work run too long, or rest too short",
+        "pH7Lone": "Working alone in the heat",
+        "pH7Unacclimatised": "Unacclimatised crew working in the heat",
+        "pH7Cycle": "Work-rest cycle",
+        "pH8Ramp": "Acclimatisation ramp-up",
+        "pH8Heavy7": "Heavy work before 7 days of acclimatisation",
+        "pH10": "No added minutes",
+        "stopRed": "Stop work in the red zone",
+        "stopNoAcclimatised": "No acclimatised worker available",
+        "fallbackHigh": "No usable forecast: treated as High"
+      }
     },
     "story": {
       "label": "Story",
@@ -1590,6 +1636,7 @@
         "product": "The product",
         "evidence": "The evidence",
         "day": "One day",
+        "try": "Try a plan",
         "boundary": "The boundary"
       }
     },
@@ -1724,20 +1771,20 @@
       "skip": "Skip to the scoreboard",
       "kicker": "Tested on last summer's real weather at Abu Dhabi airport",
       "title": "Plan tomorrow's heat tonight.",
-      "lede": "Stellar Blaze turns a day-ahead forecast into a work-and-rest plan for each crew, and a plain warning on each worker's phone, in six languages.",
+      "lede": "Heat danger does not wait for the midday break. We forecast it a day ahead and give every crew a plan and every worker a warning.",
       "door": {
         "label": "Who is this for?",
         "worker": {
           "title": "I work on a site",
-          "line": "See today's heat and when to rest. No account."
+          "line": "Today's heat and rest times. No account."
         },
         "crew": {
           "title": "I run a crew",
-          "line": "See tonight's plan for your crews. Stop work in one tap."
+          "line": "Tonight's plan. Stop work in one tap."
         },
         "safety": {
           "title": "I look after safety",
-          "line": "See which crews planned, signed and stopped."
+          "line": "Which crews planned, signed and stopped."
         },
         "review": {
           "title": "I am reviewing this",
@@ -1752,7 +1799,7 @@
       },
       "field": {
         "region": "The forecast heat field over the UAE, {day}",
-        "caption": "Forecast heat across the UAE for one hot day. An illustration, not the day we scored.",
+        "caption": "An illustration of one hot day, not the day we scored.",
         "proofWhat": "The forecast heat field, {day}, every hour",
         "stations": {
           "OMAA": "Abu Dhabi",
@@ -1780,7 +1827,12 @@
           "heading": "One sign, one instruction, in the worker's own language.",
           "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
           "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
-          "link": "Open the worker screen"
+          "link": "Open the worker screen",
+          "spine": {
+            "level": "Heat level",
+            "airport": "Abu Dhabi airport forecast",
+            "break": "Midday break"
+          }
         },
         "plan": {
           "eyebrow": "Tonight's plan",
@@ -1803,7 +1855,8 @@
           },
           "stop": "Stop work, Crew A",
           "link": "Open the crews screen",
-          "tag": "Demo"
+          "tag": "Demo",
+          "copy": "Follows the ADOSH heat rules. Stop work in one tap."
         },
         "boundary": {
           "eyebrow": "The boundary",
@@ -1813,7 +1866,17 @@
           "requestDetail": "Individual health data for one worker.",
           "refused": "Refused.",
           "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
-          "link": "See the refusal, recorded"
+          "link": "See the refusal, recorded",
+          "panel": {
+            "asked": "Asked",
+            "refused": "Refused",
+            "seen": "Seen",
+            "refusedLine": "The service holds none.",
+            "seenLine": "Every worker at the site can see it was asked.",
+            "chain": "Each log entry builds on the one before, so a change shows.",
+            "earlier": "earlier",
+            "entry": "entry"
+          }
         },
         "evidence": {
           "eyebrow": "Last summer, replayed",
@@ -1823,17 +1886,74 @@
           "falseAlarms": "False-alarm hours: {n}",
           "verdicts": "How the main checks came out",
           "scoreboard": "See the full scoreboard",
-          "unavailable": "The scored results are not available in this build."
+          "unavailable": "The scored results are not available in this build.",
+          "short": {
+            "body": "Abu Dhabi airport, summer 2026. Forecast made a day ahead.",
+            "caption": "Danger hours not warned about. Shorter is better.",
+            "trade": "Every setting trades missed danger hours against false alarms. You choose where to sit."
+          },
+          "met": "Met",
+          "notMet": "Not met",
+          "noClaim": "We do not claim to beat them.",
+          "headline": {
+            "H4": {
+              "fewer": "fewer danger hours missed than the midday break alone",
+              "more": "more danger hours missed than the midday break alone"
+            },
+            "H5": {
+              "more": "more false-alarm hours than the regulator's own zones.",
+              "fewer": "fewer false-alarm hours than the regulator's own zones."
+            }
+          }
         },
         "limits": {
           "eyebrow": "What this does not show yet",
-          "one": "One test summer and one airport station, not a worksite.",
-          "two": "No worker outcomes. This is not yet a health claim.",
-          "three": "Not yet checked by a clinician. Translations are machine-made.",
-          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "one": "One summer, one airport station.",
+          "two": "No worker outcomes yet.",
+          "three": "No clinician review yet. Translations are machine-made.",
+          "four": "Made-up demo data, hosted in France. Built for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
         }
+      },
+      "rail": {
+        "label": "Chapters",
+        "forecast": "Forecast",
+        "morning": "Morning",
+        "plan": "Plan",
+        "boundary": "Boundary",
+        "evidence": "Evidence",
+        "ways": "Ways in",
+        "limits": "Limits",
+        "note": "Demo. The crews and people are made up."
+      },
+      "scene": {
+        "measure": "WBGT, °C",
+        "source": "ECMWF IFS, day-1 forecast, {date}",
+        "limit": "Heavy-work limit {limit} °C WBGT (NIOSH REL)",
+        "legendNone": "none",
+        "how": "Relief ×{exag}. Cells over the sea are not coloured.",
+        "howPoster": "Cells over the sea are not coloured.",
+        "eyebrow": "{hour} / {date}",
+        "cells": "of {total} forecast cells are above the {limit} °C heavy-work limit.",
+        "allAbove": "From {from} to {to} every cell is above it.",
+        "hottest": "Hottest grid cell at {hour}.",
+        "where": "{lat} N, {lon} E.",
+        "station": "{station} airport forecast at {hour}.",
+        "summary": "The forecast on the map, in three steps"
+      },
+      "hero": {
+        "primary": "See how it works",
+        "skip": "Skip to the demo"
+      },
+      "ways": {
+        "heading": "Choose your way in"
+      },
+      "video": {
+        "title": "The 3-minute video",
+        "play": "Play the video",
+        "soon": "A 3-minute video walkthrough accompanies this submission.",
+        "notLoaded": "Nothing is loaded from YouTube until you press Play."
       }
     },
     "roleEntry": {
@@ -1856,7 +1976,7 @@
     },
     "tour": {
       "title": "A 3-minute tour",
-      "lead": "Five stops, in this order. Each one opens the real screen.",
+      "lead": "The stops, in this order. Each one opens the real screen.",
       "open": "Open this screen",
       "controls": "To switch between Replay and Live, or to reset the demo site, use Demo controls on the safety view.",
       "controlsLink": "Open Demo controls",
@@ -1872,6 +1992,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",

@@ -29,14 +29,15 @@ const WIDTHS = [
   { name: "1440", width: 1440, height: 900 },
 ] as const;
 const LOCALES = ["ur", "ar"] as const;
-const DISPLAY_HEADINGS = '[class*="--sign-leading-display"]';
+/** The landing's display-size texts that are Arabic-script in ur and ar and wrap or stack (its chapter headings are English blocks and have their own face): the hero's h1 and the four level names. The four door lines are display size too and the face test above probes them, but they are underlined in a grey the colour-by-line measurement would read as ink of two lines. */
+const DISPLAY_HEADINGS = ".lp h1, .lp .st .lv";
 
 async function openLanding(page: Page, locale: string, size: { width: number; height: number }, theme: "night" | "sun" = "night"): Promise<void> {
   await page.setViewportSize(size);
   await page.addInitScript((chosen) => {
     localStorage.setItem("sb-theme", JSON.stringify({ theme: chosen, until: Date.now() + 6 * 3_600_000 }));
   }, theme);
-  await page.goto(`/${locale}?static`);
+  await page.goto(`/${locale}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready);
@@ -52,9 +53,9 @@ interface PlatformFont {
 const PIN = `?site=${SITE_DEMO}&crew=crew-b`;
 const ARABIC_SCRIPT = /\p{Script=Arabic}/u;
 
-/** The routes whose display headings are checked, per locale (a path under /<locale>). The landing is the first and uses `?static`. */
+/** The routes whose display headings are checked, per locale (a path under /<locale>). The landing is the first (its own path: the scene's state does not change the page's words). */
 const ROUTES = [
-  "?static",
+  "",
   `/worker${PIN}`,
   `/worker/alert?audience=site&target=${SITE_DEMO}&level=orange&valid_from=${encodeURIComponent("2026-09-03T06:00:00Z")}`,
   "/worker/unwell",
@@ -74,6 +75,8 @@ const LOCALE_FAMILY: Readonly<Record<(typeof LOCALES)[number], RegExp>> = {
   ar: /^noto sans arabic/i,
 };
 const ARCHIVO = /^archivo/i;
+/** The app's own mono web face: the chapter numbers in the landing's rail links ("01") are drawn in it next to the Arabic-script name. Digits, not Arabic letters, and not an operating-system font. */
+const MONO = /^ibm plex mono/i;
 
 interface FaceReport {
   readonly route: string;
@@ -130,7 +133,7 @@ async function faceReports(page: Page, route: string): Promise<FaceReport[]> {
 /** In a design gate run (SB_GATE_SHOTS names a folder): a picture of each probed h1 to h3 of a route other than the landing (the landing's are taken by the lines test). */
 async function shootProbed(page: Page, locale: string, size: string, route: string, reports: readonly FaceReport[]): Promise<void> {
   const dir = process.env.SB_GATE_SHOTS;
-  if (dir === undefined || dir === "" || route.startsWith("?")) return;
+  if (dir === undefined || dir === "" || route === "") return;
   mkdirSync(path.join(dir, "i18n"), { recursive: true });
   const slug = route.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 28);
   for (const [index, report] of reports.entries()) {
@@ -168,7 +171,7 @@ for (const locale of LOCALES) {
           console.log(`landing display face ${locale} ${size.name} ${where} <${report.tag}> "${report.text}" (${String(report.arabicLetters)} Arabic letters): ${describeFonts(report.fonts)}`);
           if (report.fonts.length === 0) violations.push(`${where} <${report.tag}> "${report.text}": the browser reported no font`);
           for (const font of report.fonts) {
-            const ours = ARCHIVO.test(font.familyName) || family.test(font.familyName);
+            const ours = ARCHIVO.test(font.familyName) || MONO.test(font.familyName) || family.test(font.familyName);
             if (!font.isCustomFont || !ours) violations.push(`${where} <${report.tag}> "${report.text}": ${font.familyName} (${font.postScriptName}, ${font.isCustomFont ? "web" : "system"}) drew ${String(font.glyphCount)} glyphs`);
           }
           const byLocale = report.fonts.filter((font) => family.test(font.familyName)).reduce((sum, font) => sum + font.glyphCount, 0);

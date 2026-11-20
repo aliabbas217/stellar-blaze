@@ -8,8 +8,10 @@ import { OfflineBanner } from "@/components/states/OfflineBanner";
 import { Skeleton } from "@/components/states/Skeletons";
 import { WakingLine } from "@/components/states/WakingLine";
 import { ACTION_PRIMARY_DENSE, ACTION_SECONDARY_DENSE } from "@/components/states/actions";
+import { RuleLabel } from "@/components/provenance/RuleLabel";
 import { PlanStrip } from "./PlanStrip";
 import { RunsForm, type RunsFormHandlers } from "./RunsForm";
+import { useRuleName } from "./rule-name";
 import { ViolationList } from "./ViolationList";
 import { REPLAY_HEADCOUNT } from "./request";
 import type { Run, RunProblem, TemplateId } from "./runs";
@@ -232,6 +234,7 @@ function Result(props: TryLayoutProps) {
 
 function AnswerBlock({ answer }: { readonly answer: AnswerView }) {
   const t = useTranslations("judge.try.result");
+  const nameOf = useRuleName();
   const broken = answer.validator.violations.length;
   return (
     <div className="flex flex-col gap-4" data-answer={broken === 0 ? "none" : "violations"}>
@@ -252,10 +255,8 @@ function AnswerBlock({ answer }: { readonly answer: AnswerView }) {
         <p className="max-w-(--measure) text-sm text-ink-3">{t("checkedNote")}</p>
         <ul className="flex flex-wrap gap-2">
           {answer.validator.checkedRules.map((rule) => (
-            <li key={rule}>
-              <code className="rounded-sign border border-hair px-2 py-1 font-mono text-sm text-ink" dir="ltr" translate="no">
-                {rule}
-              </code>
+            <li key={rule} className="flex flex-wrap items-baseline gap-x-2 rounded-sign border border-hair px-2 py-1 text-sm">
+              <RuleLabel id={rule} name={nameOf(rule)} />
             </li>
           ))}
         </ul>

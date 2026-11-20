@@ -1,6 +1,8 @@
 import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { buildContentSecurityPolicy } from "./csp.ts";
+import { LANDING_YOUTUBE_ID } from "./src/features/judge/landing/video-config.ts";
 
 /*
  * Security headers of every response (plan F1 Task 13; tests/e2e/headers.spec.ts pins the exact values), except the
@@ -19,6 +21,8 @@ import createNextIntlPlugin from "next-intl/plugin";
  *    on its script response, so these headers apply to /serwist/sw.js too).
  *  - Fonts are self-hosted by next/font, so `font-src 'self'`; `img-src` adds `data:` for inlined images.
  *  - `frame-ancestors 'none'`: the app is never embedded.
+ *  - Nothing is framed (no `frame-src`, so `default-src 'self'`), except the landing's 3-minute video from youtube-nocookie.com, and only
+ *    while landing-video.json names one: csp.ts adds `frame-src https://www.youtube-nocookie.com` then and not before.
  *
  * `'unsafe-inline'` stays for scripts (Next.js's inline bootstrap and flight-data scripts, and the theme script in the
  * root layout) and for styles. The policy that would replace it for scripts uses a nonce, which Next.js applies only to
@@ -30,17 +34,9 @@ import createNextIntlPlugin from "next-intl/plugin";
  */
 const development = process.env.NODE_ENV === "development";
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}`,
-  "connect-src 'self'",
-  "worker-src 'self'",
-  "manifest-src 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
+// The string is built in csp.ts (so a unit test can assert it). `frame-src` for the landing's video is added only when
+// src/features/judge/landing/landing-video.json holds a valid YouTube id; with none, this is the policy of tests/e2e/headers.spec.ts, byte for byte.
+const contentSecurityPolicy = buildContentSecurityPolicy({ development, youtubeId: LANDING_YOUTUBE_ID });
 
 const nextConfig: NextConfig = {
   output: "standalone",

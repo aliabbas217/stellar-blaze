@@ -225,8 +225,8 @@ test("scoreboard frontier commute lives in the URL and survives a reload", async
 test("scoreboard story footer links only to routes that exist and Next goes to the day page", async ({ page }) => {
   await open(page, "/en/replay");
   const nav = page.getByRole("navigation", { name: "Story" });
-  // The story is problem, product, evidence, day, boundary (ADR 0076): the scoreboard is the evidence, the third step.
-  await expect(nav.getByText("Step 3 of 5: The evidence")).toBeVisible();
+  // The story is problem, product, evidence, day, try, boundary (ADR 0076; audit M4 added try): the scoreboard is the evidence, the third step.
+  await expect(nav.getByText("Step 3 of 6: The evidence")).toBeVisible();
   for (const href of await nav.locator("a").evaluateAll((links) => links.map((a) => a.getAttribute("href") ?? ""))) {
     const response = await page.request.get(href);
     expect(response.status(), href).toBeLessThan(400);

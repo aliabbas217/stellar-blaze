@@ -1,26 +1,24 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { act, fireEvent, screen, within } from "@testing-library/react";
-import { Profiler, type ReactNode } from "react";
+import { screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { isDeferredRoute } from "@/components/states/deferred-routes";
 import { makeFormat } from "@/features/judge/adapters";
 import { parseHourlySeries } from "@/features/judge/facts";
 import { DATA_MANIFEST } from "@/features/judge/manifest.generated";
-import { parseCoast, parseField, readingAt } from "@/features/judge/landing/field-data";
-import { FieldIsland } from "@/features/judge/landing/FieldIsland";
-import { readoutText } from "@/features/judge/landing/readout-text";
+import { buildEvidence } from "@/features/judge/landing/evidence";
+import { HEAT_NUMBER } from "@/features/judge/landing/landing-colour";
 import { LandingView } from "@/features/judge/landing/LandingView";
 import { ROLE_DOOR_DESTINATIONS } from "@/features/judge/landing/role-door-destinations";
-import { actionPlan } from "@/features/today/action-codes";
 import urMessages from "../../../../../messages/ur.json";
 import { JARGON } from "../../../../utils/jargon";
 import { renderWithIntl } from "../../../../utils/intl";
-import { SAMPLE_STORY } from "../../../../utils/story";
 
 /*
- * The landing page on the REAL committed files (redesign S2): the hero's first HTML (skip link first, the h1, the role door, the phone sign), the five
- * chapters in the story's order, the evidence chapter's four bars equal to the policy file and to the submission ledger, no statistic before a
- * person, the plain verdicts, the jargon lint over everything the page says, the live island's keyboard and motion rules.
+ * The landing page on the REAL committed files (redesign S10, "Real Earth"): the hero's first HTML (skip link first, the h1, the lede, the two
+ * links), the rail, the seven chapters in order, the evidence bars and the two big verdict numbers equal to the scored file and to the submission
+ * ledger, the plain claims (no win claim, nothing unledgered), the jargon lint over everything the page says, and the stylesheet's own rules (every
+ * selector scoped, nothing soft, snapping only on the landing).
  */
 
 vi.mock("server-only", () => ({}));
@@ -48,8 +46,6 @@ const hourly = {
 };
 const data = await loadEval({ dataRoot: path.join(root, "data"), production: true });
 const field = await loadFieldHero(hourly, path.join(root, "data"));
-const grid = parseField(json("public/data/static/uae_ifs025_d1_wbgt_2026-09-03.json"));
-const coast = parseCoast(json("public/data/static/coast.json"));
 if (data.policy === null) throw new Error("the 2026 Warnings file is not in data/eval/2026");
 const policy = data.policy;
 const format = makeFormat("en");
@@ -63,169 +59,149 @@ const ledger: Readonly<Record<string, { value: number }>> | null = existsSync(LE
 const FORBIDDEN = /calibrated|catches 90|fewer alerts than|best overall|highest CSI|beats every|beats ADOSH|robust|consistently|improved over static|untouched|tamper-proof|restricted members|immediately|\b58\s?%|clinically reviewed|certified|compliant|in-UAE|prevents|saves lives/i;
 
 const view = (dataOverride = data) => renderWithIntl(<LandingView field={field} data={dataOverride} dir="ltr" />);
+const SLIDES = ["morning", "plan", "boundary", "evidence", "checks", "ways", "limits"] as const;
 
-describe("the landing page: the hero", () => {
+describe("the landing page: the hero and the rail", () => {
   it("test_first_focusable_is_skip_link: the first tabbable element is 'Skip to the scoreboard', to /replay", () => {
     const { container } = view();
-    const first = container.querySelector<HTMLElement>("a[href], button, [tabindex='0'], input, select, summary");
-    expect(first?.textContent).toBe("Skip to the scoreboard");
-    expect(first?.getAttribute("href")).toBe("/replay");
+    const first = container.querySelector<HTMLElement>("a[href], button, select, input, [tabindex]:not([tabindex='-1'])");
+    expect(first).toHaveAttribute("href", "/replay");
+    expect(first).toHaveTextContent("Skip to the scoreboard");
   });
 
-  it("promises first: the h1 is 'Plan tomorrow's heat tonight.', the lede says what the product does, in the order kicker, h1, lede, door", () => {
+  it("promises first: one h1, 'Plan tomorrow's heat tonight.', a lede that says what the product does, and the two links to the story and to the demo", () => {
     const { container } = view();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Plan tomorrow's heat tonight.");
-    const hero = container.querySelector("[data-landing-hero]") as HTMLElement;
-    expect(hero).toHaveTextContent("Tested on last summer's real weather at Abu Dhabi airport");
-    expect(hero).toHaveTextContent("Stellar Blaze turns a day-ahead forecast into a work-and-rest plan for each crew, and a plain warning on each worker's phone, in six languages.");
-    const order = ["[data-contrast-name=kicker]", "#landing-title", "[data-contrast-name=lede]", "[data-role-door]"].map((selector) => hero.querySelector(selector));
-    for (const [i, el] of order.entries()) {
-      expect(el, String(i)).not.toBeNull();
-      const next = order[i + 1];
-      if (el !== null && next !== null && next !== undefined) expect(el.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING, `${String(i)} before ${String(i + 1)}`).toBeTruthy();
+    expect(container.querySelector(".lede")).toHaveTextContent("We forecast it a day ahead and give every crew a plan and every worker a warning.");
+    expect(container.querySelector("a.btn")).toHaveAttribute("href", "#morning");
+    expect(container.querySelector("a.quiet")).toHaveAttribute("href", "#ways");
+  });
+
+  it("the stage is complete without script: the legend, the source line, the attribution and the caption that says the map is an illustration", () => {
+    const { container } = view();
+    const stage = container.querySelector("#forecast");
+    expect(stage).toHaveTextContent("Heavy-work limit 26.6 °C WBGT (NIOSH REL)");
+    expect(stage).toHaveTextContent("ECMWF IFS, day-1 forecast, 3 Sep 2026");
+    expect(stage).toHaveTextContent("An illustration of one hot day, not the day we scored.");
+    expect(stage?.querySelector(".attr")).toHaveTextContent(field.attribution);
+    expect(field.attribution).toMatch(/NASA/);
+    expect(stage?.querySelectorAll(".chips i")).toHaveLength(5);
+    // the limit and the class steps in the legend are the field's own constants, never typed in the markup
+    expect([...(stage?.querySelectorAll(".chl span") ?? [])].map((s) => s.textContent)).toEqual(["none", "26.6", "30", "33", "36"]);
+  });
+
+  it("the hero's words are a sibling of the map box, never inside it (a text block inside the positioned map was painted over by the canvas and the still image on narrow screens)", () => {
+    const { container } = view();
+    const body = container.querySelector("#forecast .body");
+    expect(body?.querySelector(":scope > .txt h1")).not.toBeNull();
+    expect(body?.querySelector(":scope > .mapwrap")).not.toBeNull();
+    expect(container.querySelector(".mapwrap .txt")).toBeNull();
+    expect(container.querySelector(".mapwrap h1")).toBeNull();
+  });
+
+  it("the giant caption numbers take the heat colour of the ramp, set once on the page's root from the one constant the scene's shader also reads", () => {
+    const { container } = view();
+    expect(container.querySelector<HTMLElement>(".lp")?.style.getPropertyValue("--heat")).toBe(HEAT_NUMBER);
+    expect(HEAT_NUMBER).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
+  });
+
+  it("has the seven chapters in order, each slide one screen (`section.sl`) with its own h2, and the rail's seven links point at them", () => {
+    const { container } = view();
+    const ids = [...container.querySelectorAll("section[id]")].map((s) => s.id);
+    expect(ids).toEqual(["forecast", ...SLIDES]);
+    for (const id of SLIDES) {
+      const section = container.querySelector(`section#${id}`);
+      expect(section, id).toHaveClass("ch", "sl");
+      expect(section?.querySelectorAll("h2"), id).toHaveLength(1);
+      expect(section?.getAttribute("aria-labelledby"), id).toBe(section?.querySelector("h2")?.id);
     }
+    expect([...container.querySelectorAll(".idx a")].map((a) => a.getAttribute("href"))).toEqual(["#forecast", "#morning", "#plan", "#boundary", "#evidence", "#ways", "#limits"]);
+    expect(container.querySelectorAll('.idx a[aria-current="true"]')).toHaveLength(1);
+    // which one is current is the scroll listener's call (a test DOM has no layout: it reads "the foot of the page"); the server's first HTML marks chapter 1
   });
 
-  it("no statistic before a person: the copy and the door of the hero carry no digit, and the old hook and readout are gone", () => {
+  it("keeps the language picker reachable in the rail, under the demo note", () => {
     const { container } = view();
-    const copy = [...container.querySelectorAll("[data-contrast-name=kicker], #landing-title, [data-contrast-name=lede], [data-role-door]")].map((el) => el.textContent).join(" ");
-    // "3-minute" (the tour tile) is a length of time, not a statistic: it is the one digit the hero may carry.
-    expect(copy.replace("A 3-minute tour", "")).not.toMatch(/\d/);
-    expect(container.querySelector("[data-hook]")).toBeNull();
-    expect(container.querySelector("[data-field-readout]")).toBeNull();
-    expect(container.querySelector("[data-hours-bridge]")).toBeNull();
+    const rail = container.querySelector("nav.rail");
+    expect(rail).toHaveTextContent("Demo. The crews and people are made up.");
+    expect(rail?.querySelector("select")).not.toBeNull();
   });
 
-  it("the role door: four equal tiles in the fixed order, each a link with its one-line promise, the first with 'No account'; the destinations come from the one constant", () => {
+  it("the way in: four doors in the fixed order, each a link with its one-line promise, the first with 'No account'; the destinations are the one constant", () => {
     const { container } = view();
-    const door = container.querySelector("[data-role-door]") as HTMLElement;
-    const tiles = [...door.querySelectorAll<HTMLAnchorElement>("a")];
-    expect(tiles.map((a) => a.getAttribute("data-role"))).toEqual(["worker", "crew", "safety", "review"]);
-    expect(tiles.map((a) => a.getAttribute("href"))).toEqual([ROLE_DOOR_DESTINATIONS.worker, ROLE_DOOR_DESTINATIONS.crew, ROLE_DOOR_DESTINATIONS.safety, ROLE_DOOR_DESTINATIONS.review]);
-    expect(Object.values(ROLE_DOOR_DESTINATIONS)).toEqual(["/worker", "/supervisor/enter", "/hse/enter", "/tour"]);
-    expect(tiles.map((a) => a.querySelector("span:nth-of-type(2) > span:first-child")?.textContent)).toEqual(["I work on a site", "I run a crew", "I look after safety", "I am reviewing this"]);
-    expect(tiles[0]).toHaveTextContent("See today's heat and when to rest. No account.");
-    expect(tiles[1]).toHaveTextContent("See tonight's plan for your crews. Stop work in one tap.");
-    expect(tiles[2]).toHaveTextContent("See which crews planned, signed and stopped.");
-    expect(tiles[3]).toHaveTextContent("A 3-minute tour, then try anything.");
-    for (const a of tiles) expect(a.className).toMatch(/min-h-\(--target-field\)/); // 52 px, never below the 44 px target
-    expect(door.closest("[data-landing-hero]")).not.toBeNull();
-    expect(screen.getByRole("navigation", { name: "Who is this for?" })).toBe(door);
-    expect(container.textContent).toContain("This is a demo. The crews and people are made up. Workers never need an account.");
-  });
-
-  it("the phone sign is a picture built from the app's components with demo props: hidden from assistive tech and inert, labelled Demo, with its numbers read from the action code and the recorded forecast", () => {
-    const { container } = view();
-    const phone = container.querySelector("[data-hero-phone]") as HTMLElement;
-    const glass = phone.firstElementChild as HTMLElement;
-    expect(glass).toHaveAttribute("aria-hidden", "true");
-    expect(glass.hasAttribute("inert")).toBe(true);
-    expect(glass).toHaveTextContent("Demo");
-    expect(glass).toHaveTextContent("Orange");
-    expect(glass).toHaveTextContent("until 17:00");
-    // the demo prop and the app's own parser of the action code agree (the judge pages may not import worker code, so the picture holds the numbers itself)
-    const plan = actionPlan(["cycle.high.heavy.20-40"]);
-    if (plan.lead.kind !== "cycle") throw new Error("the demo code is not a cycle");
-    expect(glass).toHaveTextContent(`Work ${String(plan.lead.workMinutes)} min, rest ${String(plan.lead.restMinutes)} min in shade`);
-    expect(glass).toHaveTextContent("I feel unwell");
-    // the strip is the recorded forecast of the field's day, hours 6 to 17, each cell in the colour of its own value
-    const cells = [...glass.querySelectorAll("[data-cell]")];
-    expect(cells.map((c) => Number(c.getAttribute("data-cell")))).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
-    expect(cells.every((c) => c.getAttribute("data-heat") === "data")).toBe(true);
-    expect(phone.querySelector("figcaption")).toHaveTextContent("A worker's phone on the demo site: one sign, in the worker's language. \u201cI feel unwell\u201d is always there.");
-  });
-
-  it("the field stays in the hero block with the phone (a row of its own from 1100 px), with its caption and one Where from chip, and no readout", () => {
-    const { container } = view();
-    const column = container.querySelector("[data-field-column]") as HTMLElement;
-    expect(column.closest("[data-hero]")?.querySelector("[data-hero-phone]")).not.toBeNull();
-    expect(column.querySelector("[data-field-stage]")).not.toBeNull();
-    expect(column.querySelector("[data-scrub]")).not.toBeNull();
-    expect(column.querySelector("[data-field-caption]")).toHaveTextContent("Forecast heat across the UAE for one hot day. An illustration, not the day we scored.");
-    expect(within(column).getAllByRole("button", { name: /^Where from/ })).toHaveLength(1);
+    const doors = [...container.querySelectorAll<HTMLAnchorElement>("[data-role-door] a")];
+    expect(doors.map((a) => a.getAttribute("data-role"))).toEqual(["worker", "crew", "safety", "review"]);
+    expect(doors.map((a) => a.getAttribute("href"))).toEqual(Object.values(ROLE_DOOR_DESTINATIONS));
+    expect(doors[0]).toHaveTextContent("No account");
   });
 });
 
 describe("the landing page: the story", () => {
-  const ids = ["morning", "plan", "boundary", "evidence", "limits"];
-
-  it("has the five chapters in the story's order, after the hero and before the footer, each with one h2", () => {
+  it("the chapters are English blocks (Tier 2): lang=en dir=ltr on every slide but 'Ways in'; the hero and the door are not", () => {
     const { container } = view();
-    const sections = [...container.querySelectorAll("[data-landing-chapters] > section")].map((s) => s.id);
-    expect(sections).toEqual(ids);
-    const headings = [...container.querySelectorAll("[data-landing-chapters] h2")].map((h) => h.textContent);
-    expect(headings).toEqual([
-      "One sign, one instruction, in the worker's own language.",
-      "The crew lead sees which crew heats up first.",
-      "An employer asks for one worker's health record. The answer is no.",
-      "Danger hours nobody was warned about.",
-      "What this does not show yet",
-    ]);
-    // evidence is the payoff: after the product and the boundary, never before the first person
-    expect(container.querySelector("[data-landing-hero]")?.compareDocumentPosition(container.querySelector("#evidence") as Element)).toBeTruthy();
-    expect(container.querySelector("[data-story-nav]")?.getAttribute("aria-label")).toBe("Story");
-  });
-
-  it("the chapters are English blocks (Tier 2): lang=en dir=ltr, the hero and the door are not", () => {
-    const { container } = view();
-    const chapters = container.querySelector("[data-landing-chapters]");
-    expect(chapters).toHaveAttribute("lang", "en");
-    expect(chapters).toHaveAttribute("dir", "ltr");
-    expect(container.querySelector("[data-landing-hero]")?.closest("[lang='en']")).toBeNull();
-  });
-
-  it("tonight's plan: the crew lead's view, Stop work is one tap and never waits for sign-off, and the picture says the crews are made up", () => {
-    const { container } = view();
-    const plan = container.querySelector("#plan") as HTMLElement;
-    expect(plan).toHaveTextContent("Stop work is one tap. So is Undo. It never waits for a sign-off.");
-    expect(plan).toHaveTextContent("Demo site: the crews and times are made up.");
-    const picture = plan.querySelector("[data-plan-picture]") as HTMLElement;
-    expect(picture).toHaveAttribute("aria-hidden", "true");
-    expect(picture.hasAttribute("inert")).toBe(true);
-    expect(picture).toHaveTextContent("Stop work, Crew A");
-    expect(within(plan).getByRole("link", { name: "Open the crews screen" })).toHaveAttribute("href", "/supervisor");
-  });
-
-  it("the boundary: an employer asks for one worker's health record, the answer is no, recorded in a log that each entry builds on the one before; it links to the recorded run", () => {
-    const { container } = view();
-    const boundary = container.querySelector("#boundary") as HTMLElement;
-    expect(boundary).toHaveTextContent("The service holds none. Every worker at the site can see that it was asked.");
-    expect(boundary).toHaveTextContent("Refused. Recorded in a log that each entry builds on the one before, so a change shows.");
-    expect(within(boundary).getByRole("link", { name: "See the refusal, recorded" })).toHaveAttribute("href", "/replay/governance");
-  });
-
-  it("what this does not show yet: the five limits, in plain words, and 'For auditors' opens the proof sheet's auditor record", () => {
-    const { container } = view();
-    const limits = container.querySelector("#limits") as HTMLElement;
-    for (const sentence of [
-      "One test summer and one airport station, not a worksite.",
-      "No worker outcomes. This is not yet a health claim.",
-      "Not yet checked by a clinician. Translations are machine-made.",
-      "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
-    ]) {
-      expect(limits).toHaveTextContent(sentence);
+    for (const id of ["morning", "plan", "boundary", "evidence", "checks", "limits"]) {
+      expect(container.querySelector(`section#${id}`), id).toHaveAttribute("lang", "en");
+      expect(container.querySelector(`section#${id}`), id).toHaveAttribute("dir", "ltr");
     }
-    expect(within(limits).getByRole("link", { name: "For auditors" }).getAttribute("href")).toMatch(/^\/replay\/proof\/policy\.[a-z0-9_.]+#audit$/);
-    expect(within(limits).getByRole("link", { name: "See how it was tested" })).toHaveAttribute("href", "/replay");
+    expect(container.querySelector("section#ways")).not.toHaveAttribute("lang");
+    expect(container.querySelector("section#forecast")).not.toHaveAttribute("lang");
   });
 
-  it("says the machine-translation notice at the foot only for a translated locale (English shows none)", () => {
+  it("the morning: four levels with the app's own words, the made-up day labelled Demo, the strip coloured from the recorded forecast", () => {
     const { container } = view();
-    expect(container.querySelector("[data-machine-translation]")).toBeNull();
+    const cards = [...container.querySelectorAll("#morning .st")];
+    expect(cards).toHaveLength(4);
+    expect(cards.map((c) => c.querySelector(".lv")?.textContent)).toEqual(["Green", "Amber", "Orange", "Red"]);
+    expect(cards.map((c) => c.querySelector(".t")?.textContent)).toEqual(["06:00", "08:40", "11:20", "14:00"]);
+    expect(cards[3]).toHaveTextContent("Stop work");
+    expect(container.querySelector("#morning .tag")).toHaveTextContent("Demo");
+    expect(container.querySelectorAll("#morning .spine .heat i")).toHaveLength(12);
+  });
+
+  it("tonight's plan: the crew lead's view, Stop work is one tap, and the picture says the crews are made up", () => {
+    const { container } = view();
+    const plan = container.querySelector("#plan");
+    expect(plan).toHaveTextContent("Follows the ADOSH heat rules. Stop work in one tap.");
+    expect(plan?.querySelector("svg.fg")).toHaveAccessibleName(/Crew A, Crew C, Crew D\. Stop work, Crew A\./);
+    expect(plan).toHaveTextContent("Demo site: the crews and times are made up.");
+    expect(plan?.querySelector("a")).toHaveAttribute("href", "/supervisor");
+  });
+
+  it("the boundary: Asked, Refused, Seen, and it links to the recorded refusal", () => {
+    const { container } = view();
+    const panels = [...container.querySelectorAll("#boundary .pn")];
+    expect(panels.map((p) => p.querySelector(".pl")?.textContent)).toEqual(["1Asked", "2Refused", "3Seen"]);
+    expect(container.querySelector("#boundary")).toHaveTextContent("The service holds none.");
+    expect(container.querySelector("#boundary a")).toHaveAttribute("href", "/replay/governance");
+  });
+
+  it("what this does not show yet: the four limits, the video panel, and 'For auditors' opens the proof sheet's auditor record", () => {
+    const { container } = view();
+    const limits = container.querySelector("#limits");
+    expect([...(limits?.querySelectorAll(".lim li") ?? [])].map((li) => li.textContent)).toEqual([
+      "One summer, one airport station.",
+      "No worker outcomes yet.",
+      "No clinician review yet. Translations are machine-made.",
+      "Made-up demo data, hosted in France. Built for UAE North.",
+    ]);
+    expect(limits?.querySelector("[data-video-panel]")).toHaveAttribute("data-video-panel", "soon");
+    expect(limits?.querySelector('a[href*="#audit"]')?.getAttribute("href")).toMatch(/^\/replay\/proof\/.+#audit$/);
+    expect(container.querySelector("iframe")).toBeNull();
   });
 });
 
-describe("the evidence chapter: every number is read from the scored file and equals the ledger", () => {
+describe("the evidence slides: every number is read from the scored file and equals the ledger", () => {
   const bars = () => {
     const { container } = view();
-    return [...container.querySelectorAll<HTMLElement>("[data-evidence-bars] > li")];
+    return [...container.querySelectorAll<HTMLElement>("[data-bars] li")];
   };
 
   it("draws four bars, longest first, each labelled with the plain name of the way of warning (no policy codes)", () => {
     const list = bars();
     expect(list.map((li) => li.getAttribute("data-policy"))).toEqual(["P0", "P2", "P3_protect", "P1"]);
-    expect(list.map((li) => li.querySelector("span")?.textContent)).toEqual(["Midday break only", "Regulator's zones, raw forecast", "Stellar Blaze, protective setting", "Fixed 32 °C rule"]);
-    expect(list.filter((li) => li.hasAttribute("data-ours")).map((li) => li.getAttribute("data-policy"))).toEqual(["P3_protect"]);
+    expect(list.map((li) => li.querySelector(".lab b")?.textContent)).toEqual(["Midday break only", "Regulator's zones, raw forecast", "Stellar Blaze, protective setting", "Fixed 32 °C rule"]);
+    expect(list.filter((li) => li.classList.contains("ours")).map((li) => li.getAttribute("data-policy"))).toEqual(["P3_protect"]);
   });
 
   it("the danger hours not warned about and the false-alarm hours equal the policy file's own values", () => {
@@ -234,6 +210,7 @@ describe("the evidence chapter: every number is read from the scored file and eq
       const row = rows.find((r) => r.policy === li.getAttribute("data-policy"));
       expect(row, li.getAttribute("data-policy") ?? "").toBeDefined();
       expect(li.querySelector("[data-bar-missed]")).toHaveTextContent(format.one(row?.missed_danger_hours.value ?? NaN));
+      expect(li.querySelector("[data-bar-missed]")?.getAttribute("data-count")).toBe(String(row?.missed_danger_hours.value));
       expect(li.querySelector("[data-bar-false-alarms]")).toHaveTextContent(`False-alarm hours: ${format.one(row?.false_alarm_hours.value ?? NaN)}`);
     }
   });
@@ -250,101 +227,101 @@ describe("the evidence chapter: every number is read from the scored file and eq
     }
   });
 
-  it("the longest bar is the full width and the others are in proportion to their own numbers", () => {
-    const widths = bars().map((li) => Number.parseFloat((li.querySelector("[aria-hidden] > span") as HTMLElement).style.width));
-    const missed = bars().map((li) => Number(li.querySelector("[data-bar-missed]")?.textContent));
-    expect(widths[0]).toBeCloseTo(100, 5);
-    // the number on the bar is shown to one decimal, the width is drawn from the file's own value: they agree to that decimal
-    for (const [i, w] of widths.entries()) expect(w, String(i)).toBeCloseTo(((missed[i] ?? 0) / (missed[0] ?? 1)) * 100, 1);
-  });
-
-  it("says the honest trade: the regulator's zones raise fewer false alarms and miss more, Stellar Blaze does not 'beat' anything", () => {
+  it("the longest bar is the full length, the others are in proportion to their own numbers, and the axis ends on the longest number", () => {
+    const list = bars();
+    const shares = list.map((li) => Number(li.style.getPropertyValue("--v")));
+    const missed = list.map((li) => Number(li.querySelector("[data-bar-missed]")?.getAttribute("data-count")));
+    expect(shares[0]).toBe(1);
+    for (const [i, s] of shares.entries()) expect(s, String(i)).toBeCloseTo((missed[i] ?? 0) / (missed[0] ?? 1), 10);
     const { container } = view();
-    const trade = container.querySelector("[data-warnings-tradeoff]");
-    expect(trade).toHaveTextContent("raise fewer false alarms than Stellar Blaze at the protective setting");
-    expect(trade).toHaveTextContent("miss more danger hours");
-    expect(container.querySelector("#evidence")?.textContent).not.toMatch(/\bbeats?\b(?! the regulator)/i);
+    expect(container.querySelector("#evidence .axis .ax span:last-child")).toHaveTextContent(format.one(missed[0] ?? NaN));
   });
 
-  it("uses the PLAIN verdicts of S3, with the met or not met flag of the file, and never the verbatim H4 and H5 sentences", () => {
+  it("the two big numbers are the structured fields of the verdicts (H4: danger hours missed fewer than the midday break; H5: false-alarm hours more than the regulator's zones), not a reading of a sentence", () => {
+    const evidence = buildEvidence(data, format, (() => "") as never);
+    expect(evidence).not.toBeNull();
+    const h4 = policy.verdicts.find((v) => v.id === "H4")?.comparisons.find((c) => c.subject === "P3_protect" && c.baseline === "P0" && c.metric === "missed_danger_hours");
+    const h5 = policy.verdicts.find((v) => v.id === "H5")?.comparisons.find((c) => c.subject === "P3_protect" && c.baseline === "P2" && c.metric === "false_alarm_hours");
+    expect(evidence?.headlines.find((h) => h.id === "H4")?.valueRaw).toBe(Math.abs(h4?.difference.value ?? NaN));
+    expect(evidence?.headlines.find((h) => h.id === "H5")?.valueRaw).toBe(Math.abs(h5?.difference.value ?? NaN));
     const { container } = view();
-    const h4 = container.querySelector('[data-verdict-id="H4"]');
-    const h5 = container.querySelector('[data-verdict-id="H5"]');
-    expect(h4).toHaveAttribute("data-verdict-outcome", "met");
-    expect(h5).toHaveAttribute("data-verdict-outcome", "notMet");
-    expect(h4).toHaveTextContent("This was the main check and it was met.");
-    expect(h5).toHaveTextContent("This check was not met.");
-    expect(h5).toHaveTextContent("We do not claim to beat the regulator's zones.");
-    for (const verdict of policy.verdicts.filter((v) => v.id === "H4" || v.id === "H5")) {
-      expect(container.textContent, verdict.id).not.toContain(verdict.text);
-    }
-    expect(container.querySelector("#evidence")?.textContent).not.toMatch(/\bH[0-9]\b|supported at lead/);
+    const numbers = [...container.querySelectorAll("#checks .vn")].map((n) => n.textContent);
+    expect(numbers).toEqual([format.one(Math.abs(h4?.difference.value ?? NaN)), `+${format.one(Math.abs(h5?.difference.value ?? NaN))}`]);
+    // and on the committed 2026 file they are the numbers the submission quotes
+    expect(numbers).toEqual(["207.0", "+109.0"]);
   });
 
-  it("has at most three Where from chips on the whole page (the field, the four bars, the two checks)", () => {
+  it("says each check's status from the file's own flag, and 'We do not claim to beat them' stays next to the regulator's zones; nothing says Stellar Blaze beats anything", () => {
     const { container } = view();
-    expect(within(container).getAllByRole("button", { name: /^Where from/ })).toHaveLength(3);
+    const cards = [...container.querySelectorAll("#checks .vc")];
+    expect(cards.map((c) => c.querySelector(".vs")?.textContent)).toEqual(["Met", "Not met"]);
+    expect(cards[0]).toHaveTextContent("fewer danger hours missed than the midday break alone");
+    expect(cards[1]).toHaveTextContent("more false-alarm hours than the regulator's own zones. We do not claim to beat them.");
+    expect(container.querySelector("#checks")?.textContent).not.toMatch(/\bbeats?\b(?! them)/i);
+    expect(container.querySelector("#evidence")?.textContent).not.toMatch(/\bbeats?\b/i);
+    expect(container.querySelector("#checks")?.textContent).not.toMatch(/\bH[0-9]\b|supported at lead/);
+    for (const verdict of policy.verdicts.filter((v) => v.id === "H4" || v.id === "H5")) expect(container.textContent, verdict.id).not.toContain(verdict.text);
   });
 
-  it("shows no number without a record: with no scored file the chapter says so and the page keeps its hero", () => {
+  it("shows no number without a record: with no scored file the evidence slide says so, the checks keep their link, and the page keeps its hero", () => {
     const { container } = view(null as never);
-    expect(container.querySelector("[data-evidence-bars]")).toBeNull();
+    expect(container.querySelector("[data-bars]")).toBeNull();
     expect(container.querySelector("#evidence")).toHaveTextContent("The scored results are not available in this build.");
+    expect(container.querySelector("#checks .vc")).toBeNull();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 });
 
 describe("the landing page: what it says", () => {
-  it("never prints the unledgered season counts: no 1,624, 279, 139 or '370 of 374' anywhere in the story (D9)", () => {
+  it("never prints the unledgered season counts: no 1,624, 279, 139 or '370 of 374' anywhere on the page (D9)", () => {
     const { container } = view();
     expect(container.textContent).not.toMatch(/1,?624|\b279\b|\b139\b|370 of 374/);
   });
 
   it("has no jargon in the rendered text: no file paths, hashes, protocol, policy codes, hypothesis ids, theta, lead N, epoch or export keys", () => {
     const { container } = view();
-    // the visible text of the page, minus the proof chip's own label (a drawer stays closed here) and the bare numbers the lint cannot read
-    const text = container.textContent;
-    for (const [name, pattern] of JARGON) expect(text, name).not.toMatch(pattern);
+    for (const [name, pattern] of JARGON) expect(container.textContent, name).not.toMatch(pattern);
   });
 
-  it("says nothing the claim rules forbid, no em or en dash in the English copy, and no 'real-time' or 'in-UAE'", () => {
+  it("says nothing the claim rules forbid, no em or en dash in the English copy, no emoji, and no 'real-time' or 'in-UAE'", () => {
     const { container } = view();
     const text = container.textContent;
-    expect(text.length).toBeGreaterThan(1800);
+    expect(text.length).toBeGreaterThan(1500);
     expect(text).not.toMatch(FORBIDDEN);
     expect(text).not.toMatch(/real-time/i);
+    expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
     const landing = JSON.stringify((JSON.parse(readFileSync(path.join(root, "messages/en.json"), "utf8")) as { judge: { landing: unknown } }).judge.landing);
     expect(landing).not.toMatch(FORBIDDEN);
     expect(landing).not.toMatch(/[\u2013\u2014]/);
   });
 
-  it("links only to routes that exist or are the role door's, never to a deferred view", () => {
+  it("links only to routes that exist or are the page's own anchors, never to a deferred view", () => {
     const { container } = view();
     const hrefs = [...container.querySelectorAll("a[href]")].map((a) => a.getAttribute("href") ?? "");
     expect(hrefs.length).toBeGreaterThan(14);
-    const known = new Set(["/", "/replay", "/replay/day", "/replay/try", "/replay/governance", "/supervisor", "/worker", "/supervisor/enter", "/hse/enter", "/tour", "#main-content"]);
+    const known = new Set(["/replay", "/replay/governance", "/supervisor", "/worker", "/supervisor/enter", "/hse/enter", "/tour", "#forecast", "#morning", "#plan", "#boundary", "#evidence", "#ways", "#limits"]);
     for (const href of hrefs) {
       if (href.startsWith("/replay/proof/")) continue;
       expect(known.has(href), href).toBe(true);
-      // Every target is a built view: the role entries and the tour are real pages now, and `/hse` has left the deferred list (S7).
       expect(isDeferredRoute(href), href).toBe(false);
     }
   });
 
-  it("in Urdu the hero is translated and the chapters stay English: no Arabic-script text of its own inside a lang=en block", () => {
+  it("in Urdu the hero, the rail and the door are translated and the chapters stay English: no Arabic-script text of its own inside a lang=en block", () => {
     const { container } = renderWithIntl(<LandingView field={field} data={data} dir="rtl" />, { locale: "ur", messages: urMessages });
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(urMessages.judge.landing.title);
     expect(container.querySelector("[data-role-door] a")).toHaveTextContent(urMessages.judge.landing.door.worker.title);
+    expect(container.querySelector(".idx a")).toHaveTextContent(urMessages.judge.landing.rail.forecast);
     const arabic = /[\u0600-\u06FF\u0750-\u077F]/;
     const blocks = [...container.querySelectorAll("[lang='en']")];
-    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    expect(blocks.length).toBeGreaterThanOrEqual(6);
     const leaks: string[] = [];
     for (const block of blocks) {
       const walk = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
       for (let n = walk.nextNode(); n !== null; n = walk.nextNode()) {
         const text = n.textContent ?? "";
         if (!arabic.test(text)) continue;
-        // a translated piece that restores the page language with its own lang attribute is allowed (the story footer)
+        // a translated piece that restores the page language with its own lang attribute is allowed (the chapter mark, the four levels)
         const own = n.parentElement?.closest("[lang]");
         if (own !== null && own !== undefined && own !== block && own.getAttribute("lang") !== "en") continue;
         leaks.push(text.trim().slice(0, 60));
@@ -354,223 +331,30 @@ describe("the landing page: what it says", () => {
   });
 });
 
-describe("the live field island", () => {
-  const panel = {
-    day: field.grid.day,
-    dayLabel: "Thu 3 Sep 2026",
-    omaa: field.omaa,
-    peakHour: field.peakHour,
-    ban: { kind: "in-force", fromHour: 12.5, toHour: 15 } as const,
-    proof: {
-      what: "The forecast heat field",
-      story: SAMPLE_STORY,
-      protocol: "p",
-      protocolHref: null,
-      script: "s",
-      file: "static/uae.json",
-      fileSha256: "ab",
-      sourceSha256: null,
-      label: "RECORDED",
-      modelId: null,
-      generatedAt: null,
-    } as const,
-    dir: "ltr",
-  } as const;
+describe("the stylesheet (src/styles/landing.css)", () => {
+  const css = readFileSync(path.join(root, "src/styles/landing.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
-  let reducedNow = false;
-  const listeners: (() => void)[] = [];
-
-  function stubBrowser(reduced: boolean): { raf: ReturnType<typeof vi.fn> } {
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        observe(): void {}
-        disconnect(): void {}
-      },
-    );
-    reducedNow = reduced;
-    listeners.length = 0;
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      get matches() {
-        return reducedNow && query.includes("reduce");
-      },
-      addEventListener: (_type: string, listener: () => void) => {
-        listeners.push(listener);
-      },
-      removeEventListener: (_type: string, listener: () => void) => {
-        const at = listeners.indexOf(listener);
-        if (at >= 0) listeners.splice(at, 1);
-      },
-    }));
-    const raf = vi.fn(() => 1);
-    vi.stubGlobal("requestAnimationFrame", raf);
-    vi.stubGlobal("cancelAnimationFrame", vi.fn());
-    return { raf };
-  }
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+  it("nothing soft: no shadow, blur, glow or gradient (flat surfaces, hairlines, tonal steps)", () => {
+    expect(css).not.toMatch(/box-shadow|text-shadow|drop-shadow|backdrop-filter|filter:|blur\(|gradient\(/);
   });
 
-  const island = () => renderWithIntl(<FieldIsland panel={panel} data={{ grid, coast }} />);
-
-  it("test_scrubber_keyboard_and_values_in_dom: arrows, Home and End move a slider whose values are text", () => {
-    stubBrowser(true);
-    island();
-    const slider = screen.getByRole("slider");
-    expect(slider).toHaveAttribute("aria-valuemin", "0");
-    expect(slider).toHaveAttribute("aria-valuemax", "23");
-    expect(slider).toHaveAttribute("aria-valuenow", "14");
-    expect(slider.getAttribute("aria-valuetext")).toBe(`14:00: hottest grid cell ${readoutText(readingAt(grid, field.omaa, 14)).hottest} degrees, Abu Dhabi airport ${field.omaa[14]?.toFixed(1) ?? ""}`);
-    fireEvent.keyDown(slider, { key: "ArrowRight" });
-    expect(slider).toHaveAttribute("aria-valuenow", "15");
-    expect(document.querySelector("[data-when-hour]")).toHaveTextContent("15:00");
-    fireEvent.keyDown(slider, { key: "ArrowLeft" });
-    fireEvent.keyDown(slider, { key: "ArrowLeft" });
-    expect(slider).toHaveAttribute("aria-valuenow", "13");
-    fireEvent.keyDown(slider, { key: "Home" });
-    expect(slider).toHaveAttribute("aria-valuenow", "0");
-    // a slider does not wrap: Left at 00:00 stays, Right at 23:00 stays
-    fireEvent.keyDown(slider, { key: "ArrowLeft" });
-    expect(slider).toHaveAttribute("aria-valuenow", "0");
-    fireEvent.keyDown(slider, { key: "End" });
-    expect(slider).toHaveAttribute("aria-valuenow", "23");
-    fireEvent.keyDown(slider, { key: "ArrowRight" });
-    expect(slider).toHaveAttribute("aria-valuenow", "23");
-    fireEvent.keyDown(slider, { key: "ArrowUp" });
-    expect(slider).toHaveAttribute("aria-valuenow", "23");
+  it("every selector is scoped under .lp, so nothing leaks into the app; scroll snapping is on the landing only (`html:has(.lp)`)", () => {
+    const selectors = [...css.matchAll(/([^{}]+)\{/g)].map((m) => (m[1] ?? "").trim()).filter((s) => s !== "" && !s.startsWith("@"));
+    expect(selectors.length).toBeGreaterThan(100);
+    for (const group of selectors) for (const sel of group.split(",")) expect(sel.trim().startsWith(".lp") || sel.trim().startsWith("html:has(.lp)"), sel.trim()).toBe(true);
+    expect(css.match(/scroll-snap-type/g)).toHaveLength(1);
+    expect(css).toMatch(/html:has\(\.lp\) \{ scroll-snap-type: y mandatory; \}/);
   });
 
-  it("test_slider_page_keys_step_three_hours_and_stop_at_the_ends", () => {
-    stubBrowser(true);
-    island();
-    const slider = screen.getByRole("slider");
-    fireEvent.keyDown(slider, { key: "PageDown" });
-    expect(slider).toHaveAttribute("aria-valuenow", "11");
-    fireEvent.keyDown(slider, { key: "PageUp" });
-    fireEvent.keyDown(slider, { key: "PageUp" });
-    expect(slider).toHaveAttribute("aria-valuenow", "17");
-    fireEvent.keyDown(slider, { key: "PageUp" });
-    fireEvent.keyDown(slider, { key: "PageUp" });
-    expect(slider).toHaveAttribute("aria-valuenow", "23");
-    fireEvent.keyDown(slider, { key: "Home" });
-    fireEvent.keyDown(slider, { key: "PageDown" });
-    expect(slider).toHaveAttribute("aria-valuenow", "0");
+  it("links look like links: the app's reset takes the underline off every anchor, so the page's base rule puts it back (the buttons, the door rows and the rail opt out)", () => {
+    expect(css).toMatch(/\.lp a \{[^}]*text-decoration-line: underline/);
+    expect(css).toMatch(/\.lp a\.btn, \.lp \.door a \{ text-decoration-line: none; \}/);
+    expect(css).toMatch(/\.lp \.idx a \{[^}]*text-decoration: none/);
   });
 
-  it("test_spine_tick_thinning_pinned: on a phone every other 3-hourly label is hidden by parity, leaving 00:00 06:00 12:00 18:00 00:00", () => {
-    stubBrowser(true);
-    island();
-    const track = document.querySelector("[data-spine-track]") as HTMLElement;
-    // the rule that hides them is on the track (a media query jsdom does not evaluate; the e2e proves it on a 390 page)
-    expect(track.className).toContain("[&_[data-tick]:nth-child(even)]:hidden");
-    const ticks = [...track.querySelectorAll<HTMLElement>("[data-tick]")];
-    expect(ticks.map((tick) => tick.textContent)).toEqual(["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "00:00"]);
-    // the ticks are consecutive siblings, so `nth-child(even)` is the parity of the label's own place in the list
-    expect(new Set(ticks.map((tick) => tick.parentElement)).size).toBe(1);
-    expect(ticks.map((tick) => [...(tick.parentElement?.children ?? [])].indexOf(tick))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
-    const kept = ticks.filter((tick) => !tick.matches(":nth-child(even)")).map((tick) => tick.textContent);
-    expect(kept).toEqual(["00:00", "06:00", "12:00", "18:00", "00:00"]);
-  });
-
-  it("test_reduced_motion_is_read_live: asking for reduced motion while the day plays stops it and removes Play; asking later does not restart it", () => {
-    stubBrowser(false);
-    island();
-    expect(screen.getByRole("button", { name: "Pause the day" })).toBeInTheDocument();
-    reducedNow = true;
-    act(() => {
-      for (const listener of [...listeners]) listener();
-    });
-    expect(screen.queryByRole("button", { name: /Play the day|Pause the day/ })).toBeNull();
-    // lifting it again shows Play (a press) and does not start the day
-    reducedNow = false;
-    act(() => {
-      for (const listener of [...listeners]) listener();
-    });
-    expect(screen.getByRole("button", { name: "Play the day" })).toBeInTheDocument();
-  });
-
-  it("test_reduced_motion_no_autoplay: rests on the peak hour, starts no animation and offers no Play button", () => {
-    const { raf } = stubBrowser(true);
-    island();
-    expect(raf).not.toHaveBeenCalled();
-    expect(screen.getByRole("slider")).toHaveAttribute("aria-valuenow", "14");
-    expect(screen.queryByRole("button", { name: /Play the day|Pause the day/ })).toBeNull();
-  });
-
-  it("plays the day once on its own without reduced motion, silent for screen readers while it plays, and Pause stops it", () => {
-    const { raf } = stubBrowser(false);
-    island();
-    expect(raf).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Pause the day" })).toBeInTheDocument(); // it is playing
-    act(() => {
-      screen.getByRole("button", { name: "Pause the day" }).click();
-    });
-    expect(screen.getByRole("button", { name: "Play the day" })).toBeInTheDocument();
-  });
-
-  it("test_playing_day_island_renders_per_hour_not_per_frame: the WHOLE island (stage, readout, scrubber) commits about once per whole-hour change while the day plays, and the now line still moves every frame", () => {
-    vi.useFakeTimers({ toFake: ["performance"] });
-    const callbacks: FrameRequestCallback[] = [];
-    stubBrowser(false);
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => callbacks.push(cb));
-    let commits = 0;
-    renderWithIntl(
-      <Profiler
-        id="island"
-        onRender={() => {
-          commits++;
-        }}
-      >
-        <FieldIsland panel={panel} data={{ grid, coast }} />
-      </Profiler>,
-    );
-    const nowLine = (): string => document.querySelector("[data-now]")?.getAttribute("x1") ?? "";
-    const frame = (): void => {
-      act(() => {
-        vi.advanceTimersByTime(1000 / 60);
-        callbacks.splice(0).forEach((cb) => {
-          cb(performance.now());
-        });
-      });
-    };
-    frame();
-    const before = commits;
-    const startedAt = nowLine();
-    const positions = new Set<string>();
-    // 2 s of a playing day at 60 frames per second: 120 frames, the clock at 1.5 hours per second = 3 whole-hour changes
-    for (let i = 0; i < 120; i++) {
-      frame();
-      positions.add(nowLine());
-    }
-    const renders = commits - before;
-    console.log(`ISLAND RENDERS while playing: ${String(renders)} commits in 120 frames (2 s)`);
-    expect(screen.getByRole("button", { name: "Pause the day" }), "it really was playing").toBeInTheDocument();
-    expect(nowLine(), "the now line moved").not.toBe(startedAt);
-    expect(positions.size, "and it moved on (nearly) every frame, not once per hour").toBeGreaterThan(100);
-    expect(renders, "whole-hour changes (3 in 2 s) plus slack, never one per frame").toBeLessThanOrEqual(6);
-    vi.useRealTimers();
-  });
-
-  it("test_slider_text_equals_canvas_values: every hour's value text is the reading the canvas is drawn from (the readout card is gone; the slider says it)", () => {
-    stubBrowser(true);
-    island();
-    const slider = screen.getByRole("slider");
-    for (let hour = 0; hour < 24; hour++) {
-      fireEvent.keyDown(slider, { key: "Home" });
-      for (let step = 0; step < hour; step++) fireEvent.keyDown(slider, { key: "ArrowRight" });
-      const text = readoutText(readingAt(grid, field.omaa, hour));
-      expect(slider.getAttribute("aria-valuetext")).toBe(`${text.hour}: hottest grid cell ${text.hottest} degrees, Abu Dhabi airport ${text.station}`);
-    }
-  });
-
-  it("the island has no readout card and says what the field is in a caption with a Where from chip", () => {
-    stubBrowser(true);
-    island();
-    expect(document.querySelector("[data-field-readout]")).toBeNull();
-    expect(document.querySelector("[data-field-caption]")).toHaveTextContent("Forecast heat across the UAE for one hot day. An illustration, not the day we scored.");
-    expect(within(document.querySelector("[data-field-caption]") as HTMLElement).getByRole("button", { name: /^Where from: The forecast heat field/ })).toBeInTheDocument();
+  it("snaps only where a hand drives the wheel and motion is not reduced, on a wide and tall screen", () => {
+    const block = /@media \(min-width: 1100px\) and \(min-height: 600px\) and \(hover: hover\) and \(pointer: fine\) and \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/.exec(css);
+    expect(block?.[1]).toContain("scroll-snap-type: y mandatory");
+    expect(block?.[1]).toContain("scroll-snap-stop: always");
   });
 });

@@ -6,6 +6,7 @@ import { banStateFor, SEASON_BAN } from "@/features/judge/ban";
 import { loadScored } from "@/features/judge/data";
 import { loadHourly } from "@/features/judge/hourly";
 import { heatColor } from "@/lib/heat/ramp";
+import { StoryNav } from "@/components/shell/StoryNav";
 import { loadRecordedPlan } from "@/features/judge/validator/recorded-plan";
 import { TryGate } from "@/features/judge/validator/TryGate";
 import { TryStatic } from "@/features/judge/validator/TryStatic";
@@ -38,8 +39,14 @@ export default async function TryPage() {
   const ban = banStateFor(SEASON_BAN, date, locale);
   const dateLabel = dayFormat(locale).withWeekday(date);
   return (
-    <TryGate date={date} heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded}>
-      <TryStatic heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded} />
-    </TryGate>
+    <>
+      <TryGate date={date} heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded}>
+        <TryStatic heat={heat} ban={ban} dateLabel={dateLabel} recorded={recorded} />
+      </TryGate>
+      {/* Step five of the story: Back to one day, Next to the boundary (a server sibling of the island, as on the governance page). */}
+      <div className="mx-auto w-full max-w-(--content-max) px-4 pb-8 sm:px-6">
+        <StoryNav current="try" />
+      </div>
+    </>
   );
 }

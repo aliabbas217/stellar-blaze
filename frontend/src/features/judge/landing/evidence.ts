@@ -43,7 +43,24 @@ export interface EvidenceVerdict {
   readonly result: "met" | "notMet" | null;
 }
 
+/** Direction of a paired difference, from its 95 % interval: an interval that includes zero is never called better or worse. */
+export type Direction = "fewer" | "more" | "unclear";
+
+/**
+ * The one big number of a main check on the landing's second evidence screen, read from the STRUCTURED fields of the scoring export (never from
+ * the verbatim sentence): H4 is the danger hours our protective setting missed against the midday break alone, H5 the false-alarm hours it
+ * raised against the regulator's own zones. `value` is the size of the paired difference, formatted like the table's own numbers.
+ */
+export interface Headline {
+  readonly id: "H4" | "H5";
+  readonly outcome: "met" | "notMet" | null;
+  readonly direction: Direction;
+  readonly value: string;
+  readonly valueRaw: number;
+}
+
 export interface Evidence {
+  readonly headlines: readonly Headline[];
   readonly bars: readonly EvidenceBar[];
   readonly tradeoff: string | null;
   readonly verdicts: readonly EvidenceVerdict[];
@@ -55,6 +72,22 @@ export interface Evidence {
 
 /** A catalogue lookup whose keys are built by the verdict templates, so the typed key check cannot see them (the unit tests render them all). */
 type Say = (key: string, values?: Readonly<Record<string, string>>) => string;
+
+const HEADLINES = [
+  { id: "H4", subject: "P3_protect", baseline: "P0", metric: "missed_danger_hours" },
+  { id: "H5", subject: "P3_protect", baseline: "P2", metric: "false_alarm_hours" },
+] as const;
+
+function headlinesOf(policy: PolicyScoreboard, outcomes: ReadonlyMap<string, "met" | "notMet" | null>, format: JudgeFormat): Headline[] {
+  return HEADLINES.flatMap((h): Headline[] => {
+    const comparison = policy.verdicts.find((verdict) => verdict.id === h.id)?.comparisons.find((c) => c.subject === h.subject && c.baseline === h.baseline && c.metric === h.metric);
+    const ci = comparison?.difference.ci;
+    if (comparison === undefined || ci === null || ci === undefined) return [];
+    const raw = Math.abs(comparison.difference.value);
+    const direction: Direction = ci.hi < 0 ? "fewer" : ci.lo > 0 ? "more" : "unclear";
+    return [{ id: h.id, outcome: outcomes.get(h.id) ?? null, direction, value: format.one(raw), valueRaw: raw }];
+  });
+}
 
 export function buildEvidence(data: EvalData | null, format: JudgeFormat, ts: JudgeT): Evidence | null {
   const policy: PolicyScoreboard | null = data?.source === "2026" ? data.policy : null;
@@ -87,6 +120,7 @@ export function buildEvidence(data: EvalData | null, format: JudgeFormat, ts: Ju
     .map((verdict) => ({ id: verdict.id, text: verdict.lines.map((l) => say(`verdict.plain.${l.key}`, l.values)).join(" "), result: verdict.outcome }));
 
   return {
+    headlines: headlinesOf(policy, new Map(verdicts.map((v) => [v.id, v.result] as const)), format),
     bars,
     tradeoff: policyTradeoff(policy, 1, format, ts),
     verdicts,

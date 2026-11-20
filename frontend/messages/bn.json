@@ -666,6 +666,29 @@
         "title": "এই দলটি পাওয়া যায়নি",
         "reason": "এই সাইটে এই লিংকের কোনো দল নেই।",
         "primary": "সব দল"
+      },
+      "rules": {
+        "pH1": "দুপুরের বিরতিতে কাজ",
+        "pH1a": "দুপুরের বিরতি থেকে অব্যাহতি",
+        "pH2Daily": "দৈনিক কাজের ঘণ্টা",
+        "pH2Weekly": "সাপ্তাহিক কাজের ঘণ্টা",
+        "pH3": "পাঁচ ঘণ্টা কাজের পর বিরতি",
+        "pH4": "সাপ্তাহিক বিশ্রামের দিন",
+        "pH5Hours": "কিশোর শ্রমিক: দৈনিক ঘণ্টা",
+        "pH5Run": "কিশোর শ্রমিক: একটানা কাজ",
+        "pH5Window": "কিশোর শ্রমিক: দিনের সময়",
+        "pH5BanSeason": "কিশোর শ্রমিক: গরমের মৌসুম",
+        "pH7Cap60": "এক ঘণ্টায় কাজের মিনিট বেশি",
+        "pH7Run": "কাজের সময় দীর্ঘ বা বিশ্রাম সংক্ষিপ্ত",
+        "pH7Lone": "গরমে একা কাজ",
+        "pH7Unacclimatised": "গরমে অভ্যস্ত নয় এমন দলের গরমে কাজ",
+        "pH7Cycle": "কাজ ও বিশ্রামের চক্র",
+        "pH8Ramp": "গরমে অভ্যস্ত হওয়ার ক্রমবৃদ্ধি",
+        "pH8Heavy7": "অভ্যস্ত হওয়ার 7 দিনের আগে ভারী কাজ",
+        "pH10": "কোনো অতিরিক্ত মিনিট নয়",
+        "stopRed": "লাল অঞ্চলে কাজ বন্ধ করুন",
+        "stopNoAcclimatised": "কোনো অভ্যস্ত শ্রমিক নেই",
+        "fallbackHigh": "ব্যবহারযোগ্য পূর্বাভাস নেই: উচ্চ ধরা হয়েছে"
       }
     },
     "stop": {
@@ -1401,7 +1424,7 @@
         "start": "Start",
         "end": "End",
         "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
-        "none": "Add at least one run of work to check a plan.",
+        "none": "Add at least one run of work, or pick a roster, then check.",
         "placeholder": "hh:mm",
         "problem": {
           "format": "Write the time as hh:mm, for example 06:00.",
@@ -1457,7 +1480,30 @@
         "reason": "The rule checker could not read these lines. Nothing was checked.",
         "line": "Run {line}"
       },
-      "loading": "Loading the checker"
+      "loading": "Loading the checker",
+      "rules": {
+        "pH1": "Work during the midday ban",
+        "pH1a": "Exemption from the midday ban",
+        "pH2Daily": "Daily working hours",
+        "pH2Weekly": "Weekly working hours",
+        "pH3": "Break after five hours of work",
+        "pH4": "Weekly rest day",
+        "pH5Hours": "Young worker: daily hours",
+        "pH5Run": "Young worker: run of work",
+        "pH5Window": "Young worker: hours of the day",
+        "pH5BanSeason": "Young worker: heat season",
+        "pH7Cap60": "Too many work minutes in an hour",
+        "pH7Run": "Work run too long, or rest too short",
+        "pH7Lone": "Working alone in the heat",
+        "pH7Unacclimatised": "Unacclimatised crew working in the heat",
+        "pH7Cycle": "Work-rest cycle",
+        "pH8Ramp": "Acclimatisation ramp-up",
+        "pH8Heavy7": "Heavy work before 7 days of acclimatisation",
+        "pH10": "No added minutes",
+        "stopRed": "Stop work in the red zone",
+        "stopNoAcclimatised": "No acclimatised worker available",
+        "fallbackHigh": "No usable forecast: treated as High"
+      }
     },
     "story": {
       "label": "গল্প",
@@ -1472,6 +1518,7 @@
         "product": "পণ্য",
         "evidence": "প্রমাণ",
         "day": "একটি দিন",
+        "try": "পরিকল্পনা পরখ করুন",
         "boundary": "সীমা"
       }
     },
@@ -1606,24 +1653,24 @@
       "skip": "স্কোরবোর্ডে যান",
       "kicker": "গত গ্রীষ্মের বাস্তব আবহাওয়ায়, আবু ধাবি বিমানবন্দরে পরীক্ষিত",
       "title": "আগামীকালের তাপের পরিকল্পনা আজ রাতেই করুন।",
-      "lede": "Stellar Blaze পরের দিনের পূর্বাভাসকে প্রতিটি দলের জন্য কাজ ও বিশ্রামের পরিকল্পনায়, আর প্রতিটি শ্রমিকের ফোনে একটি সহজ সতর্কতায় রূপ দেয়, ছয় ভাষায়।",
+      "lede": "তাপের বিপদ দুপুরের বিরতির জন্য অপেক্ষা করে না। আমরা এক দিন আগেই এর পূর্বাভাস দিই এবং প্রতিটি দলকে পরিকল্পনা ও প্রতিটি শ্রমিককে সতর্কতা দিই।",
       "door": {
         "label": "এটি কার জন্য?",
         "worker": {
           "title": "আমি সাইটে কাজ করি",
-          "line": "আজকের তাপ ও বিশ্রামের সময় দেখুন। কোনো অ্যাকাউন্ট নেই।"
+          "line": "আজকের তাপ ও বিশ্রামের সময়। কোনো অ্যাকাউন্ট নেই।"
         },
         "crew": {
           "title": "আমি একটি দল চালাই",
-          "line": "আপনার দলগুলোর আজ রাতের পরিকল্পনা দেখুন। এক ট্যাপে কাজ বন্ধ করুন।"
+          "line": "আজ রাতের পরিকল্পনা। এক ট্যাপে কাজ বন্ধ করুন।"
         },
         "safety": {
           "title": "আমি নিরাপত্তা দেখি",
-          "line": "দেখুন কোন দলগুলোর পরিকল্পনা হয়েছে, স্বাক্ষর হয়েছে ও কাজ থেমেছে।"
+          "line": "কোন দল পরিকল্পনা করেছে, স্বাক্ষর করেছে এবং কাজ বন্ধ করেছে।"
         },
         "review": {
           "title": "আমি এটি পর্যালোচনা করছি",
-          "line": "3 মিনিটের একটি ট্যুর, তারপর যা খুশি চেষ্টা করুন।"
+          "line": "3 মিনিটের ট্যুর, তারপর যেকোনো কিছু চেষ্টা করুন।"
         },
         "note": "এটি একটি ডেমো। দল ও মানুষগুলো কাল্পনিক। শ্রমিকদের কখনো অ্যাকাউন্ট লাগে না।"
       },
@@ -1634,7 +1681,7 @@
       },
       "field": {
         "region": "সংযুক্ত আরব আমিরাতের ওপর পূর্বাভাসিত তাপের ক্ষেত্র, {day}",
-        "caption": "একটি গরম দিনের জন্য সারা UAE-তে পূর্বাভাসিত তাপ। একটি উদাহরণ, আমরা যে দিনটি মূল্যায়ন করেছি সেটি নয়।",
+        "caption": "একটি গরম দিনের উদাহরণচিত্র, আমরা যে দিনটির স্কোর করেছি সেটি নয়।",
         "proofWhat": "পূর্বাভাসিত তাপের ক্ষেত্র, {day}, প্রতি ঘণ্টা",
         "stations": {
           "OMAA": "আবু ধাবি",
@@ -1662,7 +1709,12 @@
           "heading": "One sign, one instruction, in the worker's own language.",
           "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
           "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
-          "link": "Open the worker screen"
+          "link": "Open the worker screen",
+          "spine": {
+            "level": "Heat level",
+            "airport": "Abu Dhabi airport forecast",
+            "break": "Midday break"
+          }
         },
         "plan": {
           "eyebrow": "Tonight's plan",
@@ -1685,7 +1737,8 @@
           },
           "stop": "Stop work, Crew A",
           "link": "Open the crews screen",
-          "tag": "Demo"
+          "tag": "Demo",
+          "copy": "Follows the ADOSH heat rules. Stop work in one tap."
         },
         "boundary": {
           "eyebrow": "The boundary",
@@ -1695,7 +1748,17 @@
           "requestDetail": "Individual health data for one worker.",
           "refused": "Refused.",
           "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
-          "link": "See the refusal, recorded"
+          "link": "See the refusal, recorded",
+          "panel": {
+            "asked": "Asked",
+            "refused": "Refused",
+            "seen": "Seen",
+            "refusedLine": "The service holds none.",
+            "seenLine": "Every worker at the site can see it was asked.",
+            "chain": "Each log entry builds on the one before, so a change shows.",
+            "earlier": "earlier",
+            "entry": "entry"
+          }
         },
         "evidence": {
           "eyebrow": "Last summer, replayed",
@@ -1705,17 +1768,74 @@
           "falseAlarms": "False-alarm hours: {n}",
           "verdicts": "How the main checks came out",
           "scoreboard": "See the full scoreboard",
-          "unavailable": "The scored results are not available in this build."
+          "unavailable": "The scored results are not available in this build.",
+          "short": {
+            "body": "Abu Dhabi airport, summer 2026. Forecast made a day ahead.",
+            "caption": "Danger hours not warned about. Shorter is better.",
+            "trade": "Every setting trades missed danger hours against false alarms. You choose where to sit."
+          },
+          "met": "Met",
+          "notMet": "Not met",
+          "noClaim": "We do not claim to beat them.",
+          "headline": {
+            "H4": {
+              "fewer": "fewer danger hours missed than the midday break alone",
+              "more": "more danger hours missed than the midday break alone"
+            },
+            "H5": {
+              "more": "more false-alarm hours than the regulator's own zones.",
+              "fewer": "fewer false-alarm hours than the regulator's own zones."
+            }
+          }
         },
         "limits": {
           "eyebrow": "What this does not show yet",
-          "one": "One test summer and one airport station, not a worksite.",
-          "two": "No worker outcomes. This is not yet a health claim.",
-          "three": "Not yet checked by a clinician. Translations are machine-made.",
-          "four": "The demo runs on made-up data hosted in France Central. It is designed for UAE North.",
+          "one": "One summer, one airport station.",
+          "two": "No worker outcomes yet.",
+          "three": "No clinician review yet. Translations are machine-made.",
+          "four": "Made-up demo data, hosted in France. Built for UAE North.",
           "tested": "See how it was tested",
           "auditors": "For auditors"
         }
+      },
+      "rail": {
+        "label": "অধ্যায়",
+        "forecast": "পূর্বাভাস",
+        "morning": "সকাল",
+        "plan": "পরিকল্পনা",
+        "boundary": "সীমানা",
+        "evidence": "প্রমাণ",
+        "ways": "প্রবেশের পথ",
+        "limits": "সীমাবদ্ধতা",
+        "note": "ডেমো। দল ও মানুষগুলো কাল্পনিক।"
+      },
+      "scene": {
+        "measure": "WBGT, °C",
+        "source": "ECMWF IFS, এক দিন আগের পূর্বাভাস, {date}",
+        "limit": "ভারী কাজের সীমা {limit} °C WBGT (NIOSH REL)",
+        "legendNone": "নেই",
+        "how": "উঁচু-নিচু ×{exag}। সমুদ্রের ওপরের সেলে রং করা হয়নি।",
+        "howPoster": "সমুদ্রের ওপরের সেলে রং করা হয়নি।",
+        "eyebrow": "{hour} / {date}",
+        "cells": "{total} পূর্বাভাস সেলের মধ্যে ভারী কাজের {limit} °C সীমার ওপরে আছে।",
+        "allAbove": "{from} থেকে {to} পর্যন্ত প্রতিটি সেল এর ওপরে।",
+        "hottest": "{hour} এ সবচেয়ে গরম গ্রিড সেল।",
+        "where": "{lat} উত্তর, {lon} পূর্ব।",
+        "station": "{hour} এ {station} বিমানবন্দরের পূর্বাভাস।",
+        "summary": "মানচিত্রে পূর্বাভাস, তিনটি ধাপে"
+      },
+      "hero": {
+        "primary": "দেখুন এটি কীভাবে কাজ করে",
+        "skip": "ডেমোতে যান"
+      },
+      "ways": {
+        "heading": "আপনার পথ বেছে নিন"
+      },
+      "video": {
+        "title": "3 মিনিটের ভিডিও",
+        "play": "ভিডিও চালান",
+        "soon": "এই জমার সঙ্গে 3 মিনিটের একটি ভিডিও ওয়াকথ্রু রয়েছে।",
+        "notLoaded": "“ভিডিও চালান” চাপার আগে পর্যন্ত YouTube থেকে কিছুই লোড হয় না।"
       }
     },
     "roleEntry": {
@@ -1738,7 +1858,7 @@
     },
     "tour": {
       "title": "3 মিনিটের ট্যুর",
-      "lead": "পাঁচটি ধাপ, এই ক্রমে। প্রতিটি আসল পর্দা খোলে।",
+      "lead": "ধাপগুলো এই ক্রমে। প্রতিটি আসল পর্দা খোলে।",
       "open": "এই পর্দা খুলুন",
       "controls": "রিপ্লে ও সরাসরির মধ্যে বদলাতে বা ডেমো সাইট রিসেট করতে নিরাপত্তা দৃশ্যের ডেমো নিয়ন্ত্রণ ব্যবহার করুন।",
       "controlsLink": "ডেমো নিয়ন্ত্রণ খুলুন",
@@ -1754,6 +1874,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",

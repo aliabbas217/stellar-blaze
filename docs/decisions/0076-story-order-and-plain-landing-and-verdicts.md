@@ -22,5 +22,8 @@ The old story opened with a statistic and a scoreboard and showed the product la
 ## Revisit trigger
 A judge test shows the scoreboard is reached too late; the video order changes again; the template for H4 or H5 disagrees with a re-scored file.
 
+## Amendments
+- **2026-11-20 (try a plan joins the story; decision 1 amended, the rest unchanged).** A live audit found that the pager and the 3-minute tour walked past the interactive validator: "Next" on the day page went straight to the boundary, so the five-click judge path (replay, evidence, day, try, governance) worked only from the top nav, and on a phone not even there. **Ruling:** the order is problem, product, evidence, day, **try a plan**, boundary (`STORY_STEPS`, six steps, "Step n of 6"); `/replay/try` carries the story footer (Back to the day, Next to the boundary); the tour gains a "Try a plan" stop between the crew lead's screen and the refusal. The product step is still an app step that Back and Next pass over. **Cost of being wrong:** one more step before the boundary, and the validator page grows by the footer (one small client component the day and governance pages already ship). **Revisit trigger:** a judge test shows the story is now too long.
+
 ## Links
 [ADR 0064](0064-f2-demo-copy-and-data-rulings.md) · [0034](0034-demo-strategy.md) · [0075](0075-three-layer-information-model-and-where-from-chip.md) · [02-narrative](../design/redesign-2026-11-17/02-narrative.md)

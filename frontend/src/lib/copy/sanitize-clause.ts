@@ -9,6 +9,8 @@
  *    spaces it leaves behind: "(ADR 0011 P-H3)" disappears, "(ADR 0011 section 4, not legal text)" becomes "(not legal text)";
  *  - a bare reference that ends a sentence about it ("The one rest day in seven is the reading in ADR 0011 P-H4"): the sentence would
  *    be left meaningless, so that one sentence goes (never a guess at what it said);
+ *  - a parenthesised runtime-config key ("below the Red edge (red_twl_w_m2) every crew is stopped": the key names a setting, not a thing a
+ *    reader can act on), when it is a snake_case identifier alone in its parentheses;
  *  - a leading internal rule id ("P-H10 No added minutes: ...": the rule id is shown beside the clause on its own).
  *
  * It rewrites one thing: the internal label "PROTECTIVE READING" becomes the plain "Protective reading". The label is how the clause
@@ -37,6 +39,8 @@ const DANGLING = /\b(?:in|of|per|under|see|by|to|as|from|at|the|is|are)\s*$/i;
 const LABEL = /PROTECTIVE READINGS?/g;
 /** A rule id at the very start, with the separator after it: spaces, or a full stop and spaces ("P-H10. No added minutes"): after a LEADING id the period is the separator, not part of a sentence. */
 const LEADING_RULE_ID = /^P-H\d+[A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*\.?\s+(?=[A-Z])/;
+/** A runtime-config key alone in parentheses: snake_case with at least one underscore ("(red_twl_w_m2)"). The law's "(5) five" and "(see Table 1)" never match. */
+const CONFIG_KEY = /\s*\([a-z][a-z0-9]*(?:_[a-z0-9]+)+\)/g;
 const ARTICLE = /\bArt\.\s*\d+(?:\(\d+\))*(?:\([a-z]\))*/;
 
 /** Separators a removal can leave at the ends of what it was inside of. */
@@ -104,7 +108,7 @@ export function sanitizeClause(text: string, options: SanitizeClauseOptions = {}
   if (text.trim() === "") return text;
   let out = stripParenthesised(text);
   out = stripBare(out);
-  out = out.replace(LEADING_RULE_ID, "").replace(LABEL, "Protective reading");
+  out = out.replace(CONFIG_KEY, "").replace(LEADING_RULE_ID, "").replace(LABEL, "Protective reading");
   out = out.trim();
   if (out === text.trim() || readable(out)) return out;
 

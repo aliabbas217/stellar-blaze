@@ -6,7 +6,7 @@ import { CopyStepLink } from "./CopyStepLink";
 import { STORY_STEPS, type StoryStepId } from "./story-steps";
 
 /**
- * The footer of every judge page: where this page sits in the five-step story, links to the steps that exist, Back and Next
+ * The footer of every judge page: where this page sits in the story, links to the steps that exist, Back and Next
  * (skipping a step whose view is not built or is not a judge page, see story-steps.ts), and "Copy link to this step". Every target is 48 px. The
  * current step is `aria-current="step"`; a step that is not built is text, never a dead link. No link prefetches (`FieldLink`):
  * on a short page (the proof sheet's empty state) the footer is in view, and a prefetch pulled the next page's script into the
