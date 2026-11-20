@@ -265,6 +265,15 @@ describe("TryGate: the lazy island", () => {
     expect([...container.querySelectorAll("[data-violation-mark]")].map((el) => el.getAttribute("data-violation-mark"))).toEqual(["1", "2", "2"]);
     // what was checked comes from the API's own list
     expect(container.querySelector("[data-checked]")?.textContent).toContain("P-H7.cap60");
+    // audit M2: every chip of "What was checked" and every breach heading carries a plain-language name before the id
+    const chips = [...container.querySelectorAll("[data-checked] li")];
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.querySelector("[data-rule-name]")?.textContent ?? "", chip.textContent).not.toBe("");
+      expect(chip.querySelector("[data-rule-id]")).not.toBeNull();
+    }
+    expect(within(rule("P-H3")).getByText("Break after five hours of work")).toBeInTheDocument();
+    expect(within(rule("P-H2.daily")).getByText("Daily working hours")).toBeInTheDocument();
   });
 
   it("the legal default answers '0 rules broken' with what was checked (the empty state)", async () => {

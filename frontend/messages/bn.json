@@ -666,6 +666,29 @@
         "title": "এই দলটি পাওয়া যায়নি",
         "reason": "এই সাইটে এই লিংকের কোনো দল নেই।",
         "primary": "সব দল"
+      },
+      "rules": {
+        "pH1": "দুপুরের বিরতিতে কাজ",
+        "pH1a": "দুপুরের বিরতি থেকে অব্যাহতি",
+        "pH2Daily": "দৈনিক কাজের ঘণ্টা",
+        "pH2Weekly": "সাপ্তাহিক কাজের ঘণ্টা",
+        "pH3": "পাঁচ ঘণ্টা কাজের পর বিরতি",
+        "pH4": "সাপ্তাহিক বিশ্রামের দিন",
+        "pH5Hours": "কিশোর শ্রমিক: দৈনিক ঘণ্টা",
+        "pH5Run": "কিশোর শ্রমিক: একটানা কাজ",
+        "pH5Window": "কিশোর শ্রমিক: দিনের সময়",
+        "pH5BanSeason": "কিশোর শ্রমিক: গরমের মৌসুম",
+        "pH7Cap60": "এক ঘণ্টায় কাজের মিনিট বেশি",
+        "pH7Run": "কাজের সময় দীর্ঘ বা বিশ্রাম সংক্ষিপ্ত",
+        "pH7Lone": "গরমে একা কাজ",
+        "pH7Unacclimatised": "গরমে অভ্যস্ত নয় এমন দলের গরমে কাজ",
+        "pH7Cycle": "কাজ ও বিশ্রামের চক্র",
+        "pH8Ramp": "গরমে অভ্যস্ত হওয়ার ক্রমবৃদ্ধি",
+        "pH8Heavy7": "অভ্যস্ত হওয়ার 7 দিনের আগে ভারী কাজ",
+        "pH10": "কোনো অতিরিক্ত মিনিট নয়",
+        "stopRed": "লাল অঞ্চলে কাজ বন্ধ করুন",
+        "stopNoAcclimatised": "কোনো অভ্যস্ত শ্রমিক নেই",
+        "fallbackHigh": "ব্যবহারযোগ্য পূর্বাভাস নেই: উচ্চ ধরা হয়েছে"
       }
     },
     "stop": {
@@ -1457,7 +1480,30 @@
         "reason": "The rule checker could not read these lines. Nothing was checked.",
         "line": "Run {line}"
       },
-      "loading": "Loading the checker"
+      "loading": "Loading the checker",
+      "rules": {
+        "pH1": "Work during the midday ban",
+        "pH1a": "Exemption from the midday ban",
+        "pH2Daily": "Daily working hours",
+        "pH2Weekly": "Weekly working hours",
+        "pH3": "Break after five hours of work",
+        "pH4": "Weekly rest day",
+        "pH5Hours": "Young worker: daily hours",
+        "pH5Run": "Young worker: run of work",
+        "pH5Window": "Young worker: hours of the day",
+        "pH5BanSeason": "Young worker: heat season",
+        "pH7Cap60": "Too many work minutes in an hour",
+        "pH7Run": "Work run too long, or rest too short",
+        "pH7Lone": "Working alone in the heat",
+        "pH7Unacclimatised": "Unacclimatised crew working in the heat",
+        "pH7Cycle": "Work-rest cycle",
+        "pH8Ramp": "Acclimatisation ramp-up",
+        "pH8Heavy7": "Heavy work before 7 days of acclimatisation",
+        "pH10": "No added minutes",
+        "stopRed": "Stop work in the red zone",
+        "stopNoAcclimatised": "No acclimatised worker available",
+        "fallbackHigh": "No usable forecast: treated as High"
+      }
     },
     "story": {
       "label": "গল্প",

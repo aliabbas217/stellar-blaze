@@ -666,6 +666,29 @@
         "title": "لم يُعثر على هذا الفريق",
         "reason": "لا يوجد في هذا الموقع فريق بهذا الرابط.",
         "primary": "كل الفرق"
+      },
+      "rules": {
+        "pH1": "العمل خلال استراحة الظهيرة",
+        "pH1a": "استثناء من استراحة الظهيرة",
+        "pH2Daily": "ساعات العمل اليومية",
+        "pH2Weekly": "ساعات العمل الأسبوعية",
+        "pH3": "استراحة بعد خمس ساعات عمل",
+        "pH4": "يوم الراحة الأسبوعي",
+        "pH5Hours": "عامل حدث: الساعات اليومية",
+        "pH5Run": "عامل حدث: فترة العمل المتواصلة",
+        "pH5Window": "عامل حدث: ساعات اليوم المسموحة",
+        "pH5BanSeason": "عامل حدث: موسم الحر",
+        "pH7Cap60": "دقائق عمل زائدة في الساعة",
+        "pH7Run": "فترة عمل طويلة أو راحة قصيرة",
+        "pH7Lone": "العمل منفردًا في الحر",
+        "pH7Unacclimatised": "طاقم غير متأقلم يعمل في الحر",
+        "pH7Cycle": "دورة العمل والراحة",
+        "pH8Ramp": "التدرج في التأقلم مع الحر",
+        "pH8Heavy7": "عمل شاق قبل 7 أيام من التأقلم",
+        "pH10": "لا دقائق عمل إضافية",
+        "stopRed": "أوقف العمل في المنطقة الحمراء",
+        "stopNoAcclimatised": "لا يوجد عامل متأقلم متاح",
+        "fallbackHigh": "لا توجد توقعات صالحة: تُعامل كمرتفع"
       }
     },
     "stop": {
@@ -1457,7 +1480,30 @@
         "reason": "The rule checker could not read these lines. Nothing was checked.",
         "line": "Run {line}"
       },
-      "loading": "Loading the checker"
+      "loading": "Loading the checker",
+      "rules": {
+        "pH1": "Work during the midday ban",
+        "pH1a": "Exemption from the midday ban",
+        "pH2Daily": "Daily working hours",
+        "pH2Weekly": "Weekly working hours",
+        "pH3": "Break after five hours of work",
+        "pH4": "Weekly rest day",
+        "pH5Hours": "Young worker: daily hours",
+        "pH5Run": "Young worker: run of work",
+        "pH5Window": "Young worker: hours of the day",
+        "pH5BanSeason": "Young worker: heat season",
+        "pH7Cap60": "Too many work minutes in an hour",
+        "pH7Run": "Work run too long, or rest too short",
+        "pH7Lone": "Working alone in the heat",
+        "pH7Unacclimatised": "Unacclimatised crew working in the heat",
+        "pH7Cycle": "Work-rest cycle",
+        "pH8Ramp": "Acclimatisation ramp-up",
+        "pH8Heavy7": "Heavy work before 7 days of acclimatisation",
+        "pH10": "No added minutes",
+        "stopRed": "Stop work in the red zone",
+        "stopNoAcclimatised": "No acclimatised worker available",
+        "fallbackHigh": "No usable forecast: treated as High"
+      }
     },
     "story": {
       "label": "القصة",

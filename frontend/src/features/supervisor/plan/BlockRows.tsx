@@ -2,11 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { useId, useState, type ReactNode } from "react";
+import { RuleLabel } from "@/components/provenance/RuleLabel";
 import { PlanSwatch, type PlanBlockState } from "@/components/plan/PlanBars";
 import { formatClock } from "@/components/spine/geometry";
 import type { PlanBlock } from "@/features/supervisor/plan/plan-model";
 import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { sanitizeClause } from "@/lib/copy/sanitize-clause";
+import { useRuleName } from "./rule-name";
 
 /*
  * Every block of the plan as a row (F2 Task 20, critique fix 5): the chart's blocks are 4 to 22 px wide, so what a supervisor
@@ -31,6 +33,7 @@ const STATE_KEY: Record<PlanBlockState, "work" | "adoshRest" | "art18Break" | "b
 
 function Row({ block, current, past }: { readonly block: PlanBlock; readonly current: boolean; readonly past: boolean }) {
   const t = useTranslations("supervisor.plan");
+  const nameOf = useRuleName();
   const [open, setOpen] = useState(false);
   const panel = useId();
   const state = t(`state.${STATE_KEY[block.state]}`);
@@ -62,8 +65,9 @@ function Row({ block, current, past }: { readonly block: PlanBlock; readonly cur
       <div id={panel} hidden={!open} className="flex flex-col gap-1 pb-3 ps-8 text-sm leading-(--sign-leading-text) text-ink-2">
         {/* The clause is the API's English text of the law, whatever the page's language: an English (LTR) block. The "no clause" line is ours and keeps the page's language. */}
         <p {...(block.clause === "" ? {} : CLAIMS_ENGLISH)}>{block.clause === "" ? t("blocks.noClause") : sanitizeClause(block.clause)}</p>
-        <p>
-          {t("blocks.rule")} <code dir="ltr" translate="no" className="font-mono text-ink-2">{block.ruleId}</code>
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-ink-3">{t("blocks.rule")}</span>
+          <RuleLabel id={block.ruleId} name={nameOf(block.ruleId)} />
         </p>
       </div>
     </li>
