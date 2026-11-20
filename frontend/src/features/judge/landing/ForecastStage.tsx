@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { readingAt, type FieldGrid } from "./field-data";
 import { loadFieldGrid } from "./field-load";
 import { allAboveRange, captionsAt } from "./landing-captions";
-import { cameraAt, FIRST_HOUR, hourOf, LAST_HOUR, PANEL_SHARE, progressOf, RELIEF, stepOf, type Step } from "./landing-camera";
+import { cameraAt, COLUMN_ZOOM, FIRST_HOUR, hourOf, LAST_HOUR, PANEL_SHARE, progressOf, RELIEF, stepOf, type Step } from "./landing-camera";
 import { isPinnedLayout, media, NARROW_QUERY, REDUCED_QUERY, subscribeScroll } from "./landing-scroll";
 import type { Scene } from "./landing-scene";
 import { SceneCaptions } from "./SceneCaptions";
@@ -35,7 +35,7 @@ export interface ForecastStageProps {
   readonly attribution: ReactNode;
   /** The three captions as visually hidden text (SceneSummary), written by the server so it is in the first HTML with or without WebGL. */
   readonly summary: ReactNode;
-  readonly stations: readonly { readonly code: string; readonly name: string; readonly lat: number; readonly lon: number; readonly leader: number; readonly end?: boolean }[];
+  readonly stations: readonly { readonly code: string; readonly name: string; readonly lat: number; readonly lon: number; readonly leader: number; readonly end?: boolean; readonly narrowEnd?: boolean }[];
 }
 
 type Mode = "loading" | "live" | "poster";
@@ -112,6 +112,7 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
           const cv = canvas.current;
           const root = labels.current;
           if (!alive || cv === null || root === null) return;
+          const narrow = media(NARROW_QUERY)?.matches === true;
           const scene = createScene({
             canvas: cv,
             labelRoot: root,
@@ -119,7 +120,7 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
             dem: assets.dem,
             image: assets.image,
             grid: { rows: field.lat.length, cols: field.lon.length, get: (h, i, j) => field.values[h * field.lat.length * field.lon.length + i * field.lon.length + j] ?? 0 },
-            labels: stations.map((s) => ({ name: s.name, lat: s.lat, lon: s.lon, leader: s.leader, ...(s.end === true ? { end: true } : {}) })),
+            labels: stations.map((s) => ({ name: s.name, lat: s.lat, lon: s.lon, leader: s.leader, ...(s.end === true || (narrow && s.narrowEnd === true) ? { end: true } : {}) })),
           });
           if (scene === null) {
             setMode("poster");
@@ -162,7 +163,7 @@ export function ForecastStage({ region, when, dateLabel, omaa, rtl, sourceLine, 
       if (scene !== null && cv !== null) {
         const aspect = cv.clientWidth / Math.max(1, cv.clientHeight);
         const sx = pinned ? (rtl ? -PANEL_SHARE : PANEL_SHARE) : 0;
-        const cam = cameraAt(p ?? 0, aspect, coast.current, sx);
+        const cam = cameraAt(p ?? 0, aspect, coast.current, sx, pinned ? 1 : COLUMN_ZOOM);
         const key = [Math.round(h * 60), cam.az, cam.dist, cam.t[0], cam.sx, cv.clientWidth, cv.clientHeight].join();
         if (key !== last.current) {
           last.current = key;
