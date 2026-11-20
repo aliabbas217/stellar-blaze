@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -52,8 +52,8 @@ describe("StoryNav steps", () => {
     for (const step of STORY_STEPS) expect(isDeferredRoute(step.href), step.href).toBe(false);
   });
 
-  it("keeps the five steps in the story order (A2): the problem, the product, the evidence, one day, the boundary, and no proof step", () => {
-    expect(STORY_STEPS.map((s) => s.id)).toEqual(["problem", "product", "evidence", "day", "boundary"]);
+  it("keeps the six steps in the story order (A2, audit M4): the problem, the product, the evidence, one day, try a plan, the boundary, and no proof step", () => {
+    expect(STORY_STEPS.map((s) => s.id)).toEqual(["problem", "product", "evidence", "day", "try", "boundary"]);
   });
 
   it("sends the product step to the worker screen until the tour exists, and only that step is an app step", () => {
@@ -64,7 +64,20 @@ describe("StoryNav steps", () => {
   it("every judge step is a page that renders the story footer (the footer names its own step)", () => {
     // The boundary is the last step and has a footer (Back, no Next): the old story ended on a worker screen with no way on.
     const judge = STORY_STEPS.filter((s) => s.frame === "judge").map((s) => s.id);
-    expect(judge).toEqual(["problem", "evidence", "day", "boundary"]);
+    expect(judge).toEqual(["problem", "evidence", "day", "try", "boundary"]);
+  });
+
+  it("test_every_judge_step_page_renders_its_own_footer: the page behind each judge step mounts <StoryNav current=its id>, so Next never lands on a page with no way on", () => {
+    const sources = readdirSync(path.resolve(import.meta.dirname, "../../../src"), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && /.tsx$/.test(entry.name))
+      .map((entry) => readFileSync(path.join(entry.parentPath, entry.name), "utf8"));
+    // The first step is the landing ("/"), the story's start: it has its own door and no footer; every later judge step has one.
+    for (const step of STORY_STEPS.filter((s) => s.frame === "judge" && s.id !== "problem")) {
+      expect(
+        sources.some((source) => source.includes(`<StoryNav current="${step.id}"`)),
+        `no page mounts <StoryNav current="${step.id}" />`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -86,13 +99,29 @@ describe("StoryNav", () => {
   it("marks the current step and links the built ones", () => {
     renderWithIntl(<StoryNav current="evidence" />);
     const nav = screen.getByRole("navigation", { name: "Story" });
-    expect(within(nav).getByText("Step 3 of 5: The evidence")).toBeInTheDocument();
+    expect(within(nav).getByText("Step 3 of 6: The evidence")).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "The evidence" })).toHaveAttribute("aria-current", "step");
     expect(within(nav).getByRole("link", { name: "The product" })).toHaveAttribute("href", "/worker");
     expect(within(nav).getByRole("link", { name: "The boundary" })).toHaveAttribute("href", "/replay/governance");
     expect(within(nav).queryByRole("link", { name: "Proof" })).toBeNull();
     expect(within(nav).getByRole("link", { name: "The problem" })).toHaveAttribute("href", "/");
     expect(within(nav).getByRole("link", { name: "One day" })).toHaveAttribute("href", "/replay/day");
+    expect(within(nav).getByRole("link", { name: "Try a plan" })).toHaveAttribute("href", "/replay/try");
+  });
+
+  it("test_pager_walks_day_then_try_then_boundary: Next from One day is Try a plan, Next from Try a plan is The boundary, and Back mirrors it (audit M4)", () => {
+    const { unmount } = renderWithIntl(<StoryNav current="day" />);
+    expect(screen.getByRole("link", { name: "Next: Try a plan" })).toHaveAttribute("href", "/replay/try");
+    expect(screen.getByRole("link", { name: "Back: The evidence" })).toHaveAttribute("href", "/replay");
+    unmount();
+    const second = renderWithIntl(<StoryNav current="try" />);
+    expect(screen.getByText("Step 5 of 6: Try a plan")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Next: The boundary" })).toHaveAttribute("href", "/replay/governance");
+    expect(screen.getByRole("link", { name: "Back: One day" })).toHaveAttribute("href", "/replay/day");
+    expect(screen.getByRole("link", { name: "Try a plan" })).toHaveAttribute("aria-current", "step");
+    second.unmount();
+    renderWithIntl(<StoryNav current="boundary" />);
+    expect(screen.getByRole("link", { name: "Back: Try a plan" })).toHaveAttribute("href", "/replay/try");
   });
 
   it("an unbuilt step is text, not a link, and Back and Next skip it", () => {
@@ -102,7 +131,7 @@ describe("StoryNav", () => {
       expect(within(nav).queryByRole("link", { name: "One day" })).toBeNull();
       expect(within(nav).getByText("One day")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Back: The problem" })).toHaveAttribute("href", "/");
-      expect(screen.getByRole("link", { name: "Next: The boundary" })).toHaveAttribute("href", "/replay/governance");
+      expect(screen.getByRole("link", { name: "Next: Try a plan" })).toHaveAttribute("href", "/replay/try");
     });
   });
 
@@ -118,10 +147,10 @@ describe("StoryNav", () => {
     expect(screen.queryByRole("link", { name: "Next: The product" })).toBeNull();
   });
 
-  it("the last step, the boundary, has Back to the day and no Next; the first has no Back", () => {
+  it("the last step, the boundary, has Back to Try a plan and no Next; the first has no Back", () => {
     const { unmount } = renderWithIntl(<StoryNav current="boundary" />);
     expect(screen.queryByRole("link", { name: /^Next:/ })).toBeNull();
-    expect(screen.getByRole("link", { name: "Back: One day" })).toHaveAttribute("href", "/replay/day");
+    expect(screen.getByRole("link", { name: "Back: Try a plan" })).toHaveAttribute("href", "/replay/try");
     unmount();
     renderWithIntl(<StoryNav current="problem" />);
     expect(screen.queryByRole("link", { name: /^Back:/ })).toBeNull();

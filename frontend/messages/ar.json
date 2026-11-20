@@ -1518,6 +1518,7 @@
         "product": "المنتج",
         "evidence": "الأدلة",
         "day": "يوم واحد",
+        "try": "جرّب خطة",
         "boundary": "الحدود"
       }
     },
@@ -1857,7 +1858,7 @@
     },
     "tour": {
       "title": "جولة من 3 دقائق",
-      "lead": "خمس محطات بهذا الترتيب. تفتح كل محطة الشاشة الحقيقية.",
+      "lead": "المحطات بهذا الترتيب. تفتح كل محطة الشاشة الحقيقية.",
       "open": "افتح هذه الشاشة",
       "controls": "للتبديل بين إعادة التشغيل والوضع المباشر، أو لإعادة ضبط الموقع التجريبي، استخدم عناصر التحكم التجريبية في عرض السلامة.",
       "controlsLink": "افتح عناصر التحكم التجريبية",
@@ -1873,6 +1874,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",

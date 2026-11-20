@@ -1518,6 +1518,7 @@
         "product": "उत्पादन",
         "evidence": "प्रमाण",
         "day": "एक दिन",
+        "try": "योजना जाँचेर हेर्नुहोस्",
         "boundary": "सीमा"
       }
     },
@@ -1857,7 +1858,7 @@
     },
     "tour": {
       "title": "3 मिनेटको भ्रमण",
-      "lead": "पाँच चरण, यही क्रममा। हरेकले वास्तविक स्क्रिन खोल्छ।",
+      "lead": "चरणहरू, यही क्रममा। हरेकले वास्तविक स्क्रिन खोल्छ।",
       "open": "यो स्क्रिन खोल्नुहोस्",
       "controls": "रिप्ले र प्रत्यक्षबीच बदल्न वा डेमो साइट रिसेट गर्न सुरक्षा दृश्यको डेमो नियन्त्रण प्रयोग गर्नुहोस्।",
       "controlsLink": "डेमो नियन्त्रण खोल्नुहोस्",
@@ -1873,6 +1874,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",

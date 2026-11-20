@@ -1636,6 +1636,7 @@
         "product": "The product",
         "evidence": "The evidence",
         "day": "One day",
+        "try": "Try a plan",
         "boundary": "The boundary"
       }
     },
@@ -1975,7 +1976,7 @@
     },
     "tour": {
       "title": "A 3-minute tour",
-      "lead": "Five stops, in this order. Each one opens the real screen.",
+      "lead": "The stops, in this order. Each one opens the real screen.",
       "open": "Open this screen",
       "controls": "To switch between Replay and Live, or to reset the demo site, use Demo controls on the safety view.",
       "controlsLink": "Open Demo controls",
@@ -1991,6 +1992,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",

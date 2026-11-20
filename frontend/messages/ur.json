@@ -1518,6 +1518,7 @@
         "product": "مصنوعہ",
         "evidence": "ثبوت",
         "day": "ایک دن",
+        "try": "منصوبہ آزمائیں",
         "boundary": "حد"
       }
     },
@@ -1857,7 +1858,7 @@
     },
     "tour": {
       "title": "3 منٹ کا ٹور",
-      "lead": "پانچ پڑاؤ، اسی ترتیب سے۔ ہر ایک اصل اسکرین کھولتا ہے۔",
+      "lead": "پڑاؤ اسی ترتیب سے۔ ہر ایک اصل اسکرین کھولتا ہے۔",
       "open": "یہ اسکرین کھولیں",
       "controls": "ری پلے اور براہِ راست کے درمیان بدلنے یا ڈیمو سائٹ ری سیٹ کرنے کے لیے حفاظتی منظر میں ڈیمو کنٹرولز استعمال کریں۔",
       "controlsLink": "ڈیمو کنٹرولز کھولیں",
@@ -1873,6 +1874,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",

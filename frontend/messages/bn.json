@@ -1518,6 +1518,7 @@
         "product": "পণ্য",
         "evidence": "প্রমাণ",
         "day": "একটি দিন",
+        "try": "পরিকল্পনা পরখ করুন",
         "boundary": "সীমা"
       }
     },
@@ -1857,7 +1858,7 @@
     },
     "tour": {
       "title": "3 মিনিটের ট্যুর",
-      "lead": "পাঁচটি ধাপ, এই ক্রমে। প্রতিটি আসল পর্দা খোলে।",
+      "lead": "ধাপগুলো এই ক্রমে। প্রতিটি আসল পর্দা খোলে।",
       "open": "এই পর্দা খুলুন",
       "controls": "রিপ্লে ও সরাসরির মধ্যে বদলাতে বা ডেমো সাইট রিসেট করতে নিরাপত্তা দৃশ্যের ডেমো নিয়ন্ত্রণ ব্যবহার করুন।",
       "controlsLink": "ডেমো নিয়ন্ত্রণ খুলুন",
@@ -1873,6 +1874,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "try": {
+          "title": "Try a plan",
+          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
         },
         "boundary": {
           "title": "The refusal",
