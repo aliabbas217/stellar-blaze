@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState, ViewTransition, type ReactNode } from "react";
+import { DOCK_CLEARANCE } from "@/components/shell/dock-height";
 import { FieldHeadingContext, type FieldHeadingSlot } from "@/components/shell/FieldHeading";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { SettingsSheet, type ChangeCrew } from "@/components/shell/SettingsSheet";
@@ -108,7 +109,9 @@ export function FieldShell({
           )}
         </div>
         {clock === undefined ? null : (
-          <p data-time-label="" className="font-display text-xl font-medium text-ink">
+          // While no time is known the clock keeps its width but is invisible (and out of the accessibility tree): a screen that never reads a
+          // forecast (the alerts page, the entry screens) would otherwise show "--:--" for good, which reads as broken.
+          <p data-time-label="" className="font-display text-xl font-medium text-ink has-[[data-clock-pending]]:invisible">
             <span className="sr-only">{t("shell.field.clockLabel")} </span>
             <bdi dir="ltr">{clock}</bdi>
           </p>
@@ -116,7 +119,7 @@ export function FieldShell({
         <SettingsSheet {...(changeCrew === undefined ? {} : { changeCrew })} />
       </header>
       <FieldHeadingContext.Provider value={slot}>
-        <div className={dock === undefined ? "flex flex-1 flex-col" : "flex flex-1 flex-col pb-44"}>{children}</div>
+        <div className={dock === undefined ? "flex flex-1 flex-col" : `flex flex-1 flex-col ${DOCK_CLEARANCE}`}>{children}</div>
       </FieldHeadingContext.Provider>
       {dock}
     </div>

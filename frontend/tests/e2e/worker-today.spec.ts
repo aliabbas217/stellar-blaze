@@ -151,6 +151,44 @@ test("the Today level is the site's, live, with the action and the one clinical 
   }
 });
 
+test("a control near the bottom ('Why Orange?') is the topmost element at its centre once scrolled to, never under the fixed dock, at phone and desktop sizes (Today)", async ({ page }) => {
+  await openToday(page);
+  const why = page.getByRole("button", { name: /^Why .*\?$/ });
+  for (const size of [PHONE, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(size);
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+    });
+    // Scrolling a control into view (a click, the Tab key, a find) must stop above the dock: scroll-padding-bottom takes the dock's height.
+    await why.scrollIntoViewIfNeeded();
+    const hit = await why.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      const dock = document.querySelector("[data-emergency]")?.closest(".fixed")?.getBoundingClientRect();
+      return { self: top !== null && element.contains(top), bottom: box.bottom, dockTop: dock?.top ?? Number.POSITIVE_INFINITY };
+    });
+    expect(hit.self, `${String(size.width)} px: the control is the topmost element at its centre`).toBe(true);
+    expect(hit.bottom, `${String(size.width)} px: it ends above the dock`).toBeLessThanOrEqual(hit.dockTop);
+    // And the same by keyboard: Tab from the top of the page scrolls the focused control clear of the dock too.
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    let reached = false;
+    for (let presses = 0; presses < 60 && !reached; presses += 1) {
+      await page.keyboard.press("Tab");
+      reached = await why.evaluate((element) => element === document.activeElement);
+    }
+    expect(reached, `${String(size.width)} px: Tab reaches the control`).toBe(true);
+    const focused = await why.evaluate((element) => element.getBoundingClientRect().bottom);
+    expect(focused, `${String(size.width)} px: focus scrolls it above the dock`).toBeLessThanOrEqual(hit.dockTop);
+  }
+  // A real click opens the drawer (it does not land on Alerts).
+  await why.click();
+  await expect(page).toHaveURL(/\/en\/worker(\?|$)/);
+  await expect(page.getByRole("dialog")).toBeVisible();
+});
+
 test("the settings sheet opens from the one language pill, holds six languages, Screen colors and Change crew, and closes with Escape and focus returns (Today)", async ({ page }) => {
   await openToday(page);
   const pill = page.getByRole("banner").getByRole("button", { name: /Settings/ });

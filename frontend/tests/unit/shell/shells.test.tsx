@@ -145,6 +145,39 @@ describe("FieldShell", () => {
     expect(screen.getByRole("banner")).toHaveTextContent("No site chosen");
   });
 
+  it("hides the clock label while its reading is pending (a screen that never reads a forecast must not show \"--:--\"), and keeps it when a time is known", () => {
+    chrome();
+    const { container, unmount } = renderWithIntl(
+      <FieldShell siteName="Site" clock={<span data-clock-pending="">--:--</span>}>
+        <main>page</main>
+      </FieldShell>,
+    );
+    const label = () => container.querySelector("[data-time-label]");
+    // jsdom cannot evaluate :has(), so the rule is pinned as a class: invisible when a pending marker is inside, nothing else hides it.
+    expect(label()?.className).toContain("has-[[data-clock-pending]]:invisible");
+    expect(label()?.querySelector("[data-clock-pending]")).not.toBeNull();
+    unmount();
+    const known = renderWithIntl(
+      <FieldShell siteName="Site" clock="11:10">
+        <main>page</main>
+      </FieldShell>,
+    );
+    expect(known.container.querySelector("[data-time-label] [data-clock-pending]")).toBeNull();
+    expect(known.container.querySelector("[data-time-label]")).toHaveTextContent("11:10");
+  });
+
+  it("pads the page's end with the dock's published height, so the last row clears the fixed dock", () => {
+    chrome();
+    const { container } = renderWithIntl(
+      <FieldShell siteName="Site" dock={<div>dock</div>}>
+        <main>page</main>
+      </FieldShell>,
+    );
+    const content = screen.getByText("page").parentElement;
+    expect(content?.className).toContain("pb-[calc(var(--worker-dock-height,11rem)+1rem)]");
+    expect(container.querySelector("main")).not.toBeNull();
+  });
+
   it("test_field_shell_applies_sun_on_a_client_navigation_from_a_desk_route", async () => {
     const meta = chrome();
     pathname = "/en/worker";

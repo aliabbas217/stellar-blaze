@@ -238,6 +238,12 @@
   }
 
   html {
+    /*
+     * A fixed bottom bar (the worker dock, the supervisor's Stop work bar) publishes its height as --worker-dock-height or
+     * --stop-bar-height. Scrolling a control into view (a Tab key, a find, a test's click) must stop ABOVE the bar, never under it
+     * (WCAG 2.2 Focus Not Obscured); with neither bar the padding is zero. The 1rem is air between the control and the bar.
+     */
+    scroll-padding-bottom: calc(max(var(--worker-dock-height, 0px), var(--stop-bar-height, 0px)) + 1rem);
     background-color: var(--ground);
     color: var(--ink);
     font-family:
