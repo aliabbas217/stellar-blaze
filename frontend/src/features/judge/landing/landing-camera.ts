@@ -55,14 +55,17 @@ export interface Camera {
 /** Share of the map's box the text panel covers on a wide screen (CSS `.txt`), and so how far the picture is pushed aside. */
 export const PANEL_SHARE = 0.375;
 
-/** The hero's view of the whole country; `aspect` is the canvas's width over its height. */
-export function wideCamera(aspect: number, sx: number): Camera {
-  return { az: -0.3, el: 0.82, dist: clamp(6.4 / (0.58 * aspect * 0.4986), 8, 18), t: [0, -0.1, 0.2], sx };
+/** How much closer the camera stands in the plain column (a phone, a tablet, reduced motion): the map box is a short box under the words, not a screen. */
+export const COLUMN_ZOOM = 0.74;
+
+/** The hero's view of the whole country; `aspect` is the canvas's width over its height; `zoom` scales the distance (1 on the pinned stage). */
+export function wideCamera(aspect: number, sx: number, zoom = 1): Camera {
+  return { az: -0.3, el: 0.82, dist: clamp(6.4 / (0.58 * aspect * 0.4986), 8, 18) * zoom, t: [0, -0.1, 0.2], sx };
 }
 
 /** The camera at a scroll progress; `coast` is the point it flies in to (the Abu Dhabi coast in world units). */
-export function cameraAt(progress: number, aspect: number, coast: readonly [number, number, number], sx: number): Camera {
-  const w = wideCamera(aspect, sx);
+export function cameraAt(progress: number, aspect: number, coast: readonly [number, number, number], sx: number, zoom = 1): Camera {
+  const w = wideCamera(aspect, sx, zoom);
   const k = smoothstep(clamp((progress - 0.12) / 0.63, 0, 1)) * (1 - smoothstep(clamp((progress - 0.88) / 0.12, 0, 1)));
   return {
     az: lerp(w.az, -0.1, k),

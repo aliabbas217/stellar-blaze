@@ -364,3 +364,122 @@
 @media (min-width: 1100px) and (min-height: 600px) {
   .lp .sl [data-role-door] { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 }
+
+/* ---- redesign S14: the page on a phone (ADR 0090, amendment of 2026-11-20) ----
+   Under 1100 px the rail is ONE slim fixed bar (--bar, 56 px): the brand, a menu button naming the chapter in view, the language picker, and a 2 px
+   strip of seven chapters along its foot. Under 640 px the display type, the paddings and the figures are cut to a phone: the first screen is the
+   headline, the promise, the two actions and the map; every chapter after it is a short column. From 1100 px none of this applies: `.bar` is
+   `display: contents`, the button and the strip are hidden, and the rail is the fixed column above. Every rule here sits after the older
+   narrow-screen rules on purpose (the later of two equal selectors wins), which also puts right the verdict list that an older rule further
+   down the file used to put back to two columns. */
+.lp .bar { display: contents; }
+.lp .menu, .lp .prog { display: none; }
+@media (max-width: 1099px) {
+  .lp { --bar: 56px; }
+  .lp section[id] { scroll-margin-block-start: var(--bar); }
+  .lp .rail { position: static; display: block; width: auto; padding: var(--bar) 0 0; border: 0; }
+  .lp .bar { position: fixed; inset-block-start: 0; inset-inline: 0; z-index: 20; height: var(--bar); display: flex; align-items: center; gap: 8px; padding-inline: var(--pad); background: var(--ground); border-block-end: 1px solid var(--hair); }
+  .lp .mark { flex: 0 1 auto; min-width: 0; font-size: 12px; letter-spacing: 0.12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lp .menu { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-inline-start: auto; min-width: 44px; min-height: 44px; padding-inline: 10px; background: transparent; border: 1px solid var(--edge); border-radius: 2px; color: var(--ink); font: 12px/1 var(--mono); cursor: pointer; }
+  .lp .menu[aria-expanded="true"] { background: var(--panel); border-color: var(--ink-3); }
+  .lp .menu:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  .lp .menu svg { flex: none; }
+  .lp .prog { position: absolute; inset-inline: 0; inset-block-end: -1px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; height: 2px; }
+  .lp .prog i { display: block; background: transparent; }
+  .lp .prog i[data-state="done"] { background: var(--edge); }
+  .lp .prog i[data-state="now"] { background: var(--signal); }
+  .lp .idx { display: none; position: absolute; inset-block-start: 100%; inset-inline: 0; max-height: calc(100svh - var(--bar)); overflow-y: auto; margin: 0; padding: 4px var(--pad) 12px; background: var(--ground); border: 0; border-block-end: 1px solid var(--edge); }
+  .lp .idx[data-open="true"] { display: block; }
+  .lp .idx li + li { border-block-start: 1px solid var(--hair); }
+  .lp .idx a { display: grid; grid-template-columns: 4ch minmax(0, 1fr); gap: 8px; align-items: center; min-height: 48px; padding-block: 0; padding-inline-start: 14px; font-size: 17px; }
+  .lp .idx a[aria-current="true"] { font-weight: 600; }
+  .lp .idx a[aria-current="true"]::before { display: block; inset-block: 12px; inset-inline-start: 0; }
+  .lp .rail .lang { margin: 0; font-size: 14px; }
+  .lp .rail .lang > div { gap: 0; }
+  .lp .rail .lang label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .lp .rail .lang select { min-height: 44px; max-width: 132px; text-overflow: ellipsis; }
+  .lp .rail .mt { margin: 0; padding: 10px var(--pad); border-block-end: 1px solid var(--hair); }
+  .lp .txt { border-inline-end: 0; }
+  .lp .vd { grid-template-columns: minmax(0, 1fr); }
+  .lp .vc { padding: 20px 0 22px; }
+  .lp .vc + .vc { padding-inline-start: 0; border-inline-start: 0; border-block-start: 1px solid var(--hair); }
+}
+@media (max-width: 359px) {
+  .lp .menu .cnt { display: none; }
+}
+@media (max-width: 639px) {
+  .lp { --pad: 20px; --d: clamp(30px, 8.8vw, 38px); }
+  .lp h2 { max-width: none; }
+  .lp h2 + .copy, .lp h2 + p { margin-top: 12px; }
+  .lp .sl { padding: 32px var(--pad) 44px; }
+  .lp .chi { margin-bottom: 12px; }
+  .lp .g > .c-b { margin-top: 20px; }
+  .lp .lnk { margin-top: 12px; gap: 4px 24px; flex-wrap: wrap; }
+  .lp .lnk a { display: inline-flex; align-items: center; min-height: 44px; }
+  .lp .tag-row { flex-wrap: wrap; gap: 8px 12px; }
+  .lp .fg .t12, .lp .fg .t12m { font-size: 14px; }
+  .lp .fg .t14 { font-size: 15.5px; }
+  .lp .fg .t16b { font-size: 17px; }
+  /* 01, the hero: the promise and the two actions first, the map under them, then what the map shows */
+  .lp .inst { display: flex; flex-direction: column; }
+  .lp .body { order: 1; }
+  .lp .ih { order: 2; padding: 12px var(--pad); border-block-start: 1px solid var(--hair); border-block-end: 0; }
+  .lp .ik { order: 3; padding: 4px var(--pad) 20px; border-block-start: 0; row-gap: 12px; }
+  .lp .ih .chi { display: none; }
+  .lp .ihr { margin-top: 0; gap: 16px; }
+  .lp .clock span { font-size: 20px; }
+  .lp .clock small { margin-top: 4px; line-height: 1.4; }
+  .lp .txt { padding: 20px var(--pad) 24px; }
+  .lp h1 { font-size: clamp(36px, 11.2vw, 46px); max-width: 13ch; }
+  .lp .lede { margin-top: 14px; }
+  .lp .act { margin-top: 20px; gap: 4px 20px; }
+  .lp .mapwrap { aspect-ratio: 16 / 11; }
+  .lp .ikr { display: flex; flex-direction: column-reverse; gap: 14px; padding-inline-start: 0; }
+  .lp .ik .attr { padding-block-start: 0; }
+  /* 02 Morning: the four levels as a compact 2 x 2 */
+  .lp .st { display: flex; flex-direction: column; padding: 16px 8px 18px 16px; }
+  .lp .st:nth-child(odd) { padding-inline-start: 0; border-inline-start: 0; }
+  .lp .st .lv { margin-top: 10px; font-size: 26px; letter-spacing: -0.02em; }
+  .lp .st .lv .mk { margin-inline-end: 8px; }
+  .lp .st .u { margin-top: 4px; font-size: 13px; }
+  .lp .st .lead { flex: 1; margin-top: 10px; min-height: 0; font-size: 14px; line-height: 1.35; }
+  .lp .scale { margin-top: 14px; }
+  .lp .foot { gap: 10px 16px; margin-top: 16px; }
+  /* 04 Boundary: three short panels, the drawing beside its words */
+  .lp .flow .ar { height: 32px; }
+  .lp .flow .ar svg { width: 32px; }
+  .lp .pn { grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 16px; row-gap: 6px; padding: 14px 16px; align-items: start; }
+  .lp .pn .pl { grid-column: 2; grid-row: 1; }
+  .lp .pn .vis { grid-column: 1; grid-row: 1 / span 2; align-self: center; padding: 0; }
+  .lp .pn .vis svg { width: 100%; height: auto; max-height: 90px; }
+  .lp .pn .tx { grid-column: 2; grid-row: 2; }
+  .lp .pn.sn { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .lp .pn.sn .pl, .lp .pn.sn .vis, .lp .pn.sn .tx { grid-column: 1; }
+  .lp .pn.sn .pl { grid-row: 1; }
+  .lp .pn.sn .vis { grid-row: 2; padding: 6px 0 10px; }
+  .lp .pn.sn .tx { grid-row: 3; }
+  .lp .pn.sn .vis svg { width: min(100%, 240px); max-height: none; margin-block: -34px -10px; }
+  .lp .pn.no .pt { font-size: 20px; }
+  /* 05 Evidence */
+  .lp .bars { --valw: auto; margin-top: 20px; }
+  .lp .bcap { padding: 10px 0 12px; font-size: 13px; }
+  .lp .bars li { padding: 12px 0; column-gap: 16px; row-gap: 8px; }
+  .lp .bars .lab b { font-size: 15px; }
+  .lp .bars .lab span { font-size: 13px; }
+  .lp .bars .val { font-size: 32px; }
+  .lp .vn { font-size: clamp(44px, 14vw, 64px); }
+  .lp .vc { gap: 8px; }
+  .lp .vb { gap: 6px; }
+  /* 06 Ways in */
+  .lp .door { margin-top: 20px; }
+  .lp .door a { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; min-height: 72px; padding: 14px 0; }
+  .lp .door b { grid-column: 1; font-size: 22px; line-height: 1.15; letter-spacing: -0.02em; text-underline-offset: 0.22em; }
+  .lp .door span { grid-column: 1; font-size: 15px; }
+  .lp .door a::after { content: ""; grid-column: 2; grid-row: 1 / span 2; width: 9px; height: 9px; border-block-start: 1.5px solid var(--ink-3); border-inline-end: 1.5px solid var(--ink-3); transform: rotate(45deg); }
+  .lp:dir(rtl) .door a::after { transform: rotate(-45deg); }
+  /* 07 Limits */
+  .lp .late { margin-top: 20px; }
+  .lp .late h3 { margin-bottom: 12px; font-size: 20px; }
+  .lp .vid { padding: 16px; }
+  .lp .lim li { padding: 12px 0; }
+}
