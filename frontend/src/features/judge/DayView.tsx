@@ -1,4 +1,4 @@
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { DayChart } from "@/components/charts/DayChart";
 import { Counter } from "@/components/provenance/Counter";
 import { longDate } from "@/components/provenance/proof-story";
@@ -12,7 +12,7 @@ import type { EvalData } from "./data";
 import { AXIS, buildDay, type DayModel } from "./day-view";
 import type { HourlyData } from "./hourly";
 import { HEAVY_WORK_LIMIT_WBGT_C } from "./limit";
-import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { claimsLocale } from "@/i18n/claims-english";
 
 /**
  * One day, hour by hour (`/replay/day`): the hero chart (raw forecast as made about 24 hours ahead, our 5 to 95 % range,
@@ -33,7 +33,7 @@ export interface DayViewProps {
 
 export function DayView({ data, failed = false, hourly }: DayViewProps) {
   const t = useTranslations("judge.day");
-  const locale = CLAIMS_LOCALE;
+  const locale = claimsLocale(useLocale());
   const day = failed ? null : (data?.day ?? null);
   const dayFile = failed ? null : (data?.files.day ?? null);
   const model = buildDay({ day, dayFile, hourly, locale, t });

@@ -10,7 +10,7 @@ import en from "../../../../messages/en.json";
 import { renderWithIntl } from "../../../utils/intl";
 
 /*
- * The 3-minute tour (redesign S7): six stops in a fixed order, each linking to a real screen, with one plain sentence each and a "Where from"
+ * The 3-minute tour (redesign S7): seven stops in a fixed order, each linking to a real screen, with one plain sentence each and a "Where from"
  * only where a proof sheet exists. And the role door's four destinations: each is a real page, none is a parked view.
  */
 
@@ -19,6 +19,7 @@ vi.mock("next-intl/server", async () => {
   const messages = (await import("../../../../messages/en.json")).default;
   return {
     getTranslations: (namespace: string) => Promise.resolve(create({ locale: "en", messages, namespace } as never)),
+    getLocale: () => Promise.resolve("en"),
   };
 });
 vi.mock("@/i18n/navigation", () => ({
@@ -67,8 +68,8 @@ describe("the route scan itself", () => {
 });
 
 describe("the tour", () => {
-  it("has six stops in the order the story is told (Try a plan before the refusal, audit M4), each with title and sentence in the catalogue", () => {
-    expect(TOUR_STEPS.map((step) => step.id)).toEqual(["story", "worker", "crew", "try", "boundary", "scoreboard"]);
+  it("has seven stops in the order the story is told (One day before Try a plan before the refusal, audit M4), each with title and sentence in the catalogue", () => {
+    expect(TOUR_STEPS.map((step) => step.id)).toEqual(["story", "worker", "crew", "day", "try", "boundary", "scoreboard"]);
     expect(TOUR_STEPS.find((step) => step.id === "try")?.href).toBe("/replay/try");
     expect([...TOUR_STEP_IDS]).toEqual(TOUR_STEPS.map((step) => step.id));
     const steps = en.judge.tour.steps as Record<string, { title: string; text: string }>;
@@ -81,7 +82,7 @@ describe("the tour", () => {
 
   it("links every stop, its Where from and the demo controls to a page that exists, never a parked one", () => {
     const targets = [...TOUR_STEPS.flatMap((step) => [step.href, ...(step.proof === undefined ? [] : [step.proof])]), DEMO_CONTROLS_HREF];
-    expect(targets.length).toBeGreaterThanOrEqual(6);
+    expect(targets.length).toBeGreaterThanOrEqual(7);
     for (const href of targets) {
       expect(isRealPage(href), href).toBe(true);
       expect(isDeferredRoute(href), href).toBe(false);
@@ -101,7 +102,7 @@ describe("the tour", () => {
     const items = [...container.querySelectorAll<HTMLElement>("[data-tour-step]")];
     expect(items.map((item) => item.dataset["tourStep"])).toEqual([...TOUR_STEP_IDS]);
     const list = screen.getByRole("list");
-    expect(within(list).getAllByRole("listitem")).toHaveLength(6);
+    expect(within(list).getAllByRole("listitem")).toHaveLength(7);
     items.forEach((item, index) => {
       expect(item).toHaveTextContent(String(index + 1));
       const open = within(item).getByRole("link", { name: en.judge.tour.open });
@@ -118,8 +119,8 @@ describe("the tour", () => {
     const { container } = renderWithIntl(await TourPage());
     const text = container.textContent;
     for (const banned of ["1,624", "279", "139", "370 of 374"]) expect(text).not.toContain(banned);
-    // The only digits are the six step numbers and the "3" of "3-minute".
-    expect(text.replace(/3-minute/g, "").match(/\d/g)?.join("")).toBe("123456");
+    // The only digits are the seven step numbers and the "3" of "3-minute".
+    expect(text.replace(/3-minute/g, "").match(/\d/g)?.join("")).toBe("1234567");
   });
 });
 

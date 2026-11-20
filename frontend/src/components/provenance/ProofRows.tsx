@@ -1,5 +1,6 @@
 "use client";
 
+import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -119,7 +120,9 @@ export function AuditRows({ proof }: { readonly proof: Proof }) {
         <Row name={t("audit.verdicts")} code>
           <span className="flex flex-col gap-2">
             {audit.verdicts.map((sentence) => (
-              <span key={sentence}>{sentence}</span>
+              <span key={sentence} {...CLAIMS_ENGLISH}>
+                {sentence}
+              </span>
             ))}
           </span>
         </Row>

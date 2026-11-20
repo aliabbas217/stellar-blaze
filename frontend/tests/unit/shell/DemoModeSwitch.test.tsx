@@ -17,13 +17,23 @@ describe("DemoModeSwitch", () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith("live");
   });
 
-  it("says live is not running when the API answered with a replay", () => {
-    renderWithIntl(<DemoModeSwitch value="live" onChange={vi.fn()} liveUnavailable />);
-    expect(screen.getByRole("status")).toHaveTextContent("Live is not running on this deployment");
+  it("when Live is unavailable it is disabled, not pressed, and a plain line says why", async () => {
+    const onChange = vi.fn();
+    renderWithIntl(<DemoModeSwitch value="live" onChange={onChange} liveUnavailable />);
+    const live = screen.getByRole("button", { name: "Live" });
+    expect(live).toBeDisabled();
+    expect(live).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("status")).toHaveTextContent("Live feeds are not connected in this demo");
+    expect(live).toHaveAccessibleDescription("Live feeds are not connected in this demo");
+    await userEvent.setup().click(live);
+    expect(onChange).not.toHaveBeenCalled();
+    // Replay stays a normal button.
+    expect(screen.getByRole("button", { name: "Replay" })).toBeEnabled();
   });
 
   it("says nothing extra otherwise", () => {
     renderWithIntl(<DemoModeSwitch value="live" onChange={vi.fn()} liveUnavailable={false} />);
-    expect(screen.queryByText(/not running/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not connected/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Live" })).toBeEnabled();
   });
 });

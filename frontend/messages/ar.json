@@ -155,8 +155,8 @@
       "mode": {
         "label": "مصدر البيانات",
         "live": "مباشر",
-        "replay": "إعادة تشغيل",
-        "liveUnavailable": "الوضع المباشر غير مشغَّل في هذا النشر"
+        "replay": "إعادة عرض",
+        "liveUnavailable": "التغذية المباشرة غير متصلة في هذا العرض التجريبي"
       }
     },
     "field": {
@@ -784,7 +784,7 @@
     "missingProvenance": "لا يُعرض {what} لأن مصدره مفقود.",
     "requestIdLabel": "معرّف الطلب",
     "stamp": {
-      "replay": "إعادة تشغيل",
+      "replay": "إعادة عرض",
       "recorded": "مسجَّل",
       "simulated": "محاكى",
       "designed": "مصمَّم",
@@ -792,219 +792,219 @@
       "notClinicallyReviewed": "لم يُراجَع سريريًا"
     },
     "proof": {
-      "chip": "Where from",
+      "chip": "من أين جاء",
       "lock": {
-        "note": "Held-out 2026 run: the protocol was committed and locked before the models were scored.",
-        "hash": "SHA-256 of the lock the run started under",
-        "protocolCommit": "Commit of the pre-registered protocol",
-        "amendmentsNote": "Changes to the protocol and the freeze addendum, each committed before 2026 was scored. They are listed with their commit and fingerprint; read them with the protocol, they are not summarized here."
+        "note": "تشغيل 2026 المحجوب عن التدريب: سُجِّل البروتوكول (commit) وقُفل قبل تقييم النماذج.",
+        "hash": "SHA-256 للقفل الذي بدأ التشغيل بموجبه",
+        "protocolCommit": "الـ commit الخاص بالبروتوكول المسجَّل مسبقًا",
+        "amendmentsNote": "التغييرات على البروتوكول وملحق التجميد، كل منها سُجِّل (commit) قبل تقييم 2026. تُعرض مع commit وبصمة كل منها. اقرأها مع البروتوكول، فهي غير ملخّصة هنا."
       },
-      "chipAria": "Where from: {what}",
-      "loadFailed": "The proof could not be opened. Try again.",
-      "title": "Where this number comes from",
-      "close": "Close",
+      "chipAria": "من أين جاء: {what}",
+      "loadFailed": "تعذر فتح الإثبات. حاول مرة أخرى.",
+      "title": "من أين يأتي هذا الرقم",
+      "close": "إغلاق",
       "rows": {
-        "protocol": "Protocol line",
-        "script": "Script",
-        "file": "Result file",
+        "protocol": "سطر البروتوكول",
+        "script": "السكربت",
+        "file": "ملف النتائج",
         "sha": "SHA-256",
-        "label": "Label",
-        "model": "Model",
-        "lock": "Pre-registration",
-        "generated": "Generated",
-        "amendments": "Amendments and freeze"
+        "label": "الوسم",
+        "model": "النموذج",
+        "lock": "التسجيل المسبق",
+        "generated": "أُنشئ في",
+        "amendments": "التعديلات والتجميد"
       },
       "sha": {
-        "file": "Of the file this page drew",
-        "source": "Of the data the exporter read"
+        "file": "للملف الذي عرضته هذه الصفحة",
+        "source": "للبيانات التي قرأها المُصدِّر"
       },
       "labels": {
-        "real": "REAL",
-        "realAssumedCrew": "REAL weather + assumed crew",
-        "simulated": "SIMULATED",
-        "dev2025": "DEV 2025, LOCO out-of-fold: not the result",
-        "recorded": "RECORDED"
+        "real": "حقيقي",
+        "realAssumedCrew": "طقس حقيقي + فريق مفترض",
+        "simulated": "محاكى",
+        "dev2025": "تطوير 2025، LOCO خارج الطيّ (out-of-fold): ليست النتيجة",
+        "recorded": "مسجَّل"
       },
       "recount": {
-        "button": "Recount in this browser",
-        "busy": "Recounting",
-        "match": "Matches",
-        "mismatch": "Does not match: report this",
-        "unpublished": "This file is not published here, so it cannot be recounted.",
-        "failed": "The file could not be read, so nothing was recounted."
+        "button": "أعد العدّ في هذا المتصفح",
+        "busy": "جارٍ إعادة العدّ",
+        "match": "مطابق",
+        "mismatch": "غير مطابق: أبلِغ عن ذلك",
+        "unpublished": "هذا الملف غير منشور هنا، لذا لا يمكن إعادة عدّه.",
+        "failed": "تعذرت قراءة الملف، لذا لم تتم إعادة أي عدّ."
       },
-      "syntheticShape": "synthetic shape",
+      "syntheticShape": "شكل اصطناعي",
       "story": {
         "rows": {
-          "madeBy": "Made by",
-          "about": "About",
-          "howCounted": "How we counted",
-          "shows": "It shows",
-          "doesNotShow": "It does not show"
+          "madeBy": "من أعدّه",
+          "about": "عن ماذا",
+          "howCounted": "كيف عددنا",
+          "shows": "ما يُظهره",
+          "doesNotShow": "ما لا يُظهره"
         },
         "stamp": {
-          "real": "Real weather.",
-          "realAssumedCrew": "Real weather, assumed crew.",
-          "simulated": "Demo site: the crews and people are made up.",
-          "dev2025": "A development run on 2025 data. This is not the result.",
-          "recorded": "From a recorded forecast."
+          "real": "طقس حقيقي.",
+          "realAssumedCrew": "طقس حقيقي، وفريق مفترض.",
+          "simulated": "موقع تجريبي: الفرق والأشخاص اصطناعيون.",
+          "dev2025": "تشغيل تطويري على بيانات 2025. هذه ليست النتيجة.",
+          "recorded": "من توقع مسجَّل."
         },
         "tested": {
-          "stamp": "Tested on summer 2026.",
-          "note": "Every setting was chosen using 2024 and 2025 data only. The test plan was written down and locked before the scored run."
+          "stamp": "اختُبر على صيف 2026.",
+          "note": "اختيرت كل الإعدادات باستخدام بيانات 2024 و2025 فقط. كُتبت خطة الاختبار وقُفلت قبل التشغيل المُقيَّم."
         },
-        "incomplete": "Some technical details for this number were not recorded. The figures above are unaffected.",
+        "incomplete": "لم تُسجَّل بعض التفاصيل التقنية لهذا الرقم. الأرقام الواردة أعلاه لا تتأثر بذلك.",
         "note": {
-          "recordedCount": "This is a count made from a recorded forecast file. It is not a scored result.",
-          "analysis": "This is an analysis of recorded data. It is not a scored result.",
-          "map": "This is a recorded forecast drawn as a map. It is not a scored result."
+          "recordedCount": "هذا عدّ من ملف توقعات مسجَّل. وليس نتيجة مُقيَّمة.",
+          "analysis": "هذا تحليل لبيانات مسجَّلة. وليس نتيجة مُقيَّمة.",
+          "map": "هذا توقع مسجَّل مرسوم على خريطة. وليس نتيجة مُقيَّمة."
         },
-        "seasonAbout": "{station}, {period}, working hours. {nDays} days.",
+        "seasonAbout": "{station}، {period}، ساعات العمل. عدد الأيام: {nDays}.",
         "range": {
-          "hours": "Likely range {lo} to {hi} hours.",
-          "minutes": "Likely range {lo} to {hi} minutes.",
-          "share": "Likely range {lo} to {hi}."
+          "hours": "النطاق المرجّح من {lo} إلى {hi} (بالساعات).",
+          "minutes": "النطاق المرجّح من {lo} إلى {hi} (بالدقائق).",
+          "share": "النطاق المرجّح من {lo} إلى {hi}."
         },
         "policy": {
           "madeBy": {
-            "P0": "The legal midday break and nothing else. It never warns about a working hour.",
-            "P1": "A fixed rule: warn whenever the raw forecast from the European weather centre (ECMWF) reaches the fixed heat-stress limit. No correction is applied.",
-            "P2": "The regulator's own heat zones (ADOSH, Abu Dhabi's workplace-safety authority) applied to the raw forecast from the European weather centre (ECMWF). No correction is applied.",
-            "P3_protect": "Our correction of the European weather centre's (ECMWF) forecast, warning at the protective setting: the cautious end of the trade-off between missed danger hours and false alarms.",
-            "P3_balanced": "Our correction of the European weather centre's (ECMWF) forecast, warning at the balanced setting, which is less cautious than the protective one."
+            "P0": "استراحة الظهيرة القانونية فقط، ولا شيء غيرها. لا تحذّر أبدًا بشأن أي ساعة عمل.",
+            "P1": "قاعدة ثابتة: يصدر تحذير كلما بلغ التوقع الخام من المركز الأوروبي للطقس (ECMWF) حدّ الإجهاد الحراري الثابت. لا يُطبَّق أي تصحيح.",
+            "P2": "مناطق الحرارة الخاصة بالجهة التنظيمية (ADOSH، جهة السلامة في أماكن العمل في أبوظبي) مطبَّقة على التوقع الخام من المركز الأوروبي للطقس (ECMWF). لا يُطبَّق أي تصحيح.",
+            "P3_protect": "تصحيحنا لتوقع المركز الأوروبي للطقس (ECMWF)، مع التحذير عند الإعداد الوقائي: الطرف الحذر من المقايضة بين ساعات الخطر الفائتة والإنذارات الكاذبة.",
+            "P3_balanced": "تصحيحنا لتوقع المركز الأوروبي للطقس (ECMWF)، مع التحذير عند الإعداد المتوازن، وهو أقل حذرًا من الإعداد الوقائي."
           },
           "lead": {
-            "1": "The forecast used was made about 24 hours ahead.",
-            "2": "The forecast used was issued by 18:00 Gulf time the evening before."
+            "1": "التوقع المستخدم صدر قبل نحو 24 ساعة.",
+            "2": "التوقع المستخدم صدر بحلول الساعة 18:00 بتوقيت الخليج مساء اليوم السابق."
           },
           "howCounted": {
-            "missed_danger_hours": "An hour is dangerous when the station's own instruments put it in the regulator's High or Red zone during working hours, outside the midday break. We count the dangerous hours this way of warning did not warn about.",
-            "false_alarm_hours": "We count the hours this way of warning warned about when the station's instruments did not put them in the regulator's High or Red zone, during working hours outside the midday break.",
-            "pod": "Of the dangerous hours (the station's instruments put them in the regulator's High or Red zone), the share this way of warning warned about.",
-            "far": "Of all the hours this way of warning warned about, the share that were not dangerous on the station's instruments."
+            "missed_danger_hours": "تُعدّ الساعة خطرة عندما تضعها أجهزة المحطة نفسها في منطقة الجهة التنظيمية «مرتفع» أو «أحمر» أثناء ساعات العمل، خارج استراحة الظهيرة. نعدّ الساعات الخطرة التي لم تحذّر منها طريقة التحذير هذه.",
+            "false_alarm_hours": "نعدّ الساعات التي حذّرت منها طريقة التحذير هذه بينما لم تضعها أجهزة المحطة في منطقة الجهة التنظيمية «مرتفع» أو «أحمر»، أثناء ساعات العمل خارج استراحة الظهيرة.",
+            "pod": "من الساعات الخطرة (تضعها أجهزة المحطة في منطقة الجهة التنظيمية «مرتفع» أو «أحمر»)، نسبة ما حذّرت منه طريقة التحذير هذه.",
+            "far": "من جميع الساعات التي حذّرت منها طريقة التحذير هذه، نسبة ما لم يكن خطرًا بحسب أجهزة المحطة."
           },
           "shows": {
-            "missed_danger_hours": "How many dangerous hours this way of warning missed in one summer at one airport.",
-            "false_alarm_hours": "How many warned hours were not dangerous on the station's record, in one summer at one airport.",
-            "pod": "How much of the danger this way of warning caught, in one summer at one airport.",
-            "far": "How often a warning turned out not to be needed, in one summer at one airport."
+            "missed_danger_hours": "عدد الساعات الخطرة التي فاتت طريقة التحذير هذه في صيف واحد في مطار واحد.",
+            "false_alarm_hours": "عدد الساعات المحذَّر منها التي لم تكن خطرة بحسب سجل المحطة، في صيف واحد في مطار واحد.",
+            "pod": "مقدار الخطر الذي رصدته طريقة التحذير هذه، في صيف واحد في مطار واحد.",
+            "far": "مدى تكرار تبيّن عدم الحاجة إلى التحذير، في صيف واحد في مطار واحد."
           },
-          "doesNotShow": "How workers fared, or how this performs at a worksite or at a new site.",
-          "doesNotShowMargin": "How workers fared, or how this performs at a worksite or at a new site. The count of dangerous hours rests on a heat margin we chose ({margin} W/m²), not on a measurement at a worksite."
+          "doesNotShow": "كيف كان حال العمال، أو كيف يؤدي هذا في موقع عمل أو في موقع جديد.",
+          "doesNotShowMargin": "كيف كان حال العمال، أو كيف يؤدي هذا في موقع عمل أو في موقع جديد. يعتمد عدّ الساعات الخطرة على هامش حراري اخترناه ({margin} W/m²)، وليس على قياس في موقع عمل."
         },
         "plan": {
           "madeBy": {
-            "baseline": "The legal minimum: working every shift minute outside the midday break.",
-            "rule_raw": "A work-and-rest plan built from the raw forecast with the ADOSH heat rules.",
-            "rule_corrected": "A work-and-rest plan built from our corrected forecast with the same ADOSH heat rules."
+            "baseline": "الحد القانوني الأدنى: العمل في كل دقيقة من الوردية خارج استراحة الظهيرة.",
+            "rule_raw": "خطة عمل واستراحة مبنية على التوقع الخام وفق قواعد الحرارة الخاصة بـ ADOSH.",
+            "rule_corrected": "خطة عمل واستراحة مبنية على توقعنا المصحَّح وفق قواعد الحرارة نفسها الخاصة بـ ADOSH."
           },
-          "about": "{station}, {period}. {nDays} days, one simulated crew of {headcount} doing heavy work.",
+          "about": "{station}، {period}. عدد الأيام: {nDays}. فريق محاكى واحد عدد أفراده {headcount}، يؤدي عملًا شاقًا.",
           "howCounted": {
-            "violation_minutes_per_season": "A rule checker that shares no code with the planner replays the plan against what the station recorded. We add up the minutes a worker would have worked against the rules, per worker over the season.",
-            "high_cycled_share": "Of the heavy work done in hours the station put in the High or Red zone, the share the plan broke into work and rest.",
-            "missed_protection_ticks": "Minutes in which the plan used a milder heat zone than the one the station recorded.",
-            "rest_minutes_added_vs_naive": "Extra rest minutes per worker over the season, compared with working every minute outside the midday break."
+            "violation_minutes_per_season": "يعيد مدقّق قواعد لا يشترك مع المخطِّط في أي شيفرة تشغيل الخطة على ما سجّلته المحطة. نجمع الدقائق التي كان العامل سيعملها مخالفًا للقواعد، لكل عامل على مدى الموسم.",
+            "high_cycled_share": "من العمل الشاق المنجز في ساعات صنّفتها المحطة في منطقة «مرتفع» أو «أحمر»، نسبة ما قسمته الخطة إلى عمل واستراحة.",
+            "missed_protection_ticks": "الدقائق التي استخدمت فيها الخطة منطقة حرارة أخف من التي سجّلتها المحطة.",
+            "rest_minutes_added_vs_naive": "دقائق الاستراحة الإضافية لكل عامل على مدى الموسم، مقارنة بالعمل في كل دقيقة خارج استراحة الظهيرة."
           },
           "shows": {
-            "violation_minutes_per_season": "How well a plan keeps a simulated crew within the rules.",
-            "high_cycled_share": "How much of the high-heat heavy work the plan paced with rest.",
-            "missed_protection_ticks": "How often the plan was less protective than the station's record called for.",
-            "rest_minutes_added_vs_naive": "What the protection costs in rest time."
+            "violation_minutes_per_season": "مدى نجاح الخطة في إبقاء فريق محاكى ضمن القواعد.",
+            "high_cycled_share": "حجم العمل الشاق في الحرارة المرتفعة الذي نظّمته الخطة بالاستراحة.",
+            "missed_protection_ticks": "مدى تكرار كون الخطة أقل حماية مما يقتضيه سجل المحطة.",
+            "rest_minutes_added_vs_naive": "ما تكلفه الحماية من وقت الاستراحة."
           },
-          "doesNotShow": "Health outcomes. The crew is simulated and the rest time is a simulated cost; no real worker is involved."
+          "doesNotShow": "النتائج الصحية. الفريق محاكى ووقت الاستراحة تكلفة محاكاة. لا يشارك أي عامل حقيقي."
         },
         "day": {
           "madeBy": {
-            "high": "The station's own instruments, not a forecast.",
-            "outside": "The station's own instruments, not a forecast.",
-            "p1": "The fixed heat-stress rule applied to the raw forecast issued the day before.",
-            "raw": "The regulator's own heat zones (ADOSH) applied to the raw forecast issued the day before.",
-            "ours": "Our correction of the day-before forecast, at the protective setting.",
-            "balanced": "Our correction of the day-before forecast, at the balanced setting."
+            "high": "أجهزة المحطة نفسها، وليست توقعًا.",
+            "outside": "أجهزة المحطة نفسها، وليست توقعًا.",
+            "p1": "قاعدة الإجهاد الحراري الثابتة مطبَّقة على التوقع الخام الصادر في اليوم السابق.",
+            "raw": "مناطق الحرارة الخاصة بالجهة التنظيمية (ADOSH) مطبَّقة على التوقع الخام الصادر في اليوم السابق.",
+            "ours": "تصحيحنا لتوقع اليوم السابق، عند الإعداد الوقائي.",
+            "balanced": "تصحيحنا لتوقع اليوم السابق، عند الإعداد المتوازن."
           },
-          "about": "{station}, {date}: one day chosen by a fixed rule from the station's records alone, before we looked at our own results. {candidates} days were considered.",
-          "aboutOne": "{station}, {date}: one day chosen by a fixed rule from the station's records alone.",
+          "about": "{station}، {date}: يوم واحد اختير بقاعدة ثابتة من سجلات المحطة وحدها، قبل أن ننظر إلى نتائجنا. عدد الأيام التي نُظر فيها: {candidates}.",
+          "aboutOne": "{station}، {date}: يوم واحد اختير بقاعدة ثابتة من سجلات المحطة وحدها.",
           "howCounted": {
-            "high": "Working hours in which the station's instruments put the heat in the regulator's High or Red zone.",
-            "outside": "The same hours, outside the midday break ({start} to {end}).",
-            "warned": "Of the {total} working hours the station recorded in the High or Red zone that day, the hours this way of warning had warned about in advance."
+            "high": "ساعات العمل التي وضعت فيها أجهزة المحطة الحرارة في منطقة الجهة التنظيمية «مرتفع» أو «أحمر».",
+            "outside": "الساعات نفسها، خارج استراحة الظهيرة ({start} إلى {end}).",
+            "warned": "من ساعات العمل البالغ عددها {total} التي سجّلت المحطة أنها في منطقة «مرتفع» أو «أحمر» في ذلك اليوم، الساعات التي كانت طريقة التحذير هذه قد حذّرت منها مسبقًا."
           },
           "shows": {
-            "high": "How much of that day was dangerous on the station's record.",
-            "warned": "How many of that day's dangerous hours this way of warning caught: {n} of {total}."
+            "high": "حجم الخطر في ذلك اليوم بحسب سجل المحطة.",
+            "warned": "عدد الساعات الخطرة في ذلك اليوم التي رصدتها طريقة التحذير هذه: {n} من {total}."
           },
-          "doesNotShow": "Skill. One day is an illustration, not proof."
+          "doesNotShow": "المهارة. يوم واحد توضيح، وليس إثباتًا."
         },
         "rule": {
-          "madeBy": "A fixed rule, written down before we looked at our own results.",
-          "about": "{station}, {date}. {candidates} days were considered.",
-          "aboutPending": "{station}. The scored day is not chosen yet; this page shows the hottest day of the recorded forecast.",
-          "howCounted": "Among the days with every working hour observed, the day with the most High or Red zone working hours outside the midday break is picked. Ties go to the earliest date. The rule looks at the station's records only.",
-          "shows": "Which day is shown, and why it is that one.",
-          "doesNotShow": "That our forecast did well on that day. One day is an illustration, not proof of skill."
+          "madeBy": "قاعدة ثابتة، كُتبت قبل أن ننظر إلى نتائجنا.",
+          "about": "{station}، {date}. عدد الأيام التي نُظر فيها: {candidates}.",
+          "aboutPending": "{station}. لم يُختر اليوم المُقيَّم بعد. تعرض هذه الصفحة أشد أيام التوقع المسجَّل حرارة.",
+          "howCounted": "من بين الأيام التي رُصدت فيها كل ساعات العمل، يُختار اليوم الذي فيه أكبر عدد من ساعات العمل في منطقة «مرتفع» أو «أحمر» خارج استراحة الظهيرة. إذا تساوت الأيام يُختار الأقدم تاريخًا. تنظر القاعدة إلى سجلات المحطة فقط.",
+          "shows": "أي يوم يُعرض، ولماذا هو بالذات.",
+          "doesNotShow": "أن توقعنا كان جيدًا في ذلك اليوم. يوم واحد توضيح، وليس إثباتًا للمهارة."
         },
         "forecast": {
-          "madeBy": "The European weather centre's (ECMWF) forecast, issued the day before and kept in a recorded file. We counted it; we did not score it.",
+          "madeBy": "توقع المركز الأوروبي للطقس (ECMWF)، صدر في اليوم السابق وحُفظ في ملف مسجَّل. عددناه ولم نمنحه درجة.",
           "howCounted": {
-            "days_over_limit": "Days on which the recorded forecast put the heat-stress index (WBGT) above {limit} °C, the heavy-work limit, at some hour.",
-            "hours_over_limit": "Working hours in which the recorded forecast put the heat-stress index (WBGT) above {limit} °C, the heavy-work limit.",
-            "hours_in_break": "Of the working hours above {limit} °C, the ones inside the midday break ({start} to {end}), when work is already stopped."
+            "days_over_limit": "الأيام التي وضع فيها التوقع المسجَّل مؤشر الإجهاد الحراري (WBGT) فوق {limit} °C، وهو حد العمل الشاق، في ساعة ما.",
+            "hours_over_limit": "ساعات العمل التي وضع فيها التوقع المسجَّل مؤشر الإجهاد الحراري (WBGT) فوق {limit} °C، وهو حد العمل الشاق.",
+            "hours_in_break": "من ساعات العمل فوق {limit} °C، تلك الواقعة داخل استراحة الظهيرة ({start} إلى {end})، حين يكون العمل متوقفًا أصلًا."
           },
-          "shows": "How hot the forecast said the summer would be.",
-          "doesNotShow": "What the weather actually was, or any danger. A forecast is not a measurement, and the heavy-work limit is a guideline for heavy work."
+          "shows": "مدى حرارة الصيف كما قال التوقع.",
+          "doesNotShow": "حال الطقس الفعلي، أو أي خطر. التوقع ليس قياسًا، وحد العمل الشاق إرشاد للعمل الشاق."
         },
         "frontier": {
-          "madeBy": "A planning analysis of the station's recorded heat in past summers, with commute, evening time and bedtime assumed. It is not a forecast.",
-          "about": "A one-way commute of {minutes} minutes, daily rosters, an assumed crew.",
-          "aboutLegal": "Daily rosters, an assumed crew, averaged over the analysis.",
+          "madeBy": "تحليل تخطيطي لحرارة المحطة المسجَّلة في صيفات سابقة، مع افتراض التنقل والوقت المسائي وموعد النوم. وليس توقعًا.",
+          "about": "مدة التنقل في اتجاه واحد (بالدقائق): {minutes}. جداول يومية، فريق مفترض.",
+          "aboutLegal": "جداول يومية، فريق مفترض، بمتوسط على مدى التحليل.",
           "howCounted": {
-            "best": "The share of summer working hours at a heat-stress index (WBGT) of 30 or more that a better roster avoids, compared with the legal default roster, keeping sleep at {gate} hours or more.",
-            "legal": "The average share of those hours avoided by moving from common practice, which breaks the rules, to the legal default roster. This gain belongs to the law, not to Stellar Blaze."
+            "best": "نسبة ساعات العمل الصيفية عند مؤشر الإجهاد الحراري (WBGT) 30 أو أكثر التي يتفاداها جدول أفضل، مقارنة بالجدول القانوني الافتراضي، مع إبقاء النوم عند {gate} (بالساعات) أو أكثر.",
+            "legal": "متوسط نسبة تلك الساعات التي يتم تفاديها بالانتقال من الممارسة الشائعة، التي تخالف القواعد، إلى الجدول القانوني الافتراضي. هذا المكسب يعود إلى القانون، وليس إلى Stellar Blaze."
           },
           "shows": {
-            "best": "How much heat exposure a smarter roster could remove on top of the law, at this commute.",
-            "legal": "How much heat exposure the legal rules already remove."
+            "best": "مقدار التعرض للحرارة الذي يمكن أن يزيله جدول أذكى فوق ما يزيله القانون، عند هذا التنقل.",
+            "legal": "مقدار التعرض للحرارة الذي تزيله القواعد القانونية أصلًا."
           },
-          "doesNotShow": "A measured benefit for real workers. Commute, evening time and bedtime are assumptions we made."
+          "doesNotShow": "فائدة مقيسة للعمال الحقيقيين. التنقل والوقت المسائي وموعد النوم افتراضات وضعناها نحن."
         },
         "level": {
-          "madeBy": "The day-ahead forecast, adjusted by Stellar Blaze, turned into a level (green, amber, orange or red) using the published ADOSH heat zones.",
-          "about": "The whole site, not you. Your own limit can be higher or lower.",
-          "doesNotShow": "A medical judgment. The wording has not yet been checked by a clinician."
+          "madeBy": "توقع اليوم التالي، بعد تعديل Stellar Blaze له، محوَّلًا إلى مستوى (أخضر أو كهرماني أو برتقالي أو أحمر) باستخدام مناطق الحرارة المنشورة لدى ADOSH.",
+          "about": "الموقع كله، وليس أنت. حدّك الشخصي قد يكون أعلى أو أقل.",
+          "doesNotShow": "حكم طبي. لم يراجع طبيب الصياغة بعد."
         },
         "truth": {
-          "madeBy": "The station's own instruments at {station}, not a forecast.",
-          "howCounted": "An hour is dangerous when the station's instruments put it in the regulator's High or Red zone during working hours.",
-          "howCountedMargin": "An hour is dangerous when the station's instruments put it in the regulator's High or Red zone during working hours, with a heat margin of {margin} W/m² that we chose.",
-          "shows": "How many working hours in that period were dangerous on the station's record.",
-          "doesNotShow": "Danger at a worksite. This is one airport station; a worksite can be hotter or cooler."
+          "madeBy": "أجهزة المحطة نفسها في {station}، وليست توقعًا.",
+          "howCounted": "تُعدّ الساعة خطرة عندما تضعها أجهزة المحطة في منطقة الجهة التنظيمية «مرتفع» أو «أحمر» أثناء ساعات العمل.",
+          "howCountedMargin": "تُعدّ الساعة خطرة عندما تضعها أجهزة المحطة في منطقة الجهة التنظيمية «مرتفع» أو «أحمر» أثناء ساعات العمل، مع هامش حراري اخترناه مقداره {margin} W/m².",
+          "shows": "عدد ساعات العمل الخطرة في تلك الفترة بحسب سجل المحطة.",
+          "doesNotShow": "الخطر في موقع العمل. هذه محطة مطار واحدة، وقد يكون موقع العمل أشد حرارة أو أبرد."
         },
         "evaluation": {
-          "madeBy": "Our own test, run once on summer 2026 with every setting fixed in advance.",
-          "howCounted": "We wrote down how we would be judged and locked the plan before the scored run. Every setting was chosen using 2024 and 2025 data only.",
-          "amendments": "Later changes to the plan, {amendments} in all, are logged for auditors.",
-          "shows": "How the ways of warning a crew and the shift plans did on one summer of real weather.",
-          "doesNotShow": "How workers fared, or how this performs at a worksite or at a new site."
+          "madeBy": "اختبارنا الخاص، أُجري مرة واحدة على صيف 2026 مع تثبيت كل الإعدادات مسبقًا.",
+          "howCounted": "كتبنا كيف سنُحاسَب وقفلنا الخطة قبل التشغيل المُقيَّم. اختيرت كل الإعدادات باستخدام بيانات 2024 و2025 فقط.",
+          "amendments": "التغييرات اللاحقة على الخطة، وعددها {amendments} في المجموع، مسجَّلة في سجل التدقيق.",
+          "shows": "أداء طرق تحذير الفريق وخطط الوردية في صيف واحد بطقس حقيقي.",
+          "doesNotShow": "كيف كان حال العمال، أو كيف يؤدي هذا في موقع عمل أو في موقع جديد."
         },
         "verdict": {
-          "madeBy": "Our own scoring run. Each check was written down before the run, and the result is reported the same way whether we won or lost.",
-          "howCounted": "Each check names two things to compare, how to measure them and what counts as met. The run reports each one as met or not met.",
-          "shows": "Whether each check we set in advance was met or not met.",
-          "doesNotShow": "That a met check means a better outcome for workers. The exact sentences are in the full record, under For auditors."
+          "madeBy": "تشغيلنا الخاص للتقييم. كُتب كل تحقق قبل التشغيل، وتُعرض النتيجة بالطريقة نفسها سواء فزنا أم خسرنا.",
+          "howCounted": "يحدد كل تحقق شيئين للمقارنة، وكيفية قياسهما، وما يُعدّ محقَّقًا. يعرض التشغيل كل تحقق على أنه محقَّق أو غير محقَّق.",
+          "shows": "هل كان كل تحقق وضعناه مسبقًا محقَّقًا أم غير محقَّق.",
+          "doesNotShow": "أن التحقق المحقَّق يعني نتيجة أفضل للعمال. الجمل الدقيقة موجودة في السجل الكامل، تحت «للمدققين»."
         },
         "field": {
-          "madeBy": "The European weather centre's (ECMWF) forecast for one hot day, issued the day before and drawn as a map of the heat-stress index (WBGT).",
-          "about": "The UAE on {date}: the day with the highest forecast heat of the summer, shown for illustration. It is not the day we scored.",
-          "shows": "Where the forecast said the heat would be worst.",
-          "doesNotShow": "A measurement, or how well our warnings did that day."
+          "madeBy": "توقع المركز الأوروبي للطقس (ECMWF) ليوم حار واحد، صدر في اليوم السابق ومرسوم على خريطة لمؤشر الإجهاد الحراري (WBGT).",
+          "about": "الإمارات في {date}: اليوم ذو أعلى حرارة متوقعة في الصيف، معروض للتوضيح. وليس اليوم الذي قيّمناه.",
+          "shows": "أين قال التوقع إن الحرارة ستكون الأسوأ.",
+          "doesNotShow": "قياس، أو مدى جودة تحذيراتنا في ذلك اليوم."
         }
       },
       "audit": {
-        "heading": "For auditors: the full record",
-        "intro": "The technical record behind this number, for anyone who wants to check it. Fields with no value are not shown.",
-        "link": "For auditors",
-        "policy": "Policy code and threshold",
-        "verdicts": "Verdict sentences, exactly as the scoring run wrote them"
+        "heading": "للمدققين: السجل الكامل",
+        "intro": "السجل التقني وراء هذا الرقم، لمن يريد التحقق منه. لا تُعرض الحقول التي لا قيمة لها.",
+        "link": "للمدققين",
+        "policy": "رمز السياسة والحد",
+        "verdicts": "جمل الحكم، كما كتبها تشغيل التقييم تمامًا"
       }
     }
   },
@@ -1040,469 +1040,469 @@
       "loadFailed": "تعذّر التحميل. حاول مرة أخرى."
     },
     "scoreboard": {
-      "title": "How four ways of warning a crew would have done last summer",
-      "lede": "Abu Dhabi airport, {from} to {to}. Four ways to warn a crew, each judged on the forecast it had about 24 hours ahead, against what the station's thermometers then recorded. We wrote down how we would be judged before we ran the test, and ran it once.",
-      "facts": "Forecast made about 24 hours ahead · Scored against station thermometers",
-      "skip": "Skip to the scores",
+      "title": "كيف كانت ستؤدي أربع طرق لتحذير الفريق في الصيف الماضي",
+      "lede": "مطار أبوظبي، من {from} إلى {to}. أربع طرق لتحذير الفريق، قُيّمت كل طريقة على التوقع الذي كان لديها قبل نحو 24 ساعة، مقابل ما سجلته مقاييس حرارة المحطة بعد ذلك. كتبنا كيف سيُحكم علينا قبل أن نجري الاختبار، وأجريناه مرة واحدة.",
+      "facts": "توقع صادر قبل نحو 24 ساعة · قُيّم مقابل مقاييس حرارة المحطة",
+      "skip": "انتقل إلى النتائج",
       "season": {
-        "heading": "The season: recorded raw forecast, before correction",
-        "aria": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}. {slot}.",
-        "ariaNoBreak": "Daily peak of the recorded raw forecast, before correction, at Abu Dhabi airport, {days} days, {from} to {to}. On {daysOver} of {days} days the raw forecast peaks above the {limit} °C heavy-work limit; lowest peak {lowest} °C, highest {highest} °C on {highestDay}.",
-        "limit": "Heavy-work limit {limit} °C",
-        "slot": "Midday break in force, {from} to {to}, {start} to {end}",
-        "slotShort": "Midday break in force",
-        "peak": "{value} °C, {day}, {hour}, the hottest raw forecast",
-        "coolest": "Coolest day still peaked at {value} °C, {day}",
-        "tableToggle": "Show the daily numbers as a table",
-        "tableCaption": "Daily peak forecast, one row per day",
+        "heading": "الموسم: التوقع الخام المسجَّل، قبل التصحيح",
+        "aria": "الذروة اليومية للتوقع الخام المسجَّل، قبل التصحيح، في مطار أبوظبي، {days} يومًا، من {from} إلى {to}. في {daysOver} من {days} يومًا تتجاوز ذروة التوقع الخام حد العمل الشاق البالغ {limit} °C؛ أدنى ذروة {lowest} °C، وأعلى ذروة {highest} °C في {highestDay}. {slot}.",
+        "ariaNoBreak": "الذروة اليومية للتوقع الخام المسجَّل، قبل التصحيح، في مطار أبوظبي، {days} يومًا، من {from} إلى {to}. في {daysOver} من {days} يومًا تتجاوز ذروة التوقع الخام حد العمل الشاق البالغ {limit} °C؛ أدنى ذروة {lowest} °C، وأعلى ذروة {highest} °C في {highestDay}.",
+        "limit": "حد العمل الشاق {limit} °C",
+        "slot": "استراحة الظهيرة سارية، من {from} إلى {to}، {start} إلى {end}",
+        "slotShort": "استراحة الظهيرة سارية",
+        "peak": "{value} °C، {day}، {hour}، أعلى توقع خام",
+        "coolest": "حتى أبرد يوم بلغت ذروته {value} °C، {day}",
+        "tableToggle": "اعرض الأرقام اليومية في جدول",
+        "tableCaption": "ذروة التوقع اليومية، صف لكل يوم",
         "columns": {
-          "day": "Day",
-          "peak": "Peak, °C",
-          "over": "Working hours over the limit",
-          "inBreak": "Midday break in force"
+          "day": "اليوم",
+          "peak": "الذروة، °C",
+          "over": "ساعات العمل فوق الحد",
+          "inBreak": "استراحة الظهيرة سارية"
         },
-        "yes": "Yes",
-        "no": "No",
-        "caption": "Recorded raw forecast, before correction. These are not hours that were actually over the limit: what the station recorded is scored below."
+        "yes": "نعم",
+        "no": "لا",
+        "caption": "التوقع الخام المسجَّل، قبل التصحيح. هذه ليست ساعات كانت فوق الحد فعلًا: ما سجلته المحطة يُقيَّم أدناه."
       },
       "tally": {
-        "through": "Through {date}",
-        "final": "Through {date}, final",
-        "daysOf": "of {total}",
-        "days": "days the raw forecast peak was above {limit} °C",
-        "hours": "working hours the raw forecast put above the limit",
-        "inBreak": "of those inside the midday break",
-        "whatDays": "Days the recorded raw forecast peaked above the limit, before correction",
-        "whatHours": "Working hours the recorded raw forecast put above the limit, before correction",
-        "whatInBreak": "Raw-forecast hours above the limit inside the midday break, before correction"
+        "through": "حتى {date}",
+        "final": "حتى {date}، نهائي",
+        "daysOf": "من {total}",
+        "days": "أيام كانت فيها ذروة التوقع الخام فوق {limit} °C",
+        "hours": "ساعات عمل وضعها التوقع الخام فوق الحد",
+        "inBreak": "منها داخل استراحة الظهيرة",
+        "whatDays": "أيام بلغت فيها ذروة التوقع الخام المسجَّل ما فوق الحد، قبل التصحيح",
+        "whatHours": "ساعات العمل التي وضعها التوقع الخام المسجَّل فوق الحد، قبل التصحيح",
+        "whatInBreak": "ساعات التوقع الخام فوق الحد داخل استراحة الظهيرة، قبل التصحيح"
       },
       "player": {
-        "play": "Play the season",
-        "pause": "Pause",
-        "resume": "Resume",
-        "note": "Plays {days} days in 8 seconds. Counts of the recorded raw forecast, before correction, not hours that were actually over the limit. The scores below compare warnings with what the station recorded.",
-        "reducedMotion": "Animation is off on this device, so the whole season is shown."
+        "play": "شغّل عرض الموسم",
+        "pause": "إيقاف مؤقت",
+        "resume": "متابعة",
+        "note": "يعرض {days} يومًا في 8 ثوانٍ. هذه أعداد من التوقع الخام المسجَّل، قبل التصحيح، وليست ساعات كانت فوق الحد فعلًا. النتائج أدناه تقارن التحذيرات بما سجلته المحطة.",
+        "reducedMotion": "الحركة متوقفة على هذا الجهاز، لذلك يظهر الموسم كاملًا."
       },
       "verdict": {
-        "heading": "What the season showed",
-        "pending": "Not available until the scored run has produced its results.",
-        "note": "This sentence is built the same way whether we did well or badly, from the numbers in the scored results. The exact sentence the scoring run wrote is under For auditors.",
-        "other": "Other checks, written down before we ran the test",
-        "lead2": "The same check on the forecast issued by 18:00 the evening before",
-        "plansHeading": "Plan checks, written down before we ran the test",
-        "priorNow": "Met on summer 2026.",
-        "priorSupported": "On the 2025 development run, made while we were building, this check was met too.",
-        "priorNotSupported": "On the 2025 development run, made while we were building, this check was not met.",
+        "heading": "ما أظهره الموسم",
+        "pending": "غير متاح إلى أن ينتج التشغيل المقيَّم نتائجه.",
+        "note": "تُبنى هذه الجملة بالطريقة نفسها سواء كان أداؤنا جيدًا أم سيئًا، من أرقام النتائج المقيَّمة. الجملة الدقيقة التي كتبها تشغيل التقييم موجودة تحت «للمدققين».",
+        "other": "تحققات أخرى، كتبناها قبل أن نجري الاختبار",
+        "lead2": "التحقق نفسه على التوقع الصادر بحلول 18:00 مساء اليوم السابق",
+        "plansHeading": "تحققات الخطط، كتبناها قبل أن نجري الاختبار",
+        "priorNow": "استُوفي في صيف 2026.",
+        "priorSupported": "في تشغيل التطوير لعام 2025، الذي أُجري أثناء البناء، استُوفي هذا التحقق أيضًا.",
+        "priorNotSupported": "في تشغيل التطوير لعام 2025، الذي أُجري أثناء البناء، لم يُستوفَ هذا التحقق.",
         "plain": {
-          "lead2Intro": "On the stricter forecast, issued by 18:00 the evening before:",
-          "primaryMet": "This was the main check and it was met.",
-          "primaryNotMet": "This was the main check and it was not met.",
-          "met": "This check was met.",
-          "notMet": "This check was not met.",
-          "unknown": "The details of this check are under For auditors.",
-          "noClaim": "We do not claim to beat the regulator's zones.",
+          "lead2Intro": "على التوقع الأكثر صرامة، الصادر بحلول 18:00 مساء اليوم السابق:",
+          "primaryMet": "كان هذا هو التحقق الرئيسي، وقد استُوفي.",
+          "primaryNotMet": "كان هذا هو التحقق الرئيسي، ولم يُستوفَ.",
+          "met": "استُوفي هذا التحقق.",
+          "notMet": "لم يُستوفَ هذا التحقق.",
+          "unknown": "تفاصيل هذا التحقق موجودة تحت «للمدققين».",
+          "noClaim": "لا ندّعي أننا نتفوق على مناطق الجهة التنظيمية.",
           "H4": {
             "missed": {
-              "fewer": "Against the midday break alone, our protective setting missed {a} fewer danger hours (likely range {lo} to {hi} fewer).",
-              "more": "Against the midday break alone, our protective setting missed {a} more danger hours (likely range {lo} to {hi} more).",
-              "unclear": "Against the midday break alone, the difference in danger hours missed is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+              "fewer": "مقارنة باستراحة الظهيرة وحدها، فوّت إعدادنا الوقائي {a} ساعة خطرة أقل (النطاق المرجح من {lo} إلى {hi} أقل).",
+              "more": "مقارنة باستراحة الظهيرة وحدها، فوّت إعدادنا الوقائي {a} ساعة خطرة أكثر (النطاق المرجح من {lo} إلى {hi} أكثر).",
+              "unclear": "مقارنة باستراحة الظهيرة وحدها، الفرق في الساعات الخطرة الفائتة أصغر من أن يمكن تمييزه (النطاق المرجح من {lo} إلى {hi}، وهو يشمل الصفر)."
             },
             "falseAlarms": {
-              "fewer": "It raised {a} fewer false-alarm hours than the fixed 32 °C rule (likely range {lo} to {hi} fewer).",
-              "more": "It raised {a} more false-alarm hours than the fixed 32 °C rule (likely range {lo} to {hi} more).",
-              "unclear": "Against the fixed 32 °C rule, the difference in false-alarm hours is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+              "fewer": "أطلق {a} ساعة إنذار كاذب أقل من قاعدة 32 °C الثابتة (النطاق المرجح من {lo} إلى {hi} أقل).",
+              "more": "أطلق {a} ساعة إنذار كاذب أكثر من قاعدة 32 °C الثابتة (النطاق المرجح من {lo} إلى {hi} أكثر).",
+              "unclear": "مقارنة بقاعدة 32 °C الثابتة، الفرق في ساعات الإنذار الكاذب أصغر من أن يمكن تمييزه (النطاق المرجح من {lo} إلى {hi}، وهو يشمل الصفر)."
             }
           },
           "H5": {
             "missed": {
-              "fewer": "Against the regulator's own zones on the raw forecast, our protective setting missed {a} fewer danger hours (likely range {lo} to {hi} fewer).",
-              "more": "Against the regulator's own zones on the raw forecast, our protective setting missed {a} more danger hours (likely range {lo} to {hi} more).",
-              "unclear": "Against the regulator's own zones on the raw forecast, the difference in danger hours missed is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+              "fewer": "مقارنة بمناطق الجهة التنظيمية نفسها على التوقع الخام، فوّت إعدادنا الوقائي {a} ساعة خطرة أقل (النطاق المرجح من {lo} إلى {hi} أقل).",
+              "more": "مقارنة بمناطق الجهة التنظيمية نفسها على التوقع الخام، فوّت إعدادنا الوقائي {a} ساعة خطرة أكثر (النطاق المرجح من {lo} إلى {hi} أكثر).",
+              "unclear": "مقارنة بمناطق الجهة التنظيمية نفسها على التوقع الخام، الفرق في الساعات الخطرة الفائتة أصغر من أن يمكن تمييزه (النطاق المرجح من {lo} إلى {hi}، وهو يشمل الصفر)."
             },
             "falseAlarms": {
-              "fewer": "It raised {a} fewer false-alarm hours (likely range {lo} to {hi} fewer).",
-              "more": "It raised {a} more false-alarm hours (likely range {lo} to {hi} more).",
-              "unclear": "The difference in false-alarm hours is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+              "fewer": "أطلق {a} ساعة إنذار كاذب أقل (النطاق المرجح من {lo} إلى {hi} أقل).",
+              "more": "أطلق {a} ساعة إنذار كاذب أكثر (النطاق المرجح من {lo} إلى {hi} أكثر).",
+              "unclear": "الفرق في ساعات الإنذار الكاذب أصغر من أن يمكن تمييزه (النطاق المرجح من {lo} إلى {hi}، وهو يشمل الصفر)."
             },
             "reason": {
-              "falseAlarms": "That is more extra false alarms than we had allowed in advance.",
-              "missed": "This check also needed a clear drop in danger hours missed, and the range did not show one."
+              "falseAlarms": "هذا عدد من الإنذارات الكاذبة الإضافية أكبر مما سمحنا به مسبقًا.",
+              "missed": "كان هذا التحقق يتطلب أيضًا انخفاضًا واضحًا في الساعات الخطرة الفائتة، ولم يُظهر النطاق ذلك."
             }
           },
           "H6": {
-            "fewer": "Against the midday break alone, the plan built from our corrected forecast had {a} fewer minutes worked against the rules, per worker per season (likely range {lo} to {hi} fewer).",
-            "more": "Against the midday break alone, the plan built from our corrected forecast had {a} more minutes worked against the rules, per worker per season (likely range {lo} to {hi} more).",
-            "unclear": "Against the midday break alone, the difference in minutes worked against the rules is too small to tell apart (likely range {lo} to {hi}, which includes zero).",
-            "crew": "Real weather, assumed crew of {headcount} doing heavy work."
+            "fewer": "مقارنة باستراحة الظهيرة وحدها، كان في الخطة المبنية على توقعنا المصحح {a} دقيقة عمل مخالفة للقواعد أقل لكل عامل في الموسم (النطاق المرجح من {lo} إلى {hi} أقل).",
+            "more": "مقارنة باستراحة الظهيرة وحدها، كان في الخطة المبنية على توقعنا المصحح {a} دقيقة عمل مخالفة للقواعد أكثر لكل عامل في الموسم (النطاق المرجح من {lo} إلى {hi} أكثر).",
+            "unclear": "مقارنة باستراحة الظهيرة وحدها، الفرق في دقائق العمل المخالفة للقواعد أصغر من أن يمكن تمييزه (النطاق المرجح من {lo} إلى {hi}، وهو يشمل الصفر).",
+            "crew": "طقس حقيقي، وفريق مفترض عدده {headcount} يؤدي عملًا شاقًا."
           },
           "H7": {
-            "fewer": "Against the plan built from the raw forecast, the plan built from our corrected forecast treated {a} fewer minutes as safer than the station's record (likely range {lo} to {hi} fewer).",
-            "more": "Against the plan built from the raw forecast, the plan built from our corrected forecast treated {a} more minutes as safer than the station's record (likely range {lo} to {hi} more).",
-            "unclear": "Against the plan built from the raw forecast, the difference in minutes treated as safer than the station's record is too small to tell apart (likely range {lo} to {hi}, which includes zero)."
+            "fewer": "مقارنة بالخطة المبنية على التوقع الخام، عدّت الخطة المبنية على توقعنا المصحح {a} دقيقة أقل على أنها أكثر أمانًا من سجل المحطة (النطاق المرجح من {lo} إلى {hi} أقل).",
+            "more": "مقارنة بالخطة المبنية على التوقع الخام، عدّت الخطة المبنية على توقعنا المصحح {a} دقيقة أكثر على أنها أكثر أمانًا من سجل المحطة (النطاق المرجح من {lo} إلى {hi} أكثر).",
+            "unclear": "مقارنة بالخطة المبنية على التوقع الخام، الفرق في الدقائق التي عُدّت أكثر أمانًا من سجل المحطة أصغر من أن يمكن تمييزه (النطاق المرجح من {lo} إلى {hi}، وهو يشمل الصفر)."
           }
         }
       },
       "warnings": {
-        "heading": "Warnings",
-        "sub": "Who was warned about 24 hours ahead, and how often a warning was a false alarm.",
-        "defs": "A danger hour is an hour the station recorded in the High or Red zone of ADOSH, Abu Dhabi's workplace-safety authority. Stellar Blaze warns when its corrected forecast (the weather model's forecast, adjusted for known local errors) puts the High or Red zone above a threshold chosen on 2024 and 2025 data only; the protective and the balanced setting use two different thresholds.",
-        "caption": "Four ways to warn a crew, scored on the season",
-        "miniCaption": "Danger hours nobody was warned about, and false-alarm hours, at Abu Dhabi airport, summer 2026, forecast about 24 hours ahead",
+        "heading": "التحذيرات",
+        "sub": "من حُذّر قبل نحو 24 ساعة، وكم مرة كان التحذير إنذارًا كاذبًا.",
+        "defs": "الساعة الخطرة هي ساعة سجلت المحطة فيها المنطقة العالية أو الحمراء حسب ADOSH، جهة السلامة المهنية في أبوظبي. يحذّر Stellar Blaze عندما يجعل توقعه المصحح (توقع نموذج الطقس بعد تعديله للأخطاء المحلية المعروفة) المنطقة العالية أو الحمراء تتجاوز حدًّا اخترناه من بيانات 2024 و2025 فقط؛ ويستخدم الإعداد الوقائي والإعداد المتوازن حدّين مختلفين.",
+        "caption": "أربع طرق لتحذير الفريق، مقيَّمة على الموسم",
+        "miniCaption": "ساعات خطرة لم يُحذَّر منها أحد، وساعات إنذار كاذب، في مطار أبوظبي، صيف 2026، التوقع قبل نحو 24 ساعة",
         "columns": {
-          "policy": "Way to warn",
-          "missed": "Danger hours nobody was warned about",
-          "falseAlarm": "False-alarm hours",
-          "warned": "Share of danger hours warned",
-          "falseShare": "Share of warnings that were false alarms"
+          "policy": "طريقة التحذير",
+          "missed": "ساعات خطرة لم يُحذَّر منها أحد",
+          "falseAlarm": "ساعات الإنذار الكاذب",
+          "warned": "نسبة الساعات الخطرة التي صدر تحذير عنها",
+          "falseShare": "نسبة التحذيرات التي كانت إنذارات كاذبة"
         },
-        "whatMissed": "Danger hours nobody was warned about, {policy}",
-        "whatFalseAlarm": "False-alarm hours, {policy}",
-        "whatWarned": "Share of danger hours warned, {policy}",
-        "whatFalseShare": "Share of warnings that were false alarms, {policy}",
-        "pending": "Warnings, summer 2026: danger hours nobody was warned about, false alarms and the two shares",
+        "whatMissed": "ساعات خطرة لم يُحذَّر منها أحد، {policy}",
+        "whatFalseAlarm": "ساعات الإنذار الكاذب، {policy}",
+        "whatWarned": "نسبة الساعات الخطرة التي صدر تحذير عنها، {policy}",
+        "whatFalseShare": "نسبة التحذيرات التي كانت إنذارات كاذبة، {policy}",
+        "pending": "التحذيرات، صيف 2026: ساعات خطرة لم يُحذَّر منها أحد، والإنذارات الكاذبة، والنسبتان",
         "policies": {
           "P0": {
-            "label": "Midday break only",
-            "sub": "{start} to {end} by law, nothing else. It never warns on a worked hour."
+            "label": "استراحة الظهيرة فقط",
+            "sub": "من {start} إلى {end} بحكم القانون، ولا شيء غيرها. لا يحذّر أبدًا في ساعة عمل."
           },
           "P1": {
-            "label": "Fixed 32 °C rule",
-            "sub": "Stop when the raw forecast reaches 32 °C"
+            "label": "قاعدة 32 °C الثابتة",
+            "sub": "أوقف العمل عندما يصل التوقع الخام إلى 32 °C"
           },
           "P2": {
-            "label": "Regulator's zones, raw forecast",
-            "sub": "ADOSH's heat zones applied to the raw weather forecast, no correction"
+            "label": "مناطق الجهة التنظيمية، التوقع الخام",
+            "sub": "مناطق الحرارة في ADOSH مطبّقة على توقع الطقس الخام، بلا تصحيح"
           },
           "P3_protect": {
-            "label": "Stellar Blaze, protective setting",
-            "sub": "Our corrected forecast, warning at the protective threshold"
+            "label": "Stellar Blaze، الإعداد الوقائي",
+            "sub": "توقعنا المصحح، مع التحذير عند الحد الوقائي"
           },
           "P3_balanced": {
-            "label": "Stellar Blaze, balanced setting",
-            "sub": "Our corrected forecast, warning at the balanced threshold"
+            "label": "Stellar Blaze، الإعداد المتوازن",
+            "sub": "توقعنا المصحح، مع التحذير عند الحد المتوازن"
           }
         },
         "lead2": {
-          "heading": "Stricter check: forecast issued by 18:00 the evening before",
-          "sub": "The same ways to warn, on the forecast issued by 18:00 Gulf time the evening before.",
-          "caption": "Ways to warn a crew, scored on the season with the forecast issued by 18:00 the evening before"
+          "heading": "تحقق أكثر صرامة: التوقع الصادر بحلول 18:00 مساء اليوم السابق",
+          "sub": "طرق التحذير نفسها، على التوقع الصادر بحلول 18:00 بتوقيت الخليج مساء اليوم السابق.",
+          "caption": "طرق تحذير الفريق، مقيَّمة على الموسم بالتوقع الصادر بحلول 18:00 مساء اليوم السابق"
         },
-        "truth": "On the station's own record the season had {value} danger hours (likely range {lo} to {hi}). A danger hour is an hour the station recorded in the High or Red zone of ADOSH, Abu Dhabi's workplace-safety authority, during working daytime ({hours}), at Abu Dhabi airport, summer 2026. The count uses a safety margin of {margin} W/m² that we chose; it is not a measurement at a worksite.",
-        "truthWhat": "Danger hours in the season, from the station record",
+        "truth": "حسب سجل المحطة نفسها، كان في الموسم {value} ساعة خطرة (النطاق المرجح من {lo} إلى {hi}). الساعة الخطرة هي ساعة سجلت المحطة فيها المنطقة العالية أو الحمراء حسب ADOSH، جهة السلامة المهنية في أبوظبي، خلال ساعات العمل النهارية ({hours})، في مطار أبوظبي، صيف 2026. يستخدم العدّ هامش أمان قدره {margin} W/m² اخترناه نحن؛ وهو ليس قياسًا في موقع عمل.",
+        "truthWhat": "الساعات الخطرة في الموسم، من سجل المحطة",
         "tradeoff": {
-          "balanced": "At the balanced setting Stellar Blaze and the regulator's zones cannot be told apart: danger hours missed {m1} and {m2}, false-alarm hours {f1} and {f2}, with overlapping likely ranges.",
-          "extremes": "The fixed 32 °C rule misses the fewest danger hours ({m}) but raises the most false alarms ({f}).",
+          "balanced": "عند الإعداد المتوازن لا يمكن التمييز بين Stellar Blaze ومناطق الجهة التنظيمية: ساعات خطرة فائتة {m1} و{m2}، وساعات إنذار كاذب {f1} و{f2}، مع تداخل النطاقات المرجحة.",
+          "extremes": "قاعدة 32 °C الثابتة تفوّت أقل عدد من الساعات الخطرة ({m}) لكنها تطلق أكبر عدد من الإنذارات الكاذبة ({f}).",
           "extremesOverlap": {
-            "both": "Its likely ranges overlap those of our protective setting on both counts.",
-            "missed": "Its likely range for missed hours overlaps that of our protective setting.",
-            "falseAlarms": "Its likely range for false alarms overlaps that of our protective setting."
+            "both": "تتداخل نطاقاتها المرجحة مع نطاقات إعدادنا الوقائي في الحالتين.",
+            "missed": "يتداخل نطاقها المرجح للساعات الفائتة مع نطاق إعدادنا الوقائي.",
+            "falseAlarms": "يتداخل نطاقها المرجح للإنذارات الكاذبة مع نطاق إعدادنا الوقائي."
           },
-          "regulator": "The regulator's zones on the raw forecast {fa} and {missed}.",
+          "regulator": "مناطق الجهة التنظيمية على التوقع الخام {fa} و{missed}.",
           "fa": {
-            "fewer": "raise fewer false alarms than Stellar Blaze at the protective setting ({r} hours against {o}{ov})",
-            "more": "raise more false alarms than Stellar Blaze at the protective setting ({r} hours against {o}{ov})",
-            "same": "raise the same number of false alarms as Stellar Blaze at the protective setting ({r} hours{ov})"
+            "fewer": "تطلق إنذارات كاذبة أقل من Stellar Blaze في الإعداد الوقائي ({r} ساعة مقابل {o}{ov})",
+            "more": "تطلق إنذارات كاذبة أكثر من Stellar Blaze في الإعداد الوقائي ({r} ساعة مقابل {o}{ov})",
+            "same": "تطلق العدد نفسه من الإنذارات الكاذبة مثل Stellar Blaze في الإعداد الوقائي ({r} ساعة{ov})"
           },
           "missed": {
-            "fewer": "miss fewer danger hours ({r} against {o}{ov})",
-            "more": "miss more danger hours ({r} against {o}{ov})",
-            "same": "miss the same number of danger hours ({r}{ov})"
+            "fewer": "تفوّت ساعات خطرة أقل ({r} مقابل {o}{ov})",
+            "more": "تفوّت ساعات خطرة أكثر ({r} مقابل {o}{ov})",
+            "same": "تفوّت العدد نفسه من الساعات الخطرة ({r}{ov})"
           },
-          "rangesOverlap": "; the likely ranges overlap"
+          "rangesOverlap": "؛ النطاقات المرجحة متداخلة"
         },
-        "falseAlarmDef": "A false-alarm hour is an hour that a way of warning would have warned about, when the station did not record it as dangerous.",
-        "rangeGloss": "A likely range is a 95% interval: if the test were repeated many times, 95 of every 100 ranges built this way would contain the true value."
+        "falseAlarmDef": "ساعة الإنذار الكاذب هي ساعة كانت إحدى طرق التحذير ستحذّر منها، بينما لم تسجلها المحطة على أنها خطرة.",
+        "rangeGloss": "النطاق المرجح هو فاصل ثقة 95%: لو أُعيد الاختبار مرات كثيرة، فإن 95 من كل 100 نطاق يُبنى بهذه الطريقة يحتوي القيمة الحقيقية."
       },
       "plans": {
-        "heading": "Plans",
-        "sub": "Each shift plan checked by an independent rule checker against what the station recorded.",
-        "defs": "Extra rest minutes are a simulated cost on an assumed crew. We count minutes worked against the rules and make no claim about health outcomes.",
-        "caption": "Shift plans, checked on the season",
+        "heading": "الخطط",
+        "sub": "كل خطة وردية تفحصها أداة تحقق مستقلة من القواعد، مقابل ما سجلته المحطة.",
+        "defs": "دقائق الراحة الإضافية كلفة مُحاكاة على فريق مفترض. نحن نعدّ الدقائق المعمولة مخالفةً للقواعد، ولا ندّعي شيئًا عن النتائج الصحية.",
+        "caption": "خطط الورديات، مفحوصة على الموسم",
         "columns": {
-          "plan": "Plan",
-          "violation": "Minutes a worker would have worked against the rules, per season",
-          "cycled": "Share of dangerous-hour heavy work that the plan broke into work and rest",
-          "missed": "Minutes the plan treated as safer than the station's record",
-          "rest": "Extra rest minutes per worker, per season"
+          "plan": "الخطة",
+          "violation": "دقائق كان العامل سيعملها مخالفةً للقواعد، في الموسم",
+          "cycled": "نسبة العمل الشاق في الساعات الخطرة التي قسّمتها الخطة إلى عمل وراحة",
+          "missed": "دقائق عدّتها الخطة أكثر أمانًا من سجل المحطة",
+          "rest": "دقائق راحة إضافية لكل عامل، في الموسم"
         },
-        "whatViolation": "Minutes a worker would have worked against the rules, per season, {plan}",
-        "whatCycled": "Share of dangerous-hour heavy work broken into work and rest, {plan}",
-        "whatMissed": "Minutes the plan treated as safer than the station's record, {plan}",
-        "whatRest": "Extra rest minutes per worker, per season, {plan}",
-        "pending": "Plans, summer 2026: minutes against the rules, share broken into work and rest, minutes treated as safer, extra rest",
-        "roster": "Real weather, assumed crew of {headcount} doing heavy work. Work times: {roster}",
+        "whatViolation": "دقائق كان العامل سيعملها مخالفةً للقواعد، في الموسم، {plan}",
+        "whatCycled": "نسبة العمل الشاق في الساعات الخطرة المقسّم إلى عمل وراحة، {plan}",
+        "whatMissed": "دقائق عدّتها الخطة أكثر أمانًا من سجل المحطة، {plan}",
+        "whatRest": "دقائق راحة إضافية لكل عامل، في الموسم، {plan}",
+        "pending": "الخطط، صيف 2026: دقائق مخالفة للقواعد، ونسبة ما قُسّم إلى عمل وراحة، ودقائق عُدّت أكثر أمانًا، والراحة الإضافية",
+        "roster": "طقس حقيقي، وفريق مفترض عدده {headcount} يؤدي عملًا شاقًا. أوقات العمل: {roster}",
         "rows": {
           "merged": {
-            "label": "Midday break only (working every minute of the shift outside the break, on the legal roster)",
-            "sub": "The legal minimum. Working straight through and the midday break only are the same plan."
+            "label": "استراحة الظهيرة فقط (العمل في كل دقيقة من الوردية خارج الاستراحة، وفق الجدول القانوني)",
+            "sub": "الحد الأدنى القانوني. العمل المتواصل واستراحة الظهيرة فقط هما الخطة نفسها."
           },
           "rule_raw": {
-            "label": "Rule plan on the raw forecast",
-            "sub": "ADOSH work-and-rest cycles from the raw forecast"
+            "label": "خطة القواعد على التوقع الخام",
+            "sub": "دورات عمل وراحة وفق ADOSH من التوقع الخام"
           },
           "rule_corrected": {
-            "label": "Rule plan on our corrected forecast",
-            "sub": "Work-and-rest cycles from our corrected forecast, protective setting"
+            "label": "خطة القواعد على توقعنا المصحح",
+            "sub": "دورات عمل وراحة من توقعنا المصحح، الإعداد الوقائي"
           }
         },
-        "tradeoff": "Minutes worked against the rules, per worker per season, fall from {from} with the midday break only to {to} on the plan built from our corrected forecast. That plan adds {rest} rest minutes per worker per season; the plan built from the raw forecast adds {restRaw}. {days} scored days, assumed crew."
+        "tradeoff": "تنخفض دقائق العمل المخالفة للقواعد، لكل عامل في الموسم، من {from} مع استراحة الظهيرة فقط إلى {to} في الخطة المبنية على توقعنا المصحح. تضيف تلك الخطة {rest} دقيقة راحة لكل عامل في الموسم؛ وتضيف الخطة المبنية على التوقع الخام {restRaw}. {days} يومًا مقيَّمًا، فريق مفترض."
       },
       "table": {
-        "notScored": "not scored yet",
-        "ours": "This is the Stellar Blaze row.",
-        "interval": "likely range {lo} to {hi}",
-        "notComputed": "not computed",
-        "baselineNoInterval": "baseline, no interval"
+        "notScored": "لم يُقيَّم بعد",
+        "ours": "هذا هو صف Stellar Blaze.",
+        "interval": "النطاق المرجح من {lo} إلى {hi}",
+        "notComputed": "لم يُحسب",
+        "baselineNoInterval": "خط الأساس، بلا فاصل"
       },
       "partial": {
-        "title": "The Plans table is not on this page yet",
-        "reason": "The Plans file has not been written. The table appears here as soon as it is."
+        "title": "جدول الخطط ليس في هذه الصفحة بعد",
+        "reason": "لم يُكتب ملف الخطط. سيظهر الجدول هنا بمجرد كتابته."
       },
       "empty": {
-        "title": "The scoring run has not written its file yet",
-        "reason": "Results appear after the scored run. Until then, one forecast number on this page shows exactly how a number is traced.",
-        "primary": "See where a number comes from"
+        "title": "لم يكتب تشغيل التقييم ملفه بعد",
+        "reason": "تظهر النتائج بعد التشغيل المقيَّم. إلى ذلك الحين، يوضح رقم توقع واحد في هذه الصفحة كيف يُتتبَّع أي رقم بدقة.",
+        "primary": "اعرف من أين جاء الرقم"
       },
       "error": {
-        "title": "The scoreboard file could not be read",
-        "reason": "The season chart above is drawn from a separate recorded file. Nothing on this page is guessed in the meantime.",
-        "primary": "Try again"
+        "title": "تعذرت قراءة ملف لوحة النتائج",
+        "reason": "مخطط الموسم أعلاه مرسوم من ملف مسجَّل منفصل. لا شيء في هذه الصفحة يُخمَّن في هذه الأثناء.",
+        "primary": "حاول مرة أخرى"
       },
       "limits": {
-        "station": "Abu Dhabi airport only, one summer the models had not seen.",
-        "crew": "The crew of {size} is an assumed schedule.",
-        "truth": "What counts as the truth is the station's temperature, humidity and wind, plus modelled sunshine.",
-        "twl": "Thermal work limit aligned with ADOSH zones, not certified.",
-        "simulated": "Simulated crew, real weather."
+        "station": "مطار أبوظبي فقط، وصيف واحد لم تره النماذج.",
+        "crew": "الفريق المكوّن من {size} هو جدول مفترض.",
+        "truth": "ما يُعدّ الحقيقة هو درجة الحرارة والرطوبة والرياح في المحطة، إضافة إلى أشعة شمس مُنمذَجة.",
+        "twl": "حد العمل الحراري متوافق مع مناطق ADOSH، وغير معتمد.",
+        "simulated": "فريق مُحاكى، وطقس حقيقي."
       },
-      "loading": "Loading the season",
-      "factsHeldOut": "Held-out 2026: every choice was fixed on 2024 and 2025 data",
+      "loading": "جارٍ تحميل الموسم",
+      "factsHeldOut": "2026 محجوب عن التدريب: كل اختيار ثُبّت على بيانات 2024 و2025",
       "units": {
-        "missed_danger_hours": "hours over the season",
-        "false_alarm_hours": "hours over the season",
-        "pod": "of danger hours were warned about",
-        "far": "of warnings were false alarms",
-        "violation_minutes_per_season": "minutes per worker, per season",
-        "high_cycled_share": "of dangerous-hour heavy work broken into work and rest",
-        "missed_protection_ticks": "minutes the plan treated as safer than the station's record",
-        "rest_minutes_added_vs_naive": "extra minutes per worker, per season"
+        "missed_danger_hours": "ساعة خلال الموسم",
+        "false_alarm_hours": "ساعة خلال الموسم",
+        "pod": "من الساعات الخطرة صدر تحذير عنها",
+        "far": "من التحذيرات كانت إنذارات كاذبة",
+        "violation_minutes_per_season": "دقيقة لكل عامل، في الموسم",
+        "high_cycled_share": "من العمل الشاق في الساعات الخطرة قُسّم إلى عمل وراحة",
+        "missed_protection_ticks": "دقيقة عدّتها الخطة أكثر أمانًا من سجل المحطة",
+        "rest_minutes_added_vs_naive": "دقيقة إضافية لكل عامل، في الموسم"
       },
       "evaluation": {
-        "line": "Tested on summer 2026. Every setting was chosen using 2024 and 2025 data only. The test plan was written down and locked before the scored run.",
-        "changesNone": "No changes were made to the plan after it was locked.",
-        "changesOne": "One later change to the plan is logged for auditors.",
-        "changesMany": "{amendments} later changes to the plan are logged for auditors.",
-        "what": "The 2026 test: held out, with the plan written down first"
+        "line": "اختُبر على صيف 2026. اختير كل إعداد باستخدام بيانات 2024 و2025 فقط. كُتبت خطة الاختبار وأُقفلت قبل التشغيل المقيَّم.",
+        "changesNone": "لم تُجرَ أي تغييرات على الخطة بعد قفلها.",
+        "changesOne": "سُجّل تغيير لاحق واحد على الخطة للمدققين.",
+        "changesMany": "سُجّلت {amendments} تغييرات لاحقة على الخطة للمدققين.",
+        "what": "اختبار 2026: محجوب عن التدريب، مع كتابة الخطة أولًا"
       }
     },
     "frontier": {
-      "sub": "Each point is a daily roster. Higher means more summer hours at 30 °C or more per scheduled hour; further right means more sleep. Pick a one-way commute.",
-      "whatPending": "The roster frontier analysis",
-      "loading": "Loading the roster frontier",
-      "commute": "One-way commute",
-      "commuteValue": "{minutes} min",
-      "aria": "Heat exposure against sleep for rosters at a {minutes} minute commute, with the legal default and the common practice roster marked.",
-      "xAxis": "Sleep per night, hours",
-      "yAxis": "Summer hours at 30 °C WBGT or more, per scheduled hour",
-      "gate": "{hours} h sleep gate",
-      "baselineLegal": "Legal default",
-      "baselineCommon": "Common practice",
-      "bestTitle": "On top of the legal default",
-      "bestUnit": "fewer hours at 30 °C or more, on top of the legal default, with sleep kept at {hours} h or more",
-      "legalTitle": "Making the common roster legal",
-      "legalUnit": "fewer hours at 30 °C or more on average in the analysis, going from common practice to the legal default. This gain belongs to the law, not to Stellar Blaze.",
-      "whatBest": "Share of hours at 30 °C or more avoided against the legal default at a {minutes} minute commute",
-      "whatLegal": "Share of hours at 30 °C or more avoided by making the common roster legal, on average in the analysis",
-      "tableToggle": "Show the roster numbers as a table",
-      "tableCaption": "Rosters at a {minutes} minute commute",
+      "sub": "كل نقطة هي جدول يومي. كلما ارتفعت النقطة زادت ساعات الصيف عند 30 °C أو أكثر لكل ساعة مجدولة، وكلما اتجهت يمينًا زاد النوم. اختر مدة التنقل في اتجاه واحد.",
+      "whatPending": "تحليل حدود الجداول",
+      "loading": "جارٍ تحميل حدود الجداول",
+      "commute": "التنقل في اتجاه واحد",
+      "commuteValue": "{minutes} دقيقة",
+      "aria": "التعرض للحرارة مقابل النوم للجداول عند تنقل مدته {minutes} دقيقة، مع تمييز الخيار الافتراضي القانوني وجدول الممارسة الشائعة.",
+      "xAxis": "النوم في الليلة، ساعات",
+      "yAxis": "ساعات الصيف عند 30 °C WBGT أو أكثر، لكل ساعة مجدولة",
+      "gate": "حد النوم {hours} h",
+      "baselineLegal": "الخيار الافتراضي القانوني",
+      "baselineCommon": "الممارسة الشائعة",
+      "bestTitle": "فوق الخيار الافتراضي القانوني",
+      "bestUnit": "ساعات أقل عند 30 °C أو أكثر، فوق الخيار الافتراضي القانوني، مع إبقاء النوم عند {hours} h أو أكثر",
+      "legalTitle": "جعل الجدول الشائع قانونيًا",
+      "legalUnit": "ساعات أقل عند 30 °C أو أكثر في المتوسط ضمن التحليل، عند الانتقال من الممارسة الشائعة إلى الخيار الافتراضي القانوني. هذا المكسب يعود إلى القانون، وليس إلى Stellar Blaze.",
+      "whatBest": "نسبة الساعات عند 30 °C أو أكثر التي تم تجنبها مقارنة بالخيار الافتراضي القانوني عند تنقل مدته {minutes} دقيقة",
+      "whatLegal": "نسبة الساعات عند 30 °C أو أكثر التي تم تجنبها بجعل الجدول الشائع قانونيًا، في المتوسط ضمن التحليل",
+      "tableToggle": "اعرض أرقام الجداول في جدول بيانات",
+      "tableCaption": "الجداول عند تنقل مدته {minutes} دقيقة",
       "columns": {
-        "roster": "Roster",
-        "sleep": "Sleep, hours",
-        "exposure": "Hours at 30 °C or more per scheduled hour"
+        "roster": "الجدول",
+        "sleep": "النوم، ساعات",
+        "exposure": "الساعات عند 30 °C أو أكثر لكل ساعة مجدولة"
       },
-      "headingGain": "At a {minutes} minute commute the analysis finds {gain} fewer hours at 30 °C or more on top of the legal default, with sleep kept at {hours} h or more. Going from common practice to the legal default cuts them by {legal} on average in the analysis.",
-      "headingMissing": "The analysis has no result for a {minutes} minute commute",
-      "headingPending": "The roster frontier",
-      "bestMissing": "The analysis has no result for this commute.",
-      "headingNoGainFails": "At a {minutes} minute commute the analysis finds no gain on top of the legal default. The legal default itself leaves {sleep} h of sleep there, under the {hours} h sleep gate. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
-      "headingNoGainPasses": "At a {minutes} minute commute the analysis finds no gain on top of the legal default: in {noChange} of {folds} cross-validation folds it was not beaten. Going from common practice to the legal default cuts the hours at 30 °C or more by {legal} on average in the analysis.",
-      "bestNoneFails": "No gain on top of the legal default at this commute. The legal default itself leaves {sleep} h of sleep, under the {hours} h sleep gate.",
-      "bestNonePasses": "No gain on top of the legal default at this commute: it was not beaten in {noChange} of {folds} cross-validation folds.",
-      "unitsNote": "Each percentage is a relative reduction in hours at 30 °C WBGT or more, against the legal default or against common practice. The sleep gate is the least sleep a roster may leave a worker: {hours} h a night."
+      "headingGain": "عند تنقل مدته {minutes} دقيقة، يجد التحليل انخفاضًا قدره {gain} في الساعات عند 30 °C أو أكثر، فوق الخيار الافتراضي القانوني، مع إبقاء النوم عند {hours} h أو أكثر. الانتقال من الممارسة الشائعة إلى الخيار الافتراضي القانوني يخفضها بمقدار {legal} في المتوسط ضمن التحليل.",
+      "headingMissing": "لا توجد نتيجة في التحليل لتنقل مدته {minutes} دقيقة",
+      "headingPending": "حدود الجداول",
+      "bestMissing": "لا توجد نتيجة في التحليل لهذا التنقل.",
+      "headingNoGainFails": "عند تنقل مدته {minutes} دقيقة، لا يجد التحليل أي مكسب فوق الخيار الافتراضي القانوني. الخيار الافتراضي القانوني نفسه يترك هناك {sleep} h من النوم، وهو أقل من حد النوم البالغ {hours} h. الانتقال من الممارسة الشائعة إلى الخيار الافتراضي القانوني يخفض الساعات عند 30 °C أو أكثر بمقدار {legal} في المتوسط ضمن التحليل.",
+      "headingNoGainPasses": "عند تنقل مدته {minutes} دقيقة، لا يجد التحليل أي مكسب فوق الخيار الافتراضي القانوني: لم يتم التفوق عليه في {noChange} من {folds} طية من التحقق المتقاطع. الانتقال من الممارسة الشائعة إلى الخيار الافتراضي القانوني يخفض الساعات عند 30 °C أو أكثر بمقدار {legal} في المتوسط ضمن التحليل.",
+      "bestNoneFails": "لا مكسب فوق الخيار الافتراضي القانوني عند هذا التنقل. الخيار الافتراضي القانوني نفسه يترك {sleep} h من النوم، وهو أقل من حد النوم البالغ {hours} h.",
+      "bestNonePasses": "لا مكسب فوق الخيار الافتراضي القانوني عند هذا التنقل: لم يتم التفوق عليه في {noChange} من {folds} طية من التحقق المتقاطع.",
+      "unitsNote": "كل نسبة مئوية هي انخفاض نسبي في الساعات عند 30 °C WBGT أو أكثر، مقارنة بالخيار الافتراضي القانوني أو بالممارسة الشائعة. حد النوم هو أقل قدر من النوم يجوز أن يتركه الجدول للعامل: {hours} h في الليلة."
     },
     "day": {
-      "title": "One day, hour by hour: {date}",
-      "lede": "The raw forecast as made about 24 hours ahead, against what the station then recorded and what we would have said.",
-      "dayShown": "Day shown: {date}",
-      "dayShownPending": "Day shown until the scored day is available: {date}, the hottest raw forecast of the recorded season.",
-      "heatHeading": "Heat by hour",
+      "title": "يوم واحد، ساعة بساعة: {date}",
+      "lede": "التوقع الخام كما صدر قبل نحو 24 ساعة، مقابل ما سجلته المحطة بعد ذلك وما كنا سنقوله.",
+      "dayShown": "اليوم المعروض: {date}",
+      "dayShownPending": "اليوم المعروض إلى أن يتوفر اليوم المقيَّم: {date}، وهو أشد التوقعات الخام حرارة في الموسم المسجَّل.",
+      "heatHeading": "الحرارة بحسب الساعة",
       "chart": {
-        "aria": "WBGT by hour at {station} on {date}, {from} to {to}. {series} Heavy-work limit {limit} degrees. {peak}",
-        "ariaRaw": "Raw forecast made about 24 hours ahead.",
-        "ariaOurs": "Our 5 to 95 percent range.",
-        "ariaTruth": "Station truth.",
-        "ariaPeak": "Raw forecast peak {value} degrees at {hour}.",
-        "limit": "Heavy-work limit {limit} °C",
-        "slot": "Midday break",
-        "outline": "Midday break by law: not in force until {date}",
-        "outlineUnknown": "Midday break by law: not in force on this date",
-        "raw": "Raw forecast, made about 24 hours ahead",
-        "ours": "Ours (5 to 95 % range)",
-        "truth": "Station truth",
-        "peak": "Raw forecast peak {value} °C at {hour}"
+        "aria": "WBGT بحسب الساعة في {station} بتاريخ {date}، من {from} إلى {to}. {series} حد العمل الشاق {limit} درجة. {peak}",
+        "ariaRaw": "التوقع الخام الصادر قبل نحو 24 ساعة.",
+        "ariaOurs": "نطاقنا من 5 إلى 95 بالمئة.",
+        "ariaTruth": "قراءات المحطة.",
+        "ariaPeak": "ذروة التوقع الخام {value} درجة عند {hour}.",
+        "limit": "حد العمل الشاق {limit} °C",
+        "slot": "استراحة الظهيرة",
+        "outline": "استراحة الظهيرة بحكم القانون: غير سارية حتى {date}",
+        "outlineUnknown": "استراحة الظهيرة بحكم القانون: غير سارية في هذا التاريخ",
+        "raw": "التوقع الخام، الصادر قبل نحو 24 ساعة",
+        "ours": "توقعنا (نطاق من 5 إلى 95 %)",
+        "truth": "قراءات المحطة",
+        "peak": "ذروة التوقع الخام {value} °C عند {hour}"
       },
-      "laterSeries": "Ours (5 to 95 % range) and station truth: added once the scored day is available",
+      "laterSeries": "توقعنا (نطاق من 5 إلى 95 %) وقراءات المحطة: تُضاف عند توفر اليوم المقيَّم",
       "rule": {
-        "heading": "Which day is scored",
-        "body": "The rule: the day with the most working hours in the High or Red zone (ADOSH's top two heat levels) outside the midday break, judged on the station's records only. Ties go to the earliest date. We show it whatever our forecast did.",
-        "pending": "Until the scored day is available, this page draws the hottest raw forecast of the recorded season and only the series that exist.",
-        "read": "Read the day rule",
-        "what": "The scored day and how it is chosen",
-        "candidates": "{count} days were considered.",
-        "runnerUp": "Runner-up: {date}."
+        "heading": "أي يوم يُقيَّم",
+        "body": "القاعدة: اليوم الذي فيه أكبر عدد من ساعات العمل في المنطقة العالية أو الحمراء (أعلى مستويين للحرارة عند ADOSH) خارج استراحة الظهيرة، بالاعتماد على سجلات المحطة فقط. عند التعادل يُختار أقدم تاريخ. نعرضه مهما كان أداء توقعنا.",
+        "pending": "إلى أن يتوفر اليوم المقيَّم، ترسم هذه الصفحة أشد التوقعات الخام حرارة في الموسم المسجَّل، وتعرض فقط السلاسل الموجودة.",
+        "read": "اقرأ قاعدة اليوم",
+        "what": "اليوم المقيَّم وكيف يُختار",
+        "candidates": "تم النظر في {count} يومًا.",
+        "runnerUp": "الثاني في الترتيب: {date}."
       },
       "table": {
-        "toggle": "Show the hours as a table",
-        "caption": "Heat by hour on the day shown, degrees C WBGT",
-        "hour": "Hour",
-        "raw": "Raw forecast",
-        "ours": "Ours (5 to 95 %)",
-        "truth": "Station truth",
-        "inBreak": "Midday break",
-        "yes": "yes",
-        "from": "from {time}",
-        "range": "{lo} to {hi}",
-        "notScored": "not scored yet"
+        "toggle": "اعرض الساعات في جدول بيانات",
+        "caption": "الحرارة بحسب الساعة في اليوم المعروض، درجات C WBGT",
+        "hour": "الساعة",
+        "raw": "التوقع الخام",
+        "ours": "توقعنا (5 إلى 95 %)",
+        "truth": "قراءات المحطة",
+        "inBreak": "استراحة الظهيرة",
+        "yes": "نعم",
+        "from": "من {time}",
+        "range": "{lo} إلى {hi}",
+        "notScored": "لم يُقيَّم بعد"
       },
       "counters": {
-        "heading": "What the station recorded, and who warned about it",
-        "sub": "Warned about means the forecast, made about 24 hours ahead, put that hour in the High or Red zone. These numbers come from the one scored run; the page is the same whatever they are.",
-        "pending": "The tally for the scored day",
-        "high": "Working hours the station recorded in the High or Red zone that day",
-        "outside": "Of those, outside the midday break ({start} to {end})",
-        "raw": "Warned about by the regulator's zones, raw forecast",
-        "ours": "Warned about by Stellar Blaze, protective setting",
-        "hours": "hours",
-        "balanced": "Warned about by Stellar Blaze, balanced setting",
-        "p1": "Warned about by the fixed 32 °C rule",
-        "of": "{n} of {total}"
+        "heading": "ما سجلته المحطة، ومن حذّر منه",
+        "sub": "التحذير يعني أن التوقع، الصادر قبل نحو 24 ساعة، وضع تلك الساعة في المنطقة العالية أو الحمراء. هذه الأرقام من التقييم الوحيد المنفذ، والصفحة هي نفسها أيًا كانت.",
+        "pending": "الحصيلة لليوم المقيَّم",
+        "high": "ساعات العمل التي سجلتها المحطة في المنطقة العالية أو الحمراء ذلك اليوم",
+        "outside": "منها خارج استراحة الظهيرة ({start} إلى {end})",
+        "raw": "تم التحذير منها بمناطق الجهة التنظيمية، التوقع الخام",
+        "ours": "تم التحذير منها بواسطة Stellar Blaze، الإعداد الوقائي",
+        "hours": "ساعات",
+        "balanced": "تم التحذير منها بواسطة Stellar Blaze، الإعداد المتوازن",
+        "p1": "تم التحذير منها بقاعدة 32 °C الثابتة",
+        "of": "{n} من {total}"
       },
       "error": {
-        "title": "The day file could not be read",
-        "reason": "The season scoreboard still works. Nothing here is guessed in the meantime.",
-        "primary": "Try again"
+        "title": "تعذرت قراءة ملف اليوم",
+        "reason": "لوحة نتائج الموسم ما زالت تعمل. لا يُخمَّن هنا شيء في الأثناء.",
+        "primary": "حاول مرة أخرى"
       },
-      "loading": "Loading the day",
-      "titlePending": "One day, hour by hour",
-      "scoredNote": "We chose this day by a fixed rule, from the station's data alone, before looking at our own results. One day is an illustration, not proof of skill."
+      "loading": "جارٍ تحميل اليوم",
+      "titlePending": "يوم واحد، ساعة بساعة",
+      "scoredNote": "اخترنا هذا اليوم بقاعدة ثابتة، من بيانات المحطة وحدها، قبل النظر إلى نتائجنا. يوم واحد مجرد توضيح، وليس إثباتًا للكفاءة."
     },
     "try": {
-      "title": "Try a plan against the rules",
-      "lede": "Pick a roster or write your own. An independent rule checker tests it against the day's heat and the labour rules, and lists the rules the plan breaks.",
-      "independent": "This rule checker is independent: it shares no code with the planner that builds our plans, so a plan cannot pass just because it was built by us.",
-      "day": "Checked on {date}, the demo day (a recorded day, replayed), for a crew of {headcount} doing heavy work.",
-      "dayLive": "Checked on {date}, today at the site, for a crew of {headcount} doing heavy work.",
+      "title": "جرّب خطة مقابل القواعد",
+      "lede": "اختر جدولًا أو اكتب جدولك. يختبره مدقق قواعد مستقل مقابل حرارة اليوم وقواعد العمل، ويسرد القواعد التي تخالفها الخطة.",
+      "independent": "أداة التحقق من القواعد هذه مستقلة: لا تشترك في أي شيفرة مع المخطِّط الذي يبني خططنا، ولذلك لا يمكن أن تنجح الخطة لمجرد أننا بنيناها.",
+      "day": "تم التحقق بتاريخ {date}، اليوم التجريبي (يوم مسجَّل، إعادة عرض)، لفريق من {headcount} يؤدون عملًا شاقًا.",
+      "dayLive": "تم التحقق بتاريخ {date}، اليوم في الموقع، لفريق من {headcount} يؤدون عملًا شاقًا.",
       "templates": {
-        "heading": "Start from a roster",
-        "common": "Common roster",
-        "legal": "Legal default",
-        "straight": "Straight through",
-        "custom": "Your own times"
+        "heading": "ابدأ من جدول",
+        "common": "الجدول الشائع",
+        "legal": "الخيار الافتراضي القانوني",
+        "straight": "دون توقف",
+        "custom": "أوقاتك الخاصة"
       },
       "assumptions": {
-        "heading": "Assumptions about the crew",
-        "note": "The check needs these two. They are filled in for you and you can change them.",
-        "acclimatised": "Crew is heat-acclimatised",
-        "acclimatisedNote": "Off means everyone is new to the heat, the protective default.",
-        "days": "Working days per week",
-        "daysNote": "Used for the weekly hours rule.",
-        "daysProblem": "Use a whole number from 1 to 7."
+        "heading": "افتراضات عن الفريق",
+        "note": "يحتاج التحقق إلى هذين الافتراضين. تمت تعبئتهما لك ويمكنك تغييرهما.",
+        "acclimatised": "الفريق متأقلم مع الحرارة",
+        "acclimatisedNote": "الإيقاف يعني أن الجميع جدد على الحرارة، وهو الافتراض الوقائي.",
+        "days": "أيام العمل في الأسبوع",
+        "daysNote": "تُستخدم لقاعدة ساعات العمل الأسبوعية.",
+        "daysProblem": "استخدم عددًا صحيحًا من 1 إلى 7."
       },
       "runs": {
-        "heading": "Work times",
-        "run": "Run {n}",
-        "start": "Start",
-        "end": "End",
-        "hint": "Write the time as hh:mm on a 5 minute grid, for example 06:05. Leave a row empty to leave it out.",
-        "none": "Add at least one run of work, or pick a roster, then check.",
+        "heading": "أوقات العمل",
+        "run": "فترة {n}",
+        "start": "البداية",
+        "end": "النهاية",
+        "hint": "اكتب الوقت بصيغة hh:mm على شبكة من 5 دقائق، مثل 06:05. اترك الصف فارغًا لتتجاهله.",
+        "none": "أضف فترة عمل واحدة على الأقل، أو اختر جدولًا، ثم تحقق.",
         "placeholder": "hh:mm",
         "problem": {
-          "format": "Write the time as hh:mm, for example 06:00.",
-          "grid": "Use a multiple of 5 minutes, for example 06:05.",
-          "order": "The end must be after the start."
+          "format": "اكتب الوقت بصيغة hh:mm، مثل 06:00.",
+          "grid": "استخدم مضاعفًا لـ 5 دقائق، مثل 06:05.",
+          "order": "يجب أن تكون النهاية بعد البداية."
         },
-        "range": "{from} to {to}"
+        "range": "{from} إلى {to}"
       },
       "strip": {
-        "heading": "The plan on the day's heat",
-        "heatNote": "The colour behind the plan is the raw forecast of the day, hour by hour.",
-        "aria": "Work plan on {date}: {runs}. {marks}",
-        "ariaMarksOne": "1 rule broken, numbered on the plan.",
-        "ariaMarks": "{count} rules broken, numbered on the plan.",
-        "ariaNoMarks": "Not checked yet.",
-        "ariaClean": "No rule broken.",
-        "slot": "Midday break",
-        "outline": "Midday break by law: not in force until {date}",
-        "outlineUnknown": "Midday break by law: not in force on this date",
-        "noHeat": "No recorded forecast colour is drawn for this day: the recorded forecast is for another day."
+        "heading": "الخطة على حرارة اليوم",
+        "heatNote": "اللون خلف الخطة هو التوقع الخام لليوم، ساعة بساعة.",
+        "aria": "خطة العمل بتاريخ {date}: {runs}. {marks}",
+        "ariaMarksOne": "1 قاعدة مخالفة، مرقَّمة على الخطة.",
+        "ariaMarks": "{count} قواعد مخالفة، مرقَّمة على الخطة.",
+        "ariaNoMarks": "لم يتم التحقق بعد.",
+        "ariaClean": "لا توجد قاعدة مخالفة.",
+        "slot": "استراحة الظهيرة",
+        "outline": "استراحة الظهيرة بحكم القانون: غير سارية حتى {date}",
+        "outlineUnknown": "استراحة الظهيرة بحكم القانون: غير سارية في هذا التاريخ",
+        "noHeat": "لا يُرسم لون توقع مسجَّل لهذا اليوم: التوقع المسجَّل هو ليوم آخر."
       },
-      "check": "Check this plan",
-      "checking": "Checking the plan",
-      "notReady": "The demo site is still loading. Try again in a moment.",
-      "noDay": "The day to check could not be read from the site's forecast. Try again in a moment.",
+      "check": "تحقق من هذه الخطة",
+      "checking": "جارٍ التحقق من الخطة",
+      "notReady": "الموقع التجريبي ما زال قيد التحميل. حاول مرة أخرى بعد قليل.",
+      "noDay": "تعذرت قراءة اليوم المراد التحقق منه من توقعات الموقع. حاول مرة أخرى بعد قليل.",
       "result": {
-        "heading": "What the rule checker found",
-        "brokenOne": "1 rule broken",
-        "broken": "{count} rules broken",
-        "zero": "0 rules broken",
-        "zeroNote": "Every rule it checked passed for this plan.",
-        "checked": "What was checked",
-        "checkedNote": "These rules were evaluated on this plan, including the ones it passed.",
-        "violation": "Rule {n}",
-        "when": "When",
-        "clause": "Clause",
-        "notFresh": "No fresh forecast: protective plan"
+        "heading": "ما وجدته أداة التحقق من القواعد",
+        "brokenOne": "1 قاعدة مخالفة",
+        "broken": "{count} قواعد مخالفة",
+        "zero": "0 قواعد مخالفة",
+        "zeroNote": "نجحت كل قاعدة تم فحصها لهذه الخطة.",
+        "checked": "ما تم فحصه",
+        "checkedNote": "تم تقييم هذه القواعد على هذه الخطة، بما فيها القواعد التي نجحت فيها.",
+        "violation": "القاعدة {n}",
+        "when": "متى",
+        "clause": "البند",
+        "notFresh": "لا توجد توقعات حديثة: خطة وقائية"
       },
       "recorded": {
-        "button": "Show a recorded result",
-        "noteMock": "Recorded against the demo mock on {date}, not the live rule checker. It is what the rule checker said for the common roster, not a check of your times.",
-        "note": "Recorded on {date}. It is what the rule checker said for the common roster, not a check of your times.",
-        "hide": "Hide the recorded result"
+        "button": "اعرض نتيجة مسجَّلة",
+        "noteMock": "سُجلت مقابل النموذج التجريبي الوهمي بتاريخ {date}، وليس أداة التحقق الحية. هي ما قالته أداة التحقق من القواعد عن الجدول الشائع، وليست تحققًا من أوقاتك.",
+        "note": "سُجلت بتاريخ {date}. هي ما قالته أداة التحقق من القواعد عن الجدول الشائع، وليست تحققًا من أوقاتك.",
+        "hide": "أخفِ النتيجة المسجَّلة"
       },
       "error": {
-        "title": "The rule checker did not answer.",
-        "reason": "Your times are kept. Nothing was checked, so this is not a result.",
-        "retry": "Try again",
-        "requestId": "Request id"
+        "title": "لم تستجب أداة التحقق من القواعد.",
+        "reason": "أوقاتك محفوظة. لم يتم التحقق من شيء، ولذلك هذه ليست نتيجة.",
+        "retry": "حاول مرة أخرى",
+        "requestId": "معرّف الطلب"
       },
       "invalid": {
-        "title": "The roster could not be read.",
-        "reason": "The rule checker could not read these lines. Nothing was checked.",
-        "line": "Run {line}"
+        "title": "تعذرت قراءة الجدول.",
+        "reason": "تعذر على أداة التحقق من القواعد قراءة هذه الأسطر. لم يتم التحقق من شيء.",
+        "line": "فترة {line}"
       },
-      "loading": "Loading the checker",
+      "loading": "جارٍ تحميل أداة التحقق",
       "rules": {
-        "pH1": "Work during the midday ban",
-        "pH1a": "Exemption from the midday ban",
-        "pH2Daily": "Daily working hours",
-        "pH2Weekly": "Weekly working hours",
-        "pH3": "Break after five hours of work",
-        "pH4": "Weekly rest day",
-        "pH5Hours": "Young worker: daily hours",
-        "pH5Run": "Young worker: run of work",
-        "pH5Window": "Young worker: hours of the day",
-        "pH5BanSeason": "Young worker: heat season",
-        "pH7Cap60": "Too many work minutes in an hour",
-        "pH7Run": "Work run too long, or rest too short",
-        "pH7Lone": "Working alone in the heat",
-        "pH7Unacclimatised": "Unacclimatised crew working in the heat",
-        "pH7Cycle": "Work-rest cycle",
-        "pH8Ramp": "Acclimatisation ramp-up",
-        "pH8Heavy7": "Heavy work before 7 days of acclimatisation",
-        "pH10": "No added minutes",
-        "stopRed": "Stop work in the red zone",
-        "stopNoAcclimatised": "No acclimatised worker available",
-        "fallbackHigh": "No usable forecast: treated as High"
+        "pH1": "العمل أثناء حظر الظهيرة",
+        "pH1a": "الاستثناء من حظر الظهيرة",
+        "pH2Daily": "ساعات العمل اليومية",
+        "pH2Weekly": "ساعات العمل الأسبوعية",
+        "pH3": "استراحة بعد خمس ساعات من العمل",
+        "pH4": "يوم الراحة الأسبوعي",
+        "pH5Hours": "العامل صغير السن: الساعات اليومية",
+        "pH5Run": "العامل صغير السن: فترة العمل المتواصلة",
+        "pH5Window": "العامل صغير السن: ساعات اليوم",
+        "pH5BanSeason": "العامل صغير السن: موسم الحرارة",
+        "pH7Cap60": "دقائق العمل في الساعة كثيرة جدًا",
+        "pH7Run": "فترة العمل طويلة جدًا، أو الراحة قصيرة جدًا",
+        "pH7Lone": "العمل منفردًا في الحرارة",
+        "pH7Unacclimatised": "فريق غير متأقلم يعمل في الحرارة",
+        "pH7Cycle": "دورة العمل والراحة",
+        "pH8Ramp": "الزيادة التدريجية للتأقلم",
+        "pH8Heavy7": "عمل شاق قبل 7 أيام من التأقلم",
+        "pH10": "لا دقائق مضافة",
+        "stopRed": "أوقف العمل في المنطقة الحمراء",
+        "stopNoAcclimatised": "لا يتوفر عامل متأقلم",
+        "fallbackHigh": "لا توجد توقعات صالحة للاستخدام: يُعامل على أنه عالٍ"
       }
     },
     "story": {
@@ -1523,129 +1523,129 @@
       }
     },
     "proof": {
-      "title": "Where this number comes from",
-      "back": "Back to the scoreboard",
-      "openSheet": "Open the proof sheet",
-      "timelineHeading": "The number's timeline",
+      "title": "من أين جاء هذا الرقم",
+      "back": "العودة إلى لوحة النتائج",
+      "openSheet": "افتح ورقة الإثبات",
+      "timelineHeading": "الجدول الزمني للرقم",
       "timeline": {
-        "plan": "Plan written down and locked",
-        "run": "Scored once on summer 2026",
-        "shown": "Shown here as scored"
+        "plan": "كُتبت الخطة وقُفلت",
+        "run": "قُيِّمت مرة واحدة على صيف 2026",
+        "shown": "معروضة هنا كما قُيِّمت"
       },
       "notes": {
-        "planLocked": "The test plan, commit {commit}, was locked before 2026 was scored.",
-        "runScored": "The single scoring run wrote this file.",
-        "shown": "This page reads the file whose fingerprint is above.",
-        "synthetic": "These numbers are made up, only to check the layout. No scoring run wrote them."
+        "planLocked": "خطة الاختبار، commit {commit}، قُفلت قبل تقييم 2026.",
+        "runScored": "كتبت عملية التقييم الوحيدة هذا الملف.",
+        "shown": "تقرأ هذه الصفحة الملف الذي بصمته أعلاه.",
+        "synthetic": "هذه الأرقام اصطناعية، فقط للتحقق من التخطيط. لم تكتبها أي عملية تقييم."
       },
-      "emptyTitle": "This number is not shown",
-      "emptyReason": "This number is not shown because its record is incomplete.",
-      "emptyAction": "Open a number that has proof",
-      "unreadableTitle": "The file behind this number could not be read",
-      "unreadableReason": "The number exists but its result file could not be read, so it is not shown. Nothing here is guessed."
+      "emptyTitle": "هذا الرقم غير معروض",
+      "emptyReason": "هذا الرقم غير معروض لأن سجله غير مكتمل.",
+      "emptyAction": "افتح رقمًا له إثبات",
+      "unreadableTitle": "تعذرت قراءة الملف الذي يقف وراء هذا الرقم",
+      "unreadableReason": "الرقم موجود لكن تعذرت قراءة ملف نتيجته، ولذلك لا يُعرض. لا يُخمَّن هنا شيء."
     },
     "governance": {
-      "eyebrow": "Governance refusal",
-      "title": "When an employer asks for individual health data, the answer is no, and every worker at the site can see that it was asked.",
-      "lede": "The service holds no individual health data, so it refuses every such request and writes the refusal to a log that every worker at the site can read. Press the button to watch it happen, in time order.",
-      "sequence": "What happens, in time order",
+      "eyebrow": "رفض الحوكمة",
+      "title": "عندما يطلب صاحب العمل بيانات صحية فردية، يكون الجواب لا، ويستطيع كل عامل في الموقع أن يرى أن الطلب قد وُجّه.",
+      "lede": "لا تحتفظ الخدمة بأي بيانات صحية فردية، لذلك ترفض كل طلب من هذا النوع وتكتب الرفض في سجل يستطيع كل عامل في الموقع قراءته. اضغط الزر لتشاهد ما يحدث بترتيب زمني.",
+      "sequence": "ما الذي يحدث، بترتيب زمني",
       "request": {
-        "who": "Employer console",
-        "title": "The employer asks",
-        "subject": "Whose data",
-        "subjectValue": "One worker",
-        "dataClass": "Kind of data",
-        "dataClassHealth": "Health",
-        "workerRef": "Worker reference",
-        "refNote": "A made-up example. The service discards the reference: it is never stored, logged or shown.",
-        "send": "Send the employer's request",
-        "sendAgain": "Send again",
-        "caption": "Each send is a real call to the demo API and adds one row to the log. Nothing is sent until you press the button.",
-        "dataClassPersonal": "Personal",
-        "dataClassExposure": "Exposure"
+        "who": "لوحة صاحب العمل",
+        "title": "صاحب العمل يطلب",
+        "subject": "بيانات من",
+        "subjectValue": "عامل واحد",
+        "dataClass": "نوع البيانات",
+        "dataClassHealth": "صحية",
+        "workerRef": "مرجع العامل",
+        "refNote": "مثال اصطناعي. تتجاهل الخدمة المرجع: لا يُخزَّن ولا يُسجَّل ولا يُعرض أبدًا.",
+        "send": "أرسل طلب صاحب العمل",
+        "sendAgain": "أرسل مرة أخرى",
+        "caption": "كل إرسال هو استدعاء حقيقي لواجهة API التجريبية ويضيف صفًا واحدًا إلى السجل. لا يُرسل شيء حتى تضغط الزر.",
+        "dataClassPersonal": "شخصية",
+        "dataClassExposure": "التعرض"
       },
       "answer": {
-        "who": "API",
-        "title": "The service answers",
-        "waiting": "Waiting for the API",
-        "none": "Nothing sent yet.",
-        "refused": "Refused",
-        "type": "Problem type",
-        "problemTitle": "Title",
-        "detail": "Detail",
-        "detailRefused": "Individual health data is not held by this service and is never released to an employer.",
-        "requestId": "Request ID"
+        "who": "واجهة API",
+        "title": "الخدمة تجيب",
+        "waiting": "في انتظار API",
+        "none": "لم يُرسل شيء بعد.",
+        "refused": "مرفوض",
+        "type": "نوع المشكلة",
+        "problemTitle": "العنوان",
+        "detail": "التفصيل",
+        "detailRefused": "هذه الخدمة لا تحتفظ بالبيانات الصحية الفردية ولا تُسلَّم أبدًا إلى صاحب العمل.",
+        "requestId": "معرّف الطلب"
       },
       "audit": {
-        "who": "Audit log",
-        "title": "The audit row",
-        "none": "Nothing recorded.",
-        "when": "Time",
-        "what": "Entry",
-        "whatValue": "Data request",
-        "askedBy": "Asked by",
-        "askedByValue": "An employer account",
-        "outcome": "Outcome",
-        "outcomeValue": "Refused",
-        "why": "Why",
-        "whyValue": "A worker's health data is never released to an employer, whatever the reason given.",
-        "rules": "Rules in force",
-        "model": "Model",
-        "noModel": "none loaded",
-        "note": "The log is tamper-evident: each entry includes the one before it, so a change shows. Nothing is ever deleted from it, and it never records whose data was asked for."
+        "who": "سجل التدقيق",
+        "title": "صف التدقيق",
+        "none": "لا شيء مسجَّل.",
+        "when": "الوقت",
+        "what": "الإدخال",
+        "whatValue": "طلب بيانات",
+        "askedBy": "الطالب",
+        "askedByValue": "حساب صاحب عمل",
+        "outcome": "النتيجة",
+        "outcomeValue": "مرفوض",
+        "why": "السبب",
+        "whyValue": "لا تُسلَّم البيانات الصحية للعامل أبدًا إلى صاحب العمل، مهما كان السبب المذكور.",
+        "rules": "القواعد السارية",
+        "model": "النموذج",
+        "noModel": "لا يوجد نموذج محمَّل",
+        "note": "السجل يكشف أي تلاعب: كل إدخال يتضمن الإدخال الذي سبقه، فيظهر أي تغيير. لا يُحذف منه شيء أبدًا، ولا يسجّل أبدًا صاحب البيانات المطلوبة."
       },
       "phone": {
-        "who": "Worker's phone",
-        "title": "Who asked for individual data",
-        "empty": "Nobody has asked for individual data at this site.",
-        "emptyHint": "If an employer asks, it is refused and shown here.",
-        "note": "Every worker at this site sees the same list. It says an employer asked at the site, never whose data.",
-        "sourceLive": "From the demo API's log",
-        "sourceRecorded": "From the recorded run",
-        "count": "The newest {shown} of {total} rows, from the demo API's log",
-        "countRecorded": "The newest {shown} of {total} rows, from the recorded run",
-        "liveBlockTitle": "Live rows from the demo API",
-        "liveBlockNote": "Written by sends to the demo API, by any visitor. They are not part of the recorded run above."
+        "who": "هاتف العامل",
+        "title": "من طلب بيانات فردية",
+        "empty": "لم يطلب أحد بيانات فردية في هذا الموقع.",
+        "emptyHint": "إذا طلب صاحب العمل ذلك، يُرفض الطلب ويظهر هنا.",
+        "note": "كل عامل في هذا الموقع يرى القائمة نفسها. تذكر أن صاحب عمل طلب في الموقع، ولا تذكر أبدًا صاحب البيانات.",
+        "sourceLive": "من سجل API التجريبية",
+        "sourceRecorded": "من التشغيل المسجَّل",
+        "count": "أحدث {shown} من {total} صفًا، من سجل API التجريبية",
+        "countRecorded": "أحدث {shown} من {total} صفًا، من التشغيل المسجَّل",
+        "liveBlockTitle": "صفوف مباشرة من API التجريبية",
+        "liveBlockNote": "كتبتها عمليات الإرسال إلى API التجريبية، من أي زائر. وهي ليست جزءًا من التشغيل المسجَّل أعلاه."
       },
       "notes": {
-        "times": "Times are Dubai time. Each step shows when it happened.",
-        "privacy": "A worker's heat level is worked out on the worker's phone and is not stored on the server."
+        "times": "الأوقات بتوقيت دبي. تُظهر كل خطوة وقت حدوثها.",
+        "privacy": "يُحسب مستوى الحرارة للعامل على هاتفه ولا يُخزَّن على الخادم."
       },
-      "resetNote": "Reset starts the demo site fresh. Nothing is deleted: the log keeps every earlier entry.",
-      "back": "Back to the scoreboard",
+      "resetNote": "إعادة الضبط تبدأ الموقع التجريبي من جديد. لا يُحذف شيء: يحتفظ السجل بكل إدخال سابق.",
+      "back": "العودة إلى لوحة النتائج",
       "proves": {
-        "title": "What proves it in the build",
-        "data_request_403_and_audit_row": "A data request gets a 403 problem and writes one audit row.",
-        "transparency_log_shows_refusal": "The worker-visible log shows the refusal and never whose data was asked for.",
-        "verify_detects_edited_row": "Editing a stored audit row is detected when the log is verified."
+        "title": "ما الذي يثبت ذلك في النسخة المبنية",
+        "data_request_403_and_audit_row": "طلب البيانات يحصل على مشكلة 403 ويكتب صف تدقيق واحدًا.",
+        "transparency_log_shows_refusal": "السجل الظاهر للعمال يعرض الرفض ولا يعرض أبدًا صاحب البيانات المطلوبة.",
+        "verify_detects_edited_row": "يُكتشف تعديل صف تدقيق مخزَّن عند التحقق من السجل."
       },
       "status": {
-        "recorded": "This is a recorded run against the demo API. Press the button to run it live.",
+        "recorded": "هذا تشغيل مسجَّل على API التجريبية. اضغط الزر لتشغيله مباشرة.",
         "live": {
-          "title": "Live.",
-          "reason": "This run was just made against the demo API, and the log below is the log the API returned."
+          "title": "مباشر.",
+          "reason": "أُجري هذا التشغيل للتو على API التجريبية، والسجل أدناه هو السجل الذي أعادته API."
         },
         "noRun": {
-          "title": "No recorded run is available.",
-          "reason": "Press the button to make the request live."
+          "title": "لا يوجد تشغيل مسجَّل.",
+          "reason": "اضغط الزر لإرسال الطلب مباشرة."
         },
-        "limited": "Not sent. Try again in a minute.",
+        "limited": "لم يُرسل. حاول مرة أخرى بعد دقيقة.",
         "unauthorized": {
-          "title": "The request was not accepted.",
-          "reason": "This deployment has no demo employer token, so the call needed a sign-in it did not have. Nothing was recorded."
+          "title": "لم يُقبل الطلب.",
+          "reason": "لا يحتوي هذا النشر على رمز صاحب عمل تجريبي، لذلك احتاج الاستدعاء إلى تسجيل دخول لم يكن متاحًا. لم يُسجَّل شيء."
         },
         "failed": {
-          "title": "Nothing was sent, so nothing was recorded.",
-          "reason": "The demo API could not be reached. The last run stays on screen."
+          "title": "لم يُرسل شيء، لذلك لم يُسجَّل شيء.",
+          "reason": "تعذر الوصول إلى API التجريبية. يبقى آخر تشغيل على الشاشة."
         },
-        "requestId": "Request ID",
+        "requestId": "معرّف الطلب",
         "unexpected": {
-          "title": "The API did not refuse the request.",
-          "reason": "This page does not report that as a result. Nothing is shown as a refusal."
+          "title": "لم ترفض API الطلب.",
+          "reason": "لا تعرض هذه الصفحة ذلك كنتيجة. لا يُعرض شيء على أنه رفض."
         },
-        "notReady": "The demo site is still loading. Try again in a moment.",
-        "logFailed": "The log could not be refreshed, so the rows shown may be out of date.",
-        "recordedMock": "Recorded against the demo mock, not the live service. Press the button to run it against the demo API."
+        "notReady": "الموقع التجريبي ما زال قيد التحميل. حاول مرة أخرى بعد قليل.",
+        "logFailed": "تعذر تحديث السجل، لذلك قد تكون الصفوف المعروضة قديمة.",
+        "recordedMock": "مسجَّل على النموذج التجريبي المحاكي، وليس على الخدمة المباشرة. اضغط الزر لتشغيله على API التجريبية."
       }
     },
     "landing": {
@@ -1705,97 +1705,97 @@
       },
       "story": {
         "morning": {
-          "eyebrow": "A morning on site",
-          "heading": "One sign, one instruction, in the worker's own language.",
-          "body1": "The midday break alone does not cover the hot hours, and a worker has no time to read a report. The phone shows the heat level, what to do now and when it changes, drawn on a clock.",
-          "body2": "“I feel unwell” is always one tap away. There is no account and no name.",
-          "link": "Open the worker screen",
+          "eyebrow": "صباح في الموقع",
+          "heading": "علامة واحدة، وتعليمة واحدة، بلغة العامل نفسه.",
+          "body1": "استراحة الظهيرة وحدها لا تغطي ساعات الحر، وليس لدى العامل وقت لقراءة تقرير. يعرض الهاتف مستوى الحرارة وما يجب فعله الآن ومتى يتغير، مرسومًا على ساعة.",
+          "body2": "“أشعر بتوعك” على بعد لمسة واحدة دائمًا. لا يوجد حساب ولا اسم.",
+          "link": "افتح شاشة العامل",
           "spine": {
-            "level": "Heat level",
-            "airport": "Abu Dhabi airport forecast",
-            "break": "Midday break"
+            "level": "مستوى الحرارة",
+            "airport": "توقعات مطار أبوظبي",
+            "break": "استراحة الظهيرة"
           }
         },
         "plan": {
-          "eyebrow": "Tonight's plan",
-          "heading": "The crew lead sees which crew heats up first.",
-          "body": "A plan that follows the published ADOSH heat rules. Stop work is one tap. So is Undo. It never waits for a sign-off.",
-          "demo": "Demo site: the crews and times are made up.",
-          "level": "Orange until 11:00",
-          "unsigned": "Plan unsigned",
+          "eyebrow": "خطة الليلة",
+          "heading": "يرى رئيس الفريق أي فريق ترتفع حرارة عمله أولًا.",
+          "body": "خطة تتبع قواعد ADOSH المنشورة للحرارة. أوقف العمل بلمسة واحدة. وكذلك التراجع. ولا تنتظر أبدًا أي توقيع موافقة.",
+          "demo": "موقع تجريبي: الفرق والأوقات اصطناعية.",
+          "level": "برتقالي حتى 11:00",
+          "unsigned": "الخطة غير موقّعة",
           "crewA": {
-            "name": "Crew A",
-            "task": "Rebar fixing"
+            "name": "فريق A",
+            "task": "تثبيت حديد التسليح"
           },
           "crewC": {
-            "name": "Crew C",
-            "task": "Formwork"
+            "name": "فريق C",
+            "task": "الشدات الخشبية"
           },
           "crewD": {
-            "name": "Crew D",
-            "task": "Survey and inspection"
+            "name": "فريق D",
+            "task": "المساحة والتفتيش"
           },
-          "stop": "Stop work, Crew A",
-          "link": "Open the crews screen",
-          "tag": "Demo",
-          "copy": "Follows the ADOSH heat rules. Stop work in one tap."
+          "stop": "أوقف العمل، فريق A",
+          "link": "افتح شاشة الفرق",
+          "tag": "تجريبي",
+          "copy": "تتبع قواعد ADOSH للحرارة. أوقف العمل بلمسة واحدة."
         },
         "boundary": {
-          "eyebrow": "The boundary",
-          "heading": "An employer asks for one worker's health record. The answer is no.",
-          "body": "The service holds none. Every worker at the site can see that it was asked.",
-          "request": "Request from an employer account.",
-          "requestDetail": "Individual health data for one worker.",
-          "refused": "Refused.",
-          "refusedDetail": "Recorded in a log that each entry builds on the one before, so a change shows.",
-          "link": "See the refusal, recorded",
+          "eyebrow": "الحد الفاصل",
+          "heading": "صاحب عمل يطلب السجل الصحي لعامل واحد. الجواب لا.",
+          "body": "الخدمة لا تحتفظ بأي منها. يستطيع كل عامل في الموقع أن يرى أن الطلب قد وُجّه.",
+          "request": "طلب من حساب صاحب عمل.",
+          "requestDetail": "بيانات صحية فردية لعامل واحد.",
+          "refused": "مرفوض.",
+          "refusedDetail": "مسجَّل في سجل يبني كل إدخال فيه على الإدخال الذي سبقه، فيظهر أي تغيير.",
+          "link": "شاهد الرفض، مسجَّلًا",
           "panel": {
-            "asked": "Asked",
-            "refused": "Refused",
-            "seen": "Seen",
-            "refusedLine": "The service holds none.",
-            "seenLine": "Every worker at the site can see it was asked.",
-            "chain": "Each log entry builds on the one before, so a change shows.",
-            "earlier": "earlier",
-            "entry": "entry"
+            "asked": "طُلب",
+            "refused": "رُفض",
+            "seen": "شوهد",
+            "refusedLine": "الخدمة لا تحتفظ بأي منها.",
+            "seenLine": "يستطيع كل عامل في الموقع أن يرى أن الطلب قد وُجّه.",
+            "chain": "كل إدخال في السجل يبني على الذي قبله، فيظهر أي تغيير.",
+            "earlier": "سابق",
+            "entry": "إدخال"
           }
         },
         "evidence": {
-          "eyebrow": "Last summer, replayed",
-          "heading": "Danger hours nobody was warned about.",
-          "body": "Abu Dhabi airport, summer 2026, with only the forecast made a day ahead. Every setting was chosen using 2024 and 2025 data only. We wrote down how we would be judged before the scored run, and ran it once.",
-          "caption": "Danger hours not warned about, by way of warning. A shorter bar means fewer danger hours missed.",
-          "falseAlarms": "False-alarm hours: {n}",
-          "verdicts": "How the main checks came out",
-          "scoreboard": "See the full scoreboard",
-          "unavailable": "The scored results are not available in this build.",
+          "eyebrow": "الصيف الماضي، إعادة عرض",
+          "heading": "ساعات خطر لم ينبّه إليها أحد.",
+          "body": "مطار أبوظبي، صيف 2026، بالتوقعات الصادرة قبل يوم واحد فقط. اختيرت كل الإعدادات باستخدام بيانات 2024 و2025 فقط. كتبنا كيف سنُقيَّم قبل التشغيل المحتسب، وشغّلناه مرة واحدة.",
+          "caption": "ساعات الخطر التي لم يصدر عنها تحذير، حسب طريقة التحذير. الشريط الأقصر يعني ساعات خطر فائتة أقل.",
+          "falseAlarms": "ساعات الإنذار الكاذب: {n}",
+          "verdicts": "نتائج التحققات الرئيسية",
+          "scoreboard": "شاهد لوحة النتائج الكاملة",
+          "unavailable": "النتائج المحتسبة غير متاحة في هذه النسخة.",
           "short": {
-            "body": "Abu Dhabi airport, summer 2026. Forecast made a day ahead.",
-            "caption": "Danger hours not warned about. Shorter is better.",
-            "trade": "Every setting trades missed danger hours against false alarms. You choose where to sit."
+            "body": "مطار أبوظبي، صيف 2026. توقعات صادرة قبل يوم واحد.",
+            "caption": "ساعات الخطر التي لم يصدر عنها تحذير. الأقصر أفضل.",
+            "trade": "كل إعداد يقايض ساعات الخطر الفائتة بالإنذارات الكاذبة. أنت تختار موضعك."
           },
-          "met": "Met",
-          "notMet": "Not met",
-          "noClaim": "We do not claim to beat them.",
+          "met": "تحقق",
+          "notMet": "لم يتحقق",
+          "noClaim": "لا ندّعي أننا نتفوق عليها.",
           "headline": {
             "H4": {
-              "fewer": "fewer danger hours missed than the midday break alone",
-              "more": "more danger hours missed than the midday break alone"
+              "fewer": "ساعات خطر فائتة أقل مما تفوته استراحة الظهيرة وحدها",
+              "more": "ساعات خطر فائتة أكثر مما تفوته استراحة الظهيرة وحدها"
             },
             "H5": {
-              "more": "more false-alarm hours than the regulator's own zones.",
-              "fewer": "fewer false-alarm hours than the regulator's own zones."
+              "more": "ساعات إنذار كاذب أكثر من مناطق الجهة التنظيمية نفسها.",
+              "fewer": "ساعات إنذار كاذب أقل من مناطق الجهة التنظيمية نفسها."
             }
           }
         },
         "limits": {
-          "eyebrow": "What this does not show yet",
-          "one": "One summer, one airport station.",
-          "two": "No worker outcomes yet.",
-          "three": "No clinician review yet. Translations are machine-made.",
-          "four": "Made-up demo data, hosted in France. Built for UAE North.",
-          "tested": "See how it was tested",
-          "auditors": "For auditors"
+          "eyebrow": "ما لا يُظهره هذا بعد",
+          "one": "صيف واحد، ومحطة مطار واحدة.",
+          "two": "لا توجد نتائج على العمال بعد.",
+          "three": "لا توجد مراجعة من طبيب بعد. الترجمات آلية.",
+          "four": "بيانات تجريبية اصطناعية، مستضافة في فرنسا. مبنية لمنطقة UAE North.",
+          "tested": "شاهد كيف اختُبر",
+          "auditors": "للمدققين"
         }
       },
       "rail": {
@@ -1860,32 +1860,36 @@
       "title": "جولة من 3 دقائق",
       "lead": "المحطات بهذا الترتيب. تفتح كل محطة الشاشة الحقيقية.",
       "open": "افتح هذه الشاشة",
-      "controls": "للتبديل بين إعادة التشغيل والوضع المباشر، أو لإعادة ضبط الموقع التجريبي، استخدم عناصر التحكم التجريبية في عرض السلامة.",
+      "controls": "لإعادة ضبط الموقع التجريبي، استخدم عناصر التحكم التجريبية في عرض السلامة. التغذية المباشرة غير متصلة في هذا العرض التجريبي، لذا تعرض كل الشاشات إعادة العرض المسجَّلة.",
       "controlsLink": "افتح عناصر التحكم التجريبية",
       "steps": {
         "story": {
-          "title": "The story",
-          "text": "Why plan the night before, and how the warnings were checked on a summer held out of every choice."
+          "title": "القصة",
+          "text": "لماذا نخطط في الليلة السابقة، وكيف جرى التحقق من التحذيرات على صيف محجوب عن كل اختيار."
         },
         "worker": {
-          "title": "The worker's phone",
-          "text": "What a worker sees: today's heat level and when to rest. There is no account to make."
+          "title": "هاتف العامل",
+          "text": "ما يراه العامل: مستوى حرارة اليوم ووقت الراحة. لا يلزم إنشاء حساب."
         },
         "crew": {
-          "title": "The crew lead's screen",
-          "text": "Crews listed worst first. Press Stop work, then undo it."
+          "title": "شاشة رئيس الفريق",
+          "text": "الفرق مرتبة من الأسوأ أولًا. اضغط أوقف العمل، ثم تراجع عنه."
+        },
+        "day": {
+          "title": "يوم واحد، ساعة بساعة",
+          "text": "يوم حار واحد، ساعة بساعة: التوقعات، وما سجّلته المحطة، وما كنا سنقوله."
         },
         "try": {
-          "title": "Try a plan",
-          "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."
+          "title": "جرّب خطة",
+          "text": "اكتب جدول عمل واضغط تحقق من هذه الخطة. تقول أداة التحقق من القواعد أي القواعد تخالفها، ومتى."
         },
         "boundary": {
-          "title": "The refusal",
-          "text": "Ask, as an employer, for one worker's health record. The service refuses and logs the request."
+          "title": "الرفض",
+          "text": "اطلب، بصفتك صاحب عمل، السجل الصحي لعامل واحد. ترفض الخدمة الطلب وتسجّله."
         },
         "scoreboard": {
-          "title": "The scoreboard",
-          "text": "Every way of warning side by side, including where Stellar Blaze does worse."
+          "title": "لوحة النتائج",
+          "text": "كل طرق التحذير جنبًا إلى جنب، بما في ذلك المواضع التي يكون فيها أداء Stellar Blaze أسوأ."
         }
       }
     }

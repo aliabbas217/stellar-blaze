@@ -43,6 +43,19 @@ export const STATUSES = ["untranslated", "machine-draft", "english-by-design", "
 export const CLAIM_PREFIXES = ["judge.scoreboard.", "judge.frontier.", "judge.proof.", "judge.day.", "judge.try.", "judge.governance.", "judge.landing.story.", "judge.tour.steps.", "states.proof."];
 /** The dev pages (design kit, specimen): not product copy. */
 export const DEV_PREFIXES = ["common.kit.", "common.specimen.", "common.spineKit."];
+/**
+ * Locales whose claims surfaces are translated (ADR 0083 amendment 2026-11-20, owner's ruling: Arabic must be complete). A claims key
+ * in one of these may differ from en, but only under the numbers rule below: every number of en's sentence is in the translation, the
+ * same number of times. The other four locales keep the claims surfaces in English.
+ */
+export const CLAIMS_TRANSLATED_LOCALES = ["ar"];
+export const isClaimsTranslated = (/** @type {string} */ locale) => CLAIMS_TRANSLATED_LOCALES.includes(locale);
+
+/** The numbers of a message, as written (digit runs with an optional decimal part), sorted. ICU arguments such as `{n}` carry no digits. */
+export function numberTokens(/** @type {string} */ message) {
+  return (message.match(/\d+(?:[.,]\d+)?/g) ?? []).sort();
+}
+
 export const ENGLISH_BY_DESIGN_PREFIXES = [...CLAIM_PREFIXES, ...DEV_PREFIXES];
 
 /**
@@ -63,6 +76,8 @@ export const INVARIANT_KEYS = [
   "judge.landing.phone.site",
   "judge.landing.scene.measure",
   "judge.landing.scene.eyebrow",
+  "states.proof.rows.sha",
+  "judge.try.runs.placeholder",
 ];
 export const INVARIANT_NOTE = "same in every language (a name, a unit or a format)";
 
@@ -139,7 +154,10 @@ export function catalogueProblems(/** @type {Catalogues} */ catalogues) {
         problems.push(`${locale}: ${key} tags [${richTags(value).join(" ")}] differ from en [${richTags(source).join(" ")}]`);
       }
       if (choiceShape(value).join() !== choiceShape(source).join()) problems.push(`${locale}: ${key} ICU choice arguments differ from en`);
-      if (isClaimKey(key) && value !== source) problems.push(`${locale}: ${key} is a claims-surface string and stays en's text`);
+      if (isClaimKey(key) && !isClaimsTranslated(locale) && value !== source) problems.push(`${locale}: ${key} is a claims-surface string and stays en's text`);
+      if (isClaimKey(key) && isClaimsTranslated(locale) && numberTokens(value).join() !== numberTokens(source).join()) {
+        problems.push(`${locale}: ${key} numbers [${numberTokens(value).join(" ")}] differ from en [${numberTokens(source).join(" ")}] (a translated claim keeps every number)`);
+      }
     }
   }
   return problems;
@@ -178,7 +196,7 @@ export function deriveManifest(catalogues, previous) {
       const same = value === source;
       let status;
       if (reviewed.has(key)) status = "reviewed";
-      else if (same && isEnglishByDesign(key)) status = "english-by-design";
+      else if (same && isEnglishByDesign(key) && !(isClaimsTranslated(locale) && isClaimKey(key))) status = "english-by-design";
       else if (same && !isInvariant(key)) status = "untranslated";
       else status = "machine-draft";
       groups[status]?.[safety.has(key) ? "safety" : "other"].push(key);
@@ -233,7 +251,7 @@ export function manifestEntries(manifest) {
  */
 export function releaseProblems(manifest) {
   return manifestEntries(manifest)
-    .filter((entry) => entry.status === "untranslated" && !isEnglishByDesign(entry.key))
+    .filter((entry) => entry.status === "untranslated" && !(isEnglishByDesign(entry.key) && !(isClaimsTranslated(entry.locale) && isClaimKey(entry.key))))
     .map((entry) => `${entry.locale}.${entry.key} is untranslated (Tier 1: machine-draft it, or mark it invariant in INVARIANT_KEYS with a reason)`);
 }
 

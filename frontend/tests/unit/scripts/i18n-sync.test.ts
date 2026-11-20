@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { placeholders, richTags } from "../../../scripts/i18n-sync.mjs";
+import { catalogueProblems, placeholders, richTags } from "../../../scripts/i18n-sync.mjs";
 
 /*
  * scripts/i18n-sync.mjs (F2 Task 22): copies the keys a view task added to en into the five other catalogues as English text and
@@ -169,5 +169,30 @@ describe("i18n-sync helpers", () => {
   it("richTags keeps every tag with its multiplicity", () => {
     expect(richTags("<bdi>{a}</bdi> and <bdi>{b}</bdi>")).toEqual(["</bdi>", "</bdi>", "<bdi>", "<bdi>"]);
     expect(richTags("plain")).toEqual([]);
+  });
+});
+
+describe("the claims rule for a translated locale (Arabic, ADR 0083 amendment 2026-11-20)", () => {
+  const catalogues = (ar: string, ur: string) => ({
+    en: { judge: { scoreboard: { x: "Missed 12 hours on 3 days" } } },
+    ar: { judge: { scoreboard: { x: ar } } },
+    ur: { judge: { scoreboard: { x: ur } } },
+    hi: { judge: { scoreboard: { x: "Missed 12 hours on 3 days" } } },
+    bn: { judge: { scoreboard: { x: "Missed 12 hours on 3 days" } } },
+    ne: { judge: { scoreboard: { x: "Missed 12 hours on 3 days" } } },
+  });
+
+  it("lets Arabic differ from en on a claims key when every number is kept", () => {
+    expect(catalogueProblems(catalogues("فاتت 12 ساعة في 3 أيام", "Missed 12 hours on 3 days") as never)).toEqual([]);
+  });
+
+  it("fails an Arabic claims key that drops, changes or adds a number", () => {
+    for (const bad of ["فاتت ساعات في 3 أيام", "فاتت 13 ساعة في 3 أيام", "فاتت 12 ساعة في 3 أيام من 30"]) {
+      expect(catalogueProblems(catalogues(bad, "Missed 12 hours on 3 days") as never).join("|"), bad).toMatch(/ar: judge.scoreboard.x numbers/);
+    }
+  });
+
+  it("still holds the other four languages to en's text", () => {
+    expect(catalogueProblems(catalogues("فاتت 12 ساعة في 3 أيام", "فاتت 12 ساعة في 3 أيام") as never).join("|")).toMatch(/ur: judge.scoreboard.x is a claims-surface string/);
   });
 });

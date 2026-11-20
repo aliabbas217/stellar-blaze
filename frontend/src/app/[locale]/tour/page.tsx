@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { MachineTranslationNotice } from "@/components/shell/MachineTranslationNotice";
 import { FieldLink } from "@/components/shell/FieldLink";
 import { ACTION_PRIMARY_DENSE, ACTION_SECONDARY_DENSE } from "@/components/states/actions";
-import { CLAIMS_ENGLISH } from "@/i18n/claims-english";
+import { claimsAttrs } from "@/i18n/claims-english";
 import { DEMO_CONTROLS_HREF, TOUR_STEPS } from "@/features/judge/tour-steps";
 
 /*
@@ -23,6 +23,7 @@ export default async function TourPage() {
   const steps = await getTranslations("judge.tour.steps");
   const proof = await getTranslations("states.proof");
   const door = await getTranslations("judge.landing.door");
+  const claims = claimsAttrs(await getLocale());
 
   return (
     <main id="main-content" className="mx-auto flex w-full max-w-(--content-max) flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
@@ -41,7 +42,7 @@ export default async function TourPage() {
               {index + 1}
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-3">
-              <div {...CLAIMS_ENGLISH} className="flex flex-col gap-1">
+              <div {...claims} className="flex flex-col gap-1">
                 <h2 className="text-lg font-semibold text-ink">{steps(`${step.id}.title`)}</h2>
                 <p className="text-base text-ink-2">{steps(`${step.id}.text`)}</p>
               </div>
@@ -50,7 +51,7 @@ export default async function TourPage() {
                   {t("open")}
                 </FieldLink>
                 {step.proof === undefined ? null : (
-                  <FieldLink href={step.proof} {...CLAIMS_ENGLISH} data-where-from="" className="inline-flex min-h-(--target) items-center text-base text-ink-2 underline underline-offset-4 hover:text-ink">
+                  <FieldLink href={step.proof} {...claims} data-where-from="" className="inline-flex min-h-(--target) items-center text-base text-ink-2 underline underline-offset-4 hover:text-ink">
                     {proof("chip")}
                   </FieldLink>
                 )}

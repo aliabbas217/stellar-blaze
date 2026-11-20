@@ -1875,6 +1875,10 @@
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
         },
+        "day": {
+          "title": "One day, hour by hour",
+          "text": "One hot day, hour by hour: the forecast, what the station recorded, and what we would have said."
+        },
         "try": {
           "title": "Try a plan",
           "text": "Type a work roster and press Check this plan. The rule checker says which rules it breaks, and when."

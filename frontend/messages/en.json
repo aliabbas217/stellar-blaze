@@ -274,7 +274,7 @@
         "label": "Data source",
         "live": "Live",
         "replay": "Replay",
-        "liveUnavailable": "Live is not running on this deployment"
+        "liveUnavailable": "Live feeds are not connected in this demo"
       }
     },
     "field": {
@@ -1978,7 +1978,7 @@
       "title": "A 3-minute tour",
       "lead": "The stops, in this order. Each one opens the real screen.",
       "open": "Open this screen",
-      "controls": "To switch between Replay and Live, or to reset the demo site, use Demo controls on the safety view.",
+      "controls": "To reset the demo site, use Demo controls on the safety view. Live feeds are not connected in this demo, so every screen shows the recorded replay.",
       "controlsLink": "Open Demo controls",
       "steps": {
         "story": {
@@ -1992,6 +1992,10 @@
         "crew": {
           "title": "The crew lead's screen",
           "text": "Crews listed worst first. Press Stop work, then undo it."
+        },
+        "day": {
+          "title": "One day, hour by hour",
+          "text": "One hot day, hour by hour: the forecast, what the station recorded, and what we would have said."
         },
         "try": {
           "title": "Try a plan",

@@ -1,9 +1,9 @@
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useMemo } from "react";
 import { makeFormat } from "./adapters";
 import { frontierHeading, frontierStatement } from "./frontier-statement";
 import type { RosterFrontier } from "./roster-frontier";
-import { CLAIMS_LOCALE } from "@/i18n/claims-english";
+import { claimsLocale } from "@/i18n/claims-english";
 
 /**
  * The frontier section's heading and its one-line explanation. The heading is a sentence generated from the export at the
@@ -12,7 +12,7 @@ import { CLAIMS_LOCALE } from "@/i18n/claims-english";
  */
 export function FrontierHeading({ data, commute }: { readonly data: RosterFrontier; readonly commute: number }) {
   const t = useTranslations("judge.frontier");
-  const locale = CLAIMS_LOCALE;
+  const locale = claimsLocale(useLocale());
   const format = useMemo(() => makeFormat(locale), [locale]);
   const hours = useMemo(() => new Intl.NumberFormat(`${locale}-u-nu-latn`, { maximumFractionDigits: 2 }), [locale]);
   return (

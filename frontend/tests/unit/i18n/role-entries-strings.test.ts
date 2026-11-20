@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { TARGET_LOCALES, flatten, isClaimKey, manifestEntries, type Manifest } from "../../../scripts/i18n-sync.mjs";
+import { CLAIMS_TRANSLATED_LOCALES, TARGET_LOCALES, flatten, isClaimKey, manifestEntries, type Manifest } from "../../../scripts/i18n-sync.mjs";
 
 /*
  * Redesign S7: the strings of the role entries, the role badge, the safety view and the tour. Tier 1 (page chrome, the badge, the entries,
@@ -23,7 +23,7 @@ const tier2 = newKeys.filter((key) => key.startsWith(TIER_2_PREFIX));
 describe("the S7 strings", () => {
   it("exist: the badge, both entries, the safety view and the tour", () => {
     expect(tier1).toHaveLength(39);
-    expect(tier2).toHaveLength(12); // six tour stops, a title and a sentence each (Try a plan added, audit M4)
+    expect(tier2).toHaveLength(14); // seven tour stops, a title and a sentence each (Try a plan added, audit M4; One day added, S13)
     for (const key of ["shell.role.crew", "shell.role.officer", "shell.role.switch", "judge.roleEntry.demoAccess", "hse.privacy", "hse.boundary.body", "judge.tour.open"]) {
       expect(en.has(key), key).toBe(true);
     }
@@ -44,18 +44,22 @@ describe("the S7 strings", () => {
     }
   });
 
-  it("Tier 2: the tour's step sentences are English in every catalogue and under a claims prefix", () => {
+  it("Tier 2: the tour's step sentences are English in every catalogue whose claims are not translated, and under a claims prefix; Arabic has its own words", () => {
     for (const key of tier2) {
       expect(isClaimKey(key), key).toBe(true);
-      for (const locale of TARGET_LOCALES) expect(flatten(load(locale)).get(key), `${locale} ${key}`).toBe(en.get(key));
+      for (const locale of TARGET_LOCALES) {
+        const value = flatten(load(locale)).get(key);
+        if (CLAIMS_TRANSLATED_LOCALES.includes(locale)) expect(value, `${locale} ${key}`).not.toBe(en.get(key));
+        else expect(value, `${locale} ${key}`).toBe(en.get(key));
+      }
     }
   });
 
-  it("the manifest lists every Tier 1 key as machine-draft and every Tier 2 key as english-by-design, in each language", () => {
+  it("the manifest lists every Tier 1 key as machine-draft and every Tier 2 key as english-by-design (machine-draft in Arabic), in each language", () => {
     for (const locale of TARGET_LOCALES) {
       const status = new Map(entries.filter((entry) => entry.locale === locale).map((entry) => [entry.key, entry.status]));
       for (const key of tier1) expect(status.get(key), `${locale} ${key}`).toBe("machine-draft");
-      for (const key of tier2) expect(status.get(key), `${locale} ${key}`).toBe("english-by-design");
+      for (const key of tier2) expect(status.get(key), `${locale} ${key}`).toBe(CLAIMS_TRANSLATED_LOCALES.includes(locale) ? "machine-draft" : "english-by-design");
     }
   });
 
