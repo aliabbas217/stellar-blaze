@@ -1,14 +1,20 @@
 // @vitest-environment node
 import { inspect } from "node:util";
-import { delay, http, HttpResponse } from "msw";
 import { DELETE, GET, POST } from "@/app/api/v1/[...path]/route";
 import { STOP_TIMEOUT_MS } from "@/api/queries";
-import { server } from "@/mocks/node";
 
 /*
  * The BFF holds the safety routes (Stop work and its undo or resume) to UPSTREAM_TIMEOUT_MS and every other request to
- * UPSTREAM_READ_TIMEOUT_MS. Real timers and short limits here (safety 50 ms, read 300 ms): the upstream is an MSW handler that
- * answers after a delay, and the route's own AbortSignal.timeout cuts it, so the test sees what the browser would see.
+ * UPSTREAM_READ_TIMEOUT_MS. Real timers and short limits here (safety 50 ms, read 300 ms): the upstream is an in-process stub of
+ * `fetch` that answers after a delay and rejects with the signal's reason the moment the signal aborts (as undici's fetch does),
+ * and the route's own AbortSignal.timeout cuts it, so the test sees what the browser would see.
+ *
+ * Why a stub and not an MSW handler (as the other API tests use): MSW 3 intercepts at the socket, and a socket it has not claimed yet
+ * is passed through to the real network. Under CPU starvation (a loaded CI runner, or about 50 copies of this file running at once
+ * on a laptop) a connection to "upstream.test" was passed through, a real DNS lookup of that name followed, and the route answered 502
+ * with `cause: getaddrinfo ENOTFOUND upstream.test` after 5 to 19 ms, long before any limit of ours could expire. The host does not
+ * exist, so the lookup can only fail. A stub of `fetch` has no socket, no DNS and no network to starve, so what is left to fail
+ * is only what these tests are about: which signal the route gives fetch, and when it answers.
  */
 
 const UPSTREAM = "http://upstream.test";
@@ -22,16 +28,48 @@ function incoming(path: string, init: RequestInit = {}): Request {
   return new Request(`http://localhost:3000${path}`, init);
 }
 
+/** The upstream's routes for the current test: what `answersAfter` registered, looked up by the stub below. */
+let upstreams: { readonly method: string; readonly path: string; readonly answer: () => Promise<Response> }[] = [];
+
+/** Resolves with `answer()`'s response, or rejects with the signal's own reason the moment it aborts: fetch's contract, with no network. */
+function settle(answer: Promise<Response>, signal: AbortSignal | null | undefined): Promise<Response> {
+  if (signal == null) return answer;
+  return new Promise<Response>((resolve, reject) => {
+    const abort = (): void => {
+      reject(signal.reason as Error);
+    };
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener("abort", abort, { once: true });
+    answer.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", abort);
+    });
+  });
+}
+
+/** A request no route of the test answers is an error, never a call out (the same strictness `onUnhandledFrame: "error"` gives the MSW tests). */
+function stubbedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  const method = (init?.method ?? "GET").toUpperCase();
+  const route = url.origin === UPSTREAM ? upstreams.find((candidate) => candidate.method === method && candidate.path === url.pathname) : undefined;
+  if (route === undefined) return Promise.reject(new TypeError(`no stubbed upstream for ${method} ${url.href}`));
+  return settle(route.answer(), init?.signal);
+}
+
 function answersAfter(ms: number, method: "get" | "post" | "delete" | "head", path: string, status = 200) {
   const handler = vi.fn(async () => {
-    await delay(ms);
-    return status === 204 ? new HttpResponse(null, { status }) : HttpResponse.json({ ok: true }, { status });
+    await new Promise<void>((done) => setTimeout(done, ms));
+    return status === 204 ? new Response(null, { status }) : Response.json({ ok: true }, { status });
   });
-  server.use(http[method](`${UPSTREAM}${path}`, handler));
+  upstreams.push({ method: method.toUpperCase(), path, answer: handler });
   return handler;
 }
 
 beforeEach(() => {
+  upstreams = [];
+  vi.stubGlobal("fetch", stubbedFetch);
   vi.stubEnv("API_ORIGIN", UPSTREAM);
   vi.stubEnv("UPSTREAM_TIMEOUT_MS", String(SAFETY_MS));
   vi.stubEnv("UPSTREAM_READ_TIMEOUT_MS", String(READ_MS));
@@ -41,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("a safety route is cut at its own limit", () => {
@@ -149,7 +188,7 @@ describe("with neither variable set", () => {
   });
 });
 
-/** The `signal` of every call the route made to fetch (the real fetch still runs, so MSW still answers). */
+/** The `signal` of every call the route made to fetch (the stub still runs, so the upstream still answers). */
 function fetchSignals(): AbortSignal[] {
   const real = globalThis.fetch;
   const signals: AbortSignal[] = [];
@@ -222,8 +261,9 @@ describe("a client that goes away", () => {
     const waited = Math.round(performance.now() - started);
 
     expect(upstream).toHaveBeenCalledTimes(1);
-    // The one failure seen so far (a 502 on the DELETE case in 1 of about 14 CI runs) could not be told apart from the
-    // route's own 300 ms limit expiring on a starved runner or from a failed connection: say which it was, and how long it took.
+    // The route waited for the upstream's 80 ms answer: it did not answer early, so the 204 below is the upstream's, not a short circuit.
+    expect(waited).toBeGreaterThanOrEqual(60);
+    // A 502 here is either the route's own 300 ms limit expiring on a starved runner or a failed call: say which it was, and how long it took.
     expect(res.status, `answered ${String(res.status)} after ${String(waited)} ms (limit ${String(READ_MS)} ms, upstream 80 ms); the route logged: ${loggedErrors()}`).toBe(status);
     expect(signals).toHaveLength(1);
     expect(signals[0]?.aborted).toBe(false);
