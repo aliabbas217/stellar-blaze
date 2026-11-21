@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { LevelSign } from "@/components/level/LevelSign";
 import { levelIndex } from "@/components/level/level";
@@ -31,6 +32,7 @@ export function ProtectiveLead({
   updatedAt,
   ageMs,
   offline,
+  why,
 }: {
   readonly description: TodayDescription;
   readonly mode: components["schemas"]["SiteForecastToday"]["mode"];
@@ -39,6 +41,8 @@ export function ProtectiveLead({
   readonly ageMs: number | null;
   /** The phone has no connection (said in words under the heading). */
   readonly offline: boolean;
+  /** The "Why site rules?" control (a node, so the screen builds the proof once): drawn on the level's own row, inside the hero, above the dock. */
+  readonly why?: ReactNode;
 }) {
   const t = useTranslations("worker.today");
   const offlineWords = useTranslations("states.offlineBanner");
@@ -73,7 +77,7 @@ export function ProtectiveLead({
         ) : null}
       </div>
       <ActionLead lead={description.plan.lead} protective />
-      <LevelHeader description={description} mode={mode} />
+      <LevelHeader description={description} mode={mode} action={why} />
       {updatedAt === null || ageMs === null ? null : (
         <div className="flex flex-col gap-2 px-4">
           {lastKnownLevel === null ? null : (

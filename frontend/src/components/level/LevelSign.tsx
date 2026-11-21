@@ -25,6 +25,12 @@ export interface LevelSignProps {
    * height, so a sign with a stamp is exactly as tall as one without.
    */
   readonly stamp?: ReactNode;
+  /**
+   * A control that belongs to this level ("Why Orange?"), set at the end of the word's own row. The row already has the height of a 44 px
+   * target in the languages with the tallest lines, and in English it grows by about 9 px: the control costs the screen almost no height, which
+   * is the point (below the sign, on a 360 x 740 phone in Arabic, it fell under the fixed dock on first paint).
+   */
+  readonly action?: ReactNode;
 }
 
 // Full class names, never built by interpolation, so Tailwind's scanner finds them.
@@ -49,7 +55,7 @@ export { LEVEL_SIGN_HEIGHT };
  * are all present. There is no filled plate, no shadow and no hatch. A stale or fallback level shows a clock beside
  * the kicker, a dimmer word and a dashed marker, so it is never mistaken for a live one.
  */
-export function LevelSign({ level, kind, size, until, kicker, stamp }: LevelSignProps) {
+export function LevelSign({ level, kind, size, until, kicker, stamp, action }: LevelSignProps) {
   const t = useTranslations("levels");
   const live = kind === "live";
   const word = level === null ? t("siteRules") : t(`name.${level}`);
@@ -89,6 +95,11 @@ export function LevelSign({ level, kind, size, until, kicker, stamp }: LevelSign
         {size === "mini" && until !== undefined ? (
           <span className="text-base leading-(--sign-leading-text) text-ink-2">{until}</span>
         ) : null}
+        {action === undefined || action === null ? null : (
+          <div data-sign-action="" className="-me-3 ms-auto flex items-center self-center">
+            {action}
+          </div>
+        )}
       </div>
       <LevelScale level={level} kind={kind} labels={size === "hero"} />
     </div>

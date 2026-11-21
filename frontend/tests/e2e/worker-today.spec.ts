@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import ar from "../../messages/ar.json";
 import en from "../../messages/en.json";
 import ur from "../../messages/ur.json";
 import { SITE_DEMO } from "../../src/mocks/fixtures.ts";
@@ -18,13 +19,16 @@ const PHONE = { width: 390, height: 844 };
 const PIN = `?site=${SITE_DEMO}&crew=crew-b`;
 
 type Theme = "night" | "sun";
-type Locale = "en" | "ur";
+type Locale = "en" | "ur" | "ar";
+const MESSAGES = { en, ur, ar } as const;
 
 interface Opening {
   readonly locale?: Locale;
   readonly theme?: Theme;
   readonly scenario?: Scenario;
   readonly query?: string;
+  /** The viewport the page is FIRST laid out at (default PHONE): set before the page opens, so the first paint is measured, not a resize. */
+  readonly size?: { readonly width: number; readonly height: number };
 }
 
 /** Opens the settings sheet from the header's language pill and returns it. */
@@ -36,15 +40,15 @@ async function openSettings(page: Page) {
 }
 
 /** Opens Today as a phone: the scenario, the theme override (before paint) and the viewport set, the console watched. */
-async function openToday(page: Page, { locale = "en", theme = "sun", scenario, query = PIN }: Opening = {}): Promise<string[]> {
+async function openToday(page: Page, { locale = "en", theme = "sun", scenario, query = PIN, size = PHONE }: Opening = {}): Promise<string[]> {
   const errors = watchConsole(page);
-  await page.setViewportSize(PHONE);
+  await page.setViewportSize(size);
   await withScenario(page, scenario ?? null);
   await page.addInitScript((chosen) => {
     localStorage.setItem("sb-theme", JSON.stringify({ theme: chosen, until: Date.now() + 6 * 3_600_000 }));
   }, theme);
   await page.goto(`/${locale}/worker${query}`);
-  await expect(page.getByRole("heading", { level: 1, name: (locale === "en" ? en : ur).worker.today.title })).toBeAttached();
+  await expect(page.getByRole("heading", { level: 1, name: MESSAGES[locale].worker.today.title })).toBeAttached();
   return errors;
 }
 
@@ -150,6 +154,60 @@ test("the Today level is the site's, live, with the action and the one clinical 
     await expect(page.getByText(duty)).toHaveCount(0);
   }
 });
+
+/*
+ * S17: the control must be reachable on FIRST paint, not only after a scroll. 'Why Orange?' used to be the last row of the page: at 390 x 844
+ * its top was at y 749 and the fixed dock (I feel unwell, Today, Alerts) covered it, so a tap at its centre landed on the dock (Alerts or
+ * the unwell sheet). The test below does not scroll: it takes the page as it paints and asks the browser what is at the control's centre.
+ * (The test above asserts the same after a scroll and by keyboard, which the dock's published height and scroll-padding fix, ADR 0093.)
+ */
+const FIRST_PAINT_SIZES = [
+  { width: 360, height: 740 },
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+  { width: 1440, height: 900 },
+] as const;
+
+for (const locale of ["en", "ar"] as const) {
+  for (const size of FIRST_PAINT_SIZES) {
+    test(`the 'Why <level>?' control is the element at its own centre at scroll 0, above the dock, ${locale}, ${String(size.width)} x ${String(size.height)} (Today)`, async ({ page }) => {
+      await openToday(page, { locale, size });
+      await expect(page.locator('[data-level-sign][data-kind="live"]')).toHaveCount(1);
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
+      const why = page.getByRole("button", { name: locale === "en" ? /^Why .*\?$/ : /^لماذا / });
+      await expect(why).toHaveCount(1);
+      await expect(page.locator("html")).toHaveAttribute("dir", locale === "ar" ? "rtl" : "ltr");
+
+      const hit = await why.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        const top = document.elementFromPoint(centre.x, centre.y);
+        const dock = document.querySelector("[data-emergency]")?.closest(".fixed")?.getBoundingClientRect();
+        return {
+          scrollY: window.scrollY,
+          self: top !== null && element.contains(top),
+          what: top === null ? "nothing" : `${top.tagName.toLowerCase()} ${top.textContent.trim().slice(0, 30)}`,
+          inFold: centre.y > 0 && centre.y < window.innerHeight && centre.x > 0 && centre.x < window.innerWidth,
+          top: box.top,
+          bottom: box.bottom,
+          height: box.height,
+          dockTop: dock?.top ?? Number.POSITIVE_INFINITY,
+          inHero: element.closest("[data-hero]") !== null,
+          inLevelSign: element.closest("[data-level-sign]") !== null,
+        };
+      });
+      const label = `${locale} ${String(size.width)} x ${String(size.height)}`;
+      expect(hit.scrollY, `${label}: measured at scroll 0, without scrolling`).toBe(0);
+      expect(hit.inFold, `${label}: the control's centre is inside the first screen`).toBe(true);
+      expect(hit.self, `${label}: the element at the centre is the control (it was: ${hit.what})`).toBe(true);
+      expect(hit.bottom, `${label}: it ends above the dock (top ${String(hit.dockTop)})`).toBeLessThanOrEqual(hit.dockTop);
+      expect(hit.height, `${label}: a 44 px target`).toBeGreaterThanOrEqual(44);
+      expect(hit.inHero, `${label}: it is part of the hero, with the level it explains`).toBe(true);
+      expect(hit.inLevelSign, `${label}: it is on the level sign's own row`).toBe(true);
+    });
+  }
+}
 
 test("a control near the bottom ('Why Orange?') is the topmost element at its centre once scrolled to, never under the fixed dock, at phone and desktop sizes (Today)", async ({ page }) => {
   await openToday(page);

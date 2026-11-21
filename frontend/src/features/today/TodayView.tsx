@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { formatClock } from "@/components/spine/geometry";
 import { LEVEL_SIGN_HEIGHT } from "@/components/level/LevelSign";
+import { WORD_LINE } from "@/components/level/level-sign-height";
 import { Pictogram } from "@/components/level/Pictogram";
 import { ProofChip } from "@/components/provenance/ProofChip";
 import { proofFromForecast } from "@/components/provenance/proof";
@@ -38,10 +39,12 @@ import { useTodayModel, type TodayModel } from "@/features/today/useTodayModel";
 const CARD = "mx-4 flex flex-col gap-4 rounded-card bg-panel p-5";
 
 /**
- * The height of the level card before its data arrives (CLS): the padding, the two-line action sentence, the gap, the rule and the
- * level sign at its published height. A sentence of three lines (some languages) grows the card past this floor.
+ * The height of the level card before its data arrives (CLS): the padding, the two-line action sentence, the gap, the rule, the
+ * level sign at its published height, and what the "Why <level>?" control adds to the word's row (it is a 44 px target; the row is as tall
+ * as the word's line, so only the part of 44 px above that line, about 9 px in English and none in Arabic or Urdu). A sentence of three
+ * lines (some languages) grows the card past this floor.
  */
-const CARD_HEIGHT = `calc(var(--s-5) * 2 + max(2.75rem, var(--t-28) * var(--sign-leading-display) * 2) + var(--s-4) * 2 + 1.5px + ${LEVEL_SIGN_HEIGHT.hero})`;
+const CARD_HEIGHT = `calc(var(--s-5) * 2 + max(2.75rem, var(--t-28) * var(--sign-leading-display) * 2) + var(--s-4) * 2 + 1.5px + ${LEVEL_SIGN_HEIGHT.hero} + max(0px, var(--target) - ${WORD_LINE.hero}))`;
 
 /** The placeholder of the whole screen, at the final element heights (CLS), shown until the forecast arrives. */
 export function TodaySkeleton() {
@@ -75,6 +78,19 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
       ? null
       : proofFromForecast(forecast, levelName === null ? t("proofWhat.siteRules") : t("proofWhat.level", { level: levelName }), { synthetic });
 
+  // "Why <level>?" belongs to the level it explains, so it sits INSIDE the hero, on the level word's own row (the level card, or the protective
+  // lead). At the foot of the page it began at y 749 of 844 on a phone, under the fixed dock on first paint (ADR 0093 amendment, S17).
+  // No proof, no chip (ProofChip draws nothing), so the row is the word's alone.
+  const why =
+    proof === null ? undefined : (
+      <ProofChip
+        proof={proof}
+        variant="quiet"
+        label={levelName === null ? t("why.siteRules") : plainWhy(levelName)}
+        labelContent={levelName === null ? undefined : t.rich("why.level", { level: levelName, bdi: (chunks) => <bdi>{chunks}</bdi> })}
+      />
+    );
+
   return (
     <div className={`flex flex-col gap-4 pb-6 ${d.notLive ? "" : "pt-3"}`}>
       {d.notLive ? (
@@ -84,6 +100,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
           updatedAt={d.banner === null ? null : d.banner.updatedAt}
           ageMs={d.banner === null ? null : d.banner.ageMs}
           offline={d.banner?.kind === "offline"}
+          {...(why === undefined ? {} : { why })}
         />
       ) : null}
       {pinFailed ? (
@@ -105,7 +122,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
         <>
           {d.notLive ? null : (
             <div className={CARD}>
-              <LevelHeader description={d} mode={forecast.mode} className="" />
+              <LevelHeader description={d} mode={forecast.mode} className="" {...(why === undefined ? {} : { action: why })} />
             </div>
           )}
           <div className="px-4">
@@ -132,7 +149,7 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
               </p>
             )}
             <div className="border-t-[1.5px] border-hair pt-4">
-              <LevelHeader description={d} mode={forecast.mode} className="" />
+              <LevelHeader description={d} mode={forecast.mode} className="" {...(why === undefined ? {} : { action: why })} />
             </div>
           </div>
           <ShiftSpine description={d} />
@@ -159,21 +176,11 @@ function Ready({ model }: { readonly model: Extract<TodayModel, { status: "ready
       )}
 
       {/* The ONE clinical note of the screen (decision D5), covering the lead and the list. The label is the honest one and stays. */}
-      <div className="flex items-center justify-between gap-3 px-4">
-        {d.noShift ? null : (
-          <p data-clinical-note="" className="text-sm leading-(--sign-leading-text) text-ink-2">
-            {t("draftWording")}
-          </p>
-        )}
-        <div className="ms-auto">
-          <ProofChip
-            proof={proof}
-            variant="quiet"
-            label={levelName === null ? t("why.siteRules") : plainWhy(levelName)}
-            labelContent={levelName === null ? undefined : t.rich("why.level", { level: levelName, bdi: (chunks) => <bdi>{chunks}</bdi> })}
-          />
-        </div>
-      </div>
+      {d.noShift ? null : (
+        <p data-clinical-note="" className="px-4 text-sm leading-(--sign-leading-text) text-ink-2">
+          {t("draftWording")}
+        </p>
+      )}
 
       {pushOff && !d.noShift ? (
         <div data-warnings-off="" className="mx-4 flex items-center justify-between gap-3 rounded-card bg-panel py-3 ps-4 pe-3">

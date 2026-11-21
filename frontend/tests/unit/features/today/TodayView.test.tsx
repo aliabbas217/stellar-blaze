@@ -405,6 +405,42 @@ describe("Today: states", () => {
     expect(document.querySelector('[data-level-sign][data-kind="live"]')).not.toBeNull();
   });
 
+  it("S17: 'Why Orange?' is on the level word's own row, inside the hero and above the shift strip, and is the only one on the screen", async () => {
+    pin();
+    renderToday();
+    await orange();
+    // It used to be the last row of the page: at y 749 of 844 on a phone, under the fixed dock on first paint (ADR 0093 amendment).
+    const whys = await screen.findAllByRole("button", { name: /^Why / });
+    expect(whys).toHaveLength(1);
+    const why = whys[0] as HTMLElement;
+    expect(why).toHaveAccessibleName("Why Orange?");
+    const hero = document.querySelector("[data-hero]") as HTMLElement;
+    expect(hero.contains(why), "the control is inside the hero").toBe(true);
+    // It is part of the level sign, in the row of the word it explains (not a row of its own under the sign).
+    const sign = hero.querySelector("[data-level-sign]") as HTMLElement;
+    const row = (sign.querySelector("[data-level-word]") as HTMLElement).parentElement as HTMLElement;
+    expect(row.contains(why), "the word's row holds the control").toBe(true);
+    // The level card (a panel) holds the sign and the control; the shift strip is outside it and after it.
+    const strip = hero.querySelector("[data-spine]") as HTMLElement;
+    const card = sign.closest(".bg-panel") as HTMLElement;
+    expect(card.contains(why)).toBe(true);
+    expect(card.contains(strip)).toBe(false);
+    expect(why.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING, "before the shift strip").toBeTruthy();
+  });
+
+  it("S17: in a protective plan the 'Why site rules?' control is inside the protective lead, not at the foot of the page", async () => {
+    server.use(
+      http.get("*/api/v1/sites/:site_id/forecast/today", ({ params }) =>
+        HttpResponse.json(forecastToday(String(params["site_id"]), { status: "fallback" })),
+      ),
+    );
+    pin();
+    renderToday();
+    const why = await screen.findByRole("button", { name: "Why site rules?" });
+    expect(screen.getAllByRole("button", { name: /^Why / })).toHaveLength(1);
+    expect((document.querySelector("[data-protective-lead]") as HTMLElement).contains(why)).toBe(true);
+  });
+
   it("the shift is ONE horizontal strip: only Now is on it, the rest of the day is one plain line under it, and the card and the strip are the hero", async () => {
     pin();
     renderToday();
