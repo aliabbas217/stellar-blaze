@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ViewTransition } from "react";
+import { ViewTransition, type ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { LevelSign } from "@/components/level/LevelSign";
 import { ModeStamp } from "@/components/provenance/ModeStamp";
@@ -21,11 +21,14 @@ export function LevelHeader({
   description,
   mode,
   className = "px-4",
+  action,
 }: {
   readonly description: TodayDescription;
   /** The API's own mode for this forecast: a replayed day carries the Replay stamp on the sign's kicker line (review focus 6). */
   readonly mode: components["schemas"]["SiteForecastToday"]["mode"];
   readonly className?: string;
+  /** The control of this level ("Why Orange?"), set on the word's row (LevelSign `action`): inside the hero, never at the foot of the page. */
+  readonly action?: ReactNode;
 }) {
   const t = useTranslations("worker.today");
   const time = useTimeFormat();
@@ -40,6 +43,7 @@ export function LevelHeader({
           size="hero"
           kicker={t(`kicker.${kicker}`)}
           stamp={<ModeStamp mode={mode} />}
+          {...(action === undefined ? {} : { action })}
           {...(untilAt === null ? {} : { until: t.rich("until", { time: time(untilAt), bdi: (chunks) => <bdi>{chunks}</bdi> }) })}
         />
         {personalHigher ? <p className="text-lg font-medium text-ink">{t("personalHigher")}</p> : null}
